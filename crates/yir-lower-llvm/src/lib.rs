@@ -124,7 +124,10 @@ fn parse_loop_control_expr_for_llvm(
             parse_loop_control_expr_for_llvm(args, start + 1, node_name, instruction_name)?;
         let (rhs, after_rhs) =
             parse_loop_control_expr_for_llvm(args, after_lhs, node_name, instruction_name)?;
-        Ok((LoopControlExpr::And(Box::new(lhs), Box::new(rhs)), after_rhs))
+        Ok((
+            LoopControlExpr::And(Box::new(lhs), Box::new(rhs)),
+            after_rhs,
+        ))
     } else if token == "or" {
         let (lhs, after_lhs) =
             parse_loop_control_expr_for_llvm(args, start + 1, node_name, instruction_name)?;
@@ -2907,10 +2910,52 @@ fn emit_cpu_function(
                 };
                 let cmp_kind = node.op.args[3].as_str();
                 let step_kind = node.op.args[4].as_str();
+                let carry_payload_len = |kind: &str| -> usize {
+                    if kind.ends_with("_plus_invariant")
+                        && kind.starts_with("mul_")
+                        && !matches!(
+                            kind,
+                            "mul_current_plus_invariant"
+                                | "mul_prev_current_plus_invariant"
+                                | "mul_invariant"
+                                | "mul_source_plus_invariant"
+                        )
+                    {
+                        1
+                    } else if kind.starts_with("mul_")
+                        && kind.contains("_plus_")
+                        && !matches!(
+                            kind,
+                            "mul_current"
+                                | "mul_prev_current"
+                                | "mul_read_value_fixed"
+                                | "mul_read_at_fixed"
+                                | "mul_read_at_dynamic_current"
+                                | "mul_read_at_dynamic_prev_current"
+                        )
+                    {
+                        usize::from(kind.ends_with("_plus_invariant"))
+                    } else if matches!(
+                        kind,
+                        "mul_current_plus_invariant"
+                            | "mul_prev_current_plus_invariant"
+                            | "mul_invariant"
+                            | "mul_source_plus_invariant"
+                    ) {
+                        1
+                    } else {
+                        0
+                    }
+                };
                 let mut carry_initial_values = Vec::new();
-                let mut carry_kinds = Vec::new();
-                for chunk in node.op.args[5..].chunks(2) {
-                    let carry_initial_value = registers.get(&chunk[0]).cloned();
+                let mut carry_specs_raw = Vec::new();
+                let mut cursor = 5usize;
+                while cursor < node.op.args.len() {
+                    let carry_initial_name = &node.op.args[cursor];
+                    let carry_kind = &node.op.args[cursor + 1];
+                    let payload_len = carry_payload_len(carry_kind);
+                    let payload_names = &node.op.args[cursor + 2..cursor + 2 + payload_len];
+                    let carry_initial_value = registers.get(carry_initial_name).cloned();
                     let Some(carry_initial_value) = carry_initial_value else {
                         body.push(format!(
                             "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more carry initials are outside the current CPU LLVM slice",
@@ -2918,8 +2963,25 @@ fn emit_cpu_function(
                         ));
                         continue;
                     };
+                    let mut payload_values = Vec::new();
+                    let mut missing_payload = false;
+                    for payload_name in payload_names {
+                        let Some(payload_value) = registers.get(payload_name).cloned() else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more carry payloads are outside the current CPU LLVM slice",
+                                node.name,
+                            ));
+                            missing_payload = true;
+                            break;
+                        };
+                        payload_values.push(payload_value);
+                    }
+                    if missing_payload {
+                        continue;
+                    }
                     carry_initial_values.push(carry_initial_value);
-                    carry_kinds.push(chunk[1].clone());
+                    carry_specs_raw.push((carry_kind.clone(), payload_values));
+                    cursor += 2 + payload_len;
                 }
                 let Some(loop_scalar_kind) = infer_loop_scalar_kind(
                     [&initial_value, &limit_value, &step_value]
@@ -2977,6 +3039,26 @@ fn emit_cpu_function(
                         continue;
                     };
                     carry_initials.push(carry_initial);
+                }
+                let mut carry_specs = Vec::new();
+                for (carry_kind, payload_values) in &carry_specs_raw {
+                    let mut payloads = Vec::new();
+                    for payload_value in payload_values {
+                        let Some(payload) = coerce_to_loop_scalar(
+                            payload_value,
+                            loop_scalar_kind,
+                            &mut body,
+                            &mut next_reg,
+                        ) else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more carry payloads are not coercible to the selected loop scalar kind",
+                                node.name,
+                            ));
+                            continue;
+                        };
+                        payloads.push(payload);
+                    }
+                    carry_specs.push((carry_kind.clone(), payloads));
                 }
                 let scalar_ty = loop_scalar_llvm_type(loop_scalar_kind);
                 let current_slot = fresh_reg(&mut next_reg);
@@ -3043,7 +3125,7 @@ fn emit_cpu_function(
                     current_carries.push(carry_before);
                 }
                 let mut next_carries = Vec::new();
-                for (index, carry_kind) in carry_kinds.iter().enumerate() {
+                for (index, (carry_kind, payloads)) in carry_specs.iter().enumerate() {
                     let (source, op) = if carry_kind == "add_current" {
                         (next_current.clone(), "add")
                     } else if carry_kind == "add_prev_current" {
@@ -3116,6 +3198,104 @@ fn emit_cpu_function(
                             })?,
                             "mul",
                         )
+                    } else if carry_kind.starts_with("mul_") {
+                        let (terms_part, has_invariant) =
+                            if let Some(terms_part) = carry_kind.strip_prefix("mul_") {
+                                if let Some(terms_part) = terms_part.strip_suffix("_plus_invariant")
+                                {
+                                    (terms_part, true)
+                                } else {
+                                    (terms_part, false)
+                                }
+                            } else {
+                                unreachable!()
+                            };
+                        let resolve_term = |term: &str| -> Result<String, String> {
+                            match term {
+                                "current" => Ok(next_current.clone()),
+                                "prev_current" => Ok(current.clone()),
+                                other if other.starts_with("prev_carry") => {
+                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    current_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                other if other.starts_with("carry") => {
+                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    next_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                _ => Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )),
+                            }
+                        };
+                        let mut terms = terms_part.split("_plus_");
+                        let first = terms.next().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let mut source = resolve_term(first)?;
+                        for term in terms {
+                            let rhs = resolve_term(term)?;
+                            source = emit_loop_numeric_op(
+                                &mut body,
+                                &mut next_reg,
+                                loop_scalar_kind,
+                                "add",
+                                &source,
+                                &rhs,
+                            )
+                            .map_err(|error| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                        }
+                        if has_invariant {
+                            let payload = payloads.first().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            source = emit_loop_numeric_op(
+                                &mut body,
+                                &mut next_reg,
+                                loop_scalar_kind,
+                                "add",
+                                &source,
+                                payload,
+                            )
+                            .map_err(|error| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                        }
+                        (source, "mul")
                     } else {
                         return Err(format!(
                             "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
@@ -3234,10 +3414,30 @@ fn emit_cpu_function(
                     continue;
                 };
                 let cmp_kind = node.op.args[3].as_str();
+                let carry_payload_len = |kind: &str| -> usize {
+                    if kind.starts_with("mul_") && kind.contains("_plus_") {
+                        usize::from(kind.ends_with("_plus_invariant"))
+                    } else if matches!(
+                        kind,
+                        "mul_current_plus_invariant"
+                            | "mul_prev_current_plus_invariant"
+                            | "mul_invariant"
+                            | "mul_source_plus_invariant"
+                    ) {
+                        1
+                    } else {
+                        0
+                    }
+                };
                 let mut carry_initials = Vec::new();
-                let mut carry_kinds = Vec::new();
-                for chunk in node.op.args[4..].chunks(2) {
-                    let carry_initial_value = registers.get(&chunk[0]).cloned();
+                let mut carry_specs = Vec::new();
+                let mut cursor = 4usize;
+                while cursor < node.op.args.len() {
+                    let carry_initial_name = &node.op.args[cursor];
+                    let carry_kind = &node.op.args[cursor + 1];
+                    let payload_len = carry_payload_len(carry_kind);
+                    let payload_names = &node.op.args[cursor + 2..cursor + 2 + payload_len];
+                    let carry_initial_value = registers.get(carry_initial_name).cloned();
                     let Some(carry_initial_value) = carry_initial_value else {
                         body.push(format!(
                             "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more carry initials are outside the current CPU LLVM slice",
@@ -3254,8 +3454,35 @@ fn emit_cpu_function(
                         ));
                         continue;
                     };
+                    let mut payloads = Vec::new();
+                    let mut missing_payload = false;
+                    for payload_name in payload_names {
+                        let Some(payload_value) = registers.get(payload_name).cloned() else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more carry payloads are outside the current CPU LLVM slice",
+                                node.name,
+                            ));
+                            missing_payload = true;
+                            break;
+                        };
+                        let Some(payload) =
+                            coerce_to_i64(&payload_value, &mut body, &mut next_reg)
+                        else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more carry payloads are not coercible to i64",
+                                node.name,
+                            ));
+                            missing_payload = true;
+                            break;
+                        };
+                        payloads.push(payload);
+                    }
+                    if missing_payload {
+                        continue;
+                    }
                     carry_initials.push(carry_initial);
-                    carry_kinds.push(chunk[1].clone());
+                    carry_specs.push((carry_kind.clone(), payloads));
+                    cursor += 2 + payload_len;
                 }
                 let current_slot = fresh_reg(&mut next_reg);
                 body.push(format!("  {current_slot} = alloca i64"));
@@ -3307,7 +3534,7 @@ fn emit_cpu_function(
                     current_carries.push(carry_before);
                 }
                 let mut next_carries = Vec::new();
-                for (index, carry_kind) in carry_kinds.iter().enumerate() {
+                for (index, (carry_kind, payloads)) in carry_specs.iter().enumerate() {
                     let (source, op) = if carry_kind == "add_current" {
                         (next_current.clone(), "add")
                     } else if carry_kind == "add_prev_current" {
@@ -3380,6 +3607,82 @@ fn emit_cpu_function(
                             })?,
                             "mul",
                         )
+                    } else if carry_kind.starts_with("mul_") {
+                        let (terms_part, has_invariant) =
+                            if let Some(terms_part) = carry_kind.strip_prefix("mul_") {
+                                if let Some(terms_part) = terms_part.strip_suffix("_plus_invariant")
+                                {
+                                    (terms_part, true)
+                                } else {
+                                    (terms_part, false)
+                                }
+                            } else {
+                                unreachable!()
+                            };
+                        let resolve_term = |term: &str| -> Result<String, String> {
+                            match term {
+                                "current" => Ok(next_current.clone()),
+                                "prev_current" => Ok(current.clone()),
+                                other if other.starts_with("prev_carry") => {
+                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    current_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                other if other.starts_with("carry") => {
+                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    next_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                _ => Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )),
+                            }
+                        };
+                        let mut terms = terms_part.split("_plus_");
+                        let first = terms.next().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let mut source = resolve_term(first)?;
+                        for term in terms {
+                            let rhs = resolve_term(term)?;
+                            let reg = fresh_reg(&mut next_reg);
+                            body.push(format!("  {reg} = add i64 {source}, {rhs}"));
+                            source = reg;
+                        }
+                        if has_invariant {
+                            let payload = payloads.first().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            let reg = fresh_reg(&mut next_reg);
+                            body.push(format!("  {reg} = add i64 {source}, {payload}"));
+                            source = reg;
+                        }
+                        (source, "mul")
                     } else {
                         return Err(format!(
                             "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
@@ -6308,12 +6611,8 @@ fn emit_cpu_function(
                 }
                 let initial_value = registers.get(&node.op.args[0]).cloned();
                 let limit_value = registers.get(&node.op.args[1]).cloned();
-                let (flow_expr, carry_start_index) = parse_loop_flow_expr_for_llvm(
-                    &node.op.args,
-                    4,
-                    &node.name,
-                    loop_instruction,
-                )?;
+                let (flow_expr, carry_start_index) =
+                    parse_loop_flow_expr_for_llvm(&node.op.args, 4, &node.name, loop_instruction)?;
                 let callee = &node.op.args[2];
                 let Some(signature) = helper_signatures.get(callee) else {
                     body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because helper signature `{}` is unavailable", node.name, callee));
@@ -6348,11 +6647,262 @@ fn emit_cpu_function(
                 ) else {
                     continue;
                 };
+                let carry_source_payload_len = |kind: &str| -> Option<usize> {
+                    let carry_state_fragment_is_valid = |fragment: &str| -> bool {
+                        match fragment {
+                            "current" | "prev_current" => true,
+                            other => {
+                                other
+                                    .strip_prefix("prev_carry")
+                                    .or_else(|| other.strip_prefix("carry"))
+                                    .is_some_and(|index| index.parse::<usize>().is_ok())
+                            }
+                        }
+                    };
+                        let add_state_list_payload_len = |kind: &str| -> Option<usize> {
+                            let (terms_part, payload_len) =
+                            if let Some(prefix) = kind.strip_prefix("add_scaled_by_") {
+                                if let Some((lhs_group, rest)) =
+                                    prefix.split_once("_times_factor_group_")
+                                {
+                                    let parse_group = |group: &str| -> Option<bool> {
+                                        if let Some(group) = group.strip_suffix("_plus_factor_invariant") {
+                                            let terms = group.split("_plus_").collect::<Vec<_>>();
+                                            if terms.is_empty()
+                                                || !terms
+                                                    .iter()
+                                                    .all(|term| carry_state_fragment_is_valid(term))
+                                            {
+                                                return None;
+                                            }
+                                            Some(true)
+                                        } else {
+                                            let terms = group.split("_plus_").collect::<Vec<_>>();
+                                            if terms.is_empty()
+                                                || !terms
+                                                    .iter()
+                                                    .all(|term| carry_state_fragment_is_valid(term))
+                                            {
+                                                return None;
+                                            }
+                                            Some(false)
+                                        }
+                                    };
+                                    let lhs_offset = parse_group(lhs_group)?;
+                                    if let Some((rhs_group, rest)) =
+                                        rest.split_once("_times_factor_invariant_times_terms_")
+                                    {
+                                        let rhs_offset = parse_group(rhs_group)?;
+                                        if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                                            (rest, usize::from(lhs_offset) + usize::from(rhs_offset) + 2usize)
+                                        } else {
+                                            (rest, usize::from(lhs_offset) + usize::from(rhs_offset) + 1usize)
+                                        }
+                                    } else {
+                                        let (rhs_group, rest) = rest.split_once("_times_terms_")?;
+                                        let rhs_offset = parse_group(rhs_group)?;
+                                        if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                                            (rest, usize::from(lhs_offset) + usize::from(rhs_offset) + 1usize)
+                                        } else {
+                                            (rest, usize::from(lhs_offset) + usize::from(rhs_offset))
+                                        }
+                                    }
+                                } else if let Some((factor_terms, rest)) =
+                                    prefix.split_once(
+                                        "_plus_factor_invariant_times_factor_invariant_times_",
+                                    )
+                                {
+                                    let factor_terms = factor_terms.split("_plus_").collect::<Vec<_>>();
+                                    if factor_terms.is_empty()
+                                        || !factor_terms
+                                            .iter()
+                                            .all(|term| carry_state_fragment_is_valid(term))
+                                    {
+                                        return None;
+                                    }
+                                    if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                                        (rest, 3usize)
+                                    } else {
+                                        (rest, 2usize)
+                                    }
+                                } else if let Some((factor_terms, rest)) =
+                                    prefix.split_once("_times_factor_invariant_times_")
+                                {
+                                    let factor_terms = factor_terms.split("_plus_").collect::<Vec<_>>();
+                                    if factor_terms.len() < 2
+                                        || !factor_terms
+                                            .iter()
+                                            .all(|term| carry_state_fragment_is_valid(term))
+                                    {
+                                        return None;
+                                    }
+                                    if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                                        (rest, 2usize)
+                                    } else {
+                                        (rest, 1usize)
+                                    }
+                                } else if let Some((factor_terms, rest)) =
+                                    prefix.split_once("_plus_factor_invariant_times_")
+                                {
+                                    let factor_terms = factor_terms.split("_plus_").collect::<Vec<_>>();
+                                    if factor_terms.is_empty()
+                                        || !factor_terms
+                                            .iter()
+                                            .all(|term| carry_state_fragment_is_valid(term))
+                                    {
+                                        return None;
+                                    }
+                                    if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                                        (rest, 2usize)
+                                    } else {
+                                        (rest, 1usize)
+                                    }
+                                } else if let Some((factor_terms, rest)) = prefix.split_once("_times_")
+                                {
+                                    let factor_terms = factor_terms.split("_plus_").collect::<Vec<_>>();
+                                    if factor_terms.len() < 2
+                                        || !factor_terms
+                                            .iter()
+                                            .all(|term| carry_state_fragment_is_valid(term))
+                                    {
+                                        return None;
+                                    }
+                                    if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                                        (rest, 1usize)
+                                    } else {
+                                        (rest, 0usize)
+                                    }
+                                } else if let Some((factor, rest)) =
+                                    prefix.split_once("_plus_factor_invariant_")
+                                {
+                                    if !carry_state_fragment_is_valid(factor) {
+                                        return None;
+                                    }
+                                    if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                                        (rest, 2usize)
+                                    } else {
+                                        (rest, 1usize)
+                                    }
+                                } else if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                    let (_, rest) = prefix.split_once('_')?;
+                                    (rest, 1usize)
+                                } else {
+                                    let (_, rest) = prefix.split_once('_')?;
+                                    (rest, 0usize)
+                                }
+                            } else if let Some(prefix) = kind.strip_prefix("add_scaled_") {
+                                if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                    (prefix, 2usize)
+                                } else {
+                                    (prefix, 1usize)
+                                }
+                            } else if let Some(prefix) = kind.strip_prefix("add_") {
+                                if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                    (prefix, 1usize)
+                                } else {
+                                    (prefix, 0usize)
+                                }
+                            } else if let Some(prefix) = kind.strip_prefix("mul_") {
+                                if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                    (prefix, 1usize)
+                                } else {
+                                    (prefix, 0usize)
+                                }
+                            } else {
+                                return None;
+                            };
+                        let terms = terms_part.split("_plus_").collect::<Vec<_>>();
+                        if terms.len() < 2 {
+                            return None;
+                        }
+                        if terms.iter().all(|term| carry_state_fragment_is_valid(term)) {
+                            Some(payload_len)
+                        } else {
+                            None
+                        }
+                    };
+                    let zero_payload_indexed_prefixes =
+                        ["add_prev_carry", "mul_prev_carry", "add_carry", "mul_carry"];
+                    let one_payload_zero_payload_indexed_prefixes =
+                        ["add_prev_carry", "add_carry", "mul_prev_carry", "mul_carry"];
+                    let one_payload_indexed_prefixes = [
+                        "add_read_at_dynamic_prev_carry",
+                        "mul_read_at_dynamic_prev_carry",
+                        "add_read_at_dynamic_carry",
+                        "mul_read_at_dynamic_carry",
+                    ];
+                    if matches!(
+                        kind,
+                        "keep"
+                            | "keep_prev_carry"
+                            | "add_current"
+                            | "add_prev_current"
+                            | "mul_current"
+                            | "mul_prev_current"
+                    ) || zero_payload_indexed_prefixes.iter().any(|prefix| {
+                        kind.strip_prefix(prefix)
+                            .is_some_and(|index| index.parse::<usize>().is_ok())
+                    }) {
+                        Some(0)
+                    } else if one_payload_indexed_prefixes.iter().any(|prefix| {
+                        kind.strip_prefix(prefix)
+                            .is_some_and(|index| index.parse::<usize>().is_ok())
+                    }) {
+                        Some(1)
+                    } else if one_payload_zero_payload_indexed_prefixes.iter().any(|prefix| {
+                        kind.strip_prefix(prefix).is_some_and(|suffix| {
+                            suffix
+                                .strip_suffix("_plus_invariant")
+                                .is_some_and(|index| index.parse::<usize>().is_ok())
+                        })
+                    }) {
+                        Some(1)
+                    } else if let Some(payload_len) = add_state_list_payload_len(kind) {
+                        Some(payload_len)
+                    } else if matches!(
+                        kind,
+                        "add_read_value_fixed"
+                            | "mul_read_value_fixed"
+                            | "add_invariant"
+                            | "add_current_plus_invariant"
+                            | "add_prev_current_plus_invariant"
+                            | "mul_invariant"
+                            | "mul_current_plus_invariant"
+                            | "mul_prev_current_plus_invariant"
+                    ) {
+                        Some(1)
+                    } else if matches!(kind, "add_read_at_fixed" | "mul_read_at_fixed") {
+                        Some(2)
+                    } else if matches!(
+                        kind,
+                        "add_read_at_dynamic_current"
+                            | "add_read_at_dynamic_prev_current"
+                            | "mul_read_at_dynamic_current"
+                            | "mul_read_at_dynamic_prev_current"
+                            | "add_source_plus_invariant"
+                            | "mul_source_plus_invariant"
+                    ) {
+                        Some(1)
+                    } else {
+                        None
+                    }
+                };
                 let mut carry_initials = Vec::new();
-                let mut carry_specs = Vec::new();
+                let mut carry_specs = Vec::<(String, Option<String>, Vec<String>, Vec<String>)>::new();
                 let mut deferred = false;
-                for chunk in node.op.args[carry_start_index..].chunks(5) {
-                    let Some(iv) = registers.get(&chunk[0]).cloned() else {
+                let mut cursor = carry_start_index;
+                while cursor < node.op.args.len() {
+                    let chunk0 = node.op.args.get(cursor);
+                    let chunk1 = node.op.args.get(cursor + 1);
+                    let chunk2 = node.op.args.get(cursor + 2);
+                    let Some(initial_name) = chunk0 else { break; };
+                    let Some(cond_kind_name) = chunk1 else {
+                        return Err(format!("cpu.{loop_instruction} `{}` has truncated carry spec during LLVM lowering", node.name));
+                    };
+                    let Some(cond_rhs_name) = chunk2 else {
+                        return Err(format!("cpu.{loop_instruction} `{}` has truncated carry spec during LLVM lowering", node.name));
+                    };
+                    let Some(iv) = registers.get(initial_name).cloned() else {
                         body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more carry initials are outside the current CPU LLVM slice", node.name));
                         deferred = true;
                         break;
@@ -6362,10 +6912,10 @@ fn emit_cpu_function(
                         deferred = true;
                         break;
                     };
-                    let cond_rhs = if chunk[1] == "always" {
+                    let cond_rhs = if cond_kind_name == "always" {
                         None
                     } else {
-                        let Some(v) = registers.get(&chunk[2]).cloned() else {
+                        let Some(v) = registers.get(cond_rhs_name).cloned() else {
                             body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more condition rhs values are outside the current CPU LLVM slice", node.name));
                             deferred = true;
                             break;
@@ -6377,13 +6927,32 @@ fn emit_cpu_function(
                         };
                         Some(rhs)
                     };
+                    let then_start = cursor + 3;
+                    let Some(then_kind) = node.op.args.get(then_start).cloned() else {
+                        return Err(format!("cpu.{loop_instruction} `{}` has truncated then carry source during LLVM lowering", node.name));
+                    };
+                    let Some(then_payload_len) = carry_source_payload_len(&then_kind) else {
+                        return Err(format!("cpu.{loop_instruction} `{}` has unsupported carry kind `{then_kind}` during LLVM lowering", node.name));
+                    };
+                    let then_end = then_start + 1 + then_payload_len;
+                    if then_end > node.op.args.len() {
+                        return Err(format!("cpu.{loop_instruction} `{}` is missing payload for carry kind `{then_kind}` during LLVM lowering", node.name));
+                    }
+                    let then_source = node.op.args[then_start..then_end].to_vec();
+                    let Some(else_kind) = node.op.args.get(then_end).cloned() else {
+                        return Err(format!("cpu.{loop_instruction} `{}` has truncated else carry source during LLVM lowering", node.name));
+                    };
+                    let Some(else_payload_len) = carry_source_payload_len(&else_kind) else {
+                        return Err(format!("cpu.{loop_instruction} `{}` has unsupported carry kind `{else_kind}` during LLVM lowering", node.name));
+                    };
+                    let else_end = then_end + 1 + else_payload_len;
+                    if else_end > node.op.args.len() {
+                        return Err(format!("cpu.{loop_instruction} `{}` is missing payload for carry kind `{else_kind}` during LLVM lowering", node.name));
+                    }
+                    let else_source = node.op.args[then_end..else_end].to_vec();
                     carry_initials.push(init);
-                    carry_specs.push((
-                        chunk[1].clone(),
-                        cond_rhs,
-                        chunk[3].clone(),
-                        chunk[4].clone(),
-                    ));
+                    carry_specs.push((cond_kind_name.clone(), cond_rhs, then_source, else_source));
+                    cursor = else_end;
                 }
                 if deferred {
                     continue;
@@ -6426,29 +6995,488 @@ fn emit_cpu_function(
                     body.push(format!("  {r} = load i64, ptr {slot}"));
                     current_carries.push(r);
                 }
+                fn resolve_state_term_for_async_post_flow(
+                    term: &str,
+                    current: &str,
+                    next_current: &str,
+                    current_carries: &[String],
+                    next_carries: &[String],
+                    node_name: &str,
+                    loop_instruction: &str,
+                ) -> Result<String, String> {
+                    match term {
+                        "current" => Ok(next_current.to_owned()),
+                        "prev_current" => Ok(current.to_owned()),
+                        other if other.starts_with("prev_carry") => {
+                            let i = other[10..].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{node_name}` has unsupported carry term `{other}` during LLVM lowering"))?;
+                            current_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` references unavailable carry term `{other}` during LLVM lowering"))
+                        }
+                        other if other.starts_with("carry") => {
+                            let i = other[5..].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{node_name}` has unsupported carry term `{other}` during LLVM lowering"))?;
+                            next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` references unavailable carry term `{other}` during LLVM lowering"))
+                        }
+                        other => Err(format!("cpu.{loop_instruction} `{node_name}` has unsupported carry term `{other}` during LLVM lowering")),
+                    }
+                }
+                fn resolve_source_for_async_post_flow(
+                    source_spec: &[String],
+                    current: &str,
+                    next_current: &str,
+                    current_carries: &[String],
+                    next_carries: &[String],
+                    body: &mut Vec<String>,
+                    next_reg: &mut usize,
+                    node_name: &str,
+                    loop_instruction: &str,
+                ) -> Result<String, String> {
+                    let Some(kind) = source_spec.first() else {
+                        return Err(format!("cpu.{loop_instruction} `{node_name}` has empty carry source during LLVM lowering"));
+                    };
+                    if matches!(kind.as_str(), "keep" | "keep_prev_carry") {
+                        return Ok(String::new());
+                    }
+                    if kind == "add_current" {
+                        return Ok(next_current.to_owned());
+                    }
+                    if let Some(rest) = kind.strip_prefix("add_carry") {
+                        let i = rest.parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{node_name}` has unsupported carry kind `{kind}` during LLVM lowering"))?;
+                        return next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` references unavailable carry source `{kind}` during LLVM lowering"));
+                    }
+                    let parse_factor_group =
+                        |group: &str| -> Option<(Vec<String>, bool)> {
+                            if let Some(group) = group.strip_suffix("_plus_factor_invariant") {
+                                let terms = group
+                                    .split("_plus_")
+                                    .map(str::to_owned)
+                                    .collect::<Vec<_>>();
+                                if terms.is_empty()
+                                    || !terms.iter().all(|term| {
+                                        matches!(term.as_str(), "current" | "prev_current")
+                                            || term.starts_with("prev_carry")
+                                            || term.starts_with("carry")
+                                    })
+                                {
+                                    return None;
+                                }
+                                Some((terms, true))
+                            } else {
+                                let terms = group
+                                    .split("_plus_")
+                                    .map(str::to_owned)
+                                    .collect::<Vec<_>>();
+                                if terms.is_empty()
+                                    || !terms.iter().all(|term| {
+                                        matches!(term.as_str(), "current" | "prev_current")
+                                            || term.starts_with("prev_carry")
+                                            || term.starts_with("carry")
+                                    })
+                                {
+                                    return None;
+                                }
+                                Some((terms, false))
+                            }
+                        };
+                    if let Some(prefix) = kind.strip_prefix("add_scaled_by_") {
+                        if let Some((lhs_group, rest)) = prefix.split_once("_times_factor_group_") {
+                            let (lhs_terms, lhs_has_offset) = parse_factor_group(lhs_group)
+                                .ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` has unsupported factor group in `{kind}` during LLVM lowering"))?;
+                            let (rhs_group, terms_part, has_factor_scale) =
+                                if let Some((rhs_group, terms_part)) =
+                                    rest.split_once("_times_factor_invariant_times_terms_")
+                                {
+                                    (rhs_group, terms_part, true)
+                                } else if let Some((rhs_group, terms_part)) =
+                                    rest.split_once("_times_terms_")
+                                {
+                                    (rhs_group, terms_part, false)
+                                } else {
+                                    return Err(format!(
+                                        "cpu.{loop_instruction} `{node_name}` has malformed factor-group carry kind `{kind}` during LLVM lowering"
+                                    ));
+                                };
+                            let (rhs_terms, rhs_has_offset) = parse_factor_group(rhs_group)
+                                .ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` has unsupported factor group in `{kind}` during LLVM lowering"))?;
+                            let (terms_part, has_invariant) =
+                                if let Some(terms_part) = terms_part.strip_suffix("_plus_invariant")
+                                {
+                                    (terms_part, true)
+                                } else {
+                                    (terms_part, false)
+                                };
+                            let terms = terms_part
+                                .split("_plus_")
+                                .map(str::to_owned)
+                                .collect::<Vec<_>>();
+                            let mut payload_index = 1usize;
+                            let resolve_group = |group_terms: &[String],
+                                                 has_offset: bool,
+                                                 payload_index: &mut usize,
+                                                 body: &mut Vec<String>,
+                                                 next_reg: &mut usize|
+                             -> Result<String, String> {
+                                let mut acc = resolve_state_term_for_async_post_flow(
+                                    &group_terms[0],
+                                    current,
+                                    next_current,
+                                    current_carries,
+                                    next_carries,
+                                    node_name,
+                                    loop_instruction,
+                                )?;
+                                for term in group_terms.iter().skip(1) {
+                                    let rhs = resolve_state_term_for_async_post_flow(
+                                        term,
+                                        current,
+                                        next_current,
+                                        current_carries,
+                                        next_carries,
+                                        node_name,
+                                        loop_instruction,
+                                    )?;
+                                    let sum = fresh_reg(next_reg);
+                                    body.push(format!("  {sum} = add i64 {acc}, {rhs}"));
+                                    acc = sum;
+                                }
+                                if has_offset {
+                                    let offset_name = source_spec.get(*payload_index).ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` is missing factor-group offset payload for `{kind}` during LLVM lowering"))?;
+                                    *payload_index += 1;
+                                    let sum = fresh_reg(next_reg);
+                                    body.push(format!("  {sum} = add i64 {acc}, {offset_name}"));
+                                    acc = sum;
+                                }
+                                Ok(acc)
+                            };
+                            let lhs = resolve_group(
+                                &lhs_terms,
+                                lhs_has_offset,
+                                &mut payload_index,
+                                body,
+                                next_reg,
+                            )?;
+                            let rhs = resolve_group(
+                                &rhs_terms,
+                                rhs_has_offset,
+                                &mut payload_index,
+                                body,
+                                next_reg,
+                            )?;
+                            let mut factor = fresh_reg(next_reg);
+                            body.push(format!("  {factor} = mul i64 {lhs}, {rhs}"));
+                            if has_factor_scale {
+                                let factor_scale_name = source_spec.get(payload_index).ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` is missing factor-scale payload for `{kind}` during LLVM lowering"))?;
+                                payload_index += 1;
+                                let scaled_factor = fresh_reg(next_reg);
+                                body.push(format!("  {scaled_factor} = mul i64 {factor}, {factor_scale_name}"));
+                                factor = scaled_factor;
+                            }
+                            let mut acc = resolve_state_term_for_async_post_flow(
+                                &terms[0],
+                                current,
+                                next_current,
+                                current_carries,
+                                next_carries,
+                                node_name,
+                                loop_instruction,
+                            )?;
+                            for term in terms.iter().skip(1) {
+                                let rhs = resolve_state_term_for_async_post_flow(
+                                    term,
+                                    current,
+                                    next_current,
+                                    current_carries,
+                                    next_carries,
+                                    node_name,
+                                    loop_instruction,
+                                )?;
+                                let sum = fresh_reg(next_reg);
+                                body.push(format!("  {sum} = add i64 {acc}, {rhs}"));
+                                acc = sum;
+                            }
+                            if has_invariant {
+                                let offset_name = source_spec.get(payload_index).ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` is missing invariant payload for `{kind}` during LLVM lowering"))?;
+                                let sum = fresh_reg(next_reg);
+                                body.push(format!("  {sum} = add i64 {acc}, {offset_name}"));
+                                acc = sum;
+                            }
+                            let scaled = fresh_reg(next_reg);
+                            body.push(format!("  {scaled} = mul i64 {acc}, {factor}"));
+                            return Ok(scaled);
+                        }
+                    }
+                    let parse_add_terms = |kind: &str| -> Option<(
+                        Option<Vec<String>>,
+                        bool,
+                        bool,
+                        bool,
+                        Vec<String>,
+                        bool,
+                    )> {
+                        let carry_state_fragment_is_valid = |fragment: &str| -> bool {
+                            matches!(fragment, "current" | "prev_current")
+                                || fragment.starts_with("prev_carry")
+                                || fragment.starts_with("carry")
+                        };
+                        let (
+                            factor_term,
+                            scaled_by_payload,
+                            factor_invariant_payload,
+                            factor_scale_payload,
+                            terms_part,
+                            has_invariant,
+                        ) = if let Some(prefix) = kind.strip_prefix("add_scaled_by_") {
+                            let (prefix, has_invariant) =
+                                if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                    (prefix, true)
+                                } else {
+                                    (prefix, false)
+                                };
+                            if let Some((factor_terms, terms_part)) = prefix.split_once(
+                                "_plus_factor_invariant_times_factor_invariant_times_",
+                            ) {
+                                (
+                                    Some(
+                                        factor_terms
+                                            .split("_plus_")
+                                            .map(str::to_owned)
+                                            .collect::<Vec<_>>(),
+                                    ),
+                                    false,
+                                    true,
+                                    true,
+                                    terms_part,
+                                    has_invariant,
+                                )
+                            } else if let Some((factor_terms, terms_part)) =
+                                prefix.split_once("_times_factor_invariant_times_")
+                            {
+                                (
+                                    Some(
+                                        factor_terms
+                                            .split("_plus_")
+                                            .map(str::to_owned)
+                                            .collect::<Vec<_>>(),
+                                    ),
+                                    false,
+                                    false,
+                                    true,
+                                    terms_part,
+                                    has_invariant,
+                                )
+                            } else if let Some((factor_terms, terms_part)) =
+                                prefix.split_once("_plus_factor_invariant_times_")
+                            {
+                                (
+                                    Some(
+                                        factor_terms
+                                            .split("_plus_")
+                                            .map(str::to_owned)
+                                            .collect::<Vec<_>>(),
+                                    ),
+                                    false,
+                                    true,
+                                    false,
+                                    terms_part,
+                                    has_invariant,
+                                )
+                            } else if let Some((factor_terms, terms_part)) =
+                                prefix.split_once("_times_")
+                            {
+                                (
+                                    Some(
+                                        factor_terms
+                                            .split("_plus_")
+                                            .map(str::to_owned)
+                                            .collect::<Vec<_>>(),
+                                    ),
+                                    false,
+                                    false,
+                                    false,
+                                    terms_part,
+                                    has_invariant,
+                                )
+                            } else {
+                                let (factor_term, factor_invariant_payload, terms_part) =
+                                    if let Some((factor_term, terms_part)) =
+                                        prefix.split_once("_plus_factor_invariant_")
+                                    {
+                                        (
+                                            Some(vec![factor_term.to_owned()]),
+                                            true,
+                                            terms_part,
+                                        )
+                                    } else {
+                                        let (factor_term, terms_part) = prefix.split_once('_')?;
+                                        (Some(vec![factor_term.to_owned()]), false, terms_part)
+                                    };
+                                (
+                                    factor_term,
+                                    false,
+                                    factor_invariant_payload,
+                                    false,
+                                    terms_part,
+                                    has_invariant,
+                                )
+                            }
+                        } else if let Some(prefix) = kind.strip_prefix("add_scaled_") {
+                            if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                (None, true, false, false, prefix, true)
+                            } else {
+                                (None, true, false, false, prefix, false)
+                            }
+                        } else if let Some(prefix) = kind.strip_prefix("add_") {
+                            if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                (None, false, false, false, prefix, true)
+                            } else {
+                                (None, false, false, false, prefix, false)
+                            }
+                        } else {
+                            return None;
+                        };
+                        let terms = terms_part
+                            .split("_plus_")
+                            .map(|term| term.to_owned())
+                            .collect::<Vec<_>>();
+                        if terms.iter().all(|term| matches!(term.as_str(), "current" | "prev_current") || term.starts_with("prev_carry") || term.starts_with("carry")) {
+                            if let Some(factor_terms) = factor_term.as_ref() {
+                                if factor_terms.is_empty()
+                                    || !factor_terms
+                                        .iter()
+                                        .all(|term| carry_state_fragment_is_valid(term))
+                                {
+                                    return None;
+                                }
+                            }
+                            Some((
+                                factor_term,
+                                scaled_by_payload,
+                                factor_invariant_payload,
+                                factor_scale_payload,
+                                terms,
+                                has_invariant,
+                            ))
+                        } else {
+                            None
+                        }
+                    };
+                    if let Some((
+                        factor_term,
+                        scaled_by_payload,
+                        factor_invariant_payload,
+                        factor_scale_payload,
+                        terms,
+                        has_invariant,
+                    )) =
+                        parse_add_terms(kind)
+                    {
+                        let mut payload_index = 1usize;
+                        let factor = if let Some(factor_terms) = factor_term {
+                            let mut factor = resolve_state_term_for_async_post_flow(
+                                &factor_terms[0],
+                                current,
+                                next_current,
+                                current_carries,
+                                next_carries,
+                                node_name,
+                                loop_instruction,
+                            )?;
+                            for factor_term in factor_terms.iter().skip(1) {
+                                let rhs = resolve_state_term_for_async_post_flow(
+                                    factor_term,
+                                    current,
+                                    next_current,
+                                    current_carries,
+                                    next_carries,
+                                    node_name,
+                                    loop_instruction,
+                                )?;
+                                let sum = fresh_reg(next_reg);
+                                body.push(format!("  {sum} = add i64 {factor}, {rhs}"));
+                                factor = sum;
+                            }
+                            if factor_scale_payload {
+                                let factor_scale_name = source_spec.get(payload_index).ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` is missing factor scale payload for `{kind}` during LLVM lowering"))?;
+                                payload_index += 1;
+                                let scaled = fresh_reg(next_reg);
+                                body.push(format!("  {scaled} = mul i64 {factor}, {factor_scale_name}"));
+                                factor = scaled;
+                            }
+                            if factor_invariant_payload {
+                                let factor_offset_name = source_spec.get(payload_index).ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` is missing factor invariant payload for `{kind}` during LLVM lowering"))?;
+                                payload_index += 1;
+                                let sum = fresh_reg(next_reg);
+                                body.push(format!("  {sum} = add i64 {factor}, {factor_offset_name}"));
+                                factor = sum;
+                            }
+                            Some(factor)
+                        } else if scaled_by_payload {
+                            let factor_name = source_spec.get(payload_index).ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` is missing scaled carry factor for `{kind}` during LLVM lowering"))?;
+                            payload_index += 1;
+                            Some(factor_name.clone())
+                        } else {
+                            None
+                        };
+                        let mut acc = resolve_state_term_for_async_post_flow(
+                            &terms[0],
+                            current,
+                            next_current,
+                            current_carries,
+                            next_carries,
+                            node_name,
+                            loop_instruction,
+                        )?;
+                        for term in terms.iter().skip(1) {
+                            let rhs = resolve_state_term_for_async_post_flow(
+                                term,
+                                current,
+                                next_current,
+                                current_carries,
+                                next_carries,
+                                node_name,
+                                loop_instruction,
+                            )?;
+                            let sum = fresh_reg(next_reg);
+                            body.push(format!("  {sum} = add i64 {acc}, {rhs}"));
+                            acc = sum;
+                        }
+                        if factor.is_some() && has_invariant {
+                            let offset_name = source_spec.get(payload_index).ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` is missing invariant payload for `{kind}` during LLVM lowering"))?;
+                            payload_index += 1;
+                            let sum = fresh_reg(next_reg);
+                            body.push(format!("  {sum} = add i64 {acc}, {offset_name}"));
+                            acc = sum;
+                        }
+                        if let Some(factor) = factor {
+                            let scaled_reg = fresh_reg(next_reg);
+                            body.push(format!("  {scaled_reg} = mul i64 {acc}, {factor}"));
+                            acc = scaled_reg;
+                        } else if has_invariant {
+                            let offset_name = source_spec.get(payload_index).ok_or_else(|| format!("cpu.{loop_instruction} `{node_name}` is missing invariant payload for `{kind}` during LLVM lowering"))?;
+                            let sum = fresh_reg(next_reg);
+                            body.push(format!("  {sum} = add i64 {acc}, {offset_name}"));
+                            acc = sum;
+                        }
+                        return Ok(acc);
+                    }
+                    Err(format!("cpu.{loop_instruction} `{node_name}` has unsupported carry kind `{kind}` during LLVM lowering"))
+                }
                 let mut next_carries = Vec::new();
-                for (index, (cond_kind, cond_rhs, then_kind, else_kind)) in
+                for (index, (cond_kind, cond_rhs, then_source_spec, else_source_spec)) in
                     carry_specs.iter().enumerate()
                 {
-                    let resolve = |kind: &str,
-                                   next_carries: &Vec<String>|
-                     -> Result<String, String> {
-                        if matches!(kind, "keep" | "keep_prev_carry") {
-                            return Ok(String::new());
-                        }
-                        if kind == "add_current" {
-                            return Ok(next_current.clone());
-                        }
-                        if let Some(rest) = kind.strip_prefix("add_carry") {
-                            let i=rest.parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported carry kind `{kind}` during LLVM lowering", node.name))?;
-                            return next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable carry source `{kind}` during LLVM lowering", node.name));
-                        }
-                        Err(format!("cpu.{loop_instruction} `{}` has unsupported carry kind `{kind}` during LLVM lowering", node.name))
-                    };
-                    let then_value = if matches!(then_kind.as_str(), "keep" | "keep_prev_carry") {
+                    let then_value = if matches!(then_source_spec[0].as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
-                        let src = resolve(then_kind, &next_carries)?;
+                        let src = resolve_source_for_async_post_flow(
+                            then_source_spec,
+                            &current,
+                            &next_current,
+                            &current_carries,
+                            &next_carries,
+                            &mut body,
+                            &mut next_reg,
+                            &node.name,
+                            loop_instruction,
+                        )?;
                         let r = fresh_reg(&mut next_reg);
                         body.push(format!(
                             "  {r} = add i64 {}, {}",
@@ -6456,10 +7484,20 @@ fn emit_cpu_function(
                         ));
                         r
                     };
-                    let else_value = if matches!(else_kind.as_str(), "keep" | "keep_prev_carry") {
+                    let else_value = if matches!(else_source_spec[0].as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
-                        let src = resolve(else_kind, &next_carries)?;
+                        let src = resolve_source_for_async_post_flow(
+                            else_source_spec,
+                            &current,
+                            &next_current,
+                            &current_carries,
+                            &next_carries,
+                            &mut body,
+                            &mut next_reg,
+                            &node.name,
+                            loop_instruction,
+                        )?;
                         let r = fresh_reg(&mut next_reg);
                         body.push(format!(
                             "  {r} = add i64 {}, {}",
@@ -6518,8 +7556,7 @@ fn emit_cpu_function(
                         &mut next_reg,
                         &node.name,
                     )?;
-                    let action_block =
-                        fresh_block(&mut next_block, "loop_async_post_flow_action");
+                    let action_block = fresh_block(&mut next_block, "loop_async_post_flow_action");
                     body.push(format!(
                         "  br i1 {control_cond}, label %{action_block}, label %{no_match_block}"
                     ));
@@ -6585,12 +7622,8 @@ fn emit_cpu_function(
                 let initial_value = registers.get(&node.op.args[0]).cloned();
                 let limit_value = registers.get(&node.op.args[1]).cloned();
                 let step_value = registers.get(&node.op.args[2]).cloned();
-                let (flow_expr, carry_start_index) = parse_loop_flow_expr_for_llvm(
-                    &node.op.args,
-                    5,
-                    &node.name,
-                    loop_instruction,
-                )?;
+                let (flow_expr, carry_start_index) =
+                    parse_loop_flow_expr_for_llvm(&node.op.args, 5, &node.name, loop_instruction)?;
                 let (Some(initial_value), Some(limit_value), Some(step_value)) =
                     (initial_value, limit_value, step_value)
                 else {
@@ -6984,86 +8017,86 @@ fn emit_cpu_function(
                             other => Err(format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name)),
                         }
                     };
-                let eval_control_expr =
-                    |expr: &ResolvedLoopControlExpr,
-                     next_current: &String,
-                     next_carries: &Vec<String>,
-                     body: &mut Vec<String>,
-                     next_reg: &mut usize|
-                     -> Result<String, String> {
-                        fn eval(
-                            expr: &ResolvedLoopControlExpr,
-                            next_current: &String,
-                            next_carries: &Vec<String>,
-                            body: &mut Vec<String>,
-                            next_reg: &mut usize,
-                            resolve_control_operand: &impl Fn(
-                                &str,
-                                &String,
-                                &Vec<String>,
-                            ) -> Result<(String, &'static str), String>,
-                        ) -> Result<String, String> {
-                            match expr {
-                                ResolvedLoopControlExpr::Cond { kind, rhs } => {
-                                    let (lhs, pred) =
-                                        resolve_control_operand(kind, next_current, next_carries)?;
-                                    let reg = fresh_reg(next_reg);
-                                    body.push(format!("  {reg} = icmp {pred} i64 {lhs}, {rhs}"));
-                                    Ok(reg)
-                                }
-                                ResolvedLoopControlExpr::And(lhs, rhs) => {
-                                    let lhs_reg = eval(
-                                        lhs,
-                                        next_current,
-                                        next_carries,
-                                        body,
-                                        next_reg,
-                                        resolve_control_operand,
-                                    )?;
-                                    let rhs_reg = eval(
-                                        rhs,
-                                        next_current,
-                                        next_carries,
-                                        body,
-                                        next_reg,
-                                        resolve_control_operand,
-                                    )?;
-                                    let reg = fresh_reg(next_reg);
-                                    body.push(format!("  {reg} = and i1 {lhs_reg}, {rhs_reg}"));
-                                    Ok(reg)
-                                }
-                                ResolvedLoopControlExpr::Or(lhs, rhs) => {
-                                    let lhs_reg = eval(
-                                        lhs,
-                                        next_current,
-                                        next_carries,
-                                        body,
-                                        next_reg,
-                                        resolve_control_operand,
-                                    )?;
-                                    let rhs_reg = eval(
-                                        rhs,
-                                        next_current,
-                                        next_carries,
-                                        body,
-                                        next_reg,
-                                        resolve_control_operand,
-                                    )?;
-                                    let reg = fresh_reg(next_reg);
-                                    body.push(format!("  {reg} = or i1 {lhs_reg}, {rhs_reg}"));
-                                    Ok(reg)
-                                }
+                let eval_control_expr = |expr: &ResolvedLoopControlExpr,
+                                         next_current: &String,
+                                         next_carries: &Vec<String>,
+                                         body: &mut Vec<String>,
+                                         next_reg: &mut usize|
+                 -> Result<String, String> {
+                    fn eval(
+                        expr: &ResolvedLoopControlExpr,
+                        next_current: &String,
+                        next_carries: &Vec<String>,
+                        body: &mut Vec<String>,
+                        next_reg: &mut usize,
+                        resolve_control_operand: &impl Fn(
+                            &str,
+                            &String,
+                            &Vec<String>,
+                        )
+                            -> Result<(String, &'static str), String>,
+                    ) -> Result<String, String> {
+                        match expr {
+                            ResolvedLoopControlExpr::Cond { kind, rhs } => {
+                                let (lhs, pred) =
+                                    resolve_control_operand(kind, next_current, next_carries)?;
+                                let reg = fresh_reg(next_reg);
+                                body.push(format!("  {reg} = icmp {pred} i64 {lhs}, {rhs}"));
+                                Ok(reg)
+                            }
+                            ResolvedLoopControlExpr::And(lhs, rhs) => {
+                                let lhs_reg = eval(
+                                    lhs,
+                                    next_current,
+                                    next_carries,
+                                    body,
+                                    next_reg,
+                                    resolve_control_operand,
+                                )?;
+                                let rhs_reg = eval(
+                                    rhs,
+                                    next_current,
+                                    next_carries,
+                                    body,
+                                    next_reg,
+                                    resolve_control_operand,
+                                )?;
+                                let reg = fresh_reg(next_reg);
+                                body.push(format!("  {reg} = and i1 {lhs_reg}, {rhs_reg}"));
+                                Ok(reg)
+                            }
+                            ResolvedLoopControlExpr::Or(lhs, rhs) => {
+                                let lhs_reg = eval(
+                                    lhs,
+                                    next_current,
+                                    next_carries,
+                                    body,
+                                    next_reg,
+                                    resolve_control_operand,
+                                )?;
+                                let rhs_reg = eval(
+                                    rhs,
+                                    next_current,
+                                    next_carries,
+                                    body,
+                                    next_reg,
+                                    resolve_control_operand,
+                                )?;
+                                let reg = fresh_reg(next_reg);
+                                body.push(format!("  {reg} = or i1 {lhs_reg}, {rhs_reg}"));
+                                Ok(reg)
                             }
                         }
-                        eval(
-                            expr,
-                            next_current,
-                            next_carries,
-                            body,
-                            next_reg,
-                            &resolve_control_operand,
-                        )
-                    };
+                    }
+                    eval(
+                        expr,
+                        next_current,
+                        next_carries,
+                        body,
+                        next_reg,
+                        &resolve_control_operand,
+                    )
+                };
                 let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
                 collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
                 let mut no_match_block = loop_continue.clone();
@@ -7443,89 +8476,86 @@ fn emit_cpu_function(
                             )),
                         }
                     };
-                let eval_control_expr =
-                    |expr: &ResolvedLoopControlExpr,
-                     next_current: &String,
-                     current_carries: &Vec<String>,
-                     body: &mut Vec<String>,
-                     next_reg: &mut usize|
-                     -> Result<String, String> {
-                        fn eval(
-                            expr: &ResolvedLoopControlExpr,
-                            next_current: &String,
-                            current_carries: &Vec<String>,
-                            body: &mut Vec<String>,
-                            next_reg: &mut usize,
-                            resolve_control_operand: &impl Fn(
-                                &str,
-                                &String,
-                                &Vec<String>,
-                            ) -> Result<(String, &'static str), String>,
-                        ) -> Result<String, String> {
-                            match expr {
-                                ResolvedLoopControlExpr::Cond { kind, rhs } => {
-                                    let (lhs, pred) = resolve_control_operand(
-                                        kind,
-                                        next_current,
-                                        current_carries,
-                                    )?;
-                                    let reg = fresh_reg(next_reg);
-                                    body.push(format!("  {reg} = icmp {pred} i64 {lhs}, {rhs}"));
-                                    Ok(reg)
-                                }
-                                ResolvedLoopControlExpr::And(lhs, rhs) => {
-                                    let lhs_reg = eval(
-                                        lhs,
-                                        next_current,
-                                        current_carries,
-                                        body,
-                                        next_reg,
-                                        resolve_control_operand,
-                                    )?;
-                                    let rhs_reg = eval(
-                                        rhs,
-                                        next_current,
-                                        current_carries,
-                                        body,
-                                        next_reg,
-                                        resolve_control_operand,
-                                    )?;
-                                    let reg = fresh_reg(next_reg);
-                                    body.push(format!("  {reg} = and i1 {lhs_reg}, {rhs_reg}"));
-                                    Ok(reg)
-                                }
-                                ResolvedLoopControlExpr::Or(lhs, rhs) => {
-                                    let lhs_reg = eval(
-                                        lhs,
-                                        next_current,
-                                        current_carries,
-                                        body,
-                                        next_reg,
-                                        resolve_control_operand,
-                                    )?;
-                                    let rhs_reg = eval(
-                                        rhs,
-                                        next_current,
-                                        current_carries,
-                                        body,
-                                        next_reg,
-                                        resolve_control_operand,
-                                    )?;
-                                    let reg = fresh_reg(next_reg);
-                                    body.push(format!("  {reg} = or i1 {lhs_reg}, {rhs_reg}"));
-                                    Ok(reg)
-                                }
+                let eval_control_expr = |expr: &ResolvedLoopControlExpr,
+                                         next_current: &String,
+                                         current_carries: &Vec<String>,
+                                         body: &mut Vec<String>,
+                                         next_reg: &mut usize|
+                 -> Result<String, String> {
+                    fn eval(
+                        expr: &ResolvedLoopControlExpr,
+                        next_current: &String,
+                        current_carries: &Vec<String>,
+                        body: &mut Vec<String>,
+                        next_reg: &mut usize,
+                        resolve_control_operand: &impl Fn(
+                            &str,
+                            &String,
+                            &Vec<String>,
+                        )
+                            -> Result<(String, &'static str), String>,
+                    ) -> Result<String, String> {
+                        match expr {
+                            ResolvedLoopControlExpr::Cond { kind, rhs } => {
+                                let (lhs, pred) =
+                                    resolve_control_operand(kind, next_current, current_carries)?;
+                                let reg = fresh_reg(next_reg);
+                                body.push(format!("  {reg} = icmp {pred} i64 {lhs}, {rhs}"));
+                                Ok(reg)
+                            }
+                            ResolvedLoopControlExpr::And(lhs, rhs) => {
+                                let lhs_reg = eval(
+                                    lhs,
+                                    next_current,
+                                    current_carries,
+                                    body,
+                                    next_reg,
+                                    resolve_control_operand,
+                                )?;
+                                let rhs_reg = eval(
+                                    rhs,
+                                    next_current,
+                                    current_carries,
+                                    body,
+                                    next_reg,
+                                    resolve_control_operand,
+                                )?;
+                                let reg = fresh_reg(next_reg);
+                                body.push(format!("  {reg} = and i1 {lhs_reg}, {rhs_reg}"));
+                                Ok(reg)
+                            }
+                            ResolvedLoopControlExpr::Or(lhs, rhs) => {
+                                let lhs_reg = eval(
+                                    lhs,
+                                    next_current,
+                                    current_carries,
+                                    body,
+                                    next_reg,
+                                    resolve_control_operand,
+                                )?;
+                                let rhs_reg = eval(
+                                    rhs,
+                                    next_current,
+                                    current_carries,
+                                    body,
+                                    next_reg,
+                                    resolve_control_operand,
+                                )?;
+                                let reg = fresh_reg(next_reg);
+                                body.push(format!("  {reg} = or i1 {lhs_reg}, {rhs_reg}"));
+                                Ok(reg)
                             }
                         }
-                        eval(
-                            expr,
-                            next_current,
-                            current_carries,
-                            body,
-                            next_reg,
-                            &resolve_control_operand,
-                        )
-                    };
+                    }
+                    eval(
+                        expr,
+                        next_current,
+                        current_carries,
+                        body,
+                        next_reg,
+                        &resolve_control_operand,
+                    )
+                };
                 let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
                 collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
                 let mut no_match_block = loop_update.clone();

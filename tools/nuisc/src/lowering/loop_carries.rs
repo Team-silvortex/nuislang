@@ -286,6 +286,80 @@ fn expr_is_loop_invariant(
     !expr_contains_loop_variant_name(expr, binding_name, carries)
 }
 
+#[derive(Clone)]
+struct ParsedAdditiveCarrySource {
+    terms: Vec<PreparedLoopStateRef>,
+    offset: Option<NirExpr>,
+}
+
+fn combine_invariant_additive_terms(terms: Vec<NirExpr>) -> Option<NirExpr> {
+    let mut iter = terms.into_iter();
+    let first = iter.next()?;
+    Some(iter.fold(first, |lhs, rhs| NirExpr::Binary {
+        op: NirBinaryOp::Add,
+        lhs: Box::new(lhs),
+        rhs: Box::new(rhs),
+    }))
+}
+
+fn parse_additive_carry_source(
+    expr: &NirExpr,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+) -> Option<PreparedCarrySource> {
+    fn parse_inner(
+        expr: &NirExpr,
+        binding_name: &str,
+        carries: &[PreparedCarryUpdate],
+    ) -> Option<ParsedAdditiveCarrySource> {
+        if let Some(state_ref) = parse_prepared_loop_state_ref_expr(expr, binding_name, carries) {
+            return Some(ParsedAdditiveCarrySource {
+                terms: vec![state_ref],
+                offset: None,
+            });
+        }
+        if is_terminal_branch_pure_expr(expr, &BTreeSet::new())
+            && expr_is_loop_invariant(expr, binding_name, carries)
+        {
+            return Some(ParsedAdditiveCarrySource {
+                terms: Vec::new(),
+                offset: Some(expr.clone()),
+            });
+        }
+        match expr {
+            NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs,
+                rhs,
+            } => {
+                let lhs = parse_inner(lhs, binding_name, carries)?;
+                let rhs = parse_inner(rhs, binding_name, carries)?;
+                let mut terms = lhs.terms;
+                terms.extend(rhs.terms);
+                let offset = combine_invariant_additive_terms(
+                    lhs.offset.into_iter().chain(rhs.offset).collect::<Vec<_>>(),
+                );
+                Some(ParsedAdditiveCarrySource { terms, offset })
+            }
+            _ => None,
+        }
+    }
+
+    let parsed = parse_inner(expr, binding_name, carries)?;
+    match (parsed.terms.len(), parsed.offset) {
+        (0, Some(invariant)) => Some(PreparedCarrySource::InvariantExpr(invariant)),
+        (1, Some(invariant)) => Some(PreparedCarrySource::AddInvariant {
+            base: Box::new(loop_state_ref_into_carry_source(parsed.terms[0])),
+            offset: invariant,
+        }),
+        (count, offset) if count >= 2 => Some(PreparedCarrySource::AddStateList {
+            terms: parsed.terms,
+            offset,
+        }),
+        _ => None,
+    }
+}
+
 fn parse_loop_variant_source_name(
     rhs_name: &str,
     binding_name: &str,
@@ -363,11 +437,9 @@ pub(super) fn parse_prepared_dynamic_read_carry_source(
     let candidate = parse_prepared_readable_carry_source_candidate(rhs, binding_name, carries)?;
     match candidate {
         PreparedReadableCarrySourceCandidate::DynamicIndexAt { buffer, index } => {
-            let index_source = loop_state_ref_into_carry_source(parse_prepared_loop_state_ref_expr(
-                &index,
-                binding_name,
-                carries,
-            )?);
+            let index_source = loop_state_ref_into_carry_source(
+                parse_prepared_loop_state_ref_expr(&index, binding_name, carries)?,
+            );
             Some(PreparedCarrySource::DynamicReadAt {
                 buffer,
                 index_source: Box::new(index_source),
@@ -445,6 +517,194 @@ pub(super) fn encode_loop_carry_source_args(
     bindings: &mut BTreeMap<String, String>,
 ) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
     let kind = render_loop_carry_kind(op, source);
+    if let Some(expr) = source.invariant_expr() {
+        let expr_name = lower_expr(expr, state, bindings)?;
+        return Ok((
+            vec![kind, expr_name.clone()],
+            vec![expr_name.clone()],
+            vec![expr_name],
+        ));
+    }
+    if let Some((_, offset)) = source.add_state_list() {
+        if let Some(offset) = offset {
+            let offset_name = lower_expr(offset, state, bindings)?;
+            return Ok((
+                vec![kind, offset_name.clone()],
+                vec![offset_name.clone()],
+                vec![offset_name],
+            ));
+        }
+        return Ok((vec![kind], vec![], vec![]));
+    }
+    if let Some((_, factor, offset)) = source.scaled_state_list() {
+        let factor_name = lower_expr(factor, state, bindings)?;
+        let mut args = vec![kind, factor_name.clone()];
+        let mut dep_inputs = vec![factor_name.clone()];
+        let mut effect_inputs = vec![factor_name];
+        if let Some(offset) = offset {
+            let offset_name = lower_expr(offset, state, bindings)?;
+            args.push(offset_name.clone());
+            dep_inputs.push(offset_name.clone());
+            effect_inputs.push(offset_name);
+        }
+        return Ok((args, dep_inputs, effect_inputs));
+    }
+    if let Some((_, _, offset)) = source.scaled_state_list_by_state() {
+        if let Some(offset) = offset {
+            let offset_name = lower_expr(offset, state, bindings)?;
+            return Ok((
+                vec![kind, offset_name.clone()],
+                vec![offset_name.clone()],
+                vec![offset_name],
+            ));
+        }
+        return Ok((vec![kind], vec![], vec![]));
+    }
+    if let Some((_, _, factor_offset, offset)) = source.scaled_state_list_by_state_plus_invariant()
+    {
+        let factor_offset_name = lower_expr(factor_offset, state, bindings)?;
+        let mut args = vec![kind, factor_offset_name.clone()];
+        let mut dep_inputs = vec![factor_offset_name.clone()];
+        let mut effect_inputs = vec![factor_offset_name];
+        if let Some(offset) = offset {
+            let offset_name = lower_expr(offset, state, bindings)?;
+            args.push(offset_name.clone());
+            dep_inputs.push(offset_name.clone());
+            effect_inputs.push(offset_name);
+        }
+        return Ok((args, dep_inputs, effect_inputs));
+    }
+    if let Some((_, _, factor_offset, offset)) = source.scaled_state_list_by_factor_state_list() {
+        let mut args = vec![kind];
+        let mut dep_inputs = Vec::new();
+        let mut effect_inputs = Vec::new();
+        if let Some(factor_offset) = factor_offset {
+            let factor_offset_name = lower_expr(factor_offset, state, bindings)?;
+            args.push(factor_offset_name.clone());
+            dep_inputs.push(factor_offset_name.clone());
+            effect_inputs.push(factor_offset_name);
+        }
+        if let Some(offset) = offset {
+            let offset_name = lower_expr(offset, state, bindings)?;
+            args.push(offset_name.clone());
+            dep_inputs.push(offset_name.clone());
+            effect_inputs.push(offset_name);
+        }
+        return Ok((args, dep_inputs, effect_inputs));
+    }
+    if let Some((_, _, factor_scale, factor_offset, offset)) =
+        source.scaled_state_list_by_factor_state_list_times_invariant()
+    {
+        let factor_scale_name = lower_expr(factor_scale, state, bindings)?;
+        let mut args = vec![kind, factor_scale_name.clone()];
+        let mut dep_inputs = vec![factor_scale_name.clone()];
+        let mut effect_inputs = vec![factor_scale_name];
+        if let Some(factor_offset) = factor_offset {
+            let factor_offset_name = lower_expr(factor_offset, state, bindings)?;
+            args.push(factor_offset_name.clone());
+            dep_inputs.push(factor_offset_name.clone());
+            effect_inputs.push(factor_offset_name);
+        }
+        if let Some(offset) = offset {
+            let offset_name = lower_expr(offset, state, bindings)?;
+            args.push(offset_name.clone());
+            dep_inputs.push(offset_name.clone());
+            effect_inputs.push(offset_name);
+        }
+        return Ok((args, dep_inputs, effect_inputs));
+    }
+    if let Some((_, _, lhs_factor_offset, _, rhs_factor_offset, offset)) =
+        source.scaled_state_list_by_factor_group_product()
+    {
+        let mut args = vec![kind];
+        let mut dep_inputs = Vec::new();
+        let mut effect_inputs = Vec::new();
+        if let Some(lhs_factor_offset) = lhs_factor_offset {
+            let lhs_factor_offset_name = lower_expr(lhs_factor_offset, state, bindings)?;
+            args.push(lhs_factor_offset_name.clone());
+            dep_inputs.push(lhs_factor_offset_name.clone());
+            effect_inputs.push(lhs_factor_offset_name);
+        }
+        if let Some(rhs_factor_offset) = rhs_factor_offset {
+            let rhs_factor_offset_name = lower_expr(rhs_factor_offset, state, bindings)?;
+            args.push(rhs_factor_offset_name.clone());
+            dep_inputs.push(rhs_factor_offset_name.clone());
+            effect_inputs.push(rhs_factor_offset_name);
+        }
+        if let Some(offset) = offset {
+            let offset_name = lower_expr(offset, state, bindings)?;
+            args.push(offset_name.clone());
+            dep_inputs.push(offset_name.clone());
+            effect_inputs.push(offset_name);
+        }
+        return Ok((args, dep_inputs, effect_inputs));
+    }
+    if let Some((_, _, lhs_factor_offset, _, rhs_factor_offset, factor_scale, offset)) =
+        source.scaled_state_list_by_factor_group_product_times_invariant()
+    {
+        let factor_scale_name = lower_expr(factor_scale, state, bindings)?;
+        let mut args = vec![kind, factor_scale_name.clone()];
+        let mut dep_inputs = vec![factor_scale_name.clone()];
+        let mut effect_inputs = vec![factor_scale_name];
+        if let Some(lhs_factor_offset) = lhs_factor_offset {
+            let lhs_factor_offset_name = lower_expr(lhs_factor_offset, state, bindings)?;
+            args.push(lhs_factor_offset_name.clone());
+            dep_inputs.push(lhs_factor_offset_name.clone());
+            effect_inputs.push(lhs_factor_offset_name);
+        }
+        if let Some(rhs_factor_offset) = rhs_factor_offset {
+            let rhs_factor_offset_name = lower_expr(rhs_factor_offset, state, bindings)?;
+            args.push(rhs_factor_offset_name.clone());
+            dep_inputs.push(rhs_factor_offset_name.clone());
+            effect_inputs.push(rhs_factor_offset_name);
+        }
+        if let Some(offset) = offset {
+            let offset_name = lower_expr(offset, state, bindings)?;
+            args.push(offset_name.clone());
+            dep_inputs.push(offset_name.clone());
+            effect_inputs.push(offset_name);
+        }
+        return Ok((args, dep_inputs, effect_inputs));
+    }
+    if let Some((base, offset)) = source.add_invariant() {
+        let offset_name = lower_expr(offset, state, bindings)?;
+        let mut args = vec![kind];
+        let mut dep_inputs = vec![offset_name.clone()];
+        let mut effect_inputs = vec![offset_name];
+        match base {
+            PreparedCarrySource::Current
+            | PreparedCarrySource::PreviousCurrent
+            | PreparedCarrySource::PreviousCarry(_)
+            | PreparedCarrySource::Carry(_) => {}
+            PreparedCarrySource::FixedRead(fixed_read) => {
+                let (base_dep_inputs, base_effect_inputs) =
+                    lower_prepared_fixed_read_carry_source_args(fixed_read, state, bindings)?;
+                args.extend(base_dep_inputs.iter().cloned());
+                dep_inputs.extend(base_dep_inputs);
+                effect_inputs.extend(base_effect_inputs);
+            }
+            PreparedCarrySource::DynamicReadAt { buffer, .. } => {
+                let buffer_name = lower_expr(buffer, state, bindings)?;
+                args.push(buffer_name.clone());
+                dep_inputs.push(buffer_name.clone());
+                effect_inputs.push(buffer_name);
+            }
+            PreparedCarrySource::InvariantExpr(_)
+            | PreparedCarrySource::AddInvariant { .. }
+            | PreparedCarrySource::AddStateList { .. }
+            | PreparedCarrySource::ScaledStateList { .. }
+            | PreparedCarrySource::ScaledStateListByState { .. }
+            | PreparedCarrySource::ScaledStateListByStatePlusInvariant { .. }
+            | PreparedCarrySource::ScaledStateListByFactorStateList { .. }
+            | PreparedCarrySource::ScaledStateListByFactorStateListTimesInvariant { .. }
+            | PreparedCarrySource::ScaledStateListByFactorGroupProduct { .. }
+            | PreparedCarrySource::ScaledStateListByFactorGroupProductTimesInvariant { .. } => {
+                unreachable!("nested invariant affine carry sources are not supported")
+            }
+        }
+        args.extend(dep_inputs.iter().take(1).cloned());
+        return Ok((args, dep_inputs, effect_inputs));
+    }
     if !source.is_fixed_read() && !source.is_dynamic_read_at() {
         return Ok((vec![kind], vec![], vec![]));
     }
@@ -472,9 +732,7 @@ pub(super) fn encode_loop_carry_branch_source_args(
     bindings: &mut BTreeMap<String, String>,
 ) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
     match source.view() {
-        PreparedCarryBranchView::KeepCurrentValue => {
-            Ok((vec!["keep".to_owned()], vec![], vec![]))
-        }
+        PreparedCarryBranchView::KeepCurrentValue => Ok((vec!["keep".to_owned()], vec![], vec![])),
         PreparedCarryBranchView::KeepPreviousValue => {
             Ok((vec!["keep_prev_carry".to_owned()], vec![], vec![]))
         }
@@ -538,10 +796,23 @@ pub(super) fn parse_loop_carry_linear(
     let (op, rhs) = parse_loop_carry_linear_shape(carry_name, &normalized)?;
     match rhs {
         NirExpr::Var(rhs_name) => parse_linear_var_source(op, rhs_name, binding_name, carries),
-        _ => parse_prepared_fixed_read_carry_source(rhs, binding_name, carries)
+        _ => match op {
+            PreparedCarryLinearOp::Mul => parse_additive_carry_source(rhs, binding_name, carries)
+                .or_else(|| {
+                    parse_prepared_fixed_read_carry_source(rhs, binding_name, carries)
+                        .map(PreparedCarrySource::FixedRead)
+                })
+                .or_else(|| parse_prepared_dynamic_read_carry_source(rhs, binding_name, carries))
+                .map(|source| (op, source)),
+            PreparedCarryLinearOp::Add => parse_prepared_fixed_read_carry_source(
+                rhs,
+                binding_name,
+                carries,
+            )
             .map(PreparedCarrySource::FixedRead)
             .or_else(|| parse_prepared_dynamic_read_carry_source(rhs, binding_name, carries))
             .map(|source| (op, source)),
+        },
     }
 }
 
@@ -703,6 +974,65 @@ mod tests {
         assert_eq!(
             prev_carry.contract_kind(PreparedCarryLinearOp::Add),
             "add_read_at_dynamic_prev_carry0"
+        );
+    }
+
+    #[test]
+    fn parse_loop_carry_linear_accepts_multiplicative_state_plus_invariant_source() {
+        let expr = NirExpr::Binary {
+            op: NirBinaryOp::Mul,
+            lhs: Box::new(NirExpr::Var("acc".to_owned())),
+            rhs: Box::new(NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Var("current".to_owned())),
+                rhs: Box::new(NirExpr::Int(1)),
+            }),
+        };
+        let (op, source) = parse_loop_carry_linear(
+            "acc",
+            &expr,
+            "current",
+            &[],
+            &BTreeMap::new(),
+        )
+        .expect("expected multiplicative additive carry source");
+        assert!(matches!(op, PreparedCarryLinearOp::Mul));
+        assert_eq!(
+            source.contract_kind(PreparedCarryLinearOp::Mul),
+            "mul_current_plus_invariant"
+        );
+    }
+
+    #[test]
+    fn parse_loop_carry_linear_accepts_multiplicative_multi_state_additive_source() {
+        let carries = vec![PreparedCarryUpdate {
+            binding_name: "slot".to_owned(),
+            kind: PreparedCarryUpdateKind::Linear {
+                op: PreparedCarryLinearOp::Add,
+                source: PreparedCarrySource::Current,
+            },
+        }];
+        let expr = NirExpr::Binary {
+            op: NirBinaryOp::Mul,
+            lhs: Box::new(NirExpr::Var("acc".to_owned())),
+            rhs: Box::new(NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Var("current".to_owned())),
+                rhs: Box::new(NirExpr::Var("slot".to_owned())),
+            }),
+        };
+        let (op, source) = parse_loop_carry_linear(
+            "acc",
+            &expr,
+            "current",
+            &carries,
+            &BTreeMap::new(),
+        )
+        .expect("expected multiplicative additive carry source");
+        assert!(matches!(op, PreparedCarryLinearOp::Mul));
+        assert_eq!(
+            source.contract_kind(PreparedCarryLinearOp::Mul),
+            "mul_current_plus_carry0"
         );
     }
 
@@ -896,11 +1226,14 @@ mod tests {
             source.view(),
             PreparedCarryBranchView::KeepPreviousValue
         ));
-        assert!(parse_loop_carry_keep_source("acc", &NirExpr::Var("acc".to_owned()), &[])
-            .is_some_and(|parsed| matches!(
-                parsed.value_kind(),
-                PreparedCarryBranchValueKind::KeepCurrentValue
-            )));
+        assert!(
+            parse_loop_carry_keep_source("acc", &NirExpr::Var("acc".to_owned()), &[]).is_some_and(
+                |parsed| matches!(
+                    parsed.value_kind(),
+                    PreparedCarryBranchValueKind::KeepCurrentValue
+                )
+            )
+        );
     }
 
     fn encode_branch_view_name(view: PreparedCarryBranchView<'_>) -> &'static str {
@@ -913,30 +1246,26 @@ mod tests {
 
     #[test]
     fn keep_like_loop_carry_exprs_do_not_report_unsupported_diagnostics() {
-        assert!(
-            diagnose_unsupported_loop_carry_expr(
-                "acc",
-                &NirExpr::Var("acc".to_owned()),
-                "current",
-                &[],
-                &BTreeMap::new(),
-            )
-            .is_none()
-        );
-        assert!(
-            diagnose_unsupported_loop_carry_expr(
-                "acc",
-                &NirExpr::Binary {
-                    op: NirBinaryOp::Add,
-                    lhs: Box::new(NirExpr::Var("acc".to_owned())),
-                    rhs: Box::new(NirExpr::Int(0)),
-                },
-                "current",
-                &[],
-                &BTreeMap::new(),
-            )
-            .is_none()
-        );
+        assert!(diagnose_unsupported_loop_carry_expr(
+            "acc",
+            &NirExpr::Var("acc".to_owned()),
+            "current",
+            &[],
+            &BTreeMap::new(),
+        )
+        .is_none());
+        assert!(diagnose_unsupported_loop_carry_expr(
+            "acc",
+            &NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Var("acc".to_owned())),
+                rhs: Box::new(NirExpr::Int(0)),
+            },
+            "current",
+            &[],
+            &BTreeMap::new(),
+        )
+        .is_none());
     }
 
     #[test]

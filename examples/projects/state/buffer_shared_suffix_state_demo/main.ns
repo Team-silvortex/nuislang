@@ -1,0 +1,23 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(3, 0);
+    store_at(buffer, 0, 7);
+    store_at(buffer, 1, 11);
+    let branch: i64 = cpu_input_i64("buffer_branch", 1, 0, 1, 1);
+
+    let current: i64 = if branch > 0 {
+      let value: i64 = load_at(buffer, 0);
+      let widened: i64 = value + 2;
+      widened
+    } else {
+      let value: i64 = load_at(buffer, 1);
+      let widened: i64 = value + 2;
+      widened
+    };
+
+    store_at(buffer, 2, current);
+    let replay: i64 = load_at(buffer, 2) + 1;
+    free(buffer);
+    return replay;
+  }
+}

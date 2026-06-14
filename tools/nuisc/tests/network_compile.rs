@@ -21,12 +21,18 @@ fn stmt_contains_host_callee(stmt: &NirStmt, callee: &str) -> bool {
             else_body,
         } => {
             expr_contains_host_callee(condition, callee)
-                || then_body.iter().any(|stmt| stmt_contains_host_callee(stmt, callee))
-                || else_body.iter().any(|stmt| stmt_contains_host_callee(stmt, callee))
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_contains_host_callee(stmt, callee))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_contains_host_callee(stmt, callee))
         }
         NirStmt::While { condition, body } => {
             expr_contains_host_callee(condition, callee)
-                || body.iter().any(|stmt| stmt_contains_host_callee(stmt, callee))
+                || body
+                    .iter()
+                    .any(|stmt| stmt_contains_host_callee(stmt, callee))
         }
         NirStmt::Break | NirStmt::Continue | NirStmt::Return(None) => false,
     }
@@ -38,9 +44,20 @@ fn expr_contains_host_callee(expr: &NirExpr, callee: &str) -> bool {
             callee: found,
             args,
             ..
-        } => found == callee || args.iter().any(|arg| expr_contains_host_callee(arg, callee)),
-        NirExpr::Call { callee: found, args } => {
-            found == callee || args.iter().any(|arg| expr_contains_host_callee(arg, callee))
+        } => {
+            found == callee
+                || args
+                    .iter()
+                    .any(|arg| expr_contains_host_callee(arg, callee))
+        }
+        NirExpr::Call {
+            callee: found,
+            args,
+        } => {
+            found == callee
+                || args
+                    .iter()
+                    .any(|arg| expr_contains_host_callee(arg, callee))
         }
         NirExpr::Binary { lhs, rhs, .. } => {
             expr_contains_host_callee(lhs, callee) || expr_contains_host_callee(rhs, callee)
@@ -609,14 +626,11 @@ fn lowers_http_roundtrip_summary_demo_with_expected_summary_call() {
         capture.return_type.as_ref().map(|ty| ty.render()),
         Some(rendered) if rendered == "String"
     ));
-    assert!(capture
-        .body
-        .iter()
-        .any(|stmt| matches!(
-            stmt,
-            NirStmt::Return(Some(NirExpr::CpuExternCall { callee, .. }))
-            if callee == "host_parse_http_roundtrip_summary"
-        )));
+    assert!(capture.body.iter().any(|stmt| matches!(
+        stmt,
+        NirStmt::Return(Some(NirExpr::CpuExternCall { callee, .. }))
+        if callee == "host_parse_http_roundtrip_summary"
+    )));
 
     let summarize = artifacts
         .nir

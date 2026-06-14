@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, NirBinaryOp, NirExpr, NirStructDef, NirTypeRef};
 
-use super::call_helpers::ensure_call_arg_matches_param;
+use super::call_helpers::{ensure_call_arg_matches_param, lower_extern_call_arg_for_param};
 use super::{
     ensure_ref_like, i64_type, lower_expr, lower_nested_expr_with_async, ref_type,
     FunctionSignature, ModuleConstValue,
@@ -24,8 +24,7 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
         "text_len" => {
             if current_domain != "cpu" {
                 return Err(
-                    "text_len(...) is currently only allowed inside `mod cpu <unit>`"
-                        .to_owned(),
+                    "text_len(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
                 );
             }
             let [value] = args else {
@@ -56,8 +55,14 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
             let [text, buffer, offset] = args else {
                 return Err("serialize_text_into(...) expects 3 args".to_owned());
             };
-            let lowered_text =
-                lower_expr(text, current_domain, bindings, signatures, struct_table, None)?;
+            let lowered_text = lower_expr(
+                text,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             let lowered_buffer = lower_expr(
                 buffer,
                 current_domain,
@@ -140,8 +145,14 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
             let [value, buffer, offset] = args else {
                 return Err("serialize_bool_into(...) expects 3 args".to_owned());
             };
-            let lowered_value =
-                lower_expr(value, current_domain, bindings, signatures, struct_table, None)?;
+            let lowered_value = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             let lowered_buffer = lower_expr(
                 buffer,
                 current_domain,
@@ -559,7 +570,9 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
                         .to_owned(),
                 );
             }
-            let [request_buffer, request_offset, request_len, response_buffer, response_offset, response_len] = args else {
+            let [request_buffer, request_offset, request_len, response_buffer, response_offset, response_len] =
+                args
+            else {
                 return Err("parse_http_roundtrip_summary(...) expects 6 args".to_owned());
             };
             let lowered_request_buffer = lower_expr(
@@ -658,8 +671,14 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
                 struct_table,
                 Some(&i64_type()),
             )?;
-            let lowered_expected =
-                lower_expr(expected, current_domain, bindings, signatures, struct_table, None)?;
+            let lowered_expected = lower_expr(
+                expected,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             let raw = NirExpr::CpuExternCall {
                 abi: "c".to_owned(),
                 interface: None,
@@ -711,8 +730,14 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
                 struct_table,
                 Some(&i64_type()),
             )?;
-            let lowered_prefix =
-                lower_expr(prefix, current_domain, bindings, signatures, struct_table, None)?;
+            let lowered_prefix = lower_expr(
+                prefix,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             let raw = NirExpr::CpuExternCall {
                 abi: "c".to_owned(),
                 interface: None,
@@ -764,8 +789,14 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
                 struct_table,
                 Some(&i64_type()),
             )?;
-            let lowered_needle =
-                lower_expr(needle, current_domain, bindings, signatures, struct_table, None)?;
+            let lowered_needle = lower_expr(
+                needle,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             let raw = NirExpr::CpuExternCall {
                 abi: "c".to_owned(),
                 interface: None,
@@ -817,8 +848,14 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
                 struct_table,
                 Some(&i64_type()),
             )?;
-            let lowered_suffix =
-                lower_expr(suffix, current_domain, bindings, signatures, struct_table, None)?;
+            let lowered_suffix = lower_expr(
+                suffix,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             let raw = NirExpr::CpuExternCall {
                 abi: "c".to_owned(),
                 interface: None,
@@ -924,8 +961,14 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
                 struct_table,
                 Some(&i64_type()),
             )?;
-            let lowered_needle =
-                lower_expr(needle, current_domain, bindings, signatures, struct_table, None)?;
+            let lowered_needle = lower_expr(
+                needle,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             Ok(Some(NirExpr::CpuExternCall {
                 abi: "c".to_owned(),
                 interface: None,
@@ -1139,6 +1182,11 @@ fn lower_named_call(
                 "extern call `{callee}` is currently only allowed inside `mod cpu <unit>`"
             ));
         }
+        let lowered_args = lowered_args
+            .into_iter()
+            .zip(signature.params.iter())
+            .map(|(arg, expected_param)| lower_extern_call_arg_for_param(arg, expected_param))
+            .collect();
         return Ok(Some(NirExpr::CpuExternCall {
             abi: signature.abi.clone(),
             interface: None,

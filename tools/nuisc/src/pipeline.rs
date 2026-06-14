@@ -138,7 +138,11 @@ fn prepare_pipeline<F>(
     validate_nir_hook: F,
 ) -> Result<PreparedPipeline, String>
 where
-    F: FnOnce(&AstModule, &NirModule, &crate::registry::NustarPackageManifest) -> Result<(), String>,
+    F: FnOnce(
+        &AstModule,
+        &NirModule,
+        &crate::registry::NustarPackageManifest,
+    ) -> Result<(), String>,
 {
     crate::optimize::simplify_nir_module(&mut nir);
     crate::nir_verify::verify_nir_module(&nir)?;
@@ -235,11 +239,10 @@ fn validate_used_units_with_local_units(
         if local_units.contains(&(item.domain.clone(), item.unit.clone())) {
             continue;
         }
-        let manifest =
-            crate::registry::load_manifest_for_domain(
-                Path::new(NUSTAR_REGISTRY_ROOT),
-                &item.domain,
-            )?;
+        let manifest = crate::registry::load_manifest_for_domain(
+            Path::new(NUSTAR_REGISTRY_ROOT),
+            &item.domain,
+        )?;
         crate::registry::validate_unit_binding(&[manifest], &item.domain, &item.unit)?;
     }
     Ok(())
@@ -253,11 +256,10 @@ fn collect_loaded_nustar(
     let mut loaded = crate::registry::required_package_ids(yir);
     loaded.push(root_package.to_owned());
     for item in &module.uses {
-        let manifest =
-            crate::registry::load_manifest_for_domain(
-                Path::new(NUSTAR_REGISTRY_ROOT),
-                &item.domain,
-            )?;
+        let manifest = crate::registry::load_manifest_for_domain(
+            Path::new(NUSTAR_REGISTRY_ROOT),
+            &item.domain,
+        )?;
         loaded.push(manifest.package_id);
     }
     for (domain, _) in collect_instantiated_units(module) {

@@ -1,8 +1,11 @@
 use super::*;
 use crate::lowering::loop_carries::{
     diagnose_unsupported_loop_carry_expr, loop_compare_from_binary_op,
-    loop_state_ref_into_cond_source, parse_loop_carry_branch_source, parse_loop_carry_linear,
-    parse_prepared_loop_state_ref_expr, unsupported_loop_carry_branch_source_message,
+    loop_state_ref_into_carry_source, loop_state_ref_into_cond_source,
+    parse_loop_carry_branch_source, parse_loop_carry_linear,
+    parse_prepared_dynamic_read_carry_source, parse_prepared_fixed_read_carry_source,
+    parse_prepared_loop_state_ref_expr, parse_prepared_loop_state_ref_name,
+    unsupported_loop_carry_branch_source_message,
 };
 use crate::lowering::loop_purity::{
     normalize_pure_bool_test_expr, substitute_branch_binding, substitute_stmt_bindings,
@@ -265,7 +268,11 @@ fn parse_loop_flow_control(
                     .expect("loop flow control prefix condition should always combine");
                 terminal(merged, action)
             }
-            PreparedLoopFlowControl::Compound { op: branch_op, lhs, rhs } => compound(
+            PreparedLoopFlowControl::Compound {
+                op: branch_op,
+                lhs,
+                rhs,
+            } => compound(
                 branch_op,
                 prefix_condition(*lhs, op, condition.clone()),
                 prefix_condition(*rhs, op, condition),
@@ -536,6 +543,14 @@ enum PreparedCarryDecisionTree {
     },
 }
 
+#[derive(Clone)]
+struct PreparedConditionalTempBinding {
+    binding_name: String,
+    condition: PreparedLoopFlowCondition,
+    then_expr: NirExpr,
+    else_expr: NirExpr,
+}
+
 fn extract_pure_block_return_expr(
     body: &[NirStmt],
     pure_helpers: &BTreeSet<String>,
@@ -562,6 +577,30 @@ fn normalize_pure_helper_body(
     loop {
         let Some((first, tail)) = current.split_first() else {
             return None;
+        };
+        let Some((name, value)) = extract_pure_branch_binding(first, pure_helpers) else {
+            return Some(current);
+        };
+        let value = inline_pure_helper_calls(&value, inlineable_pure_helpers);
+        current = tail
+            .iter()
+            .map(|stmt| substitute_stmt_bindings(stmt, &[(name.clone(), value.clone())]))
+            .collect();
+    }
+}
+
+fn normalize_pure_stmt_prefix_body(
+    body: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<Vec<NirStmt>> {
+    let mut current = body.to_vec();
+    loop {
+        if current.len() <= 1 {
+            return Some(current);
+        }
+        let Some((first, tail)) = current.split_first() else {
+            return Some(current);
         };
         let Some((name, value)) = extract_pure_branch_binding(first, pure_helpers) else {
             return Some(current);
@@ -808,6 +847,7 @@ fn parse_helper_conditional_carry_update(
 fn extract_single_stmt_carry_name(
     stmt: &NirStmt,
     pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<String> {
     match stmt {
         NirStmt::Let { .. } | NirStmt::Const { .. } => {
@@ -819,14 +859,20 @@ fn extract_single_stmt_carry_name(
             else_body,
             ..
         } => {
-            let [then_stmt] = then_body.as_slice() else {
+            let normalized_then =
+                normalize_pure_stmt_prefix_body(then_body, pure_helpers, inlineable_pure_helpers)?;
+            let normalized_else =
+                normalize_pure_stmt_prefix_body(else_body, pure_helpers, inlineable_pure_helpers)?;
+            let [then_stmt] = normalized_then.as_slice() else {
                 return None;
             };
-            let [else_stmt] = else_body.as_slice() else {
+            let [else_stmt] = normalized_else.as_slice() else {
                 return None;
             };
-            let then_name = extract_single_stmt_carry_name(then_stmt, pure_helpers)?;
-            let else_name = extract_single_stmt_carry_name(else_stmt, pure_helpers)?;
+            let then_name =
+                extract_single_stmt_carry_name(then_stmt, pure_helpers, inlineable_pure_helpers)?;
+            let else_name =
+                extract_single_stmt_carry_name(else_stmt, pure_helpers, inlineable_pure_helpers)?;
             if then_name == else_name {
                 Some(then_name)
             } else {
@@ -840,8 +886,9 @@ fn extract_single_stmt_carry_name(
 fn extract_non_temp_loop_carry_name(
     stmt: &NirStmt,
     pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<String> {
-    let name = extract_single_stmt_carry_name(stmt, pure_helpers)?;
+    let name = extract_single_stmt_carry_name(stmt, pure_helpers, inlineable_pure_helpers)?;
     if is_loop_match_scrutinee_temp_binding(&name) {
         None
     } else {
@@ -964,7 +1011,9 @@ fn stmt_references_any_name(stmt: &NirStmt, names: &BTreeSet<String>) -> bool {
         }
         NirStmt::While { condition, body } => {
             expr_references_any_name(condition, names)
-                || body.iter().any(|stmt| stmt_references_any_name(stmt, names))
+                || body
+                    .iter()
+                    .any(|stmt| stmt_references_any_name(stmt, names))
         }
         NirStmt::Return(None) | NirStmt::Break | NirStmt::Continue => false,
     }
@@ -973,13 +1022,18 @@ fn stmt_references_any_name(stmt: &NirStmt, names: &BTreeSet<String>) -> bool {
 fn collect_loop_carry_binding_names(
     stmts: &[NirStmt],
     pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<Vec<String>> {
     let mut names = Vec::new();
     for stmt in stmts {
         if extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers).is_some() {
             continue;
         }
-        names.push(extract_non_temp_loop_carry_name(stmt, pure_helpers)?);
+        names.push(extract_non_temp_loop_carry_name(
+            stmt,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )?);
     }
     Some(names)
 }
@@ -1026,10 +1080,14 @@ fn parse_stmt_carry_decision_tree(
             then_body,
             else_body,
         } => {
-            let [then_stmt] = then_body.as_slice() else {
+            let normalized_then =
+                normalize_pure_stmt_prefix_body(then_body, pure_helpers, inlineable_pure_helpers)?;
+            let normalized_else =
+                normalize_pure_stmt_prefix_body(else_body, pure_helpers, inlineable_pure_helpers)?;
+            let [then_stmt] = normalized_then.as_slice() else {
                 return None;
             };
-            let [else_stmt] = else_body.as_slice() else {
+            let [else_stmt] = normalized_else.as_slice() else {
                 return None;
             };
             Some(PreparedCarryDecisionTree::Branch {
@@ -1195,7 +1253,8 @@ fn diagnose_unsupported_loop_carry_update(
             })
         }
         NirStmt::If { .. } => {
-            let carry_name = extract_single_stmt_carry_name(stmt, pure_helpers)?;
+            let carry_name =
+                extract_single_stmt_carry_name(stmt, pure_helpers, inlineable_pure_helpers)?;
             if parse_stmt_carry_decision_tree(
                 stmt,
                 &carry_name,
@@ -1271,7 +1330,7 @@ fn parse_conditional_loop_carry_update_stmt(
     let NirStmt::If { .. } = stmt else {
         return None;
     };
-    let carry_name = extract_single_stmt_carry_name(stmt, pure_helpers)?;
+    let carry_name = extract_single_stmt_carry_name(stmt, pure_helpers, inlineable_pure_helpers)?;
     let carry_tree = parse_stmt_carry_decision_tree(
         stmt,
         &carry_name,
@@ -1287,6 +1346,702 @@ fn parse_conditional_loop_carry_update_stmt(
             condition,
             then_source,
             else_source,
+        },
+    })
+}
+
+fn extract_final_pure_binding_expr(
+    body: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<(String, NirExpr)> {
+    let normalized = normalize_pure_stmt_prefix_body(body, pure_helpers, inlineable_pure_helpers)?;
+    let [stmt] = normalized.as_slice() else {
+        return None;
+    };
+    extract_pure_branch_binding(stmt, pure_helpers)
+}
+
+fn parse_conditional_temp_binding(
+    stmt: &NirStmt,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<PreparedConditionalTempBinding> {
+    let NirStmt::If {
+        condition,
+        then_body,
+        else_body,
+    } = stmt
+    else {
+        return None;
+    };
+    let (then_name, then_expr) =
+        extract_final_pure_binding_expr(then_body, pure_helpers, inlineable_pure_helpers)?;
+    let (else_name, else_expr) =
+        extract_final_pure_binding_expr(else_body, pure_helpers, inlineable_pure_helpers)?;
+    if then_name != else_name {
+        return None;
+    }
+    Some(PreparedConditionalTempBinding {
+        binding_name: then_name,
+        condition: parse_loop_flow_condition(
+            condition,
+            binding_name,
+            carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )?,
+        then_expr,
+        else_expr,
+    })
+}
+
+fn parse_derived_conditional_temp_binding(
+    stmt: &NirStmt,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    conditional_temps: &BTreeMap<String, PreparedConditionalTempBinding>,
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<PreparedConditionalTempBinding> {
+    let (derived_binding_name, expr) = extract_pure_branch_binding(stmt, pure_helpers)?;
+    let normalized = inline_pure_helper_calls(&expr, inlineable_pure_helpers);
+    let (source_temp_name, make_branch_expr): (
+        &str,
+        Box<dyn Fn(&NirExpr) -> NirExpr>,
+    ) = match &normalized {
+        NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => match lhs.as_ref() {
+            NirExpr::Var(name) => {
+                let rhs = (**rhs).clone();
+                (
+                    name.as_str(),
+                    Box::new(move |base| NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(base.clone()),
+                        rhs: Box::new(rhs.clone()),
+                    }),
+                )
+            }
+            _ => return None,
+        },
+        NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs,
+            rhs,
+        } => match (lhs.as_ref(), rhs.as_ref()) {
+            (NirExpr::Var(name), other)
+                if parse_prepared_loop_state_ref_expr(other, binding_name, carries).is_some() =>
+            {
+                let rhs = other.clone();
+                (
+                    name.as_str(),
+                    Box::new(move |base| NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(base.clone()),
+                        rhs: Box::new(rhs.clone()),
+                    }),
+                )
+            }
+            (other, NirExpr::Var(name))
+                if parse_prepared_loop_state_ref_expr(other, binding_name, carries).is_some() =>
+            {
+                let lhs = other.clone();
+                (
+                    name.as_str(),
+                    Box::new(move |base| NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(lhs.clone()),
+                        rhs: Box::new(base.clone()),
+                    }),
+                )
+            }
+            _ => return None,
+        },
+        NirExpr::Binary {
+            op: NirBinaryOp::Mul,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => match lhs.as_ref() {
+            NirExpr::Var(name) => {
+                let rhs = (**rhs).clone();
+                (
+                    name.as_str(),
+                    Box::new(move |base| NirExpr::Binary {
+                        op: NirBinaryOp::Mul,
+                        lhs: Box::new(base.clone()),
+                        rhs: Box::new(rhs.clone()),
+                    }),
+                )
+            }
+            _ => return None,
+        },
+        _ => return None,
+    };
+    let source = conditional_temps.get(source_temp_name)?;
+    Some(PreparedConditionalTempBinding {
+        binding_name: derived_binding_name,
+        condition: source.condition.clone(),
+        then_expr: make_branch_expr(&source.then_expr),
+        else_expr: make_branch_expr(&source.else_expr),
+    })
+}
+
+fn parse_loop_carry_delta_branch_source(
+    op: PreparedCarryLinearOp,
+    expr: &NirExpr,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<PreparedCarryBranchSource> {
+    #[derive(Default)]
+    struct ParsedAdditiveSource {
+        terms: Vec<PreparedLoopStateRef>,
+        offset: Option<NirExpr>,
+    }
+
+    fn expr_contains_loop_variant_ref(
+        expr: &NirExpr,
+        binding_name: &str,
+        carries: &[PreparedCarryUpdate],
+    ) -> bool {
+        match expr {
+            NirExpr::Var(name) => {
+                parse_prepared_loop_state_ref_name(name, binding_name, carries).is_some()
+            }
+            NirExpr::Binary { lhs, rhs, .. } => {
+                expr_contains_loop_variant_ref(lhs, binding_name, carries)
+                    || expr_contains_loop_variant_ref(rhs, binding_name, carries)
+            }
+            _ => false,
+        }
+    }
+
+    fn combine_invariant_terms(terms: Vec<NirExpr>) -> Option<NirExpr> {
+        let mut iter = terms.into_iter();
+        let first = iter.next()?;
+        Some(iter.fold(first, |lhs, rhs| NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }))
+    }
+
+    fn scale_invariant_expr(expr: NirExpr, factor: i64) -> NirExpr {
+        match factor {
+            0 => NirExpr::Int(0),
+            1 => expr,
+            _ => NirExpr::Binary {
+                op: NirBinaryOp::Mul,
+                lhs: Box::new(expr),
+                rhs: Box::new(NirExpr::Int(factor)),
+            },
+        }
+    }
+
+    fn scale_additive_source(
+        source: PreparedCarrySource,
+        factor: NirExpr,
+        binding_name: &str,
+        carries: &[PreparedCarryUpdate],
+    ) -> Option<PreparedCarrySource> {
+        let factor_state = parse_prepared_loop_state_ref_expr(&factor, binding_name, carries);
+        let factor_affine = parse_additive_source_for_factor(&factor, binding_name, carries);
+        let factor_scaled_affine =
+            parse_scaled_additive_source_for_factor(&factor, binding_name, carries);
+        let factor_group_product =
+            parse_factor_group_product_for_factor(&factor, binding_name, carries);
+        let factor_group_product_times_invariant =
+            parse_scaled_factor_group_product_for_factor(&factor, binding_name, carries);
+        match source {
+            PreparedCarrySource::AddStateList { terms, offset } => {
+                if let Some(factor_state) = factor_state {
+                    Some(PreparedCarrySource::ScaledStateListByState {
+                        terms,
+                        factor: factor_state,
+                        offset,
+                    })
+                } else if let Some((factor_terms, factor_offset)) = factor_affine {
+                    match (factor_terms.as_slice(), factor_offset) {
+                        ([factor_state], Some(factor_offset)) => {
+                            Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
+                                terms,
+                                factor: *factor_state,
+                                factor_offset,
+                                offset,
+                            })
+                        }
+                        (factor_terms, factor_offset) => {
+                            Some(PreparedCarrySource::ScaledStateListByFactorStateList {
+                                terms,
+                                factor_terms: factor_terms.to_vec(),
+                                factor_offset,
+                                offset,
+                            })
+                        }
+                    }
+                } else if let Some((factor_terms, factor_scale, factor_offset)) =
+                    factor_scaled_affine
+                {
+                    Some(PreparedCarrySource::ScaledStateListByFactorStateListTimesInvariant {
+                        terms,
+                        factor_terms,
+                        factor_scale,
+                        factor_offset,
+                        offset,
+                    })
+                } else if let Some((
+                    lhs_factor_terms,
+                    lhs_factor_offset,
+                    rhs_factor_terms,
+                    rhs_factor_offset,
+                )) = factor_group_product
+                {
+                    Some(PreparedCarrySource::ScaledStateListByFactorGroupProduct {
+                        terms,
+                        lhs_factor_terms,
+                        lhs_factor_offset,
+                        rhs_factor_terms,
+                        rhs_factor_offset,
+                        offset,
+                    })
+                } else if let Some((
+                    lhs_factor_terms,
+                    lhs_factor_offset,
+                    rhs_factor_terms,
+                    rhs_factor_offset,
+                    factor_scale,
+                )) = factor_group_product_times_invariant
+                {
+                    Some(
+                        PreparedCarrySource::ScaledStateListByFactorGroupProductTimesInvariant {
+                            terms,
+                            lhs_factor_terms,
+                            lhs_factor_offset,
+                            rhs_factor_terms,
+                            rhs_factor_offset,
+                            factor_scale,
+                            offset,
+                        },
+                    )
+                } else {
+                    let scaled_offset = offset.map(|offset| NirExpr::Binary {
+                        op: NirBinaryOp::Mul,
+                        lhs: Box::new(offset),
+                        rhs: Box::new(factor.clone()),
+                    });
+                    Some(PreparedCarrySource::ScaledStateList {
+                        terms,
+                        factor,
+                        offset: scaled_offset,
+                    })
+                }
+            }
+            PreparedCarrySource::Current
+            | PreparedCarrySource::PreviousCurrent
+            | PreparedCarrySource::PreviousCarry(_)
+            | PreparedCarrySource::Carry(_)
+            | PreparedCarrySource::ScaledStateList { .. }
+            | PreparedCarrySource::ScaledStateListByState { .. }
+            | PreparedCarrySource::ScaledStateListByStatePlusInvariant { .. }
+            | PreparedCarrySource::ScaledStateListByFactorStateList { .. }
+            | PreparedCarrySource::ScaledStateListByFactorStateListTimesInvariant { .. }
+            | PreparedCarrySource::ScaledStateListByFactorGroupProduct { .. }
+            | PreparedCarrySource::ScaledStateListByFactorGroupProductTimesInvariant { .. }
+            | PreparedCarrySource::InvariantExpr(_)
+            | PreparedCarrySource::AddInvariant { .. }
+            | PreparedCarrySource::FixedRead(_)
+            | PreparedCarrySource::DynamicReadAt { .. } => None,
+        }
+    }
+
+    fn parse_additive_source_for_factor(
+        expr: &NirExpr,
+        binding_name: &str,
+        carries: &[PreparedCarryUpdate],
+    ) -> Option<(Vec<PreparedLoopStateRef>, Option<NirExpr>)> {
+        fn parse_inner(
+            expr: &NirExpr,
+            binding_name: &str,
+            carries: &[PreparedCarryUpdate],
+            expr_contains_loop_variant_ref: &impl Fn(&NirExpr, &str, &[PreparedCarryUpdate]) -> bool,
+        ) -> Option<ParsedAdditiveSource> {
+            if let Some(state_ref) = parse_prepared_loop_state_ref_expr(expr, binding_name, carries)
+            {
+                return Some(ParsedAdditiveSource {
+                    terms: vec![state_ref],
+                    offset: None,
+                });
+            }
+            if is_terminal_branch_pure_expr(expr, &BTreeSet::new())
+                && !expr_contains_loop_variant_ref(expr, binding_name, carries)
+            {
+                return Some(ParsedAdditiveSource {
+                    terms: Vec::new(),
+                    offset: Some(expr.clone()),
+                });
+            }
+            match expr {
+                NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs,
+                    rhs,
+                } => {
+                    let lhs = parse_inner(lhs, binding_name, carries, expr_contains_loop_variant_ref)?;
+                    let rhs = parse_inner(rhs, binding_name, carries, expr_contains_loop_variant_ref)?;
+                    let mut terms = lhs.terms;
+                    terms.extend(rhs.terms);
+                    let offset = combine_invariant_terms(
+                        lhs.offset.into_iter().chain(rhs.offset).collect::<Vec<_>>(),
+                    );
+                    Some(ParsedAdditiveSource { terms, offset })
+                }
+                _ => None,
+            }
+        }
+
+        let parsed = parse_inner(expr, binding_name, carries, &expr_contains_loop_variant_ref)?;
+        match (parsed.terms.is_empty(), parsed.offset.is_some()) {
+            (false, true) | (false, false) => Some((parsed.terms, parsed.offset)),
+            _ => None,
+        }
+    }
+
+    fn parse_scaled_additive_source_for_factor(
+        expr: &NirExpr,
+        binding_name: &str,
+        carries: &[PreparedCarryUpdate],
+    ) -> Option<(Vec<PreparedLoopStateRef>, NirExpr, Option<NirExpr>)> {
+        let NirExpr::Binary {
+            op: NirBinaryOp::Mul,
+            lhs,
+            rhs,
+        } = expr
+        else {
+            return None;
+        };
+        let invariant = |expr: &NirExpr| {
+            is_terminal_branch_pure_expr(expr, &BTreeSet::new())
+                && !expr_contains_loop_variant_ref(expr, binding_name, carries)
+        };
+        if let Some((factor_terms, factor_offset)) =
+            parse_additive_source_for_factor(lhs, binding_name, carries)
+        {
+            if invariant(rhs) {
+                return Some((factor_terms, (**rhs).clone(), factor_offset));
+            }
+        }
+        if let Some((factor_terms, factor_offset)) =
+            parse_additive_source_for_factor(rhs, binding_name, carries)
+        {
+            if invariant(lhs) {
+                return Some((factor_terms, (**lhs).clone(), factor_offset));
+            }
+        }
+        None
+    }
+
+    fn parse_factor_group_product_for_factor(
+        expr: &NirExpr,
+        binding_name: &str,
+        carries: &[PreparedCarryUpdate],
+    ) -> Option<(
+        Vec<PreparedLoopStateRef>,
+        Option<NirExpr>,
+        Vec<PreparedLoopStateRef>,
+        Option<NirExpr>,
+    )> {
+        let NirExpr::Binary {
+            op: NirBinaryOp::Mul,
+            lhs,
+            rhs,
+        } = expr
+        else {
+            return None;
+        };
+        let lhs_group = parse_additive_source_for_factor(lhs, binding_name, carries)?;
+        let rhs_group = parse_additive_source_for_factor(rhs, binding_name, carries)?;
+        Some((lhs_group.0, lhs_group.1, rhs_group.0, rhs_group.1))
+    }
+
+    fn parse_scaled_factor_group_product_for_factor(
+        expr: &NirExpr,
+        binding_name: &str,
+        carries: &[PreparedCarryUpdate],
+    ) -> Option<(
+        Vec<PreparedLoopStateRef>,
+        Option<NirExpr>,
+        Vec<PreparedLoopStateRef>,
+        Option<NirExpr>,
+        NirExpr,
+    )> {
+        let NirExpr::Binary {
+            op: NirBinaryOp::Mul,
+            lhs,
+            rhs,
+        } = expr
+        else {
+            return None;
+        };
+        let invariant = |expr: &NirExpr| {
+            is_terminal_branch_pure_expr(expr, &BTreeSet::new())
+                && !expr_contains_loop_variant_ref(expr, binding_name, carries)
+        };
+        if let Some((lhs_terms, lhs_offset, rhs_terms, rhs_offset)) =
+            parse_factor_group_product_for_factor(lhs, binding_name, carries)
+        {
+            if invariant(rhs) {
+                return Some((
+                    lhs_terms,
+                    lhs_offset,
+                    rhs_terms,
+                    rhs_offset,
+                    (**rhs).clone(),
+                ));
+            }
+        }
+        if let Some((lhs_terms, lhs_offset, rhs_terms, rhs_offset)) =
+            parse_factor_group_product_for_factor(rhs, binding_name, carries)
+        {
+            if invariant(lhs) {
+                return Some((
+                    lhs_terms,
+                    lhs_offset,
+                    rhs_terms,
+                    rhs_offset,
+                    (**lhs).clone(),
+                ));
+            }
+        }
+        None
+    }
+
+    let normalized = inline_pure_helper_calls(expr, inlineable_pure_helpers);
+    let parse_additive_source = |expr: &NirExpr| -> Option<PreparedCarrySource> {
+        fn parse_inner(
+            expr: &NirExpr,
+            binding_name: &str,
+            carries: &[PreparedCarryUpdate],
+            expr_contains_loop_variant_ref: &impl Fn(&NirExpr, &str, &[PreparedCarryUpdate]) -> bool,
+        ) -> Option<ParsedAdditiveSource> {
+            if let Some(state_ref) = parse_prepared_loop_state_ref_expr(expr, binding_name, carries)
+            {
+                return Some(ParsedAdditiveSource {
+                    terms: vec![state_ref],
+                    offset: None,
+                });
+            }
+            if is_terminal_branch_pure_expr(expr, &BTreeSet::new())
+                && !expr_contains_loop_variant_ref(expr, binding_name, carries)
+            {
+                return Some(ParsedAdditiveSource {
+                    terms: Vec::new(),
+                    offset: Some(expr.clone()),
+                });
+            }
+            match expr {
+                NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs,
+                    rhs,
+                } => {
+                    let lhs = parse_inner(lhs, binding_name, carries, expr_contains_loop_variant_ref)?;
+                    let rhs = parse_inner(rhs, binding_name, carries, expr_contains_loop_variant_ref)?;
+                    let mut terms = lhs.terms;
+                    terms.extend(rhs.terms);
+                    let offset = combine_invariant_terms(
+                        lhs.offset.into_iter().chain(rhs.offset).collect::<Vec<_>>(),
+                    );
+                    Some(ParsedAdditiveSource { terms, offset })
+                }
+                NirExpr::Binary {
+                    op: NirBinaryOp::Mul,
+                    lhs,
+                    rhs,
+                } => {
+                    let (base, factor) = match (lhs.as_ref(), rhs.as_ref()) {
+                        (base, NirExpr::Int(factor)) if *factor >= 0 => (base, *factor),
+                        (NirExpr::Int(factor), base) if *factor >= 0 => (base, *factor),
+                        _ => return None,
+                    };
+                    let parsed =
+                        parse_inner(base, binding_name, carries, expr_contains_loop_variant_ref)?;
+                    let terms = parsed
+                        .terms
+                        .iter()
+                        .flat_map(|term| std::iter::repeat_n(*term, factor as usize))
+                        .collect::<Vec<_>>();
+                    let offset = parsed.offset.map(|offset| scale_invariant_expr(offset, factor));
+                    Some(ParsedAdditiveSource { terms, offset })
+                }
+                _ => None,
+            }
+        }
+
+        let parsed = parse_inner(
+            expr,
+            binding_name,
+            carries,
+            &expr_contains_loop_variant_ref,
+        )?;
+        if parsed.terms.len() + usize::from(parsed.offset.is_some()) <= 1 {
+            return None;
+        }
+        match (parsed.terms.len(), parsed.offset) {
+            (0, Some(invariant)) => Some(PreparedCarrySource::InvariantExpr(invariant)),
+            (1, Some(invariant)) => Some(PreparedCarrySource::AddInvariant {
+                base: Box::new(loop_state_ref_into_carry_source(parsed.terms[0])),
+                offset: invariant,
+            }),
+            (count, offset) if count >= 2 => Some(PreparedCarrySource::AddStateList {
+                terms: parsed.terms,
+                offset,
+            }),
+            _ => None,
+        }
+    };
+    if matches!(op, PreparedCarryLinearOp::Add)
+        && is_terminal_branch_pure_expr(&normalized, &BTreeSet::new())
+        && !expr_contains_loop_variant_ref(&normalized, binding_name, carries)
+    {
+        return Some(PreparedCarryBranchSource::from_linear_source(
+            op,
+            PreparedCarrySource::InvariantExpr(normalized),
+        ));
+    }
+    if matches!(op, PreparedCarryLinearOp::Add) && matches!(normalized, NirExpr::Int(0)) {
+        return Some(PreparedCarryBranchSource::keep());
+    }
+    if matches!(op, PreparedCarryLinearOp::Add) {
+        if let NirExpr::Binary {
+            op: NirBinaryOp::Mul,
+            lhs,
+            rhs,
+        } = &normalized
+        {
+            let factor_supported = |expr: &NirExpr| {
+                parse_prepared_loop_state_ref_expr(expr, binding_name, carries).is_some()
+                    || (is_terminal_branch_pure_expr(expr, &BTreeSet::new())
+                        && !expr_contains_loop_variant_ref(expr, binding_name, carries))
+                    || parse_additive_source_for_factor(expr, binding_name, carries).is_some()
+                    || parse_scaled_additive_source_for_factor(expr, binding_name, carries)
+                        .is_some()
+                    || parse_factor_group_product_for_factor(expr, binding_name, carries)
+                        .is_some()
+                    || parse_scaled_factor_group_product_for_factor(expr, binding_name, carries)
+                        .is_some()
+            };
+            let scaled = if let Some(base) = parse_additive_source(lhs) {
+                if factor_supported(rhs) {
+                    scale_additive_source(base, (**rhs).clone(), binding_name, carries)
+                } else {
+                    None
+                }
+            } else if let Some(base) = parse_additive_source(rhs) {
+                if factor_supported(lhs) {
+                    scale_additive_source(base, (**lhs).clone(), binding_name, carries)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            if let Some(source) = scaled {
+                return Some(PreparedCarryBranchSource::from_linear_source(op, source));
+            }
+        }
+        if let Some(source) = parse_additive_source(&normalized) {
+            return Some(PreparedCarryBranchSource::from_linear_source(op, source));
+        }
+        if let NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs,
+            rhs,
+        } = &normalized
+        {
+            if let Some(base_ref) = parse_prepared_loop_state_ref_expr(lhs, binding_name, carries) {
+                if is_terminal_branch_pure_expr(rhs, &BTreeSet::new()) {
+                    return Some(PreparedCarryBranchSource::from_linear_source(
+                        op,
+                        PreparedCarrySource::AddInvariant {
+                            base: Box::new(loop_state_ref_into_carry_source(base_ref)),
+                            offset: (**rhs).clone(),
+                        },
+                    ));
+                }
+            }
+        }
+    }
+    if let Some(state_ref) = parse_prepared_loop_state_ref_expr(&normalized, binding_name, carries)
+    {
+        return Some(PreparedCarryBranchSource::from_linear_source(
+            op,
+            loop_state_ref_into_carry_source(state_ref),
+        ));
+    }
+    parse_prepared_fixed_read_carry_source(&normalized, binding_name, carries)
+        .map(PreparedCarrySource::FixedRead)
+        .or_else(|| parse_prepared_dynamic_read_carry_source(&normalized, binding_name, carries))
+        .map(|source| PreparedCarryBranchSource::from_linear_source(op, source))
+}
+
+fn parse_conditional_temp_driven_loop_carry_update(
+    stmt: &NirStmt,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    conditional_temps: &BTreeMap<String, PreparedConditionalTempBinding>,
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<PreparedCarryUpdate> {
+    let (carry_name, carry_expr) = extract_pure_branch_binding(stmt, pure_helpers)?;
+    let normalized = inline_pure_helper_calls(&carry_expr, inlineable_pure_helpers);
+    let (op, rhs_name) = match &normalized {
+        NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs,
+            rhs,
+        } => match (lhs.as_ref(), rhs.as_ref()) {
+            (NirExpr::Var(lhs_name), NirExpr::Var(rhs_name)) if lhs_name == &carry_name => {
+                (PreparedCarryLinearOp::Add, rhs_name)
+            }
+            _ => return None,
+        },
+        NirExpr::Binary {
+            op: NirBinaryOp::Mul,
+            lhs,
+            rhs,
+        } => match (lhs.as_ref(), rhs.as_ref()) {
+            (NirExpr::Var(lhs_name), NirExpr::Var(rhs_name)) if lhs_name == &carry_name => {
+                (PreparedCarryLinearOp::Mul, rhs_name)
+            }
+            _ => return None,
+        },
+        _ => return None,
+    };
+    let temp = conditional_temps.get(rhs_name)?;
+    Some(PreparedCarryUpdate {
+        binding_name: carry_name,
+        kind: PreparedCarryUpdateKind::Conditional {
+            condition: temp.condition.clone(),
+            then_source: parse_loop_carry_delta_branch_source(
+                op,
+                &temp.then_expr,
+                binding_name,
+                carries,
+                inlineable_pure_helpers,
+            )?,
+            else_source: parse_loop_carry_delta_branch_source(
+                op,
+                &temp.else_expr,
+                binding_name,
+                carries,
+                inlineable_pure_helpers,
+            )?,
         },
     })
 }
@@ -1339,9 +2094,12 @@ fn normalize_loop_control_temp_bindings(
 ) -> Vec<(String, NirExpr)> {
     let mut normalized = Vec::<(String, NirExpr)>::new();
     for (name, expr) in bindings {
-        let normalized_expr = normalized.iter().fold(expr, |current, (binding_name, binding_expr)| {
-            substitute_branch_binding(&current, binding_name, binding_expr)
-        });
+        let normalized_expr =
+            normalized
+                .iter()
+                .fold(expr, |current, (binding_name, binding_expr)| {
+                    substitute_branch_binding(&current, binding_name, binding_expr)
+                });
         normalized.push((name, normalized_expr));
     }
     normalized
@@ -1354,13 +2112,17 @@ fn prepare_loop_carry_sequence(
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
     pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
 ) -> Option<Vec<PreparedCarryUpdate>> {
-    let carry_names = collect_loop_carry_binding_names(stmts, pure_helpers)?;
+    let carry_names =
+        collect_loop_carry_binding_names(stmts, pure_helpers, inlineable_pure_helpers)?;
     let mut carries = Vec::<PreparedCarryUpdate>::new();
     let mut temp_bindings = Vec::<(String, NirExpr)>::new();
+    let mut conditional_temps = BTreeMap::<String, PreparedConditionalTempBinding>::new();
     let mut carry_index = 0usize;
     for stmt in stmts {
         let substituted = substitute_stmt_bindings(stmt, &temp_bindings);
-        if let Some(current_carry_name) = extract_non_temp_loop_carry_name(stmt, pure_helpers) {
+        if let Some(current_carry_name) =
+            extract_non_temp_loop_carry_name(stmt, pure_helpers, inlineable_pure_helpers)
+        {
             if diagnose_future_carry_reference(
                 &substituted,
                 &current_carry_name,
@@ -1381,6 +2143,38 @@ fn prepare_loop_carry_sequence(
             pure_helper_blocks,
         ) {
             carries.push(prepared);
+            continue;
+        }
+        if let Some(prepared) = parse_conditional_temp_driven_loop_carry_update(
+            &substituted,
+            binding_name,
+            &carries,
+            &conditional_temps,
+            pure_helpers,
+            inlineable_pure_helpers,
+        ) {
+            carries.push(prepared);
+            continue;
+        }
+        if let Some(temp) = parse_conditional_temp_binding(
+            &substituted,
+            binding_name,
+            &carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+        ) {
+            conditional_temps.insert(temp.binding_name.clone(), temp);
+            continue;
+        }
+        if let Some(temp) = parse_derived_conditional_temp_binding(
+            &substituted,
+            binding_name,
+            &carries,
+            &conditional_temps,
+            pure_helpers,
+            inlineable_pure_helpers,
+        ) {
+            conditional_temps.insert(temp.binding_name.clone(), temp);
             continue;
         }
         let (temp_name, temp_expr) = extract_pure_branch_binding(&substituted, pure_helpers)?;
@@ -1420,13 +2214,17 @@ pub(super) fn diagnose_unsupported_prepared_while_carry(
         return None;
     }
 
-    let carry_names = collect_loop_carry_binding_names(carry_bindings, pure_helpers)?;
+    let carry_names =
+        collect_loop_carry_binding_names(carry_bindings, pure_helpers, inlineable_pure_helpers)?;
     let mut carries = Vec::<PreparedCarryUpdate>::new();
     let mut temp_bindings = Vec::<(String, NirExpr)>::new();
+    let mut conditional_temps = BTreeMap::<String, PreparedConditionalTempBinding>::new();
     let mut carry_index = 0usize;
     for stmt in carry_bindings {
         let substituted = substitute_stmt_bindings(stmt, &temp_bindings);
-        if let Some(current_carry_name) = extract_non_temp_loop_carry_name(stmt, pure_helpers) {
+        if let Some(current_carry_name) =
+            extract_non_temp_loop_carry_name(stmt, pure_helpers, inlineable_pure_helpers)
+        {
             if let Some(diagnostic) = diagnose_future_carry_reference(
                 &substituted,
                 &current_carry_name,
@@ -1455,6 +2253,38 @@ pub(super) fn diagnose_unsupported_prepared_while_carry(
             pure_helper_blocks,
         ) {
             carries.push(prepared);
+            continue;
+        }
+        if let Some(prepared) = parse_conditional_temp_driven_loop_carry_update(
+            &substituted,
+            &binding_name,
+            &carries,
+            &conditional_temps,
+            pure_helpers,
+            inlineable_pure_helpers,
+        ) {
+            carries.push(prepared);
+            continue;
+        }
+        if let Some(temp) = parse_conditional_temp_binding(
+            &substituted,
+            &binding_name,
+            &carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+        ) {
+            conditional_temps.insert(temp.binding_name.clone(), temp);
+            continue;
+        }
+        if let Some(temp) = parse_derived_conditional_temp_binding(
+            &substituted,
+            &binding_name,
+            &carries,
+            &conditional_temps,
+            pure_helpers,
+            inlineable_pure_helpers,
+        ) {
+            conditional_temps.insert(temp.binding_name.clone(), temp);
             continue;
         }
         let (temp_name, temp_expr) = extract_pure_branch_binding(&substituted, pure_helpers)?;
@@ -1596,7 +2426,10 @@ fn split_trailing_loop_control_temp_bindings<'a>(
         split_index -= 1;
     }
     accepted.reverse();
-    Some((&stmts[..split_index], normalize_loop_control_temp_bindings(accepted)))
+    Some((
+        &stmts[..split_index],
+        normalize_loop_control_temp_bindings(accepted),
+    ))
 }
 
 pub(super) fn prepare_counted_while(
@@ -2093,6 +2926,7 @@ pub(super) fn prepare_async_post_flow_while(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::frontend::parse_nuis_module;
     use crate::lowering::loop_carries::tail_recursive_prev_carry_binding;
 
     #[test]
@@ -2128,5 +2962,359 @@ mod tests {
             &BTreeMap::new(),
         );
         assert!(diagnostic.is_none());
+    }
+
+    #[test]
+    fn extracts_loop_carry_name_from_if_expression_with_branch_local_temp_prefix() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn step(value: i64) -> i64 {
+                return value + 1;
+              }
+
+              async fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 7 {
+                  let value: i64 = await step(value);
+                  let branch_value: i64 = if value > 2 {
+                    let picked: i64 = value;
+                    picked
+                  } else {
+                    let picked: i64 = 0;
+                    picked
+                  };
+                  let acc: i64 = acc + branch_value;
+                  if acc > 8 {
+                    break;
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .expect("expected main function");
+        let NirStmt::While { body, .. } = function
+            .body
+            .iter()
+            .find(|stmt| matches!(stmt, NirStmt::While { .. }))
+            .expect("expected while body")
+        else {
+            unreachable!();
+        };
+
+        let branch_stmt = &body[1];
+        assert_eq!(
+            extract_non_temp_loop_carry_name(branch_stmt, &BTreeSet::new(), &BTreeMap::new())
+                .as_deref(),
+            Some("branch_value"),
+            "loop body shape was: {body:#?}"
+        );
+    }
+
+    #[test]
+    fn prepares_async_post_flow_carry_sequence_with_shared_suffix_branch_value() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn step(value: i64) -> i64 {
+                return value + 1;
+              }
+
+              async fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 7 {
+                  let value: i64 = await step(value);
+                  let branch_value: i64 = if value > 2 {
+                    let picked: i64 = value;
+                    picked
+                  } else {
+                    let picked: i64 = 0;
+                    picked
+                  };
+                  let acc: i64 = acc + branch_value;
+                  if acc > 8 {
+                    break;
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .expect("expected main function");
+        let NirStmt::While { body, .. } = function
+            .body
+            .iter()
+            .find(|stmt| matches!(stmt, NirStmt::While { .. }))
+            .expect("expected while body")
+        else {
+            unreachable!();
+        };
+
+        let middle = &body[1..body.len() - 1];
+        let prepared = prepare_loop_carry_sequence(
+            middle,
+            "value",
+            &BTreeSet::new(),
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+        )
+        .expect("expected carry sequence to prepare");
+        assert_eq!(
+            prepared
+                .iter()
+                .map(|carry| carry.binding_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["acc"]
+        );
+    }
+
+    #[test]
+    fn prepares_async_post_flow_carry_sequence_with_derived_conditional_temp_suffix() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn step(value: i64) -> i64 {
+                return value + 1;
+              }
+
+              async fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 7 {
+                  let value: i64 = await step(value);
+                  let branch_value: i64 = if value > 2 {
+                    let picked: i64 = value;
+                    picked
+                  } else {
+                    let picked: i64 = 0;
+                    picked
+                  };
+                  let widened: i64 = branch_value + 1;
+                  let acc: i64 = acc + widened;
+                  if acc > 8 {
+                    break;
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .expect("expected main function");
+        let NirStmt::While { body, .. } = function
+            .body
+            .iter()
+            .find(|stmt| matches!(stmt, NirStmt::While { .. }))
+            .expect("expected while body")
+        else {
+            unreachable!();
+        };
+
+        let middle = &body[1..body.len() - 1];
+        let prepared = prepare_loop_carry_sequence(
+            middle,
+            "value",
+            &BTreeSet::new(),
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+        )
+        .expect("expected derived conditional temp carry sequence to prepare");
+        assert_eq!(
+            prepared
+                .iter()
+                .map(|carry| carry.binding_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["acc"]
+        );
+    }
+
+    #[test]
+    fn prepares_async_post_flow_carry_sequence_with_remixed_loop_state_suffix() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn step(value: i64) -> i64 {
+                return value + 1;
+              }
+
+              async fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 7 {
+                  let value: i64 = await step(value);
+                  let branch_value: i64 = if value > 2 {
+                    let picked: i64 = value;
+                    picked
+                  } else {
+                    let picked: i64 = 0;
+                    picked
+                  };
+                  let widened: i64 = branch_value + 1;
+                  let normalized: i64 = widened + value;
+                  let acc: i64 = acc + normalized;
+                  if acc > 8 {
+                    break;
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .expect("expected main function");
+        let NirStmt::While { body, .. } = function
+            .body
+            .iter()
+            .find(|stmt| matches!(stmt, NirStmt::While { .. }))
+            .expect("expected while body")
+        else {
+            unreachable!();
+        };
+
+        let middle = &body[1..body.len() - 1];
+        let prepared = prepare_loop_carry_sequence(
+            middle,
+            "value",
+            &BTreeSet::new(),
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+        )
+        .expect("expected remixed loop-state carry sequence to prepare");
+        assert_eq!(
+            prepared
+                .iter()
+                .map(|carry| carry.binding_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["acc"]
+        );
+    }
+
+    #[test]
+    fn parses_derived_conditional_temp_binding_with_loop_state_remix() {
+        let stmt = NirStmt::Let {
+            name: "normalized".to_owned(),
+            ty: None,
+            value: NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Var("widened".to_owned())),
+                rhs: Box::new(NirExpr::Var("value".to_owned())),
+            },
+        };
+        let mut conditional_temps = BTreeMap::new();
+        conditional_temps.insert(
+            "widened".to_owned(),
+            PreparedConditionalTempBinding {
+                binding_name: "widened".to_owned(),
+                condition: PreparedLoopFlowCondition::Simple(PreparedLoopCarryCondition {
+                    lhs: PreparedCarryCondSource::Current,
+                    compare: PreparedLoopCompare::Gt,
+                    rhs: NirExpr::Int(2),
+                }),
+                then_expr: NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Var("value".to_owned())),
+                    rhs: Box::new(NirExpr::Int(1)),
+                },
+                else_expr: NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Int(0)),
+                    rhs: Box::new(NirExpr::Int(1)),
+                },
+            },
+        );
+
+        let prepared = parse_derived_conditional_temp_binding(
+            &stmt,
+            "value",
+            &[],
+            &conditional_temps,
+            &BTreeSet::new(),
+            &BTreeMap::new(),
+        )
+        .expect("expected remixed derived conditional temp binding");
+        assert_eq!(prepared.binding_name, "normalized");
+    }
+
+    #[test]
+    fn parses_conditional_temp_driven_carry_update_with_loop_state_remix() {
+        let stmt = NirStmt::Let {
+            name: "acc".to_owned(),
+            ty: None,
+            value: NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Var("acc".to_owned())),
+                rhs: Box::new(NirExpr::Var("normalized".to_owned())),
+            },
+        };
+        let mut conditional_temps = BTreeMap::new();
+        conditional_temps.insert(
+            "normalized".to_owned(),
+            PreparedConditionalTempBinding {
+                binding_name: "normalized".to_owned(),
+                condition: PreparedLoopFlowCondition::Simple(PreparedLoopCarryCondition {
+                    lhs: PreparedCarryCondSource::Current,
+                    compare: PreparedLoopCompare::Gt,
+                    rhs: NirExpr::Int(2),
+                }),
+                then_expr: NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(NirExpr::Var("value".to_owned())),
+                        rhs: Box::new(NirExpr::Int(1)),
+                    }),
+                    rhs: Box::new(NirExpr::Var("value".to_owned())),
+                },
+                else_expr: NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(NirExpr::Int(0)),
+                        rhs: Box::new(NirExpr::Int(1)),
+                    }),
+                    rhs: Box::new(NirExpr::Var("value".to_owned())),
+                },
+            },
+        );
+
+        let prepared = parse_conditional_temp_driven_loop_carry_update(
+            &stmt,
+            "value",
+            &[],
+            &conditional_temps,
+            &BTreeSet::new(),
+            &BTreeMap::new(),
+        )
+        .expect("expected remixed conditional temp carry update");
+        assert_eq!(prepared.binding_name, "acc");
     }
 }

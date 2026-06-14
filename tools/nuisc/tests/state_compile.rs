@@ -120,6 +120,307 @@ fn lowers_generic_callable_forwarding_hof_state_project_with_forwarded_fn2_and_f
 }
 
 #[test]
+fn compiles_glm_borrow_end_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/glm_borrow_end_state_demo",
+    );
+    nuisc::pipeline::compile_project(project).expect("glm borrow_end state project should compile");
+}
+
+#[test]
+fn lowers_glm_borrow_end_state_project_with_borrow_end_then_owner_write_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/glm_borrow_end_state_demo",
+    );
+
+    let borrow_ends = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "borrow_end")
+        .count();
+    assert!(borrow_ends >= 1, "expected explicit borrow closure path");
+
+    let lowered_ops = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu")
+        .map(|node| node.op.instruction.as_str())
+        .collect::<Vec<_>>();
+    let borrow_end_index = lowered_ops
+        .iter()
+        .position(|op| *op == "borrow_end")
+        .expect("expected borrow_end op");
+    let store_value_index = lowered_ops
+        .iter()
+        .position(|op| *op == "store_value")
+        .expect("expected owner store_value op");
+    assert!(
+        borrow_end_index < store_value_index,
+        "expected borrow_end to lower before owner write, got {lowered_ops:?}"
+    );
+}
+
+#[test]
+fn compiles_if_borrow_end_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/if_borrow_end_state_demo",
+    );
+    nuisc::pipeline::compile_project(project).expect("if borrow_end state project should compile");
+}
+
+#[test]
+fn lowers_if_borrow_end_state_project_with_borrow_end_then_owner_write_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/if_borrow_end_state_demo",
+    );
+
+    let borrow_ends = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "borrow_end")
+        .count();
+    assert!(borrow_ends >= 1, "expected explicit borrow closure path");
+
+    let lowered_ops = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu")
+        .map(|node| node.op.instruction.as_str())
+        .collect::<Vec<_>>();
+    let borrow_end_index = lowered_ops
+        .iter()
+        .position(|op| *op == "borrow_end")
+        .expect("expected borrow_end op");
+    let store_value_index = lowered_ops
+        .iter()
+        .position(|op| *op == "store_value")
+        .expect("expected owner store_value op");
+    assert!(
+        borrow_end_index < store_value_index,
+        "expected borrow_end to lower before owner write, got {lowered_ops:?}"
+    );
+}
+
+#[test]
+fn compiles_match_borrow_end_shared_suffix_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_borrow_end_shared_suffix_state_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("match borrow_end shared suffix state project should compile");
+}
+
+#[test]
+fn lowers_match_borrow_end_shared_suffix_state_project_with_shared_suffix_after_select_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_borrow_end_shared_suffix_state_demo",
+    );
+
+    let borrow_ends = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "borrow_end")
+        .count();
+    assert!(borrow_ends >= 1, "expected explicit borrow closure path");
+
+    let lowered_ops = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu")
+        .map(|node| node.op.instruction.as_str())
+        .collect::<Vec<_>>();
+    let select_index = lowered_ops
+        .iter()
+        .position(|op| *op == "select")
+        .expect("expected select op for shared branch value");
+    let borrow_end_index = lowered_ops
+        .iter()
+        .position(|op| *op == "borrow_end")
+        .expect("expected borrow_end op");
+    let shared_suffix_add_index = lowered_ops
+        .iter()
+        .rposition(|op| *op == "add")
+        .expect("expected shared suffix add op");
+    let store_value_index = lowered_ops
+        .iter()
+        .position(|op| *op == "store_value")
+        .expect("expected owner store_value op");
+    assert!(
+        select_index < borrow_end_index,
+        "expected branch select before shared borrow_end suffix, got {lowered_ops:?}"
+    );
+    assert!(
+        borrow_end_index < shared_suffix_add_index,
+        "expected shared suffix add after shared borrow_end, got {lowered_ops:?}"
+    );
+    assert!(
+        shared_suffix_add_index < store_value_index,
+        "expected shared suffix add before owner write, got {lowered_ops:?}"
+    );
+}
+
+#[test]
+fn compiles_generic_shared_suffix_if_method_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_shared_suffix_if_method_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("generic shared suffix if-method state project should compile");
+}
+
+#[test]
+fn lowers_generic_shared_suffix_if_method_state_project_with_select_then_method_suffix_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_shared_suffix_if_method_demo",
+    );
+
+    let select_nodes = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|stmt| {
+            matches!(
+                stmt,
+                yir_core::Node {
+                    op: yir_core::Operation { module, instruction, .. },
+                    ..
+                } if module == "cpu" && instruction == "select"
+            )
+        })
+        .count();
+    assert!(
+        select_nodes >= 1,
+        "expected shared-branch select in YIR lowering"
+    );
+
+    let select_index = artifacts
+        .yir
+        .nodes
+        .iter()
+        .position(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .expect("expected shared-branch select node");
+
+    let post_select_value_ops = artifacts
+        .yir
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|stmt| {
+            matches!(
+                stmt,
+                (
+                    index,
+                    yir_core::Node {
+                        op: yir_core::Operation { module, instruction, .. },
+                        ..
+                    }
+                ) if *index > select_index
+                    && module == "cpu"
+                    && (instruction == "add" || instruction == "call_i64")
+            )
+        })
+        .count();
+    assert!(
+        post_select_value_ops >= 1,
+        "expected at least one value-composition op after select in YIR"
+    );
+}
+
+#[test]
+fn compiles_task_result_shared_suffix_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/task_result_shared_suffix_state_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task result shared suffix state project should compile");
+}
+
+#[test]
+fn lowers_task_result_shared_suffix_state_project_with_select_then_suffix_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/task_result_shared_suffix_state_demo",
+    );
+
+    let lowered_ops = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu")
+        .map(|node| node.op.instruction.as_str())
+        .collect::<Vec<_>>();
+    let task_value_index = lowered_ops
+        .iter()
+        .position(|op| *op == "task_value")
+        .expect("expected task_value op");
+    let select_index = lowered_ops
+        .iter()
+        .position(|op| *op == "select")
+        .expect("expected select op for task-result branch");
+    let suffix_add_index = lowered_ops
+        .iter()
+        .rposition(|op| *op == "add")
+        .expect("expected suffix add op");
+    assert!(
+        task_value_index < select_index,
+        "expected task_value to feed branch select, got {lowered_ops:?}"
+    );
+    assert!(
+        select_index < suffix_add_index,
+        "expected suffix add after branch select, got {lowered_ops:?}"
+    );
+}
+
+#[test]
+fn compiles_buffer_shared_suffix_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/buffer_shared_suffix_state_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("buffer shared suffix state project should compile");
+}
+
+#[test]
+fn lowers_buffer_shared_suffix_state_project_with_select_then_store_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/buffer_shared_suffix_state_demo",
+    );
+
+    let lowered_ops = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu")
+        .map(|node| node.op.instruction.as_str())
+        .collect::<Vec<_>>();
+    let select_index = lowered_ops
+        .iter()
+        .position(|op| *op == "select")
+        .expect("expected select op for buffer branch");
+    let final_store_at_index = lowered_ops
+        .iter()
+        .rposition(|op| *op == "store_at")
+        .expect("expected final store_at op");
+    let replay_load_index = lowered_ops
+        .iter()
+        .rposition(|op| *op == "load_at")
+        .expect("expected replay load after shared store");
+    assert!(
+        select_index < final_store_at_index,
+        "expected shared buffer store after branch select, got {lowered_ops:?}"
+    );
+    assert!(
+        final_store_at_index < replay_load_index,
+        "expected replay load after shared buffer store, got {lowered_ops:?}"
+    );
+}
+
+#[test]
 fn lowers_generic_payload_alias_method_hof_state_project_with_hof_and_lambda_shape() {
     let artifacts = compiled_project(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo",
@@ -1211,6 +1512,34 @@ fn lowers_tail_recursive_factorial_state_project_with_multiplicative_chain_shape
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "mul_prev_current");
+}
+
+#[test]
+fn compiles_tail_recursive_factorial_affine_mul_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_affine_mul_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("tail recursive factorial affine mul state project should compile");
+}
+
+#[test]
+fn lowers_tail_recursive_factorial_affine_mul_state_project_with_affine_multiplicative_chain_shape()
+{
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_affine_mul_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "mul_prev_current_plus_invariant");
+    assert!(loop_node.op.args[7].starts_with("int_"));
 }
 
 #[test]

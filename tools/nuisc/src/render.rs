@@ -12,8 +12,8 @@ use nuis_semantics::model::{
     AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstMatchPattern, AstModule, AstStmt,
     AstTraitDef, AstTraitMethodSig, AstTypeRef, AstUnaryOp, AstVisibility, NirAnnotation,
     NirAttributeArg, NirAttributeValue, NirBinaryOp, NirExpr, NirExternInterface, NirFunction,
-    NirGenericParam, NirImplDef, NirImplMethod, NirModule, NirStmt, NirTraitDef,
-    NirTraitMethodSig, NirVisibility,
+    NirGenericParam, NirImplDef, NirImplMethod, NirModule, NirStmt, NirTraitDef, NirTraitMethodSig,
+    NirVisibility,
 };
 use yir_core::YirModule;
 

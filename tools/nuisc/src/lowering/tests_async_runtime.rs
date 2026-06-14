@@ -1060,7 +1060,11 @@ fn lowers_post_flow_break_identity_branching_aux_carry_self_tail_recursive_async
     assert_eq!(loop_node.op.args[5], "carry0_gt");
     assert_eq!(loop_node.op.args[7], "break");
     assert!(loop_node.op.args.iter().any(|arg| arg == "prev_current_gt"));
-    assert!(loop_node.op.args.iter().any(|arg| arg == "add_prev_current"));
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_prev_current"));
     assert!(loop_node.op.args.iter().any(|arg| arg == "keep_prev_carry"));
     let self_async_call_count = yir
         .nodes
@@ -1692,9 +1696,8 @@ fn rejects_async_chained_while_with_future_sibling_carry_dependency() {
     .unwrap();
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains(
-        "references sibling carry `slot` before that carry is updated in the loop body"
-    ));
+    assert!(error
+        .contains("references sibling carry `slot` before that carry is updated in the loop body"));
 }
 
 #[test]

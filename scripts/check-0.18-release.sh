@@ -4,17 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-run() {
-  echo
-  echo "==> $*"
-  (cd "$ROOT_DIR" && "$@")
-}
+echo "check-0.18-release.sh is kept as a compatibility wrapper."
+echo "Forwarding to check-0.19-release.sh."
 
-run cargo fmt --all --check
-run bash scripts/check-0.18-mainline.sh
-run cargo test -q -p nuisc multidomain_async
-run cargo test -q -p nuisc tests_async_runtime
-run cargo test -q -p nuisc tests_async_network_runtime
-
-echo
-echo "0.18.0 compiler release gate: ok"
+exec bash "$ROOT_DIR/scripts/check-0.19-release.sh"

@@ -162,6 +162,8 @@ fn builtin_unary_supported(op: AstUnaryOp, operand_ty: &NirTypeRef) -> bool {
                 && !operand_ty.is_ref
                 && !operand_ty.is_optional
         }
-        AstUnaryOp::Deref => operand_ty.name == "Node" && operand_ty.is_ref && !operand_ty.is_optional,
+        AstUnaryOp::Deref => {
+            operand_ty.name == "Node" && operand_ty.is_ref && !operand_ty.is_optional
+        }
     }
 }

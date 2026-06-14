@@ -51,6 +51,173 @@ struct ParsedCarryBranchSource {
     payload: Vec<String>,
 }
 
+fn carry_state_fragment_is_valid(fragment: &str) -> bool {
+    match fragment {
+        "current" | "prev_current" => true,
+        other => {
+            other
+                .strip_prefix("prev_carry")
+                .or_else(|| other.strip_prefix("carry"))
+                .is_some_and(|index| index.parse::<usize>().is_ok())
+        }
+    }
+}
+
+fn add_state_list_payload_len(kind: &str) -> Option<usize> {
+    let (terms_part, payload_len) = if let Some(prefix) = kind.strip_prefix("add_scaled_by_") {
+        if let Some((lhs_group, rest)) = prefix.split_once("_times_factor_group_") {
+            let parse_group = |group: &str| -> Option<bool> {
+                if let Some(group) = group.strip_suffix("_plus_factor_invariant") {
+                    let terms = group.split("_plus_").collect::<Vec<_>>();
+                    if terms.is_empty()
+                        || !terms.iter().all(|term| carry_state_fragment_is_valid(term))
+                    {
+                        return None;
+                    }
+                    Some(true)
+                } else {
+                    let terms = group.split("_plus_").collect::<Vec<_>>();
+                    if terms.is_empty()
+                        || !terms.iter().all(|term| carry_state_fragment_is_valid(term))
+                    {
+                        return None;
+                    }
+                    Some(false)
+                }
+            };
+            let lhs_offset = parse_group(lhs_group)?;
+            let (rhs_group, rest) = if let Some((rhs_group, rest)) =
+                rest.split_once("_times_factor_invariant_times_terms_")
+            {
+                let rhs_offset = parse_group(rhs_group)?;
+                if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                    (rest, usize::from(lhs_offset) + usize::from(rhs_offset) + 2usize)
+                } else {
+                    (rest, usize::from(lhs_offset) + usize::from(rhs_offset) + 1usize)
+                }
+            } else {
+                let (rhs_group, rest) = rest.split_once("_times_terms_")?;
+                let rhs_offset = parse_group(rhs_group)?;
+                if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                    (rest, usize::from(lhs_offset) + usize::from(rhs_offset) + 1usize)
+                } else {
+                    (rest, usize::from(lhs_offset) + usize::from(rhs_offset))
+                }
+            };
+            (rhs_group, rest)
+        } else if let Some((factor_terms, rest)) =
+            prefix.split_once("_plus_factor_invariant_times_factor_invariant_times_")
+        {
+            let factor_terms = factor_terms.split("_plus_").collect::<Vec<_>>();
+            if factor_terms.is_empty()
+                || !factor_terms
+                    .iter()
+                    .all(|term| carry_state_fragment_is_valid(term))
+            {
+                return None;
+            }
+            if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                (rest, 3usize)
+            } else {
+                (rest, 2usize)
+            }
+        } else if let Some((factor_terms, rest)) = prefix.split_once("_times_factor_invariant_times_")
+        {
+            let factor_terms = factor_terms.split("_plus_").collect::<Vec<_>>();
+            if factor_terms.len() < 2
+                || !factor_terms
+                    .iter()
+                    .all(|term| carry_state_fragment_is_valid(term))
+            {
+                return None;
+            }
+            if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                (rest, 2usize)
+            } else {
+                (rest, 1usize)
+            }
+        } else if let Some((factor_terms, rest)) = prefix.split_once("_plus_factor_invariant_times_") {
+            let factor_terms = factor_terms.split("_plus_").collect::<Vec<_>>();
+            if factor_terms.is_empty()
+                || !factor_terms
+                    .iter()
+                    .all(|term| carry_state_fragment_is_valid(term))
+            {
+                return None;
+            }
+            if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                (rest, 2usize)
+            } else {
+                (rest, 1usize)
+            }
+        } else if let Some((factor_terms, rest)) = prefix.split_once("_times_") {
+            let factor_terms = factor_terms.split("_plus_").collect::<Vec<_>>();
+            if factor_terms.len() < 2
+                || !factor_terms
+                    .iter()
+                    .all(|term| carry_state_fragment_is_valid(term))
+            {
+                return None;
+            }
+            if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                (rest, 1usize)
+            } else {
+                (rest, 0usize)
+            }
+        } else if let Some((factor, rest)) = prefix.split_once("_plus_factor_invariant_") {
+            if !carry_state_fragment_is_valid(factor) {
+                return None;
+            }
+            if let Some(rest) = rest.strip_suffix("_plus_invariant") {
+                (rest, 2usize)
+            } else {
+                (rest, 1usize)
+            }
+        } else if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+            let (factor, rest) = prefix.split_once('_')?;
+            if !carry_state_fragment_is_valid(factor) {
+                return None;
+            }
+            (rest, 1usize)
+        } else {
+            let (factor, rest) = prefix.split_once('_')?;
+            if !carry_state_fragment_is_valid(factor) {
+                return None;
+            }
+            (rest, 0usize)
+        }
+    } else if let Some(prefix) = kind.strip_prefix("add_scaled_") {
+        if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+            (prefix, 2usize)
+        } else {
+            (prefix, 1usize)
+        }
+    } else if let Some(prefix) = kind.strip_prefix("add_") {
+        if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+            (prefix, 1usize)
+        } else {
+            (prefix, 0usize)
+        }
+    } else if let Some(prefix) = kind.strip_prefix("mul_") {
+        if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+            (prefix, 1usize)
+        } else {
+            (prefix, 0usize)
+        }
+    } else {
+        return None;
+    };
+    let terms = terms_part.split("_plus_").collect::<Vec<_>>();
+    if terms.len() < 2 {
+        return None;
+    }
+    if terms.iter().all(|term| carry_state_fragment_is_valid(term)) {
+        Some(payload_len)
+    } else {
+        None
+    }
+}
+
 fn validate_loop_compare_kind(kind: &str, node_name: &str) -> Result<(), String> {
     match kind {
         "eq" | "ne" | "lt" | "le" | "gt" | "ge" => Ok(()),
@@ -130,24 +297,19 @@ fn validate_carry_condition_kind(
     }
 }
 
-fn parse_carry_branch_source(
-    args: &[String],
-    start: usize,
-    node_name: &str,
-) -> Result<(ParsedCarryBranchSource, usize), String> {
-    let Some(kind) = args.get(start).cloned() else {
-        return Err(format!("node `{}` is missing carry kind", node_name));
-    };
+fn carry_source_payload_len(kind: &str) -> Option<usize> {
     let zero_payload_indexed_prefixes =
         ["add_prev_carry", "mul_prev_carry", "add_carry", "mul_carry"];
+    let one_payload_zero_payload_indexed_prefixes =
+        ["add_prev_carry", "add_carry", "mul_prev_carry", "mul_carry"];
     let one_payload_indexed_prefixes = [
         "add_read_at_dynamic_prev_carry",
         "mul_read_at_dynamic_prev_carry",
         "add_read_at_dynamic_carry",
         "mul_read_at_dynamic_carry",
     ];
-    let payload_len = if matches!(
-        kind.as_str(),
+    if matches!(
+        kind,
         "keep"
             | "keep_prev_carry"
             | "add_current"
@@ -158,28 +320,60 @@ fn parse_carry_branch_source(
         kind.strip_prefix(prefix)
             .is_some_and(|index| index.parse::<usize>().is_ok())
     }) {
-        0
+        Some(0)
     } else if one_payload_indexed_prefixes.iter().any(|prefix| {
         kind.strip_prefix(prefix)
             .is_some_and(|index| index.parse::<usize>().is_ok())
     }) {
-        1
+        Some(1)
+    } else if one_payload_zero_payload_indexed_prefixes.iter().any(|prefix| {
+        kind.strip_prefix(prefix).is_some_and(|suffix| {
+            suffix
+                .strip_suffix("_plus_invariant")
+                .is_some_and(|index| index.parse::<usize>().is_ok())
+        })
+    }) {
+        Some(1)
+    } else if let Some(payload_len) = add_state_list_payload_len(kind) {
+        Some(payload_len)
     } else if matches!(
-        kind.as_str(),
-        "add_read_value_fixed" | "mul_read_value_fixed"
+        kind,
+        "add_read_value_fixed"
+            | "mul_read_value_fixed"
+            | "add_invariant"
+            | "add_current_plus_invariant"
+            | "add_prev_current_plus_invariant"
+            | "mul_invariant"
+            | "mul_current_plus_invariant"
+            | "mul_prev_current_plus_invariant"
     ) {
-        1
-    } else if matches!(kind.as_str(), "add_read_at_fixed" | "mul_read_at_fixed") {
-        2
+        Some(1)
+    } else if matches!(kind, "add_read_at_fixed" | "mul_read_at_fixed") {
+        Some(2)
     } else if matches!(
-        kind.as_str(),
+        kind,
         "add_read_at_dynamic_current"
             | "add_read_at_dynamic_prev_current"
             | "mul_read_at_dynamic_current"
             | "mul_read_at_dynamic_prev_current"
+            | "add_source_plus_invariant"
+            | "mul_source_plus_invariant"
     ) {
-        1
+        Some(1)
     } else {
+        None
+    }
+}
+
+fn parse_carry_branch_source(
+    args: &[String],
+    start: usize,
+    node_name: &str,
+) -> Result<(ParsedCarryBranchSource, usize), String> {
+    let Some(kind) = args.get(start).cloned() else {
+        return Err(format!("node `{}` is missing carry kind", node_name));
+    };
+    let Some(payload_len) = carry_source_payload_len(&kind) else {
         return Err(format!(
             "node `{}` has invalid carry kind `{}`",
             node_name, kind
@@ -289,7 +483,10 @@ where
             let (condition, action_index) =
                 parse_loop_control_expr(args, start, node_name, validate_kind)?;
             let Some(action) = args.get(action_index) else {
-                return Err(format!("node `{}` is missing flow control action", node_name));
+                return Err(format!(
+                    "node `{}` is missing flow control action",
+                    node_name
+                ));
             };
             match action.as_str() {
                 "break" | "continue" => Ok((
@@ -450,13 +647,12 @@ where
     F: Fn(&str) -> Result<String, String>,
 {
     match expr {
-        LoopFlowExpr::Legacy { condition, action } | LoopFlowExpr::Terminal { action, condition } => {
-            Ok(format!(
-                "if {} then {}",
-                format_loop_condition_expr(condition, resolve_rhs)?,
-                action
-            ))
-        }
+        LoopFlowExpr::Legacy { condition, action }
+        | LoopFlowExpr::Terminal { action, condition } => Ok(format!(
+            "if {} then {}",
+            format_loop_condition_expr(condition, resolve_rhs)?,
+            action
+        )),
         LoopFlowExpr::Binary { op, lhs, rhs } => Ok(format!(
             "({} {} {})",
             format_loop_flow_expr(lhs, resolve_rhs)?,
@@ -1098,7 +1294,7 @@ impl RegisteredMod for CpuMod {
                 Ok(InstructionSemantics::effect(node.op.args[..3].to_vec()))
             }
             "loop_while_i64_chain" | "loop_while_scalar_chain" => {
-                if node.op.args.len() < 7 || (node.op.args.len() - 5) % 2 != 0 {
+                if node.op.args.len() < 7 {
                     return Err(format!(
                         "node `{}` expects `cpu.loop_while_scalar_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<carry_initial> <carry_kind>)+`",
                         node.name
@@ -1122,67 +1318,47 @@ impl RegisteredMod for CpuMod {
                         ));
                     }
                 }
-                for carry_kind in node.op.args[6..].iter().step_by(2) {
-                    if carry_kind == "add_current"
-                        || carry_kind == "add_prev_current"
-                        || carry_kind == "mul_current"
-                        || carry_kind == "mul_prev_current"
-                    {
-                        continue;
+                let mut effect_args = node.op.args[..3].to_vec();
+                let mut cursor = 5usize;
+                let mut parsed_any_carry = false;
+                while cursor < node.op.args.len() {
+                    let Some(carry_initial) = node.op.args.get(cursor) else {
+                        break;
+                    };
+                    let Some(carry_kind) = node.op.args.get(cursor + 1) else {
+                        return Err(format!(
+                            "node `{}` expects `cpu.loop_while_scalar_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<carry_initial> <carry_kind>)+`",
+                            node.name
+                        ));
+                    };
+                    let Some(payload_len) = carry_source_payload_len(carry_kind) else {
+                        return Err(format!(
+                            "node `{}` has invalid carry kind `{}`",
+                            node.name, carry_kind
+                        ));
+                    };
+                    let payload_end = cursor + 2 + payload_len;
+                    if payload_end > node.op.args.len() {
+                        return Err(format!(
+                            "node `{}` is missing carry payload for `{}`",
+                            node.name, carry_kind
+                        ));
                     }
-                    if let Some(index) = carry_kind.strip_prefix("add_prev_carry") {
-                        index.parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid carry kind `{}`",
-                                node.name, carry_kind
-                            )
-                        })?;
-                        continue;
-                    }
-                    if let Some(index) = carry_kind.strip_prefix("mul_prev_carry") {
-                        index.parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid carry kind `{}`",
-                                node.name, carry_kind
-                            )
-                        })?;
-                        continue;
-                    }
-                    if let Some(index) = carry_kind.strip_prefix("add_carry") {
-                        index.parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid carry kind `{}`",
-                                node.name, carry_kind
-                            )
-                        })?;
-                        continue;
-                    }
-                    if let Some(index) = carry_kind.strip_prefix("mul_carry") {
-                        index.parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid carry kind `{}`",
-                                node.name, carry_kind
-                            )
-                        })?;
-                        continue;
-                    }
+                    effect_args.push(carry_initial.clone());
+                    effect_args.extend(node.op.args[cursor + 2..payload_end].iter().cloned());
+                    cursor = payload_end;
+                    parsed_any_carry = true;
+                }
+                if !parsed_any_carry || cursor != node.op.args.len() {
                     return Err(format!(
-                        "node `{}` has invalid carry kind `{}`",
-                        node.name, carry_kind
+                        "node `{}` expects `cpu.loop_while_scalar_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<carry_initial> <carry_kind>)+`",
+                        node.name
                     ));
                 }
-                Ok(InstructionSemantics::effect(
-                    node.op
-                        .args
-                        .iter()
-                        .enumerate()
-                        .filter(|(index, _)| *index < 3 || (*index >= 5 && index % 2 == 1))
-                        .map(|(_, arg)| arg.clone())
-                        .collect(),
-                ))
+                Ok(InstructionSemantics::effect(effect_args))
             }
             "loop_while_i64_async_chain" | "loop_while_scalar_async_chain" => {
-                if node.op.args.len() < 6 || (node.op.args.len() - 4) % 2 != 0 {
+                if node.op.args.len() < 6 {
                     return Err(format!(
                         "node `{}` expects `cpu.loop_while_scalar_async_chain <name> <resource> <initial> <limit> <step_callee> <cmp> (<carry_initial> <carry_kind>)+`",
                         node.name
@@ -1197,64 +1373,44 @@ impl RegisteredMod for CpuMod {
                         ));
                     }
                 }
-                for carry_kind in node.op.args[5..].iter().step_by(2) {
-                    if carry_kind == "add_current"
-                        || carry_kind == "add_prev_current"
-                        || carry_kind == "mul_current"
-                        || carry_kind == "mul_prev_current"
-                    {
-                        continue;
+                let mut effect_args = node.op.args[..2].to_vec();
+                let mut cursor = 4usize;
+                let mut parsed_any_carry = false;
+                while cursor < node.op.args.len() {
+                    let Some(carry_initial) = node.op.args.get(cursor) else {
+                        break;
+                    };
+                    let Some(carry_kind) = node.op.args.get(cursor + 1) else {
+                        return Err(format!(
+                            "node `{}` expects `cpu.loop_while_scalar_async_chain <name> <resource> <initial> <limit> <step_callee> <cmp> (<carry_initial> <carry_kind>)+`",
+                            node.name
+                        ));
+                    };
+                    let Some(payload_len) = carry_source_payload_len(carry_kind) else {
+                        return Err(format!(
+                            "node `{}` has invalid carry kind `{}`",
+                            node.name, carry_kind
+                        ));
+                    };
+                    let payload_end = cursor + 2 + payload_len;
+                    if payload_end > node.op.args.len() {
+                        return Err(format!(
+                            "node `{}` is missing carry payload for `{}`",
+                            node.name, carry_kind
+                        ));
                     }
-                    if let Some(index) = carry_kind.strip_prefix("add_prev_carry") {
-                        index.parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid carry kind `{}`",
-                                node.name, carry_kind
-                            )
-                        })?;
-                        continue;
-                    }
-                    if let Some(index) = carry_kind.strip_prefix("mul_prev_carry") {
-                        index.parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid carry kind `{}`",
-                                node.name, carry_kind
-                            )
-                        })?;
-                        continue;
-                    }
-                    if let Some(index) = carry_kind.strip_prefix("add_carry") {
-                        index.parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid carry kind `{}`",
-                                node.name, carry_kind
-                            )
-                        })?;
-                        continue;
-                    }
-                    if let Some(index) = carry_kind.strip_prefix("mul_carry") {
-                        index.parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid carry kind `{}`",
-                                node.name, carry_kind
-                            )
-                        })?;
-                        continue;
-                    }
+                    effect_args.push(carry_initial.clone());
+                    effect_args.extend(node.op.args[cursor + 2..payload_end].iter().cloned());
+                    cursor = payload_end;
+                    parsed_any_carry = true;
+                }
+                if !parsed_any_carry || cursor != node.op.args.len() {
                     return Err(format!(
-                        "node `{}` has invalid carry kind `{}`",
-                        node.name, carry_kind
+                        "node `{}` expects `cpu.loop_while_scalar_async_chain <name> <resource> <initial> <limit> <step_callee> <cmp> (<carry_initial> <carry_kind>)+`",
+                        node.name
                     ));
                 }
-                Ok(InstructionSemantics::effect(
-                    node.op
-                        .args
-                        .iter()
-                        .enumerate()
-                        .filter(|(index, _)| *index < 2 || (*index >= 4 && index % 2 == 0))
-                        .map(|(_, arg)| arg.clone())
-                        .collect(),
-                ))
+                Ok(InstructionSemantics::effect(effect_args))
             }
             "loop_while_i64_async_cond_chain" | "loop_while_scalar_async_cond_chain" => {
                 if node.op.args.len() < 6 {
@@ -1783,14 +1939,6 @@ impl RegisteredMod for CpuMod {
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                if carry_start_index < node.op.args.len()
-                    && (node.op.args.len() - carry_start_index) % 5 != 0
-                {
-                    return Err(format!(
-                        "node `{}` expects `cpu.loop_while_scalar_async_post_flow_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_flow_expr> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)*`",
-                        node.name
-                    ));
-                }
                 let carries =
                     parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?;
                 let mut inputs = vec![node.op.args[0].clone(), node.op.args[1].clone()];
@@ -2083,21 +2231,17 @@ impl RegisteredMod for CpuMod {
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                let carries = parse_conditional_carries(
-                    &node.op.args,
-                    carry_start_index,
-                    &node.name,
-                    true,
-                )?
-                .iter()
-                .map(|carry| {
-                    format_conditional_carry(carry, &|value_name| {
-                        state
-                            .expect_value(value_name)
-                            .map(|value| value.to_string())
-                    })
-                })
-                .collect::<Result<Vec<_>, String>>()?;
+                let carries =
+                    parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?
+                        .iter()
+                        .map(|carry| {
+                            format_conditional_carry(carry, &|value_name| {
+                                state
+                                    .expect_value(value_name)
+                                    .map(|value| value.to_string())
+                            })
+                        })
+                        .collect::<Result<Vec<_>, String>>()?;
                 let control_display = format_loop_flow_expr(&control_expr, &|value_name| {
                     state
                         .expect_value(value_name)
@@ -3317,21 +3461,17 @@ impl RegisteredMod for CpuMod {
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                let carries = parse_conditional_carries(
-                    &node.op.args,
-                    carry_start_index,
-                    &node.name,
-                    true,
-                )?
-                .iter()
-                .map(|carry| {
-                    format_conditional_carry(carry, &|value_name| {
-                        state
-                            .expect_value(value_name)
-                            .map(|value| value.to_string())
-                    })
-                })
-                .collect::<Result<Vec<_>, String>>()?;
+                let carries =
+                    parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?
+                        .iter()
+                        .map(|carry| {
+                            format_conditional_carry(carry, &|value_name| {
+                                state
+                                    .expect_value(value_name)
+                                    .map(|value| value.to_string())
+                            })
+                        })
+                        .collect::<Result<Vec<_>, String>>()?;
                 let control_display = format_loop_flow_expr(&control_expr, &|value_name| {
                     state
                         .expect_value(value_name)
@@ -3366,21 +3506,17 @@ impl RegisteredMod for CpuMod {
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                let carries = parse_conditional_carries(
-                    &node.op.args,
-                    carry_start_index,
-                    &node.name,
-                    true,
-                )?
-                .iter()
-                .map(|carry| {
-                    format_conditional_carry(carry, &|value_name| {
-                        state
-                            .expect_value(value_name)
-                            .map(|value| value.to_string())
-                    })
-                })
-                .collect::<Result<Vec<_>, String>>()?;
+                let carries =
+                    parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?
+                        .iter()
+                        .map(|carry| {
+                            format_conditional_carry(carry, &|value_name| {
+                                state
+                                    .expect_value(value_name)
+                                    .map(|value| value.to_string())
+                            })
+                        })
+                        .collect::<Result<Vec<_>, String>>()?;
                 let control_display = format_loop_flow_expr(&control_expr, &|value_name| {
                     state
                         .expect_value(value_name)
@@ -3416,21 +3552,17 @@ impl RegisteredMod for CpuMod {
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                let carries = parse_conditional_carries(
-                    &node.op.args,
-                    carry_start_index,
-                    &node.name,
-                    true,
-                )?
-                .iter()
-                .map(|carry| {
-                    format_conditional_carry(carry, &|value_name| {
-                        state
-                            .expect_value(value_name)
-                            .map(|value| value.to_string())
-                    })
-                })
-                .collect::<Result<Vec<_>, String>>()?;
+                let carries =
+                    parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?
+                        .iter()
+                        .map(|carry| {
+                            format_conditional_carry(carry, &|value_name| {
+                                state
+                                    .expect_value(value_name)
+                                    .map(|value| value.to_string())
+                            })
+                        })
+                        .collect::<Result<Vec<_>, String>>()?;
                 let control_display = format_loop_flow_expr(&control_expr, &|value_name| {
                     state
                         .expect_value(value_name)
@@ -3661,5 +3793,297 @@ mod tests {
         assert_eq!(carries.len(), 1);
         assert_eq!(carries[0].else_source.kind, "keep_prev_carry");
         assert!(carries[0].else_source.payload.is_empty());
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_current_plus_invariant_kind() {
+        let args = vec!["add_current_plus_invariant".to_owned(), "rhs0".to_owned()];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(source.kind, "add_current_plus_invariant");
+        assert_eq!(source.payload, vec!["rhs0".to_owned()]);
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn parse_conditional_carries_accepts_add_invariant_branch_kind() {
+        let args = vec![
+            "acc0".to_owned(),
+            "current_gt".to_owned(),
+            "rhs0".to_owned(),
+            "add_current_plus_invariant".to_owned(),
+            "rhs1".to_owned(),
+            "add_invariant".to_owned(),
+            "rhs2".to_owned(),
+        ];
+        let carries =
+            parse_conditional_carries(&args, 0, "loop_node", true).expect("expected carries");
+        assert_eq!(carries.len(), 1);
+        assert_eq!(carries[0].then_source.kind, "add_current_plus_invariant");
+        assert_eq!(carries[0].then_source.payload, vec!["rhs1".to_owned()]);
+        assert_eq!(carries[0].else_source.kind, "add_invariant");
+        assert_eq!(carries[0].else_source.payload, vec!["rhs2".to_owned()]);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_current_plus_current_plus_invariant_kind() {
+        let args = vec![
+            "add_current_plus_current_plus_invariant".to_owned(),
+            "rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(source.kind, "add_current_plus_current_plus_invariant");
+        assert_eq!(source.payload, vec!["rhs0".to_owned()]);
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_current_plus_current_plus_current_plus_invariant_kind(
+    ) {
+        let args = vec![
+            "add_current_plus_current_plus_current_plus_invariant".to_owned(),
+            "rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_current_plus_current_plus_current_plus_invariant"
+        );
+        assert_eq!(source.payload, vec!["rhs0".to_owned()]);
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_current_plus_current_plus_invariant_kind() {
+        let args = vec![
+            "add_scaled_current_plus_current_plus_invariant".to_owned(),
+            "factor0".to_owned(),
+            "rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(source.kind, "add_scaled_current_plus_current_plus_invariant");
+        assert_eq!(source.payload, vec!["factor0".to_owned(), "rhs0".to_owned()]);
+        assert_eq!(next, 3);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_current_kind() {
+        let args = vec!["add_scaled_by_current_current_plus_current".to_owned()];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(source.kind, "add_scaled_by_current_current_plus_current");
+        assert!(source.payload.is_empty());
+        assert_eq!(next, 1);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_current_plus_invariant_kind() {
+        let args = vec![
+            "add_scaled_by_current_current_plus_current_plus_invariant".to_owned(),
+            "rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_current_plus_current_plus_invariant"
+        );
+        assert_eq!(source.payload, vec!["rhs0".to_owned()]);
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_current_plus_factor_invariant_kind() {
+        let args = vec![
+            "add_scaled_by_current_plus_factor_invariant_current_plus_current".to_owned(),
+            "factor_rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_plus_factor_invariant_current_plus_current"
+        );
+        assert_eq!(source.payload, vec!["factor_rhs0".to_owned()]);
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_current_plus_factor_invariant_plus_invariant_kind(
+    ) {
+        let args = vec![
+            "add_scaled_by_current_plus_factor_invariant_current_plus_current_plus_invariant"
+                .to_owned(),
+            "factor_rhs0".to_owned(),
+            "rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_plus_factor_invariant_current_plus_current_plus_invariant"
+        );
+        assert_eq!(
+            source.payload,
+            vec!["factor_rhs0".to_owned(), "rhs0".to_owned()]
+        );
+        assert_eq!(next, 3);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_multi_state_factor_kind() {
+        let args = vec![
+            "add_scaled_by_current_plus_current_times_current_plus_current".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_plus_current_times_current_plus_current"
+        );
+        assert!(source.payload.is_empty());
+        assert_eq!(next, 1);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_multi_state_factor_plus_invariant_kind() {
+        let args = vec![
+            "add_scaled_by_current_plus_current_times_current_plus_current_plus_invariant"
+                .to_owned(),
+            "rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_plus_current_times_current_plus_current_plus_invariant"
+        );
+        assert_eq!(source.payload, vec!["rhs0".to_owned()]);
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_multi_state_factor_and_factor_invariant_kind(
+    ) {
+        let args = vec![
+            "add_scaled_by_current_plus_current_plus_factor_invariant_times_current_plus_current"
+                .to_owned(),
+            "factor_rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_plus_current_plus_factor_invariant_times_current_plus_current"
+        );
+        assert_eq!(source.payload, vec!["factor_rhs0".to_owned()]);
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_factor_group_product_kind() {
+        let args = vec![
+            "add_scaled_by_current_plus_current_times_factor_group_current_plus_factor_invariant_times_terms_current_plus_current"
+                .to_owned(),
+            "rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_plus_current_times_factor_group_current_plus_factor_invariant_times_terms_current_plus_current"
+        );
+        assert_eq!(source.payload, vec!["rhs0".to_owned()]);
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_factor_group_product_plus_invariant_kind() {
+        let args = vec![
+            "add_scaled_by_current_plus_current_plus_factor_invariant_times_factor_group_current_plus_factor_invariant_times_terms_current_plus_current_plus_invariant"
+                .to_owned(),
+            "lhs0".to_owned(),
+            "rhs0".to_owned(),
+            "base0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_plus_current_plus_factor_invariant_times_factor_group_current_plus_factor_invariant_times_terms_current_plus_current_plus_invariant"
+        );
+        assert_eq!(
+            source.payload,
+            vec!["lhs0".to_owned(), "rhs0".to_owned(), "base0".to_owned()]
+        );
+        assert_eq!(next, 4);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_factor_group_product_times_invariant_kind() {
+        let args = vec![
+            "add_scaled_by_current_plus_current_times_factor_group_current_plus_factor_invariant_times_factor_invariant_times_terms_current_plus_current"
+                .to_owned(),
+            "factor_scale0".to_owned(),
+            "rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_plus_current_times_factor_group_current_plus_factor_invariant_times_factor_invariant_times_terms_current_plus_current"
+        );
+        assert_eq!(
+            source.payload,
+            vec!["factor_scale0".to_owned(), "rhs0".to_owned()]
+        );
+        assert_eq!(next, 3);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_multi_state_factor_times_invariant_kind() {
+        let args = vec![
+            "add_scaled_by_current_plus_current_times_factor_invariant_times_current_plus_current"
+                .to_owned(),
+            "factor_scale0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_plus_current_times_factor_invariant_times_current_plus_current"
+        );
+        assert_eq!(source.payload, vec!["factor_scale0".to_owned()]);
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_add_scaled_by_multi_state_factor_and_offset_times_invariant_kind(
+    ) {
+        let args = vec![
+            "add_scaled_by_current_plus_current_plus_factor_invariant_times_factor_invariant_times_current_plus_current_plus_invariant"
+                .to_owned(),
+            "factor_scale0".to_owned(),
+            "factor_rhs0".to_owned(),
+            "rhs0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "add_scaled_by_current_plus_current_plus_factor_invariant_times_factor_invariant_times_current_plus_current_plus_invariant"
+        );
+        assert_eq!(
+            source.payload,
+            vec![
+                "factor_scale0".to_owned(),
+                "factor_rhs0".to_owned(),
+                "rhs0".to_owned()
+            ]
+        );
+        assert_eq!(next, 4);
     }
 }

@@ -5954,14 +5954,13 @@ mod tests {
         assert!(shim.contains("static int64_t nuis_host_buffer_find_text("));
         assert!(shim.contains("static int64_t nuis_host_buffer_find_line_end("));
         assert!(shim.contains("static int64_t nuis_host_buffer_trim_line_end("));
-        assert!(shim.contains(
-            "return nuis_host_serialize_text_into(text_handle, buffer_handle, offset);"
-        ));
+        assert!(shim
+            .contains("return nuis_host_serialize_text_into(text_handle, buffer_handle, offset);"));
         assert!(shim.contains("return nuis_host_serialize_i64_into(value, buffer_handle, offset);"));
-        assert!(shim.contains("return nuis_host_serialize_bool_into(value, buffer_handle, offset);"));
-        assert!(shim.contains(
-            "return nuis_host_deserialize_i64_from(buffer_handle, offset, len);"
-        ));
+        assert!(
+            shim.contains("return nuis_host_serialize_bool_into(value, buffer_handle, offset);")
+        );
+        assert!(shim.contains("return nuis_host_deserialize_i64_from(buffer_handle, offset, len);"));
         assert!(shim.contains("return nuis_host_deserialize_bool_from("));
         assert!(shim.contains("return nuis_host_deserialize_text_from("));
     }

@@ -1,0 +1,19 @@
+mod cpu Main {
+  async fn emit(seed: i64) -> i64 {
+    return seed + 10;
+  }
+
+  fn main() -> i64 {
+    let result: TaskResult<i64> = join_result(spawn(emit(7)));
+    let current: i64 = if task_completed(result) {
+      let value: i64 = task_value(result);
+      let widened: i64 = value + 3;
+      widened
+    } else {
+      let value: i64 = 0;
+      let widened: i64 = value + 3;
+      widened
+    };
+    return current + 1;
+  }
+}

@@ -1139,7 +1139,6 @@ fn rejects_sync_chained_while_with_future_sibling_carry_dependency() {
     .unwrap();
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains(
-        "references sibling carry `slot` before that carry is updated in the loop body"
-    ));
+    assert!(error
+        .contains("references sibling carry `slot` before that carry is updated in the loop body"));
 }

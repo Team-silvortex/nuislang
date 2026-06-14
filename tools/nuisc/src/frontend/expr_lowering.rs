@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::binary_lowering::lower_binary_expr_with_async;
-use super::call_helpers::ensure_call_arg_matches_param;
+use super::call_helpers::{ensure_call_arg_matches_param, lower_extern_call_arg_for_param};
 use super::metadata::{hidden_private_field_count, ModuleConstValue};
 use super::name_suggestions::suggest_similar_name;
 use super::unary_lowering::lower_unary_expr_with_async;
@@ -244,6 +244,13 @@ pub(super) fn lower_expr_with_async(
                                 "extern method `{signature_key}` is currently only allowed inside `mod cpu <unit>`"
                             ));
                         }
+                        let lowered_args = lowered_args
+                            .into_iter()
+                            .zip(signature.params.iter())
+                            .map(|(arg, expected_param)| {
+                                lower_extern_call_arg_for_param(arg, expected_param)
+                            })
+                            .collect();
                         return Ok(NirExpr::CpuExternCall {
                             abi: signature.abi.clone(),
                             interface: signature.interface.clone(),

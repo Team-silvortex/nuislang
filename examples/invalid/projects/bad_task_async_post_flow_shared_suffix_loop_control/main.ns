@@ -1,0 +1,34 @@
+mod cpu Main {
+  async fn step(value: i64) -> i64 {
+    return value + 1;
+  }
+
+  async fn accumulate(limit: i64, threshold: i64) -> i64 {
+    let value: i64 = 0;
+    let acc: i64 = 0;
+    let scale: i64 = 2;
+    while value < limit {
+      let value: i64 = await step(value);
+      let branch_value: i64 = if value > 2 {
+        let picked: i64 = value;
+        picked
+      } else {
+        let picked: i64 = 0;
+        picked
+      };
+      let widened: i64 = branch_value + 1;
+      let normalized: i64 = widened + value;
+      let remixed: i64 = normalized + value;
+      let stretched: i64 = remixed * ((((value + value) * (value + scale)) * scale) * (value + 1));
+      let acc: i64 = acc + stretched;
+      if acc > threshold {
+        break;
+      }
+    }
+    return acc;
+  }
+
+  async fn main() -> i64 {
+    return await accumulate(7, 8);
+  }
+}

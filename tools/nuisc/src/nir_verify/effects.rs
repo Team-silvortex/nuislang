@@ -29,6 +29,41 @@ pub(super) fn merge_branch_state(
     *borrows = merged_borrows;
 }
 
+pub(super) fn merge_control_flow_borrow_bindings(
+    borrow_bindings: &mut BorrowBindings,
+    then_bindings: &BorrowBindings,
+    else_bindings: &BorrowBindings,
+) {
+    let mut merged = BorrowBindings::new();
+    for (name, then_binding) in then_bindings {
+        if let Some(else_binding) = else_bindings.get(name) {
+            if then_binding == else_binding {
+                merged.insert(name.clone(), then_binding.clone());
+            }
+        }
+    }
+    *borrow_bindings = merged;
+}
+
+pub(super) fn merge_control_flow_data_bindings(
+    data_bindings: &mut BTreeMap<String, super::NirDataKind>,
+    then_bindings: &BTreeMap<String, super::NirDataKind>,
+    else_bindings: &BTreeMap<String, super::NirDataKind>,
+) {
+    let mut merged = BTreeMap::new();
+    for (name, then_kind) in then_bindings {
+        if let Some(else_kind) = else_bindings.get(name) {
+            let merged_kind = if then_kind == else_kind {
+                *then_kind
+            } else {
+                super::NirDataKind::Other
+            };
+            merged.insert(name.clone(), merged_kind);
+        }
+    }
+    *data_bindings = merged;
+}
+
 pub(super) fn ensure_binding_can_be_rebound(
     name: &str,
     borrows: &BTreeMap<String, usize>,
@@ -76,18 +111,18 @@ pub(super) fn note_binding_effects(
             }
         }
         NirExpr::Borrow(inner) => {
-            if let Some(source) = expr_resource_key(inner) {
-                *borrows.entry(source.clone()).or_insert(0) += 1;
+            if let Some(binding) = borrowed_address_binding(inner, borrow_bindings)
+                .or_else(|| expr_resource_key(inner).map(BorrowedAddressBinding::direct))
+            {
+                *borrows.entry(binding.source.clone()).or_insert(0) += 1;
                 if binding_name != "_" {
-                    borrow_bindings.insert(
-                        binding_name.to_owned(),
-                        BorrowedAddressBinding::direct(source),
-                    );
+                    borrow_bindings.insert(binding_name.to_owned(), binding);
                 }
             }
         }
         NirExpr::LoadNext(inner) => {
             if let Some(binding) = borrowed_address_binding(inner, borrow_bindings) {
+                *borrows.entry(binding.source.clone()).or_insert(0) += 1;
                 if binding_name != "_" {
                     borrow_bindings.insert(
                         binding_name.to_owned(),

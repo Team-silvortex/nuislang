@@ -89,7 +89,12 @@ fn collect_trait_name_variants(
     let mut variants = visible_trait_names
         .iter()
         .filter(|candidate| candidate.as_str() != trait_name)
-        .filter(|candidate| candidate.rsplit('.').next().is_some_and(|name| name == short_name))
+        .filter(|candidate| {
+            candidate
+                .rsplit('.')
+                .next()
+                .is_some_and(|name| name == short_name)
+        })
         .cloned()
         .collect::<Vec<_>>();
     variants.sort_by_key(|candidate| (!candidate.contains('.'), candidate.clone()));

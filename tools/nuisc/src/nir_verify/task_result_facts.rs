@@ -59,6 +59,22 @@ pub(super) fn apply_task_result_condition_facts(
     }
 }
 
+pub(super) fn merge_control_flow_task_result_facts(
+    task_result_facts: &mut BTreeMap<String, TaskResultStateFact>,
+    then_facts: &BTreeMap<String, TaskResultStateFact>,
+    else_facts: &BTreeMap<String, TaskResultStateFact>,
+) {
+    let mut merged = BTreeMap::new();
+    for (name, then_fact) in then_facts {
+        if let Some(else_fact) = else_facts.get(name) {
+            if then_fact == else_fact {
+                merged.insert(name.clone(), *then_fact);
+            }
+        }
+    }
+    *task_result_facts = merged;
+}
+
 pub(super) fn borrowed_address_binding(
     expr: &NirExpr,
     borrow_bindings: &BorrowBindings,

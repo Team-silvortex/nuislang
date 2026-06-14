@@ -700,8 +700,14 @@ fn reports_mixed_bare_and_qualified_trait_names_consistently() {
     .unwrap();
 
     let error = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap_err();
-    assert!(error.contains("bound `Addable` uses a different visible name for the same trait"), "{error}");
-    assert!(error.contains("use `Helper.Addable` consistently"), "{error}");
+    assert!(
+        error.contains("bound `Addable` uses a different visible name for the same trait"),
+        "{error}"
+    );
+    assert!(
+        error.contains("use `Helper.Addable` consistently"),
+        "{error}"
+    );
 }
 
 #[test]

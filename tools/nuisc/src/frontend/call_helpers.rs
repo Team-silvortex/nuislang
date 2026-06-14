@@ -79,6 +79,16 @@ pub(super) fn ensure_call_arg_matches_param(
     ))
 }
 
+pub(super) fn lower_extern_call_arg_for_param(
+    arg: NirExpr,
+    expected_param: &NirTypeRef,
+) -> NirExpr {
+    if expected_param == &buffer_ref_type() {
+        return NirExpr::HostBufferHandle(Box::new(arg));
+    }
+    arg
+}
+
 pub(super) fn ensure_spawn_input_safe(
     name: &str,
     expr: &NirExpr,
@@ -126,7 +136,7 @@ fn infer_boundary_address_class(
 }
 
 fn supports_host_buffer_handle_bridge(expected: &NirTypeRef, actual: &NirTypeRef) -> bool {
-    expected == &i64_host_value_type()
+    (expected == &i64_host_value_type() || expected == &buffer_ref_type())
         && (actual == &buffer_ref_type() || actual == &i64_host_value_type())
 }
 

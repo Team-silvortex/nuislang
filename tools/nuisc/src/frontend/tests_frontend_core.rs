@@ -259,8 +259,14 @@ fn suggests_similar_local_function_name_for_unknown_call() {
     )
     .unwrap_err();
 
-    assert!(error.contains("unknown function `task_policy_complted`"), "{error}");
-    assert!(error.contains("did you mean `task_policy_completed`?"), "{error}");
+    assert!(
+        error.contains("unknown function `task_policy_complted`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("did you mean `task_policy_completed`?"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -289,8 +295,14 @@ fn suggests_similar_imported_helper_function_name_for_unknown_call() {
     .unwrap();
 
     let error = super::lower_project_ast_to_nir(&entry, &[helper]).unwrap_err();
-    assert!(error.contains("unknown function `task_policy_complted`"), "{error}");
-    assert!(error.contains("did you mean `task_policy_completed`?"), "{error}");
+    assert!(
+        error.contains("unknown function `task_policy_complted`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("did you mean `task_policy_completed`?"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -824,7 +836,10 @@ fn suggests_similar_visible_field_name_for_field_access() {
     );
 
     let error = module.unwrap_err();
-    assert!(error.contains("type `Config` has no field `cout`"), "{error}");
+    assert!(
+        error.contains("type `Config` has no field `cout`"),
+        "{error}"
+    );
     assert!(error.contains("did you mean `count`?"), "{error}");
 }
 
@@ -1217,7 +1232,10 @@ fn reports_missing_impl_for_explicit_qualified_trait_call_on_concrete_type() {
     .unwrap();
 
     let error = super::lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap_err();
-    assert!(error.contains("trait `Helper.Addable` has no impl for `i64`"), "{error}");
+    assert!(
+        error.contains("trait `Helper.Addable` has no impl for `i64`"),
+        "{error}"
+    );
     assert!(error.contains("Helper.Addable.add"), "{error}");
 }
 
@@ -1254,5 +1272,8 @@ fn suggests_trait_method_name_for_explicit_qualified_trait_call() {
 
     let error = super::lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap_err();
     assert!(error.contains("does not define method `ad`"), "{error}");
-    assert!(error.contains("did you mean `Helper.Addable.add`?"), "{error}");
+    assert!(
+        error.contains("did you mean `Helper.Addable.add`?"),
+        "{error}"
+    );
 }

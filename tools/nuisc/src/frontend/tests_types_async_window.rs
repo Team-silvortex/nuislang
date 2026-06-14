@@ -419,7 +419,10 @@ fn rejects_unary_deref_for_non_node_address_types() {
     )
     .unwrap_err();
 
-    assert!(error.contains("unary `*` currently expects `ref Node` operand"), "{error}");
+    assert!(
+        error.contains("unary `*` currently expects `ref Node` operand"),
+        "{error}"
+    );
     assert!(error.contains("ref Buffer"), "{error}");
 }
 
@@ -475,7 +478,10 @@ fn rejects_unknown_node_pointer_field_access_sugar() {
     )
     .unwrap_err();
 
-    assert!(error.contains("pointer field sugar currently supports only `value` and `next`"), "{error}");
+    assert!(
+        error.contains("pointer field sugar currently supports only `value` and `next`"),
+        "{error}"
+    );
     assert!(error.contains("ref Node"), "{error}");
 }
 
@@ -530,7 +536,10 @@ fn rejects_unknown_buffer_field_access_sugar() {
     )
     .unwrap_err();
 
-    assert!(error.contains("buffer field sugar currently supports only `len`"), "{error}");
+    assert!(
+        error.contains("buffer field sugar currently supports only `len`"),
+        "{error}"
+    );
     assert!(error.contains("ref Buffer"), "{error}");
 }
 

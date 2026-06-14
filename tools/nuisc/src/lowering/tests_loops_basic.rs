@@ -276,12 +276,10 @@ fn rejects_general_sync_while_with_structured_shape_diagnostic() {
     .unwrap();
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains(
-        "structured `while` lowering recognized loop state `value` and its step"
-    ));
-    assert!(error.contains(
-        "remaining body still contains arbitrary executable statements"
-    ));
+    assert!(
+        error.contains("structured `while` lowering recognized loop state `value` and its step")
+    );
+    assert!(error.contains("remaining body still contains arbitrary executable statements"));
 }
 
 #[test]
@@ -303,9 +301,7 @@ fn rejects_structured_while_with_unsupported_first_step_binding_diagnostic() {
     .unwrap();
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains(
-        "the first body binding `next` is not a supported step"
-    ));
+    assert!(error.contains("the first body binding `next` is not a supported step"));
     assert!(error.contains("loop state `value`"));
 }
 

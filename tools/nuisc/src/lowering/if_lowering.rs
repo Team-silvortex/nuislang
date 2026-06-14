@@ -86,6 +86,15 @@ pub(super) fn lower_if_pair(
                 });
             }
         }
+        if let Some(lowered) = lower_binding_if_chain_with_shared_context(
+            &condition_name,
+            then_body,
+            else_body,
+            state,
+            bindings,
+        )? {
+            return Ok(lowered);
+        }
         return Err(
             "minimal nuisc lowering currently only supports `if` as matching `print`, matching `let/const`, `return <expr>`, or small terminal branches like `print(...); return ...`"
                 .to_owned(),
@@ -259,4 +268,90 @@ fn lower_binding_if_chain(
         }
         _ => Ok(None),
     }
+}
+
+fn lower_binding_if_chain_with_shared_context(
+    condition_name: &str,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<LoweredIfOutcome>, String> {
+    let (shared_prefix, then_core, else_core, shared_suffix) =
+        split_shared_branch_context(then_body, else_body);
+    if shared_prefix.is_empty() && shared_suffix.is_empty() {
+        return Ok(None);
+    }
+
+    let pure_helpers = state.pure_helpers.clone();
+    let mut local_bindings = bindings.clone();
+    super::body_lowering::lower_linear_stmts(shared_prefix, state, &mut local_bindings)?;
+
+    let Some((lhs_name, lhs_value)) =
+        lower_binding_if_chain(then_core, state, &local_bindings, &pure_helpers)?
+    else {
+        return Ok(None);
+    };
+    let Some((rhs_name, rhs_value)) =
+        lower_binding_if_chain(else_core, state, &local_bindings, &pure_helpers)?
+    else {
+        return Ok(None);
+    };
+    if lhs_name != rhs_name {
+        return Ok(None);
+    }
+
+    let selected = lower_select(condition_name.to_owned(), lhs_value, rhs_value, state)?;
+    local_bindings.insert(lhs_name.clone(), selected.clone());
+
+    let outcome_name = if shared_suffix.is_empty() {
+        lhs_name
+    } else {
+        let suffix_last_bound =
+            super::body_lowering::lower_linear_stmts(shared_suffix, state, &mut local_bindings)?;
+        suffix_last_bound.unwrap_or(lhs_name)
+    };
+    let Some(outcome_value) = local_bindings.get(&outcome_name).cloned() else {
+        return Err(format!(
+            "minimal nuisc lowering expected shared branch binding `{outcome_name}` to be available after shared suffix lowering"
+        ));
+    };
+
+    Ok(Some(LoweredIfOutcome::Bind {
+        name: outcome_name,
+        value: outcome_value,
+    }))
+}
+
+fn split_shared_branch_context<'a>(
+    then_body: &'a [NirStmt],
+    else_body: &'a [NirStmt],
+) -> (&'a [NirStmt], &'a [NirStmt], &'a [NirStmt], &'a [NirStmt]) {
+    let shared_prefix_len = then_body
+        .iter()
+        .zip(else_body.iter())
+        .take_while(|(lhs, rhs)| lhs == rhs)
+        .count();
+
+    let then_remaining = &then_body[shared_prefix_len..];
+    let else_remaining = &else_body[shared_prefix_len..];
+
+    let max_shared_suffix_len = then_remaining.len().min(else_remaining.len());
+    let mut shared_suffix_len = 0usize;
+    while shared_suffix_len < max_shared_suffix_len
+        && then_remaining[then_remaining.len() - 1 - shared_suffix_len]
+            == else_remaining[else_remaining.len() - 1 - shared_suffix_len]
+    {
+        shared_suffix_len += 1;
+    }
+
+    let then_core_end = then_remaining.len().saturating_sub(shared_suffix_len);
+    let else_core_end = else_remaining.len().saturating_sub(shared_suffix_len);
+
+    (
+        &then_body[..shared_prefix_len],
+        &then_remaining[..then_core_end],
+        &else_remaining[..else_core_end],
+        &then_remaining[then_core_end..],
+    )
 }

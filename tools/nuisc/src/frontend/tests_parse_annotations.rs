@@ -514,7 +514,7 @@ fn rejects_ref_parameter_in_extern_function_signature() {
     .unwrap_err();
 
     assert!(error.contains("extern function `host_take_ptr` parameter `head`"));
-    assert!(error.contains("host-boundary pointer parameters and returns are not stabilized yet"));
+    assert!(error.contains("only non-optional `ref Buffer` parameters are currently stabilized"));
 }
 
 #[test]
@@ -534,7 +534,56 @@ fn rejects_ref_return_in_extern_interface_signature() {
     .unwrap_err();
 
     assert!(error.contains("extern method `Nodes.head` return type"));
-    assert!(error.contains("host-boundary pointer parameters and returns are not stabilized yet"));
+    assert!(error.contains("pointer returns remain unsupported"));
+}
+
+#[test]
+fn accepts_ref_buffer_parameter_in_extern_function_signature() {
+    let module = parse_nuis_module(
+        r#"
+        extern "c" fn host_take_buffer(buffer: ref Buffer, len: i64) -> i64;
+        mod cpu Main {
+          fn main() -> i64 {
+            let backing: ref Buffer = alloc_buffer(8, 0);
+            return host_take_buffer(backing, 8);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert_eq!(
+        main.body,
+        vec![
+            NirStmt::Let {
+                name: "backing".to_owned(),
+                ty: Some(nuis_semantics::model::NirTypeRef {
+                    name: "Buffer".to_owned(),
+                    generic_args: vec![],
+                    is_optional: false,
+                    is_ref: true,
+                }),
+                value: NirExpr::AllocBuffer {
+                    len: Box::new(NirExpr::Int(8)),
+                    fill: Box::new(NirExpr::Int(0)),
+                },
+            },
+            NirStmt::Return(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_take_buffer".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(NirExpr::Var("backing".to_owned()))),
+                    NirExpr::Int(8),
+                ],
+            }))
+        ],
+    );
 }
 
 #[test]

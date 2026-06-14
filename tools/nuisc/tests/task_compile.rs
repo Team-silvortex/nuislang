@@ -25,6 +25,15 @@ fn compiles_task_recursive_async_keep_prev_carry_project() {
 }
 
 #[test]
+fn compiles_task_recursive_async_shared_suffix_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_shared_suffix_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task recursive async shared-suffix project should compile");
+}
+
+#[test]
 fn compiles_task_mutual_recursive_async_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_mutual_recursive_async_demo",
@@ -61,6 +70,117 @@ fn lowers_task_recursive_async_keep_prev_carry_project_with_cond_chain_shape() {
     assert_eq!(loop_node.op.args[6], "prev_current_gt");
     assert_eq!(loop_node.op.args[8], "add_prev_current");
     assert_eq!(loop_node.op.args[9], "keep_prev_carry");
+}
+
+#[test]
+fn lowers_task_recursive_async_shared_suffix_project_with_select_then_suffix_then_recursive_call_shape(
+) {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_shared_suffix_demo",
+    );
+
+    let accumulate = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "accumulate")
+        .expect("expected accumulate function");
+    assert!(accumulate.is_async);
+    assert!(accumulate.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                condition: NirExpr::Binary { .. },
+                then_body,
+                else_body,
+            } if matches!(
+                then_body.as_slice(),
+                [
+                    NirStmt::Let {
+                        name,
+                        ty: Some(ty),
+                        value: NirExpr::Var(current_name),
+                    },
+                    NirStmt::Let {
+                        name: branch_name,
+                        ty: Some(branch_ty),
+                        value: NirExpr::Var(base_name),
+                    }
+                ] if name == "base"
+                    && ty.render() == "i64"
+                    && current_name == "current"
+                    && branch_name == "branch_value"
+                    && branch_ty.render() == "i64"
+                    && base_name == "base"
+            ) && matches!(
+                else_body.as_slice(),
+                [
+                    NirStmt::Let {
+                        name,
+                        ty: Some(ty),
+                        value: NirExpr::Int(0),
+                    }
+                ] if name == "branch_value" && ty.render() == "i64"
+            )
+        )
+    }));
+    assert!(accumulate.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::Binary { .. },
+            } if name == "widened" && ty.render() == "i64"
+        )
+    }));
+    assert!(matches!(
+        accumulate.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(inner))))
+            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "accumulate")
+    ));
+
+    let lowered_ops = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction != "text")
+        .map(|node| node.op.instruction.as_str())
+        .collect::<Vec<_>>();
+    let select_index = lowered_ops
+        .iter()
+        .position(|op| *op == "select")
+        .expect("expected select op for recursive shared-suffix branch");
+    let first_add_after_select = lowered_ops
+        .iter()
+        .enumerate()
+        .skip(select_index + 1)
+        .find_map(|(index, op)| (*op == "add").then_some(index))
+        .expect("expected shared suffix add after select");
+    let async_call_index = lowered_ops
+        .iter()
+        .enumerate()
+        .skip(first_add_after_select + 1)
+        .find_map(|(index, op)| (*op == "async_call").then_some(index))
+        .expect("expected recursive async_call after shared suffix");
+    let await_index = lowered_ops
+        .iter()
+        .enumerate()
+        .skip(async_call_index + 1)
+        .find_map(|(index, op)| (*op == "await").then_some(index))
+        .expect("expected await after recursive async_call");
+    assert!(
+        select_index < first_add_after_select,
+        "expected shared suffix add after select, got {lowered_ops:?}"
+    );
+    assert!(
+        first_add_after_select < async_call_index,
+        "expected recursive async_call after shared suffix add, got {lowered_ops:?}"
+    );
+    assert!(
+        async_call_index < await_index,
+        "expected await after recursive async_call, got {lowered_ops:?}"
+    );
 }
 
 #[test]
@@ -1086,6 +1206,15 @@ fn compiles_task_async_post_flow_keep_prev_carry_project() {
 }
 
 #[test]
+fn compiles_task_async_post_flow_shared_suffix_loop_control_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async post-flow shared-suffix loop-control project should compile");
+}
+
+#[test]
 fn rejects_task_async_memory_project_with_precise_sibling_carry_diagnostic() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_memory_unsupported_demo",
@@ -1093,9 +1222,72 @@ fn rejects_task_async_memory_project_with_precise_sibling_carry_diagnostic() {
     let error = nuisc::pipeline::compile_project(project)
         .err()
         .expect("task async memory project should fail until lowering exists");
+    assert!(error
+        .contains("references sibling carry `slot` before that carry is updated in the loop body"));
+}
+
+#[test]
+fn rejects_task_async_post_flow_shared_suffix_loop_control_project_with_precise_shape_diagnostic() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/invalid/projects/bad_task_async_post_flow_shared_suffix_loop_control",
+    );
+    let error = nuisc::pipeline::compile_project(project).err().expect(
+        "task async post-flow shared-suffix loop-control project should fail until lowering exists",
+    );
     assert!(error.contains(
-        "references sibling carry `slot` before that carry is updated in the loop body"
+        "structured `while` lowering recognized loop state `value` and a loop-control `if`"
     ));
+    assert!(error.contains(
+        "control condition is not reducible to supported loop-state/carry boolean tests"
+    ));
+}
+
+#[test]
+fn lowers_task_async_post_flow_shared_suffix_loop_control_project_with_cond_chain_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo",
+    );
+
+    let accumulate = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "accumulate")
+        .expect("expected accumulate function");
+    assert!(accumulate.is_async);
+    assert!(accumulate
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::While { .. })));
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "carry0_gt");
+    assert_eq!(loop_node.op.args[6], "break");
+    assert_eq!(loop_node.op.args[8], "current_gt");
+    assert_eq!(
+        loop_node.op.args[10],
+        "add_scaled_by_current_plus_current_times_factor_group_current_plus_factor_invariant_times_factor_invariant_times_terms_current_plus_current_plus_current_plus_invariant"
+    );
+    assert!(loop_node.op.args[11].starts_with("int_"));
+    assert!(loop_node.op.args[12].starts_with("int_"));
+    assert!(loop_node.op.args[13].starts_with("int_"));
+    assert_eq!(
+        loop_node.op.args[14],
+        "add_scaled_by_current_plus_current_times_factor_group_current_plus_factor_invariant_times_factor_invariant_times_terms_current_plus_current_plus_invariant"
+    );
+    assert!(loop_node.op.args[15].starts_with("int_"));
+    assert!(loop_node.op.args[16].starts_with("int_"));
+    assert!(loop_node.op.args[17].starts_with("add_"));
 }
 
 #[test]
@@ -1118,11 +1310,7 @@ fn lowers_task_async_post_flow_recursive_branching_project_with_post_flow_recurs
     assert_eq!(loop_node.op.args[5], "carry0_gt");
     assert_eq!(loop_node.op.args[7], "break");
     assert!(loop_node.op.args.iter().any(|arg| arg == "or"));
-    assert!(loop_node
-        .op
-        .args
-        .iter()
-        .any(|arg| arg == "prev_current_gt"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "prev_current_gt"));
     assert!(loop_node
         .op
         .args
@@ -1151,7 +1339,11 @@ fn lowers_task_async_post_flow_keep_prev_carry_project_with_post_flow_recursive_
     assert_eq!(loop_node.op.args[5], "carry0_gt");
     assert_eq!(loop_node.op.args[7], "break");
     assert!(loop_node.op.args.iter().any(|arg| arg == "prev_current_gt"));
-    assert!(loop_node.op.args.iter().any(|arg| arg == "add_prev_current"));
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_prev_current"));
     assert!(loop_node.op.args.iter().any(|arg| arg == "keep_prev_carry"));
 }
 

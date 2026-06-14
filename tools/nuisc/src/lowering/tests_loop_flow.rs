@@ -1365,8 +1365,8 @@ fn lowers_nested_if_break_then_branching_carry_into_loop_while_scalar_flow_cond_
 }
 
 #[test]
-fn lowers_nested_if_break_in_then_and_direct_break_in_else_into_loop_while_scalar_flow_cond_chain(
-) {
+fn lowers_nested_if_break_in_then_and_direct_break_in_else_into_loop_while_scalar_flow_cond_chain()
+{
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {

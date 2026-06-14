@@ -704,7 +704,9 @@ fn emits_nested_boolean_flow_or_sync_flow_cond_chain() {
         )
         .unwrap(),
     });
-    for from in ["initial", "limit", "step", "rhs0", "rhs1", "rhs2", "rhs3", "rhs4"] {
+    for from in [
+        "initial", "limit", "step", "rhs0", "rhs1", "rhs2", "rhs3", "rhs4",
+    ] {
         module.edges.push(Edge {
             kind: EdgeKind::Dep,
             from: from.to_owned(),
@@ -785,7 +787,12 @@ fn emits_mixed_break_continue_async_flow_cond_chain() {
         name: "cpu0".to_owned(),
         kind: ResourceKind::parse("cpu.main"),
     });
-    for (name, value) in [("initial", "0"), ("limit", "8"), ("rhs0", "3"), ("rhs1", "2")] {
+    for (name, value) in [
+        ("initial", "0"),
+        ("limit", "8"),
+        ("rhs0", "3"),
+        ("rhs1", "2"),
+    ] {
         module.nodes.push(Node {
             name: name.to_owned(),
             resource: "cpu0".to_owned(),
@@ -881,7 +888,12 @@ fn emits_mixed_break_continue_async_post_flow_cond_chain() {
         name: "cpu0".to_owned(),
         kind: ResourceKind::parse("cpu.main"),
     });
-    for (name, value) in [("initial", "8"), ("limit", "0"), ("rhs0", "5"), ("rhs1", "2")] {
+    for (name, value) in [
+        ("initial", "8"),
+        ("limit", "0"),
+        ("rhs0", "5"),
+        ("rhs1", "2"),
+    ] {
         module.nodes.push(Node {
             name: name.to_owned(),
             resource: "cpu0".to_owned(),
@@ -1202,7 +1214,12 @@ fn rejects_flow_and_in_sync_flow_cond_chain() {
         name: "cpu0".to_owned(),
         kind: ResourceKind::parse("cpu.main"),
     });
-    for (name, value) in [("initial", "0"), ("limit", "8"), ("step", "1"), ("rhs0", "2")] {
+    for (name, value) in [
+        ("initial", "0"),
+        ("limit", "8"),
+        ("step", "1"),
+        ("rhs0", "2"),
+    ] {
         module.nodes.push(Node {
             name: name.to_owned(),
             resource: "cpu0".to_owned(),
@@ -1245,7 +1262,12 @@ fn rejects_missing_flow_action_in_sync_flow_cond_chain() {
         name: "cpu0".to_owned(),
         kind: ResourceKind::parse("cpu.main"),
     });
-    for (name, value) in [("initial", "0"), ("limit", "8"), ("step", "1"), ("rhs0", "2")] {
+    for (name, value) in [
+        ("initial", "0"),
+        ("limit", "8"),
+        ("step", "1"),
+        ("rhs0", "2"),
+    ] {
         module.nodes.push(Node {
             name: name.to_owned(),
             resource: "cpu0".to_owned(),

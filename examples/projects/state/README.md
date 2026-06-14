@@ -25,6 +25,7 @@ Then use the focused clusters below.
 Generic method-bound route:
 
 * [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo)
+* [generic_shared_suffix_if_method_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_shared_suffix_if_method_demo)
 * [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo)
 * [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
 * [generic_method_bound_payload_alias_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_payload_alias_demo)
@@ -164,8 +165,12 @@ This route now also carries:
 
 GLM / state ownership route:
 
+* [if_borrow_end_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/if_borrow_end_state_demo)
 * [glm_borrow_end_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/glm_borrow_end_state_demo)
+* [match_borrow_end_shared_suffix_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_borrow_end_shared_suffix_state_demo)
 * [glm_buffer_roundtrip_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/glm_buffer_roundtrip_state_demo)
+* [buffer_shared_suffix_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/buffer_shared_suffix_state_demo)
+* [task_result_shared_suffix_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/task_result_shared_suffix_state_demo)
 
 Runtime location/config route:
 

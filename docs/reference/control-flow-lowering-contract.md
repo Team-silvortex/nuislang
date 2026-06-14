@@ -1,0 +1,169 @@
+# Control-Flow Lowering Contract
+
+This file is the current implementation-facing summary for the small
+control-flow shapes that the checked-in `nuisc` lowering path treats as stable
+today.
+
+It is intentionally narrower than a full language design note. The goal is to
+answer:
+
+* which branch/loop/recursion shapes are already part of the current mainline
+* which project examples and regression tests prove those shapes
+* which nearby source forms are still intentionally rejected
+
+## Short Rule
+
+Today’s mainline is strongest when control flow stays in one of these families:
+
+* branch-local value selection that collapses into `select`
+* branch-local work followed by a small shared suffix
+* structured `while` bodies that match counted/carry/flow/post-flow contracts
+* async recursion that still reduces to a helper-lowered call/await spine
+
+The compiler is not yet promising general “arbitrary CFG lowering”.
+
+## Supported Today
+
+### 1. Shared branch value plus shared suffix in sync/state paths
+
+Current truth:
+
+* `if` / `match` can produce a branch-local value
+* a straight-line shared suffix can run after that value is merged
+* the merged value lowers through `cpu.select`, then the shared suffix continues
+
+Project anchors:
+
+* [if_borrow_end_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/if_borrow_end_state_demo)
+* [match_borrow_end_shared_suffix_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_borrow_end_shared_suffix_state_demo)
+* [task_result_shared_suffix_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/task_result_shared_suffix_state_demo)
+* [buffer_shared_suffix_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/buffer_shared_suffix_state_demo)
+
+Regression anchors:
+
+* [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
+* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+
+Working rule:
+
+* the shared prefix/suffix must stay straight-line
+* today that means `let`, `const`, or expression statements that lowering can
+  keep linear
+
+### 2. Shared branch value plus shared suffix in async recursion
+
+Current truth:
+
+* async recursion can still carry a branch-selected value through a shared
+  suffix before the recursive call
+* the stable YIR shape is `select -> add -> async_call/call_i64 -> await`
+
+Project anchor:
+
+* [task_recursive_async_shared_suffix_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_shared_suffix_demo)
+
+Regression anchor:
+
+* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+
+Working rule:
+
+* the recursive step remains explicit after the shared suffix
+* this is a supported combination of branch merging and helper-lowered async
+  recursion
+
+### 3. Structured async `while` with branch-local carry updates
+
+Current truth:
+
+* structured async `while` lowering accepts recognized post-flow loop shapes
+* branch-local carry updates are accepted when the eventual loop-control test is
+  still reducible to the supported carry/loop-state boolean family
+* a branch-selected temporary value can feed a later carry update before the
+  loop-control test, as long as that shared suffix still collapses into the
+  existing carry-condition vocabulary
+* a branch-selected value can now flow through a shared suffix that re-mixes the
+  current loop state repeatedly, and that additive family can also be scaled by
+  either a loop-invariant non-negative factor or a direct loop-state factor
+  before the carry update
+
+Project anchors:
+
+* [task_async_while_post_flow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_demo)
+* [task_async_while_post_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo)
+* [task_async_while_post_flow_compound_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_compound_demo)
+* [task_async_post_flow_shared_suffix_loop_control_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo)
+
+Regression anchors:
+
+* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+* [tests_loop_post_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_post_flow.rs)
+
+Working rule:
+
+* the loop body still has to match the structured post-flow recognizer
+* accepted branch work can update recognized carries
+* the final `break` / `continue` condition still has to collapse into a known
+  loop-state/carry test family
+
+## Not Yet Supported
+
+### Mixed factor expressions after additive shared-suffix re-mix inside structured async `while`
+
+Current rejection:
+
+* if a structured async post-flow `while` first selects a branch-local value
+* then runs a shared additive normalization suffix on top of that value
+* and then scales that additive result by a non-additive or otherwise deeper
+  mixed factor expression
+* current lowering still rejects that shape
+
+Boundary anchor:
+
+* [bad_task_async_post_flow_shared_suffix_loop_control](/Users/Shared/chroot/dev/nuislang/examples/invalid/projects/bad_task_async_post_flow_shared_suffix_loop_control)
+
+Regression anchor:
+
+* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+
+Current diagnostic contract:
+
+* `structured while lowering recognized loop state value and a loop-control if`
+* `control condition is not reducible to supported loop-state/carry boolean tests`
+
+What this means:
+
+* branch-value merging plus shared suffix is supported in straight-line state
+  paths
+* the same idea is supported in async recursion
+* a branch-selected temp plus repeated additive loop-state re-mix is now
+  supported in structured async `while`
+* scaling that additive family by a loop-invariant non-negative factor is
+  supported
+* scaling that additive family by a direct loop-state factor like `value` is
+  also supported
+* scaling that additive family by a one-step mixed factor like `value + scale`
+  is also supported
+* scaling that additive family by a nested additive factor like
+  `((value + scale) + 1)` is also supported
+* scaling that additive family by a multi-state additive factor like
+  `(value + value)` is also supported
+* scaling that additive family by the product of two additive factor groups like
+  `((value + value) * (value + scale))` is also supported
+* scaling that additive family by a factor-group product times an invariant like
+  `(((value + value) * (value + scale)) * scale)` is also supported
+* but the structured async `while` recognizer still rejects a deeper chain that
+  multiplies an already-composed factor product again, such as
+  `branch_value -> widened -> normalized = widened + value -> remixed = normalized + value -> stretched = remixed * ((((value + value) * (value + scale)) * scale) * (value + 1)) -> acc`,
+  before the loop-control test
+
+## Practical Reading Order
+
+If you are debugging a current control-flow lowering issue, use this order:
+
+1. read the nearest project anchor
+2. run `dump-nir` to confirm the frontend/control-flow shape
+3. run `dump-yir` if the project is expected to lower successfully
+4. compare against the matching regression test
+5. if the shape sits near the unsupported loop boundary above, expect a
+   deliberate lowering rejection rather than a missing parser/frontend feature

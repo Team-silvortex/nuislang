@@ -18,8 +18,7 @@ use super::validation_trait_bounds::{
 };
 use super::{
     build_function_return_type_table, infer_ast_expr_type, lower_type_ref,
-    lower_type_ref_with_aliases,
-    substitute_ast_type_alias_target,
+    lower_type_ref_with_aliases, substitute_ast_type_alias_target,
 };
 
 fn render_validation_function_context(function_name: &str) -> String {
@@ -149,7 +148,10 @@ fn validate_trait_impl_coherence(
         .collect::<BTreeMap<String, AstTraitDef>>();
     for helper in local_cpu_helpers {
         for definition in helper.traits.iter().filter(|definition| {
-            matches!(definition.visibility, nuis_semantics::model::AstVisibility::Public)
+            matches!(
+                definition.visibility,
+                nuis_semantics::model::AstVisibility::Public
+            )
         }) {
             trait_defs.insert(definition.name.clone(), definition.clone());
             trait_defs.insert(
@@ -167,7 +169,8 @@ fn validate_trait_impl_coherence(
                 definition.trait_name
             ));
         }
-        let rendered_for_type = render_impl_target_type(&definition.for_type, visible_type_aliases)?;
+        let rendered_for_type =
+            render_impl_target_type(&definition.for_type, visible_type_aliases)?;
         if !seen_impls.insert((definition.trait_name.clone(), rendered_for_type.clone())) {
             return Err(format!(
                 "duplicate impl for trait `{}` and type `{}`",

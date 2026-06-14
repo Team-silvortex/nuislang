@@ -141,7 +141,10 @@ fn resolve_compile_input(input: &Path) -> Result<pipeline::ResolvedCompileInput,
 fn compile_command_input(input: &Path) -> Result<CompiledCommandInput, String> {
     let resolved = resolve_compile_input(input)?;
     let artifacts = resolved.compile()?;
-    Ok(CompiledCommandInput { resolved, artifacts })
+    Ok(CompiledCommandInput {
+        resolved,
+        artifacts,
+    })
 }
 
 fn print_project_context(resolved: &pipeline::ResolvedCompileInput) {
@@ -1023,7 +1026,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             let resolved = resolve_compile_input(&input)?;
             let cpu_target = aot::resolve_cpu_build_target(
                 Path::new("nustar-packages"),
-                resolved.project_plan.as_ref().map(|plan| &plan.abi_resolution),
+                resolved
+                    .project_plan
+                    .as_ref()
+                    .map(|plan| &plan.abi_resolution),
                 cpu_abi.as_deref(),
                 target.as_deref(),
             )?;

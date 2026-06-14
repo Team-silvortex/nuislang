@@ -1,0 +1,8 @@
+version = 1
+
+[project]
+name = "bad_task_async_post_flow_shared_suffix_loop_control"
+entry = "main.ns"
+
+[abi]
+cpu = "cpu.arm64.apple_aapcs64"

@@ -409,11 +409,12 @@ pub(crate) fn infer_ast_expr_type_inner(
                         function_return_types,
                         active_exprs,
                     )?;
-                    let definition = impl_lookup.get(&(
-                        trait_name.to_owned(),
-                        lower_type_ref(&receiver_ty).render(),
-                    ))?;
-                    let method_def = definition.methods.iter().find(|item| item.name == *method)?;
+                    let definition = impl_lookup
+                        .get(&(trait_name.to_owned(), lower_type_ref(&receiver_ty).render()))?;
+                    let method_def = definition
+                        .methods
+                        .iter()
+                        .find(|item| item.name == *method)?;
                     method_def
                         .return_type
                         .clone()

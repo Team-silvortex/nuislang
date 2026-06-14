@@ -1,6 +1,25 @@
 use super::lower_nir_to_yir_builtin_cpu;
 use crate::frontend::parse_nuis_module;
 
+fn path_exists(yir: &yir_core::YirModule, from: &str, to: &str) -> bool {
+    let mut frontier = vec![from.to_owned()];
+    let mut seen = std::collections::BTreeSet::new();
+    while let Some(current) = frontier.pop() {
+        if current == to {
+            return true;
+        }
+        if !seen.insert(current.clone()) {
+            continue;
+        }
+        for edge in &yir.edges {
+            if edge.from == current {
+                frontier.push(edge.to.clone());
+            }
+        }
+    }
+    false
+}
+
 #[test]
 fn lowers_join_result_and_task_state_primitives_into_cpu_nodes() {
     let module = parse_nuis_module(
@@ -231,6 +250,219 @@ fn lowers_pure_binding_chain_into_shared_branch_binding_select() {
         .find(|node| node.op.module == "cpu" && node.op.instruction == "select")
         .expect("expected select node for shared branch binding");
     assert_eq!(select_node.op.args.len(), 3);
+}
+
+#[test]
+fn lowers_match_expression_with_shared_borrow_lifecycle_into_select_then_owner_write() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let head: ref Node = move(alloc_node(10, null()));
+            let current: i64 = match 1 {
+              1 => {
+                let head_ref: ref Node = borrow(head);
+                let value: i64 = head_ref.value;
+                borrow_end(head_ref);
+                value
+              }
+              _ => {
+                let head_ref: ref Node = borrow(head);
+                let value: i64 = head_ref.value + 1;
+                borrow_end(head_ref);
+                value
+              }
+            };
+            head.value = current + 67;
+            return head.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let borrows = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "borrow")
+        .collect::<Vec<_>>();
+    let borrow_ends = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "borrow_end")
+        .collect::<Vec<_>>();
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .collect::<Vec<_>>();
+    let store_value = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "store_value")
+        .expect("expected owner store_value after match expression");
+
+    assert_eq!(
+        borrows.len(),
+        1,
+        "expected shared borrow hoisted out of branches"
+    );
+    assert_eq!(
+        borrow_ends.len(),
+        1,
+        "expected shared borrow_end hoisted out of branches"
+    );
+    assert!(
+        !selects.is_empty(),
+        "expected select-based branch value lowering for match expression"
+    );
+    assert!(path_exists(&yir, &borrow_ends[0].name, &store_value.name));
+}
+
+#[test]
+fn lowers_if_expression_with_shared_borrow_lifecycle_into_select_then_owner_write() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let head: ref Node = move(alloc_node(10, null()));
+            let current: i64 = if true {
+              let head_ref: ref Node = borrow(head);
+              let value: i64 = head_ref.value;
+              borrow_end(head_ref);
+              value
+            } else {
+              let head_ref: ref Node = borrow(head);
+              let value: i64 = head_ref.value + 1;
+              borrow_end(head_ref);
+              value
+            };
+            head.value = current + 67;
+            return head.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let borrows = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "borrow")
+        .collect::<Vec<_>>();
+    let borrow_ends = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "borrow_end")
+        .collect::<Vec<_>>();
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .collect::<Vec<_>>();
+    let store_value = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "store_value")
+        .expect("expected owner store_value after if expression");
+
+    assert_eq!(
+        borrows.len(),
+        1,
+        "expected shared borrow hoisted out of branches"
+    );
+    assert_eq!(
+        borrow_ends.len(),
+        1,
+        "expected shared borrow_end hoisted out of branches"
+    );
+    assert!(
+        !selects.is_empty(),
+        "expected select-based branch value lowering for if expression"
+    );
+    assert!(path_exists(&yir, &borrow_ends[0].name, &store_value.name));
+}
+
+#[test]
+fn lowers_match_expression_with_shared_borrow_lifecycle_and_shared_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let head: ref Node = move(alloc_node(10, null()));
+            let current: i64 = match 1 {
+              1 => {
+                let head_ref: ref Node = borrow(head);
+                let value: i64 = head_ref.value;
+                borrow_end(head_ref);
+                let widened: i64 = value + 3;
+                widened
+              }
+              _ => {
+                let head_ref: ref Node = borrow(head);
+                let value: i64 = head_ref.value + 1;
+                borrow_end(head_ref);
+                let widened: i64 = value + 3;
+                widened
+              }
+            };
+            head.value = current + 67;
+            return head.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let borrows = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "borrow")
+        .collect::<Vec<_>>();
+    let borrow_ends = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "borrow_end")
+        .collect::<Vec<_>>();
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .collect::<Vec<_>>();
+    let adds = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .collect::<Vec<_>>();
+    let store_value = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "store_value")
+        .expect("expected owner store_value after match expression");
+
+    assert_eq!(
+        borrows.len(),
+        1,
+        "expected shared borrow hoisted out of branches"
+    );
+    assert_eq!(
+        borrow_ends.len(),
+        1,
+        "expected shared borrow_end hoisted out of branches"
+    );
+    assert!(
+        !selects.is_empty(),
+        "expected select-based branch value lowering for match expression"
+    );
+    assert!(
+        adds.len() >= 3,
+        "expected branch-local add, shared-suffix add, and owner-write add"
+    );
+    assert!(path_exists(&yir, &selects[0].name, &store_value.name));
+    assert!(path_exists(&yir, &borrow_ends[0].name, &store_value.name));
 }
 
 #[test]

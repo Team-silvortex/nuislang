@@ -321,7 +321,9 @@ fn compiles_text_serialization_intrinsics_into_buffer() {
 
     assert!(artifacts.nir.functions.iter().any(|function| {
         function.body.iter().any(|stmt| match stmt {
-            NirStmt::Let { value, .. } | NirStmt::Return(Some(value)) => contains_serialize_intrinsic(value),
+            NirStmt::Let { value, .. } | NirStmt::Return(Some(value)) => {
+                contains_serialize_intrinsic(value)
+            }
             _ => false,
         })
     }));
@@ -356,8 +358,12 @@ fn compiles_scalar_serialization_roundtrip_intrinsics() {
     )
     .expect("scalar serialization roundtrip source should compile");
 
-    assert!(artifacts.llvm_ir.contains("call i64 @host_serialize_bool_into"));
-    assert!(artifacts.llvm_ir.contains("call i64 @host_deserialize_i64_from"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_serialize_bool_into"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_deserialize_i64_from"));
 }
 
 #[test]
@@ -714,7 +720,9 @@ fn stmt_contains_host_callee(stmt: &NirStmt, callee: &str) -> bool {
         }
         NirStmt::While { condition, body } => {
             expr_contains_host_callee(condition, callee)
-                || body.iter().any(|stmt| stmt_contains_host_callee(stmt, callee))
+                || body
+                    .iter()
+                    .any(|stmt| stmt_contains_host_callee(stmt, callee))
         }
         NirStmt::Return(Some(value)) => expr_contains_host_callee(value, callee),
         NirStmt::Break | NirStmt::Continue | NirStmt::Return(None) => false,

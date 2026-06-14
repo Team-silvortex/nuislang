@@ -136,9 +136,7 @@ fn unknown_function_error(
     signatures: &BTreeMap<String, FunctionSignature>,
 ) -> String {
     if let Some(suggested) = suggest_function_name(callee, signatures) {
-        return format!(
-            "unknown function `{callee}`; did you mean `{suggested}`?"
-        );
+        return format!("unknown function `{callee}`; did you mean `{suggested}`?");
     }
     format!("unknown function `{callee}`")
 }

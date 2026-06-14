@@ -7,10 +7,14 @@ use nuis_semantics::model::{
     nir_glm_profile, NirExpr, NirFunction, NirGlmUseMode, NirModule, NirStmt, NirTypeRef,
 };
 
-use self::effects::{ensure_binding_can_be_rebound, merge_branch_state, note_binding_effects};
+use self::effects::{
+    ensure_binding_can_be_rebound, merge_branch_state, merge_control_flow_borrow_bindings,
+    merge_control_flow_data_bindings, note_binding_effects,
+};
 use self::task_result_facts::{
     apply_task_result_condition_facts, borrowed_address_alias_source, borrowed_address_binding,
-    expr_is_borrowed_pointer, BorrowBindings, TaskResultStateFact,
+    expr_is_borrowed_pointer, merge_control_flow_task_result_facts, BorrowBindings,
+    TaskResultStateFact,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -186,7 +190,11 @@ fn verify_function(function: &NirFunction) -> Result<(), String> {
     let mut moved = BTreeSet::<String>::new();
     let mut borrows = BTreeMap::<String, usize>::new();
     let mut borrow_bindings = BorrowBindings::new();
-    let mut data_bindings = BTreeMap::<String, NirDataKind>::new();
+    let mut data_bindings = function
+        .params
+        .iter()
+        .map(|param| (param.name.clone(), infer_data_kind_from_type(&param.ty)))
+        .collect::<BTreeMap<_, _>>();
     let mut task_result_facts = BTreeMap::<String, TaskResultStateFact>::new();
 
     for stmt in &function.body {
@@ -214,10 +222,6 @@ fn verify_stmt(
     match stmt {
         NirStmt::Let { name, ty, value } => {
             ensure_binding_can_be_rebound(name, borrows, borrow_bindings)?;
-            borrows.remove(name);
-            borrow_bindings.remove(name);
-            data_bindings.remove(name);
-            task_result_facts.remove(name);
             verify_expr(
                 value,
                 moved,
@@ -226,6 +230,10 @@ fn verify_stmt(
                 data_bindings,
                 task_result_facts,
             )?;
+            borrows.remove(name);
+            borrow_bindings.remove(name);
+            data_bindings.remove(name);
+            task_result_facts.remove(name);
             note_binding_effects(value, name, moved, borrows, borrow_bindings);
             data_bindings.insert(
                 name.clone(),
@@ -235,10 +243,6 @@ fn verify_stmt(
         }
         NirStmt::Const { name, ty, value } => {
             ensure_binding_can_be_rebound(name, borrows, borrow_bindings)?;
-            borrows.remove(name);
-            borrow_bindings.remove(name);
-            data_bindings.remove(name);
-            task_result_facts.remove(name);
             verify_expr(
                 value,
                 moved,
@@ -247,6 +251,10 @@ fn verify_stmt(
                 data_bindings,
                 task_result_facts,
             )?;
+            borrows.remove(name);
+            borrow_bindings.remove(name);
+            data_bindings.remove(name);
+            task_result_facts.remove(name);
             note_binding_effects(value, name, moved, borrows, borrow_bindings);
             data_bindings.insert(
                 name.clone(),
@@ -321,6 +329,21 @@ fn verify_stmt(
                 &else_moved,
                 &else_borrows,
             );
+            merge_control_flow_borrow_bindings(
+                borrow_bindings,
+                &then_borrow_bindings,
+                &else_borrow_bindings,
+            );
+            merge_control_flow_data_bindings(
+                data_bindings,
+                &then_data_bindings,
+                &else_data_bindings,
+            );
+            merge_control_flow_task_result_facts(
+                task_result_facts,
+                &then_task_result_facts,
+                &else_task_result_facts,
+            );
         }
         NirStmt::While { condition, body } => {
             verify_expr(
@@ -333,6 +356,9 @@ fn verify_stmt(
             )?;
             let pre_loop_moved = moved.clone();
             let pre_loop_borrows = borrows.clone();
+            let pre_loop_borrow_bindings = borrow_bindings.clone();
+            let pre_loop_data_bindings = data_bindings.clone();
+            let pre_loop_task_result_facts = task_result_facts.clone();
             let mut loop_moved = moved.clone();
             let mut loop_borrows = borrows.clone();
             let mut loop_borrow_bindings = borrow_bindings.clone();
@@ -355,6 +381,21 @@ fn verify_stmt(
                 &loop_borrows,
                 &pre_loop_moved,
                 &pre_loop_borrows,
+            );
+            merge_control_flow_borrow_bindings(
+                borrow_bindings,
+                &loop_borrow_bindings,
+                &pre_loop_borrow_bindings,
+            );
+            merge_control_flow_data_bindings(
+                data_bindings,
+                &loop_data_bindings,
+                &pre_loop_data_bindings,
+            );
+            merge_control_flow_task_result_facts(
+                task_result_facts,
+                &loop_task_result_facts,
+                &pre_loop_task_result_facts,
             );
         }
         NirStmt::Break | NirStmt::Continue => {}
@@ -611,9 +652,21 @@ fn verify_expr(
         | NirExpr::Int(_)
         | NirExpr::F32(_)
         | NirExpr::F64(_)
-        | NirExpr::Var(_)
         | NirExpr::Null
         | NirExpr::Instantiate { .. } => {}
+        NirExpr::Var(name) => {
+            if !data_bindings.contains_key(name) {
+                return Err(format!("nir verify: use of unbound value `{name}`"));
+            }
+            if let Some(binding) = borrow_bindings.get(name) {
+                if borrows.get(&binding.source).copied().unwrap_or(0) == 0 {
+                    return Err(format!(
+                        "nir verify: borrow alias `{}` for `{}` is not active",
+                        name, binding.source
+                    ));
+                }
+            }
+        }
         NirExpr::DataBindCore(_)
         | NirExpr::DataMarker(_)
         | NirExpr::DataHandleTable(_)

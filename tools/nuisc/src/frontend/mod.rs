@@ -460,6 +460,34 @@ mod tests {
     }
 
     #[test]
+    fn accepts_ref_buffer_parameter_to_extern_host_handle_bridge() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_stdin_read(buffer: ref Buffer, len: i64) -> i64;
+
+              fn main() -> i64 {
+                let backing: ref Buffer = alloc_buffer(8, 0);
+                return host_stdin_read(backing, 8);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::CpuExternCall { args, .. })))
+                if matches!(args.first(), Some(NirExpr::HostBufferHandle(_)))
+        ));
+    }
+
+    #[test]
     fn rejects_task_completed_on_raw_task_input() {
         let error = parse_nuis_module(
             r#"

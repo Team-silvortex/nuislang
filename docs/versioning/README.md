@@ -7,6 +7,12 @@ versioning policy documents.
 
 Start with:
 
+* [nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
+* [nuis-0.19.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-release-checklist.md)
+* [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
+* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
+* [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+* [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
 * [nuis-0.18.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-snapshot.md)
 * [nuis-0.18.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-release-checklist.md)
 * [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
@@ -86,7 +92,28 @@ true before the answer becomes yes.
 The `0.17.0` generic completion plan is the first detailed execution map under
 that mainline and should be the default entry point for generic-track work.
 
-The `0.18.0` snapshot is the next minor-line history anchor and marks the move
+The `0.19.0` snapshot is the current minor-line history anchor and marks the
+move from mainline closure toward internalization, workflow clarity, and
+cleaner current-vs-historical boundaries.
+
+The `0.19.0` release checklist is the operational reminder that the current
+line should keep the docs, gates, and source-style contract aligned instead of
+relying on inherited `0.18` names by folklore alone.
+
+The `0.19.0` mainline goals file is the short working map for the current
+active push.
+
+The `0.19.0` compile workflow file is the current compiler-facing explanation
+of how the CLI frontdoor, ordered compiler path, and project-backed gates are
+meant to be read today.
+
+The `0.19.0` mainline regression matrix is the compact answer to which checked
+test families still defend that story.
+
+The `0.19.0` address/pointer mainline file is the short truth anchor for the
+current `ref` baseline plus the now-explicit source-style boundary above it.
+
+The `0.18.0` snapshot is the previous minor-line history anchor and marks the move
 from broader subsystem integration toward a clearer single mainline centered on
 control flow, async/task + memory composition, and project-backed compile
 truth.

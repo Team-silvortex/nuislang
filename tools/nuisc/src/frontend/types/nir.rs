@@ -367,9 +367,9 @@ pub(crate) fn infer_nir_expr_type(
         {
             Some(string_type())
         }
-        NirExpr::CpuExternCall { callee, .. } => {
-            signatures.get(callee).and_then(|sig| sig.return_type.clone())
-        }
+        NirExpr::CpuExternCall { callee, .. } => signatures
+            .get(callee)
+            .and_then(|sig| sig.return_type.clone()),
         NirExpr::DataMarker(_) => Some(named_type("Marker")),
         NirExpr::DataHandleTable(_) => Some(named_type("HandleTable")),
         NirExpr::ShaderTarget { .. } => Some(named_type("Target")),

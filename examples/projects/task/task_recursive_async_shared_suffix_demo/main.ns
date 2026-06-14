@@ -1,0 +1,22 @@
+mod cpu Main {
+  async fn accumulate(current: i64, acc: i64) -> i64 {
+    if current == 0 {
+      return acc;
+    }
+
+    let branch_value: i64 = if current > 2 {
+      let base: i64 = current;
+      base
+    } else {
+      let base: i64 = 0;
+      base
+    };
+    let widened: i64 = branch_value + 1;
+
+    return await accumulate(current - 1, acc + widened);
+  }
+
+  async fn main() -> i64 {
+    return await accumulate(4, 0);
+  }
+}

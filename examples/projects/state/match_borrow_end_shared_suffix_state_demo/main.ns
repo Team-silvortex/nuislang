@@ -1,0 +1,25 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let head: ref Node = move(alloc_node(10, null()));
+    let current: i64 = match 1 {
+      1 => {
+        let head_ref: ref Node = borrow(head);
+        let value: i64 = head_ref.value;
+        borrow_end(head_ref);
+        let widened: i64 = value + 3;
+        widened
+      }
+      _ => {
+        let head_ref: ref Node = borrow(head);
+        let value: i64 = head_ref.value + 1;
+        borrow_end(head_ref);
+        let widened: i64 = value + 3;
+        widened
+      }
+    };
+    head.value = current + 67;
+    let updated: i64 = head.value;
+    free(head);
+    return updated;
+  }
+}

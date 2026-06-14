@@ -49,6 +49,42 @@ fn chain_nonpure_expr_stmt(expr: &NirExpr, lowered: &str, state: &mut LoweringSt
     }
 }
 
+pub(super) fn lower_linear_stmts(
+    stmts: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &mut BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    let mut last_bound_name = None;
+    for stmt in stmts {
+        match stmt {
+            NirStmt::Let { name, value, .. } => {
+                let lowered = lower_expr(value, state, bindings)?;
+                chain_nonpure_expr_stmt(value, &lowered, state);
+                bindings.insert(name.clone(), lowered);
+                last_bound_name = Some(name.clone());
+            }
+            NirStmt::Const { name, value, .. } => {
+                let lowered = lower_expr(value, state, bindings)?;
+                chain_nonpure_expr_stmt(value, &lowered, state);
+                bindings.insert(name.clone(), lowered);
+                last_bound_name = Some(name.clone());
+            }
+            NirStmt::Expr(expr) => {
+                let lowered = lower_expr(expr, state, bindings)?;
+                chain_nonpure_expr_stmt(expr, &lowered, state);
+                last_bound_name = None;
+            }
+            _ => {
+                return Err(
+                    "minimal nuisc lowering currently only supports shared branch context made of straight-line `let`, `const`, or expression statements"
+                        .to_owned(),
+                )
+            }
+        }
+    }
+    Ok(last_bound_name)
+}
+
 fn unsupported_loop_control_stmt_message(keyword: &str) -> String {
     format!(
         "`{keyword}` is currently lowered only as terminal loop control inside recognized `while` flow shapes (for example guard, flow, or post-flow loop bodies); bare `{keyword}` here has no structured loop lowering target yet"

@@ -109,24 +109,38 @@ fn validate_extern_abi_surface(
         reject_extern_ref_abi_type(
             &param.ty,
             &format!("{callee_label} parameter `{}`", param.name),
+            true,
         )?;
     }
     reject_extern_ref_abi_type(
         &function.return_type,
         &format!("{callee_label} return type"),
+        false,
     )?;
     Ok(())
 }
 
-fn reject_extern_ref_abi_type(ty: &NirTypeRef, context: &str) -> Result<(), String> {
+fn reject_extern_ref_abi_type(
+    ty: &NirTypeRef,
+    context: &str,
+    allow_buffer_param_bridge: bool,
+) -> Result<(), String> {
+    if allow_buffer_param_bridge
+        && ty.is_ref
+        && ty.name == "Buffer"
+        && !ty.is_optional
+        && ty.generic_args.is_empty()
+    {
+        return Ok(());
+    }
     if ty.is_ref {
         return Err(format!(
-            "{context} cannot use `{}` in the current extern ABI; host-boundary pointer parameters and returns are not stabilized yet, so keep `extern` surfaces value-only for now",
-            ty.render()
+            "{context} cannot use `{}` in the current extern ABI; only non-optional `ref Buffer` parameters are currently stabilized as the narrow host buffer-handle bridge, while other host-boundary pointer parameters and all pointer returns remain unsupported",
+            ty.render(),
         ));
     }
     for arg in &ty.generic_args {
-        reject_extern_ref_abi_type(arg, context)?;
+        reject_extern_ref_abi_type(arg, context, false)?;
     }
     Ok(())
 }

@@ -10,8 +10,7 @@ use super::validation_binding_env::{
 };
 use super::{
     infer_ast_expr_type, lower_type_ref, name_suggestions::suggest_similar_name,
-    resolve_ast_type_ref_aliases,
-    substitute_ast_type_alias_target,
+    resolve_ast_type_ref_aliases, substitute_ast_type_alias_target,
 };
 
 pub(super) fn collect_visible_trait_methods(
@@ -204,7 +203,8 @@ pub(super) fn validate_expr_generic_method_bounds(
                 local_type_env,
                 context,
             )?;
-            if let Some((operator, method, required_bound)) = unary_operator_trait_requirement(*op) {
+            if let Some((operator, method, required_bound)) = unary_operator_trait_requirement(*op)
+            {
                 if let Some(operand_ty) = infer_ast_expr_type(
                     operand,
                     local_type_env,
@@ -403,7 +403,8 @@ pub(super) fn validate_expr_generic_method_bounds(
                 local_type_env,
                 context,
             )?;
-            if let Some((operator, method, required_bound)) = binary_operator_trait_requirement(*op) {
+            if let Some((operator, method, required_bound)) = binary_operator_trait_requirement(*op)
+            {
                 if let Some(lhs_ty) = infer_ast_expr_type(
                     lhs,
                     local_type_env,
@@ -920,7 +921,8 @@ fn validate_explicit_trait_call_bound(
         if impl_lookup.contains_key(&(trait_name.to_owned(), receiver_rendered.clone())) {
             return Ok(());
         }
-        let available_impls = collect_receiver_trait_impl_candidates(&receiver_rendered, impl_lookup);
+        let available_impls =
+            collect_receiver_trait_impl_candidates(&receiver_rendered, impl_lookup);
         if available_impls.is_empty() {
             return Err(format!(
                 "{context} calls trait method `{trait_name}.{method}` for `{receiver_rendered}`, but trait `{trait_name}` has no impl for `{receiver_rendered}`"
@@ -961,7 +963,12 @@ fn collect_trait_name_variants(
     trait_methods
         .keys()
         .filter(|candidate| candidate.as_str() != trait_name)
-        .filter(|candidate| candidate.rsplit('.').next().is_some_and(|name| name == short_name))
+        .filter(|candidate| {
+            candidate
+                .rsplit('.')
+                .next()
+                .is_some_and(|name| name == short_name)
+        })
         .cloned()
         .collect()
 }

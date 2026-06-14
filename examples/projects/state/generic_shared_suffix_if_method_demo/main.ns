@@ -1,0 +1,28 @@
+mod cpu Main {
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  fn bump<T: Addable>(seed: T, flag: bool) -> T {
+    let current: T = if flag {
+      let picked: T = seed.add(seed);
+      let widened: T = picked.add(seed);
+      widened
+    } else {
+      let picked: T = seed;
+      let widened: T = picked.add(seed);
+      widened
+    };
+    return current.add(seed);
+  }
+
+  fn main() -> i64 {
+    return bump(4, true);
+  }
+}

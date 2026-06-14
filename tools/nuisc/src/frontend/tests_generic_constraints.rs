@@ -46,7 +46,10 @@ fn suggests_visible_qualified_trait_name_for_unknown_bare_generic_bound() {
     .unwrap();
 
     let error = super::lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap_err();
-    assert!(error.contains("unknown generic bound trait `Worker.Missing`"), "{error}");
+    assert!(
+        error.contains("unknown generic bound trait `Worker.Missing`"),
+        "{error}"
+    );
     assert!(error.contains("did you mean `Helper.Missing`?"), "{error}");
 }
 
@@ -69,7 +72,10 @@ fn rejects_impl_for_unknown_trait() {
     )
     .unwrap_err();
 
-    assert!(error.contains("impl references unknown trait `Missing`"), "{error}");
+    assert!(
+        error.contains("impl references unknown trait `Missing`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -101,7 +107,10 @@ fn rejects_duplicate_impl_for_same_trait_and_type() {
     )
     .unwrap_err();
 
-    assert!(error.contains("duplicate impl for trait `Addable` and type `i64`"), "{error}");
+    assert!(
+        error.contains("duplicate impl for trait `Addable` and type `i64`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -128,7 +137,10 @@ fn rejects_impl_missing_required_trait_method() {
     )
     .unwrap_err();
 
-    assert!(error.contains("missing required trait method `zero`"), "{error}");
+    assert!(
+        error.contains("missing required trait method `zero`"),
+        "{error}"
+    );
     assert!(error.contains("impl `Addable` for `i64`"), "{error}");
 }
 
@@ -186,7 +198,10 @@ fn rejects_impl_method_signature_mismatch_against_trait() {
     )
     .unwrap_err();
 
-    assert!(error.contains("method `add` in impl `Addable` for `i64` does not match trait signature"), "{error}");
+    assert!(
+        error.contains("method `add` in impl `Addable` for `i64` does not match trait signature"),
+        "{error}"
+    );
 }
 
 #[test]
