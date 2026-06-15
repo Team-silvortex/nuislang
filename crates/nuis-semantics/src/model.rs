@@ -344,6 +344,7 @@ pub enum AstExpr {
         body: Vec<AstStmt>,
     },
     Await(Box<AstExpr>),
+    Try(Box<AstExpr>),
     Instantiate {
         domain: String,
         unit: String,

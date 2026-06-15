@@ -7,6 +7,7 @@ fn ast_expr_requires_match_hoist(expr: &AstExpr) -> bool {
         | AstExpr::MethodCall { .. }
         | AstExpr::Await(_)
         | AstExpr::Instantiate { .. } => true,
+        AstExpr::Try(value) => ast_expr_requires_match_hoist(value),
         AstExpr::If {
             condition,
             then_body,

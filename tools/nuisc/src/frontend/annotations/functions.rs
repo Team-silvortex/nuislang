@@ -97,6 +97,7 @@ fn validate_const_safe_expr(expr: &AstExpr) -> Result<(), &'static str> {
         }
         AstExpr::FieldAccess { base, .. } => validate_const_safe_expr(base),
         AstExpr::Await(_) => Err("`await` is not const-safe"),
+        AstExpr::Try(_) => Err("`?` is not const-safe"),
         AstExpr::Instantiate { .. } => Err("`instantiate` is not const-safe"),
         AstExpr::Call { .. } | AstExpr::Invoke { .. } | AstExpr::MethodCall { .. } => {
             Err("calls are not const-safe in the current MVP")

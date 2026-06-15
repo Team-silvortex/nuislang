@@ -8,6 +8,7 @@ workflow/history checkpoints, and policy notes.
 If you want the current line instead of historical backfill, start with:
 
 * [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+* [nuis-0.20.x-to-alpha-bootstrap-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
 * [nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
 * [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
 * [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
@@ -23,6 +24,7 @@ Use that set when the question is:
 * what the current compile workflow is
 * what the repo currently claims is ready
 * which ABI terms are now canonical
+* how `0.20.*` is supposed to hand off into `alpha-0.0.1`
 * which project/frontend/workflow matrices should still be treated as live
 
 ## Previous Minor Line

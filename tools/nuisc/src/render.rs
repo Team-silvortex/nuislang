@@ -400,6 +400,7 @@ fn render_ast_expr(value: &AstExpr) -> String {
         AstExpr::Int(value) => value.to_string(),
         AstExpr::Float(value) => value.clone(),
         AstExpr::Var(name) => name.clone(),
+        AstExpr::Try(value) => format!("{}?", render_ast_expr(value)),
         AstExpr::If {
             condition,
             then_body,

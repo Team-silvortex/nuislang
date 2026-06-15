@@ -319,6 +319,152 @@ fn lowers_trait_method_calls_on_variant_values_via_parent_enum_impls() {
 }
 
 #[test]
+fn lowers_result_error_patterns_into_nested_variant_checks() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+            MissingValue,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn handle(result: Result<i64, CoreError>) -> i64 {
+            match result {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(CoreError.MissingValue) => {
+                return 0;
+              }
+              Result.Err(CoreError.InvalidInput) => {
+                return -1;
+              }
+              _ => {
+                return -2;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(matches!(
+        &module.functions[0].body[0],
+        NirStmt::If { then_body, .. }
+            if matches!(
+                then_body.as_slice(),
+                [
+                    NirStmt::Let { name, value, .. },
+                    NirStmt::Return(Some(NirExpr::Var(result)))
+                ] if name == "value"
+                    && result == "value"
+                    && matches!(value, NirExpr::FieldAccess { field, .. } if field == "value")
+            )
+    ));
+
+}
+
+#[test]
+fn result_err_constructor_accepts_enum_error_payload_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+            MissingValue,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn main() {
+            let failure: Result<i64, CoreError> = Result.Err(CoreError.MissingValue);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(matches!(
+        &module.functions[0].body[0],
+        NirStmt::Let {
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_name, type_args, fields },
+            ..
+        } if ty.render() == "Result<i64, CoreError>"
+            && type_name == "Result.Err"
+            && type_args.len() == 2
+            && type_args[0].render() == "i64"
+            && type_args[1].render() == "CoreError"
+            && fields.len() == 1
+    ));
+}
+
+#[test]
+fn lowers_result_match_expression_propagation_pattern() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+            MissingValue,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn choose(seed: i64) -> Result<i64, CoreError> {
+            if seed > 0 {
+              return Result.Ok(seed);
+            }
+            return Result.Err(CoreError.InvalidInput);
+          }
+
+          fn pipeline(seed: i64) -> Result<i64, CoreError> {
+            let chosen: Result<i64, CoreError> = choose(seed);
+            let mut value: i64 = 0;
+            match chosen {
+              Result.Ok(payload) => {
+                value = payload;
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+            return Result.Ok(value + 1);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let pipeline = module
+        .functions
+        .iter()
+        .find(|function| function.name == "pipeline")
+        .unwrap();
+    assert!(matches!(
+        pipeline.body.as_slice(),
+        [
+            NirStmt::Let { .. },
+            NirStmt::Let { .. },
+            NirStmt::If { .. },
+            NirStmt::Return(Some(NirExpr::StructLiteral { type_name, .. }))
+        ] if type_name == "Result.Ok"
+    ));
+}
+
+#[test]
 fn lowers_generic_impl_method_calls_on_enum_variants() {
     let module = parse_nuis_module(
         r#"

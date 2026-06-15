@@ -165,6 +165,7 @@ fn validate_expr(
             validate_stmt_block(body, &mut lambda_env, "lambda body")?;
         }
         AstExpr::Await(value)
+        | AstExpr::Try(value)
         | AstExpr::Unary { operand: value, .. }
         | AstExpr::FieldAccess { base: value, .. } => validate_expr(value, env, context)?,
         AstExpr::Call { args, .. } | AstExpr::Invoke { args, .. } => {

@@ -1,0 +1,205 @@
+mod cpu Main {
+  enum CoreError {
+    InvalidInput,
+    MissingValue,
+    Overflow,
+  }
+
+  enum Option<T> {
+    None,
+    Some(T),
+  }
+
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  fn option_is_some<T>(value: Option<T>) -> bool {
+    match value {
+      Option.Some(_) => {
+        return true;
+      }
+      Option.None => {
+        return false;
+      }
+    }
+  }
+
+  fn option_is_none<T>(value: Option<T>) -> bool {
+    return !option_is_some(value);
+  }
+
+  fn option_unwrap_or<T>(value: Option<T>, fallback: T) -> T {
+    match value {
+      Option.Some(payload) => {
+        return payload;
+      }
+      Option.None => {
+        return fallback;
+      }
+    }
+  }
+
+  fn option_map<T, R>(value: Option<T>, mapper: Fn1<T, R>) -> Option<R> {
+    match value {
+      Option.Some(payload) => {
+        return Option.Some(mapper(payload));
+      }
+      Option.None => {
+        return Option.None;
+      }
+    }
+  }
+
+  fn option_and_then<T, R>(value: Option<T>, mapper: Fn1<T, Option<R>>) -> Option<R> {
+    match value {
+      Option.Some(payload) => {
+        return mapper(payload);
+      }
+      Option.None => {
+        return Option.None;
+      }
+    }
+  }
+
+  fn choose_value(seed: i64) -> Result<i64, CoreError> {
+    if seed > 0 {
+      return Result.Ok(seed);
+    }
+    if seed == 0 {
+      return Result.Err(CoreError.MissingValue);
+    }
+    return Result.Err(CoreError.InvalidInput);
+  }
+
+  fn promote_option(value: Option<i64>) -> Result<i64, CoreError> {
+    match value {
+      Option.Some(payload) => {
+        return Result.Ok(payload);
+      }
+      Option.None => {
+        return Result.Err(CoreError.MissingValue);
+      }
+    }
+  }
+
+  fn result_is_ok<T, E>(result: Result<T, E>) -> bool {
+    match result {
+      Result.Ok(_) => {
+        return true;
+      }
+      Result.Err(_) => {
+        return false;
+      }
+    }
+  }
+
+  fn result_is_err<T, E>(result: Result<T, E>) -> bool {
+    return !result_is_ok(result);
+  }
+
+  fn result_unwrap_or<T, E>(result: Result<T, E>, fallback: T) -> T {
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(_) => {
+        return fallback;
+      }
+    }
+  }
+
+  fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(mapper(value));
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  fn result_map_err<T, E, F>(result: Result<T, E>, mapper: Fn1<E, F>) -> Result<T, F> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(value);
+      }
+      Result.Err(error) => {
+        return Result.Err(mapper(error));
+      }
+    }
+  }
+
+  fn result_and_then<T, R, E>(result: Result<T, E>, mapper: Fn1<T, Result<R, E>>) -> Result<R, E> {
+    match result {
+      Result.Ok(value) => {
+        return mapper(value);
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  fn result_from_option<T, E>(value: Option<T>, error: E) -> Result<T, E> {
+    match value {
+      Option.Some(payload) => {
+        return Result.Ok(payload);
+      }
+      Option.None => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  fn option_from_result<T, E>(result: Result<T, E>) -> Option<T> {
+    match result {
+      Result.Ok(value) => {
+        return Option.Some(value);
+      }
+      Result.Err(_) => {
+        return Option.None;
+      }
+    }
+  }
+
+  fn unwrap_or(result: Result<i64, CoreError>, fallback: i64) -> i64 {
+    return result_unwrap_or(result, fallback);
+  }
+
+  fn try_increment(seed: i64) -> Result<i64, CoreError> {
+    let value: i64 = choose_value(seed)?;
+    return Result.Ok(value + 1);
+  }
+
+  fn try_sum(seed: i64) -> Result<i64, CoreError> {
+    let left: i64 = try_increment(seed)?;
+    let right: i64 = promote_option(Option.Some(seed + 2))?;
+    return Result.Ok(left + right);
+  }
+
+  fn summarize_error_handling(seed: i64) -> i64 {
+    let direct: Result<i64, CoreError> = choose_value(seed);
+    let lifted: Result<i64, CoreError> = promote_option(Option.Some(seed + 1));
+    let doubled: Result<i64, CoreError> = result_map(direct, |value: i64| -> i64 {
+      return value * 2;
+    });
+    let chained: Result<i64, CoreError> = result_and_then(doubled, |value: i64| -> Result<i64, CoreError> {
+      return Result.Ok(value + 3);
+    });
+    let raised: Option<i64> = option_map(Option.Some(seed), |value: i64| -> i64 {
+      return value + 5;
+    });
+    let total_try: Result<i64, CoreError> = try_sum(seed);
+    return unwrap_or(chained, -10)
+      + unwrap_or(lifted, -20)
+      + option_unwrap_or(raised, -30)
+      + unwrap_or(total_try, -40);
+  }
+
+  fn main() {
+    print(summarize_error_handling(7));
+  }
+}

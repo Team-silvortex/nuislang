@@ -1930,6 +1930,9 @@ impl Parser {
                     type_args: Vec::new(),
                     fields,
                 };
+            } else if self.peek_symbol('?') {
+                self.expect_symbol('?')?;
+                expr = AstExpr::Try(Box::new(expr));
             } else {
                 break;
             }
@@ -2115,14 +2118,11 @@ impl Parser {
             && !self.peek_word("let")
             && !self.peek_word("const")
             && !self.peek_word("link")
-            && !self.peek_word("if")
-            && !self.peek_word("match")
             && !self.peek_word("while")
             && !self.peek_word("loop")
             && !self.peek_word("break")
             && !self.peek_word("continue")
             && !self.peek_word("return")
-            && !self.peek_word("await")
             && !self.peek_word("mod")
     }
 

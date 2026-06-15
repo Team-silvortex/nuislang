@@ -27,8 +27,15 @@ Non-goals:
 Planned direction:
 
 * typed scalar aliases and canonical prelude surface
-* stable struct/result/option-like source patterns once the frontend library/import model settles
 * the lowest shared contracts for CPU/data/shader/kernel-facing source code
+
+Source patterns that now exist:
+
+* stable struct construction examples
+* canonical enum-based `Option<T>` / `Result<T, E>` / `CoreError` patterns for source-level error handling
+* `match`-driven success/error branching that higher layers can reuse before a fuller import/prelude story lands
+* generic helper families such as `option_map`, `option_and_then`, `result_map`, `result_map_err`, `result_and_then`, and `result_from_option`
+* direct-statement `?` propagation for `Result<Payload, Error>` in source, lowered through the same enum-based branching model
 
 First source modules:
 
@@ -37,6 +44,7 @@ First source modules:
 * [math_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/math_runtime.ns)
 * [ref_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/ref_runtime.ns)
 * [value_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/value_blueprint.ns)
+* [result_patterns.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/result_patterns.ns)
 
 What is not true yet:
 

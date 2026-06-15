@@ -120,6 +120,9 @@ pub(super) fn collect_lambda_expr_captures(
             "nested or inline lambdas are not supported in the current MVP; bind lambdas with `let name = |...| -> ... { ... };` only"
                 .to_owned(),
         ),
+        AstExpr::Try(value) => {
+            collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)
+        }
         AstExpr::Await(value) => {
             collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)
         }

@@ -1556,6 +1556,20 @@ fn rewrite_lambda_expr(
             counter,
             synthesized,
         )?)),
+        AstExpr::Try(value) => AstExpr::Try(Box::new(rewrite_lambda_expr(
+            value,
+            None,
+            inherited_generic_params,
+            lambda_aliases,
+            visible_locals,
+            visible_local_types,
+            module_impls,
+            module_const_names,
+            module_function_table,
+            owning_function_name,
+            counter,
+            synthesized,
+        )?)),
         AstExpr::Invoke { callee, args } => {
             let rewritten_args = args
                 .iter()

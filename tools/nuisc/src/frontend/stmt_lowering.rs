@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use nuis_semantics::model::nir_expr_effect_class;
 use nuis_semantics::model::{AstDestructureBinding, AstDestructureField, AstMatchArm, NirExpr};
@@ -7,10 +8,13 @@ use super::match_lowering::lower_match_stmt_with_async;
 use super::metadata::ModuleConstValue;
 use super::validation_helpers::validate_type_ref;
 use super::{
-    bool_type, infer_nir_expr_type, instantiate_struct_field_type, lower_expr_with_async,
+    ast_type_from_nir, bool_type, compatible_types, infer_nir_expr_type,
+    instantiate_struct_field_type, lower_expr_with_async,
     lower_type_ref_with_aliases, resolve_declared_or_inferred, AstStmt, AstTypeAlias, AstTypeRef,
     FunctionSignature, NirStmt, NirStructDef, NirTypeRef,
 };
+
+static TRY_EXPANSION_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_stmt_with_async(
@@ -650,6 +654,54 @@ pub(super) fn lower_stmt_sequence_with_async(
             );
         }
     }
+    if let Some(expanded) = expand_try_stmt(
+        stmt,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        return_type,
+        type_aliases,
+        signatures,
+        struct_table,
+    )? {
+        return lower_expanded_stmt_sequence_with_async(
+            stmt,
+            expanded,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        );
+    }
+    if let Some(expanded) = expand_nested_try_stmt(
+        stmt,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        return_type,
+        type_aliases,
+        signatures,
+        struct_table,
+    )? {
+        return lower_expanded_stmt_sequence_with_async(
+            stmt,
+            expanded,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        );
+    }
     if let AstStmt::DestructureLet {
         type_ref,
         fields,
@@ -741,6 +793,887 @@ fn lower_expanded_stmt_sequence_with_async(
         )?);
     }
     Ok(lowered)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn expand_try_stmt(
+    stmt: &AstStmt,
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    return_type: Option<&AstTypeRef>,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<Option<Vec<AstStmt>>, String> {
+    let (inner, expansion) = match stmt {
+        AstStmt::Let {
+            mutable,
+            name,
+            ty,
+            value: super::AstExpr::Try(inner),
+        } => (
+            inner.as_ref(),
+            TryConsumer::Let {
+                mutable: *mutable,
+                name: name.clone(),
+                declared_ty: ty.clone(),
+            },
+        ),
+        AstStmt::Const {
+            name,
+            ty,
+            value: super::AstExpr::Try(inner),
+        } => (
+            inner.as_ref(),
+            TryConsumer::Const {
+                name: name.clone(),
+                declared_ty: ty.clone(),
+            },
+        ),
+        AstStmt::Print(super::AstExpr::Try(inner)) => (inner.as_ref(), TryConsumer::Print),
+        AstStmt::Expr(super::AstExpr::Try(inner)) => (inner.as_ref(), TryConsumer::Expr),
+        AstStmt::Return(Some(super::AstExpr::Try(inner))) => (inner.as_ref(), TryConsumer::Return),
+        _ => return Ok(None),
+    };
+
+    let function_result_ty = current_function_result_type(return_type, type_aliases)?;
+    let lowered_inner = lower_expr_with_async(
+        inner,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        None,
+        false,
+    )?;
+    let inner_ty = infer_nir_expr_type(&lowered_inner, bindings, signatures, struct_table)
+        .ok_or_else(|| "could not infer operand type for `?`".to_owned())?;
+    let (payload_ty, error_ty) = split_result_type(&inner_ty)?;
+    if !compatible_types(&function_result_ty.1, &error_ty) {
+        return Err(format!(
+            "`?` error type `{}` does not match enclosing function error type `{}`",
+            error_ty.render(),
+            function_result_ty.1.render()
+        ));
+    }
+
+    let expansion = match expansion {
+        TryConsumer::Let {
+            mutable,
+            name,
+            declared_ty,
+        } => {
+            let final_payload_ty = match declared_ty {
+                Some(declared_ty) => {
+                    let lowered_declared = lower_type_ref_with_aliases(&declared_ty, type_aliases)?;
+                    if !compatible_types(&lowered_declared, &payload_ty) {
+                        return Err(format!(
+                            "`?` payload type `{}` does not match declared type `{}` for `{}`",
+                            payload_ty.render(),
+                            lowered_declared.render(),
+                            name
+                        ));
+                    }
+                    ast_type_from_nir(&lowered_declared)
+                }
+                None => ast_type_from_nir(&payload_ty),
+            };
+            synthesize_try_statements(
+                lowered_inner,
+                inner_ty,
+                AstStmt::Let {
+                    mutable,
+                    name,
+                    ty: Some(final_payload_ty),
+                    value: super::AstExpr::Var("__nuis_try_payload".to_owned()),
+                },
+            )
+        }
+        TryConsumer::Const { name, declared_ty } => {
+            let final_payload_ty = match declared_ty {
+                Some(declared_ty) => {
+                    let lowered_declared = lower_type_ref_with_aliases(&declared_ty, type_aliases)?;
+                    if !compatible_types(&lowered_declared, &payload_ty) {
+                        return Err(format!(
+                            "`?` payload type `{}` does not match declared type `{}` for `{}`",
+                            payload_ty.render(),
+                            lowered_declared.render(),
+                            name
+                        ));
+                    }
+                    ast_type_from_nir(&lowered_declared)
+                }
+                None => ast_type_from_nir(&payload_ty),
+            };
+            synthesize_try_statements(
+                lowered_inner,
+                inner_ty,
+                AstStmt::Const {
+                    name,
+                    ty: Some(final_payload_ty),
+                    value: super::AstExpr::Var("__nuis_try_payload".to_owned()),
+                },
+            )
+        }
+        TryConsumer::Print => synthesize_try_statements(
+            lowered_inner,
+            inner_ty,
+            AstStmt::Print(super::AstExpr::Var("__nuis_try_payload".to_owned())),
+        ),
+        TryConsumer::Expr => synthesize_try_expr_statements(lowered_inner, inner_ty),
+        TryConsumer::Return => synthesize_try_statements(
+            lowered_inner,
+            inner_ty,
+            AstStmt::Return(Some(super::AstExpr::Var("__nuis_try_payload".to_owned()))),
+        ),
+    }?;
+
+    Ok(Some(expansion))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn expand_nested_try_stmt(
+    stmt: &AstStmt,
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    return_type: Option<&AstTypeRef>,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<Option<Vec<AstStmt>>, String> {
+    match stmt {
+        AstStmt::Let {
+            mutable,
+            name,
+            ty,
+            value,
+        } => expand_nested_try_expr_as_stmt(
+            value,
+            &|value| AstStmt::Let {
+                mutable: *mutable,
+                name: name.clone(),
+                ty: ty.clone(),
+                value,
+            },
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        ),
+        AstStmt::AssignLocal { name, value } => expand_nested_try_expr_as_stmt(
+            value,
+            &|value| AstStmt::AssignLocal {
+                name: name.clone(),
+                value,
+            },
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        ),
+        AstStmt::Const { name, ty, value } => expand_nested_try_expr_as_stmt(
+            value,
+            &|value| AstStmt::Const {
+                name: name.clone(),
+                ty: ty.clone(),
+                value,
+            },
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        ),
+        AstStmt::Print(value) => expand_nested_try_expr_as_stmt(
+            value,
+            &AstStmt::Print,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        ),
+        AstStmt::Expr(value) => expand_nested_try_expr_as_stmt(
+            value,
+            &AstStmt::Expr,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        ),
+        AstStmt::Return(Some(value)) => expand_nested_try_expr_as_stmt(
+            value,
+            &|value| AstStmt::Return(Some(value)),
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        ),
+        _ => Ok(None),
+    }
+}
+
+enum TryConsumer {
+    Let {
+        mutable: bool,
+        name: String,
+        declared_ty: Option<AstTypeRef>,
+    },
+    Const {
+        name: String,
+        declared_ty: Option<AstTypeRef>,
+    },
+    Print,
+    Expr,
+    Return,
+}
+
+fn current_function_result_type<'a>(
+    return_type: Option<&'a AstTypeRef>,
+    type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+) -> Result<(NirTypeRef, NirTypeRef), String> {
+    let return_type = return_type.ok_or_else(|| {
+        "`?` currently requires an enclosing function with explicit `Result<Payload, Error>` return type"
+            .to_owned()
+    })?;
+    let lowered = lower_type_ref_with_aliases(return_type, type_aliases)?;
+    let (payload, error) = split_result_type(&lowered)?;
+    Ok((payload, error))
+}
+
+fn split_result_type(ty: &NirTypeRef) -> Result<(NirTypeRef, NirTypeRef), String> {
+    if ty.name == "Result" && ty.generic_args.len() == 2 && !ty.is_ref && !ty.is_optional {
+        return Ok((ty.generic_args[0].clone(), ty.generic_args[1].clone()));
+    }
+    Err(format!(
+        "`?` currently requires a `Result<Payload, Error>` operand, found `{}`",
+        ty.render()
+    ))
+}
+
+fn synthesize_try_statements(
+    lowered_inner: NirExpr,
+    inner_ty: NirTypeRef,
+    ok_terminal: AstStmt,
+) -> Result<Vec<AstStmt>, String> {
+    let id = TRY_EXPANSION_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let result_name = format!("__nuis_try_result_{id}");
+    let payload_name = format!("__nuis_try_payload_{id}");
+    let error_name = format!("__nuis_try_error_{id}");
+    let result_ty = ast_type_from_nir(&inner_ty);
+    let ok_stmt = rewrite_try_payload_placeholder(ok_terminal, &payload_name)?;
+
+    Ok(vec![
+        AstStmt::Let {
+            mutable: false,
+            name: result_name.clone(),
+            ty: Some(result_ty),
+            value: ast_expr_from_nir(lowered_inner),
+        },
+        AstStmt::Match {
+            value: super::AstExpr::Var(result_name),
+            arms: vec![
+                AstMatchArm {
+                    pattern: nuis_semantics::model::AstMatchPattern::PayloadStruct {
+                        type_ref: AstTypeRef {
+                            name: "Result.Ok".to_owned(),
+                            generic_args: Vec::new(),
+                            is_optional: false,
+                            is_ref: false,
+                        },
+                        payload: Box::new(nuis_semantics::model::AstMatchPattern::Bind(
+                            payload_name,
+                        )),
+                    },
+                    guard: None,
+                    body: vec![ok_stmt],
+                },
+                AstMatchArm {
+                    pattern: nuis_semantics::model::AstMatchPattern::PayloadStruct {
+                        type_ref: AstTypeRef {
+                            name: "Result.Err".to_owned(),
+                            generic_args: Vec::new(),
+                            is_optional: false,
+                            is_ref: false,
+                        },
+                        payload: Box::new(nuis_semantics::model::AstMatchPattern::Bind(
+                            error_name.clone(),
+                        )),
+                    },
+                    guard: None,
+                    body: vec![AstStmt::Return(Some(super::AstExpr::Call {
+                        callee: "Result.Err".to_owned(),
+                        generic_args: Vec::new(),
+                        args: vec![super::AstExpr::Var(error_name)],
+                    }))],
+                },
+            ],
+        },
+    ])
+}
+
+fn synthesize_try_expr_statements(
+    lowered_inner: NirExpr,
+    inner_ty: NirTypeRef,
+) -> Result<Vec<AstStmt>, String> {
+    let id = TRY_EXPANSION_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let result_name = format!("__nuis_try_result_{id}");
+    let error_name = format!("__nuis_try_error_{id}");
+    Ok(vec![
+        AstStmt::Let {
+            mutable: false,
+            name: result_name.clone(),
+            ty: Some(ast_type_from_nir(&inner_ty)),
+            value: ast_expr_from_nir(lowered_inner),
+        },
+        AstStmt::Match {
+            value: super::AstExpr::Var(result_name),
+            arms: vec![
+                AstMatchArm {
+                    pattern: nuis_semantics::model::AstMatchPattern::PayloadStruct {
+                        type_ref: AstTypeRef {
+                            name: "Result.Ok".to_owned(),
+                            generic_args: Vec::new(),
+                            is_optional: false,
+                            is_ref: false,
+                        },
+                        payload: Box::new(nuis_semantics::model::AstMatchPattern::Wildcard),
+                    },
+                    guard: None,
+                    body: Vec::new(),
+                },
+                AstMatchArm {
+                    pattern: nuis_semantics::model::AstMatchPattern::PayloadStruct {
+                        type_ref: AstTypeRef {
+                            name: "Result.Err".to_owned(),
+                            generic_args: Vec::new(),
+                            is_optional: false,
+                            is_ref: false,
+                        },
+                        payload: Box::new(nuis_semantics::model::AstMatchPattern::Bind(
+                            error_name.clone(),
+                        )),
+                    },
+                    guard: None,
+                    body: vec![AstStmt::Return(Some(super::AstExpr::Call {
+                        callee: "Result.Err".to_owned(),
+                        generic_args: Vec::new(),
+                        args: vec![super::AstExpr::Var(error_name)],
+                    }))],
+                },
+            ],
+        },
+    ])
+}
+
+#[allow(clippy::too_many_arguments)]
+fn synthesize_try_wrapped_statements(
+    inner: &super::AstExpr,
+    wrap: &dyn Fn(super::AstExpr) -> AstStmt,
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    return_type: Option<&AstTypeRef>,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<Vec<AstStmt>, String> {
+    let function_result_ty = current_function_result_type(return_type, type_aliases)?;
+    let lowered_inner = lower_expr_with_async(
+        inner,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        None,
+        false,
+    )?;
+    let inner_ty = infer_nir_expr_type(&lowered_inner, bindings, signatures, struct_table)
+        .ok_or_else(|| "could not infer operand type for `?`".to_owned())?;
+    let (_payload_ty, error_ty) = split_result_type(&inner_ty)?;
+    if !compatible_types(&function_result_ty.1, &error_ty) {
+        return Err(format!(
+            "`?` error type `{}` does not match enclosing function error type `{}`",
+            error_ty.render(),
+            function_result_ty.1.render()
+        ));
+    }
+    synthesize_try_statements(
+        lowered_inner,
+        inner_ty,
+        wrap(super::AstExpr::Var("__nuis_try_payload".to_owned())),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn expand_nested_try_expr_as_stmt(
+    expr: &super::AstExpr,
+    wrap: &dyn Fn(super::AstExpr) -> AstStmt,
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    return_type: Option<&AstTypeRef>,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<Option<Vec<AstStmt>>, String> {
+    match expr {
+        super::AstExpr::Try(inner) => Ok(Some(synthesize_try_wrapped_statements(
+            inner,
+            wrap,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        )?)),
+        super::AstExpr::Await(value) => expand_nested_try_expr_as_stmt(
+            value,
+            &|rewritten| wrap(super::AstExpr::Await(Box::new(rewritten))),
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        ),
+        super::AstExpr::Unary { op, operand } => expand_nested_try_expr_as_stmt(
+            operand,
+            &|rewritten| {
+                wrap(super::AstExpr::Unary {
+                    op: *op,
+                    operand: Box::new(rewritten),
+                })
+            },
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        ),
+        super::AstExpr::Invoke { callee, args } => {
+            if let Some(expanded) = expand_nested_try_expr_as_stmt(
+                callee,
+                &|rewritten| {
+                    wrap(super::AstExpr::Invoke {
+                        callee: Box::new(rewritten),
+                        args: args.clone(),
+                    })
+                },
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                return_type,
+                type_aliases,
+                signatures,
+                struct_table,
+            )? {
+                return Ok(Some(expanded));
+            }
+            for (index, arg) in args.iter().enumerate() {
+                if let Some(expanded) = expand_nested_try_expr_as_stmt(
+                    arg,
+                    &|rewritten| {
+                        let mut rewritten_args = args.clone();
+                        rewritten_args[index] = rewritten;
+                        wrap(super::AstExpr::Invoke {
+                            callee: callee.clone(),
+                            args: rewritten_args,
+                        })
+                    },
+                    current_domain,
+                    current_function_is_async,
+                    bindings,
+                    module_consts,
+                    return_type,
+                    type_aliases,
+                    signatures,
+                    struct_table,
+                )? {
+                    return Ok(Some(expanded));
+                }
+            }
+            Ok(None)
+        }
+        super::AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } => {
+            for (index, arg) in args.iter().enumerate() {
+                if let Some(expanded) = expand_nested_try_expr_as_stmt(
+                    arg,
+                    &|rewritten| {
+                        let mut rewritten_args = args.clone();
+                        rewritten_args[index] = rewritten;
+                        wrap(super::AstExpr::Call {
+                            callee: callee.clone(),
+                            generic_args: generic_args.clone(),
+                            args: rewritten_args,
+                        })
+                    },
+                    current_domain,
+                    current_function_is_async,
+                    bindings,
+                    module_consts,
+                    return_type,
+                    type_aliases,
+                    signatures,
+                    struct_table,
+                )? {
+                    return Ok(Some(expanded));
+                }
+            }
+            Ok(None)
+        }
+        super::AstExpr::MethodCall {
+            receiver,
+            method,
+            args,
+        } => {
+            if let Some(expanded) = expand_nested_try_expr_as_stmt(
+                receiver,
+                &|rewritten| {
+                    wrap(super::AstExpr::MethodCall {
+                        receiver: Box::new(rewritten),
+                        method: method.clone(),
+                        args: args.clone(),
+                    })
+                },
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                return_type,
+                type_aliases,
+                signatures,
+                struct_table,
+            )? {
+                return Ok(Some(expanded));
+            }
+            for (index, arg) in args.iter().enumerate() {
+                if let Some(expanded) = expand_nested_try_expr_as_stmt(
+                    arg,
+                    &|rewritten| {
+                        let mut rewritten_args = args.clone();
+                        rewritten_args[index] = rewritten;
+                        wrap(super::AstExpr::MethodCall {
+                            receiver: receiver.clone(),
+                            method: method.clone(),
+                            args: rewritten_args,
+                        })
+                    },
+                    current_domain,
+                    current_function_is_async,
+                    bindings,
+                    module_consts,
+                    return_type,
+                    type_aliases,
+                    signatures,
+                    struct_table,
+                )? {
+                    return Ok(Some(expanded));
+                }
+            }
+            Ok(None)
+        }
+        super::AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => {
+            for (index, (_, value)) in fields.iter().enumerate() {
+                if let Some(expanded) = expand_nested_try_expr_as_stmt(
+                    value,
+                    &|rewritten| {
+                        let mut rewritten_fields = fields.clone();
+                        rewritten_fields[index].1 = rewritten;
+                        wrap(super::AstExpr::StructLiteral {
+                            type_name: type_name.clone(),
+                            type_args: type_args.clone(),
+                            fields: rewritten_fields,
+                        })
+                    },
+                    current_domain,
+                    current_function_is_async,
+                    bindings,
+                    module_consts,
+                    return_type,
+                    type_aliases,
+                    signatures,
+                    struct_table,
+                )? {
+                    return Ok(Some(expanded));
+                }
+            }
+            Ok(None)
+        }
+        super::AstExpr::FieldAccess { base, field } => expand_nested_try_expr_as_stmt(
+            base,
+            &|rewritten| {
+                wrap(super::AstExpr::FieldAccess {
+                    base: Box::new(rewritten),
+                    field: field.clone(),
+                })
+            },
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        ),
+        super::AstExpr::Binary { op, lhs, rhs } => {
+            if let Some(expanded) = expand_nested_try_expr_as_stmt(
+                lhs,
+                &|rewritten| {
+                    wrap(super::AstExpr::Binary {
+                        op: *op,
+                        lhs: Box::new(rewritten),
+                        rhs: rhs.clone(),
+                    })
+                },
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                return_type,
+                type_aliases,
+                signatures,
+                struct_table,
+            )? {
+                return Ok(Some(expanded));
+            }
+            expand_nested_try_expr_as_stmt(
+                rhs,
+                &|rewritten| {
+                    wrap(super::AstExpr::Binary {
+                        op: *op,
+                        lhs: lhs.clone(),
+                        rhs: Box::new(rewritten),
+                    })
+                },
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                return_type,
+                type_aliases,
+                signatures,
+                struct_table,
+            )
+        }
+        super::AstExpr::Bool(_)
+        | super::AstExpr::Text(_)
+        | super::AstExpr::Int(_)
+        | super::AstExpr::Float(_)
+        | super::AstExpr::Var(_)
+        | super::AstExpr::Lambda { .. }
+        | super::AstExpr::Instantiate { .. }
+        | super::AstExpr::If { .. }
+        | super::AstExpr::Match { .. } => Ok(None),
+    }
+}
+
+fn rewrite_try_payload_placeholder(stmt: AstStmt, payload_name: &str) -> Result<AstStmt, String> {
+    match stmt {
+        AstStmt::Let {
+            mutable,
+            name,
+            ty,
+            value,
+        } => Ok(AstStmt::Let {
+            mutable,
+            name,
+            ty,
+            value: rewrite_try_payload_placeholder_expr(value, payload_name),
+        }),
+        AstStmt::Const {
+            name,
+            ty,
+            value,
+        } => Ok(AstStmt::Const {
+            name,
+            ty,
+            value: rewrite_try_payload_placeholder_expr(value, payload_name),
+        }),
+        AstStmt::Print(value) => Ok(AstStmt::Print(rewrite_try_payload_placeholder_expr(
+            value,
+            payload_name,
+        ))),
+        AstStmt::Expr(value) => Ok(AstStmt::Expr(rewrite_try_payload_placeholder_expr(
+            value,
+            payload_name,
+        ))),
+        AstStmt::Return(Some(value)) => Ok(AstStmt::Return(Some(
+            rewrite_try_payload_placeholder_expr(value, payload_name),
+        ))),
+        other => Err(format!(
+            "internal error: unsupported `?` payload rewrite target `{other:?}`"
+        )),
+    }
+}
+
+fn rewrite_try_payload_placeholder_expr(
+    expr: super::AstExpr,
+    payload_name: &str,
+) -> super::AstExpr {
+    match expr {
+        super::AstExpr::Var(var) if var == "__nuis_try_payload" => {
+            super::AstExpr::Var(payload_name.to_owned())
+        }
+        super::AstExpr::Await(value) => super::AstExpr::Await(Box::new(
+            rewrite_try_payload_placeholder_expr(*value, payload_name),
+        )),
+        super::AstExpr::Try(value) => super::AstExpr::Try(Box::new(
+            rewrite_try_payload_placeholder_expr(*value, payload_name),
+        )),
+        super::AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } => super::AstExpr::Call {
+            callee,
+            generic_args,
+            args: args
+                .into_iter()
+                .map(|arg| rewrite_try_payload_placeholder_expr(arg, payload_name))
+                .collect(),
+        },
+        super::AstExpr::Invoke { callee, args } => super::AstExpr::Invoke {
+            callee: Box::new(rewrite_try_payload_placeholder_expr(*callee, payload_name)),
+            args: args
+                .into_iter()
+                .map(|arg| rewrite_try_payload_placeholder_expr(arg, payload_name))
+                .collect(),
+        },
+        super::AstExpr::MethodCall {
+            receiver,
+            method,
+            args,
+        } => super::AstExpr::MethodCall {
+            receiver: Box::new(rewrite_try_payload_placeholder_expr(*receiver, payload_name)),
+            method,
+            args: args
+                .into_iter()
+                .map(|arg| rewrite_try_payload_placeholder_expr(arg, payload_name))
+                .collect(),
+        },
+        super::AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => super::AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields: fields
+                .into_iter()
+                .map(|(field, value)| {
+                    (
+                        field,
+                        rewrite_try_payload_placeholder_expr(value, payload_name),
+                    )
+                })
+                .collect(),
+        },
+        super::AstExpr::FieldAccess { base, field } => super::AstExpr::FieldAccess {
+            base: Box::new(rewrite_try_payload_placeholder_expr(*base, payload_name)),
+            field,
+        },
+        super::AstExpr::Unary { op, operand } => super::AstExpr::Unary {
+            op,
+            operand: Box::new(rewrite_try_payload_placeholder_expr(*operand, payload_name)),
+        },
+        super::AstExpr::Binary { op, lhs, rhs } => super::AstExpr::Binary {
+            op,
+            lhs: Box::new(rewrite_try_payload_placeholder_expr(*lhs, payload_name)),
+            rhs: Box::new(rewrite_try_payload_placeholder_expr(*rhs, payload_name)),
+        },
+        other => other,
+    }
+}
+
+fn ast_expr_from_nir(expr: NirExpr) -> super::AstExpr {
+    match expr {
+        NirExpr::Bool(value) => super::AstExpr::Bool(value),
+        NirExpr::Text(text) => super::AstExpr::Text(text),
+        NirExpr::Int(value) => super::AstExpr::Int(value),
+        NirExpr::F32(value) | NirExpr::F64(value) => super::AstExpr::Float(value),
+        NirExpr::Var(name) => super::AstExpr::Var(name),
+        NirExpr::Await(value) => super::AstExpr::Await(Box::new(ast_expr_from_nir(*value))),
+        NirExpr::Call { callee, args } => super::AstExpr::Call {
+            callee,
+            generic_args: Vec::new(),
+            args: args.into_iter().map(ast_expr_from_nir).collect(),
+        },
+        NirExpr::FieldAccess { base, field } => super::AstExpr::FieldAccess {
+            base: Box::new(ast_expr_from_nir(*base)),
+            field,
+        },
+        NirExpr::Binary { op, lhs, rhs } => super::AstExpr::Binary {
+            op: match op {
+                nuis_semantics::model::NirBinaryOp::And => nuis_semantics::model::AstBinaryOp::And,
+                nuis_semantics::model::NirBinaryOp::Or => nuis_semantics::model::AstBinaryOp::Or,
+                nuis_semantics::model::NirBinaryOp::Add => nuis_semantics::model::AstBinaryOp::Add,
+                nuis_semantics::model::NirBinaryOp::Sub => nuis_semantics::model::AstBinaryOp::Sub,
+                nuis_semantics::model::NirBinaryOp::Mul => nuis_semantics::model::AstBinaryOp::Mul,
+                nuis_semantics::model::NirBinaryOp::Div => nuis_semantics::model::AstBinaryOp::Div,
+                nuis_semantics::model::NirBinaryOp::Rem => nuis_semantics::model::AstBinaryOp::Rem,
+                nuis_semantics::model::NirBinaryOp::Eq => nuis_semantics::model::AstBinaryOp::Eq,
+                nuis_semantics::model::NirBinaryOp::Ne => nuis_semantics::model::AstBinaryOp::Ne,
+                nuis_semantics::model::NirBinaryOp::Lt => nuis_semantics::model::AstBinaryOp::Lt,
+                nuis_semantics::model::NirBinaryOp::Le => nuis_semantics::model::AstBinaryOp::Le,
+                nuis_semantics::model::NirBinaryOp::Gt => nuis_semantics::model::AstBinaryOp::Gt,
+                nuis_semantics::model::NirBinaryOp::Ge => nuis_semantics::model::AstBinaryOp::Ge,
+            },
+            lhs: Box::new(ast_expr_from_nir(*lhs)),
+            rhs: Box::new(ast_expr_from_nir(*rhs)),
+        },
+        other => panic!("internal error: unsupported NIR-to-AST try expansion expr {other:?}"),
+    }
 }
 
 fn seed_expanded_stmt_bindings(
@@ -867,6 +1800,12 @@ fn expand_nested_control_expr_as_stmt(
         super::AstExpr::Await(value) => expand_nested_control_expr_as_stmt(
             value,
             &|rewritten| wrap(super::AstExpr::Await(Box::new(rewritten))),
+            kind,
+            true,
+        ),
+        super::AstExpr::Try(value) => expand_nested_control_expr_as_stmt(
+            value,
+            &|rewritten| wrap(super::AstExpr::Try(Box::new(rewritten))),
             kind,
             true,
         ),

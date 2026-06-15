@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use nuis_semantics::model::{
     nir_expr_effect_class, AstExpr, AstMatchArm, AstMatchPattern, AstTypeAlias, AstTypeRef,
@@ -54,27 +55,38 @@ pub(super) fn lower_match_stmt_with_async(
     let wildcard_index = arms
         .iter()
         .position(|arm| matches!(arm.pattern, AstMatchPattern::Wildcard) && arm.guard.is_none())
-        .ok_or_else(|| "minimal `match` currently requires a final unguarded `_` arm".to_owned())?;
-    if wildcard_index != arms.len() - 1 {
+        ;
+
+    let (arms_to_lower, mut else_body) = if let Some(wildcard_index) = wildcard_index {
+        if wildcard_index != arms.len() - 1 {
+            return Err(
+                "minimal `match` currently requires an unguarded `_` to be the final arm"
+                    .to_owned(),
+            );
+        }
+        let mut wildcard_bindings = bindings.clone();
+        let else_body = lower_stmt_block_with_async(
+            &arms[wildcard_index].body,
+            current_domain,
+            current_function_is_async,
+            &mut wildcard_bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        )?;
+        (&arms[..wildcard_index], else_body)
+    } else if is_exhaustive_option_or_result_match(arms, &value_ty, type_aliases)? {
+        (arms, Vec::new())
+    } else {
         return Err(
-            "minimal `match` currently requires an unguarded `_` to be the final arm".to_owned(),
+            "minimal `match` currently requires a final unguarded `_` arm unless an `Option` or `Result` match is explicitly exhaustive"
+                .to_owned(),
         );
-    }
+    };
 
-    let mut wildcard_bindings = bindings.clone();
-    let mut else_body = lower_stmt_block_with_async(
-        &arms[wildcard_index].body,
-        current_domain,
-        current_function_is_async,
-        &mut wildcard_bindings,
-        module_consts,
-        return_type,
-        type_aliases,
-        signatures,
-        struct_table,
-    )?;
-
-    for arm in arms[..wildcard_index].iter().rev() {
+    for arm in arms_to_lower.iter().rev() {
         let (mut condition, pattern_bindings) = lower_match_pattern_condition_and_bindings(
             &arm.pattern,
             &lowered_value,
@@ -146,6 +158,64 @@ pub(super) fn lower_match_stmt_with_async(
         .into_iter()
         .next()
         .ok_or_else(|| "internal error: lowered empty `match` body".to_owned())
+}
+
+fn is_exhaustive_option_or_result_match(
+    arms: &[AstMatchArm],
+    value_ty: &NirTypeRef,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<bool, String> {
+    if arms.is_empty() || arms.iter().any(|arm| arm.guard.is_some()) {
+        return Ok(false);
+    }
+
+    let mut parent_name: Option<String> = None;
+    let mut variants = BTreeSet::new();
+    for arm in arms {
+        let Some((parent, variant)) =
+            exhaustive_option_or_result_variant_name(&arm.pattern, value_ty, type_aliases)?
+        else {
+            return Ok(false);
+        };
+        if !matches!(parent.as_str(), "Option" | "Result") {
+            return Ok(false);
+        }
+        if let Some(existing) = parent_name.as_ref() {
+            if existing != &parent {
+                return Ok(false);
+            }
+        } else {
+            parent_name = Some(parent);
+        }
+        variants.insert(variant);
+    }
+
+    match parent_name.as_deref() {
+        Some("Option") => Ok(variants.contains("Some") && variants.contains("None")),
+        Some("Result") => Ok(variants.contains("Ok") && variants.contains("Err")),
+        _ => Ok(false),
+    }
+}
+
+fn exhaustive_option_or_result_variant_name(
+    pattern: &AstMatchPattern,
+    value_ty: &NirTypeRef,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<Option<(String, String)>, String> {
+    let type_ref = match pattern {
+        AstMatchPattern::PayloadStruct { type_ref, .. } => type_ref,
+        AstMatchPattern::StructFields {
+            type_ref: Some(type_ref),
+            ..
+        } => type_ref,
+        _ => return Ok(None),
+    };
+    let resolved_type_ref = resolve_ast_type_ref_aliases(type_ref, type_aliases)?;
+    let lowered_pattern_ty = lower_pattern_type_for_scrutinee(&resolved_type_ref, value_ty, type_aliases)?;
+    let Some((parent, variant)) = lowered_pattern_ty.name.rsplit_once('.') else {
+        return Ok(None);
+    };
+    Ok(Some((parent.to_owned(), variant.to_owned())))
 }
 
 fn substitute_pattern_binding_vars(

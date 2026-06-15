@@ -195,6 +195,79 @@ fn lowers_generic_fn1_higher_order_lambda_family() {
 }
 
 #[test]
+fn lowers_result_map_and_and_then_higher_order_helpers() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                return Result.Ok(mapper(value));
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn result_and_then<T, R, E>(
+            result: Result<T, E>,
+            mapper: Fn1<T, Result<R, E>>
+          ) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                return mapper(value);
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let input: Result<i64, CoreError> = Result.Ok(7);
+            let mapped: Result<i64, CoreError> = result_map(
+              input,
+              |value: i64| -> i64 { return value + 1; }
+            );
+            let chained: Result<i64, CoreError> = result_and_then(
+              mapped,
+              |value: i64| -> Result<i64, CoreError> { return Result.Ok(value * 2); }
+            );
+            match chained {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name.starts_with("__hof_result_map_")));
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name.starts_with("__hof_result_and_then_")));
+}
+
+#[test]
 fn lowers_generic_named_function_through_concrete_fn1_parameter() {
     let module = parse_nuis_module(
         r#"

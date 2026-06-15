@@ -162,6 +162,21 @@ pub(crate) fn infer_ast_expr_type_inner(
                 Some(ty)
             }
         }),
+        AstExpr::Try(value) => infer_ast_expr_type_inner(
+            value,
+            env,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            active_exprs,
+        )
+        .and_then(|ty| {
+            if ty.name == "Result" && ty.generic_args.len() == 2 {
+                ty.generic_args.first().cloned()
+            } else {
+                None
+            }
+        }),
         AstExpr::Call {
             callee,
             generic_args,

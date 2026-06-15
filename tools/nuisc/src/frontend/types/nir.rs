@@ -179,7 +179,14 @@ pub(crate) fn infer_nir_expr_type(
         NirExpr::F32(_) => Some(f32_type()),
         NirExpr::F64(_) => Some(f64_type()),
         NirExpr::Var(name) => bindings.get(name).cloned(),
-        NirExpr::Await(value) => infer_nir_expr_type(value, bindings, signatures, struct_table),
+        NirExpr::Await(value) => infer_nir_expr_type(value, bindings, signatures, struct_table)
+            .and_then(|ty| {
+                if ty.name == "Task" && ty.generic_args.len() == 1 {
+                    ty.generic_args.first().cloned()
+                } else {
+                    Some(ty)
+                }
+            }),
         NirExpr::Instantiate { unit, .. } => {
             Some(generic_named_type("Instance", vec![named_type(unit)]))
         }

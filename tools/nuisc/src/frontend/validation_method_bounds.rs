@@ -227,7 +227,9 @@ pub(super) fn validate_expr_generic_method_bounds(
             )?;
         }
         AstExpr::Instantiate { .. } => {}
-        AstExpr::Await(value) | AstExpr::FieldAccess { base: value, .. } => {
+        AstExpr::Try(value)
+        | AstExpr::Await(value)
+        | AstExpr::FieldAccess { base: value, .. } => {
             validate_expr_generic_method_bounds(
                 value,
                 visible_type_aliases,

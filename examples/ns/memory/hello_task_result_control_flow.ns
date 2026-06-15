@@ -1,0 +1,43 @@
+mod cpu Main {
+  enum Error {
+    InvalidInput,
+  }
+
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  async fn work(seed: i64) -> i64 {
+    return seed + 10;
+  }
+
+  fn fetch(seed: i64) -> Result<Task<i64>, Error> {
+    if seed > 0 {
+      return Result.Ok(spawn(work(seed)));
+    }
+    return Result.Err(Error.InvalidInput);
+  }
+
+  async fn choose(flag: bool, seed: i64) -> Result<i64, Error> {
+    let current_task: Result<Task<i64>, Error> = fetch(seed);
+    let first_task: Result<Task<i64>, Error> = fetch(1);
+    let next_task: Result<Task<i64>, Error> = fetch(seed + 1);
+
+    let selected_task: Result<Task<i64>, Error> = if flag {
+      current_task
+    } else {
+      match seed {
+        1 => { first_task },
+        _ => { next_task }
+      }
+    };
+
+    let value: i64 = await selected_task?;
+    return Result.Ok(value + 1);
+  }
+
+  async fn main() -> Result<i64, Error> {
+    return await choose(true, 2);
+  }
+}

@@ -285,6 +285,48 @@ fn lowers_if_expression_in_return_position() {
 }
 
 #[test]
+fn lowers_tail_if_expression_without_explicit_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            if false {
+              1
+            } else {
+              2
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    match &function.body[0] {
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            assert!(matches!(condition, NirExpr::Bool(false)));
+            assert!(matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Int(1)))]
+            ));
+            assert!(matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Int(2)))]
+            ));
+        }
+        other => panic!("expected lowered tail if-expression return, found {other:?}"),
+    }
+}
+
+#[test]
 fn lowers_workflow_style_if_expression_chain_without_empty_branches() {
     let module = parse_nuis_module(
         r#"
@@ -334,6 +376,46 @@ fn lowers_workflow_style_if_expression_chain_without_empty_branches() {
             assert!(!then_body.is_empty(), "then branch should not be empty");
             assert!(!else_body.is_empty(), "else branch should not be empty");
         }
+    }
+}
+
+#[test]
+fn lowers_tail_match_expression_without_explicit_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            match 1 {
+              1 => { 7 },
+              _ => { 9 }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    match &function.body[0] {
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            assert!(matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Int(7)))]
+            ));
+            assert!(matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Int(9)))]
+            ));
+        }
+        other => panic!("expected lowered tail match-expression return, found {other:?}"),
     }
 }
 
@@ -661,6 +743,34 @@ fn lowers_match_expression_inside_await_operand() {
         }
         other => panic!("expected lowered match-expression around await operand, found {other:?}"),
     }
+}
+
+#[test]
+fn lowers_tail_await_expression_without_explicit_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn one() -> i64 {
+            return 1;
+          }
+
+          async fn main() -> i64 {
+            await one()
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        function.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Await(_)))]
+    ));
 }
 
 #[test]

@@ -175,6 +175,12 @@ pub(super) fn lower_expr_with_async(
                 true,
             )?))
         }
+        AstExpr::Try(_) => {
+            return Err(
+                "`?` is currently only supported as the direct value of `let`, `const`, `print`, `return`, or expression statements"
+                    .to_owned(),
+            )
+        }
         AstExpr::Instantiate { domain, unit } => {
             if current_domain != "cpu" {
                 return Err(format!(
