@@ -35,6 +35,7 @@ pub struct AstModule {
     pub consts: Vec<AstConstItem>,
     pub type_aliases: Vec<AstTypeAlias>,
     pub structs: Vec<AstStructDef>,
+    pub enums: Vec<AstEnumDef>,
     pub traits: Vec<AstTraitDef>,
     pub impls: Vec<AstImplDef>,
     pub functions: Vec<AstFunction>,
@@ -53,6 +54,7 @@ pub struct AstTypeAlias {
     pub visibility: AstVisibility,
     pub name: String,
     pub generic_params: Vec<AstGenericParam>,
+    pub where_bounds: Vec<AstWherePredicate>,
     pub target: AstTypeRef,
 }
 
@@ -89,7 +91,31 @@ pub struct AstStructDef {
     pub attributes: Vec<AstAttribute>,
     pub name: String,
     pub generic_params: Vec<AstGenericParam>,
+    pub where_bounds: Vec<AstWherePredicate>,
     pub fields: Vec<AstStructField>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstEnumDef {
+    pub visibility: AstVisibility,
+    pub attributes: Vec<AstAttribute>,
+    pub name: String,
+    pub generic_params: Vec<AstGenericParam>,
+    pub where_bounds: Vec<AstWherePredicate>,
+    pub variants: Vec<AstEnumVariant>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstEnumVariant {
+    pub name: String,
+    pub kind: AstEnumVariantKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AstEnumVariantKind {
+    Unit,
+    Tuple(Vec<AstTypeRef>),
+    Struct(Vec<AstStructField>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,7 +141,13 @@ pub struct AstAttribute {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstGenericParam {
     pub name: String,
-    pub bound: Option<AstTypeRef>,
+    pub bounds: Vec<AstTypeRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstWherePredicate {
+    pub param_name: String,
+    pub bounds: Vec<AstTypeRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,6 +174,8 @@ pub struct AstImplMethod {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstImplDef {
+    pub generic_params: Vec<AstGenericParam>,
+    pub where_bounds: Vec<AstWherePredicate>,
     pub trait_name: String,
     pub for_type: AstTypeRef,
     pub methods: Vec<AstImplMethod>,
@@ -229,6 +263,7 @@ pub struct AstFunction {
     pub test_clock_policy: Option<TestClockPolicy>,
     pub is_async: bool,
     pub generic_params: Vec<AstGenericParam>,
+    pub where_bounds: Vec<AstWherePredicate>,
     pub params: Vec<AstParam>,
     pub return_type: Option<AstTypeRef>,
     pub body: Vec<AstStmt>,
@@ -387,6 +422,7 @@ pub struct NirModule {
     pub consts: Vec<NirConstItem>,
     pub type_aliases: Vec<NirTypeAlias>,
     pub structs: Vec<NirStructDef>,
+    pub enums: Vec<NirEnumDef>,
     pub traits: Vec<NirTraitDef>,
     pub impls: Vec<NirImplDef>,
     pub functions: Vec<NirFunction>,
@@ -405,6 +441,7 @@ pub struct NirTypeAlias {
     pub visibility: NirVisibility,
     pub name: String,
     pub generic_params: Vec<NirGenericParam>,
+    pub where_bounds: Vec<NirWherePredicate>,
     pub target: NirTypeRef,
 }
 
@@ -441,6 +478,7 @@ pub struct NirStructDef {
     pub annotations: Vec<NirAnnotation>,
     pub name: String,
     pub generic_params: Vec<NirGenericParam>,
+    pub where_bounds: Vec<NirWherePredicate>,
     pub fields: Vec<NirStructField>,
 }
 
@@ -451,9 +489,38 @@ impl NirStructDef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirEnumDef {
+    pub visibility: NirVisibility,
+    pub annotations: Vec<NirAnnotation>,
+    pub name: String,
+    pub generic_params: Vec<NirGenericParam>,
+    pub where_bounds: Vec<NirWherePredicate>,
+    pub variants: Vec<NirEnumVariant>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirEnumVariant {
+    pub name: String,
+    pub kind: NirEnumVariantKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NirEnumVariantKind {
+    Unit,
+    Tuple(Vec<NirTypeRef>),
+    Struct(Vec<NirStructField>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirGenericParam {
     pub name: String,
-    pub bound: Option<NirTypeRef>,
+    pub bounds: Vec<NirTypeRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirWherePredicate {
+    pub param_name: String,
+    pub bounds: Vec<NirTypeRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1024,6 +1091,7 @@ pub struct NirFunction {
     pub test_clock_policy: Option<TestClockPolicy>,
     pub is_async: bool,
     pub generic_params: Vec<NirGenericParam>,
+    pub where_bounds: Vec<NirWherePredicate>,
     pub params: Vec<NirParam>,
     pub return_type: Option<NirTypeRef>,
     pub body: Vec<NirStmt>,

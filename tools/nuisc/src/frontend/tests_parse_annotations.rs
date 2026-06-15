@@ -64,13 +64,192 @@ fn parses_trait_impl_and_generic_function_into_ast() {
         .unwrap();
     assert_eq!(function.generic_params.len(), 1);
     assert_eq!(function.generic_params[0].name, "T");
-    assert_eq!(
-        function.generic_params[0]
-            .bound
-            .as_ref()
-            .map(|bound| bound.name.as_str()),
-        Some("Addable")
-    );
+    assert_eq!(function.generic_params[0].bounds.len(), 1);
+    assert_eq!(function.generic_params[0].bounds[0].name, "Addable");
+}
+
+#[test]
+fn parses_multiple_generic_bounds_into_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          pub trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          fn keep<T: Addable + Printable>(value: T) -> T {
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "keep")
+        .unwrap();
+    assert_eq!(function.generic_params.len(), 1);
+    assert_eq!(function.generic_params[0].name, "T");
+    assert_eq!(function.generic_params[0].bounds.len(), 2);
+    assert_eq!(function.generic_params[0].bounds[0].name, "Addable");
+    assert_eq!(function.generic_params[0].bounds[1].name, "Printable");
+}
+
+#[test]
+fn parses_function_where_clause_into_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          pub trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          fn keep<T>(value: T) -> T where T: Addable + Printable {
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "keep")
+        .unwrap();
+    assert_eq!(function.generic_params.len(), 1);
+    assert_eq!(function.where_bounds.len(), 1);
+    assert_eq!(function.where_bounds[0].param_name, "T");
+    assert_eq!(function.where_bounds[0].bounds.len(), 2);
+    assert_eq!(function.where_bounds[0].bounds[0].name, "Addable");
+    assert_eq!(function.where_bounds[0].bounds[1].name, "Printable");
+}
+
+#[test]
+fn parses_struct_and_type_alias_where_clauses_into_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          struct Boxed<T> where T: Addable {
+            value: T,
+          }
+
+          type Alias<T> where T: Addable = T;
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(ast.structs[0].where_bounds.len(), 1);
+    assert_eq!(ast.structs[0].where_bounds[0].param_name, "T");
+    assert_eq!(ast.structs[0].where_bounds[0].bounds[0].name, "Addable");
+    assert_eq!(ast.type_aliases[0].where_bounds.len(), 1);
+    assert_eq!(ast.type_aliases[0].where_bounds[0].param_name, "T");
+    assert_eq!(ast.type_aliases[0].where_bounds[0].bounds[0].name, "Addable");
+}
+
+#[test]
+fn parses_enum_declaration_into_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          pub enum Option<T> where T: Addable {
+            None,
+            Some(T),
+            Named {
+              value: T,
+            },
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(ast.enums.len(), 1);
+    let definition = &ast.enums[0];
+    assert_eq!(definition.name, "Option");
+    assert_eq!(definition.visibility, AstVisibility::Public);
+    assert_eq!(definition.generic_params.len(), 1);
+    assert_eq!(definition.where_bounds.len(), 1);
+    assert_eq!(definition.variants.len(), 3);
+    assert_eq!(definition.variants[0].name, "None");
+    assert_eq!(definition.variants[1].name, "Some");
+    assert_eq!(definition.variants[2].name, "Named");
+}
+
+#[test]
+fn lowers_enum_declaration_into_nir() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let nir = lower_project_ast_to_nir(&ast, &[]).unwrap();
+    assert_eq!(nir.enums.len(), 1);
+    assert_eq!(nir.enums[0].name, "Option");
+    assert_eq!(nir.enums[0].variants.len(), 2);
+}
+
+#[test]
+fn parses_repeated_where_predicates_into_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          pub trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          fn keep<T>(value: T) -> T where T: Addable, T: Printable {
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "keep")
+        .unwrap();
+    assert_eq!(function.where_bounds.len(), 2);
+    assert_eq!(function.where_bounds[0].param_name, "T");
+    assert_eq!(function.where_bounds[0].bounds[0].name, "Addable");
+    assert_eq!(function.where_bounds[1].param_name, "T");
+    assert_eq!(function.where_bounds[1].bounds[0].name, "Printable");
 }
 
 #[test]
@@ -652,4 +831,35 @@ fn lowers_host_symbol_bridge_stub_calls_into_cpu_extern_calls() {
             args: vec![NirExpr::Int(80), NirExpr::Int(8080)],
         }))]
     );
+}
+
+#[test]
+fn parses_generic_impl_headers() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          trait Showable {
+            fn show(value: Self) -> i64;
+          }
+
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          impl<T: Showable> Showable for Option<T> where T: Showable {
+            fn show(value: Option<T>) -> i64 {
+              return 0;
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(ast.impls.len(), 1);
+    assert_eq!(ast.impls[0].generic_params.len(), 1);
+    assert_eq!(ast.impls[0].generic_params[0].name, "T");
+    assert_eq!(ast.impls[0].where_bounds.len(), 1);
+    assert_eq!(ast.impls[0].for_type.name, "Option");
 }

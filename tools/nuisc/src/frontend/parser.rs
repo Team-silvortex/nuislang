@@ -1,9 +1,9 @@
 use nuis_semantics::model::{
-    AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstConstItem, AstExpr,
-    AstExternFunction, AstExternInterface, AstFunction, AstGenericParam, AstImplDef, AstImplMethod,
-    AstMatchArm, AstMatchPattern, AstModule, AstParam, AstStmt, AstStructDef, AstStructField,
-    AstTraitDef, AstTraitMethodSig, AstTypeAlias, AstTypeRef, AstVisibility, TestClockDomain,
-    TestClockPolicy,
+    AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstConstItem, AstEnumDef,
+    AstEnumVariant, AstEnumVariantKind, AstExpr, AstExternFunction, AstExternInterface,
+    AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstMatchArm, AstMatchPattern,
+    AstModule, AstParam, AstStmt, AstStructDef, AstStructField, AstTraitDef, AstTraitMethodSig,
+    AstTypeAlias, AstTypeRef, AstVisibility, AstWherePredicate, TestClockDomain, TestClockPolicy,
 };
 
 use super::lexer::{describe_token, Token};
@@ -66,6 +66,7 @@ impl Parser {
         self.expect_symbol('{')?;
 
         let mut structs = Vec::new();
+        let mut enums = Vec::new();
         let mut traits = Vec::new();
         let mut impls = Vec::new();
         let mut consts = Vec::new();
@@ -91,6 +92,8 @@ impl Parser {
                 }
             } else if self.peek_item_keyword_after_attributes("struct") {
                 structs.push(self.parse_struct_def()?);
+            } else if self.peek_item_keyword_after_attributes("enum") {
+                enums.push(self.parse_enum_def()?);
             } else if self.peek_item_keyword_after_attributes("trait") {
                 traits.push(self.parse_trait_def()?);
             } else if self.peek_item_keyword_after_attributes("impl") {
@@ -116,6 +119,7 @@ impl Parser {
             consts,
             type_aliases,
             structs,
+            enums,
             traits,
             impls,
             functions,
@@ -204,6 +208,11 @@ impl Parser {
         } else {
             Vec::new()
         };
+        let where_bounds = if self.peek_word("where") {
+            self.parse_where_predicate_list()?
+        } else {
+            Vec::new()
+        };
         self.expect_symbol('{')?;
         let mut fields = Vec::new();
         while !self.peek_symbol('}') {
@@ -230,6 +239,7 @@ impl Parser {
             attributes,
             name,
             generic_params,
+            where_bounds,
             fields,
         })
     }
@@ -255,6 +265,84 @@ impl Parser {
         })
     }
 
+    fn parse_enum_def(&mut self) -> Result<AstEnumDef, String> {
+        let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
+        self.expect_word("enum")?;
+        let name = self.expect_ident()?;
+        let generic_params = if self.peek_symbol('<') {
+            self.parse_generic_param_decl_list()?
+        } else {
+            Vec::new()
+        };
+        let where_bounds = if self.peek_word("where") {
+            self.parse_where_predicate_list()?
+        } else {
+            Vec::new()
+        };
+        self.expect_symbol('{')?;
+        let mut variants = Vec::new();
+        while !self.peek_symbol('}') {
+            let variant_name = self.expect_ident()?;
+            let kind = if self.peek_symbol('(') {
+                self.expect_symbol('(')?;
+                let mut fields = Vec::new();
+                while !self.peek_symbol(')') {
+                    fields.push(self.parse_type_ref()?);
+                    if self.peek_symbol(',') {
+                        self.expect_symbol(',')?;
+                    } else {
+                        break;
+                    }
+                }
+                self.expect_symbol(')')?;
+                AstEnumVariantKind::Tuple(fields)
+            } else if self.peek_symbol('{') {
+                self.expect_symbol('{')?;
+                let mut fields = Vec::new();
+                while !self.peek_symbol('}') {
+                    let (field_visibility, field_attributes) =
+                        self.parse_visibility_and_attribute_list()?;
+                    let field_name = self.expect_ident()?;
+                    self.expect_symbol(':')?;
+                    let ty = self.parse_type_ref()?;
+                    fields.push(AstStructField {
+                        visibility: field_visibility,
+                        attributes: field_attributes,
+                        name: field_name,
+                        ty,
+                    });
+                    if self.peek_symbol(',') {
+                        self.expect_symbol(',')?;
+                    } else {
+                        break;
+                    }
+                }
+                self.expect_symbol('}')?;
+                AstEnumVariantKind::Struct(fields)
+            } else {
+                AstEnumVariantKind::Unit
+            };
+            variants.push(AstEnumVariant {
+                name: variant_name,
+                kind,
+            });
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+            } else {
+                break;
+            }
+        }
+        self.expect_symbol('}')?;
+        Ok(AstEnumDef {
+            visibility,
+            attributes,
+            name,
+            generic_params,
+            where_bounds,
+            variants,
+        })
+    }
+
     fn parse_type_alias_item(&mut self) -> Result<AstTypeAlias, String> {
         let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
         if !attributes.is_empty() {
@@ -270,6 +358,11 @@ impl Parser {
         } else {
             Vec::new()
         };
+        let where_bounds = if self.peek_word("where") {
+            self.parse_where_predicate_list()?
+        } else {
+            Vec::new()
+        };
         self.expect_symbol('=')?;
         let target = self.parse_type_ref()?;
         self.expect_symbol(';')?;
@@ -277,6 +370,7 @@ impl Parser {
             visibility,
             name,
             generic_params,
+            where_bounds,
             target,
         })
     }
@@ -334,9 +428,19 @@ impl Parser {
 
     fn parse_impl_def(&mut self) -> Result<AstImplDef, String> {
         self.expect_word("impl")?;
+        let generic_params = if self.peek_symbol('<') {
+            self.parse_generic_param_decl_list()?
+        } else {
+            Vec::new()
+        };
         let trait_name = self.parse_qualified_ident()?;
         self.expect_word("for")?;
         let for_type = self.parse_type_ref()?;
+        let where_bounds = if self.peek_word("where") {
+            self.parse_where_predicate_list()?
+        } else {
+            Vec::new()
+        };
         self.expect_symbol('{')?;
         let mut methods = Vec::new();
         while !self.peek_symbol('}') {
@@ -344,6 +448,8 @@ impl Parser {
         }
         self.expect_symbol('}')?;
         Ok(AstImplDef {
+            generic_params,
+            where_bounds,
             trait_name,
             for_type,
             methods,
@@ -578,6 +684,11 @@ impl Parser {
         };
         self.expect_symbol(')')?;
         let return_type = self.parse_optional_return_type()?;
+        let where_bounds = if self.peek_word("where") {
+            self.parse_where_predicate_list()?
+        } else {
+            Vec::new()
+        };
         let body = self.parse_block()?;
 
         Ok(AstFunction {
@@ -593,6 +704,7 @@ impl Parser {
             test_clock_policy,
             is_async,
             generic_params,
+            where_bounds,
             params,
             return_type,
             body,
@@ -850,13 +962,18 @@ impl Parser {
         let mut params = Vec::new();
         loop {
             let name = self.expect_ident()?;
-            let bound = if self.peek_symbol(':') {
+            let bounds = if self.peek_symbol(':') {
                 self.expect_symbol(':')?;
-                Some(self.parse_type_ref()?)
+                let mut bounds = vec![self.parse_type_ref()?];
+                while self.peek_symbol('+') {
+                    self.expect_symbol('+')?;
+                    bounds.push(self.parse_type_ref()?);
+                }
+                bounds
             } else {
-                None
+                Vec::new()
             };
-            params.push(AstGenericParam { name, bound });
+            params.push(AstGenericParam { name, bounds });
             if self.peek_symbol(',') {
                 self.expect_symbol(',')?;
             } else {
@@ -865,6 +982,30 @@ impl Parser {
         }
         self.expect_symbol('>')?;
         Ok(params)
+    }
+
+    fn parse_where_predicate_list(&mut self) -> Result<Vec<AstWherePredicate>, String> {
+        self.expect_word("where")?;
+        let mut predicates = Vec::new();
+        loop {
+            let param_name = self.expect_ident()?;
+            self.expect_symbol(':')?;
+            let mut bounds = vec![self.parse_type_ref()?];
+            while self.peek_symbol('+') {
+                self.expect_symbol('+')?;
+                bounds.push(self.parse_type_ref()?);
+            }
+            predicates.push(AstWherePredicate { param_name, bounds });
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+                if self.peek_symbol('{') {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        Ok(predicates)
     }
 
     fn parse_test_decl_call_syntax(
@@ -1075,6 +1216,23 @@ impl Parser {
             name.push_str(&self.expect_ident()?);
         }
         Ok(name)
+    }
+
+    fn qualified_expr_path(&self, expr: &AstExpr) -> Option<String> {
+        match expr {
+            AstExpr::Var(name) => Some(name.clone()),
+            AstExpr::FieldAccess { base, field } => {
+                Some(format!("{}.{}", self.qualified_expr_path(base)?, field))
+            }
+            _ => None,
+        }
+    }
+
+    fn qualified_expr_prefers_constructor(&self, expr: &AstExpr) -> bool {
+        self.qualified_expr_path(expr)
+            .and_then(|path| path.split('.').next().map(str::to_owned))
+            .and_then(|head| head.chars().next())
+            .is_some_and(|ch| ch.is_ascii_uppercase())
     }
 
     fn parse_type_arg_list(&mut self) -> Result<Vec<AstTypeRef>, String> {
@@ -1704,6 +1862,13 @@ impl Parser {
                         generic_args: Vec::new(),
                         args,
                     },
+                    other if self.qualified_expr_prefers_constructor(&other) => AstExpr::Call {
+                        callee: self
+                            .qualified_expr_path(&other)
+                            .expect("qualified constructor path exists"),
+                        generic_args: Vec::new(),
+                        args,
+                    },
                     other => AstExpr::Invoke {
                         callee: Box::new(other),
                         args,
@@ -1716,10 +1881,24 @@ impl Parser {
                     self.expect_symbol('(')?;
                     let args = self.parse_argument_list(')')?;
                     self.expect_symbol(')')?;
-                    expr = AstExpr::MethodCall {
-                        receiver: Box::new(expr),
-                        method: member,
-                        args,
+                    let namespace_candidate = AstExpr::FieldAccess {
+                        base: Box::new(expr.clone()),
+                        field: member.clone(),
+                    };
+                    expr = if self.qualified_expr_prefers_constructor(&namespace_candidate) {
+                        AstExpr::Call {
+                            callee: self
+                                .qualified_expr_path(&namespace_candidate)
+                                .expect("qualified constructor path exists"),
+                            generic_args: Vec::new(),
+                            args,
+                        }
+                    } else {
+                        AstExpr::MethodCall {
+                            receiver: Box::new(expr),
+                            method: member,
+                            args,
+                        }
                     };
                 } else {
                     expr = AstExpr::FieldAccess {
@@ -1735,6 +1914,21 @@ impl Parser {
                     callee: "load_at".to_owned(),
                     generic_args: Vec::new(),
                     args: vec![expr, index],
+                };
+            } else if self.allow_struct_literals
+                && self.peek_symbol('{')
+                && self.qualified_expr_prefers_constructor(&expr)
+            {
+                let type_name = self
+                    .qualified_expr_path(&expr)
+                    .expect("qualified constructor path exists");
+                self.expect_symbol('{')?;
+                let fields = self.parse_struct_field_list()?;
+                self.expect_symbol('}')?;
+                expr = AstExpr::StructLiteral {
+                    type_name,
+                    type_args: Vec::new(),
+                    fields,
                 };
             } else {
                 break;

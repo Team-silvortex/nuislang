@@ -224,6 +224,241 @@ fn monomorphizes_generic_binary_add_with_addable_bound() {
 }
 
 #[test]
+fn monomorphizes_generic_function_with_parent_enum_parameter_from_variant_argument() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn keep<T>(value: Option<T>) -> Option<T> {
+            return value;
+          }
+
+          fn main() -> i64 {
+            let value: Option<i64> = keep(Option.Some(7));
+            match value {
+              Option.Some(payload) => {
+                return payload;
+              }
+              _ => {
+                return 0;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        &main.body[0],
+        NirStmt::Let {
+            value: NirExpr::Call { callee, args },
+            ..
+        } if callee == "keep__i64"
+            && matches!(
+                args.as_slice(),
+                [NirExpr::StructLiteral { type_name, type_args, .. }]
+                    if type_name == "Option.Some"
+                        && type_args.len() == 1
+                        && type_args[0].render() == "i64"
+            )
+    ));
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "keep__i64")
+        .unwrap();
+    assert!(specialized.generic_params.is_empty());
+    assert!(matches!(
+        specialized.params.as_slice(),
+        [param] if param.ty.render() == "Option<i64>"
+    ));
+}
+
+#[test]
+fn monomorphizes_parent_enum_parameter_from_unit_variant_and_sibling_argument() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn fallback<T>(value: Option<T>, fallback: T) -> T {
+            match value {
+              Option.Some(payload) => {
+                return payload;
+              }
+              _ => {
+                return fallback;
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            return fallback(Option.None, 7);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, args })))
+            if callee == "fallback__i64"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::StructLiteral { type_name, type_args, .. }, NirExpr::Int(7)]
+                        if type_name == "Option.None"
+                            && type_args.len() == 1
+                            && type_args[0].render() == "i64"
+                )
+    ));
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "fallback__i64")
+        .unwrap();
+    assert!(specialized.generic_params.is_empty());
+    assert!(matches!(
+        specialized.params.as_slice(),
+        [option_param, fallback_param]
+            if option_param.ty.render() == "Option<i64>"
+                && fallback_param.ty.render() == "i64"
+    ));
+}
+
+#[test]
+fn monomorphizes_parent_enum_parameter_from_unit_variant_and_expected_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn keep<T>(value: Option<T>) -> Option<T> {
+            return value;
+          }
+
+          fn main() {
+            let value: Option<i64> = keep(Option.None);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        &main.body[0],
+        NirStmt::Let {
+            ty: Some(ty),
+            value: NirExpr::Call { callee, args },
+            ..
+        } if ty.render() == "Option<i64>"
+            && callee == "keep__i64"
+            && matches!(
+                args.as_slice(),
+                [NirExpr::StructLiteral { type_name, type_args, .. }]
+                    if type_name == "Option.None"
+                        && type_args.len() == 1
+                        && type_args[0].render() == "i64"
+            )
+    ));
+}
+
+#[test]
+fn generic_bound_accepts_enum_variant_argument_via_parent_enum_impl() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          trait Showable {
+            fn show(value: Self) -> i64;
+          }
+
+          impl Showable for Option<i64> {
+            fn show(value: Option<i64>) -> i64 {
+              match value {
+                Option.Some(payload) => {
+                  return payload;
+                }
+                Option.None => {
+                  return 0;
+                }
+                _ => {
+                  return -1;
+                }
+              }
+            }
+          }
+
+          fn reveal<T: Showable>(value: T) -> i64 {
+            return Showable.show(value);
+          }
+
+          fn main() -> i64 {
+            return reveal(Option.Some(7));
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    let specialized_name = match main.body.last() {
+        Some(nuis_semantics::model::NirStmt::Return(Some(
+            nuis_semantics::model::NirExpr::Call { callee, .. },
+        ))) => callee.clone(),
+        other => panic!("expected main to return specialized reveal call, found {other:?}"),
+    };
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == specialized_name)
+        .unwrap();
+    assert!(matches!(
+        specialized.body.first(),
+        Some(nuis_semantics::model::NirStmt::Return(Some(
+            nuis_semantics::model::NirExpr::Call { callee, .. }
+        ))) if callee == "impl.Showable.for.Option_i64_.show"
+    ));
+}
+
+#[test]
 fn monomorphizes_generic_binary_remainder_with_remainderable_bound() {
     let module = parse_nuis_module(
         r#"
@@ -1633,6 +1868,89 @@ fn monomorphizes_generic_function_from_inferred_non_transparent_alias_struct_lit
 }
 
 #[test]
+fn monomorphizes_generic_function_from_outer_struct_literal_with_deferred_inner_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Phantom<T, U> {
+            value: T,
+            tag: i64,
+          }
+
+          struct Outer<T, U> {
+            inner: Phantom<T, U>,
+            meta: U,
+          }
+
+          fn unwrap_outer<T, U>(outer: Outer<T, U>) -> T {
+            return outer.inner.value;
+          }
+
+          fn main() -> i64 {
+            return unwrap_outer(Outer {
+              inner: Phantom { value: 7, tag: 1 },
+              meta: "ok",
+            });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "unwrap_outer__i64__String"
+    ));
+}
+
+#[test]
+fn monomorphizes_generic_function_from_outer_struct_literal_with_deferred_inner_payload_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Just<T, U> {
+            value: T,
+          }
+
+          struct Outer<T, U> {
+            inner: Just<T, U>,
+            meta: U,
+          }
+
+          fn unwrap_outer<T, U>(outer: Outer<T, U>) -> T {
+            return outer.inner.value;
+          }
+
+          fn main() -> i64 {
+            return unwrap_outer(Outer {
+              inner: Just(7),
+              meta: "ok",
+            });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "unwrap_outer__i64__String"
+    ));
+}
+
+#[test]
 fn monomorphizes_generic_function_from_inferred_payload_constructor_argument() {
     let module = parse_nuis_module(
         r#"
@@ -1697,6 +2015,102 @@ fn monomorphizes_generic_function_from_inferred_alias_payload_constructor_argume
         main.body.last(),
         Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
             if callee == "unwrap_just__i64"
+    ));
+}
+
+#[test]
+fn monomorphizes_generic_function_from_transparent_alias_outer_literal_with_deferred_inner_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type OuterAlias<T, U> = Outer<T, U>;
+
+          struct Phantom<T, U> {
+            value: T,
+            tag: i64,
+          }
+
+          struct Outer<T, U> {
+            inner: Phantom<T, U>,
+            meta: U,
+          }
+
+          fn unwrap_outer<T, U>(outer: Outer<T, U>) -> T {
+            return outer.inner.value;
+          }
+
+          fn main() -> i64 {
+            return unwrap_outer(OuterAlias {
+              inner: Phantom { value: 7, tag: 1 },
+              meta: "ok",
+            });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "unwrap_outer__i64__String"
+    ));
+}
+
+#[test]
+fn monomorphizes_generic_function_from_non_transparent_alias_outer_literal_with_deferred_inner_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type OuterAlias<T, U> = Wrapper<Outer<T, U>>;
+
+          struct Phantom<T, U> {
+            value: T,
+            tag: i64,
+          }
+
+          struct Outer<T, U> {
+            inner: Phantom<T, U>,
+            meta: U,
+          }
+
+          struct Wrapper<T> {
+            inner: T,
+            mark: i64,
+          }
+
+          fn unwrap_outer<T, U>(wrapped: Wrapper<Outer<T, U>>) -> T {
+            return wrapped.inner.inner.value;
+          }
+
+          fn main() -> i64 {
+            return unwrap_outer(OuterAlias {
+              inner: Outer {
+                inner: Phantom { value: 7, tag: 1 },
+                meta: "ok",
+              },
+              mark: 1,
+            });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "unwrap_outer__i64__String"
     ));
 }
 

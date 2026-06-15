@@ -5,15 +5,16 @@ use self::render_stmt_helpers::{
     render_ast_destructure_let, render_ast_stmt_inline, render_ast_type_suffix,
 };
 use self::render_struct_helpers::{
-    render_ast_struct, render_nir_struct, render_nir_type_arg_suffix,
+    render_ast_enum, render_ast_struct, render_nir_enum, render_nir_struct,
+    render_nir_type_arg_suffix,
 };
 use nuis_semantics::model::{
     AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternInterface,
     AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstMatchPattern, AstModule, AstStmt,
-    AstTraitDef, AstTraitMethodSig, AstTypeRef, AstUnaryOp, AstVisibility, NirAnnotation,
-    NirAttributeArg, NirAttributeValue, NirBinaryOp, NirExpr, NirExternInterface, NirFunction,
-    NirGenericParam, NirImplDef, NirImplMethod, NirModule, NirStmt, NirTraitDef, NirTraitMethodSig,
-    NirVisibility,
+    AstTraitDef, AstTraitMethodSig, AstTypeRef, AstUnaryOp, AstVisibility, AstWherePredicate,
+    NirAnnotation, NirAttributeArg, NirAttributeValue, NirBinaryOp, NirExpr, NirExternInterface,
+    NirFunction, NirGenericParam, NirImplDef, NirImplMethod, NirModule, NirStmt, NirTraitDef,
+    NirTraitMethodSig, NirVisibility, NirWherePredicate,
 };
 use yir_core::YirModule;
 
@@ -75,24 +76,26 @@ pub fn render_ast(module: &AstModule) -> String {
                 alias
                     .generic_params
                     .iter()
-                    .map(|param| match &param.bound {
-                        Some(bound) => format!("{}: {}", param.name, render_ast_type(bound)),
-                        None => param.name.clone(),
-                    })
+                    .map(render_ast_generic_param)
                     .collect::<Vec<_>>()
                     .join(", ")
-            )
+                )
         };
+        let where_suffix = render_ast_where_clause(&alias.where_bounds);
         out.push_str(&format!(
-            "  {}type {}{} = {}\n",
+            "  {}type {}{}{} = {}\n",
             visibility_prefix,
             alias.name,
             generics,
+            where_suffix,
             render_ast_type(&alias.target)
         ));
     }
     for definition in &module.structs {
         out.push_str(&render_ast_struct(definition));
+    }
+    for definition in &module.enums {
+        out.push_str(&render_ast_enum(definition));
     }
     for definition in &module.traits {
         out.push_str(&render_ast_trait(definition));
@@ -252,24 +255,26 @@ pub fn render_nir(module: &NirModule) -> String {
                 alias
                     .generic_params
                     .iter()
-                    .map(|param| match &param.bound {
-                        Some(bound) => format!("{}: {}", param.name, render_nir_type(bound)),
-                        None => param.name.clone(),
-                    })
+                    .map(render_nir_generic_param)
                     .collect::<Vec<_>>()
                     .join(", ")
-            )
+                )
         };
+        let where_suffix = render_nir_where_clause(&alias.where_bounds);
         out.push_str(&format!(
-            "  {}type {}{} = {}\n",
+            "  {}type {}{}{} = {}\n",
             visibility_prefix,
             alias.name,
             generics,
+            where_suffix,
             render_nir_type(&alias.target)
         ));
     }
     for definition in &module.structs {
         out.push_str(&render_nir_struct(definition));
+    }
+    for definition in &module.enums {
+        out.push_str(&render_nir_enum(definition));
     }
     for definition in &module.traits {
         out.push_str(&render_nir_trait(definition));
@@ -1426,10 +1431,7 @@ fn render_ast_generic_params(params: &[AstGenericParam]) -> String {
     }
     let parts = params
         .iter()
-        .map(|param| match &param.bound {
-            Some(bound) => format!("{}: {}", param.name, render_ast_type(bound)),
-            None => param.name.clone(),
-        })
+        .map(render_ast_generic_param)
         .collect::<Vec<_>>()
         .join(", ");
     format!("<{}>", parts)
@@ -1464,13 +1466,40 @@ fn render_nir_generic_params(params: &[NirGenericParam]) -> String {
     }
     let parts = params
         .iter()
-        .map(|param| match &param.bound {
-            Some(bound) => format!("{}: {}", param.name, render_nir_type(bound)),
-            None => param.name.clone(),
-        })
+        .map(render_nir_generic_param)
         .collect::<Vec<_>>()
         .join(", ");
     format!("<{}>", parts)
+}
+
+fn render_ast_generic_param(param: &AstGenericParam) -> String {
+    if param.bounds.is_empty() {
+        return param.name.clone();
+    }
+    format!(
+        "{}: {}",
+        param.name,
+        param.bounds
+            .iter()
+            .map(render_ast_type)
+            .collect::<Vec<_>>()
+            .join(" + ")
+    )
+}
+
+fn render_nir_generic_param(param: &NirGenericParam) -> String {
+    if param.bounds.is_empty() {
+        return param.name.clone();
+    }
+    format!(
+        "{}: {}",
+        param.name,
+        param.bounds
+            .iter()
+            .map(render_nir_type)
+            .collect::<Vec<_>>()
+            .join(" + ")
+    )
 }
 
 fn render_ast_function_header(function: &AstFunction) -> String {
@@ -1514,8 +1543,9 @@ fn render_ast_function_header(function: &AstFunction) -> String {
     let async_prefix = if function.is_async { "async " } else { "" };
     let attribute_prefix = render_ast_attributes(&function.attributes);
     let visibility_prefix = render_ast_visibility(function.visibility);
+    let where_suffix = render_ast_where_clause(&function.where_bounds);
     format!(
-        "  {}{}{}{}fn {}{}({}){}\n",
+        "  {}{}{}{}fn {}{}({}){}{}\n",
         attribute_prefix,
         visibility_prefix,
         test_prefix,
@@ -1523,7 +1553,8 @@ fn render_ast_function_header(function: &AstFunction) -> String {
         function.name,
         render_ast_generic_params(&function.generic_params),
         params,
-        return_suffix
+        return_suffix,
+        where_suffix
     )
 }
 
@@ -1568,8 +1599,9 @@ fn render_nir_function_header(function: &NirFunction) -> String {
     let async_prefix = if function.is_async { "async " } else { "" };
     let annotation_prefix = render_nir_annotations(&function.annotations);
     let visibility_prefix = render_nir_visibility(function.visibility);
+    let where_suffix = render_nir_where_clause(&function.where_bounds);
     format!(
-        "  {}{}{}{}fn {}{}({}){}\n",
+        "  {}{}{}{}fn {}{}({}){}{}\n",
         annotation_prefix,
         visibility_prefix,
         test_prefix,
@@ -1577,7 +1609,62 @@ fn render_nir_function_header(function: &NirFunction) -> String {
         function.name,
         render_nir_generic_params(&function.generic_params),
         params,
-        return_suffix
+        return_suffix,
+        where_suffix
+    )
+}
+
+fn render_ast_where_clause(predicates: &[AstWherePredicate]) -> String {
+    if predicates.is_empty() {
+        return String::new();
+    }
+    format!(
+        " where {}",
+        predicates
+            .iter()
+            .map(render_ast_where_predicate)
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
+fn render_nir_where_clause(predicates: &[NirWherePredicate]) -> String {
+    if predicates.is_empty() {
+        return String::new();
+    }
+    format!(
+        " where {}",
+        predicates
+            .iter()
+            .map(render_nir_where_predicate)
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
+fn render_ast_where_predicate(predicate: &AstWherePredicate) -> String {
+    format!(
+        "{}: {}",
+        predicate.param_name,
+        predicate
+            .bounds
+            .iter()
+            .map(render_ast_type)
+            .collect::<Vec<_>>()
+            .join(" + ")
+    )
+}
+
+fn render_nir_where_predicate(predicate: &NirWherePredicate) -> String {
+    format!(
+        "{}: {}",
+        predicate.param_name,
+        predicate
+            .bounds
+            .iter()
+            .map(render_nir_type)
+            .collect::<Vec<_>>()
+            .join(" + ")
     )
 }
 
@@ -1827,6 +1914,7 @@ mod tests {
             consts: vec![],
             type_aliases: vec![],
             structs: vec![],
+            enums: vec![],
             traits: vec![],
             impls: vec![],
             functions: vec![AstFunction {
@@ -1842,6 +1930,7 @@ mod tests {
                 test_clock_policy: None,
                 is_async: false,
                 generic_params: vec![],
+                where_bounds: vec![],
                 params: vec![],
                 return_type: Some(AstTypeRef {
                     name: "i64".to_owned(),
@@ -1878,5 +1967,52 @@ mod tests {
         assert!(rendered.contains("let mut value: i64 = 1"), "{rendered}");
         assert!(rendered.contains("value = (value + 2)"), "{rendered}");
         assert!(rendered.contains("return value"), "{rendered}");
+    }
+
+    #[test]
+    fn renders_enum_declarations_in_ast() {
+        let module = AstModule {
+            uses: vec![],
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![],
+            extern_interfaces: vec![],
+            consts: vec![],
+            type_aliases: vec![],
+            structs: vec![],
+            enums: vec![nuis_semantics::model::AstEnumDef {
+                visibility: AstVisibility::Public,
+                attributes: vec![],
+                name: "Option".to_owned(),
+                generic_params: vec![AstGenericParam {
+                    name: "T".to_owned(),
+                    bounds: vec![],
+                }],
+                where_bounds: vec![],
+                variants: vec![
+                    nuis_semantics::model::AstEnumVariant {
+                        name: "None".to_owned(),
+                        kind: nuis_semantics::model::AstEnumVariantKind::Unit,
+                    },
+                    nuis_semantics::model::AstEnumVariant {
+                        name: "Some".to_owned(),
+                        kind: nuis_semantics::model::AstEnumVariantKind::Tuple(vec![AstTypeRef {
+                            name: "T".to_owned(),
+                            generic_args: vec![],
+                            is_optional: false,
+                            is_ref: false,
+                        }]),
+                    },
+                ],
+            }],
+            traits: vec![],
+            impls: vec![],
+            functions: vec![],
+        };
+
+        let rendered = render_ast(&module);
+        assert!(rendered.contains("pub enum Option<T>"), "{rendered}");
+        assert!(rendered.contains("variant None"), "{rendered}");
+        assert!(rendered.contains("variant Some(T)"), "{rendered}");
     }
 }

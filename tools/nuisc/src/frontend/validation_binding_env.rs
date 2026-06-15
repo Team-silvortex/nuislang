@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{
-    AstDestructureBinding, AstDestructureField, AstExpr, AstMatchPattern, AstModule, AstStructDef,
-    AstTypeAlias, AstTypeRef,
+    AstDestructureBinding, AstDestructureField, AstEnumDef, AstEnumVariantKind, AstExpr,
+    AstMatchPattern, AstModule, AstStructDef, AstStructField, AstTypeAlias, AstTypeRef,
+    AstVisibility,
 };
 
 use super::resolve_ast_type_ref_aliases;
@@ -15,6 +16,13 @@ pub(super) fn collect_visible_structs(
         .structs
         .iter()
         .map(|definition| (definition.name.clone(), definition.clone()))
+        .chain(
+            module
+                .enums
+                .iter()
+                .flat_map(synthesize_enum_variant_structs)
+                .map(|definition| (definition.name.clone(), definition)),
+        )
         .collect::<BTreeMap<_, _>>();
     for helper in local_cpu_helpers {
         for definition in helper
@@ -23,6 +31,14 @@ pub(super) fn collect_visible_structs(
             .filter(|definition| super::is_public_visibility(definition.visibility))
         {
             structs.insert(definition.name.clone(), definition.clone());
+        }
+        for definition in helper
+            .enums
+            .iter()
+            .filter(|definition| super::is_public_visibility(definition.visibility))
+            .flat_map(synthesize_enum_variant_structs)
+        {
+            structs.insert(definition.name.clone(), definition);
         }
     }
     structs
@@ -215,4 +231,36 @@ fn substitute_ast_struct_generic_type(
         is_optional: ty.is_optional,
         is_ref: ty.is_ref,
     }
+}
+
+fn synthesize_enum_variant_structs(definition: &AstEnumDef) -> Vec<AstStructDef> {
+    definition
+        .variants
+        .iter()
+        .map(|variant| AstStructDef {
+            visibility: definition.visibility,
+            attributes: Vec::new(),
+            name: format!("{}.{}", definition.name, variant.name),
+            generic_params: definition.generic_params.clone(),
+            where_bounds: definition.where_bounds.clone(),
+            fields: match &variant.kind {
+                AstEnumVariantKind::Unit => Vec::new(),
+                AstEnumVariantKind::Tuple(fields) => fields
+                    .iter()
+                    .enumerate()
+                    .map(|(index, ty)| AstStructField {
+                        visibility: AstVisibility::Public,
+                        attributes: Vec::new(),
+                        name: if fields.len() == 1 {
+                            "value".to_owned()
+                        } else {
+                            format!("_{index}")
+                        },
+                        ty: ty.clone(),
+                    })
+                    .collect(),
+                AstEnumVariantKind::Struct(fields) => fields.clone(),
+            },
+        })
+        .collect()
 }

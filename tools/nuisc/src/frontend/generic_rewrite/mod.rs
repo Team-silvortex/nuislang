@@ -9,12 +9,20 @@ use nuis_semantics::model::{AstFunction, AstImplDef, AstStructDef, AstTypeAlias,
 use self::blocks::rewrite_generic_calls_in_block;
 use super::FunctionSignature;
 
+#[derive(Clone)]
+pub(super) struct GenericImplMethodTemplate {
+    pub(super) trait_name: String,
+    pub(super) method_name: String,
+    pub(super) function: AstFunction,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn rewrite_generic_calls_in_function(
     function: &AstFunction,
     module_const_env: &BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
+    generic_impl_method_templates: &[GenericImplMethodTemplate],
     higher_order_templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     signatures: &BTreeMap<String, FunctionSignature>,
@@ -35,6 +43,7 @@ pub(super) fn rewrite_generic_calls_in_function(
         &mut env,
         visible_type_aliases,
         generic_templates,
+        generic_impl_method_templates,
         higher_order_templates,
         function_table,
         signatures,

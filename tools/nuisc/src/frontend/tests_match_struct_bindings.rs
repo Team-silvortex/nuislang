@@ -339,6 +339,72 @@ fn lowers_inferred_aliased_generic_struct_field_binding_visible_in_guard_inside_
 }
 
 #[test]
+fn lowers_match_binding_after_outer_literal_with_deferred_inner_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Phantom<T, U> {
+            value: T,
+            tag: i64,
+          }
+
+          struct Outer<T, U> {
+            inner: Phantom<T, U>,
+            meta: U,
+          }
+
+          fn main() -> i64 {
+            let value = Outer {
+              inner: Phantom { value: 7, tag: 1 },
+              meta: true,
+            };
+            while 1 == 1 {
+              match value {
+                Outer<i64, bool> { inner: { value: payload }, meta: true } if payload == 7 => {
+                  return payload;
+                }
+                _ => {
+                  return 9;
+                }
+              }
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[1] {
+        NirStmt::While { body, .. } => match &body[0] {
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                assert!(matches!(
+                    then_body.as_slice(),
+                    [
+                        NirStmt::Let { name, ty, .. },
+                        NirStmt::Return(Some(NirExpr::Var(result)))
+                    ] if name == "payload"
+                        && result == "payload"
+                        && matches!(ty, Some(ty) if ty.render() == "i64")
+                ));
+                assert!(matches!(
+                    else_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Int(9)))]
+                ));
+            }
+            other => panic!(
+                "expected lowered deferred-inference outer match if in while body, found {other:?}"
+            ),
+        },
+        other => panic!("expected while statement after deferred-inference outer binding, found {other:?}"),
+    }
+}
+
+#[test]
 fn lowers_generic_aliased_struct_field_binding_visible_in_guard_inside_while() {
     let module = parse_nuis_module(
         r#"

@@ -13,6 +13,57 @@ use super::{
     resolve_ast_type_ref_aliases, substitute_ast_type_alias_target,
 };
 
+fn parent_enum_ast_type(receiver_ty: &AstTypeRef) -> Option<AstTypeRef> {
+    let (parent, _variant) = receiver_ty.name.rsplit_once('.')?;
+    Some(AstTypeRef {
+        name: parent.to_owned(),
+        generic_args: receiver_ty.generic_args.clone(),
+        is_optional: receiver_ty.is_optional,
+        is_ref: receiver_ty.is_ref,
+    })
+}
+
+fn impl_target_matches_receiver(
+    pattern: &AstTypeRef,
+    pattern_generics: &BTreeSet<String>,
+    concrete: &AstTypeRef,
+) -> bool {
+    if pattern.is_optional != concrete.is_optional || pattern.is_ref != concrete.is_ref {
+        return false;
+    }
+    if pattern_generics.contains(&pattern.name) && pattern.generic_args.is_empty() {
+        return true;
+    }
+    if pattern.name == concrete.name && pattern.generic_args.len() == concrete.generic_args.len() {
+        return pattern
+            .generic_args
+            .iter()
+            .zip(&concrete.generic_args)
+            .all(|(lhs, rhs)| impl_target_matches_receiver(lhs, pattern_generics, rhs));
+    }
+    false
+}
+
+fn impl_matches_receiver_type(
+    definition: &AstImplDef,
+    receiver_ty: &AstTypeRef,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<bool, String> {
+    let pattern = resolve_ast_type_ref_aliases(&definition.for_type, visible_type_aliases)?;
+    let generics = definition
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    if impl_target_matches_receiver(&pattern, &generics, receiver_ty) {
+        return Ok(true);
+    }
+    if let Some(parent) = parent_enum_ast_type(receiver_ty) {
+        return Ok(impl_target_matches_receiver(&pattern, &generics, &parent));
+    }
+    Ok(false)
+}
+
 pub(super) fn collect_visible_trait_methods(
     module: &AstModule,
     local_cpu_helpers: &[&AstModule],
@@ -46,7 +97,7 @@ pub(super) fn validate_expr_generic_method_bounds(
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
     trait_methods: &BTreeMap<String, BTreeSet<String>>,
     generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, String>,
+    generic_bounds: &BTreeMap<String, Vec<String>>,
     local_type_env: &BTreeMap<String, AstTypeRef>,
     context: &str,
 ) -> Result<(), String> {
@@ -467,7 +518,7 @@ fn validate_stmt_generic_method_bounds_block(
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
     trait_methods: &BTreeMap<String, BTreeSet<String>>,
     generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, String>,
+    generic_bounds: &BTreeMap<String, Vec<String>>,
     local_type_env: &mut BTreeMap<String, AstTypeRef>,
     context: &str,
 ) -> Result<(), String> {
@@ -496,7 +547,7 @@ fn validate_stmt_generic_method_bounds(
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
     trait_methods: &BTreeMap<String, BTreeSet<String>>,
     generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, String>,
+    generic_bounds: &BTreeMap<String, Vec<String>>,
     local_type_env: &mut BTreeMap<String, AstTypeRef>,
     context: &str,
 ) -> Result<(), String> {
@@ -765,9 +816,9 @@ fn resolve_generic_receiver_bound_context(
     receiver_ty: &AstTypeRef,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, String>,
+    generic_bounds: &BTreeMap<String, Vec<String>>,
     context: &str,
-) -> Result<Option<(String, String, Option<String>)>, String> {
+) -> Result<Option<(String, String, Vec<String>)>, String> {
     let Some((generic_name, receiver_context)) = resolve_generic_receiver_context(
         receiver_ty,
         visible_type_aliases,
@@ -780,7 +831,10 @@ fn resolve_generic_receiver_bound_context(
     Ok(Some((
         generic_name.clone(),
         format!("{context}{receiver_context}"),
-        generic_bounds.get(&generic_name).cloned(),
+        generic_bounds
+            .get(&generic_name)
+            .cloned()
+            .unwrap_or_default(),
     )))
 }
 
@@ -804,16 +858,20 @@ fn bound_matches_required_trait(
             .is_some_and(|methods| methods.contains(required_method))
 }
 
+fn render_declared_bounds(bounds: &[String]) -> String {
+    bounds.join(" + ")
+}
+
 fn validate_generic_receiver_method_bound(
     receiver_ty: &AstTypeRef,
     method: &str,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     trait_methods: &BTreeMap<String, BTreeSet<String>>,
     generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, String>,
+    generic_bounds: &BTreeMap<String, Vec<String>>,
     context: &str,
 ) -> Result<(), String> {
-    let Some((generic_name, context, bound)) = resolve_generic_receiver_bound_context(
+    let Some((generic_name, context, bounds)) = resolve_generic_receiver_bound_context(
         receiver_ty,
         visible_type_aliases,
         generic_param_names,
@@ -829,35 +887,62 @@ fn validate_generic_receiver_method_bound(
         .map(|(trait_name, _)| trait_name.clone())
         .collect::<Vec<_>>();
 
-    if let Some(bound) = bound {
-        if trait_methods
-            .get(&bound)
-            .is_some_and(|methods| methods.contains(method))
-        {
+    if !bounds.is_empty() {
+        if bounds.iter().any(|bound| {
+            trait_methods
+                .get(bound)
+                .is_some_and(|methods| methods.contains(method))
+        }) {
             return Ok(());
         }
-        if let Some(suggested_method) = trait_methods
-            .get(&bound)
-            .and_then(|methods| suggest_trait_method_name(method, methods))
-        {
+        let declared = render_declared_bounds(&bounds);
+        if let Some((bound, suggested_method)) = bounds.iter().find_map(|bound| {
+            trait_methods
+                .get(bound)
+                .and_then(|methods| suggest_trait_method_name(method, methods))
+                .map(|suggested| (bound, suggested))
+        }) {
+            if bounds.len() == 1 {
+                return Err(format!(
+                    "{context} calls method `{method}` on generic parameter `{generic_name}` but bound `{bound}` does not define that method; did you mean `{}`?",
+                    suggested_method
+                ));
+            }
             return Err(format!(
-                "{context} calls method `{method}` on generic parameter `{generic_name}` but bound `{bound}` does not define that method; did you mean `{}`?",
+                "{context} calls method `{method}` on generic parameter `{generic_name}` but declared bounds `{declared}` do not define that method; trait `{bound}` suggests `{}`",
                 suggested_method
             ));
         }
         if candidates.is_empty() {
+            if bounds.len() == 1 {
+                return Err(format!(
+                    "{context} calls method `{method}` on generic parameter `{generic_name}` but bound `{declared}` does not define that method"
+                ));
+            }
             return Err(format!(
-                "{context} calls method `{method}` on generic parameter `{generic_name}` but bound `{bound}` does not define that method"
+                "{context} calls method `{method}` on generic parameter `{generic_name}` but declared bounds `{declared}` do not define that method"
             ));
         }
         if candidates.len() == 1 {
+            if bounds.len() == 1 {
+                return Err(format!(
+                    "{context} calls method `{method}` on generic parameter `{generic_name}` but bound `{declared}` does not define that method; consider bound `{}`",
+                    candidates[0]
+                ));
+            }
             return Err(format!(
-                "{context} calls method `{method}` on generic parameter `{generic_name}` but bound `{bound}` does not define that method; consider bound `{}`",
+                "{context} calls method `{method}` on generic parameter `{generic_name}` but declared bounds `{declared}` do not define that method; consider bound `{}`",
                 candidates[0]
             ));
         }
+        if bounds.len() == 1 {
+            return Err(format!(
+                "{context} calls method `{method}` on generic parameter `{generic_name}` but bound `{declared}` does not define that method; candidate bounds: {}",
+                candidates.join(", ")
+            ));
+        }
         return Err(format!(
-            "{context} calls method `{method}` on generic parameter `{generic_name}` but bound `{bound}` does not define that method; candidate bounds: {}",
+            "{context} calls method `{method}` on generic parameter `{generic_name}` but declared bounds `{declared}` do not define that method; candidate bounds: {}",
             candidates.join(", ")
         ));
     }
@@ -886,10 +971,10 @@ fn validate_generic_receiver_operator_bound(
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     trait_methods: &BTreeMap<String, BTreeSet<String>>,
     generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, String>,
+    generic_bounds: &BTreeMap<String, Vec<String>>,
     context: &str,
 ) -> Result<(), String> {
-    let Some((generic_name, context, bound)) = resolve_generic_receiver_bound_context(
+    let Some((generic_name, context, bounds)) = resolve_generic_receiver_bound_context(
         receiver_ty,
         visible_type_aliases,
         generic_param_names,
@@ -899,12 +984,21 @@ fn validate_generic_receiver_operator_bound(
         return Ok(());
     };
 
-    if let Some(bound) = bound {
-        if bound_matches_required_trait(&bound, required_bound, method, trait_methods) {
+    if !bounds.is_empty() {
+        if bounds
+            .iter()
+            .any(|bound| bound_matches_required_trait(bound, required_bound, method, trait_methods))
+        {
             return Ok(());
         }
+        let declared = render_declared_bounds(&bounds);
+        if bounds.len() == 1 {
+            return Err(format!(
+                "{context} calls operator `{operator}` on generic parameter `{generic_name}` but bound `{declared}` does not satisfy required trait `{required_bound}`"
+            ));
+        }
         return Err(format!(
-            "{context} calls operator `{operator}` on generic parameter `{generic_name}` but bound `{bound}` does not satisfy required trait `{required_bound}`"
+            "{context} calls operator `{operator}` on generic parameter `{generic_name}` but declared bounds `{declared}` do not satisfy required trait `{required_bound}`"
         ));
     }
 
@@ -924,7 +1018,7 @@ fn validate_explicit_trait_call_bound(
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
     trait_methods: &BTreeMap<String, BTreeSet<String>>,
     generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, String>,
+    generic_bounds: &BTreeMap<String, Vec<String>>,
     local_type_env: &BTreeMap<String, AstTypeRef>,
     context: &str,
 ) -> Result<(), String> {
@@ -969,7 +1063,7 @@ fn validate_explicit_trait_call_bound(
         return Ok(());
     };
     let receiver_rendered = lower_type_ref(&receiver_ty).render();
-    let Some((generic_name, context, bound)) = resolve_generic_receiver_bound_context(
+    let Some((generic_name, context, bounds)) = resolve_generic_receiver_bound_context(
         &receiver_ty,
         visible_type_aliases,
         generic_param_names,
@@ -977,6 +1071,19 @@ fn validate_explicit_trait_call_bound(
         context,
     )? else {
         if impl_lookup.contains_key(&(trait_name.to_owned(), receiver_rendered.clone())) {
+            return Ok(());
+        }
+        if let Some(parent_receiver_ty) = parent_enum_ast_type(&receiver_ty) {
+            let parent_rendered = lower_type_ref(&parent_receiver_ty).render();
+            if impl_lookup.contains_key(&(trait_name.to_owned(), parent_rendered)) {
+                return Ok(());
+            }
+        }
+        if impl_lookup.values().any(|definition| {
+            definition.trait_name == trait_name
+                && impl_matches_receiver_type(definition, &receiver_ty, visible_type_aliases)
+                    .unwrap_or(false)
+        }) {
             return Ok(());
         }
         let available_impls =
@@ -992,18 +1099,27 @@ fn validate_explicit_trait_call_bound(
         ));
     };
 
-    if let Some(bound) = bound {
-        if bound == trait_name {
+    if !bounds.is_empty() {
+        if bounds.iter().any(|bound| bound == trait_name) {
             return Ok(());
         }
         let variants = collect_trait_name_variants(trait_name, trait_methods);
-        if variants.iter().any(|candidate| candidate == &bound) {
+        if let Some(bound) = bounds
+            .iter()
+            .find(|bound| variants.iter().any(|candidate| candidate == *bound))
+        {
             return Err(format!(
                 "{context} calls trait method `{trait_name}.{method}` on generic parameter `{generic_name}` but bound `{bound}` uses a different visible name for the same trait; use `{trait_name}` consistently"
             ));
         }
+        let declared = render_declared_bounds(&bounds);
+        if bounds.len() == 1 {
+            return Err(format!(
+                "{context} calls trait method `{trait_name}.{method}` on generic parameter `{generic_name}` but bound `{declared}` does not satisfy required trait `{trait_name}`"
+            ));
+        }
         return Err(format!(
-            "{context} calls trait method `{trait_name}.{method}` on generic parameter `{generic_name}` but bound `{bound}` does not satisfy required trait `{trait_name}`"
+            "{context} calls trait method `{trait_name}.{method}` on generic parameter `{generic_name}` but declared bounds `{declared}` do not satisfy required trait `{trait_name}`"
         ));
     }
 

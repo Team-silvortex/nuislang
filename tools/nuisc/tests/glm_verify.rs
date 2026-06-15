@@ -14,6 +14,7 @@ fn module_with_body(body: Vec<NirStmt>) -> NirModule {
         consts: vec![],
         type_aliases: vec![],
         structs: vec![],
+        enums: vec![],
         traits: vec![],
         impls: vec![],
         functions: vec![NirFunction {
@@ -29,6 +30,7 @@ fn module_with_body(body: Vec<NirStmt>) -> NirModule {
             test_clock_policy: None,
             is_async: false,
             generic_params: vec![],
+            where_bounds: vec![],
             params: vec![],
             return_type: None,
             body,

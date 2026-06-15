@@ -5,7 +5,7 @@ use nuis_semantics::model::{AstBinaryOp, AstExpr, NirExpr, NirStructDef, NirType
 use super::metadata::hidden_private_field_count;
 use super::name_suggestions::suggest_similar_name;
 use super::{
-    impl_method_symbol_name, infer_nir_expr_type, lower_binary_expr_with_async,
+    impl_method_symbol_names, infer_nir_expr_type, lower_binary_expr_with_async,
     lower_direct_call_builtin_or_named_call, lower_expr_with_async,
     lower_routed_call_or_core_builtin, resolve_declared_or_inferred, FunctionSignature,
     ModuleConstValue,
@@ -194,8 +194,10 @@ fn lower_explicit_trait_qualified_call(
     else {
         return Ok(None);
     };
-    let symbol_name = impl_method_symbol_name(trait_name, &receiver_ty, method);
-    let Some(signature) = signatures.get(&symbol_name) else {
+    let Some(signature) = impl_method_symbol_names(trait_name, &receiver_ty, method)
+        .into_iter()
+        .find_map(|symbol_name| signatures.get(&symbol_name))
+    else {
         return Err(format!(
             "trait method `{callee}` has no impl for `{}`",
             receiver_ty.render()
@@ -280,9 +282,12 @@ fn lower_payload_struct_constructor_sugar(
             is_ref: false,
         }
     } else if let Some(expected) = expected {
-        if expected.name != callee {
+        let expected_matches_parent = expected
+            .name
+            .eq(callee.rsplit_once('.').map(|(parent, _)| parent).unwrap_or_default());
+        if expected.name != callee && !expected_matches_parent {
             return Err(format!(
-                "payload-style struct constructor `{callee}(...)` requires expected type `{callee}<...>`, found `{}`",
+                "payload-style struct constructor `{callee}(...)` requires expected type `{callee}<...>` or its parent enum type, found `{}`",
                 expected.render()
             ));
         }
@@ -291,11 +296,16 @@ fn lower_payload_struct_constructor_sugar(
             || expected.is_ref
         {
             return Err(format!(
-                "payload-style struct constructor `{callee}(...)` requires expected type `{callee}<...>`, found `{}`",
+                "payload-style struct constructor `{callee}(...)` requires expected type `{callee}<...>` or its parent enum type, found `{}`",
                 expected.render()
             ));
         }
-        expected.clone()
+        NirTypeRef {
+            name: callee.to_owned(),
+            generic_args: expected.generic_args.clone(),
+            is_optional: false,
+            is_ref: false,
+        }
     } else {
         let lowered_arg = lower_expr_with_async(
             &args[0],

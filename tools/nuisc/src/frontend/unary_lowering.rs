@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::{AstExpr, AstUnaryOp, NirBinaryOp, NirExpr, NirStructDef, NirTypeRef};
 
 use super::{
-    bool_type, compatible_types, impl_method_symbol_name, infer_nir_expr_type,
+    bool_type, compatible_types, find_impl_method_signature, infer_nir_expr_type,
     lower_nested_expr_with_async_and_consts, FunctionSignature, ModuleConstValue,
 };
 
@@ -103,8 +103,9 @@ fn lower_overloaded_unary_operator(
     if builtin_unary_supported(op, operand_ty) {
         return Ok(None);
     }
-    let symbol_name = impl_method_symbol_name(trait_name, operand_ty, method_name);
-    let Some(signature) = signatures.get(&symbol_name) else {
+    let Some(signature) =
+        find_impl_method_signature(signatures, trait_name, operand_ty, method_name)
+    else {
         return Ok(None);
     };
     if signature.params.len() != 1 {

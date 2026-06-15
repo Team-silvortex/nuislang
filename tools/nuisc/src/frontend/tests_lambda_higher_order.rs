@@ -266,6 +266,53 @@ fn lowers_no_capture_lambda_passed_to_named_fn1_function() {
 }
 
 #[test]
+fn lowers_no_capture_lambda_without_explicit_return_type_passed_to_named_fn1_function() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn apply(x: i64, f: Fn1<i64, i64>) -> i64 {
+            return f(x);
+          }
+
+          fn main() -> i64 {
+            return apply(6, |x: i64| { return x + 1; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__lambda_main_"))
+        .expect("expected synthesized lambda function");
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_apply_"))
+        .expect("expected synthesized higher-order specialization");
+    assert_eq!(specialized.params.len(), 1);
+    assert_eq!(specialized.params[0].name, "x");
+    assert!(matches!(
+        specialized.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == &lambda.name && matches!(args.as_slice(), [NirExpr::Var(name)] if name == "x")
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == &specialized.name && matches!(args.as_slice(), [NirExpr::Int(6)])
+    ));
+}
+
+#[test]
 fn lowers_named_function_passed_to_named_fn1_function() {
     let module = parse_nuis_module(
         r#"

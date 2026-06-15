@@ -7,9 +7,9 @@ use nuis_semantics::model::{
 
 use super::stmt_lowering::lower_stmt_block_with_async;
 use super::{
-    bool_type, infer_nir_expr_type, instantiate_struct_field_type, lower_expr_with_async,
-    lower_type_ref, lower_type_ref_with_aliases, resolve_ast_type_ref_aliases, FunctionSignature,
-    ModuleConstValue,
+    bool_type, compatible_types, infer_nir_expr_type, instantiate_struct_field_type,
+    lower_expr_with_async, lower_type_ref, lower_type_ref_with_aliases,
+    resolve_ast_type_ref_aliases, FunctionSignature, ModuleConstValue,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -299,7 +299,9 @@ fn lower_match_pattern_condition_and_bindings(
             let resolved_type_ref = resolve_ast_type_ref_aliases(type_ref, type_aliases)?;
             let lowered_pattern_ty =
                 lower_pattern_type_for_scrutinee(&resolved_type_ref, value_ty, type_aliases)?;
-            if *value_ty != lowered_pattern_ty {
+            if !compatible_types(value_ty, &lowered_pattern_ty)
+                && !compatible_types(&lowered_pattern_ty, value_ty)
+            {
                 return Err(format!(
                     "payload-style struct match pattern `{}` requires scrutinee of type `{}`, found `{}`",
                     lower_type_ref(type_ref).render(),
@@ -342,7 +344,9 @@ fn lower_match_pattern_condition_and_bindings(
                 let resolved_type_ref = resolve_ast_type_ref_aliases(type_ref, type_aliases)?;
                 let lowered_pattern_ty =
                     lower_pattern_type_for_scrutinee(&resolved_type_ref, value_ty, type_aliases)?;
-                if *value_ty != lowered_pattern_ty {
+                if !compatible_types(value_ty, &lowered_pattern_ty)
+                    && !compatible_types(&lowered_pattern_ty, value_ty)
+                {
                     return Err(format!(
                         "struct match pattern `{}` requires scrutinee of type `{}`, found `{}`",
                         lower_type_ref(type_ref).render(),
@@ -441,6 +445,27 @@ fn lower_pattern_type_for_scrutinee(
         && !lowered.is_ref
     {
         return Ok(value_ty.clone());
+    }
+    if let Some((parent, _variant)) = lowered.name.rsplit_once('.') {
+        if value_ty.name == parent {
+            if lowered.generic_args.is_empty() && !value_ty.generic_args.is_empty() {
+                return Ok(NirTypeRef {
+                    name: lowered.name,
+                    generic_args: value_ty.generic_args.clone(),
+                    is_optional: lowered.is_optional,
+                    is_ref: lowered.is_ref,
+                });
+            }
+            if value_ty.generic_args.len() == lowered.generic_args.len()
+                && value_ty
+                    .generic_args
+                    .iter()
+                    .zip(&lowered.generic_args)
+                    .all(|(lhs, rhs)| lhs.render() == rhs.render())
+            {
+                return Ok(lowered);
+            }
+        }
     }
     Ok(lowered)
 }

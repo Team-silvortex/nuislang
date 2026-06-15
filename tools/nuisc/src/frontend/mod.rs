@@ -38,6 +38,8 @@ mod tests_control_flow;
 #[cfg(test)]
 mod tests_destructure_let;
 #[cfg(test)]
+mod tests_enums;
+#[cfg(test)]
 mod tests_frontend_core;
 
 // Generic specialization and higher-order behavior.
@@ -116,17 +118,19 @@ use self::expr_lowering::{
     lower_expr, lower_expr_with_async, lower_nested_expr_with_async,
     lower_nested_expr_with_async_and_consts,
 };
+use self::function_lowering::find_impl_method_signature;
 use self::function_lowering::{
-    build_impl_method_function, impl_method_lookup_key, impl_method_symbol_name, lower_function,
+    build_impl_method_function, impl_method_lookup_key, impl_method_lookup_keys,
+    impl_method_symbol_name, impl_method_symbol_names, lower_function,
 };
-use self::generic_rewrite::rewrite_generic_calls_in_function;
+use self::generic_rewrite::{rewrite_generic_calls_in_function, GenericImplMethodTemplate};
 use self::higher_order::expand_higher_order_functions;
 use self::lambda_expansion::expand_module_lambdas;
 use self::match_hoist::expand_effectful_match_scrutinees;
 use self::metadata::{helper_visible_struct_annotations, lower_ast_attributes, ModuleConstValue};
 use self::module_assembly::{
-    build_impl_lookup, build_module_struct_table, build_visible_struct_defs, lower_extern_items,
-    lower_type_alias_items,
+    build_impl_lookup, build_module_struct_table, build_visible_enum_defs,
+    build_visible_struct_defs, lower_extern_items, lower_type_alias_items,
 };
 use self::return_inference::infer_missing_function_return_type;
 use self::signature_building::{build_initial_function_signatures, FunctionSignature};
@@ -214,6 +218,7 @@ pub fn lower_project_ast_to_nir(
     }
 
     let struct_defs = build_visible_struct_defs(module, &local_cpu_helpers, &visible_type_aliases)?;
+    let enum_defs = build_visible_enum_defs(module, &local_cpu_helpers, &visible_type_aliases)?;
     let struct_table = struct_defs
         .iter()
         .map(|definition| (definition.name.clone(), definition.clone()))
@@ -274,6 +279,7 @@ pub fn lower_project_ast_to_nir(
         extern_interfaces: lowered_extern_interfaces,
         consts: lowered_consts,
         structs: struct_defs,
+        enums: enum_defs,
         traits: lowered_traits,
         impls: lowered_impls,
         functions: lowered_functions,

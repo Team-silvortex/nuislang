@@ -10,7 +10,8 @@ use super::{
     build_function_return_type_table, build_impl_method_function, impl_method_lookup_key,
     impl_method_symbol_name, infer_missing_function_return_type, is_public_visibility,
     lower_function, lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
-    rewrite_generic_calls_in_function, FunctionSignature, ModuleConstValue,
+    rewrite_generic_calls_in_function, FunctionSignature, GenericImplMethodTemplate,
+    ModuleConstValue,
 };
 use nuis_semantics::model::{
     NirImplDef, NirImplMethod, NirTraitDef, NirTraitMethodSig, NirTypeRef,
@@ -30,6 +31,32 @@ pub(super) fn build_lowered_functions_and_impls(
     generic_templates: &BTreeMap<String, AstFunction>,
     concrete_module_functions: &[AstFunction],
 ) -> Result<(Vec<NirFunction>, Vec<NirTraitDef>, Vec<NirImplDef>), String> {
+    let generic_impl_method_templates = module
+        .impls
+        .iter()
+        .filter(|definition| {
+            !definition.generic_params.is_empty() || !definition.where_bounds.is_empty()
+        })
+        .flat_map(|definition| {
+            let lowered_for_type =
+                lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases).ok();
+            definition.methods.iter().filter_map(move |method| {
+                lowered_for_type.as_ref().map(|lowered_for_type| GenericImplMethodTemplate {
+                    trait_name: definition.trait_name.clone(),
+                    method_name: method.name.clone(),
+                    function: build_impl_method_function(
+                        definition,
+                        method,
+                        &impl_method_symbol_name(
+                            &definition.trait_name,
+                            lowered_for_type,
+                            &method.name,
+                        ),
+                    ),
+                })
+            })
+        })
+        .collect::<Vec<_>>();
     let higher_order_templates = module
         .functions
         .iter()
@@ -64,6 +91,7 @@ pub(super) fn build_lowered_functions_and_impls(
                 module_const_env,
                 visible_type_aliases,
                 generic_templates,
+                &generic_impl_method_templates,
                 &higher_order_templates,
                 &higher_order_function_table,
                 signatures,
@@ -119,6 +147,7 @@ pub(super) fn build_lowered_functions_and_impls(
             &function,
             &higher_order_templates,
             &higher_order_function_table,
+            &BTreeMap::new(),
             visible_type_aliases,
             &mut higher_order_specialization_cache,
             &mut higher_order_specialized_templates,
@@ -134,6 +163,7 @@ pub(super) fn build_lowered_functions_and_impls(
             &BTreeMap::new(),
             visible_type_aliases,
             &extended_generic_templates,
+            &generic_impl_method_templates,
             &higher_order_templates,
             &higher_order_function_table,
             signatures,
@@ -152,9 +182,17 @@ pub(super) fn build_lowered_functions_and_impls(
     }
 
     for definition in &module.impls {
+        if !definition.generic_params.is_empty() || !definition.where_bounds.is_empty() {
+            continue;
+        }
         let lowered_for_type =
             lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases)?;
         for method in &definition.methods {
+            if method.params.iter().any(|param| {
+                is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
+            }) {
+                continue;
+            }
             let symbol_name =
                 impl_method_symbol_name(&definition.trait_name, &lowered_for_type, &method.name);
             let signature = FunctionSignature {
@@ -295,8 +333,16 @@ pub(super) fn build_lowered_functions_and_impls(
 
     let mut lowered_impls = Vec::new();
     for definition in &module.impls {
+        if !definition.generic_params.is_empty() || !definition.where_bounds.is_empty() {
+            continue;
+        }
         let mut methods = Vec::new();
         for method in &definition.methods {
+            if method.params.iter().any(|param| {
+                is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
+            }) {
+                continue;
+            }
             let mut bindings = BTreeMap::<String, NirTypeRef>::new();
             for param in &method.params {
                 bindings.insert(

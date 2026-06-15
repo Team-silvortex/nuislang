@@ -5,6 +5,7 @@ use nuis_semantics::model::{
 };
 
 use super::super::{infer_ast_expr_type, FunctionSignature};
+use super::GenericImplMethodTemplate;
 use super::exprs::{call_arg_expected_type, rewrite_generic_calls_in_expr};
 
 #[allow(clippy::too_many_arguments)]
@@ -17,6 +18,7 @@ pub(super) fn hoist_direct_result_wrapper_args(
     env: &mut BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
+    generic_impl_method_templates: &[GenericImplMethodTemplate],
     higher_order_templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     signatures: &BTreeMap<String, FunctionSignature>,
@@ -46,6 +48,7 @@ pub(super) fn hoist_direct_result_wrapper_args(
             env,
             visible_type_aliases,
             generic_templates,
+            generic_impl_method_templates,
             higher_order_templates,
             function_table,
             signatures,

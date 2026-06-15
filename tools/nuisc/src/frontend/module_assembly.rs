@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{
-    AstImplDef, AstModule, AstStructDef, AstTypeAlias, NirExternFunction, NirExternInterface,
-    NirGenericParam, NirStructDef, NirStructField, NirTypeAlias,
+    AstEnumDef, AstEnumVariantKind, AstImplDef, AstModule, AstStructDef, AstStructField,
+    AstTypeAlias, AstVisibility, NirEnumDef, NirEnumVariant, NirEnumVariantKind,
+    NirExternFunction, NirExternInterface, NirGenericParam, NirStructDef, NirStructField,
+    NirTypeAlias, NirWherePredicate,
 };
 
 use super::{
@@ -29,11 +31,25 @@ pub(super) fn build_visible_struct_defs(
                     .map(|param| {
                         Ok(NirGenericParam {
                             name: param.name.clone(),
-                            bound: param
-                                .bound
-                                .as_ref()
+                            bounds: param
+                                .bounds
+                                .iter()
                                 .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
-                                .transpose()?,
+                                .collect::<Result<Vec<_>, _>>()?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+                where_bounds: definition
+                    .where_bounds
+                    .iter()
+                    .map(|predicate| {
+                        Ok(NirWherePredicate {
+                            param_name: predicate.param_name.clone(),
+                            bounds: predicate
+                                .bounds
+                                .iter()
+                                .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                                .collect::<Result<Vec<_>, _>>()?,
                         })
                     })
                     .collect::<Result<Vec<_>, String>>()?,
@@ -67,13 +83,29 @@ pub(super) fn build_visible_struct_defs(
                             .map(|param| {
                                 Ok(NirGenericParam {
                                     name: param.name.clone(),
-                                    bound: param
-                                        .bound
-                                        .as_ref()
+                                    bounds: param
+                                        .bounds
+                                        .iter()
                                         .map(|ty| {
                                             lower_type_ref_with_aliases(ty, visible_type_aliases)
                                         })
-                                        .transpose()?,
+                                        .collect::<Result<Vec<_>, _>>()?,
+                                })
+                            })
+                            .collect::<Result<Vec<_>, String>>()?,
+                        where_bounds: definition
+                            .where_bounds
+                            .iter()
+                            .map(|predicate| {
+                                Ok(NirWherePredicate {
+                                    param_name: predicate.param_name.clone(),
+                                    bounds: predicate
+                                        .bounds
+                                        .iter()
+                                        .map(|ty| {
+                                            lower_type_ref_with_aliases(ty, visible_type_aliases)
+                                        })
+                                        .collect::<Result<Vec<_>, _>>()?,
                                 })
                             })
                             .collect::<Result<Vec<_>, String>>()?,
@@ -96,6 +128,19 @@ pub(super) fn build_visible_struct_defs(
                     })
                 })
         }))
+        .chain(module.enums.iter().flat_map(|definition| {
+            synthesize_enum_variant_structs(definition)
+                .into_iter()
+                .map(|definition| lower_ast_struct_def(&definition, visible_type_aliases, false))
+        }))
+        .chain(local_cpu_helpers.iter().flat_map(|helper| {
+            helper
+                .enums
+                .iter()
+                .filter(|definition| is_public_visibility(definition.visibility))
+                .flat_map(|definition| synthesize_enum_variant_structs(definition).into_iter())
+                .map(|definition| lower_ast_struct_def(&definition, visible_type_aliases, true))
+        }))
         .collect::<Result<Vec<_>, String>>()
 }
 
@@ -103,8 +148,34 @@ pub(super) fn build_module_struct_table(module: &AstModule) -> BTreeMap<String, 
     module
         .structs
         .iter()
-        .map(|definition| (definition.name.clone(), definition.clone()))
+        .cloned()
+        .chain(
+            module
+                .enums
+                .iter()
+                .flat_map(synthesize_enum_variant_structs),
+        )
+        .map(|definition| (definition.name.clone(), definition))
         .collect::<BTreeMap<_, _>>()
+}
+
+pub(super) fn build_visible_enum_defs(
+    module: &AstModule,
+    local_cpu_helpers: &[&AstModule],
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<Vec<NirEnumDef>, String> {
+    module
+        .enums
+        .iter()
+        .map(|definition| lower_enum_def(definition, visible_type_aliases, false))
+        .chain(local_cpu_helpers.iter().flat_map(|helper| {
+            helper
+                .enums
+                .iter()
+                .filter(|definition| is_public_visibility(definition.visibility))
+                .map(|definition| lower_enum_def(definition, visible_type_aliases, true))
+        }))
+        .collect::<Result<Vec<_>, String>>()
 }
 
 pub(super) fn build_impl_lookup(
@@ -144,11 +215,25 @@ pub(super) fn lower_type_alias_items(
                     .map(|param| {
                         Ok(NirGenericParam {
                             name: param.name.clone(),
-                            bound: param
-                                .bound
-                                .as_ref()
+                            bounds: param
+                                .bounds
+                                .iter()
                                 .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
-                                .transpose()?,
+                                .collect::<Result<Vec<_>, _>>()?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+                where_bounds: alias
+                    .where_bounds
+                    .iter()
+                    .map(|predicate| {
+                        Ok(NirWherePredicate {
+                            param_name: predicate.param_name.clone(),
+                            bounds: predicate
+                                .bounds
+                                .iter()
+                                .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                                .collect::<Result<Vec<_>, _>>()?,
                         })
                     })
                     .collect::<Result<Vec<_>, String>>()?,
@@ -220,4 +305,181 @@ pub(super) fn lower_extern_items(
         .collect::<Result<Vec<_>, String>>()?;
 
     Ok((externs, extern_interfaces))
+}
+
+fn lower_enum_def(
+    definition: &AstEnumDef,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    helper_visible: bool,
+) -> Result<NirEnumDef, String> {
+    Ok(NirEnumDef {
+        annotations: if helper_visible {
+            helper_visible_struct_annotations(&AstStructDef {
+                visibility: definition.visibility,
+                attributes: definition.attributes.clone(),
+                name: definition.name.clone(),
+                generic_params: definition.generic_params.clone(),
+                where_bounds: definition.where_bounds.clone(),
+                fields: Vec::new(),
+            })
+        } else {
+            lower_ast_attributes(&definition.attributes)
+        },
+        visibility: lower_visibility(definition.visibility),
+        name: definition.name.clone(),
+        generic_params: definition
+            .generic_params
+            .iter()
+            .map(|param| {
+                Ok(NirGenericParam {
+                    name: param.name.clone(),
+                    bounds: param
+                        .bounds
+                        .iter()
+                        .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                        .collect::<Result<Vec<_>, _>>()?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?,
+        where_bounds: definition
+            .where_bounds
+            .iter()
+            .map(|predicate| {
+                Ok(NirWherePredicate {
+                    param_name: predicate.param_name.clone(),
+                    bounds: predicate
+                        .bounds
+                        .iter()
+                        .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                        .collect::<Result<Vec<_>, _>>()?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?,
+        variants: definition
+            .variants
+            .iter()
+            .map(|variant| {
+                Ok(NirEnumVariant {
+                    name: variant.name.clone(),
+                    kind: match &variant.kind {
+                        AstEnumVariantKind::Unit => NirEnumVariantKind::Unit,
+                        AstEnumVariantKind::Tuple(fields) => NirEnumVariantKind::Tuple(
+                            fields
+                                .iter()
+                                .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                                .collect::<Result<Vec<_>, _>>()?,
+                        ),
+                        AstEnumVariantKind::Struct(fields) => NirEnumVariantKind::Struct(
+                            fields
+                                .iter()
+                                .filter(|field| {
+                                    !helper_visible || is_public_visibility(field.visibility)
+                                })
+                                .map(|field| {
+                                    Ok(NirStructField {
+                                        annotations: lower_ast_attributes(&field.attributes),
+                                        visibility: lower_visibility(field.visibility),
+                                        name: field.name.clone(),
+                                        ty: lower_type_ref_with_aliases(
+                                            &field.ty,
+                                            visible_type_aliases,
+                                        )?,
+                                    })
+                                })
+                                .collect::<Result<Vec<_>, String>>()?,
+                        ),
+                    },
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?,
+    })
+}
+
+fn lower_ast_struct_def(
+    definition: &AstStructDef,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    helper_visible: bool,
+) -> Result<NirStructDef, String> {
+    Ok(NirStructDef {
+        annotations: if helper_visible {
+            helper_visible_struct_annotations(definition)
+        } else {
+            lower_ast_attributes(&definition.attributes)
+        },
+        visibility: lower_visibility(definition.visibility),
+        name: definition.name.clone(),
+        generic_params: definition
+            .generic_params
+            .iter()
+            .map(|param| {
+                Ok(NirGenericParam {
+                    name: param.name.clone(),
+                    bounds: param
+                        .bounds
+                        .iter()
+                        .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                        .collect::<Result<Vec<_>, _>>()?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?,
+        where_bounds: definition
+            .where_bounds
+            .iter()
+            .map(|predicate| {
+                Ok(NirWherePredicate {
+                    param_name: predicate.param_name.clone(),
+                    bounds: predicate
+                        .bounds
+                        .iter()
+                        .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                        .collect::<Result<Vec<_>, _>>()?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?,
+        fields: definition
+            .fields
+            .iter()
+            .filter(|field| !helper_visible || is_public_visibility(field.visibility))
+            .map(|field| {
+                Ok(NirStructField {
+                    annotations: lower_ast_attributes(&field.attributes),
+                    visibility: lower_visibility(field.visibility),
+                    name: field.name.clone(),
+                    ty: lower_type_ref_with_aliases(&field.ty, visible_type_aliases)?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?,
+    })
+}
+
+fn synthesize_enum_variant_structs(definition: &AstEnumDef) -> Vec<AstStructDef> {
+    definition
+        .variants
+        .iter()
+        .map(|variant| AstStructDef {
+            visibility: definition.visibility,
+            attributes: Vec::new(),
+            name: format!("{}.{}", definition.name, variant.name),
+            generic_params: definition.generic_params.clone(),
+            where_bounds: definition.where_bounds.clone(),
+            fields: match &variant.kind {
+                AstEnumVariantKind::Unit => Vec::new(),
+                AstEnumVariantKind::Tuple(fields) => fields
+                    .iter()
+                    .enumerate()
+                    .map(|(index, ty)| AstStructField {
+                        visibility: AstVisibility::Public,
+                        attributes: Vec::new(),
+                        name: if fields.len() == 1 {
+                            "value".to_owned()
+                        } else {
+                            format!("_{index}")
+                        },
+                        ty: ty.clone(),
+                    })
+                    .collect(),
+                AstEnumVariantKind::Struct(fields) => fields.clone(),
+            },
+        })
+        .collect()
 }

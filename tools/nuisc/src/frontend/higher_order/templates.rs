@@ -77,6 +77,7 @@ pub(crate) fn specialize_higher_order_template(
         test_clock_policy: None,
         is_async: template.is_async,
         generic_params: template.generic_params.clone(),
+        where_bounds: template.where_bounds.clone(),
         params: template
             .params
             .iter()

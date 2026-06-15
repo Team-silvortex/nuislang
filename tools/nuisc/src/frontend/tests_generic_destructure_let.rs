@@ -310,6 +310,63 @@ fn lowers_shorthand_generic_struct_destructuring_let_into_field_bindings() {
     }
 }
 
+#[test]
+fn lowers_destructure_after_outer_literal_with_deferred_inner_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Phantom<T, U> {
+            value: T,
+            tag: i64,
+          }
+
+          struct Outer<T, U> {
+            inner: Phantom<T, U>,
+            meta: U,
+          }
+
+          fn main() -> i64 {
+            let value = Outer {
+              inner: Phantom { value: 7, tag: 1 },
+              meta: "ok",
+            };
+            let { inner: { value: payload }, meta } = value;
+            return payload;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[1] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "payload");
+            assert!(matches!(ty, Some(ty) if ty.render() == "i64"));
+            assert!(matches!(
+                value,
+                NirExpr::FieldAccess { field, base }
+                    if field == "value"
+                        && matches!(
+                            base.as_ref(),
+                            NirExpr::FieldAccess { field, .. } if field == "inner"
+                        )
+            ));
+        }
+        other => panic!("expected deferred-inference payload destructured binding, found {other:?}"),
+    }
+    match &module.functions[0].body[2] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "meta");
+            assert!(matches!(ty, Some(ty) if ty.render() == "String"));
+            assert!(matches!(
+                value,
+                NirExpr::FieldAccess { field, .. } if field == "meta"
+            ));
+        }
+        other => panic!("expected deferred-inference meta destructured binding, found {other:?}"),
+    }
+}
+
 fn bind_field(field: &str, binding: &str) -> AstDestructureField {
     AstDestructureField {
         field: field.to_owned(),

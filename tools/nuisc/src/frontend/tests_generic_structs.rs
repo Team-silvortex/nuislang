@@ -19,7 +19,7 @@ fn parses_generic_struct_definition_into_ast() {
     assert_eq!(definition.name, "Boxed");
     assert_eq!(definition.generic_params.len(), 1);
     assert_eq!(definition.generic_params[0].name, "T");
-    assert!(definition.generic_params[0].bound.is_none());
+    assert!(definition.generic_params[0].bounds.is_empty());
     assert_eq!(definition.fields[0].ty.name, "T");
 }
 
@@ -341,6 +341,197 @@ fn rejects_generic_alias_struct_literal_when_fields_do_not_fully_determine_type_
         ),
         "{error}"
     );
+}
+
+#[test]
+fn lowers_outer_generic_struct_literal_when_later_field_completes_inner_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Phantom<T, U> {
+            value: T,
+            tag: i64,
+          }
+
+          struct Outer<T, U> {
+            inner: Phantom<T, U>,
+            meta: U,
+          }
+
+          fn main() -> i64 {
+            let outer = Outer {
+              inner: Phantom { value: 7, tag: 1 },
+              meta: "ok",
+            };
+            return outer.inner.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "outer");
+            assert_eq!(ty.as_ref().unwrap().render(), "Outer<i64, String>");
+            assert!(matches!(
+                value,
+                NirExpr::StructLiteral {
+                    type_name,
+                    type_args,
+                    ..
+                } if type_name == "Outer"
+                    && matches!(type_args.as_slice(), [lhs, rhs] if lhs.render() == "i64" && rhs.render() == "String")
+            ));
+        }
+        other => panic!("expected inferred outer generic struct let, found {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_outer_generic_struct_literal_when_later_field_completes_inner_payload_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Just<T, U> {
+            value: T,
+          }
+
+          struct Outer<T, U> {
+            inner: Just<T, U>,
+            meta: U,
+          }
+
+          fn main() -> i64 {
+            let outer = Outer {
+              inner: Just(7),
+              meta: "ok",
+            };
+            return outer.inner.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "outer");
+            assert_eq!(ty.as_ref().unwrap().render(), "Outer<i64, String>");
+            assert!(matches!(
+                value,
+                NirExpr::StructLiteral {
+                    type_name,
+                    type_args,
+                    ..
+                } if type_name == "Outer"
+                    && matches!(type_args.as_slice(), [lhs, rhs] if lhs.render() == "i64" && rhs.render() == "String")
+            ));
+        }
+        other => panic!("expected inferred outer generic struct let from payload route, found {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_transparent_alias_outer_literal_when_later_field_completes_inner_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type OuterAlias<T, U> = Outer<T, U>;
+
+          struct Phantom<T, U> {
+            value: T,
+            tag: i64,
+          }
+
+          struct Outer<T, U> {
+            inner: Phantom<T, U>,
+            meta: U,
+          }
+
+          fn main() -> i64 {
+            let outer = OuterAlias {
+              inner: Phantom { value: 7, tag: 1 },
+              meta: "ok",
+            };
+            return outer.inner.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "outer");
+            assert_eq!(ty.as_ref().unwrap().render(), "Outer<i64, String>");
+            assert!(matches!(
+                value,
+                NirExpr::StructLiteral {
+                    type_name,
+                    type_args,
+                    ..
+                } if type_name == "Outer"
+                    && matches!(type_args.as_slice(), [lhs, rhs] if lhs.render() == "i64" && rhs.render() == "String")
+            ));
+        }
+        other => panic!("expected inferred transparent alias outer let, found {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_non_transparent_alias_outer_literal_when_later_field_completes_inner_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type OuterAlias<T, U> = Wrapper<Outer<T, U>>;
+
+          struct Phantom<T, U> {
+            value: T,
+            tag: i64,
+          }
+
+          struct Outer<T, U> {
+            inner: Phantom<T, U>,
+            meta: U,
+          }
+
+          struct Wrapper<T> {
+            inner: T,
+            mark: i64,
+          }
+
+          fn main() -> i64 {
+            let outer = OuterAlias {
+              inner: Outer {
+                inner: Phantom { value: 7, tag: 1 },
+                meta: "ok",
+              },
+              mark: 1,
+            };
+            return outer.inner.inner.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "outer");
+            assert_eq!(ty.as_ref().unwrap().render(), "Wrapper<Outer<i64, String>>");
+            assert!(matches!(
+                value,
+                NirExpr::StructLiteral {
+                    type_name,
+                    type_args,
+                    ..
+                } if type_name == "Wrapper"
+                    && matches!(type_args.as_slice(), [inner] if inner.render() == "Outer<i64, String>")
+            ));
+        }
+        other => panic!("expected inferred non-transparent alias outer let, found {other:?}"),
+    }
 }
 
 #[test]

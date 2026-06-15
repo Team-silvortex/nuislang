@@ -36,6 +36,82 @@ fn reports_missing_generic_bound_for_method_call_on_type_param() {
 }
 
 #[test]
+fn accepts_method_call_on_type_param_with_where_clause_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn bump<T>(value: T) -> T where T: Addable {
+            return value.add(value);
+          }
+
+          fn main() -> i64 {
+            return bump(7);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "bump__i64"));
+}
+
+#[test]
+fn accepts_method_call_on_type_param_with_repeated_where_predicates() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          impl Printable for i64 {
+            fn print(value: i64) -> Text {
+              return "ok";
+            }
+          }
+
+          fn bump<T>(value: T) -> T where T: Printable, T: Addable {
+            return value.add(value);
+          }
+
+          fn main() -> i64 {
+            return bump(7);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "bump__i64"));
+}
+
+#[test]
 fn reports_missing_generic_bound_for_method_call_on_call_inferred_local() {
     let error = parse_nuis_module(
         r#"
@@ -192,6 +268,56 @@ fn accepts_alias_bound_for_method_call_on_type_param() {
         .functions
         .iter()
         .any(|function| function.name == "bump__i64"));
+}
+
+#[test]
+fn accepts_method_call_on_receiver_from_outer_literal_with_deferred_inner_inference() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Phantom<T, U> {
+            value: T,
+            tag: i64,
+          }
+
+          struct Outer<T, U> {
+            inner: Phantom<T, U>,
+            meta: U,
+          }
+
+          fn value_of<T, U>(outer: Outer<T, U>) -> T {
+            return outer.inner.value;
+          }
+
+          fn bump<T: Addable, U>(outer: Outer<T, U>) -> T {
+            return value_of(outer).add(value_of(outer));
+          }
+
+          fn main() -> i64 {
+            return bump(Outer {
+              inner: Phantom { value: 7, tag: 1 },
+              meta: "ok",
+            });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "bump__i64__String"));
 }
 
 #[test]
@@ -581,6 +707,104 @@ fn accepts_explicit_trait_qualified_call_on_bound_type_param() {
 }
 
 #[test]
+fn accepts_explicit_trait_qualified_call_when_trait_is_one_of_multiple_bounds() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          impl Printable for i64 {
+            fn print(value: i64) -> Text {
+              return "ok";
+            }
+          }
+
+          fn bump<T: Addable + Printable>(value: T) -> T {
+            return Addable.add(value, value);
+          }
+
+          fn main() -> i64 {
+            return bump(7);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "bump__i64"));
+}
+
+#[test]
+fn reports_explicit_trait_qualified_call_when_multiple_bounds_miss_required_trait() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          trait Showable {
+            fn show(value: Self) -> i64;
+          }
+
+          trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          impl Showable for i64 {
+            fn show(value: i64) -> i64 {
+              return value;
+            }
+          }
+
+          impl Printable for i64 {
+            fn print(value: i64) -> Text {
+              return "ok";
+            }
+          }
+
+          fn bump<T: Showable + Printable>(value: T) -> T {
+            return Addable.add(value, value);
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "calls trait method `Addable.add` on generic parameter `T` but declared bounds `Showable + Printable` do not satisfy required trait `Addable`"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
 fn accepts_explicit_trait_qualified_call_with_public_helper_trait_bound() {
     let main_ast = parse_nuis_ast(
         r#"
@@ -711,6 +935,62 @@ fn reports_mixed_bare_and_qualified_trait_names_consistently() {
 }
 
 #[test]
+fn reports_mixed_bare_and_qualified_trait_names_consistently_with_multiple_bounds() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          impl Helper.Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          impl Printable for i64 {
+            fn print(value: i64) -> Text {
+              return "ok";
+            }
+          }
+
+          fn bump<T: Addable + Printable>(value: T) -> T {
+            return Helper.Addable.add(value, value);
+          }
+
+          fn main() -> i64 {
+            return bump(7);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap_err();
+    assert!(
+        error.contains("bound `Addable` uses a different visible name for the same trait"),
+        "{error}"
+    );
+    assert!(
+        error.contains("use `Helper.Addable` consistently"),
+        "{error}"
+    );
+}
+
+#[test]
 fn accepts_qualified_helper_trait_bound_for_operator_call() {
     let main_ast = parse_nuis_ast(
         r#"
@@ -724,6 +1004,162 @@ fn accepts_qualified_helper_trait_bound_for_operator_call() {
           }
 
           fn bump<T: Helper.Addable>(lhs: T, rhs: T) -> T {
+            return lhs + rhs;
+          }
+
+          fn main() -> i64 {
+            return bump(7, 8);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "bump__i64"));
+}
+
+#[test]
+fn accepts_qualified_helper_trait_bound_for_operator_call_with_multiple_bounds() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          impl Helper.Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          impl Printable for i64 {
+            fn print(value: i64) -> Text {
+              return "ok";
+            }
+          }
+
+          fn bump<T: Helper.Addable + Printable>(lhs: T, rhs: T) -> T {
+            return lhs + rhs;
+          }
+
+          fn main() -> i64 {
+            return bump(7, 8);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "bump__i64"));
+}
+
+#[test]
+fn accepts_qualified_helper_trait_bound_for_operator_call_with_where_clause() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          impl Helper.Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          impl Printable for i64 {
+            fn print(value: i64) -> Text {
+              return "ok";
+            }
+          }
+
+          fn bump<T>(lhs: T, rhs: T) -> T where T: Printable, T: Helper.Addable {
+            return lhs + rhs;
+          }
+
+          fn main() -> i64 {
+            return bump(7, 8);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "bump__i64"));
+}
+
+#[test]
+fn accepts_bare_bound_name_for_operator_call_with_multiple_bounds_when_helper_variant_is_visible() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          impl Helper.Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          impl Printable for i64 {
+            fn print(value: i64) -> Text {
+              return "ok";
+            }
+          }
+
+          fn bump<T: Addable + Printable>(lhs: T, rhs: T) -> T {
             return lhs + rhs;
           }
 
@@ -1249,6 +1685,323 @@ fn reports_alias_chain_context_for_mismatched_generic_binary_eq_bound() {
         ),
         "{error}"
     );
+}
+
+#[test]
+fn accepts_qualified_helper_trait_bound_for_equality_operator_with_multiple_bounds() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          impl Helper.Equatable for i64 {
+            fn eq(lhs: i64, rhs: i64) -> bool {
+              return lhs == rhs;
+            }
+          }
+
+          impl Printable for i64 {
+            fn print(value: i64) -> Text {
+              return "ok";
+            }
+          }
+
+          fn same<T: Helper.Equatable + Printable>(lhs: T, rhs: T) -> bool {
+            return lhs == rhs;
+          }
+
+          fn main() -> i64 {
+            if same(7, 7) {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Equatable {
+            fn eq(lhs: Self, rhs: Self) -> bool;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    assert_eq!(module.unit, "Main");
+}
+
+#[test]
+fn accepts_bare_bound_name_for_equality_operator_with_multiple_bounds_when_helper_variant_is_visible() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          impl Helper.Equatable for i64 {
+            fn eq(lhs: i64, rhs: i64) -> bool {
+              return lhs == rhs;
+            }
+          }
+
+          impl Printable for i64 {
+            fn print(value: i64) -> Text {
+              return "ok";
+            }
+          }
+
+          fn same<T: Equatable + Printable>(lhs: T, rhs: T) -> bool {
+            return lhs == rhs;
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Equatable {
+            fn eq(lhs: Self, rhs: Self) -> bool;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    assert_eq!(module.unit, "Main");
+}
+
+#[test]
+fn accepts_qualified_helper_trait_bounds_for_mul_div_rem_operators() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          impl Helper.Multipliable for i64 {
+            fn mul(lhs: i64, rhs: i64) -> i64 {
+              return lhs * rhs;
+            }
+          }
+
+          impl Helper.Dividable for i64 {
+            fn div(lhs: i64, rhs: i64) -> i64 {
+              return lhs / rhs;
+            }
+          }
+
+          impl Helper.Remainderable for i64 {
+            fn rem(lhs: i64, rhs: i64) -> i64 {
+              return lhs % rhs;
+            }
+          }
+
+          fn mul_it<T: Helper.Multipliable>(lhs: T, rhs: T) -> T {
+            return lhs * rhs;
+          }
+
+          fn div_it<T: Helper.Dividable>(lhs: T, rhs: T) -> T {
+            return lhs / rhs;
+          }
+
+          fn rem_it<T: Helper.Remainderable>(lhs: T, rhs: T) -> T {
+            return lhs % rhs;
+          }
+
+          fn main() -> i64 {
+            return mul_it(6, 7) + div_it(8, 2) + rem_it(9, 4);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Multipliable {
+            fn mul(lhs: Self, rhs: Self) -> Self;
+          }
+
+          pub trait Dividable {
+            fn div(lhs: Self, rhs: Self) -> Self;
+          }
+
+          pub trait Remainderable {
+            fn rem(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "mul_it__i64"));
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "div_it__i64"));
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "rem_it__i64"));
+}
+
+#[test]
+fn accepts_qualified_helper_trait_bounds_for_order_operators() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          trait Printable {
+            fn print(value: Self) -> Text;
+          }
+
+          impl Helper.Orderable for i64 {
+            fn lt(lhs: i64, rhs: i64) -> bool {
+              return lhs < rhs;
+            }
+            fn le(lhs: i64, rhs: i64) -> bool {
+              return lhs < rhs || lhs == rhs;
+            }
+            fn gt(lhs: i64, rhs: i64) -> bool {
+              return !(lhs <= rhs);
+            }
+            fn ge(lhs: i64, rhs: i64) -> bool {
+              return !(lhs < rhs);
+            }
+          }
+
+          impl Printable for i64 {
+            fn print(value: i64) -> Text {
+              return "ok";
+            }
+          }
+
+          fn ordered<T: Helper.Orderable + Printable>(lhs: T, rhs: T) -> bool {
+            return lhs < rhs;
+          }
+
+          fn main() -> i64 {
+            if ordered(1, 2) {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Orderable {
+            fn lt(lhs: Self, rhs: Self) -> bool;
+            fn le(lhs: Self, rhs: Self) -> bool;
+            fn gt(lhs: Self, rhs: Self) -> bool;
+            fn ge(lhs: Self, rhs: Self) -> bool;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "ordered__i64"));
+}
+
+#[test]
+fn accepts_qualified_helper_trait_bounds_for_unary_not_and_neg_on_custom_type() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          impl Helper.Notable for Pair {
+            fn not(value: Pair) -> bool {
+              return value.value == 0;
+            }
+          }
+
+          impl Helper.Negatable for Pair {
+            fn neg(value: Pair) -> Pair {
+              return Pair { value: 0 - value.value };
+            }
+          }
+
+          fn empty<T: Helper.Notable>(value: T) -> bool {
+            return !value;
+          }
+
+          fn flip<T: Helper.Negatable>(value: T) -> T {
+            return -value;
+          }
+
+          fn main() -> i64 {
+            let zero: Pair = Pair { value: 0 };
+            let seven: Pair = Pair { value: 7 };
+            let is_empty = empty(zero);
+            let flipped = flip(seven);
+            if is_empty {
+              return flipped.value;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Notable {
+            fn not(value: Self) -> bool;
+          }
+
+          pub trait Negatable {
+            fn neg(value: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "empty__Pair"));
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "flip__Pair"));
 }
 
 #[test]

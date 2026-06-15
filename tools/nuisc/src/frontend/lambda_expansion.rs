@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     AstBinaryOp, AstDestructureBinding, AstDestructureField, AstExpr, AstFunction, AstGenericParam,
-    AstMatchArm, AstModule, AstParam, AstStmt, AstTypeRef, AstUnaryOp, AstVisibility,
+    AstImplDef, AstMatchArm, AstModule, AstParam, AstStmt, AstTypeRef, AstUnaryOp, AstVisibility,
 };
 
 use super::lambda_validation::collect_lambda_block_captures;
@@ -29,8 +29,12 @@ pub(super) fn expand_module_lambdas(module: &AstModule) -> Result<AstModule, Str
     let mut expanded = module.clone();
     expanded.functions.clear();
     for function in &module.functions {
-        let (rewritten, synthesized) =
-            expand_function_lambdas(function, &module_const_names, &module_function_table)?;
+        let (rewritten, synthesized) = expand_function_lambdas(
+            function,
+            &module.impls,
+            &module_const_names,
+            &module_function_table,
+        )?;
         expanded.functions.extend(synthesized);
         expanded.functions.push(rewritten);
     }
@@ -39,6 +43,7 @@ pub(super) fn expand_module_lambdas(module: &AstModule) -> Result<AstModule, Str
 
 fn expand_function_lambdas(
     function: &AstFunction,
+    module_impls: &[AstImplDef],
     module_const_names: &BTreeSet<String>,
     module_function_table: &BTreeMap<String, AstFunction>,
 ) -> Result<(AstFunction, Vec<AstFunction>), String> {
@@ -56,10 +61,12 @@ fn expand_function_lambdas(
         .collect::<BTreeMap<_, _>>();
     let body = expand_lambda_block(
         &function.body,
+        function.return_type.as_ref(),
         &function.generic_params,
         &BTreeMap::new(),
         &visible_locals,
         &visible_local_types,
+        module_impls,
         module_const_names,
         module_function_table,
         &function.name,
@@ -109,6 +116,145 @@ fn callable_type_from_signature(
 fn callable_type_from_function(function: &AstFunction) -> Option<AstTypeRef> {
     let return_type = function.return_type.as_ref()?;
     callable_type_from_signature(&function.params, return_type)
+}
+
+fn specialize_type_with_substitutions(
+    ty: &AstTypeRef,
+    substitutions: &BTreeMap<String, AstTypeRef>,
+) -> AstTypeRef {
+    if ty.generic_args.is_empty() {
+        if let Some(substitution) = substitutions.get(&ty.name) {
+            return substitution.clone();
+        }
+    }
+    AstTypeRef {
+        name: ty.name.clone(),
+        generic_args: ty
+            .generic_args
+            .iter()
+            .map(|arg| specialize_type_with_substitutions(arg, substitutions))
+            .collect(),
+        is_optional: ty.is_optional,
+        is_ref: ty.is_ref,
+    }
+}
+
+fn unify_generic_type_pattern(
+    pattern: &AstTypeRef,
+    actual: &AstTypeRef,
+    generic_names: &BTreeSet<String>,
+    substitutions: &mut BTreeMap<String, AstTypeRef>,
+) {
+    if pattern.is_optional != actual.is_optional || pattern.is_ref != actual.is_ref {
+        return;
+    }
+    if pattern.generic_args.is_empty() && generic_names.contains(&pattern.name) {
+        match substitutions.get(&pattern.name) {
+            Some(existing) if existing != actual => {}
+            Some(_) => {}
+            None => {
+                substitutions.insert(pattern.name.clone(), actual.clone());
+            }
+        }
+        return;
+    }
+    if pattern.name != actual.name || pattern.generic_args.len() != actual.generic_args.len() {
+        return;
+    }
+    for (pattern_arg, actual_arg) in pattern.generic_args.iter().zip(actual.generic_args.iter()) {
+        unify_generic_type_pattern(pattern_arg, actual_arg, generic_names, substitutions);
+    }
+}
+
+fn infer_generic_call_substitutions(
+    function: &AstFunction,
+    explicit_generic_args: &[AstTypeRef],
+    args: &[AstExpr],
+    expected_result_type: Option<&AstTypeRef>,
+    visible_local_types: &BTreeMap<String, AstTypeRef>,
+    module_function_table: &BTreeMap<String, AstFunction>,
+) -> BTreeMap<String, AstTypeRef> {
+    let generic_names = function
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    let mut substitutions = BTreeMap::new();
+    if explicit_generic_args.len() == function.generic_params.len() {
+        for (param, arg) in function.generic_params.iter().zip(explicit_generic_args.iter()) {
+            substitutions.insert(param.name.clone(), arg.clone());
+        }
+    }
+    for (param, arg) in function.params.iter().zip(args.iter()) {
+        if matches!(arg, AstExpr::Lambda { .. }) {
+            continue;
+        }
+        let Some(arg_ty) = infer_local_binding_type(arg, visible_local_types, module_function_table)
+        else {
+            continue;
+        };
+        unify_generic_type_pattern(&param.ty, &arg_ty, &generic_names, &mut substitutions);
+    }
+    if let (Some(return_pattern), Some(expected_result_type)) =
+        (function.return_type.as_ref(), expected_result_type)
+    {
+        unify_generic_type_pattern(
+            return_pattern,
+            expected_result_type,
+            &generic_names,
+            &mut substitutions,
+        );
+    }
+    substitutions
+}
+
+fn infer_impl_method_substitutions(
+    definition: &AstImplDef,
+    method_index: usize,
+    receiver_ty: &AstTypeRef,
+    args: &[AstExpr],
+    expected_result_type: Option<&AstTypeRef>,
+    visible_local_types: &BTreeMap<String, AstTypeRef>,
+    module_function_table: &BTreeMap<String, AstFunction>,
+) -> BTreeMap<String, AstTypeRef> {
+    let generic_names = definition
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    let mut substitutions = BTreeMap::new();
+    unify_generic_type_pattern(
+        &definition.for_type,
+        receiver_ty,
+        &generic_names,
+        &mut substitutions,
+    );
+    let Some(method_def) = definition.methods.get(method_index) else {
+        return substitutions;
+    };
+    for (param, arg) in method_def.params.iter().skip(1).zip(args.iter()) {
+        if matches!(arg, AstExpr::Lambda { .. }) {
+            continue;
+        }
+        let Some(arg_ty) = infer_local_binding_type(arg, visible_local_types, module_function_table)
+        else {
+            continue;
+        };
+        unify_generic_type_pattern(&param.ty, &arg_ty, &generic_names, &mut substitutions);
+    }
+    let method_return_ty = method_def
+        .return_type
+        .as_ref()
+        .unwrap_or(&definition.for_type);
+    if let Some(expected_result_type) = expected_result_type {
+        unify_generic_type_pattern(
+            method_return_ty,
+            expected_result_type,
+            &generic_names,
+            &mut substitutions,
+        );
+    }
+    substitutions
 }
 
 fn callable_type_matches_signature(
@@ -293,6 +439,7 @@ fn synthesize_lambda_function(
     lambda_aliases: &BTreeMap<String, LambdaBinding>,
     outer_locals: &BTreeSet<String>,
     outer_local_types: &BTreeMap<String, AstTypeRef>,
+    module_impls: &[AstImplDef],
     module_const_names: &BTreeSet<String>,
     module_function_table: &BTreeMap<String, AstFunction>,
     owning_function_name: &str,
@@ -302,6 +449,39 @@ fn synthesize_lambda_function(
     let Some(lambda_return_type) = return_type.clone() else {
         return Err("inline lambda currently requires an explicit return type".to_owned());
     };
+    synthesize_lambda_function_with_known_return_type(
+        params,
+        lambda_return_type,
+        body,
+        inherited_generic_params,
+        lambda_aliases,
+        outer_locals,
+        outer_local_types,
+        module_impls,
+        module_const_names,
+        module_function_table,
+        owning_function_name,
+        counter,
+        synthesized,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn synthesize_lambda_function_with_known_return_type(
+    params: &[AstParam],
+    lambda_return_type: AstTypeRef,
+    body: &[AstStmt],
+    inherited_generic_params: &[AstGenericParam],
+    lambda_aliases: &BTreeMap<String, LambdaBinding>,
+    outer_locals: &BTreeSet<String>,
+    outer_local_types: &BTreeMap<String, AstTypeRef>,
+    module_impls: &[AstImplDef],
+    module_const_names: &BTreeSet<String>,
+    module_function_table: &BTreeMap<String, AstFunction>,
+    owning_function_name: &str,
+    counter: &mut usize,
+    synthesized: &mut Vec<AstFunction>,
+) -> Result<LambdaBinding, String> {
     let mut lambda_locals = params
         .iter()
         .map(|param| param.name.clone())
@@ -340,10 +520,12 @@ fn synthesize_lambda_function(
 
     let lambda_body = expand_lambda_block(
         body,
+        Some(&lambda_return_type),
         inherited_generic_params,
         lambda_aliases,
         &lambda_visible_locals,
         &lambda_visible_local_types,
+        module_impls,
         module_const_names,
         module_function_table,
         owning_function_name,
@@ -365,6 +547,7 @@ fn synthesize_lambda_function(
         test_clock_policy: None,
         is_async: false,
         generic_params: inherited_generic_params.to_vec(),
+        where_bounds: Vec::new(),
         params: synthesized_params,
         return_type: Some(lambda_return_type),
         body: lambda_body,
@@ -375,13 +558,114 @@ fn synthesize_lambda_function(
     })
 }
 
+fn inline_lambda_return_type_from_callable(
+    params: &[AstParam],
+    explicit_return_type: &Option<AstTypeRef>,
+    expected_callable_type: Option<&AstTypeRef>,
+) -> Result<Option<AstTypeRef>, String> {
+    let Some(expected_callable_type) = expected_callable_type else {
+        return Ok(explicit_return_type.clone());
+    };
+    let Some(arity) = callable_type_arity(expected_callable_type) else {
+        return Ok(explicit_return_type.clone());
+    };
+    if params.len() != arity || expected_callable_type.generic_args.len() != arity + 1 {
+        return Ok(explicit_return_type.clone());
+    }
+    for (param, expected) in params.iter().zip(expected_callable_type.generic_args[..arity].iter()) {
+        if param.ty != *expected {
+            return Ok(explicit_return_type.clone());
+        }
+    }
+    let inferred_return_type = expected_callable_type.generic_args[arity].clone();
+    if let Some(explicit_return_type) = explicit_return_type {
+        if *explicit_return_type != inferred_return_type {
+            return Err(format!(
+                "inline lambda return type `{}` does not match expected callable return type `{}`",
+                explicit_return_type.name, inferred_return_type.name
+            ));
+        }
+    }
+    Ok(Some(inferred_return_type))
+}
+
+fn expected_callable_type_for_call_arg(
+    callee: &str,
+    index: usize,
+    generic_args: &[AstTypeRef],
+    args: &[AstExpr],
+    expected_result_type: Option<&AstTypeRef>,
+    visible_local_types: &BTreeMap<String, AstTypeRef>,
+    module_function_table: &BTreeMap<String, AstFunction>,
+) -> Option<AstTypeRef> {
+    let function = module_function_table.get(callee)?;
+    let param = function.params.get(index)?;
+    let specialized = if function.generic_params.is_empty() && generic_args.is_empty() {
+        param.ty.clone()
+    } else {
+        let substitutions = infer_generic_call_substitutions(
+            function,
+            generic_args,
+            args,
+            expected_result_type,
+            visible_local_types,
+            module_function_table,
+        );
+        specialize_type_with_substitutions(&param.ty, &substitutions)
+    };
+    callable_type_arity(&specialized).map(|_| specialized)
+}
+
+fn expected_callable_type_for_method_arg(
+    receiver: &AstExpr,
+    method: &str,
+    index: usize,
+    args: &[AstExpr],
+    expected_result_type: Option<&AstTypeRef>,
+    visible_local_types: &BTreeMap<String, AstTypeRef>,
+    module_function_table: &BTreeMap<String, AstFunction>,
+    module_impls: &[AstImplDef],
+) -> Option<AstTypeRef> {
+    let receiver_ty =
+        infer_local_binding_type(receiver, visible_local_types, module_function_table)?;
+    for definition in module_impls {
+        let Some(method_index) = definition.methods.iter().position(|item| item.name == method) else {
+            continue;
+        };
+        let substitutions = infer_impl_method_substitutions(
+            definition,
+            method_index,
+            &receiver_ty,
+            args,
+            expected_result_type,
+            visible_local_types,
+            module_function_table,
+        );
+        let specialized_for_type = specialize_type_with_substitutions(&definition.for_type, &substitutions);
+        if specialized_for_type != receiver_ty {
+            continue;
+        }
+        let method_def = &definition.methods[method_index];
+        let Some(param) = method_def.params.get(index + 1) else {
+            continue;
+        };
+        let specialized = specialize_type_with_substitutions(&param.ty, &substitutions);
+        if callable_type_arity(&specialized).is_some() {
+            return Some(specialized);
+        }
+    }
+    None
+}
+
 #[allow(clippy::too_many_arguments)]
 fn expand_lambda_block(
     body: &[AstStmt],
+    current_return_type: Option<&AstTypeRef>,
     inherited_generic_params: &[AstGenericParam],
     lambda_aliases: &BTreeMap<String, LambdaBinding>,
     visible_locals: &BTreeSet<String>,
     visible_local_types: &BTreeMap<String, AstTypeRef>,
+    module_impls: &[AstImplDef],
     module_const_names: &BTreeSet<String>,
     module_function_table: &BTreeMap<String, AstFunction>,
     owning_function_name: &str,
@@ -415,6 +699,7 @@ fn expand_lambda_block(
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -501,10 +786,12 @@ fn expand_lambda_block(
             } => {
                 let rewritten_value = rewrite_lambda_expr(
                     value,
+                    ty.as_ref(),
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -530,10 +817,12 @@ fn expand_lambda_block(
             AstStmt::AssignLocal { name, value } => {
                 let rewritten_value = rewrite_lambda_expr(
                     value,
+                    local_types.get(name),
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -557,10 +846,12 @@ fn expand_lambda_block(
             } => {
                 let rewritten_value = rewrite_lambda_expr(
                     value,
+                    type_ref.as_ref(),
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -583,10 +874,12 @@ fn expand_lambda_block(
             AstStmt::Const { name, ty, value } => {
                 let rewritten_value = rewrite_lambda_expr(
                     value,
+                    ty.as_ref(),
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -610,10 +903,12 @@ fn expand_lambda_block(
             }
             AstStmt::Print(value) => rewritten.push(AstStmt::Print(rewrite_lambda_expr(
                 value,
+                None,
                 inherited_generic_params,
                 &aliases,
                 &locals,
                 &local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -622,10 +917,12 @@ fn expand_lambda_block(
             )?)),
             AstStmt::Await(value) => rewritten.push(AstStmt::Await(rewrite_lambda_expr(
                 value,
+                None,
                 inherited_generic_params,
                 &aliases,
                 &locals,
                 &local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -639,10 +936,12 @@ fn expand_lambda_block(
             } => rewritten.push(AstStmt::If {
                 condition: rewrite_lambda_expr(
                     condition,
+                    None,
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -651,10 +950,12 @@ fn expand_lambda_block(
                 )?,
                 then_body: expand_lambda_block(
                     then_body,
+                    current_return_type,
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -663,10 +964,12 @@ fn expand_lambda_block(
                 )?,
                 else_body: expand_lambda_block(
                     else_body,
+                    current_return_type,
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -677,10 +980,12 @@ fn expand_lambda_block(
             AstStmt::Match { value, arms } => rewritten.push(AstStmt::Match {
                 value: rewrite_lambda_expr(
                     value,
+                    None,
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -698,10 +1003,12 @@ fn expand_lambda_block(
                                 .map(|guard| {
                                     rewrite_lambda_expr(
                                         &guard,
+                                        None,
                                         inherited_generic_params,
                                         &aliases,
                                         &locals,
                                         &local_types,
+                                        module_impls,
                                         module_const_names,
                                         module_function_table,
                                         owning_function_name,
@@ -712,10 +1019,12 @@ fn expand_lambda_block(
                                 .transpose()?,
                             body: expand_lambda_block(
                                 &arm.body,
+                                current_return_type,
                                 inherited_generic_params,
                                 &aliases,
                                 &locals,
                                 &local_types,
+                                module_impls,
                                 module_const_names,
                                 module_function_table,
                                 owning_function_name,
@@ -729,10 +1038,12 @@ fn expand_lambda_block(
             AstStmt::While { condition, body } => rewritten.push(AstStmt::While {
                 condition: rewrite_lambda_expr(
                     condition,
+                    None,
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -741,10 +1052,12 @@ fn expand_lambda_block(
                 )?,
                 body: expand_lambda_block(
                     body,
+                    current_return_type,
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -754,10 +1067,12 @@ fn expand_lambda_block(
             }),
             AstStmt::Expr(expr) => rewritten.push(AstStmt::Expr(rewrite_lambda_expr(
                 expr,
+                None,
                 inherited_generic_params,
                 &aliases,
                 &locals,
                 &local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -767,10 +1082,12 @@ fn expand_lambda_block(
             AstStmt::Return(value) => rewritten.push(AstStmt::Return(match value {
                 Some(value) => Some(rewrite_lambda_expr(
                     value,
+                    current_return_type,
                     inherited_generic_params,
                     &aliases,
                     &locals,
                     &local_types,
+                    module_impls,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -801,10 +1118,12 @@ fn collect_destructure_binding_names(fields: &[AstDestructureField], names: &mut
 #[allow(clippy::too_many_arguments)]
 fn rewrite_lambda_expr(
     expr: &AstExpr,
+    expected_expr_type: Option<&AstTypeRef>,
     inherited_generic_params: &[AstGenericParam],
     lambda_aliases: &BTreeMap<String, LambdaBinding>,
     visible_locals: &BTreeSet<String>,
     visible_local_types: &BTreeMap<String, AstTypeRef>,
+    module_impls: &[AstImplDef],
     module_const_names: &BTreeSet<String>,
     module_function_table: &BTreeMap<String, AstFunction>,
     owning_function_name: &str,
@@ -828,10 +1147,12 @@ fn rewrite_lambda_expr(
         } => AstExpr::If {
             condition: Box::new(rewrite_lambda_expr(
                 condition,
+                None,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -840,10 +1161,12 @@ fn rewrite_lambda_expr(
             )?),
             then_body: expand_lambda_block(
                 then_body,
+                expected_expr_type,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -852,10 +1175,12 @@ fn rewrite_lambda_expr(
             )?,
             else_body: expand_lambda_block(
                 else_body,
+                expected_expr_type,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -866,10 +1191,12 @@ fn rewrite_lambda_expr(
         AstExpr::Match { value, arms } => AstExpr::Match {
             value: Box::new(rewrite_lambda_expr(
                 value,
+                None,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -884,10 +1211,12 @@ fn rewrite_lambda_expr(
                         guard: match &arm.guard {
                             Some(guard) => Some(rewrite_lambda_expr(
                                 guard,
+                                None,
                                 inherited_generic_params,
                                 lambda_aliases,
                                 visible_locals,
                                 visible_local_types,
+                                module_impls,
                                 module_const_names,
                                 module_function_table,
                                 owning_function_name,
@@ -898,10 +1227,12 @@ fn rewrite_lambda_expr(
                         },
                         body: expand_lambda_block(
                             &arm.body,
+                            expected_expr_type,
                             inherited_generic_params,
                             lambda_aliases,
                             visible_locals,
                             visible_local_types,
+                            module_impls,
                             module_const_names,
                             module_function_table,
                             owning_function_name,
@@ -925,6 +1256,7 @@ fn rewrite_lambda_expr(
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -935,10 +1267,12 @@ fn rewrite_lambda_expr(
         }
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_lambda_expr(
             value,
+            None,
             inherited_generic_params,
             lambda_aliases,
             visible_locals,
             visible_local_types,
+            module_impls,
             module_const_names,
             module_function_table,
             owning_function_name,
@@ -951,10 +1285,12 @@ fn rewrite_lambda_expr(
                 .map(|arg| {
                     rewrite_lambda_expr(
                         arg,
+                        None,
                         inherited_generic_params,
                         lambda_aliases,
                         visible_locals,
                         visible_local_types,
+                        module_impls,
                         module_const_names,
                         module_function_table,
                         owning_function_name,
@@ -977,6 +1313,7 @@ fn rewrite_lambda_expr(
                         lambda_aliases,
                         visible_locals,
                         visible_local_types,
+                        module_impls,
                         module_const_names,
                         module_function_table,
                         owning_function_name,
@@ -1011,19 +1348,63 @@ fn rewrite_lambda_expr(
         } => {
             let rewritten_args = args
                 .iter()
-                .map(|arg| {
-                    rewrite_lambda_expr(
-                        arg,
-                        inherited_generic_params,
-                        lambda_aliases,
-                        visible_locals,
-                        visible_local_types,
-                        module_const_names,
-                        module_function_table,
-                        owning_function_name,
-                        counter,
-                        synthesized,
-                    )
+                .enumerate()
+                .map(|(index, arg)| {
+                    if let AstExpr::Lambda {
+                        params,
+                        return_type,
+                        body,
+                    } = arg
+                    {
+                        let inferred_return_type = inline_lambda_return_type_from_callable(
+                            params,
+                            return_type,
+                            expected_callable_type_for_call_arg(
+                                callee,
+                                index,
+                                generic_args,
+                                args,
+                                expected_expr_type,
+                                visible_local_types,
+                                module_function_table,
+                            )
+                            .as_ref(),
+                        )?;
+                        let binding = synthesize_lambda_function_with_known_return_type(
+                            params,
+                            inferred_return_type.ok_or_else(|| {
+                                "inline lambda currently requires an explicit return type"
+                                    .to_owned()
+                            })?,
+                            body,
+                            inherited_generic_params,
+                            lambda_aliases,
+                            visible_locals,
+                            visible_local_types,
+                            module_impls,
+                            module_const_names,
+                            module_function_table,
+                            owning_function_name,
+                            counter,
+                            synthesized,
+                        )?;
+                        Ok(build_lambda_binding_value(&binding))
+                    } else {
+                        rewrite_lambda_expr(
+                            arg,
+                            None,
+                            inherited_generic_params,
+                            lambda_aliases,
+                            visible_locals,
+                            visible_local_types,
+                            module_impls,
+                            module_const_names,
+                            module_function_table,
+                            owning_function_name,
+                            counter,
+                            synthesized,
+                        )
+                    }
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             if let Some(binding) = lambda_aliases.get(callee) {
@@ -1040,38 +1421,89 @@ fn rewrite_lambda_expr(
             receiver,
             method,
             args,
-        } => AstExpr::MethodCall {
-            receiver: Box::new(rewrite_lambda_expr(
+        } => {
+            let rewritten_receiver = Box::new(rewrite_lambda_expr(
                 receiver,
+                None,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
                 counter,
                 synthesized,
-            )?),
-            method: method.clone(),
-            args: args
+            )?);
+            let rewritten_args = args
                 .iter()
-                .map(|arg| {
-                    rewrite_lambda_expr(
-                        arg,
-                        inherited_generic_params,
-                        lambda_aliases,
-                        visible_locals,
-                        visible_local_types,
-                        module_const_names,
-                        module_function_table,
-                        owning_function_name,
-                        counter,
-                        synthesized,
-                    )
+                .enumerate()
+                .map(|(index, arg)| {
+                    if let AstExpr::Lambda {
+                        params,
+                        return_type,
+                        body,
+                    } = arg
+                    {
+                        let inferred_return_type = inline_lambda_return_type_from_callable(
+                            params,
+                            return_type,
+                            expected_callable_type_for_method_arg(
+                                receiver,
+                                method,
+                                index,
+                                args,
+                                expected_expr_type,
+                                visible_local_types,
+                                module_function_table,
+                                module_impls,
+                            )
+                            .as_ref(),
+                        )?;
+                        let binding = synthesize_lambda_function_with_known_return_type(
+                            params,
+                            inferred_return_type.ok_or_else(|| {
+                                "inline lambda currently requires an explicit return type"
+                                    .to_owned()
+                            })?,
+                            body,
+                            inherited_generic_params,
+                            lambda_aliases,
+                            visible_locals,
+                            visible_local_types,
+                            module_impls,
+                            module_const_names,
+                            module_function_table,
+                            owning_function_name,
+                            counter,
+                            synthesized,
+                        )?;
+                        Ok(build_lambda_binding_value(&binding))
+                    } else {
+                        rewrite_lambda_expr(
+                            arg,
+                            None,
+                            inherited_generic_params,
+                            lambda_aliases,
+                            visible_locals,
+                            visible_local_types,
+                            module_impls,
+                            module_const_names,
+                            module_function_table,
+                            owning_function_name,
+                            counter,
+                            synthesized,
+                        )
+                    }
                 })
-                .collect::<Result<Vec<_>, _>>()?,
-        },
+                .collect::<Result<Vec<_>, _>>()?;
+            AstExpr::MethodCall {
+                receiver: rewritten_receiver,
+                method: method.clone(),
+                args: rewritten_args,
+            }
+        }
         AstExpr::StructLiteral {
             type_name,
             type_args,
@@ -1086,10 +1518,12 @@ fn rewrite_lambda_expr(
                         name.clone(),
                         rewrite_lambda_expr(
                             value,
+                            None,
                             inherited_generic_params,
                             lambda_aliases,
                             visible_locals,
                             visible_local_types,
+                            module_impls,
                             module_const_names,
                             module_function_table,
                             owning_function_name,
@@ -1103,10 +1537,12 @@ fn rewrite_lambda_expr(
         AstExpr::FieldAccess { base, field } => AstExpr::FieldAccess {
             base: Box::new(rewrite_lambda_expr(
                 base,
+                None,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -1119,10 +1555,12 @@ fn rewrite_lambda_expr(
             op: *op,
             operand: Box::new(rewrite_lambda_expr(
                 operand,
+                None,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -1134,10 +1572,12 @@ fn rewrite_lambda_expr(
             op: *op,
             lhs: Box::new(rewrite_lambda_expr(
                 lhs,
+                None,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -1146,10 +1586,12 @@ fn rewrite_lambda_expr(
             )?),
             rhs: Box::new(rewrite_lambda_expr(
                 rhs,
+                None,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
+                module_impls,
                 module_const_names,
                 module_function_table,
                 owning_function_name,

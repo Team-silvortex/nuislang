@@ -1427,6 +1427,7 @@ mod tests {
             consts: vec![],
             type_aliases: vec![],
             structs: vec![],
+            enums: vec![],
             traits: vec![],
             impls: vec![],
             functions: vec![NirFunction {
@@ -1442,6 +1443,7 @@ mod tests {
                 test_clock_policy: None,
                 is_async: false,
                 generic_params: vec![],
+                where_bounds: vec![],
                 params: vec![],
                 return_type: None,
                 body,
@@ -1785,6 +1787,7 @@ mod tests {
             consts: vec![],
             type_aliases: vec![],
             structs: vec![],
+            enums: vec![],
             traits: vec![],
             impls: vec![],
             functions: vec![
@@ -1801,6 +1804,7 @@ mod tests {
                     test_clock_policy: None,
                     is_async: false,
                     generic_params: vec![],
+                    where_bounds: vec![],
                     params: vec![NirParam {
                         name: "value".to_owned(),
                         ty: i64_type(),
@@ -1825,6 +1829,7 @@ mod tests {
                     test_clock_policy: None,
                     is_async: false,
                     generic_params: vec![],
+                    where_bounds: vec![],
                     params: vec![],
                     return_type: Some(i64_type()),
                     body: vec![NirStmt::Return(Some(NirExpr::Call {
@@ -1853,6 +1858,7 @@ mod tests {
             consts: vec![],
             type_aliases: vec![],
             structs: vec![],
+            enums: vec![],
             traits: vec![],
             impls: vec![],
             functions: vec![
@@ -1869,6 +1875,7 @@ mod tests {
                     test_clock_policy: None,
                     is_async: false,
                     generic_params: vec![],
+                    where_bounds: vec![],
                     params: vec![NirParam {
                         name: "value".to_owned(),
                         ty: i64_type(),
@@ -1893,6 +1900,7 @@ mod tests {
                     test_clock_policy: None,
                     is_async: false,
                     generic_params: vec![],
+                    where_bounds: vec![],
                     params: vec![],
                     return_type: Some(i64_type()),
                     body: vec![NirStmt::Return(Some(NirExpr::Call {

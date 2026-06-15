@@ -90,10 +90,28 @@ pub(crate) fn infer_generic_substitutions(
                 template.name, generic.name
             ));
         };
-        if let Some(bound) = &generic.bound {
+        for bound in &generic.bounds {
             let concrete_ast = ast_type_from_nir(concrete);
             validate_generic_parameter_use_site_bound(
                 &generic.name,
+                &concrete_ast,
+                &bound.name,
+                visible_type_aliases,
+                impl_lookup,
+            )?;
+        }
+    }
+    for predicate in &template.where_bounds {
+        let Some(concrete) = lowered_substitutions.get(&predicate.param_name) else {
+            return Err(format!(
+                "generic function `{}` currently requires inferring concrete type for `{}` from direct parameter positions or explicit expected type",
+                template.name, predicate.param_name
+            ));
+        };
+        let concrete_ast = ast_type_from_nir(concrete);
+        for bound in &predicate.bounds {
+            validate_generic_parameter_use_site_bound(
+                &predicate.param_name,
                 &concrete_ast,
                 &bound.name,
                 visible_type_aliases,
@@ -211,11 +229,21 @@ pub(crate) fn unify_generic_type_pattern(
         }
         return Ok(());
     }
-    if pattern.name != concrete.name
-        || pattern.generic_args.len() != concrete.generic_args.len()
-        || pattern.is_optional != concrete.is_optional
-        || pattern.is_ref != concrete.is_ref
-    {
+    let same_shape = pattern.name == concrete.name
+        && pattern.generic_args.len() == concrete.generic_args.len()
+        && pattern.is_optional == concrete.is_optional
+        && pattern.is_ref == concrete.is_ref;
+    let enum_parent_shape = concrete
+        .name
+        .rsplit_once('.')
+        .is_some_and(|(parent, _)| {
+            pattern.name == parent
+                && pattern.is_optional == concrete.is_optional
+                && pattern.is_ref == concrete.is_ref
+                && (pattern.generic_args.len() == concrete.generic_args.len()
+                    || concrete.generic_args.is_empty())
+        });
+    if !same_shape && !enum_parent_shape {
         return Err(format!(
             "generic function `{}` could not match expected type pattern `{}` with concrete type `{}`",
             function_name,
@@ -253,6 +281,7 @@ pub(crate) fn specialize_function_template(
         test_clock_policy: None,
         is_async: template.is_async,
         generic_params: vec![],
+        where_bounds: vec![],
         params: template
             .params
             .iter()

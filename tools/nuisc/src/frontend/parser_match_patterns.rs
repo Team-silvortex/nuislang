@@ -82,7 +82,10 @@ impl Parser {
             Some(Token::Word(word)) if word == "true" => Ok(AstMatchPattern::Bool(true)),
             Some(Token::Word(word)) if word == "false" => Ok(AstMatchPattern::Bool(false)),
             Some(Token::Word(_word))
-                if self.peek_symbol('{') || self.peek_symbol('<') || self.peek_symbol('(') =>
+                if self.peek_symbol('{')
+                    || self.peek_symbol('<')
+                    || self.peek_symbol('(')
+                    || self.peek_symbol('.') =>
             {
                 self.cursor = self.cursor.saturating_sub(1);
                 let type_ref = self.parse_type_ref()?;
@@ -90,6 +93,11 @@ impl Parser {
                     self.parse_struct_match_pattern_with_fields(Some(type_ref))
                 } else if self.peek_symbol('(') {
                     self.parse_payload_struct_match_pattern(type_ref)
+                } else if type_ref.name.contains('.') {
+                    Ok(AstMatchPattern::StructFields {
+                        type_ref: Some(type_ref),
+                        fields: Vec::new(),
+                    })
                 } else {
                     Err("expected `{` or `(` after struct match pattern type".to_owned())
                 }
@@ -145,7 +153,10 @@ impl Parser {
                 self.parse_struct_match_pattern_with_fields(None)
             }
             Some(Token::Word(_word))
-                if self.peek_symbol('{') || self.peek_symbol('<') || self.peek_symbol('(') =>
+                if self.peek_symbol('{')
+                    || self.peek_symbol('<')
+                    || self.peek_symbol('(')
+                    || self.peek_symbol('.') =>
             {
                 self.cursor = self.cursor.saturating_sub(1);
                 let type_ref = self.parse_type_ref()?;
@@ -153,6 +164,11 @@ impl Parser {
                     self.parse_struct_match_pattern_with_fields(Some(type_ref))
                 } else if self.peek_symbol('(') {
                     self.parse_payload_struct_match_pattern(type_ref)
+                } else if type_ref.name.contains('.') {
+                    Ok(AstMatchPattern::StructFields {
+                        type_ref: Some(type_ref),
+                        fields: Vec::new(),
+                    })
                 } else {
                     Err("expected `{` or `(` after nested struct match pattern type".to_owned())
                 }
