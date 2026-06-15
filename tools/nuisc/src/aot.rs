@@ -23,6 +23,7 @@ pub struct CompileArtifacts {
 pub struct BuildManifestProjectInfo {
     pub name: String,
     pub abi_mode: String,
+    pub abi_graph_summary: Option<String>,
     pub abi_entries: Vec<(String, String)>,
     pub plan_summary: Option<String>,
     pub effective_input: Option<String>,
@@ -435,6 +436,12 @@ pub fn write_build_manifest(
             "abi_mode = \"{}\"\n",
             escape_toml_string(&project.abi_mode)
         ));
+        if let Some(value) = &project.abi_graph_summary {
+            out.push_str(&format!(
+                "abi_graph = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
         if let Some(value) = &project.plan_summary {
             out.push_str(&format!(
                 "plan_summary = \"{}\"\n",
@@ -4014,6 +4021,10 @@ mod tests {
                 project: Some(BuildManifestProjectInfo {
                     name: "demo".to_owned(),
                     abi_mode: "explicit".to_owned(),
+                    abi_graph_summary: Some(
+                        "graph\tmode=explicit\tdomains=cpu\tcpu_summary=present\tdata_summary=absent\tkernel_target=absent\tshader_target=absent\tnetwork_target=absent"
+                            .to_owned(),
+                    ),
                     abi_entries: vec![("cpu".to_owned(), cpu_target.abi.clone())],
                     plan_summary: None,
                     effective_input: None,
@@ -4031,6 +4042,9 @@ mod tests {
             },
         )
         .unwrap();
+        let manifest_text = std::fs::read_to_string(&manifest).unwrap();
+        assert!(manifest_text.contains("abi_graph = "));
+        assert!(manifest_text.contains("graph\tmode=explicit"));
         let report = verify_build_manifest(PathBuf::from(manifest).as_path()).unwrap();
         assert_eq!(report.cpu_target_abi, cpu_target.abi);
         assert_eq!(report.cpu_target_machine_arch, cpu_target.machine_arch);

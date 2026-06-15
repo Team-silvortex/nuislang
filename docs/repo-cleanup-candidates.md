@@ -171,7 +171,8 @@ Reason:
 * they still anchor the current documented `nuis.toml` project workflow
 * they give the repo one stable place to inspect emitted
   `nuis.build.manifest.toml`, `nuis.project.host_ffi.txt`,
-  `nuis.project.abi.txt`, and related build artifacts
+  `nuis.project.abi.txt`, the manifest-level `abi_graph` summary, and related
+  build artifacts
 * current top-level docs and project docs still intentionally use them as
   concrete build targets rather than purely ephemeral `/private/tmp` outputs
 

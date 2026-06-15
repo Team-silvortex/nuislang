@@ -4,6 +4,11 @@ mod cpu Main {
   type IntMutex = Mutex<i64>;
   type IntMutexGuard = MutexGuard<i64>;
 
+  struct MutexSnapshot<T> {
+    value: T,
+    lock: Mutex<T>
+  }
+
   struct ThreadMutexSummary {
     first_read: i64,
     second_read: i64,
@@ -14,16 +19,32 @@ mod cpu Main {
     return seed + 9;
   }
 
+  fn mutex_snapshot<T>(lock: Mutex<T>) -> MutexSnapshot<T> {
+    let guard: MutexGuard<T> = mutex_lock(lock);
+    let value: T = mutex_value(guard);
+    let reopened: Mutex<T> = mutex_unlock(guard);
+    return MutexSnapshot {
+      value: value,
+      lock: reopened
+    };
+  }
+
+  fn join_thread_result<T>(worker: Thread<T>) -> TaskResult<T> {
+    return thread_join_result(worker);
+  }
+
+  fn join_thread_value<T>(worker: Thread<T>) -> T {
+    return thread_join(worker);
+  }
+
   fn capture_thread_mutex(seed: i64) -> ThreadMutexSummary {
-    let lock: IntMutex = mutex_new(seed + 3);
-    let guard: IntMutexGuard = mutex_lock(lock);
-    let first_read: i64 = mutex_value(guard);
-    let reopened: IntMutex = mutex_unlock(guard);
-    let reopened_guard: IntMutexGuard = mutex_lock(reopened);
-    let second_read: i64 = mutex_value(reopened_guard);
+    let first_snapshot: MutexSnapshot<i64> = mutex_snapshot(mutex_new(seed + 3));
+    let first_read: i64 = first_snapshot.value;
+    let second_snapshot: MutexSnapshot<i64> = mutex_snapshot(first_snapshot.lock);
+    let second_read: i64 = second_snapshot.value;
 
     let worker: IntThread = thread_spawn(ping(second_read));
-    let joined: IntTaskResult = thread_join_result(worker);
+    let joined: IntTaskResult = join_thread_result(worker);
 
     if task_completed(joined) {
       return ThreadMutexSummary {
@@ -40,8 +61,26 @@ mod cpu Main {
     };
   }
 
+  fn capture_thread_mutex_direct_join(seed: i64) -> ThreadMutexSummary {
+    let first_snapshot: MutexSnapshot<i64> = mutex_snapshot(mutex_new(seed + 3));
+    let first_read: i64 = first_snapshot.value;
+    let second_snapshot: MutexSnapshot<i64> = mutex_snapshot(first_snapshot.lock);
+    let second_read: i64 = second_snapshot.value;
+
+    let worker: IntThread = thread_spawn(ping(second_read));
+    let thread_value: i64 = join_thread_value(worker);
+
+    return ThreadMutexSummary {
+      first_read: first_read,
+      second_read: second_read,
+      thread_value: thread_value
+    };
+  }
+
   fn main() -> i64 {
-    let summary: ThreadMutexSummary = capture_thread_mutex(5);
-    return summary.first_read + summary.second_read + summary.thread_value;
+    let observed: ThreadMutexSummary = capture_thread_mutex(5);
+    let direct: ThreadMutexSummary = capture_thread_mutex_direct_join(5);
+    return observed.first_read + observed.second_read + observed.thread_value +
+      direct.thread_value;
   }
 }

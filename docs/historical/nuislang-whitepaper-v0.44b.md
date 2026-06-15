@@ -602,7 +602,7 @@ nuisc 具有最终否决权：
 * 当前 `nuisc` 已具备最小注册发现入口：`cargo run -p nuisc -- registry`
 * 当前 `nuisc` 也已具备最小前端链：`hello_world.ns` 可走 `nuis -> NIR -> YIR -> LLVM -> arm64 binary`
 * 当前 `nuisc` 前端也已拆成真正的 `AST -> NIR -> YIR` 三层，且最小 `.ns` 已支持 `let`、变量引用、括号和 `+ - * /` 表达式；前门可用 `dump-ast / dump-nir / dump-yir`
-* CPU-hosted UI event demo: `examples/yir/demos/host_ui_sphere.yir`
+* CPU-hosted UI event demo previously lived at `examples/yir/demos/host_ui_sphere.yir`
 * CPU linked-list demo: `examples/yir/cpu/cpu_linked_list.yir`
 * Rust-ish CPU ownership demo: `examples/yir/cpu/cpu_linked_list_rustish.yir`
 * Rust-ish CPU buffer demo: `examples/yir/cpu/cpu_buffer_rustish.yir`
@@ -610,7 +610,7 @@ nuisc 具有最终否决权：
 * Invalid borrowed-buffer-write demo: `examples/invalid/yir/cpu_buffer_borrow_write_invalid.yir`
 * Invalid use-after-free demo: `examples/invalid/yir/cpu_use_after_free_invalid.yir`
 * CPU/kernel tensor demo: `examples/yir/kernel/kernel_tensor_demo.yir`
-* Legacy CPU/NPU tensor demo: `examples/legacy/npu_tensor_demo.yir`
+* Legacy CPU/NPU tensor demo previously lived at `examples/legacy/npu_tensor_demo.yir`
 * 一次性窗口入口：`bash tools/yir-preview-macos/run-ball-once.sh`
 * 现有 Rust crate 主要用于固定术语、边界与后续实现入口
 * 后续整改优先级应为：`YIR expand -> semantics model -> verifier hardening -> AOT executable path`

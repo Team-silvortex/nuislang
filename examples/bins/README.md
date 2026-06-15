@@ -20,6 +20,6 @@ Notes:
 * Asset files inside a bundle should use the bundle name where possible; older anonymous leftovers such as `main.ppm` are treated as stale and can be cleaned.
 * All `nuis build` outputs now emit `nuis.build.manifest.toml` with toolchain/profile info, loaded nustar list, effective project ABI mode, per-artifact FNV-1a hashes, and CPU target details such as ABI, machine, object format, calling ABI, clang triple, and cross-build flag.
 * Project builds now also emit `nuis.project.host_ffi.txt` that records the host FFI contract surface used by the project entry.
-* Project builds now also emit `nuis.project.abi.txt` that records required ABI profile locks per domain or auto-resolved project ABI state.
-* Current `project-status` and `build` output also surface per-domain ABI target metadata such as backend family and whether a selected ABI is host-adaptive.
+* Project builds now also emit `nuis.project.abi.txt` for the resolved ABI entries and record the compact `abi_graph` summary in both `nuis.project.plan.txt` and `nuis.build.manifest.toml`.
+* Current `project-status` and `build` output also surface the same ABI graph/target view, including per-domain backend family and whether a selected ABI is host-adaptive.
 * Per-project `.nuis/` compile caches are generated locally and should not be checked into the repository.

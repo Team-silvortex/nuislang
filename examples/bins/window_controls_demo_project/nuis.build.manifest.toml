@@ -55,6 +55,7 @@ fnv1a64 = "0x98af60bf624ba160"
 [project]
 name = "window_controls_demo"
 abi_mode = "explicit"
+abi_graph = "graph\tmode=explicit\tdomains=cpu,data,shader\tcpu_summary=present\tdata_summary=present\tkernel_target=absent\tshader_target=present\tnetwork_target=absent"
 abi = ["cpu=cpu.arm64.apple_aapcs64", "data=data.fabric.macos.arm64.v1", "shader=shader.metal.msl2_4"]
 manifest_copy = "examples/bins/window_controls_demo_project/nuis.project.toml"
 modules_index = "examples/bins/window_controls_demo_project/nuis.project.modules.txt"

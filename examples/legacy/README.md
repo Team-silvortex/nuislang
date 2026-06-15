@@ -1,16 +1,10 @@
 # Legacy Examples
 
-These examples are kept for continuity while terminology and architecture names
-have evolved.
+The older checked-in legacy examples have now been retired from the repository
+tree to reduce noise.
 
-Current legacy files:
-
-* [nsnova_ball_frame.yir](/Users/Shared/chroot/dev/nuislang/examples/legacy/nsnova_ball_frame.yir)
-* [npu_tensor_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/legacy/npu_tensor_demo.yir)
-* [tooling](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling)
-
-They are still useful historical bridges, but they should be read as archived
-waypoints rather than current recommended starting points.
+This directory remains only as a small tombstone router for historical notes
+and replacement paths.
 
 ## Prefer These Current Routes Instead
 
@@ -32,6 +26,5 @@ For general current routes, prefer:
 * [examples/projects](/Users/Shared/chroot/dev/nuislang/examples/projects)
 * [examples/yir](/Users/Shared/chroot/dev/nuislang/examples/yir)
 
-For archived tooling probes, see:
-
-* [examples/legacy/tooling](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling)
+The old low-level tooling probes were also removed; use current tooling routes
+under [examples/projects/tooling/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/README.md) instead.

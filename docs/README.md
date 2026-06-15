@@ -22,23 +22,24 @@ There is also a practical split inside the current tree:
 If you want to understand the repository as it exists today, start here:
 
 * [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* [versioning/nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
-* [versioning/nuis-0.16.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-snapshot.md)
-* [versioning/nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
-* [versioning/nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md)
-* [versioning/nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
+* [versioning/nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
+* [versioning/nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
+* [versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+* [versioning/nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
+* [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
 * [reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
 * [repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
 
 If your immediate question is “what is the canonical compile route today?”,
-start with the `0.16.0` workflow file before drilling into deeper reference
+start with the `0.19.0` workflow file before drilling into deeper reference
 material.
 
 If your immediate question is “what is the current minor-line history anchor?”,
-start with the `0.16.0` snapshot.
+start with the `0.19.0` snapshot.
 
-If your immediate question is “what still blocks calling this a mature binary
-compile story?”, read the `0.16.0` binary-compile maturity file next.
+If your immediate question is “which ABI words are now preferred before
+`0.20.*` broadens the surface further?”, read the
+`0.20.0` ABI compile vocabulary file next.
 
 Then branch by the kind of truth you want:
 

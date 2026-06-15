@@ -88,13 +88,14 @@ pub fn apply_project_support_modules_to_yir(
     project: &LoadedProject,
     module: &mut YirModule,
 ) -> Result<(), String> {
+    let abi_resolution = resolve_project_abi(project)?;
     for project_module in &project.modules {
         if project_module.path == project.entry_path {
             continue;
         }
-        apply_support_module_profile(&project_module.ast, module)?;
+        apply_support_module_profile(&project_module.ast, module, Some(&abi_resolution))?;
     }
-    materialize_project_type_contract_nodes(project, module)?;
+    materialize_project_type_contract_nodes(project, &abi_resolution, module)?;
     resolve_project_profile_refs(module)?;
     stitch_shader_profile_edges(module);
     stitch_data_profile_edges(module);

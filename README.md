@@ -23,23 +23,26 @@ The key thing that is already real today is not “all language features are don
 
 That model is increasingly enforced through `YIR` contracts, project validation, per-domain `nustar` manifests, and verifier checks rather than only ad hoc frontend rules.
 
-Current phase snapshots and current minor-line anchor:
+Current versioning entrypoints:
 
-* [docs/versioning/nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
-* [docs/versioning/nuis-0.16.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-snapshot.md)
-* [docs/versioning/nuis-0.17.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-snapshot.md)
-* [docs/versioning/nuis-0.18.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-snapshot.md)
-* current:
+* current snapshot:
   [docs/versioning/nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
 * current workflow:
   [docs/versioning/nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
+* current ABI compile vocabulary bridge into `0.20.*`:
+  [docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 * current regression gate:
   [docs/versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
 * current address/pointer anchor:
   [docs/versioning/nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
+* previous minor-line snapshot:
+  [docs/versioning/nuis-0.18.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-snapshot.md)
+* historical index:
+  [docs/versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md)
 
 If you want the current minor-line history anchor first, start with
-[`0.19.0` snapshot](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md).
+[`0.19.0` snapshot](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md), then use
+[docs/versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md) only when you intentionally need older lines.
 
 Current source-style note:
 
@@ -98,7 +101,7 @@ cargo run -p nuis -- project-status examples/projects/window_controls_demo
 cargo run -p nuis -- project-lock-abi examples/projects/window_controls_demo
 ```
 
-The `0.16.0` rule of thumb should be:
+The current rule of thumb should be:
 
 * `project-doctor` before deep work on a project
 * `check` for compile/validation truth

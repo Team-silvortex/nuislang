@@ -48,8 +48,7 @@ If you want the fastest route into the current repository spine:
   [kernel_tensor_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_tensor_demo.yir)
 * invalid/verifier examples:
   [examples/invalid](/Users/Shared/chroot/dev/nuislang/examples/invalid)
-* historical bridge material:
-  [examples/legacy](/Users/Shared/chroot/dev/nuislang/examples/legacy)
+* retired historical material summaries
 
 ## Freshness Rule
 
@@ -63,7 +62,8 @@ Examples in this repository are now best read in four roles:
   validation, experiment, or future-facing routes that should not be mistaken
   for first-stop reading
 * legacy:
-  kept for continuity, naming history, or semantic bridge value
+  historical material that is better summarized by docs than kept as active
+  checked-in example source
 
 That means:
 
@@ -81,5 +81,4 @@ Drill into the area you are actually touching:
 * [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
 * [examples/yir/README.md](/Users/Shared/chroot/dev/nuislang/examples/yir/README.md)
 * [examples/invalid/README.md](/Users/Shared/chroot/dev/nuislang/examples/invalid/README.md)
-* [examples/legacy/README.md](/Users/Shared/chroot/dev/nuislang/examples/legacy/README.md)
 * [examples/bins/README.md](/Users/Shared/chroot/dev/nuislang/examples/bins/README.md)

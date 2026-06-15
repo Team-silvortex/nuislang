@@ -14,6 +14,21 @@ impl RegisteredMod for NetworkMod {
         require_network_resource(node, resource)?;
 
         match node.op.instruction.as_str() {
+            "target_config" => {
+                if node.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` expects `network.target_config <name> <resource> <arch> <runtime> <lane_width>`",
+                        node.name
+                    ));
+                }
+                node.op.args[2].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid lane width `{}`",
+                        node.name, node.op.args[2]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
             "observe" => {
                 if node.op.args.len() != 2 {
                     return Err(format!(
@@ -82,6 +97,16 @@ impl RegisteredMod for NetworkMod {
         require_network_resource(node, resource)?;
 
         match node.op.instruction.as_str() {
+            "target_config" => Ok(Value::Tuple(vec![
+                Value::Symbol(node.op.args[0].clone()),
+                Value::Symbol(node.op.args[1].clone()),
+                Value::Int(node.op.args[2].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid lane width `{}`",
+                        node.name, node.op.args[2]
+                    )
+                })?),
+            ])),
             "observe" => {
                 let value = state.expect_value(&node.op.args[0])?.clone();
                 let flow = parse_network_flow_state(&node.op.args[1])?;
@@ -166,9 +191,9 @@ impl RegisteredMod for NetworkMod {
 }
 
 fn require_network_resource(node: &Node, resource: &Resource) -> Result<(), String> {
-    if resource.kind.raw.as_str() != "network.io" {
+    if !resource.kind.is_family("network") {
         return Err(format!(
-            "node `{}` expects network.io resource, got `{}`",
+            "node `{}` expects network-family resource, got `{}`",
             node.name, resource.kind.raw
         ));
     }

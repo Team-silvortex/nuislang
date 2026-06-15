@@ -1,13 +1,15 @@
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, AstModule, AstStmt};
+use crate::registry::RegisteredAbiTarget;
 use yir_core::{Node, Operation, Resource, ResourceKind, YirModule};
 
-use super::sanitize_ident;
+use super::{sanitize_ident, ProjectAbiResolution};
 
 pub(super) fn apply_support_module_profile(
     ast: &AstModule,
     module: &mut YirModule,
+    abi_resolution: Option<&ProjectAbiResolution>,
 ) -> Result<(), String> {
     let Some(profile) = ast
         .functions
@@ -20,18 +22,34 @@ pub(super) fn apply_support_module_profile(
 
     match ast.domain.as_str() {
         "shader" => {
-            ensure_project_resource(module, "shader0", "shader.render");
+            ensure_project_resource(
+                module,
+                "shader0",
+                &project_resource_kind("shader", abi_resolution)?,
+            );
+            materialize_default_shader_target_config(ast, module, abi_resolution)?;
             for stmt in &profile.body {
                 apply_shader_profile_stmt(ast, stmt, module, &int_bindings)?;
             }
         }
         "kernel" => {
-            ensure_project_resource(module, "kernel0", "kernel.apple");
+            ensure_project_resource(
+                module,
+                "kernel0",
+                &project_resource_kind("kernel", abi_resolution)?,
+            );
             for stmt in &profile.body {
                 apply_kernel_profile_stmt(ast, stmt, module, &int_bindings)?;
             }
+            materialize_default_kernel_target_config(ast, &profile.body, module, abi_resolution)?;
         }
         "network" => {
+            ensure_project_resource(
+                module,
+                "network0",
+                &project_resource_kind("network", abi_resolution)?,
+            );
+            materialize_default_network_target_config(ast, module, abi_resolution)?;
             for stmt in &profile.body {
                 apply_network_profile_stmt(ast, stmt, module)?;
             }
@@ -46,6 +64,200 @@ pub(super) fn apply_support_module_profile(
     }
 
     Ok(())
+}
+
+fn project_resource_kind(
+    domain: &str,
+    abi_resolution: Option<&ProjectAbiResolution>,
+) -> Result<String, String> {
+    let Some(target) = resolve_registered_abi_target(domain, abi_resolution)? else {
+        return Ok(match domain {
+            "shader" => "shader.render".to_owned(),
+            "kernel" => "kernel.compute".to_owned(),
+            "network" => "network.io".to_owned(),
+            "data" => "data.fabric".to_owned(),
+            other => other.to_owned(),
+        });
+    };
+    Ok(match domain {
+        "shader" => {
+            let backend = target
+                .backend_family
+                .as_deref()
+                .unwrap_or("render")
+                .replace('-', "_");
+            format!("shader.{backend}")
+        }
+        "kernel" => {
+            let backend = target.backend_family.as_deref().unwrap_or("compute");
+            if backend == "coreml" {
+                "kernel.apple".to_owned()
+            } else {
+                format!("kernel.{}", backend.replace('-', "_"))
+            }
+        }
+        "network" => match target.machine_os.as_str() {
+            "darwin" => "network.urlsession".to_owned(),
+            "windows" => "network.winsock".to_owned(),
+            _ => "network.socket".to_owned(),
+        },
+        "data" => "data.fabric".to_owned(),
+        other => other.to_owned(),
+    })
+}
+
+pub(super) fn resolve_registered_abi_target(
+    domain: &str,
+    abi_resolution: Option<&ProjectAbiResolution>,
+) -> Result<Option<RegisteredAbiTarget>, String> {
+    let Some(abi_resolution) = abi_resolution else {
+        return Ok(None);
+    };
+    let Some(abi) = abi_resolution
+        .requirements
+        .iter()
+        .find(|item| item.domain == domain)
+        .map(|item| item.abi.as_str())
+    else {
+        return Ok(None);
+    };
+    let manifest = crate::registry::load_manifest_for_domain(
+        std::path::Path::new("nustar-packages"),
+        domain,
+    )?;
+    crate::registry::registered_abi_target(&manifest, abi).map(Some)
+}
+
+pub(super) fn target_config_tokens_for_domain(
+    domain: &str,
+    target: &RegisteredAbiTarget,
+) -> (String, String, String) {
+    match domain {
+        "kernel" => {
+            let (arch, runtime) = kernel_target_tokens(target);
+            (arch, runtime, "1".to_owned())
+        }
+        "shader" => {
+            let runtime = target
+                .backend_family
+                .clone()
+                .unwrap_or_else(|| "render".to_owned());
+            (target.machine_arch.clone(), runtime, "1".to_owned())
+        }
+        "network" => {
+            let runtime = match target.machine_os.as_str() {
+                "darwin" => "urlsession",
+                "windows" => "winsock",
+                _ => "socket",
+            }
+            .to_owned();
+            (target.machine_arch.clone(), runtime, "1".to_owned())
+        }
+        _ => (
+            target.machine_arch.clone(),
+            target.calling_abi.clone(),
+            "1".to_owned(),
+        ),
+    }
+}
+
+fn materialize_default_kernel_target_config(
+    ast: &AstModule,
+    body: &[AstStmt],
+    module: &mut YirModule,
+    abi_resolution: Option<&ProjectAbiResolution>,
+) -> Result<(), String> {
+    let has_explicit = body.iter().any(|stmt| {
+        extract_profile_call(stmt)
+            .map(|(_, callee, _)| callee == "kernel_target_config")
+            .unwrap_or(false)
+    });
+    if has_explicit {
+        return Ok(());
+    }
+    let Some(target) = resolve_registered_abi_target("kernel", abi_resolution)? else {
+        return Ok(());
+    };
+    let (arch, runtime, lane_width) = target_config_tokens_for_domain("kernel", &target);
+    let name = format!(
+        "project_profile_{}_{}_kernel_target_config_auto",
+        sanitize_ident(&ast.domain),
+        sanitize_ident(&ast.unit)
+    );
+    push_profile_node(
+        module,
+        name,
+        "kernel0",
+        Operation {
+            module: "kernel".to_owned(),
+            instruction: "target_config".to_owned(),
+            args: vec![arch, runtime, lane_width],
+        },
+    );
+    Ok(())
+}
+
+fn materialize_default_shader_target_config(
+    ast: &AstModule,
+    module: &mut YirModule,
+    abi_resolution: Option<&ProjectAbiResolution>,
+) -> Result<(), String> {
+    let Some(target) = resolve_registered_abi_target("shader", abi_resolution)? else {
+        return Ok(());
+    };
+    let (arch, runtime, lane_width) = target_config_tokens_for_domain("shader", &target);
+    let name = format!(
+        "project_profile_{}_{}_shader_target_config_auto",
+        sanitize_ident(&ast.domain),
+        sanitize_ident(&ast.unit)
+    );
+    push_profile_node(
+        module,
+        name,
+        "shader0",
+        Operation {
+            module: "shader".to_owned(),
+            instruction: "target_config".to_owned(),
+            args: vec![arch, runtime, lane_width],
+        },
+    );
+    Ok(())
+}
+
+fn materialize_default_network_target_config(
+    ast: &AstModule,
+    module: &mut YirModule,
+    abi_resolution: Option<&ProjectAbiResolution>,
+) -> Result<(), String> {
+    let Some(target) = resolve_registered_abi_target("network", abi_resolution)? else {
+        return Ok(());
+    };
+    let (arch, runtime, lane_width) = target_config_tokens_for_domain("network", &target);
+    let name = format!(
+        "project_profile_{}_{}_network_target_config_auto",
+        sanitize_ident(&ast.domain),
+        sanitize_ident(&ast.unit)
+    );
+    push_profile_node(
+        module,
+        name,
+        "network0",
+        Operation {
+            module: "network".to_owned(),
+            instruction: "target_config".to_owned(),
+            args: vec![arch, runtime, lane_width],
+        },
+    );
+    Ok(())
+}
+
+fn kernel_target_tokens(target: &RegisteredAbiTarget) -> (String, String) {
+    match target.backend_family.as_deref() {
+        Some("coreml") => ("apple_ane".to_owned(), "coreml".to_owned()),
+        Some("cpu-fallback") => (target.machine_arch.clone(), "cpu-fallback".to_owned()),
+        Some(other) => (target.machine_arch.clone(), other.to_owned()),
+        None => (target.machine_arch.clone(), target.calling_abi.clone()),
+    }
 }
 
 fn apply_shader_profile_stmt(

@@ -75,6 +75,8 @@ use body_lowering::{
 use bootstrap::dispatch_nustar_lowering;
 #[cfg(test)]
 use bootstrap::lower_nir_to_yir_builtin_cpu;
+#[cfg(test)]
+use bootstrap::lower_nir_to_yir_builtin_cpu_with_target;
 use bridge_helpers::{lower_data_profile_send, lower_project_profile_ref};
 use call_exprs::lower_call_family_expr;
 use core_exprs::lower_core_expr;
@@ -125,11 +127,50 @@ use shader_packets::lower_shader_packet_expr;
 use state::{next_name, LoweringState, ResultLoweringDomain};
 use tail_recursion::rewrite_self_tail_recursive_functions;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LoweringTargetConfig {
+    pub abi: String,
+    pub machine_arch: String,
+    pub machine_os: String,
+    pub object_format: String,
+    pub calling_abi: String,
+    pub clang_target: String,
+}
+
+impl LoweringTargetConfig {
+    pub fn from_cpu_build_target(target: &crate::aot::CpuBuildTarget) -> Self {
+        Self {
+            abi: target.abi.clone(),
+            machine_arch: target.machine_arch.clone(),
+            machine_os: target.machine_os.clone(),
+            object_format: target.object_format.clone(),
+            calling_abi: target.calling_abi.clone(),
+            clang_target: target.clang_target.clone(),
+        }
+    }
+
+    pub fn cpu_vector_bits(&self) -> i64 {
+        match self.machine_arch.as_str() {
+            "arm64" | "aarch64" | "x86_64" => 128,
+            _ => 0,
+        }
+    }
+
+    pub fn supports_host_ffi_abi(&self, abi: &str) -> bool {
+        match abi {
+            "c" => true,
+            "nurs" => self.abi.contains(".nurs."),
+            _ => false,
+        }
+    }
+}
+
 pub fn lower_nir_to_yir(
     module: &NirModule,
     nustar_manifest: &NustarPackageManifest,
+    target_config: Option<&LoweringTargetConfig>,
 ) -> Result<YirModule, String> {
-    dispatch_nustar_lowering(module, nustar_manifest)
+    dispatch_nustar_lowering(module, nustar_manifest, target_config)
 }
 
 fn lower_expr(
@@ -385,3 +426,6 @@ mod tests_recursion;
 #[cfg(test)]
 #[path = "lowering/tests_recursive_composed_calls.rs"]
 mod tests_recursive_composed_calls;
+#[cfg(test)]
+#[path = "lowering/tests_target_config.rs"]
+mod tests_target_config;

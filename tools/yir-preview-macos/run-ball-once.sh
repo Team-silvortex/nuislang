@@ -2,4 +2,4 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-bash "${SCRIPT_DIR}/run-preview.sh" examples/yir/host_ui_sphere.yir /tmp/host_ui_sphere.ppm 4
+bash "${SCRIPT_DIR}/run-preview.sh" examples/yir/demos/window_controls_demo.yir /tmp/window_controls_demo_once.ppm 4

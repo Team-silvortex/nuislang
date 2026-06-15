@@ -56,7 +56,10 @@ use profile_apply::{
 };
 use profile_refs::push_project_dependency_edge_if_missing;
 use profile_targets::resolve_project_profile_target_name;
-pub use rendering::{organize_project, organize_project_exchanges};
+pub use rendering::{
+    describe_project_abi_graph, organize_project, organize_project_exchanges,
+    render_project_abi_graph_line,
+};
 use rendering::{
     render_project_abi_index, render_project_exchange_index, render_project_host_ffi_index,
     render_project_organization_index,

@@ -20,6 +20,222 @@ fn project_link_stage_contract_accepts_cpu_to_shader_over_data() {
 }
 
 #[test]
+fn materializes_shader_and_network_resources_from_project_abi_targets() {
+    let mut project = project_with_modules(vec![
+        (
+            "surface_shader.ns",
+            r#"
+            mod shader SurfaceShader {
+              fn profile() {
+                let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+              }
+            }
+            "#,
+        ),
+        (
+            "network_unit.ns",
+            r#"
+            mod network NetworkUnit {
+              fn profile() {}
+            }
+            "#,
+        ),
+    ]);
+    project.manifest.abi_requirements = vec![
+        ProjectAbiRequirement {
+            domain: "shader".to_owned(),
+            abi: "shader.metal.msl2_4".to_owned(),
+        },
+        ProjectAbiRequirement {
+            domain: "network".to_owned(),
+            abi: "network.socket.macos.arm64.v1".to_owned(),
+        },
+    ];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    assert!(yir
+        .resources
+        .iter()
+        .any(|resource| resource.name == "shader0" && resource.kind.raw == "shader.metal"));
+    assert!(yir
+        .resources
+        .iter()
+        .any(|resource| resource.name == "network0" && resource.kind.raw == "network.urlsession"));
+    assert!(yir.nodes.iter().any(|node| {
+        node.name == "project_profile_shader_SurfaceShader_shader_target_config_auto"
+            && node.op.module == "shader"
+            && node.op.instruction == "target_config"
+            && node.op.args == vec!["arm64".to_owned(), "metal".to_owned(), "1".to_owned()]
+    }));
+    assert!(yir.nodes.iter().any(|node| {
+        node.name == "project_profile_network_NetworkUnit_network_target_config_auto"
+            && node.op.module == "network"
+            && node.op.instruction == "target_config"
+            && node.op.args
+                == vec!["arm64".to_owned(), "urlsession".to_owned(), "1".to_owned()]
+    }));
+    assert!(yir.nodes.iter().any(|node| {
+        node.name == "project_profile_shader_SurfaceShader_abi_selection_contract_type"
+            && node.op.module == "cpu"
+            && node.op.instruction == "text"
+            && node.op.args
+                == vec!["mode=symbol:explicit;abi=symbol:shader.metal.msl2_4;arch=symbol:arm64;runtime=symbol:metal;lane_width=i64:1".to_owned()]
+    }));
+    assert!(yir.nodes.iter().any(|node| {
+        node.name == "project_profile_network_NetworkUnit_abi_selection_contract_type"
+            && node.op.module == "cpu"
+            && node.op.instruction == "text"
+            && node.op.args
+                == vec!["mode=symbol:explicit;abi=symbol:network.socket.macos.arm64.v1;arch=symbol:arm64;runtime=symbol:urlsession;lane_width=i64:1".to_owned()]
+    }));
+}
+
+#[test]
+fn materializes_auto_abi_selection_contract_for_recommended_shader_target() {
+    let project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+          }
+        }
+        "#,
+    )]);
+
+    let resolution = resolve_project_abi(&project).unwrap();
+    let shader_abi = resolution
+        .requirements
+        .iter()
+        .find(|item| item.domain == "shader")
+        .unwrap()
+        .abi
+        .clone();
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    let contract = yir
+        .nodes
+        .iter()
+        .find(|node| node.name == "project_profile_shader_SurfaceShader_abi_selection_contract_type")
+        .unwrap();
+    let value = contract.op.args.first().unwrap();
+    assert!(value.starts_with("mode=symbol:auto;"));
+    assert!(value.contains(&format!("abi=symbol:{shader_abi};")));
+}
+
+#[test]
+fn materializes_project_abi_summary_entries_for_cpu_and_data() {
+    let mut project = project_with_modules(vec![
+        (
+            "main.ns",
+            r#"
+            use data FabricPlane;
+
+            mod cpu Main {
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        ),
+        (
+            "fabric_plane.ns",
+            r#"
+            mod data FabricPlane {
+              fn profile() {
+                let profile_handles: HandleTable<FabricBindings> =
+                  data_handle_table("host=cpu0");
+              }
+            }
+            "#,
+        ),
+    ]);
+    project.manifest.abi_requirements = vec![
+        ProjectAbiRequirement {
+            domain: "cpu".to_owned(),
+            abi: "cpu.arm64.apple_aapcs64".to_owned(),
+        },
+        ProjectAbiRequirement {
+            domain: "data".to_owned(),
+            abi: "data.fabric.host-match.v1".to_owned(),
+        },
+    ];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.name == "project_abi_cpu_selection_entry"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.name == "project_abi_cpu_selection_summary_type"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.name == "project_abi_data_selection_entry"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.name == "project_abi_data_selection_summary_type"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.name == "project_abi_graph_summary_type"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.name == "project_abi_graph_summary_entry"));
+}
+
+#[test]
+fn renders_project_abi_index_with_graph_summary_and_domain_details() {
+    let mut project = project_with_modules(vec![
+        (
+            "main.ns",
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        ),
+        (
+            "network_unit.ns",
+            r#"
+            mod network NetworkUnit {
+              fn profile() {}
+            }
+            "#,
+        ),
+    ]);
+    project.manifest.abi_requirements = vec![
+        ProjectAbiRequirement {
+            domain: "cpu".to_owned(),
+            abi: "cpu.arm64.apple_aapcs64".to_owned(),
+        },
+        ProjectAbiRequirement {
+            domain: "network".to_owned(),
+            abi: "network.socket.macos.arm64.v1".to_owned(),
+        },
+    ];
+
+    let rendered = render_project_abi_index(&project).unwrap();
+    assert!(rendered.contains("# mode=explicit"));
+    assert!(rendered.contains("graph\tmode=explicit\tdomains=cpu,network"));
+    assert!(rendered.contains("cpu_summary=present"));
+    assert!(rendered.contains("network_target=present"));
+    assert!(rendered.contains("domain\tcpu\tabi=cpu.arm64.apple_aapcs64"));
+    assert!(rendered.contains("domain\tnetwork\tabi=network.socket.macos.arm64.v1"));
+}
+
+#[test]
 fn project_link_stage_contract_rejects_shader_to_kernel_for_now() {
     let error = required_project_link_stage_contract(
         "shader.SurfaceShader",

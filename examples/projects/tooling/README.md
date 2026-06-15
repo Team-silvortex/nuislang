@@ -4,9 +4,8 @@ This folder contains narrow project-form host/runtime companions.
 
 Most entries here are small surface probes, not showcase programs.
 
-Older low-level shell, line-input, and report probes now live under:
-
-* [examples/legacy/tooling](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling)
+Older low-level shell, line-input, automation, and report probes have been
+retired from the checked-in examples tree.
 
 ## Start Here
 

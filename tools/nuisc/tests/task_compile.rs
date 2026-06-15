@@ -2652,6 +2652,30 @@ fn lowers_task_thread_mutex_project_with_thread_and_lock_shape() {
         .iter()
         .find(|function| function.name == "capture_thread_mutex")
         .expect("expected capture_thread_mutex function");
+    let mutex_snapshot = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "mutex_snapshot__i64")
+        .expect("expected specialized mutex_snapshot helper");
+    let join_thread_result = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "join_thread_result__i64")
+        .expect("expected specialized join_thread_result helper");
+    let join_thread_value = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "join_thread_value__i64")
+        .expect("expected specialized join_thread_value helper");
+    let capture_direct_join = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_thread_mutex_direct_join")
+        .expect("expected capture_thread_mutex_direct_join function");
 
     assert!(capture.body.iter().any(|stmt| {
         matches!(
@@ -2659,11 +2683,25 @@ fn lowers_task_thread_mutex_project_with_thread_and_lock_shape() {
             NirStmt::Let {
                 name,
                 ty: Some(ty),
-                value: NirExpr::CpuMutexNew(_),
-            } if name == "lock" && ty.render() == "Mutex<i64>"
+                value: NirExpr::Call { callee, .. },
+            } if name == "first_snapshot"
+                && ty.render() == "MutexSnapshot<i64>"
+                && callee == "mutex_snapshot__i64"
         )
     }));
     assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::Call { callee, .. },
+            } if name == "second_snapshot"
+                && ty.render() == "MutexSnapshot<i64>"
+                && callee == "mutex_snapshot__i64"
+        )
+    }));
+    assert!(mutex_snapshot.body.iter().any(|stmt| {
         matches!(
             stmt,
             NirStmt::Let {
@@ -2673,7 +2711,27 @@ fn lowers_task_thread_mutex_project_with_thread_and_lock_shape() {
             } if name == "guard" && ty.render() == "MutexGuard<i64>"
         )
     }));
-    assert!(capture.body.iter().any(|stmt| {
+    assert!(mutex_snapshot.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuMutexLock(_),
+            } if name == "guard" && ty.render() == "MutexGuard<i64>"
+        )
+    }));
+    assert!(mutex_snapshot.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuMutexValue(_),
+            } if name == "value" && ty.render() == "i64"
+        )
+    }));
+    assert!(mutex_snapshot.body.iter().any(|stmt| {
         matches!(
             stmt,
             NirStmt::Let {
@@ -2693,14 +2751,40 @@ fn lowers_task_thread_mutex_project_with_thread_and_lock_shape() {
             } if name == "worker" && ty.render() == "Thread<i64>" && callee == "ping"
         )
     }));
+    assert!(join_thread_result.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Return(Some(NirExpr::CpuThreadJoinResult(_)))
+        )
+    }));
+    assert!(join_thread_value.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Return(Some(NirExpr::CpuThreadJoin(_)))
+        )
+    }));
     assert!(capture.body.iter().any(|stmt| {
         matches!(
             stmt,
             NirStmt::Let {
                 name,
                 ty: Some(ty),
-                value: NirExpr::CpuThreadJoinResult(_),
-            } if name == "joined" && ty.render() == "TaskResult<i64>"
+                value: NirExpr::Call { callee, .. },
+            } if name == "joined"
+                && ty.render() == "TaskResult<i64>"
+                && callee == "join_thread_result__i64"
+        )
+    }));
+    assert!(capture_direct_join.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::Call { callee, .. },
+            } if name == "thread_value"
+                && ty.render() == "i64"
+                && callee == "join_thread_value__i64"
         )
     }));
     assert!(capture.body.iter().any(|stmt| {

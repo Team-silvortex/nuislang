@@ -44,9 +44,9 @@ The most important example-tree truths now are:
   - [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
   tracks subtree status, current frontdoor anchors, archived routes, and
   future cleanup targets
-* tooling now has a real legacy split:
-  - older low-level shell, line-input, automation, and report probes now live
-    under [examples/legacy/tooling](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling)
+* tooling first had a legacy split:
+  - older low-level shell, line-input, automation, and report probes were
+    separated from the main tooling frontdoor
   - current tooling frontdoor starts from `cli_runtime_demo`,
     `command_runtime_demo`, and `workflow_runtime_demo`
 * filesystem routing is more complete:

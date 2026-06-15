@@ -220,6 +220,23 @@ pub(crate) fn infer_ast_expr_type_inner(
                     .flatten()?;
                 Some(ast_generic_named_type("Task", vec![payload]))
             }
+            "thread_spawn" => {
+                let [call] = args.as_slice() else {
+                    return None;
+                };
+                let AstExpr::Call {
+                    callee: spawned_callee,
+                    ..
+                } = call
+                else {
+                    return None;
+                };
+                let payload = function_return_types
+                    .get(spawned_callee)
+                    .cloned()
+                    .flatten()?;
+                Some(ast_generic_named_type("Thread", vec![payload]))
+            }
             "timeout" => {
                 let [task, _] = args.as_slice() else {
                     return None;
@@ -268,6 +285,119 @@ pub(crate) fn infer_ast_expr_type_inner(
                         NirResultFamily::Task,
                         task_ty.generic_args[0].clone(),
                     ))
+                } else {
+                    None
+                }
+            }
+            "thread_join" => {
+                let [thread] = args.as_slice() else {
+                    return None;
+                };
+                let thread_ty = infer_ast_expr_type_inner(
+                    thread,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if thread_ty.name == "Thread" && thread_ty.generic_args.len() == 1 {
+                    Some(thread_ty.generic_args[0].clone())
+                } else {
+                    None
+                }
+            }
+            "thread_join_result" => {
+                let [thread] = args.as_slice() else {
+                    return None;
+                };
+                let thread_ty = infer_ast_expr_type_inner(
+                    thread,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if thread_ty.name == "Thread" && thread_ty.generic_args.len() == 1 {
+                    Some(ast_make_result_type(
+                        NirResultFamily::Task,
+                        thread_ty.generic_args[0].clone(),
+                    ))
+                } else {
+                    None
+                }
+            }
+            "mutex_new" => {
+                let [value] = args.as_slice() else {
+                    return None;
+                };
+                let payload = infer_ast_expr_type_inner(
+                    value,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                Some(ast_generic_named_type("Mutex", vec![payload]))
+            }
+            "mutex_lock" => {
+                let [mutex] = args.as_slice() else {
+                    return None;
+                };
+                let mutex_ty = infer_ast_expr_type_inner(
+                    mutex,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if mutex_ty.name == "Mutex" && mutex_ty.generic_args.len() == 1 {
+                    Some(ast_generic_named_type(
+                        "MutexGuard",
+                        vec![mutex_ty.generic_args[0].clone()],
+                    ))
+                } else {
+                    None
+                }
+            }
+            "mutex_unlock" => {
+                let [guard] = args.as_slice() else {
+                    return None;
+                };
+                let guard_ty = infer_ast_expr_type_inner(
+                    guard,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if guard_ty.name == "MutexGuard" && guard_ty.generic_args.len() == 1 {
+                    Some(ast_generic_named_type(
+                        "Mutex",
+                        vec![guard_ty.generic_args[0].clone()],
+                    ))
+                } else {
+                    None
+                }
+            }
+            "mutex_value" => {
+                let [guard] = args.as_slice() else {
+                    return None;
+                };
+                let guard_ty = infer_ast_expr_type_inner(
+                    guard,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if guard_ty.name == "MutexGuard" && guard_ty.generic_args.len() == 1 {
+                    Some(guard_ty.generic_args[0].clone())
                 } else {
                     None
                 }

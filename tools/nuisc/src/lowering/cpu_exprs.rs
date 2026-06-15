@@ -419,6 +419,14 @@ fn lower_cpu_extern_call(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
+    if let Some(target_config) = &state.target_config {
+        if !target_config.supports_host_ffi_abi(abi) {
+            return Err(format!(
+                "extern ABI `{abi}` is not supported by lowering target `{}`",
+                target_config.abi
+            ));
+        }
+    }
     let lowered_args = args
         .iter()
         .map(|arg| lower_expr(arg, state, bindings))

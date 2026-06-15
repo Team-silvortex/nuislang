@@ -147,6 +147,8 @@ pub(super) fn build_lowered_functions_and_impls(
             &function,
             &higher_order_templates,
             &higher_order_function_table,
+            &[],
+            &BTreeMap::new(),
             &BTreeMap::new(),
             visible_type_aliases,
             &mut higher_order_specialization_cache,

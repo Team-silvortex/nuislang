@@ -2276,6 +2276,101 @@ fn lowers_match_guarded_while_state_project_with_guarded_return_shape() {
 }
 
 #[test]
+fn compiles_match_guard_or_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_or_state_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("match guard-or state project should compile");
+}
+
+#[test]
+fn lowers_match_guard_or_state_project_with_guarded_return_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_or_state_demo",
+    );
+
+    assert!(artifacts
+        .yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_return"));
+}
+
+#[test]
+fn compiles_match_multi_guard_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_multi_guard_state_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("match multi-guard state project should compile");
+}
+
+#[test]
+fn lowers_match_multi_guard_state_project_with_guarded_return_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_multi_guard_state_demo",
+    );
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(matches!(
+        &main.body[2],
+        NirStmt::While { body, .. }
+            if matches!(
+                body.as_slice(),
+                [NirStmt::If {
+                    then_body,
+                    else_body,
+                    ..
+                }] if matches!(
+                    then_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Int(5)))]
+                ) && matches!(
+                    else_body.as_slice(),
+                    [NirStmt::If {
+                        then_body,
+                        else_body,
+                        ..
+                    }] if matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ) && matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    )
+                )
+            )
+    ));
+}
+
+#[test]
+fn compiles_match_guard_range_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_range_state_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("match guard-range state project should compile");
+}
+
+#[test]
+fn lowers_match_guard_range_state_project_with_guarded_return_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_range_state_demo",
+    );
+
+    assert!(artifacts
+        .yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_return"));
+}
+
+#[test]
 fn compiles_flow_continuing_while_state_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo",

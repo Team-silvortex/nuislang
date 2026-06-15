@@ -17,6 +17,11 @@ pub struct PipelineArtifacts {
     pub loaded_nustar: Vec<String>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PipelineCompileOptions {
+    pub lowering_target: Option<crate::lowering::LoweringTargetConfig>,
+}
+
 pub struct ResolvedCompileInput {
     pub input_path: PathBuf,
     pub effective_input_path: PathBuf,
@@ -32,10 +37,17 @@ struct PreparedPipeline {
 
 impl ResolvedCompileInput {
     pub fn compile(&self) -> Result<PipelineArtifacts, String> {
+        self.compile_with_options(&PipelineCompileOptions::default())
+    }
+
+    pub fn compile_with_options(
+        &self,
+        options: &PipelineCompileOptions,
+    ) -> Result<PipelineArtifacts, String> {
         if let (Some(project), Some(plan)) = (&self.project, &self.project_plan) {
-            compile_project_plan(project, plan)
+            compile_project_plan_with_options(project, plan, options)
         } else {
-            compile_source_path(&self.input_path)
+            compile_source_path_with_options(&self.input_path, options)
         }
     }
 }
@@ -60,13 +72,20 @@ pub fn resolve_compile_input(path: &Path) -> Result<ResolvedCompileInput, String
 }
 
 pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
+    compile_source_path_with_options(path, &PipelineCompileOptions::default())
+}
+
+pub fn compile_source_path_with_options(
+    path: &Path,
+    options: &PipelineCompileOptions,
+) -> Result<PipelineArtifacts, String> {
     let resolved = resolve_compile_input(path)?;
     if resolved.project.is_some() {
-        return resolved.compile();
+        return resolved.compile_with_options(options);
     }
     let source = fs::read_to_string(path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
-    compile_source(&source)
+    compile_source_with_options(&source, options)
 }
 
 pub fn compile_project(path: &Path) -> Result<PipelineArtifacts, String> {
@@ -77,13 +96,29 @@ pub fn compile_project(path: &Path) -> Result<PipelineArtifacts, String> {
 
 pub fn compile_project_plan(
     project: &crate::project::LoadedProject,
-    _plan: &crate::project::ProjectCompilationPlan,
+    plan: &crate::project::ProjectCompilationPlan,
+) -> Result<PipelineArtifacts, String> {
+    compile_project_plan_with_options(project, plan, &PipelineCompileOptions::default())
+}
+
+pub fn compile_project_plan_with_options(
+    project: &crate::project::LoadedProject,
+    plan: &crate::project::ProjectCompilationPlan,
+    options: &PipelineCompileOptions,
 ) -> Result<PipelineArtifacts, String> {
     let (ast, nir, local_units) = prepare_project_nir(project)?;
+    let lowering_target = options
+        .lowering_target
+        .clone()
+        .or_else(|| {
+            project_lowering_target_for_domain(&nir.domain, &plan.abi_resolution)
+                .ok()
+                .and_then(|target| target)
+        });
     let prepared = prepare_pipeline(ast, nir, &local_units, |_, nir, _| {
         crate::project::validate_project_links_against_nir(project, nir)
     })?;
-    let mut artifacts = lower_prepared_pipeline(prepared)?;
+    let mut artifacts = lower_prepared_pipeline(prepared, lowering_target)?;
     crate::project::apply_project_support_modules_to_yir(project, &mut artifacts.yir)?;
     crate::project::apply_project_links_to_yir(project, &mut artifacts.yir)?;
     crate::project::validate_project_links_against_yir(project, &artifacts.yir)?;
@@ -94,14 +129,28 @@ pub fn compile_project_plan(
 }
 
 pub fn compile_source(source: &str) -> Result<PipelineArtifacts, String> {
+    compile_source_with_options(source, &PipelineCompileOptions::default())
+}
+
+pub fn compile_source_with_options(
+    source: &str,
+    options: &PipelineCompileOptions,
+) -> Result<PipelineArtifacts, String> {
     let ast = crate::frontend::parse_nuis_ast(source)?;
-    compile_ast(ast)
+    compile_ast_with_options(ast, options)
 }
 
 pub fn compile_ast(ast: AstModule) -> Result<PipelineArtifacts, String> {
+    compile_ast_with_options(ast, &PipelineCompileOptions::default())
+}
+
+pub fn compile_ast_with_options(
+    ast: AstModule,
+    options: &PipelineCompileOptions,
+) -> Result<PipelineArtifacts, String> {
     let nir = crate::frontend::lower_ast_to_nir(&ast)?;
     let prepared = prepare_pipeline(ast, nir, &BTreeSet::new(), |_, _, _| Ok(()))?;
-    lower_prepared_pipeline(prepared)
+    lower_prepared_pipeline(prepared, options.lowering_target.clone())
 }
 
 fn prepare_project_nir(
@@ -164,8 +213,15 @@ where
     })
 }
 
-fn lower_prepared_pipeline(prepared: PreparedPipeline) -> Result<PipelineArtifacts, String> {
-    let yir = crate::lowering::lower_nir_to_yir(&prepared.nir, &prepared.lowering_manifest)?;
+fn lower_prepared_pipeline(
+    prepared: PreparedPipeline,
+    lowering_target: Option<crate::lowering::LoweringTargetConfig>,
+) -> Result<PipelineArtifacts, String> {
+    let yir = crate::lowering::lower_nir_to_yir(
+        &prepared.nir,
+        &prepared.lowering_manifest,
+        lowering_target.as_ref(),
+    )?;
     let llvm_ir = yir_lower_llvm::emit_module(&yir)?;
     let loaded_nustar =
         collect_loaded_nustar(&prepared.nir, &yir, &prepared.lowering_manifest.package_id)?;
@@ -176,6 +232,25 @@ fn lower_prepared_pipeline(prepared: PreparedPipeline) -> Result<PipelineArtifac
         llvm_ir,
         loaded_nustar,
     })
+}
+
+fn project_lowering_target_for_domain(
+    domain: &str,
+    resolution: &crate::project::ProjectAbiResolution,
+) -> Result<Option<crate::lowering::LoweringTargetConfig>, String> {
+    let Some(abi) = resolution
+        .requirements
+        .iter()
+        .find(|item| item.domain == domain)
+        .map(|item| item.abi.as_str())
+    else {
+        return Ok(None);
+    };
+    if domain != "cpu" {
+        return Ok(None);
+    }
+    let target = crate::aot::resolve_cpu_build_target_from_abi(Path::new(NUSTAR_REGISTRY_ROOT), abi)?;
+    Ok(Some(crate::lowering::LoweringTargetConfig::from_cpu_build_target(&target)))
 }
 
 fn refresh_loaded_nustar(artifacts: &mut PipelineArtifacts) -> Result<(), String> {

@@ -19,6 +19,7 @@ Use it when the question is not only “what compiles?”, but:
 
 Use it together with:
 
+* [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 * [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
 * [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
 * [nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
@@ -51,6 +52,20 @@ compiler-facing route
 Short rule:
 
 `0.19.0` compile truth is now as much about keeping the route legible as it is about keeping the route green`
+
+For the current late-`0.19.*` / pre-`0.20.*` state, ABI-facing output should
+now also be read through the newer vocabulary anchor:
+
+* `resolution`
+* `selection`
+* `summary`
+* `target_config`
+* `graph`
+* `index`
+
+That naming split is recorded in:
+
+* [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 
 ## Current CLI Frontdoor
 

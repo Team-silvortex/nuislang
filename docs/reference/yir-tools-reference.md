@@ -389,6 +389,9 @@ Read that as:
   `nuis.project.plan.txt`, `nuis.project.organization.txt`,
   `nuis.project.exchange.txt`, `nuis.project.packet.txt`,
   `nuis.project.host_ffi.txt`, and `nuis.project.abi.txt`
+  the current plan/manifests also carry one compact `abi_graph` summary so
+  project-side CLI output, `nuis.project.plan.txt`, and
+  `nuis.build.manifest.toml` all describe the same per-domain ABI shape
   packet metadata now records shape, field order, coarse field role, and a
   first encode skeleton; packet validation is still intentionally narrow, and
   async-carrier families like `Task<...>` / `*Result<...>` are still rejected

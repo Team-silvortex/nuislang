@@ -32,6 +32,10 @@ Short rule:
 
 `0.19.0` is where the mainline should stop feeling newly assembled and start feeling deliberately maintained`
 
+For the current late-`0.19.*` state, that maintenance story now also includes
+locking down ABI compile vocabulary before `0.20.*` starts broadening the
+surface again.
+
 ## High-Signal Current Surface
 
 The most important current truths for `0.19.0` are:
@@ -83,11 +87,12 @@ For the `0.19.0` line, the shortest practical route is:
 3. [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
 4. [nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
 5. [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-6. [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
-7. [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
-8. [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
-9. [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-10. [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+6. [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+7. [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+8. [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
+9. [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
+10. [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+11. [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
 
 ## Concrete Anchor Cases
 

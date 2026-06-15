@@ -16,6 +16,21 @@ impl RegisteredMod for ShaderMod {
         require_shader_resource(node, resource)?;
 
         match node.op.instruction.as_str() {
+            "target_config" => {
+                if node.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` expects `shader.target_config <name> <resource> <arch> <runtime> <lane_width>`",
+                        node.name
+                    ));
+                }
+                node.op.args[2].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid lane width `{}`",
+                        node.name, node.op.args[2]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
             "const" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
@@ -520,6 +535,16 @@ impl RegisteredMod for ShaderMod {
         state: &mut ExecutionState,
     ) -> Result<Value, String> {
         match node.op.instruction.as_str() {
+            "target_config" => Ok(Value::Tuple(vec![
+                Value::Symbol(node.op.args[0].clone()),
+                Value::Symbol(node.op.args[1].clone()),
+                Value::Int(node.op.args[2].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid lane width `{}`",
+                        node.name, node.op.args[2]
+                    )
+                })?),
+            ])),
             "const" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(
                 |_| {
                     format!(

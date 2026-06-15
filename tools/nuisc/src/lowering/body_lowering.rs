@@ -1,6 +1,6 @@
 use super::*;
 
-fn chain_statement_effect(state: &mut LoweringState<'_>, anchor: &str) {
+pub(super) fn chain_statement_effect(state: &mut LoweringState<'_>, anchor: &str) {
     if let Some(previous) = state.last_effect_anchor.as_ref() {
         if previous != anchor
             && !state.yir.edges.iter().any(|edge| {
@@ -56,6 +56,79 @@ fn chain_nonpure_expr_stmt(expr: &NirExpr, lowered: &str, state: &mut LoweringSt
     }
 }
 
+fn refresh_const_binding(
+    const_bindings: &mut BTreeMap<String, NirExpr>,
+    name: &str,
+    value: &NirExpr,
+) {
+    if eval_const_i64_with_env(value, const_bindings, &mut BTreeSet::new()).is_some() {
+        const_bindings.insert(name.to_owned(), value.clone());
+    } else {
+        const_bindings.remove(name);
+    }
+}
+
+fn eval_const_i64_with_env(
+    expr: &NirExpr,
+    const_bindings: &BTreeMap<String, NirExpr>,
+    visited: &mut BTreeSet<String>,
+) -> Option<i64> {
+    match expr {
+        NirExpr::Int(value) => Some(*value),
+        NirExpr::Bool(value) => Some(i64::from(*value)),
+        NirExpr::Var(name) => {
+            if !visited.insert(name.clone()) {
+                return None;
+            }
+            let resolved = const_bindings
+                .get(name)
+                .and_then(|value| eval_const_i64_with_env(value, const_bindings, visited));
+            visited.remove(name);
+            resolved
+        }
+        NirExpr::CastI64ToI32(value)
+        | NirExpr::CastI32ToI64(value)
+        | NirExpr::CastBoolToI64(value)
+        | NirExpr::CastF32ToI64(value)
+        | NirExpr::CastF64ToI64(value) => {
+            eval_const_i64_with_env(value, const_bindings, visited)
+        }
+        NirExpr::CastI64ToBool(value) => Some(i64::from(
+            eval_const_i64_with_env(value, const_bindings, visited)? != 0,
+        )),
+        NirExpr::Binary { op, lhs, rhs } => {
+            let lhs = eval_const_i64_with_env(lhs, const_bindings, visited)?;
+            let rhs = eval_const_i64_with_env(rhs, const_bindings, visited)?;
+            match op {
+                NirBinaryOp::And => Some(i64::from(lhs != 0 && rhs != 0)),
+                NirBinaryOp::Or => Some(i64::from(lhs != 0 || rhs != 0)),
+                NirBinaryOp::Add => Some(lhs + rhs),
+                NirBinaryOp::Sub => Some(lhs - rhs),
+                NirBinaryOp::Mul => Some(lhs * rhs),
+                NirBinaryOp::Div => (rhs != 0).then_some(lhs / rhs),
+                NirBinaryOp::Rem => (rhs != 0).then_some(lhs % rhs),
+                NirBinaryOp::Eq => Some(i64::from(lhs == rhs)),
+                NirBinaryOp::Ne => Some(i64::from(lhs != rhs)),
+                NirBinaryOp::Lt => Some(i64::from(lhs < rhs)),
+                NirBinaryOp::Le => Some(i64::from(lhs <= rhs)),
+                NirBinaryOp::Gt => Some(i64::from(lhs > rhs)),
+                NirBinaryOp::Ge => Some(i64::from(lhs >= rhs)),
+            }
+        }
+        _ => None,
+    }
+}
+
+fn eval_const_bool_with_env(
+    expr: &NirExpr,
+    const_bindings: &BTreeMap<String, NirExpr>,
+) -> Option<bool> {
+    match expr {
+        NirExpr::Bool(value) => Some(*value),
+        _ => Some(eval_const_i64_with_env(expr, const_bindings, &mut BTreeSet::new())? != 0),
+    }
+}
+
 pub(super) fn lower_linear_stmts(
     stmts: &[NirStmt],
     state: &mut LoweringState<'_>,
@@ -92,40 +165,25 @@ pub(super) fn lower_linear_stmts(
     Ok(last_bound_name)
 }
 
-fn unsupported_loop_control_stmt_message(keyword: &str) -> String {
-    format!(
-        "`{keyword}` is currently lowered only as terminal loop control inside recognized `while` flow shapes (for example guard, flow, or post-flow loop bodies); bare `{keyword}` here has no structured loop lowering target yet"
-    )
-}
-
-fn unsupported_async_while_message() -> String {
-    "async/task-driven `while` lowering currently recognizes only structured async loop shapes such as `await` step + chained carries, flow control, or post-flow control; general async backedge execution with task primitives inside arbitrary loop conditions/bodies is not lowered yet"
-        .to_owned()
-}
-
-fn unsupported_sync_while_message() -> String {
-    "structured `while` lowering currently recognizes guard, counted, chained-carry, flow, and post-flow loop shapes; general iterative backedge execution with arbitrary synchronous loop bodies is not lowered yet"
-        .to_owned()
-}
-
-pub(super) fn lower_function_body(
-    function: &NirFunction,
+fn lower_inline_stmts(
+    stmts: &[NirStmt],
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
-    allow_implicit_return: bool,
+    const_bindings: &mut BTreeMap<String, NirExpr>,
 ) -> Result<Option<String>, String> {
-    let saved_effect_anchor = state.last_effect_anchor.take();
-    for stmt in &function.body {
+    for stmt in stmts {
         match stmt {
             NirStmt::Let { name, value, .. } => {
                 let lowered = lower_expr(value, state, bindings)?;
                 chain_nonpure_expr_stmt(value, &lowered, state);
                 bindings.insert(name.clone(), lowered);
+                refresh_const_binding(const_bindings, name, value);
             }
             NirStmt::Const { name, value, .. } => {
                 let lowered = lower_expr(value, state, bindings)?;
                 chain_nonpure_expr_stmt(value, &lowered, state);
                 bindings.insert(name.clone(), lowered);
+                refresh_const_binding(const_bindings, name, value);
             }
             NirStmt::Print(value) => {
                 let lowered = lower_expr(value, state, bindings)?;
@@ -169,26 +227,27 @@ pub(super) fn lower_function_body(
                 else_body,
             } => {
                 if let Some(returned) =
-                    lower_if_stmt(condition, then_body, else_body, state, bindings)?
+                    lower_if_stmt(
+                        condition,
+                        then_body,
+                        else_body,
+                        state,
+                        bindings,
+                        const_bindings,
+                    )?
                 {
-                    state.last_effect_anchor = saved_effect_anchor.clone();
                     return Ok(Some(returned));
                 }
             }
             NirStmt::While { condition, body } => {
-                if let Some(returned) = lower_while_stmt(condition, body, state, bindings)? {
-                    state.last_effect_anchor = saved_effect_anchor.clone();
+                if let Some(returned) =
+                    lower_while_stmt(condition, body, state, bindings, const_bindings)?
+                {
                     return Ok(Some(returned));
                 }
             }
-            NirStmt::Break => {
-                state.last_effect_anchor = saved_effect_anchor.clone();
-                return Err(unsupported_loop_control_stmt_message("break"));
-            }
-            NirStmt::Continue => {
-                state.last_effect_anchor = saved_effect_anchor.clone();
-                return Err(unsupported_loop_control_stmt_message("continue"));
-            }
+            NirStmt::Break => return Err(unsupported_loop_control_stmt_message("break")),
+            NirStmt::Continue => return Err(unsupported_loop_control_stmt_message("continue")),
             NirStmt::Expr(expr) => {
                 let lowered = lower_expr(expr, state, bindings)?;
                 chain_nonpure_expr_stmt(expr, &lowered, state);
@@ -198,10 +257,43 @@ pub(super) fn lower_function_body(
                     Some(value) => Some(lower_expr(value, state, bindings)?),
                     None => None,
                 };
-                state.last_effect_anchor = saved_effect_anchor.clone();
                 return Ok(returned);
             }
         }
+    }
+
+    Ok(None)
+}
+
+fn unsupported_loop_control_stmt_message(keyword: &str) -> String {
+    format!(
+        "`{keyword}` is currently lowered only as terminal loop control inside recognized `while` flow shapes (for example guard, flow, or post-flow loop bodies); bare `{keyword}` here has no structured loop lowering target yet"
+    )
+}
+
+fn unsupported_async_while_message() -> String {
+    "async/task-driven `while` lowering currently recognizes only structured async loop shapes such as `await` step + chained carries, flow control, or post-flow control; general async backedge execution with task primitives inside arbitrary loop conditions/bodies is not lowered yet"
+        .to_owned()
+}
+
+fn unsupported_sync_while_message() -> String {
+    "structured `while` lowering currently recognizes guard, counted, chained-carry, flow, and post-flow loop shapes; general iterative backedge execution with arbitrary synchronous loop bodies is not lowered yet"
+        .to_owned()
+}
+
+pub(super) fn lower_function_body(
+    function: &NirFunction,
+    state: &mut LoweringState<'_>,
+    bindings: &mut BTreeMap<String, String>,
+    allow_implicit_return: bool,
+) -> Result<Option<String>, String> {
+    let saved_effect_anchor = state.last_effect_anchor.take();
+    let mut const_bindings = BTreeMap::new();
+    if let Some(returned) =
+        lower_inline_stmts(&function.body, state, bindings, &mut const_bindings)?
+    {
+        state.last_effect_anchor = saved_effect_anchor.clone();
+        return Ok(Some(returned));
     }
 
     state.last_effect_anchor = saved_effect_anchor.clone();
@@ -222,7 +314,18 @@ pub(super) fn lower_if_stmt(
     else_body: &[NirStmt],
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
+    const_bindings: &mut BTreeMap<String, NirExpr>,
 ) -> Result<Option<String>, String> {
+    let branch_has_conditional_effect =
+        super::if_lowering::stmts_contain_conditional_effect_primitive(then_body)
+            || super::if_lowering::stmts_contain_conditional_effect_primitive(else_body);
+    if branch_has_conditional_effect {
+        if let Some(value) = eval_const_bool_with_env(condition, const_bindings) {
+            let active_body = if value { then_body } else { else_body };
+            let mut branch_const_bindings = const_bindings.clone();
+            return lower_inline_stmts(active_body, state, bindings, &mut branch_const_bindings);
+        }
+    }
     let condition_name = lower_expr(condition, state, bindings)?;
     let lowered = lower_if_pair(condition_name, then_body, else_body, state, bindings)?;
     match lowered {
@@ -241,6 +344,7 @@ pub(super) fn lower_while_stmt(
     body: &[NirStmt],
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
+    _const_bindings: &mut BTreeMap<String, NirExpr>,
 ) -> Result<Option<String>, String> {
     if let Some(prepared) = prepare_post_flow_while(
         condition,

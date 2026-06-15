@@ -55,6 +55,7 @@ fnv1a64 = "0x184d23a9f025aedb"
 [project]
 name = "kernel_tensor_demo"
 abi_mode = "explicit"
+abi_graph = "graph\tmode=explicit\tdomains=cpu,data,kernel\tcpu_summary=present\tdata_summary=present\tkernel_target=present\tshader_target=absent\tnetwork_target=absent"
 abi = ["cpu=cpu.arm64.apple_aapcs64", "data=data.fabric.macos.arm64.v1", "kernel=kernel.apple_ane.coreml.v1"]
 manifest_copy = "examples/bins/kernel_tensor_demo_project/nuis.project.toml"
 modules_index = "examples/bins/kernel_tensor_demo_project/nuis.project.modules.txt"

@@ -5,12 +5,17 @@ use crate::lowering::direct_calls::collect_recursive_direct_call_functions;
 
 pub(super) trait BootstrapLoweringProvider {
     fn lowering_entry(&self) -> &'static str;
-    fn lower(&self, module: &NirModule) -> Result<YirModule, String>;
+    fn lower(
+        &self,
+        module: &NirModule,
+        target_config: Option<&LoweringTargetConfig>,
+    ) -> Result<YirModule, String>;
 }
 
 pub(super) fn dispatch_nustar_lowering(
     module: &NirModule,
     nustar_manifest: &NustarPackageManifest,
+    target_config: Option<&LoweringTargetConfig>,
 ) -> Result<YirModule, String> {
     if nustar_manifest.domain_family != module.domain {
         return Err(format!(
@@ -25,7 +30,8 @@ pub(super) fn dispatch_nustar_lowering(
                 nustar_manifest.yir_lowering_entry
             )
         })?;
-    provider.lower(module)
+    validate_lowering_target(module, nustar_manifest, target_config)?;
+    provider.lower(module, target_config)
 }
 
 fn bootstrap_lowering_provider(entry: &str) -> Option<&'static dyn BootstrapLoweringProvider> {
@@ -42,12 +48,24 @@ impl BootstrapLoweringProvider for CpuBootstrapLoweringProvider {
         "cpu.yir.lowering.v1"
     }
 
-    fn lower(&self, module: &NirModule) -> Result<YirModule, String> {
-        lower_nir_to_yir_builtin_cpu(module)
+    fn lower(
+        &self,
+        module: &NirModule,
+        target_config: Option<&LoweringTargetConfig>,
+    ) -> Result<YirModule, String> {
+        lower_nir_to_yir_builtin_cpu_with_target(module, target_config)
     }
 }
 
+#[cfg(test)]
 pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModule, String> {
+    lower_nir_to_yir_builtin_cpu_with_target(module, None)
+}
+
+pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
+    module: &NirModule,
+    target_config: Option<&LoweringTargetConfig>,
+) -> Result<YirModule, String> {
     if module.domain != "cpu" {
         return Err(format!(
             "minimal nuisc lowering currently only supports `mod cpu`, found `{}`",
@@ -74,9 +92,12 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
         .collect::<BTreeMap<_, _>>();
 
     let mut yir = YirModule::new("0.1");
+    let cpu_resource_kind = target_config
+        .map(|target| format!("cpu.{}", target.machine_arch))
+        .unwrap_or_else(|| "cpu.arm64".to_owned());
     yir.resources.push(Resource {
         name: "cpu0".to_owned(),
-        kind: ResourceKind::parse("cpu.arm64"),
+        kind: ResourceKind::parse(&cpu_resource_kind),
     });
 
     let mut state = LoweringState {
@@ -95,7 +116,10 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
         await_counter: 0,
         call_stack: Vec::new(),
         last_effect_anchor: None,
+        target_config: target_config.cloned(),
     };
+
+    materialize_cpu_target_config_node(&mut state);
 
     for function in module.functions.iter().filter(|function| {
         direct_call_functions.contains(&function.name)
@@ -132,4 +156,63 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
     assign_default_lanes(&mut yir);
 
     Ok(yir)
+}
+
+fn validate_lowering_target(
+    module: &NirModule,
+    manifest: &NustarPackageManifest,
+    target_config: Option<&LoweringTargetConfig>,
+) -> Result<(), String> {
+    let Some(target_config) = target_config else {
+        return Ok(());
+    };
+    crate::registry::validate_manifest_abi(manifest, &target_config.abi)?;
+    if module.domain == "cpu" {
+        let registered = crate::registry::registered_abi_target(manifest, &target_config.abi)?;
+        if registered.machine_arch != target_config.machine_arch
+            || registered.machine_os != target_config.machine_os
+            || registered.object_format != target_config.object_format
+            || registered.calling_abi != target_config.calling_abi
+            || registered.clang_target != target_config.clang_target
+        {
+            return Err(format!(
+                "lowering target `{}` does not match registered ABI target metadata for domain `{}`",
+                target_config.abi, module.domain
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn materialize_cpu_target_config_node(state: &mut LoweringState<'_>) {
+    let Some(target_config) = state.target_config.clone() else {
+        return;
+    };
+    let arch = target_config.machine_arch.clone();
+    let abi = target_config.abi.clone();
+    let vector_bits = target_config.cpu_vector_bits().to_string();
+    let name = "lowering_cpu_target_config".to_owned();
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "target_config".to_owned(),
+            args: vec![arch.clone(), abi.clone(), vector_bits.clone()],
+        },
+    });
+    let contract_name = "lowering_cpu_target_contract_type".to_owned();
+    state.yir.nodes.push(Node {
+        name: contract_name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "text".to_owned(),
+            args: vec![format!(
+                "arch=symbol:{};abi=symbol:{};vector_bits=i64:{}",
+                arch, abi, vector_bits
+            )],
+        },
+    });
+    push_dep_edges(state, &contract_name, &name);
 }

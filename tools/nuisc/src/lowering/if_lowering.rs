@@ -1,5 +1,258 @@
 use super::*;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SelectableCpuUnaryRuntimeOp {
+    Join,
+    ThreadJoin,
+    JoinResult,
+    ThreadJoinResult,
+    MutexNew,
+    MutexLock,
+    MutexUnlock,
+}
+
+impl SelectableCpuUnaryRuntimeOp {
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Join => "cpu_join",
+            Self::ThreadJoin => "cpu_thread_join",
+            Self::JoinResult => "cpu_join_result",
+            Self::ThreadJoinResult => "cpu_thread_join_result",
+            Self::MutexNew => "cpu_mutex_new",
+            Self::MutexLock => "cpu_mutex_lock",
+            Self::MutexUnlock => "cpu_mutex_unlock",
+        }
+    }
+
+    fn instruction(self) -> &'static str {
+        match self {
+            Self::Join => "join",
+            Self::ThreadJoin => "thread_join",
+            Self::JoinResult => "join_result",
+            Self::ThreadJoinResult => "thread_join_result",
+            Self::MutexNew => "mutex_new",
+            Self::MutexLock => "mutex_lock",
+            Self::MutexUnlock => "mutex_unlock",
+        }
+    }
+}
+
+fn extract_selectable_cpu_unary_runtime_expr(
+    expr: &NirExpr,
+) -> Option<(SelectableCpuUnaryRuntimeOp, &NirExpr)> {
+    match expr {
+        NirExpr::CpuJoin(input) => Some((SelectableCpuUnaryRuntimeOp::Join, input)),
+        NirExpr::CpuThreadJoin(input) => Some((SelectableCpuUnaryRuntimeOp::ThreadJoin, input)),
+        NirExpr::CpuJoinResult(input) => Some((SelectableCpuUnaryRuntimeOp::JoinResult, input)),
+        NirExpr::CpuThreadJoinResult(input) => {
+            Some((SelectableCpuUnaryRuntimeOp::ThreadJoinResult, input))
+        }
+        NirExpr::CpuMutexNew(input) => Some((SelectableCpuUnaryRuntimeOp::MutexNew, input)),
+        NirExpr::CpuMutexLock(input) => Some((SelectableCpuUnaryRuntimeOp::MutexLock, input)),
+        NirExpr::CpuMutexUnlock(input) => Some((SelectableCpuUnaryRuntimeOp::MutexUnlock, input)),
+        _ => None,
+    }
+}
+
+fn extract_binding_name_and_value(stmt: &NirStmt) -> Option<(&String, &NirExpr)> {
+    match stmt {
+        NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => Some((name, value)),
+        _ => None,
+    }
+}
+
+fn extract_selectable_cpu_unary_runtime_binding_chain(
+    stmts: &[NirStmt],
+) -> Option<(String, SelectableCpuUnaryRuntimeOp, &NirExpr)> {
+    let first = stmts.first()?;
+    let (first_name, first_value) = extract_binding_name_and_value(first)?;
+    let (op, input) = extract_selectable_cpu_unary_runtime_expr(first_value)?;
+
+    let mut previous_name = first_name;
+    let mut outcome_name = first_name.clone();
+    for stmt in &stmts[1..] {
+        let (name, value) = extract_binding_name_and_value(stmt)?;
+        let NirExpr::Var(var_name) = value else {
+            return None;
+        };
+        if var_name != previous_name {
+            return None;
+        }
+        previous_name = name;
+        outcome_name = name.clone();
+    }
+    Some((outcome_name, op, input))
+}
+
+fn extract_selectable_cpu_unary_runtime_return_chain(
+    stmts: &[NirStmt],
+) -> Option<(SelectableCpuUnaryRuntimeOp, &NirExpr)> {
+    match stmts {
+        [NirStmt::Return(Some(value))] | [NirStmt::Expr(value)] => {
+            extract_selectable_cpu_unary_runtime_expr(value)
+        }
+        _ => {
+            let (last_stmt, prefix) = stmts.split_last()?;
+            let (op, input, previous_name) = {
+                let first = prefix.first()?;
+                let (first_name, first_value) = extract_binding_name_and_value(first)?;
+                let (op, input) = extract_selectable_cpu_unary_runtime_expr(first_value)?;
+                (op, input, first_name)
+            };
+
+            let mut previous_name = previous_name;
+            for stmt in &prefix[1..] {
+                let (name, value) = extract_binding_name_and_value(stmt)?;
+                let NirExpr::Var(var_name) = value else {
+                    return None;
+                };
+                if var_name != previous_name {
+                    return None;
+                }
+                previous_name = name;
+            }
+
+            match last_stmt {
+                NirStmt::Return(Some(NirExpr::Var(var_name))) | NirStmt::Expr(NirExpr::Var(var_name))
+                    if var_name == previous_name =>
+                {
+                    Some((op, input))
+                }
+                _ => None,
+            }
+        }
+    }
+}
+
+fn build_selectable_cpu_unary_runtime_expr(
+    op: SelectableCpuUnaryRuntimeOp,
+    input: &NirExpr,
+) -> NirExpr {
+    match op {
+        SelectableCpuUnaryRuntimeOp::Join => NirExpr::CpuJoin(Box::new(input.clone())),
+        SelectableCpuUnaryRuntimeOp::ThreadJoin => {
+            NirExpr::CpuThreadJoin(Box::new(input.clone()))
+        }
+        SelectableCpuUnaryRuntimeOp::JoinResult => NirExpr::CpuJoinResult(Box::new(input.clone())),
+        SelectableCpuUnaryRuntimeOp::ThreadJoinResult => {
+            NirExpr::CpuThreadJoinResult(Box::new(input.clone()))
+        }
+        SelectableCpuUnaryRuntimeOp::MutexNew => NirExpr::CpuMutexNew(Box::new(input.clone())),
+        SelectableCpuUnaryRuntimeOp::MutexLock => NirExpr::CpuMutexLock(Box::new(input.clone())),
+        SelectableCpuUnaryRuntimeOp::MutexUnlock => {
+            NirExpr::CpuMutexUnlock(Box::new(input.clone()))
+        }
+    }
+}
+
+fn lower_selected_cpu_unary_runtime_effect(
+    condition_name: String,
+    lhs_value: &NirExpr,
+    rhs_value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    let Some((lhs_op, lhs_input)) = extract_selectable_cpu_unary_runtime_expr(lhs_value) else {
+        return Ok(None);
+    };
+    let Some((rhs_op, rhs_input)) = extract_selectable_cpu_unary_runtime_expr(rhs_value) else {
+        return Ok(None);
+    };
+    if lhs_op != rhs_op {
+        return Ok(None);
+    }
+
+    let lhs_name = lower_expr(lhs_input, state, bindings)?;
+    let rhs_name = lower_expr(rhs_input, state, bindings)?;
+    let selected_input = lower_select(condition_name, lhs_name, rhs_name, state)?;
+    let name = next_name(state, lhs_op.prefix());
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: lhs_op.instruction().to_owned(),
+            args: vec![selected_input.clone()],
+        },
+    });
+    push_dep_edges(state, &selected_input, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: selected_input,
+        to: name.clone(),
+    });
+    Ok(Some(name))
+}
+
+fn lower_direct_selectable_runtime_binding(
+    condition_name: String,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<LoweredIfOutcome>, String> {
+    let Some((lhs_name, lhs_op, lhs_input)) =
+        extract_selectable_cpu_unary_runtime_binding_chain(then_body)
+    else {
+        return Ok(None);
+    };
+    let Some((rhs_name, rhs_op, rhs_input)) =
+        extract_selectable_cpu_unary_runtime_binding_chain(else_body)
+    else {
+        return Ok(None);
+    };
+    if lhs_name != rhs_name || lhs_op != rhs_op {
+        return Ok(None);
+    }
+
+    let lhs_expr = build_selectable_cpu_unary_runtime_expr(lhs_op, lhs_input);
+    let rhs_expr = build_selectable_cpu_unary_runtime_expr(rhs_op, rhs_input);
+    let Some(value) =
+        lower_selected_cpu_unary_runtime_effect(condition_name, &lhs_expr, &rhs_expr, state, bindings)?
+    else {
+        return Ok(None);
+    };
+    super::body_lowering::chain_statement_effect(state, &value);
+    Ok(Some(LoweredIfOutcome::Bind {
+        name: lhs_name,
+        value,
+    }))
+}
+
+fn lower_direct_selectable_runtime_return(
+    condition_name: String,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<LoweredIfOutcome>, String> {
+    let Some((lhs_op, lhs_input)) = extract_selectable_cpu_unary_runtime_return_chain(then_body)
+    else {
+        return Ok(None);
+    };
+    let Some((rhs_op, rhs_input)) = extract_selectable_cpu_unary_runtime_return_chain(else_body)
+    else {
+        return Ok(None);
+    };
+    if lhs_op != rhs_op {
+        return Ok(None);
+    }
+
+    let lhs_expr = build_selectable_cpu_unary_runtime_expr(lhs_op, lhs_input);
+    let rhs_expr = build_selectable_cpu_unary_runtime_expr(rhs_op, rhs_input);
+    let Some(value) = lower_selected_cpu_unary_runtime_effect(
+        condition_name,
+        &lhs_expr,
+        &rhs_expr,
+        state,
+        bindings,
+    )?
+    else {
+        return Ok(None);
+    };
+    Ok(Some(LoweredIfOutcome::Returned(value)))
+}
+
 fn is_branch_local_runtime_observer(expr: &NirExpr) -> bool {
     matches!(
         expr,
@@ -230,7 +483,7 @@ fn stmt_contains_conditional_effect_primitive(stmt: &NirStmt) -> bool {
     }
 }
 
-fn stmts_contain_conditional_effect_primitive(stmts: &[NirStmt]) -> bool {
+pub(super) fn stmts_contain_conditional_effect_primitive(stmts: &[NirStmt]) -> bool {
     stmts.iter().any(stmt_contains_conditional_effect_primitive)
 }
 
@@ -319,6 +572,15 @@ pub(super) fn lower_if_pair(
             let selected = lower_select(condition_name, lhs, rhs, state)?;
             return Ok(LoweredIfOutcome::Returned(selected));
         }
+        if let Some(lowered) = lower_direct_selectable_runtime_return(
+            condition_name.clone(),
+            then_body,
+            else_body,
+            state,
+            bindings,
+        )? {
+            return Ok(lowered);
+        }
         let pure_helpers = state.pure_helpers.clone();
         if let (Some((lhs_name, lhs_value)), Some((rhs_name, rhs_value))) = (
             lower_binding_if_chain(then_body, state, bindings, &pure_helpers)?,
@@ -331,6 +593,15 @@ pub(super) fn lower_if_pair(
                     value: selected,
                 });
             }
+        }
+        if let Some(lowered) = lower_direct_selectable_runtime_binding(
+            condition_name.clone(),
+            then_body,
+            else_body,
+            state,
+            bindings,
+        )? {
+            return Ok(lowered);
         }
         if let Some(lowered) = lower_binding_if_chain_with_shared_context(
             &condition_name,
@@ -361,6 +632,16 @@ pub(super) fn lower_if_pair(
         return Ok(LoweredIfOutcome::Returned(selected));
     }
 
+    if let Some(lowered) = lower_direct_selectable_runtime_return(
+        condition_name.clone(),
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(lowered);
+    }
+
     let pure_helpers = state.pure_helpers.clone();
     if let (Some((lhs_name, lhs_value)), Some((rhs_name, rhs_value))) = (
         lower_binding_if_chain(then_body, state, bindings, &pure_helpers)?,
@@ -373,6 +654,16 @@ pub(super) fn lower_if_pair(
                 value: selected,
             });
         }
+    }
+
+    if let Some(lowered) = lower_direct_selectable_runtime_binding(
+        condition_name.clone(),
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(lowered);
     }
 
     match (&then_body[0], &else_body[0]) {
@@ -448,6 +739,9 @@ fn lower_return_if_chain(
 ) -> Result<Option<String>, String> {
     match stmts {
         [NirStmt::Return(Some(value))] | [NirStmt::Expr(value)] => {
+            if expr_contains_conditional_effect_primitive(value) {
+                return Ok(None);
+            }
             Ok(Some(lower_expr(value, state, bindings)?))
         }
         [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {
@@ -492,6 +786,9 @@ fn lower_binding_if_chain(
 ) -> Result<Option<(String, String)>, String> {
     match stmts {
         [NirStmt::Let { name, value, .. }] | [NirStmt::Const { name, value, .. }] => {
+            if expr_contains_conditional_effect_primitive(value) {
+                return Ok(None);
+            }
             Ok(Some((name.clone(), lower_expr(value, state, bindings)?)))
         }
         [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {

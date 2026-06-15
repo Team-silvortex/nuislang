@@ -2,12 +2,69 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     AstBinaryOp, AstDestructureBinding, AstDestructureField, AstExpr, AstFunction, AstGenericParam,
-    AstImplDef, AstMatchArm, AstModule, AstParam, AstStmt, AstTypeRef, AstUnaryOp, AstVisibility,
+    AstImplDef, AstMatchArm, AstModule, AstParam, AstStmt, AstStructDef, AstTypeRef, AstUnaryOp,
+    AstVisibility,
 };
 
 use super::lambda_validation::collect_lambda_block_captures;
+use super::validation_binding_env::instantiate_ast_struct_field_type;
 
 const LAMBDA_BIND_PREFIX: &str = "__lambda_bind.";
+
+fn render_local_access_path(expr: &AstExpr) -> Option<String> {
+    match expr {
+        AstExpr::Var(name) => Some(name.clone()),
+        AstExpr::FieldAccess { base, field } => {
+            Some(format!("{}.{}", render_local_access_path(base)?, field))
+        }
+        _ => None,
+    }
+}
+
+fn extend_local_field_bindings_from_expr(
+    binding_path: &str,
+    expr: &AstExpr,
+    local_types: &mut BTreeMap<String, AstTypeRef>,
+    module_function_table: &BTreeMap<String, AstFunction>,
+    module_impls: &[AstImplDef],
+) {
+    let AstExpr::StructLiteral { fields, .. } = expr else {
+        return;
+    };
+    for (field_name, value) in fields {
+        let Some(field_ty) =
+            infer_local_binding_type(value, local_types, module_function_table, module_impls)
+        else {
+            continue;
+        };
+        let field_path = format!("{binding_path}.{}", field_name);
+        local_types.insert(field_path.clone(), field_ty);
+        extend_local_field_bindings_from_expr(
+            &field_path,
+            value,
+            local_types,
+            module_function_table,
+            module_impls,
+        );
+    }
+}
+
+fn extend_local_field_bindings_from_type(
+    binding_path: &str,
+    ty: &AstTypeRef,
+    visible_structs: &BTreeMap<String, AstStructDef>,
+    local_types: &mut BTreeMap<String, AstTypeRef>,
+) {
+    let Some(definition) = visible_structs.get(&ty.name) else {
+        return;
+    };
+    for field in &definition.fields {
+        let field_ty = instantiate_ast_struct_field_type(ty, definition, &field.ty);
+        let field_path = format!("{}.{}", binding_path, field.name);
+        local_types.insert(field_path.clone(), field_ty.clone());
+        extend_local_field_bindings_from_type(&field_path, &field_ty, visible_structs, local_types);
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct LambdaBinding {
@@ -26,12 +83,18 @@ pub(super) fn expand_module_lambdas(module: &AstModule) -> Result<AstModule, Str
         .iter()
         .map(|function| (function.name.clone(), function.clone()))
         .collect::<BTreeMap<_, _>>();
+    let visible_structs = module
+        .structs
+        .iter()
+        .map(|definition| (definition.name.clone(), definition.clone()))
+        .collect::<BTreeMap<_, _>>();
     let mut expanded = module.clone();
     expanded.functions.clear();
     for function in &module.functions {
         let (rewritten, synthesized) = expand_function_lambdas(
             function,
             &module.impls,
+            &visible_structs,
             &module_const_names,
             &module_function_table,
         )?;
@@ -44,6 +107,7 @@ pub(super) fn expand_module_lambdas(module: &AstModule) -> Result<AstModule, Str
 fn expand_function_lambdas(
     function: &AstFunction,
     module_impls: &[AstImplDef],
+    visible_structs: &BTreeMap<String, AstStructDef>,
     module_const_names: &BTreeSet<String>,
     module_function_table: &BTreeMap<String, AstFunction>,
 ) -> Result<(AstFunction, Vec<AstFunction>), String> {
@@ -54,11 +118,19 @@ fn expand_function_lambdas(
         .iter()
         .map(|param| param.name.clone())
         .collect::<BTreeSet<_>>();
-    let visible_local_types = function
+    let mut visible_local_types = function
         .params
         .iter()
         .map(|param| (param.name.clone(), param.ty.clone()))
         .collect::<BTreeMap<_, _>>();
+    for param in &function.params {
+        extend_local_field_bindings_from_type(
+            &param.name,
+            &param.ty,
+            visible_structs,
+            &mut visible_local_types,
+        );
+    }
     let body = expand_lambda_block(
         &function.body,
         function.return_type.as_ref(),
@@ -67,6 +139,7 @@ fn expand_function_lambdas(
         &visible_locals,
         &visible_local_types,
         module_impls,
+        visible_structs,
         module_const_names,
         module_function_table,
         &function.name,
@@ -173,6 +246,7 @@ fn infer_generic_call_substitutions(
     expected_result_type: Option<&AstTypeRef>,
     visible_local_types: &BTreeMap<String, AstTypeRef>,
     module_function_table: &BTreeMap<String, AstFunction>,
+    module_impls: &[AstImplDef],
 ) -> BTreeMap<String, AstTypeRef> {
     let generic_names = function
         .generic_params
@@ -189,7 +263,12 @@ fn infer_generic_call_substitutions(
         if matches!(arg, AstExpr::Lambda { .. }) {
             continue;
         }
-        let Some(arg_ty) = infer_local_binding_type(arg, visible_local_types, module_function_table)
+        let Some(arg_ty) = infer_local_binding_type(
+            arg,
+            visible_local_types,
+            module_function_table,
+            module_impls,
+        )
         else {
             continue;
         };
@@ -216,6 +295,7 @@ fn infer_impl_method_substitutions(
     expected_result_type: Option<&AstTypeRef>,
     visible_local_types: &BTreeMap<String, AstTypeRef>,
     module_function_table: &BTreeMap<String, AstFunction>,
+    module_impls: &[AstImplDef],
 ) -> BTreeMap<String, AstTypeRef> {
     let generic_names = definition
         .generic_params
@@ -236,7 +316,12 @@ fn infer_impl_method_substitutions(
         if matches!(arg, AstExpr::Lambda { .. }) {
             continue;
         }
-        let Some(arg_ty) = infer_local_binding_type(arg, visible_local_types, module_function_table)
+        let Some(arg_ty) = infer_local_binding_type(
+            arg,
+            visible_local_types,
+            module_function_table,
+            module_impls,
+        )
         else {
             continue;
         };
@@ -321,6 +406,7 @@ fn infer_local_binding_type(
     value: &AstExpr,
     visible_local_types: &BTreeMap<String, AstTypeRef>,
     module_function_table: &BTreeMap<String, AstFunction>,
+    module_impls: &[AstImplDef],
 ) -> Option<AstTypeRef> {
     match value {
         AstExpr::Bool(_) => Some(named_type("bool")),
@@ -332,6 +418,8 @@ fn infer_local_binding_type(
                 .get(name)
                 .and_then(callable_type_from_function)
         }),
+        AstExpr::FieldAccess { .. } => render_local_access_path(value)
+            .and_then(|path| visible_local_types.get(&path).cloned()),
         AstExpr::StructLiteral {
             type_name,
             type_args,
@@ -363,13 +451,28 @@ fn infer_local_binding_type(
         AstExpr::Unary { op, operand } => match op {
             AstUnaryOp::Not => Some(named_type("bool")),
             AstUnaryOp::Neg => {
-                infer_local_binding_type(operand, visible_local_types, module_function_table)
+                infer_local_binding_type(
+                    operand,
+                    visible_local_types,
+                    module_function_table,
+                    module_impls,
+                )
             }
             AstUnaryOp::Deref => None,
         },
         AstExpr::Binary { op, lhs, rhs } => {
-            let lhs_ty = infer_local_binding_type(lhs, visible_local_types, module_function_table)?;
-            let rhs_ty = infer_local_binding_type(rhs, visible_local_types, module_function_table)?;
+            let lhs_ty = infer_local_binding_type(
+                lhs,
+                visible_local_types,
+                module_function_table,
+                module_impls,
+            )?;
+            let rhs_ty = infer_local_binding_type(
+                rhs,
+                visible_local_types,
+                module_function_table,
+                module_impls,
+            )?;
             match op {
                 AstBinaryOp::And
                 | AstBinaryOp::Or
@@ -390,6 +493,106 @@ fn infer_local_binding_type(
                 }
                 _ => None,
             }
+        }
+        AstExpr::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            let then_ty = infer_block_result_type(
+                then_body,
+                visible_local_types,
+                module_function_table,
+                module_impls,
+            )?;
+            let else_ty = infer_block_result_type(
+                else_body,
+                visible_local_types,
+                module_function_table,
+                module_impls,
+            )?;
+            if then_ty == else_ty {
+                Some(then_ty)
+            } else {
+                None
+            }
+        }
+        AstExpr::Match { arms, .. } => {
+            let mut arm_types = arms.iter().filter_map(|arm| {
+                infer_block_result_type(
+                    &arm.body,
+                    visible_local_types,
+                    module_function_table,
+                    module_impls,
+                )
+            });
+            let first = arm_types.next()?;
+            if arm_types.all(|ty| ty == first) {
+                Some(first)
+            } else {
+                None
+            }
+        }
+        AstExpr::MethodCall {
+            receiver,
+            method,
+            args,
+        } => {
+            let receiver_ty = infer_local_binding_type(
+                receiver,
+                visible_local_types,
+                module_function_table,
+                module_impls,
+            )?;
+            for definition in module_impls {
+                let Some(method_index) =
+                    definition.methods.iter().position(|item| item.name == *method)
+                else {
+                    continue;
+                };
+                let substitutions = infer_impl_method_substitutions(
+                    definition,
+                    method_index,
+                    &receiver_ty,
+                    args,
+                    None,
+                    visible_local_types,
+                    module_function_table,
+                    module_impls,
+                );
+                let specialized_for_type =
+                    specialize_type_with_substitutions(&definition.for_type, &substitutions);
+                if specialized_for_type != receiver_ty {
+                    continue;
+                }
+                let method_def = &definition.methods[method_index];
+                let method_return_ty =
+                    method_def.return_type.as_ref().unwrap_or(&definition.for_type);
+                return Some(specialize_type_with_substitutions(
+                    method_return_ty,
+                    &substitutions,
+                ));
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn infer_block_result_type(
+    body: &[AstStmt],
+    visible_local_types: &BTreeMap<String, AstTypeRef>,
+    module_function_table: &BTreeMap<String, AstFunction>,
+    module_impls: &[AstImplDef],
+) -> Option<AstTypeRef> {
+    match body.last() {
+        Some(AstStmt::Return(Some(expr))) | Some(AstStmt::Expr(expr)) => {
+            infer_local_binding_type(
+                expr,
+                visible_local_types,
+                module_function_table,
+                module_impls,
+            )
         }
         _ => None,
     }
@@ -440,6 +643,7 @@ fn synthesize_lambda_function(
     outer_locals: &BTreeSet<String>,
     outer_local_types: &BTreeMap<String, AstTypeRef>,
     module_impls: &[AstImplDef],
+    visible_structs: &BTreeMap<String, AstStructDef>,
     module_const_names: &BTreeSet<String>,
     module_function_table: &BTreeMap<String, AstFunction>,
     owning_function_name: &str,
@@ -458,6 +662,7 @@ fn synthesize_lambda_function(
         outer_locals,
         outer_local_types,
         module_impls,
+        visible_structs,
         module_const_names,
         module_function_table,
         owning_function_name,
@@ -476,6 +681,7 @@ fn synthesize_lambda_function_with_known_return_type(
     outer_locals: &BTreeSet<String>,
     outer_local_types: &BTreeMap<String, AstTypeRef>,
     module_impls: &[AstImplDef],
+    visible_structs: &BTreeMap<String, AstStructDef>,
     module_const_names: &BTreeSet<String>,
     module_function_table: &BTreeMap<String, AstFunction>,
     owning_function_name: &str,
@@ -526,6 +732,7 @@ fn synthesize_lambda_function_with_known_return_type(
         &lambda_visible_locals,
         &lambda_visible_local_types,
         module_impls,
+        visible_structs,
         module_const_names,
         module_function_table,
         owning_function_name,
@@ -597,6 +804,7 @@ fn expected_callable_type_for_call_arg(
     expected_result_type: Option<&AstTypeRef>,
     visible_local_types: &BTreeMap<String, AstTypeRef>,
     module_function_table: &BTreeMap<String, AstFunction>,
+    module_impls: &[AstImplDef],
 ) -> Option<AstTypeRef> {
     let function = module_function_table.get(callee)?;
     let param = function.params.get(index)?;
@@ -610,6 +818,7 @@ fn expected_callable_type_for_call_arg(
             expected_result_type,
             visible_local_types,
             module_function_table,
+            module_impls,
         );
         specialize_type_with_substitutions(&param.ty, &substitutions)
     };
@@ -627,7 +836,12 @@ fn expected_callable_type_for_method_arg(
     module_impls: &[AstImplDef],
 ) -> Option<AstTypeRef> {
     let receiver_ty =
-        infer_local_binding_type(receiver, visible_local_types, module_function_table)?;
+        infer_local_binding_type(
+            receiver,
+            visible_local_types,
+            module_function_table,
+            module_impls,
+        )?;
     for definition in module_impls {
         let Some(method_index) = definition.methods.iter().position(|item| item.name == method) else {
             continue;
@@ -640,6 +854,7 @@ fn expected_callable_type_for_method_arg(
             expected_result_type,
             visible_local_types,
             module_function_table,
+            module_impls,
         );
         let specialized_for_type = specialize_type_with_substitutions(&definition.for_type, &substitutions);
         if specialized_for_type != receiver_ty {
@@ -666,6 +881,7 @@ fn expand_lambda_block(
     visible_locals: &BTreeSet<String>,
     visible_local_types: &BTreeMap<String, AstTypeRef>,
     module_impls: &[AstImplDef],
+    visible_structs: &BTreeMap<String, AstStructDef>,
     module_const_names: &BTreeSet<String>,
     module_function_table: &BTreeMap<String, AstFunction>,
     owning_function_name: &str,
@@ -700,6 +916,7 @@ fn expand_lambda_block(
                     &locals,
                     &local_types,
                     module_impls,
+                    visible_structs,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -808,11 +1025,31 @@ fn expand_lambda_block(
                 locals.insert(name.clone());
                 if let Some(ty) = ty.clone() {
                     local_types.insert(name.clone(), ty);
+                    if let Some(bound_ty) = local_types.get(name).cloned() {
+                        extend_local_field_bindings_from_type(
+                            name,
+                            &bound_ty,
+                            visible_structs,
+                            &mut local_types,
+                        );
+                    }
                 } else if let Some(inferred_ty) =
-                    infer_local_binding_type(&rewritten_value, &local_types, module_function_table)
+                    infer_local_binding_type(
+                        &rewritten_value,
+                        &local_types,
+                        module_function_table,
+                        module_impls,
+                    )
                 {
                     local_types.insert(name.clone(), inferred_ty);
                 }
+                extend_local_field_bindings_from_expr(
+                    name,
+                    &rewritten_value,
+                    &mut local_types,
+                    module_function_table,
+                    module_impls,
+                );
             }
             AstStmt::AssignLocal { name, value } => {
                 let rewritten_value = rewrite_lambda_expr(
@@ -834,10 +1071,22 @@ fn expand_lambda_block(
                     value: rewritten_value.clone(),
                 });
                 if let Some(inferred_ty) =
-                    infer_local_binding_type(&rewritten_value, &local_types, module_function_table)
+                    infer_local_binding_type(
+                        &rewritten_value,
+                        &local_types,
+                        module_function_table,
+                        module_impls,
+                    )
                 {
                     local_types.insert(name.clone(), inferred_ty);
                 }
+                extend_local_field_bindings_from_expr(
+                    name,
+                    &rewritten_value,
+                    &mut local_types,
+                    module_function_table,
+                    module_impls,
+                );
             }
             AstStmt::DestructureLet {
                 type_ref,
@@ -895,11 +1144,31 @@ fn expand_lambda_block(
                 locals.insert(name.clone());
                 if let Some(ty) = ty.clone() {
                     local_types.insert(name.clone(), ty);
+                    if let Some(bound_ty) = local_types.get(name).cloned() {
+                        extend_local_field_bindings_from_type(
+                            name,
+                            &bound_ty,
+                            visible_structs,
+                            &mut local_types,
+                        );
+                    }
                 } else if let Some(inferred_ty) =
-                    infer_local_binding_type(&rewritten_value, &local_types, module_function_table)
+                    infer_local_binding_type(
+                        &rewritten_value,
+                        &local_types,
+                        module_function_table,
+                        module_impls,
+                    )
                 {
                     local_types.insert(name.clone(), inferred_ty);
                 }
+                extend_local_field_bindings_from_expr(
+                    name,
+                    &rewritten_value,
+                    &mut local_types,
+                    module_function_table,
+                    module_impls,
+                );
             }
             AstStmt::Print(value) => rewritten.push(AstStmt::Print(rewrite_lambda_expr(
                 value,
@@ -956,6 +1225,7 @@ fn expand_lambda_block(
                     &locals,
                     &local_types,
                     module_impls,
+                    visible_structs,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -970,6 +1240,7 @@ fn expand_lambda_block(
                     &locals,
                     &local_types,
                     module_impls,
+                    visible_structs,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -1025,6 +1296,7 @@ fn expand_lambda_block(
                                 &locals,
                                 &local_types,
                                 module_impls,
+                                visible_structs,
                                 module_const_names,
                                 module_function_table,
                                 owning_function_name,
@@ -1058,6 +1330,7 @@ fn expand_lambda_block(
                     &locals,
                     &local_types,
                     module_impls,
+                    visible_structs,
                     module_const_names,
                     module_function_table,
                     owning_function_name,
@@ -1167,6 +1440,7 @@ fn rewrite_lambda_expr(
                 visible_locals,
                 visible_local_types,
                 module_impls,
+                &BTreeMap::new(),
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -1181,6 +1455,7 @@ fn rewrite_lambda_expr(
                 visible_locals,
                 visible_local_types,
                 module_impls,
+                &BTreeMap::new(),
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -1233,6 +1508,7 @@ fn rewrite_lambda_expr(
                             visible_locals,
                             visible_local_types,
                             module_impls,
+                            &BTreeMap::new(),
                             module_const_names,
                             module_function_table,
                             owning_function_name,
@@ -1257,6 +1533,7 @@ fn rewrite_lambda_expr(
                 visible_locals,
                 visible_local_types,
                 module_impls,
+                &BTreeMap::new(),
                 module_const_names,
                 module_function_table,
                 owning_function_name,
@@ -1290,8 +1567,8 @@ fn rewrite_lambda_expr(
                         lambda_aliases,
                         visible_locals,
                         visible_local_types,
-                        module_impls,
-                        module_const_names,
+        module_impls,
+        module_const_names,
                         module_function_table,
                         owning_function_name,
                         counter,
@@ -1314,6 +1591,7 @@ fn rewrite_lambda_expr(
                         visible_locals,
                         visible_local_types,
                         module_impls,
+                        &BTreeMap::new(),
                         module_const_names,
                         module_function_table,
                         owning_function_name,
@@ -1367,6 +1645,7 @@ fn rewrite_lambda_expr(
                                 expected_expr_type,
                                 visible_local_types,
                                 module_function_table,
+                                module_impls,
                             )
                             .as_ref(),
                         )?;
@@ -1382,6 +1661,7 @@ fn rewrite_lambda_expr(
                             visible_locals,
                             visible_local_types,
                             module_impls,
+                            &BTreeMap::new(),
                             module_const_names,
                             module_function_table,
                             owning_function_name,
@@ -1397,8 +1677,8 @@ fn rewrite_lambda_expr(
                             lambda_aliases,
                             visible_locals,
                             visible_local_types,
-                            module_impls,
-                            module_const_names,
+                    module_impls,
+                    module_const_names,
                             module_function_table,
                             owning_function_name,
                             counter,
@@ -1473,6 +1753,7 @@ fn rewrite_lambda_expr(
                             visible_locals,
                             visible_local_types,
                             module_impls,
+                            &BTreeMap::new(),
                             module_const_names,
                             module_function_table,
                             owning_function_name,
@@ -1560,8 +1841,8 @@ fn rewrite_lambda_expr(
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
-                module_impls,
-                module_const_names,
+                    module_impls,
+                    module_const_names,
                 module_function_table,
                 owning_function_name,
                 counter,
@@ -1577,8 +1858,8 @@ fn rewrite_lambda_expr(
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
-                module_impls,
-                module_const_names,
+                    module_impls,
+                    module_const_names,
                 module_function_table,
                 owning_function_name,
                 counter,

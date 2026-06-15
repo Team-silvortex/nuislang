@@ -6,16 +6,20 @@ use yir_core::{Operation, YirModule};
 use super::{
     build_project_link_bridge_contract, collect_profile_int_bindings, ensure_project_resource,
     infer_data_handle_table_schema, infer_shader_packet_contract, merge_project_payload_contract,
-    payload_class_marker_name, payload_shape_marker_name, push_profile_node,
+    payload_class_marker_name, payload_shape_marker_name, profile_apply::resolve_registered_abi_target,
+    profile_apply::target_config_tokens_for_domain, push_profile_node,
     resolve_project_profile_target_name, sanitize_ident, LoadedProject,
 };
+use super::ProjectAbiResolution;
 
 pub(super) fn materialize_project_type_contract_nodes(
     project: &LoadedProject,
+    abi_resolution: &ProjectAbiResolution,
     module: &mut YirModule,
 ) -> Result<(), String> {
     ensure_project_resource(module, "cpu0", "cpu.arm64");
     super::materialize_project_bridge_contract_nodes(project, module)?;
+    materialize_project_abi_summary_nodes(abi_resolution, module)?;
 
     for project_module in &project.modules {
         match project_module.ast.domain.as_str() {
@@ -23,16 +27,136 @@ pub(super) fn materialize_project_type_contract_nodes(
                 materialize_data_type_contract_nodes(project, &project_module.ast.unit, module)?
             }
             "shader" => {
-                materialize_shader_type_contract_nodes(project, &project_module.ast.unit, module)?
+                materialize_shader_type_contract_nodes(
+                    project,
+                    &project_module.ast.unit,
+                    abi_resolution,
+                    module,
+                )?
             }
             "kernel" => {
-                materialize_kernel_type_contract_nodes(project, &project_module.ast.unit, module)?
+                materialize_kernel_type_contract_nodes(
+                    project,
+                    &project_module.ast.unit,
+                    abi_resolution,
+                    module,
+                )?
+            }
+            "network" => {
+                materialize_network_type_contract_nodes(
+                    &project_module.ast.unit,
+                    abi_resolution,
+                    module,
+                )?
             }
             _ => {}
         }
     }
 
+    materialize_project_abi_graph_summary_node(abi_resolution, module);
+
     Ok(())
+}
+
+fn materialize_project_abi_summary_nodes(
+    abi_resolution: &ProjectAbiResolution,
+    module: &mut YirModule,
+) -> Result<(), String> {
+    for requirement in &abi_resolution.requirements {
+        let mode = if abi_resolution.explicit {
+            "explicit"
+        } else {
+            "auto"
+        };
+        let target = resolve_registered_abi_target(&requirement.domain, Some(abi_resolution)).ok().flatten();
+        let arch = target
+            .as_ref()
+            .map(|target| target.machine_arch.clone())
+            .unwrap_or_else(|| "unknown".to_owned());
+        let os = target
+            .as_ref()
+            .map(|target| target.machine_os.clone())
+            .unwrap_or_else(|| "unknown".to_owned());
+        let object = target
+            .as_ref()
+            .map(|target| target.object_format.clone())
+            .unwrap_or_else(|| "unknown".to_owned());
+        let calling = target
+            .as_ref()
+            .map(|target| target.calling_abi.clone())
+            .unwrap_or_else(|| "unknown".to_owned());
+        let backend = target
+            .and_then(|target| target.backend_family)
+            .unwrap_or_else(|| "none".to_owned());
+        let value = format!(
+            "mode=symbol:{mode};abi=symbol:{};arch=symbol:{};os=symbol:{};object=symbol:{};calling=symbol:{};backend=symbol:{}",
+            requirement.abi,
+            arch,
+            os,
+            object,
+            calling,
+            backend
+        );
+        let entry_name = format!(
+            "project_abi_{}_selection_entry",
+            sanitize_ident(&requirement.domain)
+        );
+        let contract_name = format!(
+            "project_abi_{}_selection_summary_type",
+            sanitize_ident(&requirement.domain)
+        );
+        push_profile_text_node(module, entry_name.clone(), value.clone());
+        push_profile_text_node(module, contract_name.clone(), value);
+        connect_project_contract_node(module, &contract_name, &entry_name);
+    }
+    Ok(())
+}
+
+fn materialize_project_abi_graph_summary_node(
+    abi_resolution: &ProjectAbiResolution,
+    module: &mut YirModule,
+) {
+    let domains = abi_resolution
+        .requirements
+        .iter()
+        .map(|item| item.domain.as_str())
+        .collect::<Vec<_>>();
+    let has_cpu_summary = domains.iter().any(|domain| *domain == "cpu");
+    let has_data_summary = domains.iter().any(|domain| *domain == "data");
+    let has_kernel_target = module.nodes.iter().any(|node| {
+        node.name.ends_with("_kernel_target_config_auto")
+            && node.op.module == "kernel"
+            && node.op.instruction == "target_config"
+    });
+    let has_shader_target = module.nodes.iter().any(|node| {
+        node.name.ends_with("_shader_target_config_auto")
+            && node.op.module == "shader"
+            && node.op.instruction == "target_config"
+    });
+    let has_network_target = module.nodes.iter().any(|node| {
+        node.name.ends_with("_network_target_config_auto")
+            && node.op.module == "network"
+            && node.op.instruction == "target_config"
+    });
+    let mode = if abi_resolution.explicit {
+        "explicit"
+    } else {
+        "auto"
+    };
+    let value = format!(
+        "mode=symbol:{mode};domains=symbol:{};cpu_summary=symbol:{};data_summary=symbol:{};kernel_target=symbol:{};shader_target=symbol:{};network_target=symbol:{}",
+        domains.join(","),
+        if has_cpu_summary { "present" } else { "absent" },
+        if has_data_summary { "present" } else { "absent" },
+        if has_kernel_target { "present" } else { "absent" },
+        if has_shader_target { "present" } else { "absent" },
+        if has_network_target { "present" } else { "absent" }
+    );
+    let entry_name = "project_abi_graph_summary_entry".to_owned();
+    let contract_name = "project_abi_graph_summary_type".to_owned();
+    push_profile_text_node(module, entry_name.clone(), value.clone());
+    push_profile_text_node(module, contract_name.clone(), value);
+    connect_project_contract_node(module, &contract_name, &entry_name);
 }
 
 pub(super) fn push_profile_text_node(module: &mut YirModule, name: String, value: String) {
@@ -168,80 +292,177 @@ fn materialize_data_type_contract_nodes(
 fn materialize_shader_type_contract_nodes(
     project: &LoadedProject,
     unit: &str,
+    abi_resolution: &ProjectAbiResolution,
     module: &mut YirModule,
 ) -> Result<(), String> {
-    let Some(contract) = infer_shader_packet_contract(project, unit)? else {
-        return Ok(());
-    };
-    let packet_type = NirTypeRef {
-        name: contract.type_name.clone(),
-        generic_args: Vec::new(),
-        is_optional: false,
-        is_ref: false,
-    };
-    let type_node = format!(
-        "project_profile_shader_{}_packet_type",
-        sanitize_ident(unit)
-    );
-    let class_node = format!(
-        "project_profile_shader_{}_packet_class_type",
-        sanitize_ident(unit)
-    );
-    let shape_node = format!(
-        "project_profile_shader_{}_packet_shape_type",
-        sanitize_ident(unit)
-    );
-    push_profile_text_node(module, type_node.clone(), contract.type_name);
-    push_profile_text_node(
-        module,
-        class_node.clone(),
-        payload_class_marker_name(&packet_type),
-    );
-    push_profile_text_node(
-        module,
-        shape_node.clone(),
-        payload_shape_marker_name(&packet_type),
-    );
-    connect_project_contract_node(
-        module,
-        &type_node,
-        &resolve_project_profile_target_name("shader", unit, "packet_field_count"),
-    );
-    connect_project_contract_node(
-        module,
-        &class_node,
-        &resolve_project_profile_target_name("shader", unit, "packet_field_count"),
-    );
-    connect_project_contract_node(
-        module,
-        &shape_node,
-        &resolve_project_profile_target_name("shader", unit, "packet_field_count"),
-    );
+    if let Some(contract) = infer_shader_packet_contract(project, unit)? {
+        let packet_type = NirTypeRef {
+            name: contract.type_name.clone(),
+            generic_args: Vec::new(),
+            is_optional: false,
+            is_ref: false,
+        };
+        let type_node = format!(
+            "project_profile_shader_{}_packet_type",
+            sanitize_ident(unit)
+        );
+        let class_node = format!(
+            "project_profile_shader_{}_packet_class_type",
+            sanitize_ident(unit)
+        );
+        let shape_node = format!(
+            "project_profile_shader_{}_packet_shape_type",
+            sanitize_ident(unit)
+        );
+        push_profile_text_node(module, type_node.clone(), contract.type_name);
+        push_profile_text_node(
+            module,
+            class_node.clone(),
+            payload_class_marker_name(&packet_type),
+        );
+        push_profile_text_node(
+            module,
+            shape_node.clone(),
+            payload_shape_marker_name(&packet_type),
+        );
+        connect_project_contract_node(
+            module,
+            &type_node,
+            &resolve_project_profile_target_name("shader", unit, "packet_field_count"),
+        );
+        connect_project_contract_node(
+            module,
+            &class_node,
+            &resolve_project_profile_target_name("shader", unit, "packet_field_count"),
+        );
+        connect_project_contract_node(
+            module,
+            &shape_node,
+            &resolve_project_profile_target_name("shader", unit, "packet_field_count"),
+        );
+    }
+    materialize_target_config_contract_node("shader", unit, module);
+    materialize_abi_selection_contract_node("shader", unit, abi_resolution, module)?;
     Ok(())
 }
 
 fn materialize_kernel_type_contract_nodes(
     project: &LoadedProject,
     unit: &str,
+    abi_resolution: &ProjectAbiResolution,
     module: &mut YirModule,
 ) -> Result<(), String> {
-    let Some(summary) = infer_kernel_slot_contract_summary(project, unit)? else {
+    if let Some(summary) = infer_kernel_slot_contract_summary(project, unit)? {
+        let summary_node = format!(
+            "project_profile_kernel_{}_slot_contract_type",
+            sanitize_ident(unit)
+        );
+        push_profile_text_node(module, summary_node.clone(), summary);
+        connect_project_contract_node(
+            module,
+            &summary_node,
+            &format!(
+                "project_profile_kernel_{}_profile_entry",
+                sanitize_ident(unit)
+            ),
+        );
+    }
+    materialize_target_config_contract_node("kernel", unit, module);
+    materialize_abi_selection_contract_node("kernel", unit, abi_resolution, module)?;
+    Ok(())
+}
+
+fn materialize_network_type_contract_nodes(
+    unit: &str,
+    abi_resolution: &ProjectAbiResolution,
+    module: &mut YirModule,
+) -> Result<(), String> {
+    materialize_target_config_contract_node("network", unit, module);
+    materialize_abi_selection_contract_node("network", unit, abi_resolution, module)?;
+    Ok(())
+}
+
+fn materialize_abi_selection_contract_node(
+    domain: &str,
+    unit: &str,
+    abi_resolution: &ProjectAbiResolution,
+    module: &mut YirModule,
+) -> Result<(), String> {
+    let Some(requirement) = abi_resolution
+        .requirements
+        .iter()
+        .find(|item| item.domain == domain)
+    else {
         return Ok(());
     };
-    let summary_node = format!(
-        "project_profile_kernel_{}_slot_contract_type",
+    let Some(target) = resolve_registered_abi_target(domain, Some(abi_resolution))? else {
+        return Ok(());
+    };
+    let (arch, runtime, lane_width) = target_config_tokens_for_domain(domain, &target);
+    let target_suffix = match domain {
+        "kernel" => "kernel_target_config_auto",
+        "shader" => "shader_target_config_auto",
+        "network" => "network_target_config_auto",
+        _ => return Ok(()),
+    };
+    let target_name = format!(
+        "project_profile_{}_{}_{}",
+        sanitize_ident(domain),
+        sanitize_ident(unit),
+        target_suffix
+    );
+    if !module.nodes.iter().any(|node| node.name == target_name) {
+        return Ok(());
+    }
+    let contract_name = format!(
+        "project_profile_{}_{}_abi_selection_contract_type",
+        sanitize_ident(domain),
         sanitize_ident(unit)
     );
-    push_profile_text_node(module, summary_node.clone(), summary);
-    connect_project_contract_node(
-        module,
-        &summary_node,
-        &format!(
-            "project_profile_kernel_{}_profile_entry",
-            sanitize_ident(unit)
-        ),
+    let mode = if abi_resolution.explicit {
+        "explicit"
+    } else {
+        "auto"
+    };
+    let contract_value = format!(
+        "mode=symbol:{mode};abi=symbol:{};arch=symbol:{arch};runtime=symbol:{runtime};lane_width=i64:{lane_width}",
+        requirement.abi
     );
+    push_profile_text_node(module, contract_name.clone(), contract_value);
+    connect_project_contract_node(module, &contract_name, &target_name);
     Ok(())
+}
+
+fn materialize_target_config_contract_node(domain: &str, unit: &str, module: &mut YirModule) {
+    let suffix = match domain {
+        "kernel" => "kernel_target_config_auto",
+        "shader" => "shader_target_config_auto",
+        "network" => "network_target_config_auto",
+        _ => return,
+    };
+    let target_name = format!(
+        "project_profile_{}_{}_{}",
+        sanitize_ident(domain),
+        sanitize_ident(unit),
+        suffix
+    );
+    let Some(target) = module.nodes.iter().find(|node| node.name == target_name) else {
+        return;
+    };
+    if target.op.args.len() < 3 {
+        return;
+    }
+    let contract_name = format!(
+        "project_profile_{}_{}_target_contract_type",
+        sanitize_ident(domain),
+        sanitize_ident(unit)
+    );
+    let contract_value = format!(
+        "arch=symbol:{};runtime=symbol:{};lane_width=i64:{}",
+        target.op.args[0], target.op.args[1], target.op.args[2]
+    );
+    push_profile_text_node(module, contract_name.clone(), contract_value);
+    connect_project_contract_node(module, &contract_name, &target_name);
 }
 
 fn infer_kernel_slot_contract_summary(

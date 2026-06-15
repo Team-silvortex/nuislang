@@ -34,15 +34,11 @@ If you only want the current front-door examples, start with:
   [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo),
   [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo),
   [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
-* multidomain orchestration ladder:
-  [multidomain_profile_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/multidomain_profile_probe_demo),
-  [multidomain_async_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/multidomain_async_probe_demo),
-  [multidomain_async_orchestration_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/multidomain_async_orchestration_demo)
-* network recipe/front-door ladder:
-  [net_endpoint_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_endpoint_recipe_demo),
+* network HTTP/session ladder:
   [net_http_request_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_recipe_demo),
   [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo),
-  [net_http_service_lane_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_service_lane_recipe_demo)
+  [net_http_service_lane_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_service_lane_recipe_demo),
+  [net_http_session_loop_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
 * network runtime validation probes:
   [network_loopback_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_loopback_runtime_demo),
   [network_host_handle_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_probe_demo),
@@ -58,10 +54,14 @@ If you only want the current front-door examples, start with:
   [network_owned_transport_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_owned_transport_result_demo),
   [network_transport_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_demo),
   [network_transport_result_session_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_session_bridge_demo)
-* HTTP/session bridge anchor:
-  [net_http_session_loop_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
 * exploratory protocol route:
   [net_protocol_experiment_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_experiment_recipe_demo)
+
+## Retired In Current Cleanup
+
+The older zero-reference `multidomain_*` and broad `net_*` recipe swarm that
+no longer carried current doc, script, or mainline-map responsibility has been
+retired from the checked-in examples tree.
 
 ## Reading Rule
 

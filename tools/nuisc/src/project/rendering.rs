@@ -1,8 +1,9 @@
 use nuis_semantics::model::{AstExternFunction, AstTypeRef};
 
 use super::{
-    resolve_project_abi, LoadedProject, ProjectExchangeOrganization, ProjectExchangeRoute,
-    ProjectOrganization, ProjectOrganizationLink, ProjectOrganizationModule,
+    profile_apply::resolve_registered_abi_target, resolve_project_abi, LoadedProject,
+    ProjectAbiResolution, ProjectExchangeOrganization, ProjectExchangeRoute, ProjectOrganization,
+    ProjectOrganizationLink, ProjectOrganizationModule,
 };
 
 pub fn organize_project(project: &LoadedProject) -> ProjectOrganization {
@@ -156,18 +157,98 @@ pub(super) fn render_project_abi_index(project: &LoadedProject) -> Result<String
     if resolution.requirements.is_empty() {
         return Ok(String::new());
     }
-    let mut lines = resolution
-        .requirements
-        .iter()
-        .map(|item| format!("{}\t{}", item.domain, item.abi))
-        .collect::<Vec<_>>();
-    lines.sort();
     let mode = if resolution.explicit {
         "# mode=explicit"
     } else {
         "# mode=auto-recommended"
     };
+    let graph_summary = render_project_abi_graph_line(&resolution);
+    let mut lines = vec![graph_summary];
+    for item in &resolution.requirements {
+        let target = resolve_registered_abi_target(&item.domain, Some(&resolution))
+            .ok()
+            .flatten();
+        let arch = target
+            .as_ref()
+            .map(|target| target.machine_arch.as_str())
+            .unwrap_or("unknown");
+        let os = target
+            .as_ref()
+            .map(|target| target.machine_os.as_str())
+            .unwrap_or("unknown");
+        let object = target
+            .as_ref()
+            .map(|target| target.object_format.as_str())
+            .unwrap_or("unknown");
+        let calling = target
+            .as_ref()
+            .map(|target| target.calling_abi.as_str())
+            .unwrap_or("unknown");
+        let backend = target
+            .as_ref()
+            .and_then(|target| target.backend_family.as_deref())
+            .unwrap_or("none");
+        lines.push(format!(
+            "domain\t{}\tabi={}\tarch={}\tos={}\tobject={}\tcalling={}\tbackend={}",
+            item.domain, item.abi, arch, os, object, calling, backend
+        ));
+    }
+    lines.sort_by(|lhs, rhs| {
+        if lhs.starts_with("graph\t") {
+            std::cmp::Ordering::Less
+        } else if rhs.starts_with("graph\t") {
+            std::cmp::Ordering::Greater
+        } else {
+            lhs.cmp(rhs)
+        }
+    });
     Ok(format!("{mode}\n{}\n", lines.join("\n")))
+}
+
+pub fn render_project_abi_graph_line(resolution: &ProjectAbiResolution) -> String {
+    let domains = resolution
+        .requirements
+        .iter()
+        .map(|item| item.domain.as_str())
+        .collect::<Vec<_>>();
+    format!(
+        "graph\tmode={}\tdomains={}\tcpu_summary={}\tdata_summary={}\tkernel_target={}\tshader_target={}\tnetwork_target={}",
+        if resolution.explicit { "explicit" } else { "auto" },
+        domains.join(","),
+        if domains.iter().any(|domain| *domain == "cpu") {
+            "present"
+        } else {
+            "absent"
+        },
+        if domains.iter().any(|domain| *domain == "data") {
+            "present"
+        } else {
+            "absent"
+        },
+        if domains.iter().any(|domain| *domain == "kernel") {
+            "present"
+        } else {
+            "absent"
+        },
+        if domains.iter().any(|domain| *domain == "shader") {
+            "present"
+        } else {
+            "absent"
+        },
+        if domains.iter().any(|domain| *domain == "network") {
+            "present"
+        } else {
+            "absent"
+        },
+    )
+}
+
+pub fn describe_project_abi_graph(project: &LoadedProject) -> Result<String, String> {
+    let resolution = resolve_project_abi(project)?;
+    if resolution.requirements.is_empty() {
+        return Ok("graph\tmode=none\tdomains=<none>".to_owned());
+    }
+    Ok(render_project_abi_graph_line(&resolution))
 }
 
 pub(super) fn render_project_host_ffi_index(project: &LoadedProject) -> String {

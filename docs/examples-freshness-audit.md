@@ -57,8 +57,7 @@ Completed in this pass:
   `command_runtime_demo`, and `workflow_runtime_demo`
 * companion routing updated to include missing current examples such as
   `argv_runtime_demo`, `env_runtime_demo`, and `text_json_demo`
-* older low-level probes moved into
-  [examples/legacy/tooling](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling)
+* older low-level probes were retired from the checked-in examples tree
 * `current-mainline-map`, tooling README, self-hosted gate planning, and
   tooling workflow contract now all point at the same structure
 
@@ -314,21 +313,19 @@ wording cleanup, but they should not be deleted blindly yet.
 
 ### Archived
 
-These routes were intentionally moved out of `examples/projects/` and into
-`examples/legacy/` because they are older low-level host/runtime probes rather
-than current recommended workflow examples.
+These routes were intentionally removed from the checked-in examples tree after
+their current replacements became clearer and better aligned with the current
+tooling front door.
 
-* [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling/command_shell_demo)
-  kept as a historical shell-bridge probe; current readers should start from
-  `command_runtime_demo`, `workflow_runtime_demo`, or `cli_runtime_demo`
-* [automation_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling/automation_runtime_demo)
-  archived for historical continuity; its practical role is now covered more
-  clearly by workflow and CLI-oriented routes
-* [line_input_demo](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling/line_input_demo)
-  retained as an older focused stdin probe rather than a current tooling route
-* [report_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling/report_runtime_demo)
-  retained as an older report-host probe; current readers should prefer
-  diagnostic/result/report session routes
+* `command_shell_demo`
+  replaced in practice by `command_runtime_demo`, `workflow_runtime_demo`, and
+  `cli_runtime_demo`
+* `automation_runtime_demo`
+  replaced in practice by workflow and CLI-oriented routes
+* `line_input_demo`
+  replaced in practice by `input_runtime_demo` and terminal/CLI session routes
+* `report_runtime_demo`
+  replaced in practice by diagnostic/result/report session routes
 
 ### Stale Wording Only
 

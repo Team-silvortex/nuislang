@@ -1001,6 +1001,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "project_plan: {}",
                     project::describe_project_compilation_plan(plan)
                 );
+                println!(
+                    "project_abi_graph: {}",
+                    project::render_project_abi_graph_line(&plan.abi_resolution)
+                );
             }
             println!(
                 "loaded_nustar: {}",
@@ -1039,7 +1043,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 resolved.project_plan.as_ref(),
             )?;
             let cache_hit = cache::lookup_compile_cache(&cache_key)?;
-            let artifacts = resolved.compile()?;
+            let artifacts = resolved.compile_with_options(&pipeline::PipelineCompileOptions {
+                lowering_target: Some(lowering::LoweringTargetConfig::from_cpu_build_target(
+                    &cpu_target,
+                )),
+            })?;
             let written = if let Some(entry) = &cache_hit {
                 cache::restore_compile_cache(entry, &output_dir)?;
                 aot::compile_artifacts_for_output_dir(
@@ -1093,6 +1101,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                             } else {
                                 "auto-recommended".to_owned()
                             },
+                            abi_graph_summary: Some(project::render_project_abi_graph_line(
+                                &plan.abi_resolution,
+                            )),
                             abi_entries: plan
                                 .abi_resolution
                                 .requirements
@@ -1146,11 +1157,18 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             }
             if let Some(project) = &resolved.project {
                 println!("project: {}", project::describe_project(project));
+                if let Ok(graph) = project::describe_project_abi_graph(project) {
+                    println!("project_abi_graph: {}", graph);
+                }
             }
             if let Some(plan) = &resolved.project_plan {
                 println!(
                     "project_plan: {}",
                     project::describe_project_compilation_plan(plan)
+                );
+                println!(
+                    "project_abi_graph: {}",
+                    project::render_project_abi_graph_line(&plan.abi_resolution)
                 );
             }
             println!(

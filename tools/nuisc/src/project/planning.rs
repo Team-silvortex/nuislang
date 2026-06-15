@@ -5,11 +5,12 @@ use std::path::Path;
 
 use super::{
     organize_project, organize_project_exchanges, packet, parse_project_manifest,
-    render_project_abi_index, render_project_exchange_index, render_project_host_ffi_index,
-    render_project_organization_index, resolve_project_abi, validate_project_abi_requirements,
-    validate_project_links, validate_project_modules, validate_project_unit_bindings,
-    validate_project_uses, LoadedProject, ProjectBuildMetadata, ProjectCompilationDependency,
-    ProjectCompilationPlan, ProjectModule, ProjectOutputIntent, ProjectSyntheticInput,
+    render_project_abi_graph_line, render_project_abi_index, render_project_exchange_index,
+    render_project_host_ffi_index, render_project_organization_index, resolve_project_abi,
+    validate_project_abi_requirements, validate_project_links, validate_project_modules,
+    validate_project_unit_bindings, validate_project_uses, LoadedProject, ProjectBuildMetadata,
+    ProjectCompilationDependency, ProjectCompilationPlan, ProjectModule, ProjectOutputIntent,
+    ProjectSyntheticInput,
 };
 
 pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
@@ -315,12 +316,13 @@ pub fn render_project_compilation_plan_index(plan: &ProjectCompilationPlan) -> S
             .join(", ")
     };
     format!(
-        "project {}\nentry {}\ndomains {}\nexchanges {}\nabi_mode {}\nabi {}\ndependencies {}\nsynthetic_input_kind {}\nsynthetic_input {}\noutput_intents {}\neffective_input {}\nsummary {}\n",
+        "project {}\nentry {}\ndomains {}\nexchanges {}\nabi_mode {}\nabi_graph {}\nabi {}\ndependencies {}\nsynthetic_input_kind {}\nsynthetic_input {}\noutput_intents {}\neffective_input {}\nsummary {}\n",
         plan.project_name,
         plan.entry,
         plan.organization.domains.join(", "),
         plan.exchanges.routes.len(),
         abi_mode,
+        render_project_abi_graph_line(&plan.abi_resolution),
         abi_entries,
         dependencies,
         plan.synthetic_input.kind,

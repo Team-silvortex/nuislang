@@ -1268,6 +1268,8 @@ pub(super) fn ensure_generic_specialization(
             &specialized,
             higher_order_templates,
             function_table,
+            &[],
+            &BTreeMap::new(),
             &BTreeMap::new(),
             visible_type_aliases,
             &mut higher_order_specialization_cache,

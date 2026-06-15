@@ -50,8 +50,6 @@ There are also project-form companions:
 
 * [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo)
 * [subprocess_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo)
-* [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling/command_shell_demo)
-* [automation_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling/automation_runtime_demo)
 * [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
 
 These are enough to show that the direction is real.
@@ -59,9 +57,9 @@ These are enough to show that the direction is real.
 They are not enough to say that the current `0.17.0` mainline matrix should
 already be implemented in `nuis`.
 
-The archived `command_shell_demo` and `automation_runtime_demo` routes remain
-useful as historical low-level probes, but they no longer represent the current
-recommended tooling path.
+The older `command_shell_demo` and `automation_runtime_demo` routes have now
+been retired from the checked-in examples tree; they no longer represent the
+current recommended tooling path.
 
 ## Why The Current Surface Is Still Not Enough
 

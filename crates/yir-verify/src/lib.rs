@@ -137,6 +137,7 @@ pub fn verify_module_with_registry(
     verify_result_state_nodes(module)?;
     verify_scheduler_contract_nodes(module, &resources, &nodes)?;
     verify_project_type_contract_nodes(module)?;
+    verify_lowering_contract_nodes(module)?;
     verify_cpu_heap_protocol(module)?;
     Ok(())
 }
@@ -554,6 +555,12 @@ fn verify_project_type_contract_nodes(module: &YirModule) -> Result<(), String> 
         }
 
         match contract.kind {
+            ProjectContractKind::AbiGraphSummary => {
+                verify_abi_graph_summary_text(node.name.as_str(), value, target)?;
+            }
+            ProjectContractKind::AbiSelectionSummary => {
+                verify_abi_selection_summary_text(node.name.as_str(), value, target)?;
+            }
             ProjectContractKind::DataPayloadClass | ProjectContractKind::ShaderPacketClass => {
                 require_prefixed_contract_value(node.name.as_str(), value, "PayloadClass")?;
             }
@@ -576,7 +583,80 @@ fn verify_project_type_contract_nodes(module: &YirModule) -> Result<(), String> 
             ProjectContractKind::KernelSlotContract => {
                 verify_kernel_slot_contract_text(node.name.as_str(), value, target)?;
             }
+            ProjectContractKind::KernelTargetContract => {
+                verify_target_contract_text(node.name.as_str(), value, target, "kernel")?;
+            }
+            ProjectContractKind::KernelAbiSelectionContract => {
+                verify_abi_selection_contract_text(node.name.as_str(), value, target, "kernel")?;
+            }
+            ProjectContractKind::ShaderTargetContract => {
+                verify_target_contract_text(node.name.as_str(), value, target, "shader")?;
+            }
+            ProjectContractKind::ShaderAbiSelectionContract => {
+                verify_abi_selection_contract_text(node.name.as_str(), value, target, "shader")?;
+            }
+            ProjectContractKind::NetworkTargetContract => {
+                verify_target_contract_text(node.name.as_str(), value, target, "network")?;
+            }
+            ProjectContractKind::NetworkAbiSelectionContract => {
+                verify_abi_selection_contract_text(node.name.as_str(), value, target, "network")?;
+            }
         }
+    }
+
+    Ok(())
+}
+
+fn verify_lowering_contract_nodes(module: &YirModule) -> Result<(), String> {
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
+
+    for node in &module.nodes {
+        if node.op.module != "cpu" || node.op.instruction != "text" {
+            continue;
+        }
+        if node.name != "lowering_cpu_target_contract_type" {
+            continue;
+        }
+        let value = node
+            .op
+            .args
+            .first()
+            .map(|value| value.trim())
+            .ok_or_else(|| {
+                format!(
+                    "lowering contract node `{}` must carry a canonical text payload",
+                    node.name
+                )
+            })?;
+        if value.is_empty() {
+            return Err(format!(
+                "lowering contract node `{}` must carry a non-empty canonical text payload",
+                node.name
+            ));
+        }
+        let target_name = "lowering_cpu_target_config";
+        let target = nodes.get(target_name).copied().ok_or_else(|| {
+            format!(
+                "lowering contract node `{}` references unknown target `{target_name}`",
+                node.name
+            )
+        })?;
+        let has_link = module.edges.iter().any(|edge| {
+            edge.from == node.name
+                && edge.to == target_name
+                && matches!(edge.kind, EdgeKind::Dep | EdgeKind::CrossDomainExchange)
+        });
+        if !has_link {
+            return Err(format!(
+                "lowering contract node `{}` requires dep/xfer edge into `{target_name}`",
+                node.name
+            ));
+        }
+        verify_cpu_target_contract_text(node.name.as_str(), value, target)?;
     }
 
     Ok(())
@@ -1551,6 +1631,8 @@ fn verify_scheduler_observer_branch_class_contract_text(
 
 #[derive(Clone, Copy)]
 enum ProjectContractKind {
+    AbiGraphSummary,
+    AbiSelectionSummary,
     DataPayloadClass,
     DataPayloadShape,
     DataHandleTableSchema,
@@ -1560,6 +1642,12 @@ enum ProjectContractKind {
     BridgeStageContract,
     BridgePayloadContract(BridgePayloadDirection),
     KernelSlotContract,
+    KernelTargetContract,
+    KernelAbiSelectionContract,
+    ShaderTargetContract,
+    ShaderAbiSelectionContract,
+    NetworkTargetContract,
+    NetworkAbiSelectionContract,
 }
 
 #[derive(Clone, Copy)]
@@ -1575,6 +1663,23 @@ struct ProjectContract<'a> {
 }
 
 fn classify_project_contract_node(name: &str) -> Option<ProjectContract<'_>> {
+    if name == "project_abi_graph_summary_type" {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::AbiGraphSummary,
+            target: "project_abi_graph_summary_entry".to_owned(),
+            _unit: "graph",
+        });
+    }
+    if let Some(domain) = name
+        .strip_prefix("project_abi_")
+        .and_then(|suffix| suffix.strip_suffix("_selection_summary_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::AbiSelectionSummary,
+            target: format!("project_abi_{domain}_selection_entry"),
+            _unit: domain,
+        });
+    }
     if let Some(id) = name
         .strip_prefix("project_link_")
         .and_then(|suffix| suffix.strip_suffix("_bridge_stage_type"))
@@ -1695,6 +1800,66 @@ fn classify_project_contract_node(name: &str) -> Option<ProjectContract<'_>> {
         return Some(ProjectContract {
             kind: ProjectContractKind::KernelSlotContract,
             target: format!("project_profile_kernel_{unit}_profile_entry"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_kernel_")
+        .and_then(|suffix| suffix.strip_suffix("_target_contract_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::KernelTargetContract,
+            target: format!("project_profile_kernel_{unit}_kernel_target_config_auto"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_kernel_")
+        .and_then(|suffix| suffix.strip_suffix("_abi_selection_contract_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::KernelAbiSelectionContract,
+            target: format!("project_profile_kernel_{unit}_kernel_target_config_auto"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_shader_")
+        .and_then(|suffix| suffix.strip_suffix("_target_contract_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::ShaderTargetContract,
+            target: format!("project_profile_shader_{unit}_shader_target_config_auto"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_shader_")
+        .and_then(|suffix| suffix.strip_suffix("_abi_selection_contract_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::ShaderAbiSelectionContract,
+            target: format!("project_profile_shader_{unit}_shader_target_config_auto"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_network_")
+        .and_then(|suffix| suffix.strip_suffix("_target_contract_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::NetworkTargetContract,
+            target: format!("project_profile_network_{unit}_network_target_config_auto"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_network_")
+        .and_then(|suffix| suffix.strip_suffix("_abi_selection_contract_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::NetworkAbiSelectionContract,
+            target: format!("project_profile_network_{unit}_network_target_config_auto"),
             _unit: unit,
         });
     }
@@ -1916,6 +2081,406 @@ fn verify_kernel_slot_contract_text(
         ));
     }
 
+    Ok(())
+}
+
+fn verify_target_contract_text(
+    node_name: &str,
+    value: &str,
+    target: &Node,
+    domain: &str,
+) -> Result<(), String> {
+    if target.op.module != domain || target.op.instruction != "target_config" {
+        return Err(format!(
+            "project contract node `{node_name}` must target `{domain}.target_config`, got `{}.{}`",
+            target.op.module, target.op.instruction
+        ));
+    }
+    let fields = parse_semicolon_kv_contract(node_name, value, "target contract")?;
+    let arch = fields.get("arch").copied().ok_or_else(|| {
+        format!("project contract node `{node_name}` is missing `arch` field")
+    })?;
+    let runtime = fields.get("runtime").copied().ok_or_else(|| {
+        format!("project contract node `{node_name}` is missing `runtime` field")
+    })?;
+    let lane_width = fields.get("lane_width").copied().ok_or_else(|| {
+        format!("project contract node `{node_name}` is missing `lane_width` field")
+    })?;
+    let arch = arch.strip_prefix("symbol:").ok_or_else(|| {
+        format!("project contract node `{node_name}` expects `arch=symbol:...`")
+    })?;
+    let runtime = runtime.strip_prefix("symbol:").ok_or_else(|| {
+        format!("project contract node `{node_name}` expects `runtime=symbol:...`")
+    })?;
+    let lane_width = lane_width.strip_prefix("i64:").ok_or_else(|| {
+        format!("project contract node `{node_name}` expects `lane_width=i64:...`")
+    })?;
+    let lane_width = lane_width.parse::<i64>().map_err(|_| {
+        format!("project contract node `{node_name}` has non-integer lane_width")
+    })?;
+    if lane_width <= 0 {
+        return Err(format!(
+            "project contract node `{node_name}` requires `lane_width > 0`, got `{lane_width}`"
+        ));
+    }
+    let target_arch = target.op.args.first().map(String::as_str).ok_or_else(|| {
+        format!(
+            "project contract node `{node_name}` references `{}` without arch arg",
+            target.name
+        )
+    })?;
+    let target_runtime = target.op.args.get(1).map(String::as_str).ok_or_else(|| {
+        format!(
+            "project contract node `{node_name}` references `{}` without runtime arg",
+            target.name
+        )
+    })?;
+    let target_lane_width = target
+        .op
+        .args
+        .get(2)
+        .ok_or_else(|| {
+            format!(
+                "project contract node `{node_name}` references `{}` without lane width arg",
+                target.name
+            )
+        })?
+        .parse::<i64>()
+        .map_err(|_| {
+            format!(
+                "project contract node `{node_name}` references `{}` with non-integer lane width",
+                target.name
+            )
+        })?;
+    if target_arch != arch {
+        return Err(format!(
+            "project contract node `{node_name}` encodes `arch={arch}`, but `{}` uses `{target_arch}`",
+            target.name
+        ));
+    }
+    if target_runtime != runtime {
+        return Err(format!(
+            "project contract node `{node_name}` encodes `runtime={runtime}`, but `{}` uses `{target_runtime}`",
+            target.name
+        ));
+    }
+    if target_lane_width != lane_width {
+        return Err(format!(
+            "project contract node `{node_name}` encodes `lane_width={lane_width}`, but `{}` uses `{target_lane_width}`",
+            target.name
+        ));
+    }
+    Ok(())
+}
+
+fn verify_cpu_target_contract_text(node_name: &str, value: &str, target: &Node) -> Result<(), String> {
+    if target.op.module != "cpu" || target.op.instruction != "target_config" {
+        return Err(format!(
+            "lowering contract node `{node_name}` must target `cpu.target_config`, got `{}.{}`",
+            target.op.module, target.op.instruction
+        ));
+    }
+    let fields = parse_semicolon_kv_contract(node_name, value, "cpu target contract")?;
+    let arch = fields.get("arch").copied().ok_or_else(|| {
+        format!("lowering contract node `{node_name}` is missing `arch` field")
+    })?;
+    let abi = fields.get("abi").copied().ok_or_else(|| {
+        format!("lowering contract node `{node_name}` is missing `abi` field")
+    })?;
+    let vector_bits = fields.get("vector_bits").copied().ok_or_else(|| {
+        format!("lowering contract node `{node_name}` is missing `vector_bits` field")
+    })?;
+    let arch = arch.strip_prefix("symbol:").ok_or_else(|| {
+        format!("lowering contract node `{node_name}` expects `arch=symbol:...`")
+    })?;
+    let abi = abi.strip_prefix("symbol:").ok_or_else(|| {
+        format!("lowering contract node `{node_name}` expects `abi=symbol:...`")
+    })?;
+    let vector_bits = vector_bits.strip_prefix("i64:").ok_or_else(|| {
+        format!("lowering contract node `{node_name}` expects `vector_bits=i64:...`")
+    })?;
+    let vector_bits = vector_bits.parse::<i64>().map_err(|_| {
+        format!("lowering contract node `{node_name}` has non-integer vector_bits")
+    })?;
+    if vector_bits <= 0 {
+        return Err(format!(
+            "lowering contract node `{node_name}` requires `vector_bits > 0`, got `{vector_bits}`"
+        ));
+    }
+    let target_arch = target.op.args.first().map(String::as_str).ok_or_else(|| {
+        format!(
+            "lowering contract node `{node_name}` references `{}` without arch arg",
+            target.name
+        )
+    })?;
+    let target_abi = target.op.args.get(1).map(String::as_str).ok_or_else(|| {
+        format!(
+            "lowering contract node `{node_name}` references `{}` without abi arg",
+            target.name
+        )
+    })?;
+    let target_vector_bits = target
+        .op
+        .args
+        .get(2)
+        .ok_or_else(|| {
+            format!(
+                "lowering contract node `{node_name}` references `{}` without vector_bits arg",
+                target.name
+            )
+        })?
+        .parse::<i64>()
+        .map_err(|_| {
+            format!(
+                "lowering contract node `{node_name}` references `{}` with non-integer vector_bits",
+                target.name
+            )
+        })?;
+    if target_arch != arch {
+        return Err(format!(
+            "lowering contract node `{node_name}` encodes `arch={arch}`, but `{}` uses `{target_arch}`",
+            target.name
+        ));
+    }
+    if target_abi != abi {
+        return Err(format!(
+            "lowering contract node `{node_name}` encodes `abi={abi}`, but `{}` uses `{target_abi}`",
+            target.name
+        ));
+    }
+    if target_vector_bits != vector_bits {
+        return Err(format!(
+            "lowering contract node `{node_name}` encodes `vector_bits={vector_bits}`, but `{}` uses `{target_vector_bits}`",
+            target.name
+        ));
+    }
+    Ok(())
+}
+
+fn verify_abi_selection_contract_text(
+    node_name: &str,
+    value: &str,
+    target: &Node,
+    domain: &str,
+) -> Result<(), String> {
+    if target.op.module != domain || target.op.instruction != "target_config" {
+        return Err(format!(
+            "project ABI selection contract node `{node_name}` must target `{domain}.target_config`, got `{}.{}`",
+            target.op.module, target.op.instruction
+        ));
+    }
+    let fields = parse_semicolon_kv_contract(node_name, value, "ABI selection contract")?;
+    let mode = fields.get("mode").copied().ok_or_else(|| {
+        format!("project ABI selection contract node `{node_name}` is missing `mode` field")
+    })?;
+    let abi = fields.get("abi").copied().ok_or_else(|| {
+        format!("project ABI selection contract node `{node_name}` is missing `abi` field")
+    })?;
+    let arch = fields.get("arch").copied().ok_or_else(|| {
+        format!("project ABI selection contract node `{node_name}` is missing `arch` field")
+    })?;
+    let runtime = fields.get("runtime").copied().ok_or_else(|| {
+        format!("project ABI selection contract node `{node_name}` is missing `runtime` field")
+    })?;
+    let lane_width = fields.get("lane_width").copied().ok_or_else(|| {
+        format!("project ABI selection contract node `{node_name}` is missing `lane_width` field")
+    })?;
+    let mode = mode.strip_prefix("symbol:").ok_or_else(|| {
+        format!("project ABI selection contract node `{node_name}` expects `mode=symbol:...`")
+    })?;
+    if mode != "explicit" && mode != "auto" {
+        return Err(format!(
+            "project ABI selection contract node `{node_name}` requires `mode` to be `explicit` or `auto`, got `{mode}`"
+        ));
+    }
+    let abi = abi.strip_prefix("symbol:").ok_or_else(|| {
+        format!("project ABI selection contract node `{node_name}` expects `abi=symbol:...`")
+    })?;
+    if abi.is_empty() {
+        return Err(format!(
+            "project ABI selection contract node `{node_name}` requires non-empty `abi`"
+        ));
+    }
+    let arch = arch.strip_prefix("symbol:").ok_or_else(|| {
+        format!("project ABI selection contract node `{node_name}` expects `arch=symbol:...`")
+    })?;
+    let runtime = runtime.strip_prefix("symbol:").ok_or_else(|| {
+        format!("project ABI selection contract node `{node_name}` expects `runtime=symbol:...`")
+    })?;
+    let lane_width = lane_width.strip_prefix("i64:").ok_or_else(|| {
+        format!("project ABI selection contract node `{node_name}` expects `lane_width=i64:...`")
+    })?;
+    let lane_width = lane_width.parse::<i64>().map_err(|_| {
+        format!("project ABI selection contract node `{node_name}` has non-integer lane_width")
+    })?;
+    if lane_width <= 0 {
+        return Err(format!(
+            "project ABI selection contract node `{node_name}` requires `lane_width > 0`, got `{lane_width}`"
+        ));
+    }
+    let target_arch = target.op.args.first().map(String::as_str).ok_or_else(|| {
+        format!(
+            "project ABI selection contract node `{node_name}` references `{}` without arch arg",
+            target.name
+        )
+    })?;
+    let target_runtime = target.op.args.get(1).map(String::as_str).ok_or_else(|| {
+        format!(
+            "project ABI selection contract node `{node_name}` references `{}` without runtime arg",
+            target.name
+        )
+    })?;
+    let target_lane_width = target
+        .op
+        .args
+        .get(2)
+        .ok_or_else(|| {
+            format!(
+                "project ABI selection contract node `{node_name}` references `{}` without lane width arg",
+                target.name
+            )
+        })?
+        .parse::<i64>()
+        .map_err(|_| {
+            format!(
+                "project ABI selection contract node `{node_name}` references `{}` with non-integer lane width",
+                target.name
+            )
+        })?;
+    if target_arch != arch {
+        return Err(format!(
+            "project ABI selection contract node `{node_name}` encodes `arch={arch}`, but `{}` uses `{target_arch}`",
+            target.name
+        ));
+    }
+    if target_runtime != runtime {
+        return Err(format!(
+            "project ABI selection contract node `{node_name}` encodes `runtime={runtime}`, but `{}` uses `{target_runtime}`",
+            target.name
+        ));
+    }
+    if target_lane_width != lane_width {
+        return Err(format!(
+            "project ABI selection contract node `{node_name}` encodes `lane_width={lane_width}`, but `{}` uses `{target_lane_width}`",
+            target.name
+        ));
+    }
+    Ok(())
+}
+
+fn verify_abi_selection_summary_text(
+    node_name: &str,
+    value: &str,
+    target: &Node,
+) -> Result<(), String> {
+    if target.op.module != "cpu" || target.op.instruction != "text" {
+        return Err(format!(
+            "project ABI summary node `{node_name}` must target `cpu.text`, got `{}.{}`",
+            target.op.module, target.op.instruction
+        ));
+    }
+    let target_value = target
+        .op
+        .args
+        .first()
+        .map(|item| item.trim())
+        .ok_or_else(|| {
+            format!(
+                "project ABI summary node `{node_name}` references `{}` without summary payload",
+                target.name
+            )
+        })?;
+    let fields = parse_semicolon_kv_contract(node_name, value, "ABI summary contract")?;
+    for key in ["mode", "abi", "arch", "os", "object", "calling", "backend"] {
+        let raw = fields.get(key).copied().ok_or_else(|| {
+            format!("project ABI summary node `{node_name}` is missing `{key}` field")
+        })?;
+        let parsed = raw.strip_prefix("symbol:").ok_or_else(|| {
+            format!("project ABI summary node `{node_name}` expects `{key}=symbol:...`")
+        })?;
+        if parsed.is_empty() {
+            return Err(format!(
+                "project ABI summary node `{node_name}` requires non-empty `{key}`"
+            ));
+        }
+    }
+    let mode = fields
+        .get("mode")
+        .and_then(|value| value.strip_prefix("symbol:"))
+        .unwrap_or_default();
+    if mode != "explicit" && mode != "auto" {
+        return Err(format!(
+            "project ABI summary node `{node_name}` requires `mode` to be `explicit` or `auto`, got `{mode}`"
+        ));
+    }
+    if value != target_value {
+        return Err(format!(
+            "project ABI summary node `{node_name}` encodes `{value}`, but `{}` uses `{target_value}`",
+            target.name
+        ));
+    }
+    Ok(())
+}
+
+fn verify_abi_graph_summary_text(
+    node_name: &str,
+    value: &str,
+    target: &Node,
+) -> Result<(), String> {
+    if target.op.module != "cpu" || target.op.instruction != "text" {
+        return Err(format!(
+            "project ABI graph summary node `{node_name}` must target `cpu.text`, got `{}.{}`",
+            target.op.module, target.op.instruction
+        ));
+    }
+    let target_value = target
+        .op
+        .args
+        .first()
+        .map(|item| item.trim())
+        .ok_or_else(|| {
+            format!(
+                "project ABI graph summary node `{node_name}` references `{}` without summary payload",
+                target.name
+            )
+        })?;
+    let fields = parse_semicolon_kv_contract(node_name, value, "ABI graph summary")?;
+    for key in [
+        "mode",
+        "domains",
+        "cpu_summary",
+        "data_summary",
+        "kernel_target",
+        "shader_target",
+        "network_target",
+    ] {
+        let raw = fields.get(key).copied().ok_or_else(|| {
+            format!("project ABI graph summary node `{node_name}` is missing `{key}` field")
+        })?;
+        let parsed = raw.strip_prefix("symbol:").ok_or_else(|| {
+            format!("project ABI graph summary node `{node_name}` expects `{key}=symbol:...`")
+        })?;
+        if parsed.is_empty() {
+            return Err(format!(
+                "project ABI graph summary node `{node_name}` requires non-empty `{key}`"
+            ));
+        }
+    }
+    let mode = fields
+        .get("mode")
+        .and_then(|value| value.strip_prefix("symbol:"))
+        .unwrap_or_default();
+    if mode != "explicit" && mode != "auto" {
+        return Err(format!(
+            "project ABI graph summary node `{node_name}` requires `mode` to be `explicit` or `auto`, got `{mode}`"
+        ));
+    }
+    if value != target_value {
+        return Err(format!(
+            "project ABI graph summary node `{node_name}` encodes `{value}`, but `{}` uses `{target_value}`",
+            target.name
+        ));
+    }
     Ok(())
 }
 
@@ -3427,6 +3992,443 @@ mod tests {
 
         let error = verify_module(&module).unwrap_err();
         assert!(error.contains("encodes `batch_lanes=12`"));
+    }
+
+    #[test]
+    fn project_contract_nodes_validate_kernel_target_config() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "kernel0".to_owned(),
+                    kind: ResourceKind::parse("kernel.apple"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_kernel_KernelUnit_target_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["arch=symbol:apple_ane;runtime=symbol:coreml;lane_width=i64:1"],
+                ),
+                node(
+                    "project_profile_kernel_KernelUnit_kernel_target_config_auto",
+                    "kernel0",
+                    "kernel.target_config",
+                    &["apple_ane", "coreml", "1"],
+                ),
+            ],
+            edges: vec![xfer(
+                "project_profile_kernel_KernelUnit_target_contract_type",
+                "project_profile_kernel_KernelUnit_kernel_target_config_auto",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn project_contract_nodes_reject_kernel_target_runtime_mismatch() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "kernel0".to_owned(),
+                    kind: ResourceKind::parse("kernel.apple"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_kernel_KernelUnit_target_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["arch=symbol:apple_ane;runtime=symbol:mlx;lane_width=i64:1"],
+                ),
+                node(
+                    "project_profile_kernel_KernelUnit_kernel_target_config_auto",
+                    "kernel0",
+                    "kernel.target_config",
+                    &["apple_ane", "coreml", "1"],
+                ),
+            ],
+            edges: vec![xfer(
+                "project_profile_kernel_KernelUnit_target_contract_type",
+                "project_profile_kernel_KernelUnit_kernel_target_config_auto",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("encodes `runtime=mlx`"));
+    }
+
+    #[test]
+    fn project_contract_nodes_validate_shader_and_network_target_configs() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+                Resource {
+                    name: "network0".to_owned(),
+                    kind: ResourceKind::parse("network.urlsession"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_shader_SurfaceShader_target_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["arch=symbol:arm64;runtime=symbol:metal;lane_width=i64:1"],
+                ),
+                node(
+                    "project_profile_shader_SurfaceShader_shader_target_config_auto",
+                    "shader0",
+                    "shader.target_config",
+                    &["arm64", "metal", "1"],
+                ),
+                node(
+                    "project_profile_network_HttpLink_target_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["arch=symbol:arm64;runtime=symbol:urlsession;lane_width=i64:1"],
+                ),
+                node(
+                    "project_profile_network_HttpLink_network_target_config_auto",
+                    "network0",
+                    "network.target_config",
+                    &["arm64", "urlsession", "1"],
+                ),
+            ],
+            edges: vec![
+                xfer(
+                    "project_profile_shader_SurfaceShader_target_contract_type",
+                    "project_profile_shader_SurfaceShader_shader_target_config_auto",
+                ),
+                xfer(
+                    "project_profile_network_HttpLink_target_contract_type",
+                    "project_profile_network_HttpLink_network_target_config_auto",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn project_contract_nodes_validate_shader_abi_selection_contract() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_shader_SurfaceShader_abi_selection_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["mode=symbol:explicit;abi=symbol:shader.metal.msl2_4;arch=symbol:arm64;runtime=symbol:metal;lane_width=i64:1"],
+                ),
+                node(
+                    "project_profile_shader_SurfaceShader_shader_target_config_auto",
+                    "shader0",
+                    "shader.target_config",
+                    &["arm64", "metal", "1"],
+                ),
+            ],
+            edges: vec![xfer(
+                "project_profile_shader_SurfaceShader_abi_selection_contract_type",
+                "project_profile_shader_SurfaceShader_shader_target_config_auto",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn project_contract_nodes_validate_project_cpu_abi_summary() {
+        let payload = "mode=symbol:explicit;abi=symbol:cpu.arm64.apple_aapcs64;arch=symbol:arm64;os=symbol:darwin;object=symbol:mach-o;calling=symbol:aapcs64-darwin;backend=symbol:none";
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node(
+                    "project_abi_cpu_selection_summary_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[payload],
+                ),
+                node("project_abi_cpu_selection_entry", "cpu0", "cpu.text", &[payload]),
+            ],
+            edges: vec![dep(
+                "project_abi_cpu_selection_summary_type",
+                "project_abi_cpu_selection_entry",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn project_contract_nodes_validate_project_abi_graph_summary() {
+        let payload = "mode=symbol:explicit;domains=symbol:cpu,data;cpu_summary=symbol:present;data_summary=symbol:present;kernel_target=symbol:absent;shader_target=symbol:absent;network_target=symbol:absent";
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node("project_abi_graph_summary_type", "cpu0", "cpu.text", &[payload]),
+                node("project_abi_graph_summary_entry", "cpu0", "cpu.text", &[payload]),
+            ],
+            edges: vec![dep(
+                "project_abi_graph_summary_type",
+                "project_abi_graph_summary_entry",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn project_contract_nodes_reject_project_data_abi_summary_invalid_mode() {
+        let bad = "mode=symbol:recommended;abi=symbol:data.fabric.host-match.v1;arch=symbol:arm64;os=symbol:darwin;object=symbol:mach-o;calling=symbol:aapcs64-darwin;backend=symbol:none";
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node(
+                    "project_abi_data_selection_summary_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[bad],
+                ),
+                node("project_abi_data_selection_entry", "cpu0", "cpu.text", &[bad]),
+            ],
+            edges: vec![dep(
+                "project_abi_data_selection_summary_type",
+                "project_abi_data_selection_entry",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("requires `mode` to be `explicit` or `auto`"));
+    }
+
+    #[test]
+    fn project_contract_nodes_reject_shader_abi_selection_mode_mismatch() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_shader_SurfaceShader_abi_selection_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["mode=symbol:recommended;abi=symbol:shader.metal.msl2_4;arch=symbol:arm64;runtime=symbol:metal;lane_width=i64:1"],
+                ),
+                node(
+                    "project_profile_shader_SurfaceShader_shader_target_config_auto",
+                    "shader0",
+                    "shader.target_config",
+                    &["arm64", "metal", "1"],
+                ),
+            ],
+            edges: vec![xfer(
+                "project_profile_shader_SurfaceShader_abi_selection_contract_type",
+                "project_profile_shader_SurfaceShader_shader_target_config_auto",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("requires `mode` to be `explicit` or `auto`"));
+    }
+
+    #[test]
+    fn project_contract_nodes_reject_shader_target_runtime_mismatch() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_shader_SurfaceShader_target_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["arch=symbol:arm64;runtime=symbol:vulkan;lane_width=i64:1"],
+                ),
+                node(
+                    "project_profile_shader_SurfaceShader_shader_target_config_auto",
+                    "shader0",
+                    "shader.target_config",
+                    &["arm64", "metal", "1"],
+                ),
+            ],
+            edges: vec![xfer(
+                "project_profile_shader_SurfaceShader_target_contract_type",
+                "project_profile_shader_SurfaceShader_shader_target_config_auto",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("encodes `runtime=vulkan`"));
+    }
+
+    #[test]
+    fn project_contract_nodes_reject_network_target_lane_width_mismatch() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "network0".to_owned(),
+                    kind: ResourceKind::parse("network.urlsession"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_network_HttpLink_target_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["arch=symbol:arm64;runtime=symbol:urlsession;lane_width=i64:4"],
+                ),
+                node(
+                    "project_profile_network_HttpLink_network_target_config_auto",
+                    "network0",
+                    "network.target_config",
+                    &["arm64", "urlsession", "1"],
+                ),
+            ],
+            edges: vec![xfer(
+                "project_profile_network_HttpLink_target_contract_type",
+                "project_profile_network_HttpLink_network_target_config_auto",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("encodes `lane_width=4`"));
+    }
+
+    #[test]
+    fn lowering_contract_nodes_validate_cpu_target_config() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.x86_64"),
+            }],
+            nodes: vec![
+                node(
+                    "lowering_cpu_target_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["arch=symbol:x86_64;abi=symbol:cpu.x86_64.sysv64;vector_bits=i64:128"],
+                ),
+                node(
+                    "lowering_cpu_target_config",
+                    "cpu0",
+                    "cpu.target_config",
+                    &["x86_64", "cpu.x86_64.sysv64", "128"],
+                ),
+            ],
+            edges: vec![dep(
+                "lowering_cpu_target_contract_type",
+                "lowering_cpu_target_config",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn lowering_contract_nodes_reject_cpu_target_vector_mismatch() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.x86_64"),
+            }],
+            nodes: vec![
+                node(
+                    "lowering_cpu_target_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["arch=symbol:x86_64;abi=symbol:cpu.x86_64.sysv64;vector_bits=i64:256"],
+                ),
+                node(
+                    "lowering_cpu_target_config",
+                    "cpu0",
+                    "cpu.target_config",
+                    &["x86_64", "cpu.x86_64.sysv64", "128"],
+                ),
+            ],
+            edges: vec![dep(
+                "lowering_cpu_target_contract_type",
+                "lowering_cpu_target_config",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("encodes `vector_bits=256`"));
     }
 
     #[test]

@@ -327,3 +327,50 @@ fn materializes_kernel_slot_contract_node_into_yir() {
         .iter()
         .any(|node| node.name == "project_profile_kernel_KernelUnit_slot_contract_type"));
 }
+
+#[test]
+fn materializes_default_kernel_target_config_from_project_abi() {
+    let mut project = project_with_modules(vec![(
+        "kernel_unit.ns",
+        r#"
+        mod kernel KernelUnit {
+          fn profile() {
+            const bind_core: i64 = 2;
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "kernel".to_owned(),
+        abi: "kernel.apple_ane.coreml.v1".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    assert!(yir
+        .resources
+        .iter()
+        .any(|resource| resource.name == "kernel0" && resource.kind.raw == "kernel.apple"));
+    assert!(yir.nodes.iter().any(|node| {
+        node.name == "project_profile_kernel_KernelUnit_kernel_target_config_auto"
+            && node.op.module == "kernel"
+            && node.op.instruction == "target_config"
+            && node.op.args
+                == vec!["apple_ane".to_owned(), "coreml".to_owned(), "1".to_owned()]
+    }));
+    assert!(yir.nodes.iter().any(|node| {
+        node.name == "project_profile_kernel_KernelUnit_target_contract_type"
+            && node.op.module == "cpu"
+            && node.op.instruction == "text"
+            && node.op.args
+                == vec!["arch=symbol:apple_ane;runtime=symbol:coreml;lane_width=i64:1".to_owned()]
+    }));
+    assert!(yir.nodes.iter().any(|node| {
+        node.name == "project_profile_kernel_KernelUnit_abi_selection_contract_type"
+            && node.op.module == "cpu"
+            && node.op.instruction == "text"
+            && node.op.args
+                == vec!["mode=symbol:explicit;abi=symbol:kernel.apple_ane.coreml.v1;arch=symbol:apple_ane;runtime=symbol:coreml;lane_width=i64:1".to_owned()]
+    }));
+}

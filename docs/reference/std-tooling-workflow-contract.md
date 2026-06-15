@@ -121,8 +121,9 @@ Current example routing for this lane:
   [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
 * companion router:
   [examples/projects/tooling/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/README.md)
-* archived historical probes:
-  [examples/legacy/tooling](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling)
+* retired historical probes:
+  older low-level shell/line-input/automation/report examples have been
+  removed from the checked-in examples tree
 
 ## 1. Command Request
 
@@ -356,8 +357,8 @@ At the examples layer, the same reading rule should hold:
 
 * prefer the three frontdoor project routes first
 * drop to the tooling companion router only when auditing a narrower host lane
-* treat `examples/legacy/tooling/` as historical bridge material, not current
-  recommended entrypoints
+* treat those removed legacy tooling probes as historical background only, not
+  current recommended entrypoints
 
 That grouped surface is no longer only a `std` authoring pattern.
 
