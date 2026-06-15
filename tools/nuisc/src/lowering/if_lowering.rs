@@ -6,6 +6,7 @@ enum SelectableCpuUnaryRuntimeOp {
     ThreadJoin,
     JoinResult,
     ThreadJoinResult,
+    Cancel,
     MutexNew,
     MutexLock,
     MutexUnlock,
@@ -18,6 +19,7 @@ impl SelectableCpuUnaryRuntimeOp {
             Self::ThreadJoin => "cpu_thread_join",
             Self::JoinResult => "cpu_join_result",
             Self::ThreadJoinResult => "cpu_thread_join_result",
+            Self::Cancel => "cpu_cancel",
             Self::MutexNew => "cpu_mutex_new",
             Self::MutexLock => "cpu_mutex_lock",
             Self::MutexUnlock => "cpu_mutex_unlock",
@@ -30,9 +32,51 @@ impl SelectableCpuUnaryRuntimeOp {
             Self::ThreadJoin => "thread_join",
             Self::JoinResult => "join_result",
             Self::ThreadJoinResult => "thread_join_result",
+            Self::Cancel => "cancel",
             Self::MutexNew => "mutex_new",
             Self::MutexLock => "mutex_lock",
             Self::MutexUnlock => "mutex_unlock",
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SelectableCpuCallRuntimeOp {
+    Spawn,
+    ThreadSpawn,
+}
+
+impl SelectableCpuCallRuntimeOp {
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Spawn => "cpu_spawn_task",
+            Self::ThreadSpawn => "cpu_spawn_thread",
+        }
+    }
+
+    fn instruction(self) -> &'static str {
+        match self {
+            Self::Spawn => "spawn_task",
+            Self::ThreadSpawn => "spawn_thread",
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SelectableCpuBinaryRuntimeOp {
+    Timeout,
+}
+
+impl SelectableCpuBinaryRuntimeOp {
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Timeout => "cpu_timeout",
+        }
+    }
+
+    fn instruction(self) -> &'static str {
+        match self {
+            Self::Timeout => "timeout",
         }
     }
 }
@@ -47,9 +91,37 @@ fn extract_selectable_cpu_unary_runtime_expr(
         NirExpr::CpuThreadJoinResult(input) => {
             Some((SelectableCpuUnaryRuntimeOp::ThreadJoinResult, input))
         }
+        NirExpr::CpuCancel(input) => Some((SelectableCpuUnaryRuntimeOp::Cancel, input)),
         NirExpr::CpuMutexNew(input) => Some((SelectableCpuUnaryRuntimeOp::MutexNew, input)),
         NirExpr::CpuMutexLock(input) => Some((SelectableCpuUnaryRuntimeOp::MutexLock, input)),
         NirExpr::CpuMutexUnlock(input) => Some((SelectableCpuUnaryRuntimeOp::MutexUnlock, input)),
+        _ => None,
+    }
+}
+
+fn extract_selectable_cpu_call_runtime_expr(
+    expr: &NirExpr,
+) -> Option<(SelectableCpuCallRuntimeOp, &str, &[NirExpr])> {
+    match expr {
+        NirExpr::CpuSpawn { callee, args } => {
+            Some((SelectableCpuCallRuntimeOp::Spawn, callee.as_str(), args.as_slice()))
+        }
+        NirExpr::CpuThreadSpawn { callee, args } => Some((
+            SelectableCpuCallRuntimeOp::ThreadSpawn,
+            callee.as_str(),
+            args.as_slice(),
+        )),
+        _ => None,
+    }
+}
+
+fn extract_selectable_cpu_binary_runtime_expr(
+    expr: &NirExpr,
+) -> Option<(SelectableCpuBinaryRuntimeOp, &NirExpr, &NirExpr)> {
+    match expr {
+        NirExpr::CpuTimeout { task, limit } => {
+            Some((SelectableCpuBinaryRuntimeOp::Timeout, task, limit))
+        }
         _ => None,
     }
 }
@@ -82,6 +154,52 @@ fn extract_selectable_cpu_unary_runtime_binding_chain(
         outcome_name = name.clone();
     }
     Some((outcome_name, op, input))
+}
+
+fn extract_selectable_cpu_call_runtime_binding_chain(
+    stmts: &[NirStmt],
+) -> Option<(String, SelectableCpuCallRuntimeOp, &str, &[NirExpr])> {
+    let first = stmts.first()?;
+    let (first_name, first_value) = extract_binding_name_and_value(first)?;
+    let (op, callee, args) = extract_selectable_cpu_call_runtime_expr(first_value)?;
+
+    let mut previous_name = first_name;
+    let mut outcome_name = first_name.clone();
+    for stmt in &stmts[1..] {
+        let (name, value) = extract_binding_name_and_value(stmt)?;
+        let NirExpr::Var(var_name) = value else {
+            return None;
+        };
+        if var_name != previous_name {
+            return None;
+        }
+        previous_name = name;
+        outcome_name = name.clone();
+    }
+    Some((outcome_name, op, callee, args))
+}
+
+fn extract_selectable_cpu_binary_runtime_binding_chain(
+    stmts: &[NirStmt],
+) -> Option<(String, SelectableCpuBinaryRuntimeOp, &NirExpr, &NirExpr)> {
+    let first = stmts.first()?;
+    let (first_name, first_value) = extract_binding_name_and_value(first)?;
+    let (op, lhs, rhs) = extract_selectable_cpu_binary_runtime_expr(first_value)?;
+
+    let mut previous_name = first_name;
+    let mut outcome_name = first_name.clone();
+    for stmt in &stmts[1..] {
+        let (name, value) = extract_binding_name_and_value(stmt)?;
+        let NirExpr::Var(var_name) = value else {
+            return None;
+        };
+        if var_name != previous_name {
+            return None;
+        }
+        previous_name = name;
+        outcome_name = name.clone();
+    }
+    Some((outcome_name, op, lhs, rhs))
 }
 
 fn extract_selectable_cpu_unary_runtime_return_chain(
@@ -124,6 +242,86 @@ fn extract_selectable_cpu_unary_runtime_return_chain(
     }
 }
 
+fn extract_selectable_cpu_call_runtime_return_chain(
+    stmts: &[NirStmt],
+) -> Option<(SelectableCpuCallRuntimeOp, &str, &[NirExpr])> {
+    match stmts {
+        [NirStmt::Return(Some(value))] | [NirStmt::Expr(value)] => {
+            extract_selectable_cpu_call_runtime_expr(value)
+        }
+        _ => {
+            let (last_stmt, prefix) = stmts.split_last()?;
+            let (op, callee, args, previous_name) = {
+                let first = prefix.first()?;
+                let (first_name, first_value) = extract_binding_name_and_value(first)?;
+                let (op, callee, args) = extract_selectable_cpu_call_runtime_expr(first_value)?;
+                (op, callee, args, first_name)
+            };
+
+            let mut previous_name = previous_name;
+            for stmt in &prefix[1..] {
+                let (name, value) = extract_binding_name_and_value(stmt)?;
+                let NirExpr::Var(var_name) = value else {
+                    return None;
+                };
+                if var_name != previous_name {
+                    return None;
+                }
+                previous_name = name;
+            }
+
+            match last_stmt {
+                NirStmt::Return(Some(NirExpr::Var(var_name))) | NirStmt::Expr(NirExpr::Var(var_name))
+                    if var_name == previous_name =>
+                {
+                    Some((op, callee, args))
+                }
+                _ => None,
+            }
+        }
+    }
+}
+
+fn extract_selectable_cpu_binary_runtime_return_chain(
+    stmts: &[NirStmt],
+) -> Option<(SelectableCpuBinaryRuntimeOp, &NirExpr, &NirExpr)> {
+    match stmts {
+        [NirStmt::Return(Some(value))] | [NirStmt::Expr(value)] => {
+            extract_selectable_cpu_binary_runtime_expr(value)
+        }
+        _ => {
+            let (last_stmt, prefix) = stmts.split_last()?;
+            let (op, lhs, rhs, previous_name) = {
+                let first = prefix.first()?;
+                let (first_name, first_value) = extract_binding_name_and_value(first)?;
+                let (op, lhs, rhs) = extract_selectable_cpu_binary_runtime_expr(first_value)?;
+                (op, lhs, rhs, first_name)
+            };
+
+            let mut previous_name = previous_name;
+            for stmt in &prefix[1..] {
+                let (name, value) = extract_binding_name_and_value(stmt)?;
+                let NirExpr::Var(var_name) = value else {
+                    return None;
+                };
+                if var_name != previous_name {
+                    return None;
+                }
+                previous_name = name;
+            }
+
+            match last_stmt {
+                NirStmt::Return(Some(NirExpr::Var(var_name))) | NirStmt::Expr(NirExpr::Var(var_name))
+                    if var_name == previous_name =>
+                {
+                    Some((op, lhs, rhs))
+                }
+                _ => None,
+            }
+        }
+    }
+}
+
 fn build_selectable_cpu_unary_runtime_expr(
     op: SelectableCpuUnaryRuntimeOp,
     input: &NirExpr,
@@ -137,6 +335,7 @@ fn build_selectable_cpu_unary_runtime_expr(
         SelectableCpuUnaryRuntimeOp::ThreadJoinResult => {
             NirExpr::CpuThreadJoinResult(Box::new(input.clone()))
         }
+        SelectableCpuUnaryRuntimeOp::Cancel => NirExpr::CpuCancel(Box::new(input.clone())),
         SelectableCpuUnaryRuntimeOp::MutexNew => NirExpr::CpuMutexNew(Box::new(input.clone())),
         SelectableCpuUnaryRuntimeOp::MutexLock => NirExpr::CpuMutexLock(Box::new(input.clone())),
         SelectableCpuUnaryRuntimeOp::MutexUnlock => {
@@ -162,9 +361,66 @@ fn lower_selected_cpu_unary_runtime_effect(
         return Ok(None);
     }
 
-    let lhs_name = lower_expr(lhs_input, state, bindings)?;
-    let rhs_name = lower_expr(rhs_input, state, bindings)?;
-    let selected_input = lower_select(condition_name, lhs_name, rhs_name, state)?;
+    let selected_input = if matches!(
+        lhs_op,
+        SelectableCpuUnaryRuntimeOp::Join
+            | SelectableCpuUnaryRuntimeOp::JoinResult
+            | SelectableCpuUnaryRuntimeOp::ThreadJoin
+            | SelectableCpuUnaryRuntimeOp::ThreadJoinResult
+            | SelectableCpuUnaryRuntimeOp::Cancel
+    ) {
+        if let (Some((lhs_bin_op, lhs_bin_lhs, lhs_bin_rhs)), Some((rhs_bin_op, rhs_bin_lhs, rhs_bin_rhs))) = (
+            extract_selectable_cpu_binary_runtime_expr(lhs_input),
+            extract_selectable_cpu_binary_runtime_expr(rhs_input),
+        ) {
+            if let Some(lowered) = lower_selected_cpu_binary_runtime_effect(
+                condition_name.clone(),
+                lhs_bin_op,
+                lhs_bin_lhs,
+                lhs_bin_rhs,
+                rhs_bin_op,
+                rhs_bin_lhs,
+                rhs_bin_rhs,
+                state,
+                bindings,
+            )? {
+                lowered
+            } else {
+                let lhs_name = lower_expr(lhs_input, state, bindings)?;
+                let rhs_name = lower_expr(rhs_input, state, bindings)?;
+                lower_select(condition_name, lhs_name, rhs_name, state)?
+            }
+        } else if let (Some((lhs_call_op, lhs_callee, lhs_args)), Some((rhs_call_op, rhs_callee, rhs_args))) = (
+            extract_selectable_cpu_call_runtime_expr(lhs_input),
+            extract_selectable_cpu_call_runtime_expr(rhs_input),
+        ) {
+            if let Some(lowered) = lower_selected_cpu_call_runtime_effect(
+                condition_name.clone(),
+                lhs_call_op,
+                lhs_callee,
+                lhs_args,
+                rhs_call_op,
+                rhs_callee,
+                rhs_args,
+                state,
+                bindings,
+            )? {
+                lowered
+            } else {
+                let lhs_name = lower_expr(lhs_input, state, bindings)?;
+                let rhs_name = lower_expr(rhs_input, state, bindings)?;
+                lower_select(condition_name, lhs_name, rhs_name, state)?
+            }
+        } else {
+            let lhs_name = lower_expr(lhs_input, state, bindings)?;
+            let rhs_name = lower_expr(rhs_input, state, bindings)?;
+            lower_select(condition_name, lhs_name, rhs_name, state)?
+        }
+    } else {
+        let lhs_name = lower_expr(lhs_input, state, bindings)?;
+        let rhs_name = lower_expr(rhs_input, state, bindings)?;
+        lower_select(condition_name, lhs_name, rhs_name, state)?
+    };
     let name = next_name(state, lhs_op.prefix());
     state.yir.nodes.push(Node {
         name: name.clone(),
@@ -179,6 +435,153 @@ fn lower_selected_cpu_unary_runtime_effect(
     state.yir.edges.push(Edge {
         kind: EdgeKind::Effect,
         from: selected_input,
+        to: name.clone(),
+    });
+    Ok(Some(name))
+}
+
+fn lower_selected_cpu_call_runtime_effect(
+    condition_name: String,
+    lhs_op: SelectableCpuCallRuntimeOp,
+    lhs_callee: &str,
+    lhs_args: &[NirExpr],
+    rhs_op: SelectableCpuCallRuntimeOp,
+    rhs_callee: &str,
+    rhs_args: &[NirExpr],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    if lhs_op != rhs_op || lhs_callee != rhs_callee || lhs_args.len() != rhs_args.len() {
+        return Ok(None);
+    }
+
+    let mut selected_bindings = bindings.clone();
+    let mut selected_args = Vec::with_capacity(lhs_args.len());
+    for (index, (lhs_arg, rhs_arg)) in lhs_args.iter().zip(rhs_args.iter()).enumerate() {
+        let lhs_name = lower_expr(lhs_arg, state, bindings)?;
+        let rhs_name = lower_expr(rhs_arg, state, bindings)?;
+        let selected_name = lower_select(condition_name.clone(), lhs_name, rhs_name, state)?;
+        let temp_name = format!("__nuis_selected_runtime_arg_{index}");
+        selected_bindings.insert(temp_name.clone(), selected_name);
+        selected_args.push(NirExpr::Var(temp_name));
+    }
+
+    let returned = super::body_lowering::lower_async_call_boundary(
+        lhs_callee,
+        &selected_args,
+        state,
+        &selected_bindings,
+    )?;
+    let name = next_name(state, lhs_op.prefix());
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: lhs_op.instruction().to_owned(),
+            args: vec![lhs_callee.to_owned(), returned.clone()],
+        },
+    });
+    push_dep_edges(state, &returned, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: returned,
+        to: name.clone(),
+    });
+    Ok(Some(name))
+}
+
+fn lower_selected_cpu_binary_runtime_effect(
+    condition_name: String,
+    lhs_op: SelectableCpuBinaryRuntimeOp,
+    lhs_lhs: &NirExpr,
+    lhs_rhs: &NirExpr,
+    rhs_op: SelectableCpuBinaryRuntimeOp,
+    rhs_lhs: &NirExpr,
+    rhs_rhs: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    if lhs_op != rhs_op {
+        return Ok(None);
+    }
+
+    let selected_lhs = if lhs_op == SelectableCpuBinaryRuntimeOp::Timeout {
+        if let Some(lowered) = lower_selected_cpu_unary_runtime_effect(
+            condition_name.clone(),
+            lhs_lhs,
+            rhs_lhs,
+            state,
+            bindings,
+        )? {
+            lowered
+        } else if let (Some((lhs_call_op, lhs_callee, lhs_args)), Some((rhs_call_op, rhs_callee, rhs_args))) = (
+            extract_selectable_cpu_call_runtime_expr(lhs_lhs),
+            extract_selectable_cpu_call_runtime_expr(rhs_lhs),
+        ) {
+            if let Some(lowered) = lower_selected_cpu_call_runtime_effect(
+                condition_name.clone(),
+                lhs_call_op,
+                lhs_callee,
+                lhs_args,
+                rhs_call_op,
+                rhs_callee,
+                rhs_args,
+                state,
+                bindings,
+            )? {
+                lowered
+            } else {
+                lower_select(
+                    condition_name.clone(),
+                    lower_expr(lhs_lhs, state, bindings)?,
+                    lower_expr(rhs_lhs, state, bindings)?,
+                    state,
+                )?
+            }
+        } else {
+            lower_select(
+                condition_name.clone(),
+                lower_expr(lhs_lhs, state, bindings)?,
+                lower_expr(rhs_lhs, state, bindings)?,
+                state,
+            )?
+        }
+    } else {
+        lower_select(
+            condition_name.clone(),
+            lower_expr(lhs_lhs, state, bindings)?,
+            lower_expr(rhs_lhs, state, bindings)?,
+            state,
+        )?
+    };
+    let selected_rhs = lower_select(
+        condition_name,
+        lower_expr(lhs_rhs, state, bindings)?,
+        lower_expr(rhs_rhs, state, bindings)?,
+        state,
+    )?;
+
+    let name = next_name(state, lhs_op.prefix());
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: lhs_op.instruction().to_owned(),
+            args: vec![selected_lhs.clone(), selected_rhs.clone()],
+        },
+    });
+    push_dep_edges(state, &selected_lhs, &name);
+    push_dep_edges(state, &selected_rhs, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: selected_lhs,
+        to: name.clone(),
+    });
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: selected_rhs,
         to: name.clone(),
     });
     Ok(Some(name))
@@ -219,6 +622,90 @@ fn lower_direct_selectable_runtime_binding(
     }))
 }
 
+fn lower_direct_selectable_call_runtime_binding(
+    condition_name: String,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<LoweredIfOutcome>, String> {
+    let Some((lhs_name, lhs_op, lhs_callee, lhs_args)) =
+        extract_selectable_cpu_call_runtime_binding_chain(then_body)
+    else {
+        return Ok(None);
+    };
+    let Some((rhs_name, rhs_op, rhs_callee, rhs_args)) =
+        extract_selectable_cpu_call_runtime_binding_chain(else_body)
+    else {
+        return Ok(None);
+    };
+    if lhs_name != rhs_name {
+        return Ok(None);
+    }
+
+    let Some(value) = lower_selected_cpu_call_runtime_effect(
+        condition_name,
+        lhs_op,
+        lhs_callee,
+        lhs_args,
+        rhs_op,
+        rhs_callee,
+        rhs_args,
+        state,
+        bindings,
+    )?
+    else {
+        return Ok(None);
+    };
+    super::body_lowering::chain_statement_effect(state, &value);
+    Ok(Some(LoweredIfOutcome::Bind {
+        name: lhs_name,
+        value,
+    }))
+}
+
+fn lower_direct_selectable_binary_runtime_binding(
+    condition_name: String,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<LoweredIfOutcome>, String> {
+    let Some((lhs_name, lhs_op, lhs_lhs, lhs_rhs)) =
+        extract_selectable_cpu_binary_runtime_binding_chain(then_body)
+    else {
+        return Ok(None);
+    };
+    let Some((rhs_name, rhs_op, rhs_lhs, rhs_rhs)) =
+        extract_selectable_cpu_binary_runtime_binding_chain(else_body)
+    else {
+        return Ok(None);
+    };
+    if lhs_name != rhs_name {
+        return Ok(None);
+    }
+
+    let Some(value) = lower_selected_cpu_binary_runtime_effect(
+        condition_name,
+        lhs_op,
+        lhs_lhs,
+        lhs_rhs,
+        rhs_op,
+        rhs_lhs,
+        rhs_rhs,
+        state,
+        bindings,
+    )?
+    else {
+        return Ok(None);
+    };
+    super::body_lowering::chain_statement_effect(state, &value);
+    Ok(Some(LoweredIfOutcome::Bind {
+        name: lhs_name,
+        value,
+    }))
+}
+
 fn lower_direct_selectable_runtime_return(
     condition_name: String,
     then_body: &[NirStmt],
@@ -244,6 +731,76 @@ fn lower_direct_selectable_runtime_return(
         condition_name,
         &lhs_expr,
         &rhs_expr,
+        state,
+        bindings,
+    )?
+    else {
+        return Ok(None);
+    };
+    Ok(Some(LoweredIfOutcome::Returned(value)))
+}
+
+fn lower_direct_selectable_call_runtime_return(
+    condition_name: String,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<LoweredIfOutcome>, String> {
+    let Some((lhs_op, lhs_callee, lhs_args)) =
+        extract_selectable_cpu_call_runtime_return_chain(then_body)
+    else {
+        return Ok(None);
+    };
+    let Some((rhs_op, rhs_callee, rhs_args)) =
+        extract_selectable_cpu_call_runtime_return_chain(else_body)
+    else {
+        return Ok(None);
+    };
+
+    let Some(value) = lower_selected_cpu_call_runtime_effect(
+        condition_name,
+        lhs_op,
+        lhs_callee,
+        lhs_args,
+        rhs_op,
+        rhs_callee,
+        rhs_args,
+        state,
+        bindings,
+    )?
+    else {
+        return Ok(None);
+    };
+    Ok(Some(LoweredIfOutcome::Returned(value)))
+}
+
+fn lower_direct_selectable_binary_runtime_return(
+    condition_name: String,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<LoweredIfOutcome>, String> {
+    let Some((lhs_op, lhs_lhs, lhs_rhs)) =
+        extract_selectable_cpu_binary_runtime_return_chain(then_body)
+    else {
+        return Ok(None);
+    };
+    let Some((rhs_op, rhs_lhs, rhs_rhs)) =
+        extract_selectable_cpu_binary_runtime_return_chain(else_body)
+    else {
+        return Ok(None);
+    };
+
+    let Some(value) = lower_selected_cpu_binary_runtime_effect(
+        condition_name,
+        lhs_op,
+        lhs_lhs,
+        lhs_rhs,
+        rhs_op,
+        rhs_lhs,
+        rhs_rhs,
         state,
         bindings,
     )?
@@ -581,6 +1138,24 @@ pub(super) fn lower_if_pair(
         )? {
             return Ok(lowered);
         }
+        if let Some(lowered) = lower_direct_selectable_call_runtime_return(
+            condition_name.clone(),
+            then_body,
+            else_body,
+            state,
+            bindings,
+        )? {
+            return Ok(lowered);
+        }
+        if let Some(lowered) = lower_direct_selectable_binary_runtime_return(
+            condition_name.clone(),
+            then_body,
+            else_body,
+            state,
+            bindings,
+        )? {
+            return Ok(lowered);
+        }
         let pure_helpers = state.pure_helpers.clone();
         if let (Some((lhs_name, lhs_value)), Some((rhs_name, rhs_value))) = (
             lower_binding_if_chain(then_body, state, bindings, &pure_helpers)?,
@@ -595,6 +1170,24 @@ pub(super) fn lower_if_pair(
             }
         }
         if let Some(lowered) = lower_direct_selectable_runtime_binding(
+            condition_name.clone(),
+            then_body,
+            else_body,
+            state,
+            bindings,
+        )? {
+            return Ok(lowered);
+        }
+        if let Some(lowered) = lower_direct_selectable_call_runtime_binding(
+            condition_name.clone(),
+            then_body,
+            else_body,
+            state,
+            bindings,
+        )? {
+            return Ok(lowered);
+        }
+        if let Some(lowered) = lower_direct_selectable_binary_runtime_binding(
             condition_name.clone(),
             then_body,
             else_body,
@@ -641,6 +1234,24 @@ pub(super) fn lower_if_pair(
     )? {
         return Ok(lowered);
     }
+    if let Some(lowered) = lower_direct_selectable_call_runtime_return(
+        condition_name.clone(),
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(lowered);
+    }
+    if let Some(lowered) = lower_direct_selectable_binary_runtime_return(
+        condition_name.clone(),
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(lowered);
+    }
 
     let pure_helpers = state.pure_helpers.clone();
     if let (Some((lhs_name, lhs_value)), Some((rhs_name, rhs_value))) = (
@@ -657,6 +1268,24 @@ pub(super) fn lower_if_pair(
     }
 
     if let Some(lowered) = lower_direct_selectable_runtime_binding(
+        condition_name.clone(),
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(lowered);
+    }
+    if let Some(lowered) = lower_direct_selectable_call_runtime_binding(
+        condition_name.clone(),
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(lowered);
+    }
+    if let Some(lowered) = lower_direct_selectable_binary_runtime_binding(
         condition_name.clone(),
         then_body,
         else_body,

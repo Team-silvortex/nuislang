@@ -406,6 +406,157 @@ fn rejects_type_alias_generic_arg_that_does_not_satisfy_bound() {
 }
 
 #[test]
+fn rejects_unannotated_generic_struct_literal_explicit_type_arg_that_violates_bound() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Boxed<T> where T: Addable {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let boxed = Boxed<Text> { value: "hi" };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("type `Text` does not satisfy bound `Addable`"), "{error}");
+    assert!(error.contains("struct literal `Boxed`"), "{error}");
+    assert!(error.contains("via struct `Boxed` generic parameter `T`"), "{error}");
+}
+
+#[test]
+fn rejects_lambda_body_local_alias_bound_failure() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          type Alias<T: Addable> = T;
+
+          fn apply<T>(value: T, f: Fn1<T, T>) -> T {
+            return f(value);
+          }
+
+          fn keep<T>(value: T) -> T {
+            return apply(value, |x: T| -> T {
+              let local: Alias<Text> = "hi";
+              return x;
+            });
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("type `Text` does not satisfy bound `Addable`"), "{error}");
+    assert!(error.contains("function `keep` body lambda body local `local`"), "{error}");
+    assert!(error.contains("type alias `Alias` generic parameter `T`"), "{error}");
+}
+
+#[test]
+fn rejects_if_result_branch_struct_literal_type_arg_that_violates_bound_with_branch_context() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Boxed<T> where T: Addable {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let boxed = if true {
+              Boxed<Text> { value: "hi" }
+            } else {
+              Boxed<i64> { value: 0 }
+            };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("type `Text` does not satisfy bound `Addable`"), "{error}");
+    assert!(error.contains("function `main` body if-then"), "{error}");
+    assert!(error.contains("struct literal `Boxed`"), "{error}");
+}
+
+#[test]
+fn rejects_match_result_branch_struct_literal_type_arg_that_violates_bound_with_arm_context() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Boxed<T> where T: Addable {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let boxed = match 1 {
+              1 => {
+                Boxed<Text> { value: "hi" }
+              }
+              _ => {
+                Boxed<i64> { value: 0 }
+              }
+            };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("type `Text` does not satisfy bound `Addable`"), "{error}");
+    assert!(error.contains("function `main` body match-arm"), "{error}");
+    assert!(error.contains("struct literal `Boxed`"), "{error}");
+}
+
+#[test]
 fn rejects_non_trait_shaped_generic_bound() {
     let error = parse_nuis_module(
         r#"
@@ -886,6 +1037,108 @@ fn reports_explicit_function_generic_arg_bound_failure_from_where_clause() {
 
           fn main() -> i64 {
             keep<Text>("hi");
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable` for generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_explicit_function_generic_arg_bound_failure_inside_if_result_branch() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          fn keep<U>(value: U) -> U where U: Addable {
+            return value;
+          }
+
+          fn main() -> i64 {
+            let value = if true {
+              keep<Text>("hi")
+            } else {
+              keep<i64>(0)
+            };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable` for generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_explicit_function_generic_arg_bound_failure_inside_match_result_branch() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          fn keep<U>(value: U) -> U where U: Addable {
+            return value;
+          }
+
+          fn main() -> i64 {
+            let value = match 1 {
+              1 => {
+                keep<Text>("hi")
+              }
+              _ => {
+                keep<i64>(0)
+              }
+            };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable` for generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_explicit_function_generic_arg_bound_failure_inside_lambda_body() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          fn apply<T>(value: T, mapper: Fn1<T, T>) -> T {
+            return mapper(value);
+          }
+
+          fn keep<U>(value: U) -> U where U: Addable {
+            return value;
+          }
+
+          fn main() -> i64 {
+            let value = apply(0, |x: i64| -> i64 {
+              keep<Text>("hi");
+              return x;
+            });
             return 0;
           }
         }

@@ -1466,6 +1466,8 @@ fn lowers_effectful_match_arm_when_constant_binding_controls_scrutinee() {
         .any(|node| node.op.module == "cpu" && node.op.instruction == "task_value"));
 }
 
+// Dynamic branch-local runtime tests are grouped below by the runtime family
+// or suffix shape they are defending.
 #[test]
 fn lowers_dynamic_if_binding_by_selecting_mutex_input_before_lock() {
     let module = parse_nuis_module(
@@ -1780,4 +1782,3587 @@ fn lowers_dynamic_match_return_chain_by_selecting_thread_input_before_join_resul
         "expected one post-select thread_join_result"
     );
     assert!(select_count >= 1, "expected selected match-arm input");
+}
+
+// Spawn/task-result branch selection.
+#[test]
+fn lowers_dynamic_if_binding_by_selecting_spawn_args_before_spawn_task() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Task<i64> {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              spawn(ping(5))
+            } else {
+              spawn(ping(9))
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert!(select_count >= 1, "expected selected spawn argument");
+}
+
+#[test]
+fn lowers_dynamic_match_binding_by_selecting_spawn_args_before_spawn_task() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Task<i64> {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = spawn(ping(5));
+                task
+              }
+              _ => {
+                let task: Task<i64> = spawn(ping(9));
+                task
+              }
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert!(select_count >= 1, "expected selected spawn argument");
+}
+
+#[test]
+fn lowers_dynamic_if_binding_chain_by_selecting_spawn_args_before_spawn_task() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Task<i64> {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              let task: Task<i64> = spawn(ping(5));
+              let alias: Task<i64> = task;
+              alias
+            } else {
+              let task: Task<i64> = spawn(ping(9));
+              let alias: Task<i64> = task;
+              alias
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert!(select_count >= 1, "expected selected spawn argument");
+}
+
+#[test]
+fn lowers_dynamic_match_binding_chain_by_selecting_spawn_args_before_spawn_task() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Task<i64> {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = spawn(ping(5));
+                let alias: Task<i64> = task;
+                alias
+              }
+              _ => {
+                let task: Task<i64> = spawn(ping(9));
+                let alias: Task<i64> = task;
+                alias
+              }
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert!(select_count >= 1, "expected selected spawn argument");
+}
+
+// Timeout over task handles, including alias-chain forms.
+#[test]
+fn lowers_dynamic_if_binding_by_selecting_timeout_inputs_before_timeout() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Task<i64> {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              timeout(spawn(ping(5)), 16)
+            } else {
+              timeout(spawn(ping(9)), 32)
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(timeout_count, 1, "expected one post-select timeout");
+    assert!(select_count >= 2, "expected selected task and timeout inputs");
+}
+
+#[test]
+fn lowers_dynamic_if_binding_chain_by_selecting_timeout_inputs_before_timeout() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Task<i64> {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              let task: Task<i64> = timeout(spawn(ping(5)), 16);
+              let alias: Task<i64> = task;
+              alias
+            } else {
+              let task: Task<i64> = timeout(spawn(ping(9)), 32);
+              let alias: Task<i64> = task;
+              alias
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(timeout_count, 1, "expected one post-select timeout");
+    assert!(select_count >= 2, "expected selected task and timeout inputs");
+}
+
+#[test]
+fn lowers_dynamic_match_binding_by_selecting_timeout_inputs_before_timeout() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Task<i64> {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = timeout(spawn(ping(5)), 16);
+                task
+              }
+              _ => {
+                let task: Task<i64> = timeout(spawn(ping(9)), 32);
+                task
+              }
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(timeout_count, 1, "expected one post-select timeout");
+    assert!(select_count >= 2, "expected selected task and timeout inputs");
+}
+
+#[test]
+fn lowers_dynamic_match_binding_chain_by_selecting_timeout_inputs_before_timeout() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Task<i64> {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = timeout(spawn(ping(5)), 16);
+                let alias: Task<i64> = task;
+                alias
+              }
+              _ => {
+                let task: Task<i64> = timeout(spawn(ping(9)), 32);
+                let alias: Task<i64> = task;
+                alias
+              }
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(timeout_count, 1, "expected one post-select timeout");
+    assert!(select_count >= 2, "expected selected task and timeout inputs");
+}
+
+// Thread handle production through branch-local selection.
+#[test]
+fn lowers_dynamic_if_binding_by_selecting_thread_spawn_args_before_spawn_thread() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Thread<i64> {
+            let argc: i64 = host_argv_count();
+            let chosen: Thread<i64> = if argc < 2 {
+              thread_spawn(ping(5))
+            } else {
+              thread_spawn(ping(9))
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert!(select_count >= 1, "expected selected thread_spawn argument");
+}
+
+#[test]
+fn lowers_dynamic_if_binding_chain_by_selecting_thread_spawn_args_before_spawn_thread() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Thread<i64> {
+            let argc: i64 = host_argv_count();
+            let chosen: Thread<i64> = if argc < 2 {
+              let thread: Thread<i64> = thread_spawn(ping(5));
+              let alias: Thread<i64> = thread;
+              alias
+            } else {
+              let thread: Thread<i64> = thread_spawn(ping(9));
+              let alias: Thread<i64> = thread;
+              alias
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert!(select_count >= 1, "expected selected thread_spawn argument");
+}
+
+#[test]
+fn lowers_dynamic_match_binding_by_selecting_thread_spawn_args_before_spawn_thread() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Thread<i64> {
+            let arm: i64 = host_argv_count();
+            let chosen: Thread<i64> = match arm {
+              0 => {
+                let thread: Thread<i64> = thread_spawn(ping(5));
+                thread
+              }
+              _ => {
+                let thread: Thread<i64> = thread_spawn(ping(9));
+                thread
+              }
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert!(select_count >= 1, "expected selected thread_spawn argument");
+}
+
+#[test]
+fn lowers_dynamic_match_binding_chain_by_selecting_thread_spawn_args_before_spawn_thread() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Thread<i64> {
+            let arm: i64 = host_argv_count();
+            let chosen: Thread<i64> = match arm {
+              0 => {
+                let thread: Thread<i64> = thread_spawn(ping(5));
+                let alias: Thread<i64> = thread;
+                alias
+              }
+              _ => {
+                let thread: Thread<i64> = thread_spawn(ping(9));
+                let alias: Thread<i64> = thread;
+                alias
+              }
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert!(select_count >= 1, "expected selected thread_spawn argument");
+}
+
+// Cancel(task) branch-local selection.
+#[test]
+fn lowers_dynamic_if_binding_by_selecting_cancel_input_before_cancel() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Task<i64> {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              cancel(spawn(ping(5)))
+            } else {
+              cancel(spawn(ping(9)))
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let cancel_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(cancel_count, 1, "expected one post-select cancel");
+    assert!(select_count >= 1, "expected selected cancel input");
+}
+
+#[test]
+fn lowers_dynamic_match_binding_by_selecting_cancel_input_before_cancel() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> Task<i64> {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = cancel(spawn(ping(5)));
+                task
+              }
+              _ => {
+                let task: Task<i64> = cancel(spawn(ping(9)));
+                task
+              }
+            };
+            return chosen;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let cancel_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(cancel_count, 1, "expected one post-select cancel");
+    assert!(select_count >= 1, "expected selected cancel input");
+}
+
+// Nested result-producing runtime consumers.
+#[test]
+fn lowers_dynamic_if_return_by_selecting_spawn_input_before_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let argc: i64 = host_argv_count();
+            if argc < 2 {
+              return join_result(spawn(ping(5)));
+            } else {
+              return join_result(spawn(ping(9)));
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(join_result_count, 1, "expected one post-select join_result");
+    assert!(select_count >= 1, "expected selected join_result input");
+}
+
+#[test]
+fn lowers_dynamic_match_return_by_selecting_spawn_input_before_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let arm: i64 = host_argv_count();
+            match arm {
+              0 => {
+                return join_result(spawn(ping(5)));
+              }
+              _ => {
+                return join_result(spawn(ping(9)));
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(join_result_count, 1, "expected one post-select join_result");
+    assert!(select_count >= 1, "expected selected join_result input");
+}
+
+#[test]
+fn lowers_dynamic_if_return_chain_by_selecting_spawn_input_before_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let argc: i64 = host_argv_count();
+            if argc < 2 {
+              let joined: TaskResult<i64> = join_result(spawn(ping(5)));
+              let alias: TaskResult<i64> = joined;
+              return alias;
+            } else {
+              let joined: TaskResult<i64> = join_result(spawn(ping(9)));
+              let alias: TaskResult<i64> = joined;
+              return alias;
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(join_result_count, 1, "expected one post-select join_result");
+    assert!(select_count >= 1, "expected selected join_result input");
+}
+
+#[test]
+fn lowers_dynamic_match_return_chain_by_selecting_spawn_input_before_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let arm: i64 = host_argv_count();
+            match arm {
+              0 => {
+                let joined: TaskResult<i64> = join_result(spawn(ping(5)));
+                let alias: TaskResult<i64> = joined;
+                return alias;
+              }
+              _ => {
+                let joined: TaskResult<i64> = join_result(spawn(ping(9)));
+                let alias: TaskResult<i64> = joined;
+                return alias;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(join_result_count, 1, "expected one post-select join_result");
+    assert!(select_count >= 1, "expected selected join_result input");
+}
+
+#[test]
+fn lowers_dynamic_if_return_by_selecting_spawn_input_before_join() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            if argc < 2 {
+              return join(spawn(ping(5)));
+            } else {
+              return join(spawn(ping(9)));
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(join_count, 1, "expected one post-select join");
+    assert!(select_count >= 1, "expected selected join input");
+}
+
+#[test]
+fn lowers_dynamic_match_return_by_selecting_spawn_input_before_join() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            match arm {
+              0 => {
+                return join(spawn(ping(5)));
+              }
+              _ => {
+                return join(spawn(ping(9)));
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(join_count, 1, "expected one post-select join");
+    assert!(select_count >= 1, "expected selected join input");
+}
+
+#[test]
+fn lowers_dynamic_if_return_by_selecting_thread_spawn_input_before_thread_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let argc: i64 = host_argv_count();
+            if argc < 2 {
+              return thread_join_result(thread_spawn(ping(5)));
+            } else {
+              return thread_join_result(thread_spawn(ping(9)));
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(
+        join_result_count, 1,
+        "expected one post-select thread_join_result"
+    );
+    assert!(select_count >= 1, "expected selected thread_join_result input");
+}
+
+#[test]
+fn lowers_dynamic_if_return_chain_by_selecting_thread_spawn_input_before_thread_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let argc: i64 = host_argv_count();
+            if argc < 2 {
+              let joined: TaskResult<i64> = thread_join_result(thread_spawn(ping(5)));
+              let alias: TaskResult<i64> = joined;
+              return alias;
+            } else {
+              let joined: TaskResult<i64> = thread_join_result(thread_spawn(ping(9)));
+              let alias: TaskResult<i64> = joined;
+              return alias;
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(
+        join_result_count, 1,
+        "expected one post-select thread_join_result"
+    );
+    assert!(select_count >= 1, "expected selected thread_join_result input");
+}
+
+#[test]
+fn lowers_dynamic_if_return_by_selecting_thread_spawn_input_before_thread_join() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            if argc < 2 {
+              return thread_join(thread_spawn(ping(5)));
+            } else {
+              return thread_join(thread_spawn(ping(9)));
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(join_count, 1, "expected one post-select thread_join");
+    assert!(select_count >= 1, "expected selected thread_join input");
+}
+
+#[test]
+fn lowers_dynamic_match_return_by_selecting_thread_spawn_input_before_thread_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let arm: i64 = host_argv_count();
+            match arm {
+              0 => {
+                return thread_join_result(thread_spawn(ping(5)));
+              }
+              _ => {
+                return thread_join_result(thread_spawn(ping(9)));
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(
+        join_result_count, 1,
+        "expected one post-select thread_join_result"
+    );
+    assert!(select_count >= 1, "expected selected thread_join_result input");
+}
+
+#[test]
+fn lowers_dynamic_match_return_chain_by_selecting_thread_spawn_input_before_thread_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let arm: i64 = host_argv_count();
+            match arm {
+              0 => {
+                let joined: TaskResult<i64> = thread_join_result(thread_spawn(ping(5)));
+                let alias: TaskResult<i64> = joined;
+                return alias;
+              }
+              _ => {
+                let joined: TaskResult<i64> = thread_join_result(thread_spawn(ping(9)));
+                let alias: TaskResult<i64> = joined;
+                return alias;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(
+        join_result_count, 1,
+        "expected one post-select thread_join_result"
+    );
+    assert!(select_count >= 1, "expected selected thread_join_result input");
+}
+
+// Shared observer and pure-suffix paths for TaskResult<T>.
+#[test]
+fn lowers_dynamic_if_task_result_binding_into_shared_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let joined: TaskResult<i64> = if argc < 2 {
+              join_result(spawn(ping(5)))
+            } else {
+              join_result(spawn(ping(9)))
+            };
+            if task_completed(joined) {
+              return task_value(joined);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(select_count >= 1, "expected select before shared observer suffix");
+}
+
+#[test]
+fn lowers_dynamic_match_task_result_binding_into_shared_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let joined: TaskResult<i64> = match arm {
+              0 => {
+                let result: TaskResult<i64> = join_result(spawn(ping(5)));
+                result
+              }
+              _ => {
+                let result: TaskResult<i64> = join_result(spawn(ping(9)));
+                result
+              }
+            };
+            if task_completed(joined) {
+              return task_value(joined);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(select_count >= 1, "expected select before shared observer suffix");
+}
+
+#[test]
+fn lowers_dynamic_if_task_result_binding_into_shared_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let joined: TaskResult<i64> = if argc < 2 {
+              join_result(spawn(ping(5)))
+            } else {
+              join_result(spawn(ping(9)))
+            };
+            let resolved: i64 = if task_completed(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            return resolved + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+#[test]
+fn lowers_dynamic_match_task_result_binding_into_shared_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let joined: TaskResult<i64> = match arm {
+              0 => {
+                let result: TaskResult<i64> = join_result(spawn(ping(5)));
+                result
+              }
+              _ => {
+                let result: TaskResult<i64> = join_result(spawn(ping(9)));
+                result
+              }
+            };
+            let resolved: i64 = if task_completed(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            return resolved + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+#[test]
+fn lowers_dynamic_if_task_result_binding_into_two_stage_shared_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let joined: TaskResult<i64> = if argc < 2 {
+              join_result(spawn(ping(5)))
+            } else {
+              join_result(spawn(ping(9)))
+            };
+            let resolved: i64 = if task_completed(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            let widened: i64 = resolved + 1;
+            return widened + 2;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 2, "expected two-stage shared pure suffix adds");
+}
+
+#[test]
+fn lowers_dynamic_match_task_result_binding_into_two_stage_shared_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let joined: TaskResult<i64> = match arm {
+              0 => {
+                let result: TaskResult<i64> = join_result(spawn(ping(5)));
+                result
+              }
+              _ => {
+                let result: TaskResult<i64> = join_result(spawn(ping(9)));
+                result
+              }
+            };
+            let resolved: i64 = if task_completed(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            let widened: i64 = resolved + 1;
+            return widened + 2;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 2, "expected two-stage shared pure suffix adds");
+}
+
+// Shared observer and pure-suffix paths for timeout(task, limit).
+#[test]
+fn lowers_dynamic_if_timeout_task_binding_into_shared_result_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              timeout(spawn(ping(5)), 16)
+            } else {
+              timeout(spawn(ping(9)), 32)
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            if task_completed(joined) {
+              return task_value(joined);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+}
+
+#[test]
+fn lowers_dynamic_match_timeout_task_binding_into_shared_result_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = timeout(spawn(ping(5)), 16);
+                task
+              }
+              _ => {
+                let task: Task<i64> = timeout(spawn(ping(9)), 32);
+                task
+              }
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            if task_completed(joined) {
+              return task_value(joined);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+}
+
+#[test]
+fn lowers_dynamic_if_timeout_task_binding_into_shared_result_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              timeout(spawn(ping(5)), 16)
+            } else {
+              timeout(spawn(ping(9)), 32)
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            let resolved: i64 = if task_completed(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            return resolved + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+#[test]
+fn lowers_dynamic_match_timeout_task_binding_into_shared_result_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = timeout(spawn(ping(5)), 16);
+                task
+              }
+              _ => {
+                let task: Task<i64> = timeout(spawn(ping(9)), 32);
+                task
+              }
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            let resolved: i64 = if task_completed(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            return resolved + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+// Nested direct-return timeout -> join_result recursion.
+#[test]
+fn lowers_dynamic_if_return_by_selecting_timeout_spawn_input_before_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let argc: i64 = host_argv_count();
+            if argc < 2 {
+              return join_result(timeout(spawn(ping(5)), 16));
+            } else {
+              return join_result(timeout(spawn(ping(9)), 32));
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+}
+
+#[test]
+fn lowers_dynamic_match_return_by_selecting_timeout_spawn_input_before_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let arm: i64 = host_argv_count();
+            match arm {
+              0 => {
+                return join_result(timeout(spawn(ping(5)), 16));
+              }
+              _ => {
+                return join_result(timeout(spawn(ping(9)), 32));
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+}
+
+#[test]
+fn lowers_dynamic_if_return_chain_by_selecting_timeout_spawn_input_before_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let argc: i64 = host_argv_count();
+            if argc < 2 {
+              let joined: TaskResult<i64> = join_result(timeout(spawn(ping(5)), 16));
+              let alias: TaskResult<i64> = joined;
+              return alias;
+            } else {
+              let joined: TaskResult<i64> = join_result(timeout(spawn(ping(9)), 32));
+              let alias: TaskResult<i64> = joined;
+              return alias;
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+}
+
+#[test]
+fn lowers_dynamic_match_return_chain_by_selecting_timeout_spawn_input_before_join_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> TaskResult<i64> {
+            let arm: i64 = host_argv_count();
+            match arm {
+              0 => {
+                let joined: TaskResult<i64> = join_result(timeout(spawn(ping(5)), 16));
+                let alias: TaskResult<i64> = joined;
+                return alias;
+              }
+              _ => {
+                let joined: TaskResult<i64> = join_result(timeout(spawn(ping(9)), 32));
+                let alias: TaskResult<i64> = joined;
+                return alias;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+}
+
+// Shared observer and pure-suffix paths for Thread<T>.
+#[test]
+fn lowers_dynamic_if_thread_binding_into_shared_result_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let chosen: Thread<i64> = if argc < 2 {
+              thread_spawn(ping(5))
+            } else {
+              thread_spawn(ping(9))
+            };
+            let joined: TaskResult<i64> = thread_join_result(chosen);
+            if task_completed(joined) {
+              return task_value(joined);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(
+        join_result_count, 1,
+        "expected one shared thread_join_result"
+    );
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+}
+
+#[test]
+fn lowers_dynamic_match_thread_binding_into_shared_result_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let chosen: Thread<i64> = match arm {
+              0 => {
+                let thread: Thread<i64> = thread_spawn(ping(5));
+                thread
+              }
+              _ => {
+                let thread: Thread<i64> = thread_spawn(ping(9));
+                thread
+              }
+            };
+            let joined: TaskResult<i64> = thread_join_result(chosen);
+            if task_completed(joined) {
+              return task_value(joined);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(
+        join_result_count, 1,
+        "expected one shared thread_join_result"
+    );
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+}
+
+#[test]
+fn lowers_dynamic_if_thread_binding_into_shared_result_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let chosen: Thread<i64> = if argc < 2 {
+              thread_spawn(ping(5))
+            } else {
+              thread_spawn(ping(9))
+            };
+            let joined: TaskResult<i64> = thread_join_result(chosen);
+            let resolved: i64 = if task_completed(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            return resolved + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(
+        join_result_count, 1,
+        "expected one shared thread_join_result"
+    );
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+#[test]
+fn lowers_dynamic_match_thread_binding_into_shared_result_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let chosen: Thread<i64> = match arm {
+              0 => {
+                let thread: Thread<i64> = thread_spawn(ping(5));
+                thread
+              }
+              _ => {
+                let thread: Thread<i64> = thread_spawn(ping(9));
+                thread
+              }
+            };
+            let joined: TaskResult<i64> = thread_join_result(chosen);
+            let resolved: i64 = if task_completed(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            return resolved + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let completed_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(
+        join_result_count, 1,
+        "expected one shared thread_join_result"
+    );
+    assert_eq!(completed_count, 1, "expected one shared task_completed");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+// Shared observer and pure-suffix paths for cancel(task).
+#[test]
+fn lowers_dynamic_if_cancelled_task_binding_into_shared_result_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              cancel(spawn(ping(5)))
+            } else {
+              cancel(spawn(ping(9)))
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            if task_cancelled(joined) {
+              return task_value(joined);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let cancel_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let cancelled_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(cancel_count, 1, "expected one shared cancel");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(cancelled_count, 1, "expected one shared task_cancelled");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+}
+
+#[test]
+fn lowers_dynamic_match_cancelled_task_binding_into_shared_result_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = cancel(spawn(ping(5)));
+                task
+              }
+              _ => {
+                let task: Task<i64> = cancel(spawn(ping(9)));
+                task
+              }
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            if task_cancelled(joined) {
+              return task_value(joined);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let cancel_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let cancelled_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(cancel_count, 1, "expected one shared cancel");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(cancelled_count, 1, "expected one shared task_cancelled");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+}
+
+#[test]
+fn lowers_dynamic_if_cancelled_task_binding_into_shared_result_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              cancel(spawn(ping(5)))
+            } else {
+              cancel(spawn(ping(9)))
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            let resolved: i64 = if task_cancelled(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            return resolved + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let cancel_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let cancelled_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(cancel_count, 1, "expected one shared cancel");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(cancelled_count, 1, "expected one shared task_cancelled");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+#[test]
+fn lowers_dynamic_match_cancelled_task_binding_into_shared_result_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = cancel(spawn(ping(5)));
+                task
+              }
+              _ => {
+                let task: Task<i64> = cancel(spawn(ping(9)));
+                task
+              }
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            let resolved: i64 = if task_cancelled(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            return resolved + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let cancel_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let cancelled_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(cancel_count, 1, "expected one shared cancel");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(cancelled_count, 1, "expected one shared task_cancelled");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+// Mixed nested binary(unary(call)) recursion: timeout(cancel(spawn(...)), limit).
+#[test]
+fn lowers_dynamic_if_timeout_cancelled_task_binding_into_shared_result_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              timeout(cancel(spawn(ping(5))), 16)
+            } else {
+              timeout(cancel(spawn(ping(9))), 32)
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            if task_cancelled(joined) {
+              return task_value(joined);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let cancel_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let cancelled_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(cancel_count, 1, "expected one shared cancel");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(cancelled_count, 1, "expected one shared task_cancelled");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+}
+
+#[test]
+fn lowers_dynamic_match_timeout_cancelled_task_binding_into_shared_result_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = timeout(cancel(spawn(ping(5))), 16);
+                task
+              }
+              _ => {
+                let task: Task<i64> = timeout(cancel(spawn(ping(9))), 32);
+                task
+              }
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            if task_cancelled(joined) {
+              return task_value(joined);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let cancel_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let cancelled_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(cancel_count, 1, "expected one shared cancel");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(cancelled_count, 1, "expected one shared task_cancelled");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+}
+
+#[test]
+fn lowers_dynamic_if_timeout_cancelled_task_binding_into_shared_result_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let chosen: Task<i64> = if argc < 2 {
+              timeout(cancel(spawn(ping(5))), 16)
+            } else {
+              timeout(cancel(spawn(ping(9))), 32)
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            let resolved: i64 = if task_cancelled(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            return resolved + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let cancel_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let cancelled_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(cancel_count, 1, "expected one shared cancel");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(cancelled_count, 1, "expected one shared task_cancelled");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+#[test]
+fn lowers_dynamic_match_timeout_cancelled_task_binding_into_shared_result_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let chosen: Task<i64> = match arm {
+              0 => {
+                let task: Task<i64> = timeout(cancel(spawn(ping(5))), 16);
+                task
+              }
+              _ => {
+                let task: Task<i64> = timeout(cancel(spawn(ping(9))), 32);
+                task
+              }
+            };
+            let joined: TaskResult<i64> = join_result(chosen);
+            let resolved: i64 = if task_cancelled(joined) {
+              task_value(joined)
+            } else {
+              0
+            };
+            return resolved + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let cancel_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let timeout_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let cancelled_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one shared spawn_task");
+    assert_eq!(async_call_count, 1, "expected one shared async_call");
+    assert_eq!(cancel_count, 1, "expected one shared cancel");
+    assert_eq!(timeout_count, 1, "expected one shared timeout");
+    assert_eq!(join_result_count, 1, "expected one shared join_result");
+    assert_eq!(cancelled_count, 1, "expected one shared task_cancelled");
+    assert_eq!(value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+// Shared observer and pure-suffix paths for MutexGuard<T>.
+#[test]
+fn lowers_dynamic_if_mutex_guard_binding_into_shared_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let left: Mutex<i64> = mutex_new(11);
+            let right: Mutex<i64> = mutex_new(19);
+            let guard: MutexGuard<i64> = if argc < 2 {
+              mutex_lock(left)
+            } else {
+              mutex_lock(right)
+            };
+            return mutex_value(guard);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let lock_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(lock_count, 1, "expected one shared mutex_lock");
+    assert_eq!(value_count, 1, "expected one shared mutex_value");
+    assert!(select_count >= 1, "expected select before shared mutex observer");
+}
+
+#[test]
+fn lowers_dynamic_if_mutex_guard_binding_into_shared_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let left: Mutex<i64> = mutex_new(11);
+            let right: Mutex<i64> = mutex_new(19);
+            let guard: MutexGuard<i64> = if argc < 2 {
+              mutex_lock(left)
+            } else {
+              mutex_lock(right)
+            };
+            let value: i64 = mutex_value(guard);
+            return value + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let lock_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(lock_count, 1, "expected one shared mutex_lock");
+    assert_eq!(value_count, 1, "expected one shared mutex_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+#[test]
+fn lowers_dynamic_if_mutex_guard_binding_into_two_stage_shared_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          fn main() -> i64 {
+            let argc: i64 = host_argv_count();
+            let left: Mutex<i64> = mutex_new(11);
+            let right: Mutex<i64> = mutex_new(19);
+            let guard: MutexGuard<i64> = if argc < 2 {
+              mutex_lock(left)
+            } else {
+              mutex_lock(right)
+            };
+            let value: i64 = mutex_value(guard);
+            let widened: i64 = value + 1;
+            return widened + 2;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let lock_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(lock_count, 1, "expected one shared mutex_lock");
+    assert_eq!(value_count, 1, "expected one shared mutex_value");
+    assert!(add_count >= 2, "expected two-stage shared pure suffix adds");
+}
+
+#[test]
+fn lowers_dynamic_match_mutex_guard_binding_into_shared_observer_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let left: Mutex<i64> = mutex_new(11);
+            let right: Mutex<i64> = mutex_new(19);
+            let guard: MutexGuard<i64> = match arm {
+              0 => {
+                let locked: MutexGuard<i64> = mutex_lock(left);
+                locked
+              }
+              _ => {
+                let locked: MutexGuard<i64> = mutex_lock(right);
+                locked
+              }
+            };
+            return mutex_value(guard);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let lock_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(lock_count, 1, "expected one shared mutex_lock");
+    assert_eq!(value_count, 1, "expected one shared mutex_value");
+    assert!(select_count >= 1, "expected select before shared mutex observer");
+}
+
+#[test]
+fn lowers_dynamic_match_mutex_guard_binding_into_shared_observer_and_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let left: Mutex<i64> = mutex_new(11);
+            let right: Mutex<i64> = mutex_new(19);
+            let guard: MutexGuard<i64> = match arm {
+              0 => {
+                let locked: MutexGuard<i64> = mutex_lock(left);
+                locked
+              }
+              _ => {
+                let locked: MutexGuard<i64> = mutex_lock(right);
+                locked
+              }
+            };
+            let value: i64 = mutex_value(guard);
+            return value + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let lock_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(lock_count, 1, "expected one shared mutex_lock");
+    assert_eq!(value_count, 1, "expected one shared mutex_value");
+    assert!(add_count >= 1, "expected shared pure suffix add");
+}
+
+#[test]
+fn lowers_dynamic_match_mutex_guard_binding_into_two_stage_shared_pure_suffix() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            let left: Mutex<i64> = mutex_new(11);
+            let right: Mutex<i64> = mutex_new(19);
+            let guard: MutexGuard<i64> = match arm {
+              0 => {
+                let locked: MutexGuard<i64> = mutex_lock(left);
+                locked
+              }
+              _ => {
+                let locked: MutexGuard<i64> = mutex_lock(right);
+                locked
+              }
+            };
+            let value: i64 = mutex_value(guard);
+            let widened: i64 = value + 1;
+            return widened + 2;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let lock_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+        .count();
+    let value_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value")
+        .count();
+    let add_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+
+    assert_eq!(lock_count, 1, "expected one shared mutex_lock");
+    assert_eq!(value_count, 1, "expected one shared mutex_value");
+    assert!(add_count >= 2, "expected two-stage shared pure suffix adds");
+}
+
+#[test]
+fn lowers_dynamic_match_return_by_selecting_thread_spawn_input_before_thread_join() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count() -> i64;
+
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let arm: i64 = host_argv_count();
+            match arm {
+              0 => {
+                return thread_join(thread_spawn(ping(5)));
+              }
+              _ => {
+                return thread_join(thread_spawn(ping(9)));
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let spawn_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread")
+        .count();
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let join_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join")
+        .count();
+    let select_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(spawn_count, 1, "expected one post-select spawn_thread");
+    assert_eq!(async_call_count, 1, "expected one post-select async_call");
+    assert_eq!(join_count, 1, "expected one post-select thread_join");
+    assert!(select_count >= 1, "expected selected thread_join input");
 }

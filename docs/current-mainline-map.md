@@ -14,11 +14,14 @@ If you only need the shortest current late-`0.19.*` reading route, use this orde
 3. [versioning/nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
 4. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 5. [versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
-6. [versioning/nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
-7. [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
-8. [versioning/nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
-9. [versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
-10. [versioning/nuis-0.19.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-release-checklist.md)
+6. [versioning/nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
+7. [versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
+8. [versioning/nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
+9. [versioning/nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
+10. [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
+11. [versioning/nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
+12. [versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+13. [versioning/nuis-0.19.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-release-checklist.md)
 
 Short rule:
 
@@ -36,6 +39,12 @@ Short rule:
   [versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 * current `0.20.* -> alpha` roadmap:
   [versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
+* current frontend-vs-CLI boundary note:
+  [versioning/nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
+* current branch-runtime lowering matrix:
+  [versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
+* current compile-gap checklist:
+  [versioning/nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
 * current goals / gates:
   [versioning/nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md),
   [versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md),
