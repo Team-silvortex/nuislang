@@ -44,6 +44,10 @@ fn json_optional_string_field(name: &str, value: Option<&str>) -> String {
     }
 }
 
+fn json_bool_field(name: &str, value: bool) -> String {
+    format!("\"{}\":{}", name, if value { "true" } else { "false" })
+}
+
 fn json_string_array_field(name: &str, values: &[String]) -> String {
     let entries = values
         .iter()
@@ -273,6 +277,135 @@ pub struct NustarDomainRegistration {
     pub contract: NustarDomainContract,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProjectDomainRegistryIssueKind {
+    DomainNotRegistered,
+    ContractSchemaMismatch,
+    AbiNotRegistered,
+}
+
+impl ProjectDomainRegistryIssueKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::DomainNotRegistered => "domain_not_registered",
+            Self::ContractSchemaMismatch => "contract_schema_mismatch",
+            Self::AbiNotRegistered => "abi_not_registered",
+        }
+    }
+
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::DomainNotRegistered => "NRG001",
+            Self::ContractSchemaMismatch => "NRG002",
+            Self::AbiNotRegistered => "NRG003",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectDomainRegistryIssue {
+    pub kind: ProjectDomainRegistryIssueKind,
+    pub message: String,
+}
+
+impl ProjectDomainRegistryIssue {
+    pub fn summary(&self) -> String {
+        format!(
+            "{} {}: {}",
+            self.kind.code(),
+            self.kind.as_str(),
+            self.message
+        )
+    }
+}
+
+pub fn project_domain_registry_issue_json(issue: &ProjectDomainRegistryIssue) -> String {
+    format!(
+        "{{{},{},{}}}",
+        json_field("code", issue.kind.code()),
+        json_field("kind", issue.kind.as_str()),
+        json_field("message", &issue.message)
+    )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectDomainRegistryCheck {
+    pub domain: String,
+    pub package: Option<String>,
+    pub contract_schema: Option<String>,
+    pub abi: Option<String>,
+    pub abi_registered: bool,
+    pub ok: bool,
+    pub issues: Vec<ProjectDomainRegistryIssue>,
+}
+
+impl ProjectDomainRegistryCheck {
+    pub fn issue_count(&self) -> usize {
+        self.issues.len()
+    }
+
+    pub fn summary_line(&self) -> String {
+        format!(
+            "{} (package={}, abi={}): {}",
+            self.domain,
+            self.package.as_deref().unwrap_or("<missing>"),
+            self.abi.as_deref().unwrap_or("<none>"),
+            if self.issues.is_empty() {
+                "ok".to_owned()
+            } else {
+                self.issues
+                    .iter()
+                    .map(ProjectDomainRegistryIssue::summary)
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            }
+        )
+    }
+}
+
+pub fn project_domain_registry_check_json(check: &ProjectDomainRegistryCheck) -> String {
+    let issue_json = check
+        .issues
+        .iter()
+        .map(project_domain_registry_issue_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{{},{},{},{},{},{},{}}}",
+        json_field("domain", &check.domain),
+        json_optional_string_field("package", check.package.as_deref()),
+        json_optional_string_field("contract_schema", check.contract_schema.as_deref()),
+        json_optional_string_field("abi", check.abi.as_deref()),
+        json_bool_field("abi_registered", check.abi_registered),
+        json_bool_field("ok", check.ok),
+        format!("\"issues\":[{}]", issue_json)
+    )
+}
+
+pub fn render_project_domain_registry_check_lines(
+    check: &ProjectDomainRegistryCheck,
+) -> Vec<String> {
+    let mut lines = vec![format!(
+        "registry: {} package={} schema={} abi={} ok={} abi_registered={} issues={}",
+        check.domain,
+        check.package.as_deref().unwrap_or("<missing>"),
+        check.contract_schema.as_deref().unwrap_or("<missing>"),
+        check.abi.as_deref().unwrap_or("<none>"),
+        if check.ok { "yes" } else { "no" },
+        if check.abi_registered { "yes" } else { "no" },
+        check.issue_count()
+    )];
+    for issue in &check.issues {
+        lines.push(format!(
+            "registry_issue: {} {} {}",
+            issue.kind.code(),
+            issue.kind.as_str(),
+            issue.message
+        ));
+    }
+    lines
+}
+
 pub fn domain_contract(manifest: &NustarPackageManifest) -> NustarDomainContract {
     let mut contract_groups = vec![
         NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY.to_owned(),
@@ -376,6 +509,82 @@ pub fn load_domain_registration_for_domain(
             )
         })?;
     domain_registration(&root, &entry)
+}
+
+pub fn validate_project_domain_registry(
+    plan: &crate::project::ProjectCompilationPlan,
+) -> Vec<ProjectDomainRegistryCheck> {
+    plan.abi_resolution
+        .requirements
+        .iter()
+        .map(|item| {
+            let mut issues = Vec::new();
+            let mut package = None;
+            let mut contract_schema = None;
+            let mut abi_registered = false;
+            match load_domain_registration_for_domain(Path::new("nustar-packages"), &item.domain) {
+                Ok(registration) => {
+                    package = Some(registration.package_id.clone());
+                    contract_schema = Some(registration.contract.contract_schema.clone());
+                    if registration.contract.contract_schema != NUSTAR_DOMAIN_CONTRACT_SCHEMA {
+                        issues.push(ProjectDomainRegistryIssue {
+                            kind: ProjectDomainRegistryIssueKind::ContractSchemaMismatch,
+                            message: format!(
+                                "unexpected contract schema `{}`",
+                                registration.contract.contract_schema
+                            ),
+                        });
+                    }
+                    abi_registered = registration
+                        .contract
+                        .abi_profiles
+                        .iter()
+                        .any(|candidate| candidate == &item.abi);
+                    if !abi_registered {
+                        issues.push(ProjectDomainRegistryIssue {
+                            kind: ProjectDomainRegistryIssueKind::AbiNotRegistered,
+                            message: format!(
+                                "abi `{}` is not declared by registered profiles",
+                                item.abi
+                            ),
+                        });
+                    }
+                }
+                Err(error) => issues.push(ProjectDomainRegistryIssue {
+                    kind: ProjectDomainRegistryIssueKind::DomainNotRegistered,
+                    message: error,
+                }),
+            }
+            ProjectDomainRegistryCheck {
+                domain: item.domain.clone(),
+                package,
+                contract_schema,
+                abi: Some(item.abi.clone()),
+                abi_registered,
+                ok: issues.is_empty(),
+                issues,
+            }
+        })
+        .collect()
+}
+
+pub fn ensure_project_domain_registry_valid(
+    plan: &crate::project::ProjectCompilationPlan,
+) -> Result<(), String> {
+    let checks = validate_project_domain_registry(plan);
+    let failures = checks
+        .iter()
+        .filter(|check| !check.ok)
+        .map(ProjectDomainRegistryCheck::summary_line)
+        .collect::<Vec<_>>();
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "project domain registry validation failed:\n{}",
+            failures.join("\n")
+        ))
+    }
 }
 
 pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
@@ -2183,6 +2392,39 @@ fn parse_array(raw: &str) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::project::{
+        ProjectAbiRequirement, ProjectAbiResolution, ProjectCompilationPlan,
+        ProjectExchangeOrganization, ProjectOrganization, ProjectOutputIntent,
+        ProjectSyntheticInput,
+    };
+
+    fn test_project_plan(domain: &str, abi: &str) -> ProjectCompilationPlan {
+        ProjectCompilationPlan {
+            project_name: "registry-check-demo".to_owned(),
+            entry: "main.ns".to_owned(),
+            organization: ProjectOrganization {
+                entry: "main.ns".to_owned(),
+                domains: vec![domain.to_owned()],
+                modules: Vec::new(),
+                links: Vec::new(),
+            },
+            exchanges: ProjectExchangeOrganization { routes: Vec::new() },
+            abi_resolution: ProjectAbiResolution {
+                requirements: vec![ProjectAbiRequirement {
+                    domain: domain.to_owned(),
+                    abi: abi.to_owned(),
+                }],
+                explicit: true,
+            },
+            dependencies: Vec::new(),
+            synthetic_input: ProjectSyntheticInput {
+                kind: "test".to_owned(),
+                path: PathBuf::from("main.ns"),
+            },
+            output_intents: Vec::<ProjectOutputIntent>::new(),
+            effective_input_path: PathBuf::from("main.ns"),
+        }
+    }
     use crate::pipeline;
 
     const DATA_BINDING_SOURCE: &str = r#"
@@ -2516,6 +2758,56 @@ mod cpu Main {
             .extension_groups
             .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET.to_owned()));
         assert!(!network.ops.is_empty());
+    }
+
+    #[test]
+    fn ensure_project_domain_registry_valid_accepts_registered_abi() {
+        let plan = test_project_plan("network", "network.socket.macos.arm64.v1");
+        let checks = validate_project_domain_registry(&plan);
+        assert!(checks.iter().all(|check| check.issues.is_empty()));
+        let network = checks.iter().find(|check| check.domain == "network").unwrap();
+        assert_eq!(network.issue_count(), 0);
+        assert!(network.summary_line().contains(": ok"));
+        ensure_project_domain_registry_valid(&plan).unwrap();
+    }
+
+    #[test]
+    fn ensure_project_domain_registry_valid_rejects_unknown_abi() {
+        let plan = test_project_plan("network", "network.socket.unknown.v1");
+        let checks = validate_project_domain_registry(&plan);
+        let network = checks.iter().find(|check| check.domain == "network").unwrap();
+        assert!(network
+            .issues
+            .iter()
+            .any(|issue| issue.kind == ProjectDomainRegistryIssueKind::AbiNotRegistered));
+        assert!(network
+            .issues
+            .iter()
+            .any(|issue| issue.kind.code() == "NRG003"));
+        assert!(network.summary_line().contains("NRG003 abi_not_registered"));
+        let error = ensure_project_domain_registry_valid(&plan).unwrap_err();
+        assert!(error.contains("project domain registry validation failed"));
+        assert!(error.contains("network"));
+        assert!(error.contains("network.socket.unknown.v1"));
+        assert!(error.contains("NRG003"));
+        assert!(error.contains("abi_not_registered"));
+    }
+
+    #[test]
+    fn project_domain_registry_check_renderers_expose_codes_and_issue_counts() {
+        let plan = test_project_plan("network", "network.socket.unknown.v1");
+        let check = validate_project_domain_registry(&plan)
+            .into_iter()
+            .find(|check| check.domain == "network")
+            .expect("network check");
+        let json = project_domain_registry_check_json(&check);
+        assert!(json.contains("\"domain\":\"network\""));
+        assert!(json.contains("\"code\":\"NRG003\""));
+        assert!(json.contains("\"kind\":\"abi_not_registered\""));
+        let lines = render_project_domain_registry_check_lines(&check);
+        assert!(!lines.is_empty());
+        assert!(lines[0].contains("issues=1"));
+        assert!(lines.iter().any(|line| line.contains("NRG003 abi_not_registered")));
     }
 
     #[test]

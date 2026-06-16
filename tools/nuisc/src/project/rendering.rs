@@ -1,10 +1,286 @@
+use std::path::Path;
+
 use nuis_semantics::model::{AstExternFunction, AstTypeRef};
 
 use super::{
     profile_apply::resolve_registered_abi_target, resolve_project_abi, LoadedProject,
-    ProjectAbiResolution, ProjectExchangeOrganization, ProjectExchangeRoute, ProjectOrganization,
-    ProjectOrganizationLink, ProjectOrganizationModule,
+    ProjectAbiResolution, ProjectAbiSelectionView, ProjectExchangeOrganization,
+    ProjectExchangeRoute, ProjectLoweringIssue, ProjectLoweringIssueKind,
+    ProjectLoweringSelectionView, ProjectOrganization, ProjectOrganizationLink,
+    ProjectOrganizationModule,
 };
+
+fn json_escape(value: &str) -> String {
+    let mut out = String::new();
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            ch if ch.is_control() => out.push_str(&format!("\\u{:04x}", ch as u32)),
+            ch => out.push(ch),
+        }
+    }
+    out
+}
+
+pub fn project_abi_selection_views(
+    resolution: &ProjectAbiResolution,
+) -> Vec<ProjectAbiSelectionView> {
+    let mut views = resolution
+        .requirements
+        .iter()
+        .map(|item| {
+            let target = resolve_registered_abi_target(&item.domain, Some(resolution))
+                .ok()
+                .flatten();
+            ProjectAbiSelectionView {
+                domain: item.domain.clone(),
+                abi: item.abi.clone(),
+                machine_arch: target.as_ref().map(|target| target.machine_arch.clone()),
+                machine_os: target.as_ref().map(|target| target.machine_os.clone()),
+                object_format: target.as_ref().map(|target| target.object_format.clone()),
+                calling_abi: target.as_ref().map(|target| target.calling_abi.clone()),
+                clang_target: target.as_ref().map(|target| target.clang_target.clone()),
+                backend_family: target
+                    .as_ref()
+                    .and_then(|target| target.backend_family.clone()),
+                host_adaptive: target.as_ref().map(|target| target.host_adaptive),
+            }
+        })
+        .collect::<Vec<_>>();
+    views.sort_by(|lhs, rhs| lhs.domain.cmp(&rhs.domain));
+    views
+}
+
+pub fn project_abi_selection_view_json(item: &ProjectAbiSelectionView) -> String {
+    format!(
+        "{{\"domain\":\"{}\",\"abi\":\"{}\",\"abi_target_machine\":{},\"abi_target_object\":{},\"abi_target_calling\":{},\"abi_target_clang\":{},\"abi_target_backend\":{},\"abi_target_host_adaptive\":{}}}",
+        json_escape(&item.domain),
+        json_escape(&item.abi),
+        item.machine_arch
+            .as_deref()
+            .zip(item.machine_os.as_deref())
+            .map(|(arch, os)| format!("\"{}-{}\"", json_escape(arch), json_escape(os)))
+            .unwrap_or_else(|| "null".to_owned()),
+        item.object_format
+            .as_deref()
+            .map(|value| format!("\"{}\"", json_escape(value)))
+            .unwrap_or_else(|| "null".to_owned()),
+        item.calling_abi
+            .as_deref()
+            .map(|value| format!("\"{}\"", json_escape(value)))
+            .unwrap_or_else(|| "null".to_owned()),
+        item.clang_target
+            .as_deref()
+            .map(|value| format!("\"{}\"", json_escape(value)))
+            .unwrap_or_else(|| "null".to_owned()),
+        item.backend_family
+            .as_deref()
+            .map(|value| format!("\"{}\"", json_escape(value)))
+            .unwrap_or_else(|| "null".to_owned()),
+        item.host_adaptive
+            .map(|value| if value { "true" } else { "false" }.to_owned())
+            .unwrap_or_else(|| "null".to_owned())
+    )
+}
+
+pub fn render_project_abi_selection_lines(
+    resolution: &ProjectAbiResolution,
+) -> Vec<String> {
+    project_abi_selection_views(resolution)
+        .into_iter()
+        .flat_map(|item| render_project_abi_selection_view_lines(&item))
+        .collect()
+}
+
+pub fn render_project_abi_selection_view_lines(item: &ProjectAbiSelectionView) -> Vec<String> {
+    let mut lines = vec![format!("abi: {}={}", item.domain, item.abi)];
+    if let (Some(machine_arch), Some(machine_os)) =
+        (item.machine_arch.as_deref(), item.machine_os.as_deref())
+    {
+        lines.push(format!("  abi_target_machine: {}-{}", machine_arch, machine_os));
+    }
+    if let Some(object_format) = item.object_format.as_deref() {
+        lines.push(format!("  abi_target_object: {}", object_format));
+    }
+    if let Some(calling_abi) = item.calling_abi.as_deref() {
+        lines.push(format!("  abi_target_calling: {}", calling_abi));
+    }
+    if let Some(clang_target) = item.clang_target.as_deref() {
+        lines.push(format!("  abi_target_clang: {}", clang_target));
+    }
+    if let Some(backend_family) = item.backend_family.as_deref() {
+        lines.push(format!("  abi_target_backend: {}", backend_family));
+    }
+    if let Some(host_adaptive) = item.host_adaptive {
+        lines.push(format!(
+            "  abi_target_host_adaptive: {}",
+            if host_adaptive { "true" } else { "false" }
+        ));
+    }
+    lines
+}
+
+pub fn validate_project_lowering_selections(
+    resolution: &ProjectAbiResolution,
+) -> Vec<ProjectLoweringSelectionView> {
+    let mut views = resolution
+        .requirements
+        .iter()
+        .map(|item| {
+            let mut issues = Vec::new();
+            let mut registered_lowering_targets = Vec::new();
+            let mut selected_lowering_target = None;
+            match crate::registry::load_domain_registration_for_domain(
+                Path::new("nustar-packages"),
+                &item.domain,
+            ) {
+                Ok(registration) => {
+                    registered_lowering_targets = registration.lowering_targets.clone();
+                    if registered_lowering_targets.is_empty() {
+                        issues.push(ProjectLoweringIssue {
+                            kind: ProjectLoweringIssueKind::NoRegisteredLoweringTargets,
+                            message: format!(
+                                "registered domain `{}` does not declare any lowering targets",
+                                item.domain
+                            ),
+                        });
+                    }
+                    if item.domain == "cpu" {
+                        match crate::aot::resolve_cpu_build_target_from_abi(
+                            Path::new("nustar-packages"),
+                            &item.abi,
+                        ) {
+                            Ok(_) => {
+                                selected_lowering_target = Some("llvm".to_owned());
+                            }
+                            Err(error) => issues.push(ProjectLoweringIssue {
+                                kind: ProjectLoweringIssueKind::AbiTargetResolutionFailed,
+                                message: error,
+                            }),
+                        }
+                    }
+                    if let Some(selected) = selected_lowering_target.as_deref() {
+                        if !registered_lowering_targets
+                            .iter()
+                            .any(|target| target == selected)
+                        {
+                            issues.push(ProjectLoweringIssue {
+                                kind: ProjectLoweringIssueKind::SelectedLoweringTargetNotRegistered,
+                                message: format!(
+                                    "selected lowering target `{selected}` is not declared by registered lowering targets: {}",
+                                    if registered_lowering_targets.is_empty() {
+                                        "<none>".to_owned()
+                                    } else {
+                                        registered_lowering_targets.join(", ")
+                                    }
+                                ),
+                            });
+                        }
+                    }
+                }
+                Err(error) => issues.push(ProjectLoweringIssue {
+                    kind: ProjectLoweringIssueKind::DomainNotRegistered,
+                    message: error,
+                }),
+            }
+            ProjectLoweringSelectionView {
+                domain: item.domain.clone(),
+                abi: Some(item.abi.clone()),
+                registered_lowering_targets,
+                selected_lowering_target,
+                ok: issues.is_empty(),
+                issues,
+            }
+        })
+        .collect::<Vec<_>>();
+    views.sort_by(|lhs, rhs| lhs.domain.cmp(&rhs.domain));
+    views
+}
+
+pub fn render_project_lowering_selection_lines(
+    view: &ProjectLoweringSelectionView,
+) -> Vec<String> {
+    let mut lines = vec![format!(
+        "lowering: {} abi={} ok={} selected={} registered={} issues={}",
+        view.domain,
+        view.abi.as_deref().unwrap_or("<none>"),
+        if view.ok { "yes" } else { "no" },
+        view.selected_lowering_target
+            .as_deref()
+            .unwrap_or("<none>"),
+        if view.registered_lowering_targets.is_empty() {
+            "<none>".to_owned()
+        } else {
+            view.registered_lowering_targets.join(", ")
+        },
+        view.issue_count()
+    )];
+    for issue in &view.issues {
+        lines.push(format!("lowering_issue: {}", issue.summary().replace(": ", " ")));
+    }
+    lines
+}
+
+pub fn project_lowering_issue_json(issue: &ProjectLoweringIssue) -> String {
+    format!(
+        "{{\"code\":\"{}\",\"kind\":\"{}\",\"message\":\"{}\"}}",
+        issue.kind.code(),
+        issue.kind.as_str(),
+        json_escape(&issue.message)
+    )
+}
+
+pub fn project_lowering_selection_json(view: &ProjectLoweringSelectionView) -> String {
+    let issues = view
+        .issues
+        .iter()
+        .map(project_lowering_issue_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let registered = view
+        .registered_lowering_targets
+        .iter()
+        .map(|target| format!("\"{}\"", json_escape(target)))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{\"domain\":\"{}\",\"abi\":{},\"registered_lowering_targets\":[{}],\"selected_lowering_target\":{},\"ok\":{},\"issues\":[{}]}}",
+        json_escape(&view.domain),
+        view.abi
+            .as_deref()
+            .map(|value| format!("\"{}\"", json_escape(value)))
+            .unwrap_or_else(|| "null".to_owned()),
+        registered,
+        view.selected_lowering_target
+            .as_deref()
+            .map(|value| format!("\"{}\"", json_escape(value)))
+            .unwrap_or_else(|| "null".to_owned()),
+        if view.ok { "true" } else { "false" },
+        issues
+    )
+}
+
+pub fn ensure_project_lowering_selections_valid(
+    resolution: &ProjectAbiResolution,
+) -> Result<(), String> {
+    let failures = validate_project_lowering_selections(resolution)
+        .into_iter()
+        .filter(|view| !view.ok)
+        .map(|view| view.summary_line())
+        .collect::<Vec<_>>();
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "project lowering selection validation failed:\n{}",
+            failures.join("\n")
+        ))
+    }
+}
 
 pub fn organize_project(project: &LoadedProject) -> ProjectOrganization {
     let mut domains = project
@@ -164,30 +440,12 @@ pub(super) fn render_project_abi_index(project: &LoadedProject) -> Result<String
     };
     let graph_summary = render_project_abi_graph_line(&resolution);
     let mut lines = vec![graph_summary];
-    for item in &resolution.requirements {
-        let target = resolve_registered_abi_target(&item.domain, Some(&resolution))
-            .ok()
-            .flatten();
-        let arch = target
-            .as_ref()
-            .map(|target| target.machine_arch.as_str())
-            .unwrap_or("unknown");
-        let os = target
-            .as_ref()
-            .map(|target| target.machine_os.as_str())
-            .unwrap_or("unknown");
-        let object = target
-            .as_ref()
-            .map(|target| target.object_format.as_str())
-            .unwrap_or("unknown");
-        let calling = target
-            .as_ref()
-            .map(|target| target.calling_abi.as_str())
-            .unwrap_or("unknown");
-        let backend = target
-            .as_ref()
-            .and_then(|target| target.backend_family.as_deref())
-            .unwrap_or("none");
+    for item in project_abi_selection_views(&resolution) {
+        let arch = item.machine_arch.as_deref().unwrap_or("unknown");
+        let os = item.machine_os.as_deref().unwrap_or("unknown");
+        let object = item.object_format.as_deref().unwrap_or("unknown");
+        let calling = item.calling_abi.as_deref().unwrap_or("unknown");
+        let backend = item.backend_family.as_deref().unwrap_or("none");
         lines.push(format!(
             "domain\t{}\tabi={}\tarch={}\tos={}\tobject={}\tcalling={}\tbackend={}",
             item.domain, item.abi, arch, os, object, calling, backend

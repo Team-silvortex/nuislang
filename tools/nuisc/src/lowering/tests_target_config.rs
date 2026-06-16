@@ -53,6 +53,18 @@ fn lowers_cpu_target_config_and_resource_kind_for_selected_abi() {
         edge.from == "lowering_cpu_target_contract_type"
             && edge.to == "lowering_cpu_target_config"
     }));
+    assert_eq!(
+        yir.node_lanes
+            .get("lowering_cpu_target_contract_type")
+            .map(String::as_str),
+        Some("contract")
+    );
+    assert_eq!(
+        yir.node_lanes
+            .get("lowering_cpu_target_config")
+            .map(String::as_str),
+        Some("contract")
+    );
 }
 
 #[test]

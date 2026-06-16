@@ -106,6 +106,9 @@ pub fn compile_project_plan_with_options(
     plan: &crate::project::ProjectCompilationPlan,
     options: &PipelineCompileOptions,
 ) -> Result<PipelineArtifacts, String> {
+    crate::project::ensure_project_abi_selections_valid(project, &plan.abi_resolution)?;
+    crate::registry::ensure_project_domain_registry_valid(plan)?;
+    crate::project::ensure_project_lowering_selections_valid(&plan.abi_resolution)?;
     let (ast, nir, local_units) = prepare_project_nir(project)?;
     let lowering_target = options
         .lowering_target
@@ -305,6 +308,7 @@ fn validate_instantiated_units(module: &NirModule) -> Result<(), String> {
     }
     Ok(())
 }
+
 
 fn validate_used_units_with_local_units(
     module: &NirModule,

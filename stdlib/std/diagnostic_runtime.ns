@@ -3,28 +3,110 @@ mod cpu Main {
   extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
   extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
 
-  struct DiagnosticRecord {
+  enum ErrorSeverity {
+    Info,
+    Warning,
+    Error,
+  }
+
+  enum ErrorFamily {
+    Unknown,
+    InputValidation,
+    ResultRuntime,
+    DiagnosticRuntime,
+  }
+
+  struct DiagnosticCode {
     label_handle: i64,
     span_handle: i64,
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64,
     emit_code: i64
   }
 
-  fn emit_diagnostic(message_handle: i64, start: i64, end: i64, severity: i64) -> DiagnosticRecord {
+  fn kind_diagnostic_message() -> i64 {
+    return 1303;
+  }
+
+  fn severity_code(severity: ErrorSeverity) -> i64 {
+    match severity {
+      ErrorSeverity.Info => {
+        return 1;
+      }
+      ErrorSeverity.Warning => {
+        return 2;
+      }
+      ErrorSeverity.Error => {
+        return 3;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn family_code(family: ErrorFamily) -> i64 {
+    match family {
+      ErrorFamily.Unknown => {
+        return 0;
+      }
+      ErrorFamily.InputValidation => {
+        return 11;
+      }
+      ErrorFamily.ResultRuntime => {
+        return 12;
+      }
+      ErrorFamily.DiagnosticRuntime => {
+        return 13;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn classify_diagnostic_severity(message_handle: i64) -> ErrorSeverity {
+    if message_handle == kind_diagnostic_message() {
+      return ErrorSeverity.Warning;
+    }
+    return ErrorSeverity.Info;
+  }
+
+  fn classify_diagnostic_family(message_handle: i64) -> ErrorFamily {
+    if message_handle == kind_diagnostic_message() {
+      return ErrorFamily.DiagnosticRuntime;
+    }
+    return ErrorFamily.Unknown;
+  }
+
+  fn build_diagnostic_code(message_handle: i64, start: i64, end: i64) -> DiagnosticCode {
     let label_handle: i64 = host_diag_label(message_handle);
     let span_handle: i64 = host_diag_span(start, end);
-    return DiagnosticRecord {
+    let severity: ErrorSeverity = classify_diagnostic_severity(message_handle);
+    let family: ErrorFamily = classify_diagnostic_family(message_handle);
+    let severity_number: i64 = severity_code(severity);
+    return DiagnosticCode {
       label_handle: label_handle,
       span_handle: span_handle,
-      emit_code: host_diag_emit(label_handle, span_handle, severity)
+      message_handle: message_handle,
+      severity_code: severity_number,
+      family_code: family_code(family),
+      emit_code: host_diag_emit(label_handle, span_handle, severity_number)
     };
   }
 
-  fn summarize_diagnostic(message_handle: i64, start: i64, end: i64, severity: i64) -> i64 {
-    let diag: DiagnosticRecord = emit_diagnostic(message_handle, start, end, severity);
-    return diag.label_handle + diag.span_handle + diag.emit_code;
+  fn summarize_diagnostic(message_handle: i64, start: i64, end: i64) -> i64 {
+    let diag: DiagnosticCode = build_diagnostic_code(message_handle, start, end);
+    return diag.label_handle
+      + diag.span_handle
+      + diag.message_handle
+      + diag.severity_code
+      + diag.family_code
+      + diag.emit_code;
   }
 
   fn main() {
-    print(summarize_diagnostic(1303, 4, 9, 2));
+    print(summarize_diagnostic(kind_diagnostic_message(), 4, 9));
   }
 }

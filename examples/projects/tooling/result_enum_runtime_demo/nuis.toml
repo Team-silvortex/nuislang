@@ -1,0 +1,6 @@
+name = "result_enum_runtime_demo"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64"
+]

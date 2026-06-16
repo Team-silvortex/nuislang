@@ -9,46 +9,203 @@ mod cpu Main {
   extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
   extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
 
-  struct ResultDiagnosticProjectSummary {
+  enum ErrorSeverity {
+    Info,
+    Warning,
+    Error,
+  }
+
+  enum ErrorFamily {
+    Unknown,
+    InputValidation,
+    ResultRuntime,
+    DiagnosticRuntime,
+  }
+
+  struct ResultRecord {
+    tag_handle: i64,
     is_ok: i64,
     value_handle: i64,
-    error_handle: i64,
-    error_code: i64,
-    error_message_handle: i64,
-    error_severity: i64,
-    diag_label_handle: i64,
-    diag_span_handle: i64,
-    diag_emit_code: i64
+    error_handle: i64
+  }
+
+  struct ErrorCode {
+    kind_handle: i64,
+    stable_code: i64,
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64,
+    retryable: i64
+  }
+
+  struct DiagnosticCode {
+    label_handle: i64,
+    span_handle: i64,
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64,
+    emit_code: i64
+  }
+
+  struct ErrorEnvelope {
+    error: ErrorCode,
+    diagnostic: DiagnosticCode
+  }
+
+  struct ResultDiagnosticProjectSummary {
+    result: ResultRecord,
+    envelope: ErrorEnvelope
+  }
+
+  fn kind_invalid_input() -> i64 {
+    return 1101;
+  }
+
+  fn kind_result_missing() -> i64 {
+    return 1202;
+  }
+
+  fn kind_diagnostic_message() -> i64 {
+    return 1303;
+  }
+
+  fn severity_code(severity: ErrorSeverity) -> i64 {
+    match severity {
+      ErrorSeverity.Info => {
+        return 1;
+      }
+      ErrorSeverity.Warning => {
+        return 2;
+      }
+      ErrorSeverity.Error => {
+        return 3;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn family_code(family: ErrorFamily) -> i64 {
+    match family {
+      ErrorFamily.Unknown => {
+        return 0;
+      }
+      ErrorFamily.InputValidation => {
+        return 11;
+      }
+      ErrorFamily.ResultRuntime => {
+        return 12;
+      }
+      ErrorFamily.DiagnosticRuntime => {
+        return 13;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn classify_error_severity(kind_handle: i64) -> ErrorSeverity {
+    if kind_handle == kind_invalid_input() {
+      return ErrorSeverity.Error;
+    }
+    if kind_handle == kind_result_missing() {
+      return ErrorSeverity.Warning;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorSeverity.Warning;
+    }
+    return ErrorSeverity.Info;
+  }
+
+  fn classify_error_family(kind_handle: i64) -> ErrorFamily {
+    if kind_handle == kind_invalid_input() {
+      return ErrorFamily.InputValidation;
+    }
+    if kind_handle == kind_result_missing() {
+      return ErrorFamily.ResultRuntime;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorFamily.DiagnosticRuntime;
+    }
+    return ErrorFamily.Unknown;
+  }
+
+  fn classify_error_retryable(kind_handle: i64) -> i64 {
+    if kind_handle == kind_result_missing() {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn read_result_record(tag_handle: i64) -> ResultRecord {
+    return ResultRecord {
+      tag_handle: tag_handle,
+      is_ok: host_result_is_ok(tag_handle),
+      value_handle: host_result_value(tag_handle),
+      error_handle: host_result_error(tag_handle)
+    };
+  }
+
+  fn build_error_code(kind_handle: i64) -> ErrorCode {
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    return ErrorCode {
+      kind_handle: kind_handle,
+      stable_code: host_error_code(kind_handle),
+      message_handle: host_error_message(kind_handle),
+      severity_code: host_error_severity(kind_handle),
+      family_code: family_code(family),
+      retryable: classify_error_retryable(kind_handle)
+    };
+  }
+
+  fn build_diagnostic_code(kind_handle: i64, span_start: i64, span_end: i64) -> DiagnosticCode {
+    let severity: ErrorSeverity = classify_error_severity(kind_handle);
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    let message_handle: i64 = host_error_message(kind_handle);
+    let label_handle: i64 = host_diag_label(message_handle);
+    let span_handle: i64 = host_diag_span(span_start, span_end);
+    let severity_number: i64 = severity_code(severity);
+    return DiagnosticCode {
+      label_handle: label_handle,
+      span_handle: span_handle,
+      message_handle: message_handle,
+      severity_code: severity_number,
+      family_code: family_code(family),
+      emit_code: host_diag_emit(label_handle, span_handle, severity_number)
+    };
+  }
+
+  fn build_error_envelope(kind_handle: i64, span_start: i64, span_end: i64) -> ErrorEnvelope {
+    return ErrorEnvelope {
+      error: build_error_code(kind_handle),
+      diagnostic: build_diagnostic_code(kind_handle, span_start, span_end)
+    };
   }
 
   fn capture_result_diagnostic_project() -> ResultDiagnosticProjectSummary {
-    let error_message_handle: i64 = host_error_message(1101);
-    let diag_label_handle: i64 = host_diag_label(error_message_handle);
-    let diag_span_handle: i64 = host_diag_span(4, 9);
-    let error_severity: i64 = host_error_severity(1101);
     return ResultDiagnosticProjectSummary {
-      is_ok: host_result_is_ok(1207),
-      value_handle: host_result_value(1207),
-      error_handle: host_result_error(1207),
-      error_code: host_error_code(1101),
-      error_message_handle: error_message_handle,
-      error_severity: error_severity,
-      diag_label_handle: diag_label_handle,
-      diag_span_handle: diag_span_handle,
-      diag_emit_code: host_diag_emit(diag_label_handle, diag_span_handle, error_severity)
+      result: read_result_record(1207),
+      envelope: build_error_envelope(kind_invalid_input(), 4, 9)
     };
   }
 
   fn main() -> i64 {
     let summary: ResultDiagnosticProjectSummary = capture_result_diagnostic_project();
-    return summary.is_ok
-      + summary.value_handle
-      + summary.error_handle
-      + summary.error_code
-      + summary.error_message_handle
-      + summary.error_severity
-      + summary.diag_label_handle
-      + summary.diag_span_handle
-      + summary.diag_emit_code;
+    return summary.result.is_ok
+      + summary.result.value_handle
+      + summary.result.error_handle
+      + summary.envelope.error.stable_code
+      + summary.envelope.error.message_handle
+      + summary.envelope.error.severity_code
+      + summary.envelope.error.family_code
+      + summary.envelope.error.retryable
+      + summary.envelope.diagnostic.label_handle
+      + summary.envelope.diagnostic.span_handle
+      + summary.envelope.diagnostic.message_handle
+      + summary.envelope.diagnostic.severity_code
+      + summary.envelope.diagnostic.family_code
+      + summary.envelope.diagnostic.emit_code;
   }
 }

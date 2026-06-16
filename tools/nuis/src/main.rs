@@ -149,6 +149,49 @@ fn handle_release_check(
     cpu_abi: Option<String>,
     target: Option<String>,
 ) -> Result<(), String> {
+    if nuisc::project::is_project_input(&input) {
+        let project = nuisc::project::load_project(&input)?;
+        let plan = nuisc::project::build_project_compilation_plan(&project)?;
+        let abi_checks = nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
+        let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
+        let lowering_checks = nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
+        println!("release-check: abi");
+        for check in &abi_checks {
+            for line in nuisc::project::render_project_abi_selection_check_lines(check) {
+                println!("  {}", line);
+            }
+        }
+        if abi_checks.iter().any(|check| !check.ok) {
+            return Err(
+                "release-check aborted because one or more project domains failed ABI selection validation"
+                    .to_owned(),
+            );
+        }
+        println!("release-check: registry");
+        for check in &registry_checks {
+            for line in nuisc::registry::render_project_domain_registry_check_lines(check) {
+                println!("  {}", line);
+            }
+        }
+        if registry_checks.iter().any(|check| !check.ok) {
+            return Err(
+                "release-check aborted because one or more project domains failed registry validation"
+                    .to_owned(),
+            );
+        }
+        println!("release-check: lowering");
+        for check in &lowering_checks {
+            for line in nuisc::project::render_project_lowering_selection_lines(check) {
+                println!("  {}", line);
+            }
+        }
+        if lowering_checks.iter().any(|check| !check.ok) {
+            return Err(
+                "release-check aborted because one or more project domains failed lowering selection validation"
+                    .to_owned(),
+            );
+        }
+    }
     println!("release-check: check");
     nuisc::run(nuisc::CommandKind::Check {
         input: input.clone(),
@@ -1239,56 +1282,8 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
 
 #[derive(Debug, Clone)]
 struct SchedulerViewDomainRecord {
-    domain: String,
-    package: Option<String>,
-    contract_schema: String,
-    contract_groups: Vec<String>,
-    extension_groups: Vec<String>,
-    frontend: String,
-    shared_contract_json: String,
-    shared_registration_json: String,
-    manifest_path: String,
-    entry_crate: String,
-    ast_entry: String,
-    nir_entry: String,
-    yir_lowering_entry: String,
-    part_verify_entry: String,
-    ast_surface: Vec<String>,
-    nir_surface: Vec<String>,
-    yir_lowering: Vec<String>,
-    part_verify: Vec<String>,
-    resource_families: Vec<String>,
-    unit_types: Vec<String>,
-    lowering_targets: Vec<String>,
-    ops: Vec<String>,
-    abi: Option<String>,
-    abi_profiles: Vec<String>,
-    abi_target_machine: Option<String>,
-    abi_target_object: Option<String>,
-    abi_target_calling: Option<String>,
-    abi_target_clang: Option<String>,
-    abi_target_backend: Option<String>,
-    abi_target_host_adaptive: Option<bool>,
-    loader_abi: String,
-    loader_entry: String,
-    machine_abi_policy: String,
-    host_ffi_surface: Vec<String>,
-    host_ffi_abis: Vec<String>,
-    host_ffi_bridge: Option<String>,
-    support_surface: Vec<String>,
-    support_profile_slots: Vec<String>,
-    default_lanes: Vec<String>,
-    scheduler_contract_stack: String,
-    scheduler_clock: String,
-    scheduler_result_roles: String,
-    scheduler_sample_navigation: Option<String>,
-    scheduler_result_samples: Option<String>,
-    scheduler_transport_samples: Option<String>,
-    scheduler_summary_api: String,
-    scheduler_summary_samples: Option<String>,
-    scheduler_observer_classes: String,
-    std_net_navigation: Option<String>,
-    std_net_samples: Option<String>,
+    shared_domain_json: String,
+    shared_abi_json: Option<String>,
 }
 
 fn json_escape_local(value: &str) -> String {
@@ -1318,13 +1313,6 @@ fn json_optional_string_field(name: &str, value: Option<&str>) -> String {
     }
 }
 
-fn json_optional_bool_field(name: &str, value: Option<bool>) -> String {
-    match value {
-        Some(value) => format!("\"{}\":{}", name, if value { "true" } else { "false" }),
-        None => format!("\"{}\":null", name),
-    }
-}
-
 fn json_bool_field(name: &str, value: bool) -> String {
     format!("\"{}\":{}", name, if value { "true" } else { "false" })
 }
@@ -1346,12 +1334,48 @@ fn json_object_field(name: &str, fields: &[String]) -> String {
     format!("\"{}\":{{{}}}", name, fields.join(","))
 }
 
-fn json_embedded_object_field(name: &str, object_json: &str) -> String {
-    format!("\"{}\":{}", name, object_json)
+fn append_json_object_fields(base_json: &str, fields: &[String]) -> String {
+    let mut out = base_json.to_owned();
+    if out.ends_with('}') {
+        out.pop();
+        if !fields.is_empty() {
+            out.push(',');
+            out.push_str(&fields.join(","));
+        }
+        out.push('}');
+    }
+    out
 }
 
 fn json_object_array_field(name: &str, values: &[String]) -> String {
     format!("\"{}\":[{}]", name, values.join(","))
+}
+
+fn project_domain_registry_checks_json(
+    checks: &[nuisc::registry::ProjectDomainRegistryCheck],
+) -> Vec<String> {
+    checks
+        .iter()
+        .map(nuisc::registry::project_domain_registry_check_json)
+        .collect()
+}
+
+fn project_lowering_checks_json(
+    checks: &[nuisc::project::ProjectLoweringSelectionView],
+) -> Vec<String> {
+    checks
+        .iter()
+        .map(nuisc::project::project_lowering_selection_json)
+        .collect()
+}
+
+fn project_abi_checks_json(
+    checks: &[nuisc::project::ProjectAbiSelectionCheck],
+) -> Vec<String> {
+    checks
+        .iter()
+        .map(nuisc::project::project_abi_selection_check_json)
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1642,155 +1666,42 @@ fn project_workflow_json_fields(
 
 fn scheduler_view_domain_record(
     domain: &str,
-    package: Option<String>,
+    _package: Option<String>,
     abi: Option<String>,
 ) -> Result<SchedulerViewDomainRecord, String> {
     let registration = nuisc::registry::load_domain_registration_for_domain(
         std::path::Path::new("nustar-packages"),
         domain,
     )?;
-    let contract = registration.contract.clone();
-    let mut abi_target_machine = None;
-    let mut abi_target_object = None;
-    let mut abi_target_calling = None;
-    let mut abi_target_clang = None;
-    let mut abi_target_backend = None;
-    let mut abi_target_host_adaptive = None;
-    if let Some(abi_name) = abi.as_deref() {
-        let manifest =
-            nuisc::registry::load_manifest_for_domain(std::path::Path::new("nustar-packages"), domain)?;
-        if let Ok(target) = nuisc::registry::registered_abi_target(&manifest, abi_name) {
-            abi_target_machine = Some(format!("{}-{}", target.machine_arch, target.machine_os));
-            abi_target_object = Some(target.object_format.to_owned());
-            abi_target_calling = Some(target.calling_abi.to_owned());
-            abi_target_clang = Some(target.clang_target.to_owned());
-            abi_target_backend = target.backend_family.map(|value| value.to_owned());
-            abi_target_host_adaptive = Some(target.host_adaptive);
-        }
-    }
+    let shared_abi_json = if let Some(abi_name) = abi.as_deref() {
+        let resolution = nuisc::project::ProjectAbiResolution {
+            requirements: vec![nuisc::project::ProjectAbiRequirement {
+                domain: domain.to_owned(),
+                abi: abi_name.to_owned(),
+            }],
+            explicit: true,
+        };
+        nuisc::project::project_abi_selection_views(&resolution)
+            .into_iter()
+            .next()
+            .map(|view| nuisc::project::project_abi_selection_view_json(&view))
+    } else {
+        None
+    };
     Ok(SchedulerViewDomainRecord {
-        domain: domain.to_owned(),
-        package: package.or_else(|| Some(contract.package_id.clone())),
-        contract_schema: contract.contract_schema,
-        contract_groups: contract.contract_groups,
-        extension_groups: contract.extension_groups,
-        frontend: contract.frontend,
-        shared_contract_json: nuisc::registry::domain_contract_object_json(&registration.contract),
-        shared_registration_json: nuisc::registry::domain_registration_object_json(&registration),
-        manifest_path: registration.manifest_path,
-        entry_crate: registration.entry_crate,
-        ast_entry: registration.ast_entry,
-        nir_entry: registration.nir_entry,
-        yir_lowering_entry: registration.yir_lowering_entry,
-        part_verify_entry: registration.part_verify_entry,
-        ast_surface: registration.ast_surface,
-        nir_surface: registration.nir_surface,
-        yir_lowering: registration.yir_lowering,
-        part_verify: registration.part_verify,
-        resource_families: registration.resource_families,
-        unit_types: registration.unit_types,
-        lowering_targets: registration.lowering_targets,
-        ops: registration.ops,
-        abi,
-        abi_profiles: contract.abi_profiles,
-        abi_target_machine,
-        abi_target_object,
-        abi_target_calling,
-        abi_target_clang,
-        abi_target_backend,
-        abi_target_host_adaptive,
-        loader_abi: contract.loader_abi,
-        loader_entry: contract.loader_entry,
-        machine_abi_policy: contract.machine_abi_policy,
-        host_ffi_surface: contract.host_ffi_surface,
-        host_ffi_abis: contract.host_ffi_abis,
-        host_ffi_bridge: contract.host_ffi_bridge,
-        support_surface: contract.capability.support_surface,
-        support_profile_slots: contract.capability.support_profile_slots,
-        default_lanes: contract.capability.default_lanes,
-        scheduler_contract_stack: contract.scheduler.contract_stack,
-        scheduler_clock: contract.scheduler.clock.brief(),
-        scheduler_result_roles: contract.scheduler.result_roles,
-        scheduler_sample_navigation: contract.scheduler.sample_navigation,
-        scheduler_result_samples: contract.scheduler.result_samples,
-        scheduler_transport_samples: contract.scheduler.transport_samples,
-        scheduler_summary_api: contract.scheduler.summary_api,
-        scheduler_summary_samples: contract.scheduler.summary_samples,
-        scheduler_observer_classes: contract.scheduler.observer_classes,
-        std_net_navigation: contract.std_net.sample_navigation,
-        std_net_samples: contract.std_net.recipe_samples,
+        shared_domain_json: nuisc::registry::domain_registration_json(&registration),
+        shared_abi_json,
     })
 }
 
 fn scheduler_view_domain_record_json(record: &SchedulerViewDomainRecord) -> String {
-    let fields = vec![
-        json_field("domain", &record.domain),
-        json_optional_string_field("package", record.package.as_deref()),
-        json_field("contract_schema", &record.contract_schema),
-        json_string_array_field("contract_groups", &record.contract_groups),
-        json_string_array_field("extension_groups", &record.extension_groups),
-        json_field("frontend", &record.frontend),
-        json_field("manifest_path", &record.manifest_path),
-        json_field("entry_crate", &record.entry_crate),
-        json_field("ast_entry", &record.ast_entry),
-        json_field("nir_entry", &record.nir_entry),
-        json_field("yir_lowering_entry", &record.yir_lowering_entry),
-        json_field("part_verify_entry", &record.part_verify_entry),
-        json_string_array_field("ast_surface", &record.ast_surface),
-        json_string_array_field("nir_surface", &record.nir_surface),
-        json_string_array_field("yir_lowering", &record.yir_lowering),
-        json_string_array_field("part_verify", &record.part_verify),
-        json_string_array_field("resource_families", &record.resource_families),
-        json_string_array_field("unit_types", &record.unit_types),
-        json_string_array_field("lowering_targets", &record.lowering_targets),
-        json_string_array_field("ops", &record.ops),
-        json_optional_string_field("abi", record.abi.as_deref()),
-        json_string_array_field("abi_profiles", &record.abi_profiles),
-        json_optional_string_field("abi_target_machine", record.abi_target_machine.as_deref()),
-        json_optional_string_field("abi_target_object", record.abi_target_object.as_deref()),
-        json_optional_string_field("abi_target_calling", record.abi_target_calling.as_deref()),
-        json_optional_string_field("abi_target_clang", record.abi_target_clang.as_deref()),
-        json_optional_string_field("abi_target_backend", record.abi_target_backend.as_deref()),
-        json_optional_bool_field("abi_target_host_adaptive", record.abi_target_host_adaptive),
-        json_field("loader_abi", &record.loader_abi),
-        json_field("loader_entry", &record.loader_entry),
-        json_field("machine_abi_policy", &record.machine_abi_policy),
-        json_string_array_field("host_ffi_surface", &record.host_ffi_surface),
-        json_string_array_field("host_ffi_abis", &record.host_ffi_abis),
-        json_optional_string_field("host_ffi_bridge", record.host_ffi_bridge.as_deref()),
-        json_string_array_field("support_surface", &record.support_surface),
-        json_string_array_field("support_profile_slots", &record.support_profile_slots),
-        json_string_array_field("default_lanes", &record.default_lanes),
-        json_field("scheduler_contract_stack", &record.scheduler_contract_stack),
-        json_field("scheduler_clock", &record.scheduler_clock),
-        json_field("scheduler_result_roles", &record.scheduler_result_roles),
-        json_optional_string_field(
-            "scheduler_sample_navigation",
-            record.scheduler_sample_navigation.as_deref(),
-        ),
-        json_optional_string_field(
-            "scheduler_result_samples",
-            record.scheduler_result_samples.as_deref(),
-        ),
-        json_optional_string_field(
-            "scheduler_transport_samples",
-            record.scheduler_transport_samples.as_deref(),
-        ),
-        json_field("scheduler_summary_api", &record.scheduler_summary_api),
-        json_optional_string_field(
-            "scheduler_summary_samples",
-            record.scheduler_summary_samples.as_deref(),
-        ),
-        json_field(
-            "scheduler_observer_classes",
-            &record.scheduler_observer_classes,
-        ),
-        json_optional_string_field("std_net_navigation", record.std_net_navigation.as_deref()),
-        json_optional_string_field("std_net_samples", record.std_net_samples.as_deref()),
-        json_embedded_object_field("contract", &record.shared_contract_json),
-        json_embedded_object_field("registration", &record.shared_registration_json),
-    ];
-    format!("{{{}}}", fields.join(","))
+    let mut fields = Vec::new();
+    if let Some(shared_abi_json) = record.shared_abi_json.as_deref() {
+        fields.push(format!("\"abi_selection\":{}", shared_abi_json));
+    } else {
+        fields.push("\"abi_selection\":null".to_owned());
+    }
+    append_json_object_fields(&record.shared_domain_json, &fields)
 }
 
 fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), String> {
@@ -1862,35 +1773,17 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
             "  resolved_domains: {}",
             plan.abi_resolution.requirements.len()
         );
-        for item in plan.abi_resolution.requirements {
+        for item in nuisc::project::project_abi_selection_views(&plan.abi_resolution) {
+            let domain = item.domain.clone();
             println!("  domain: {}", item.domain);
-            println!("    abi: {}", item.abi);
-            if let Ok(manifest) = nuisc::registry::load_manifest_for_domain(
-                std::path::Path::new("nustar-packages"),
-                &item.domain,
-            ) {
-                if let Ok(target) = nuisc::registry::registered_abi_target(&manifest, &item.abi) {
-                    println!(
-                        "    abi_target_machine: {}-{}",
-                        target.machine_arch, target.machine_os
-                    );
-                    println!("    abi_target_object: {}", target.object_format);
-                    println!("    abi_target_calling: {}", target.calling_abi);
-                    println!("    abi_target_clang: {}", target.clang_target);
-                    if let Some(backend) = target.backend_family {
-                        println!("    abi_target_backend: {}", backend);
-                    }
-                    println!(
-                        "    abi_target_host_adaptive: {}",
-                        if target.host_adaptive {
-                            "true"
-                        } else {
-                            "false"
-                        }
-                    );
+            for line in nuisc::project::render_project_abi_selection_view_lines(&item) {
+                if let Some(detail) = line.strip_prefix("abi: ") {
+                    println!("    abi: {}", detail.split_once('=').map(|(_, abi)| abi).unwrap_or(detail));
+                } else {
+                    println!("    {}", line.trim_start());
                 }
             }
-            print_project_scheduler_contract_view(&item.domain)?;
+            print_project_scheduler_contract_view(&domain)?;
         }
         return Ok(());
     }
@@ -2166,34 +2059,16 @@ fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), St
             "auto-recommended"
         }
     );
-    for item in plan.abi_resolution.requirements {
-        println!("  abi: {}={}", item.domain, item.abi);
-        if let Ok(manifest) = nuisc::registry::load_manifest_for_domain(
-            std::path::Path::new("nustar-packages"),
-            &item.domain,
-        ) {
-            if let Ok(target) = nuisc::registry::registered_abi_target(&manifest, &item.abi) {
-                println!(
-                    "    abi_target_machine: {}-{}",
-                    target.machine_arch, target.machine_os
-                );
-                println!("    abi_target_object: {}", target.object_format);
-                println!("    abi_target_calling: {}", target.calling_abi);
-                println!("    abi_target_clang: {}", target.clang_target);
-                if let Some(backend) = target.backend_family {
-                    println!("    abi_target_backend: {}", backend);
-                }
-                println!(
-                    "    abi_target_host_adaptive: {}",
-                    if target.host_adaptive {
-                        "true"
-                    } else {
-                        "false"
-                    }
-                );
+    for item in nuisc::project::project_abi_selection_views(&plan.abi_resolution) {
+        let domain = item.domain.clone();
+        for line in nuisc::project::render_project_abi_selection_view_lines(&item) {
+            if let Some(detail) = line.strip_prefix("abi: ") {
+                println!("  abi: {}", detail);
+            } else {
+                println!("    {}", line.trim_start());
             }
         }
-        print_project_scheduler_contract_view(&item.domain)?;
+        print_project_scheduler_contract_view(&domain)?;
     }
     for item in &project.manifest.galaxy_dependencies {
         println!("  galaxy: {}={}", item.name, item.version);
@@ -2460,6 +2335,10 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
         .dependencies
         .iter()
         .any(|dependency| !dependency.installed);
+    let abi_checks = nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
+    let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
+    let lowering_checks =
+        nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
     let frontdoor = project_frontdoor_surface(
         &plan,
         &declared_tests,
@@ -2511,6 +2390,24 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
             "auto-recommended"
         }
     );
+    println!("  abi_checks: {}", abi_checks.len());
+    for check in &abi_checks {
+        for line in nuisc::project::render_project_abi_selection_check_lines(check) {
+            println!("  {}", line);
+        }
+    }
+    println!("  registry_checks: {}", registry_checks.len());
+    for check in &registry_checks {
+        for line in nuisc::registry::render_project_domain_registry_check_lines(check) {
+            println!("  {}", line);
+        }
+    }
+    println!("  lowering_checks: {}", lowering_checks.len());
+    for check in &lowering_checks {
+        for line in nuisc::project::render_project_lowering_selection_lines(check) {
+            println!("  {}", line);
+        }
+    }
     for item in &plan.abi_resolution.requirements {
         println!("  abi: {}={}", item.domain, item.abi);
         print_project_scheduler_contract_view(&item.domain)?;
@@ -2826,6 +2723,10 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
         .dependencies
         .iter()
         .any(|dependency| !dependency.installed);
+    let abi_checks = nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
+    let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
+    let lowering_checks =
+        nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
     let frontdoor = project_frontdoor_surface(
         &plan,
         &declared_tests,
@@ -3043,6 +2944,21 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
             "auto-recommended"
         },
     ));
+    fields.push(json_usize_field("abi_checks_count", abi_checks.len()));
+    fields.push(json_bool_field(
+        "abi_checks_ok",
+        abi_checks.iter().all(|check| check.ok),
+    ));
+    fields.push(json_usize_field("registry_checks_count", registry_checks.len()));
+    fields.push(json_bool_field(
+        "registry_checks_ok",
+        registry_checks.iter().all(|check| check.ok),
+    ));
+    fields.push(json_usize_field("lowering_checks_count", lowering_checks.len()));
+    fields.push(json_bool_field(
+        "lowering_checks_ok",
+        lowering_checks.iter().all(|check| check.ok),
+    ));
     fields.push(json_field("galaxy_manifest", &galaxy_manifest_display));
     match galaxy_check {
         Some(Ok(checked)) => {
@@ -3110,6 +3026,18 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
     fields.push(json_object_array_field(
         "public_surface_records",
         &public_surface_json,
+    ));
+    fields.push(json_object_array_field(
+        "abi_checks",
+        &project_abi_checks_json(&abi_checks),
+    ));
+    fields.push(json_object_array_field(
+        "registry_checks",
+        &project_domain_registry_checks_json(&registry_checks),
+    ));
+    fields.push(json_object_array_field(
+        "lowering_checks",
+        &project_lowering_checks_json(&lowering_checks),
     ));
     fields.push(json_object_array_field(
         "galaxy_dependencies",
@@ -3779,10 +3707,12 @@ fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
 mod tests {
     use super::{
         build_workflow_frontdoor_surface, handle_check, handle_test,
-        project_compile_workflow_source_profile, resolve_runner_clock_domain,
-        run_language_tests_for_source_file, scheduler_view_domain_record,
-        scheduler_view_domain_record_json, single_source_workflow_source_profile,
-        wait_for_test_child, RawTestOutcome, WorkflowRecommendation,
+        project_abi_checks_json, project_compile_workflow_source_profile,
+        project_domain_registry_checks_json,
+        resolve_runner_clock_domain, run_language_tests_for_source_file,
+        scheduler_view_domain_record, scheduler_view_domain_record_json,
+        single_source_workflow_source_profile, wait_for_test_child, RawTestOutcome,
+        WorkflowRecommendation,
     };
     use std::{
         env, fs,
@@ -4288,6 +4218,7 @@ mod cpu Main {
             .expect("expected network scheduler registration record");
         let json = scheduler_view_domain_record_json(&record);
 
+        assert!(json.contains("\"abi_selection\":null"));
         assert!(json.contains("\"registration\":{"));
         assert!(json.contains("\"manifest_path\":\""));
         assert!(json.contains("network.toml"));
@@ -4300,6 +4231,65 @@ mod cpu Main {
         assert!(json.contains("\"unit_types\":["));
         assert!(json.contains("\"lowering_targets\":["));
         assert!(json.contains("\"ops\":["));
+    }
+
+    #[test]
+    fn scheduler_view_domain_record_json_exposes_shared_abi_selection_section() {
+        let record = scheduler_view_domain_record(
+            "network",
+            None,
+            Some("network.socket.macos.arm64.v1".to_owned()),
+        )
+        .expect("expected network scheduler registration record");
+        let json = scheduler_view_domain_record_json(&record);
+
+        assert!(json.contains("\"abi_selection\":{"));
+        assert!(json.contains("\"domain\":\"network\""));
+        assert!(json.contains("\"abi\":\"network.socket.macos.arm64.v1\""));
+        assert!(json.contains("\"abi_target_machine\":\"arm64-darwin\""));
+        assert!(json.contains("\"abi_target_host_adaptive\":false"));
+    }
+
+    #[test]
+    fn project_domain_registry_checks_report_registered_abis() {
+        let project = nuisc::project::load_project(
+            &repo_root().join("examples/projects/domains/net_session_recipe_demo"),
+        )
+        .expect("load project");
+        let plan = nuisc::project::build_project_compilation_plan(&project).expect("build plan");
+        let checks = nuisc::registry::validate_project_domain_registry(&plan);
+        assert!(!checks.is_empty());
+        assert!(checks.iter().all(|check| check.ok));
+        assert!(checks.iter().any(|check| check.domain == "network"));
+        let network = checks.iter().find(|check| check.domain == "network").unwrap();
+        assert!(network.abi_registered);
+        assert!(network.issues.is_empty());
+        assert_eq!(
+            network.contract_schema.as_deref(),
+            Some(nuisc::registry::NUSTAR_DOMAIN_CONTRACT_SCHEMA)
+        );
+        let json = project_domain_registry_checks_json(&checks).join(",");
+        assert!(json.contains("\"issues\":[]"));
+        assert!(json.contains("\"abi_registered\":true"));
+    }
+
+    #[test]
+    fn project_abi_checks_report_recommended_abis() {
+        let project = nuisc::project::load_project(
+            &repo_root().join("examples/projects/domains/net_session_recipe_demo"),
+        )
+        .expect("load project");
+        let plan = nuisc::project::build_project_compilation_plan(&project).expect("build plan");
+        let checks =
+            nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)
+                .expect("abi checks");
+        assert!(!checks.is_empty());
+        assert!(checks.iter().all(|check| check.ok));
+        assert!(checks.iter().any(|check| check.source == "recommended"));
+        let json = project_abi_checks_json(&checks).join(",");
+        assert!(json.contains("\"source\":\"recommended\""));
+        assert!(json.contains("\"abi_registered\":true"));
+        assert!(json.contains("\"issues\":[]"));
     }
 
     #[test]

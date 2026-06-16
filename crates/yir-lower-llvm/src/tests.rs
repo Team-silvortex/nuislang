@@ -48,6 +48,94 @@ fn emits_dynamic_declare_for_cpu_extern_calls() {
 }
 
 #[test]
+fn emits_module_with_contract_metadata_nodes_on_cpu_without_fake_cycles() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    module.nodes.push(Node {
+        name: "seed".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.const_i64", vec!["7".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "print_0".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.print", vec!["seed".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "lowering_cpu_target_config".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.target_config",
+            vec![
+                "arm64".to_owned(),
+                "cpu.arm64.apple_aapcs64".to_owned(),
+                "128".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "lowering_cpu_target_contract_type".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.text",
+            vec!["arch=symbol:arm64;abi=symbol:cpu.arm64.apple_aapcs64;vector_bits=i64:128"
+                .to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "project_abi_cpu_selection_entry".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.text",
+            vec!["mode=symbol:auto;abi=symbol:cpu.arm64.apple_aapcs64;arch=symbol:arm64;os=symbol:darwin;object=symbol:mach-o;calling=symbol:aapcs64-darwin;backend=symbol:llvm".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "project_abi_cpu_selection_summary_type".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.text",
+            vec!["mode=symbol:auto;abi=symbol:cpu.arm64.apple_aapcs64;arch=symbol:arm64;os=symbol:darwin;object=symbol:mach-o;calling=symbol:aapcs64-darwin;backend=symbol:llvm".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.edges.push(Edge {
+        kind: EdgeKind::Dep,
+        from: "seed".to_owned(),
+        to: "print_0".to_owned(),
+    });
+    module.edges.push(Edge {
+        kind: EdgeKind::Dep,
+        from: "lowering_cpu_target_contract_type".to_owned(),
+        to: "lowering_cpu_target_config".to_owned(),
+    });
+    module.edges.push(Edge {
+        kind: EdgeKind::Dep,
+        from: "project_abi_cpu_selection_summary_type".to_owned(),
+        to: "project_abi_cpu_selection_entry".to_owned(),
+    });
+    for name in [
+        "lowering_cpu_target_config",
+        "lowering_cpu_target_contract_type",
+        "project_abi_cpu_selection_entry",
+        "project_abi_cpu_selection_summary_type",
+    ] {
+        module
+            .node_lanes
+            .insert(name.to_owned(), "contract".to_owned());
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("ret i64"));
+}
+
+#[test]
 fn emits_three_arg_cpu_extern_calls() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

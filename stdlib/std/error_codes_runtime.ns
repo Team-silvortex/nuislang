@@ -1,0 +1,98 @@
+mod cpu Main {
+  extern "c" fn host_error_code(kind_handle: i64) -> i64;
+  extern "c" fn host_error_message(kind_handle: i64) -> i64;
+  extern "c" fn host_error_severity(kind_handle: i64) -> i64;
+
+  struct ErrorCodeRecord {
+    kind_handle: i64,
+    stable_code: i64,
+    message_handle: i64,
+    severity: i64,
+    family_code: i64,
+    retryable: i64
+  }
+
+  fn kind_invalid_input() -> i64 {
+    return 1101;
+  }
+
+  fn kind_result_missing() -> i64 {
+    return 1202;
+  }
+
+  fn kind_diagnostic_message() -> i64 {
+    return 1303;
+  }
+
+  fn family_unknown() -> i64 {
+    return 0;
+  }
+
+  fn family_input_validation() -> i64 {
+    return 11;
+  }
+
+  fn family_result_runtime() -> i64 {
+    return 12;
+  }
+
+  fn family_diagnostic_runtime() -> i64 {
+    return 13;
+  }
+
+  fn retryable_no() -> i64 {
+    return 0;
+  }
+
+  fn retryable_yes() -> i64 {
+    return 1;
+  }
+
+  fn classify_error_family(kind_handle: i64) -> i64 {
+    if kind_handle == kind_invalid_input() {
+      return family_input_validation();
+    }
+    if kind_handle == kind_result_missing() {
+      return family_result_runtime();
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return family_diagnostic_runtime();
+    }
+    return family_unknown();
+  }
+
+  fn classify_error_retryable(kind_handle: i64) -> i64 {
+    if kind_handle == kind_result_missing() {
+      return retryable_yes();
+    }
+    return retryable_no();
+  }
+
+  fn is_known_error_kind(kind_handle: i64) -> bool {
+    return classify_error_family(kind_handle) != family_unknown();
+  }
+
+  fn build_error_code(kind_handle: i64) -> ErrorCodeRecord {
+    return ErrorCodeRecord {
+      kind_handle: kind_handle,
+      stable_code: host_error_code(kind_handle),
+      message_handle: host_error_message(kind_handle),
+      severity: host_error_severity(kind_handle),
+      family_code: classify_error_family(kind_handle),
+      retryable: classify_error_retryable(kind_handle)
+    };
+  }
+
+  fn summarize_error_code(kind_handle: i64) -> i64 {
+    let record: ErrorCodeRecord = build_error_code(kind_handle);
+    return record.stable_code
+      + record.message_handle
+      + record.severity
+      + record.family_code
+      + record.retryable;
+  }
+
+  fn main() {
+    print(summarize_error_code(kind_invalid_input()));
+  }
+}

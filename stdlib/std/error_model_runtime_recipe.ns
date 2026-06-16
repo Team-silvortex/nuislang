@@ -1,15 +1,7 @@
 mod cpu Main {
-  extern "c" fn host_result_is_ok(tag_handle: i64) -> i64;
-  extern "c" fn host_result_value(tag_handle: i64) -> i64;
-  extern "c" fn host_result_error(tag_handle: i64) -> i64;
   extern "c" fn host_error_code(kind_handle: i64) -> i64;
   extern "c" fn host_error_message(kind_handle: i64) -> i64;
   extern "c" fn host_error_severity(kind_handle: i64) -> i64;
-
-  enum ResultState {
-    Ok,
-    Err,
-  }
 
   enum ErrorSeverity {
     Info,
@@ -22,13 +14,6 @@ mod cpu Main {
     InputValidation,
     ResultRuntime,
     DiagnosticRuntime,
-  }
-
-  struct ResultRecord {
-    tag_handle: i64,
-    is_ok: i64,
-    value_handle: i64,
-    error_handle: i64
   }
 
   struct ErrorCode {
@@ -51,13 +36,15 @@ mod cpu Main {
     diagnostic: DiagnosticCode
   }
 
-  struct ResultProjectSummary {
-    primary_state_code: i64,
-    primary: ResultRecord,
-    primary_envelope: ErrorEnvelope,
-    secondary_state_code: i64,
-    secondary: ResultRecord,
-    secondary_envelope: ErrorEnvelope
+  struct ErrorModelRecipeSeed {
+    primary_kind_handle: i64,
+    secondary_kind_handle: i64
+  }
+
+  struct ErrorModelRecipeSummary {
+    primary: ErrorEnvelope,
+    secondary: ErrorEnvelope,
+    known_count: i64
   }
 
   fn kind_invalid_input() -> i64 {
@@ -70,27 +57,6 @@ mod cpu Main {
 
   fn kind_diagnostic_message() -> i64 {
     return 1303;
-  }
-
-  fn result_state_code(state: ResultState) -> i64 {
-    match state {
-      ResultState.Ok => {
-        return 1;
-      }
-      ResultState.Err => {
-        return 2;
-      }
-      _ => {
-        return 0;
-      }
-    }
-  }
-
-  fn classify_result_state(tag_handle: i64) -> ResultState {
-    if host_result_is_ok(tag_handle) == 1 {
-      return ResultState.Ok;
-    }
-    return ResultState.Err;
   }
 
   fn severity_code(severity: ErrorSeverity) -> i64 {
@@ -163,15 +129,6 @@ mod cpu Main {
     return 0;
   }
 
-  fn read_result(tag_handle: i64) -> ResultRecord {
-    return ResultRecord {
-      tag_handle: tag_handle,
-      is_ok: host_result_is_ok(tag_handle),
-      value_handle: host_result_value(tag_handle),
-      error_handle: host_result_error(tag_handle)
-    };
-  }
-
   fn build_error_code(kind_handle: i64) -> ErrorCode {
     let family: ErrorFamily = classify_error_family(kind_handle);
     return ErrorCode {
@@ -201,44 +158,51 @@ mod cpu Main {
     };
   }
 
-  fn capture_result_project() -> ResultProjectSummary {
-    let primary: ResultRecord = read_result(1207);
-    let secondary: ResultRecord = read_result(1308);
-    return ResultProjectSummary {
-      primary_state_code: result_state_code(classify_result_state(1207)),
+  fn is_known_envelope(envelope: ErrorEnvelope) -> i64 {
+    if envelope.error.family_code == family_code(ErrorFamily.Unknown) {
+      return 0;
+    }
+    return 1;
+  }
+
+  fn capture_error_model_recipe(seed: ErrorModelRecipeSeed) -> ErrorModelRecipeSummary {
+    let primary: ErrorEnvelope = build_error_envelope(seed.primary_kind_handle);
+    let secondary: ErrorEnvelope = build_error_envelope(seed.secondary_kind_handle);
+    return ErrorModelRecipeSummary {
       primary: primary,
-      primary_envelope: build_error_envelope(primary.error_handle),
-      secondary_state_code: result_state_code(classify_result_state(1308)),
       secondary: secondary,
-      secondary_envelope: build_error_envelope(secondary.error_handle)
+      known_count: is_known_envelope(primary) + is_known_envelope(secondary)
     };
   }
 
-  fn main() -> i64 {
-    let summary: ResultProjectSummary = capture_result_project();
-    return summary.primary_state_code
-      + summary.primary.is_ok
-      + summary.primary.value_handle
-      + summary.primary.error_handle
-      + summary.primary_envelope.error.stable_code
-      + summary.primary_envelope.error.message_handle
-      + summary.primary_envelope.error.severity_code
-      + summary.primary_envelope.error.family_code
-      + summary.primary_envelope.error.retryable
-      + summary.primary_envelope.diagnostic.message_handle
-      + summary.primary_envelope.diagnostic.severity_code
-      + summary.primary_envelope.diagnostic.family_code
-      + summary.secondary_state_code
-      + summary.secondary.is_ok
-      + summary.secondary.value_handle
-      + summary.secondary.error_handle
-      + summary.secondary_envelope.error.stable_code
-      + summary.secondary_envelope.error.message_handle
-      + summary.secondary_envelope.error.severity_code
-      + summary.secondary_envelope.error.family_code
-      + summary.secondary_envelope.error.retryable
-      + summary.secondary_envelope.diagnostic.message_handle
-      + summary.secondary_envelope.diagnostic.severity_code
-      + summary.secondary_envelope.diagnostic.family_code;
+  fn summarize_error_model_recipe(primary_kind_handle: i64, secondary_kind_handle: i64) -> i64 {
+    let summary: ErrorModelRecipeSummary = capture_error_model_recipe(ErrorModelRecipeSeed {
+      primary_kind_handle: primary_kind_handle,
+      secondary_kind_handle: secondary_kind_handle
+    });
+    return summary.primary.error.stable_code
+      + summary.primary.error.message_handle
+      + summary.primary.error.severity_code
+      + summary.primary.error.family_code
+      + summary.primary.error.retryable
+      + summary.primary.diagnostic.message_handle
+      + summary.primary.diagnostic.severity_code
+      + summary.primary.diagnostic.family_code
+      + summary.secondary.error.stable_code
+      + summary.secondary.error.message_handle
+      + summary.secondary.error.severity_code
+      + summary.secondary.error.family_code
+      + summary.secondary.error.retryable
+      + summary.secondary.diagnostic.message_handle
+      + summary.secondary.diagnostic.severity_code
+      + summary.secondary.diagnostic.family_code
+      + summary.known_count;
+  }
+
+  fn main() {
+    print(summarize_error_model_recipe(
+      kind_invalid_input(),
+      kind_diagnostic_message()
+    ));
   }
 }

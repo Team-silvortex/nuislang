@@ -1,0 +1,120 @@
+mod cpu Main {
+  extern "c" fn host_error_code(kind_handle: i64) -> i64;
+  extern "c" fn host_error_message(kind_handle: i64) -> i64;
+  extern "c" fn host_error_severity(kind_handle: i64) -> i64;
+
+  struct ErrorCodeRecipeSeed {
+    primary_kind_handle: i64,
+    secondary_kind_handle: i64
+  }
+
+  struct ErrorCodeRecipeRecord {
+    kind_handle: i64,
+    stable_code: i64,
+    message_handle: i64,
+    severity: i64,
+    family_code: i64,
+    retryable: i64
+  }
+
+  struct ErrorCodeRecipeSummary {
+    primary: ErrorCodeRecipeRecord,
+    secondary: ErrorCodeRecipeRecord,
+    known_count: i64
+  }
+
+  fn kind_invalid_input() -> i64 {
+    return 1101;
+  }
+
+  fn kind_result_missing() -> i64 {
+    return 1202;
+  }
+
+  fn family_unknown() -> i64 {
+    return 0;
+  }
+
+  fn family_input_validation() -> i64 {
+    return 11;
+  }
+
+  fn family_result_runtime() -> i64 {
+    return 12;
+  }
+
+  fn retryable_no() -> i64 {
+    return 0;
+  }
+
+  fn retryable_yes() -> i64 {
+    return 1;
+  }
+
+  fn classify_error_family(kind_handle: i64) -> i64 {
+    if kind_handle == kind_invalid_input() {
+      return family_input_validation();
+    }
+    if kind_handle == kind_result_missing() {
+      return family_result_runtime();
+    }
+    return family_unknown();
+  }
+
+  fn classify_error_retryable(kind_handle: i64) -> i64 {
+    if kind_handle == kind_result_missing() {
+      return retryable_yes();
+    }
+    return retryable_no();
+  }
+
+  fn build_error_code_record(kind_handle: i64) -> ErrorCodeRecipeRecord {
+    return ErrorCodeRecipeRecord {
+      kind_handle: kind_handle,
+      stable_code: host_error_code(kind_handle),
+      message_handle: host_error_message(kind_handle),
+      severity: host_error_severity(kind_handle),
+      family_code: classify_error_family(kind_handle),
+      retryable: classify_error_retryable(kind_handle)
+    };
+  }
+
+  fn count_known_record(record: ErrorCodeRecipeRecord) -> i64 {
+    if record.family_code == family_unknown() {
+      return 0;
+    }
+    return 1;
+  }
+
+  fn capture_error_code_recipe(seed: ErrorCodeRecipeSeed) -> ErrorCodeRecipeSummary {
+    let primary: ErrorCodeRecipeRecord = build_error_code_record(seed.primary_kind_handle);
+    let secondary: ErrorCodeRecipeRecord = build_error_code_record(seed.secondary_kind_handle);
+    return ErrorCodeRecipeSummary {
+      primary: primary,
+      secondary: secondary,
+      known_count: count_known_record(primary) + count_known_record(secondary)
+    };
+  }
+
+  fn summarize_error_code_recipe(primary_kind_handle: i64, secondary_kind_handle: i64) -> i64 {
+    let summary: ErrorCodeRecipeSummary = capture_error_code_recipe(ErrorCodeRecipeSeed {
+      primary_kind_handle: primary_kind_handle,
+      secondary_kind_handle: secondary_kind_handle
+    });
+    return summary.primary.stable_code
+      + summary.primary.message_handle
+      + summary.primary.severity
+      + summary.primary.family_code
+      + summary.primary.retryable
+      + summary.secondary.stable_code
+      + summary.secondary.message_handle
+      + summary.secondary.severity
+      + summary.secondary.family_code
+      + summary.secondary.retryable
+      + summary.known_count;
+  }
+
+  fn main() {
+    print(summarize_error_code_recipe(kind_invalid_input(), kind_result_missing()));
+  }
+}

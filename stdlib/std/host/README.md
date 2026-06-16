@@ -69,8 +69,11 @@ Current rule:
 
 ### Diagnostic And Reporting Edge
 
+* [error_model_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_model_runtime_recipe.ns)
+* [error_codes_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_codes_runtime_recipe.ns)
 * [error_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_runtime_recipe.ns)
 * [result_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_runtime_recipe.ns)
+* [result_enum_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_enum_runtime_recipe.ns)
 * [diagnostic_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/diagnostic_runtime_recipe.ns)
 * [result_diagnostic_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_diagnostic_recipe.ns)
 * [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)

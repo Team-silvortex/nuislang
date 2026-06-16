@@ -26,7 +26,11 @@ mod support_contracts;
 mod type_contracts;
 mod validation_core;
 
-pub use abi::resolve_project_abi;
+pub use abi::{
+    ensure_project_abi_selections_valid, project_abi_selection_check_json,
+    render_project_abi_selection_check_lines, resolve_project_abi,
+    validate_project_abi_selections,
+};
 #[cfg(test)]
 use abi::{host_calling_abi, host_object_format, recommend_abi_profile_for_host};
 use bridge_contracts::{
@@ -57,8 +61,12 @@ use profile_apply::{
 use profile_refs::push_project_dependency_edge_if_missing;
 use profile_targets::resolve_project_profile_target_name;
 pub use rendering::{
-    describe_project_abi_graph, organize_project, organize_project_exchanges,
-    render_project_abi_graph_line,
+    describe_project_abi_graph, ensure_project_lowering_selections_valid, organize_project,
+    organize_project_exchanges, project_abi_selection_view_json,
+    project_abi_selection_views, project_lowering_selection_json,
+    render_project_abi_graph_line, render_project_abi_selection_lines,
+    render_project_abi_selection_view_lines, render_project_lowering_selection_lines,
+    validate_project_lowering_selections,
 };
 use rendering::{
     render_project_abi_index, render_project_exchange_index, render_project_host_ffi_index,
@@ -185,6 +193,179 @@ pub struct ProjectExchangeRoute {
 pub struct ProjectAbiResolution {
     pub requirements: Vec<ProjectAbiRequirement>,
     pub explicit: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectAbiSelectionView {
+    pub domain: String,
+    pub abi: String,
+    pub machine_arch: Option<String>,
+    pub machine_os: Option<String>,
+    pub object_format: Option<String>,
+    pub calling_abi: Option<String>,
+    pub clang_target: Option<String>,
+    pub backend_family: Option<String>,
+    pub host_adaptive: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProjectAbiIssueKind {
+    MissingExplicitDomainAbi,
+    UnusedExplicitDomainAbi,
+    DomainNotRegistered,
+    AbiNotRegistered,
+}
+
+impl ProjectAbiIssueKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::MissingExplicitDomainAbi => "missing_explicit_domain_abi",
+            Self::UnusedExplicitDomainAbi => "unused_explicit_domain_abi",
+            Self::DomainNotRegistered => "domain_not_registered",
+            Self::AbiNotRegistered => "abi_not_registered",
+        }
+    }
+
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::MissingExplicitDomainAbi => "ABI001",
+            Self::UnusedExplicitDomainAbi => "ABI002",
+            Self::DomainNotRegistered => "ABI003",
+            Self::AbiNotRegistered => "ABI004",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectAbiIssue {
+    pub kind: ProjectAbiIssueKind,
+    pub message: String,
+}
+
+impl ProjectAbiIssue {
+    pub fn summary(&self) -> String {
+        format!(
+            "{} {}: {}",
+            self.kind.code(),
+            self.kind.as_str(),
+            self.message
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectAbiSelectionCheck {
+    pub domain: String,
+    pub abi: Option<String>,
+    pub source: String,
+    pub abi_registered: bool,
+    pub ok: bool,
+    pub issues: Vec<ProjectAbiIssue>,
+}
+
+impl ProjectAbiSelectionCheck {
+    pub fn issue_count(&self) -> usize {
+        self.issues.len()
+    }
+
+    pub fn summary_line(&self) -> String {
+        format!(
+            "{} (source={}, abi={}): {}",
+            self.domain,
+            self.source,
+            self.abi.as_deref().unwrap_or("<none>"),
+            if self.issues.is_empty() {
+                "ok".to_owned()
+            } else {
+                self.issues
+                    .iter()
+                    .map(ProjectAbiIssue::summary)
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            }
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProjectLoweringIssueKind {
+    DomainNotRegistered,
+    NoRegisteredLoweringTargets,
+    AbiTargetResolutionFailed,
+    SelectedLoweringTargetNotRegistered,
+}
+
+impl ProjectLoweringIssueKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::DomainNotRegistered => "domain_not_registered",
+            Self::NoRegisteredLoweringTargets => "no_registered_lowering_targets",
+            Self::AbiTargetResolutionFailed => "abi_target_resolution_failed",
+            Self::SelectedLoweringTargetNotRegistered => "selected_lowering_target_not_registered",
+        }
+    }
+
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::DomainNotRegistered => "NLT001",
+            Self::NoRegisteredLoweringTargets => "NLT002",
+            Self::AbiTargetResolutionFailed => "NLT003",
+            Self::SelectedLoweringTargetNotRegistered => "NLT004",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectLoweringIssue {
+    pub kind: ProjectLoweringIssueKind,
+    pub message: String,
+}
+
+impl ProjectLoweringIssue {
+    pub fn summary(&self) -> String {
+        format!(
+            "{} {}: {}",
+            self.kind.code(),
+            self.kind.as_str(),
+            self.message
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectLoweringSelectionView {
+    pub domain: String,
+    pub abi: Option<String>,
+    pub registered_lowering_targets: Vec<String>,
+    pub selected_lowering_target: Option<String>,
+    pub ok: bool,
+    pub issues: Vec<ProjectLoweringIssue>,
+}
+
+impl ProjectLoweringSelectionView {
+    pub fn issue_count(&self) -> usize {
+        self.issues.len()
+    }
+
+    pub fn summary_line(&self) -> String {
+        format!(
+            "{} (abi={}, selected={}): {}",
+            self.domain,
+            self.abi.as_deref().unwrap_or("<none>"),
+            self.selected_lowering_target
+                .as_deref()
+                .unwrap_or("<none>"),
+            if self.issues.is_empty() {
+                "ok".to_owned()
+            } else {
+                self.issues
+                    .iter()
+                    .map(ProjectLoweringIssue::summary)
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            }
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

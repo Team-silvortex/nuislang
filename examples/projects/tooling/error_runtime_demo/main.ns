@@ -3,33 +3,129 @@ mod cpu Main {
   extern "c" fn host_error_message(kind_handle: i64) -> i64;
   extern "c" fn host_error_severity(kind_handle: i64) -> i64;
 
+  enum ErrorSeverity {
+    Info,
+    Warning,
+    Error,
+  }
+
+  enum ErrorFamily {
+    Unknown,
+    InputValidation,
+    ResultRuntime,
+    DiagnosticRuntime,
+  }
+
+  struct ErrorCode {
+    kind_handle: i64,
+    stable_code: i64,
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64,
+    retryable: i64
+  }
+
   struct ErrorProjectSummary {
-    primary_code: i64,
-    primary_message_handle: i64,
-    primary_severity: i64,
-    secondary_code: i64,
-    secondary_message_handle: i64,
-    secondary_severity: i64
+    primary: ErrorCode,
+    secondary: ErrorCode
+  }
+
+  fn kind_invalid_input() -> i64 {
+    return 1101;
+  }
+
+  fn kind_result_missing() -> i64 {
+    return 1202;
+  }
+
+  fn kind_diagnostic_message() -> i64 {
+    return 1303;
+  }
+
+  fn family_code(family: ErrorFamily) -> i64 {
+    match family {
+      ErrorFamily.Unknown => {
+        return 0;
+      }
+      ErrorFamily.InputValidation => {
+        return 11;
+      }
+      ErrorFamily.ResultRuntime => {
+        return 12;
+      }
+      ErrorFamily.DiagnosticRuntime => {
+        return 13;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn classify_error_severity(kind_handle: i64) -> ErrorSeverity {
+    if kind_handle == kind_invalid_input() {
+      return ErrorSeverity.Error;
+    }
+    if kind_handle == kind_result_missing() {
+      return ErrorSeverity.Warning;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorSeverity.Warning;
+    }
+    return ErrorSeverity.Info;
+  }
+
+  fn classify_error_family(kind_handle: i64) -> ErrorFamily {
+    if kind_handle == kind_invalid_input() {
+      return ErrorFamily.InputValidation;
+    }
+    if kind_handle == kind_result_missing() {
+      return ErrorFamily.ResultRuntime;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorFamily.DiagnosticRuntime;
+    }
+    return ErrorFamily.Unknown;
+  }
+
+  fn classify_error_retryable(kind_handle: i64) -> i64 {
+    if kind_handle == kind_result_missing() {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn build_error_code(kind_handle: i64) -> ErrorCode {
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    let _severity: ErrorSeverity = classify_error_severity(kind_handle);
+    return ErrorCode {
+      kind_handle: kind_handle,
+      stable_code: host_error_code(kind_handle),
+      message_handle: host_error_message(kind_handle),
+      severity_code: host_error_severity(kind_handle),
+      family_code: family_code(family),
+      retryable: classify_error_retryable(kind_handle)
+    };
   }
 
   fn capture_error_project() -> ErrorProjectSummary {
     return ErrorProjectSummary {
-      primary_code: host_error_code(1101),
-      primary_message_handle: host_error_message(1101),
-      primary_severity: host_error_severity(1101),
-      secondary_code: host_error_code(1202),
-      secondary_message_handle: host_error_message(1202),
-      secondary_severity: host_error_severity(1202)
+      primary: build_error_code(kind_invalid_input()),
+      secondary: build_error_code(kind_result_missing())
     };
   }
 
   fn main() -> i64 {
     let summary: ErrorProjectSummary = capture_error_project();
-    return summary.primary_code
-      + summary.primary_message_handle
-      + summary.primary_severity
-      + summary.secondary_code
-      + summary.secondary_message_handle
-      + summary.secondary_severity;
+    return summary.primary.stable_code
+      + summary.primary.message_handle
+      + summary.primary.severity_code
+      + summary.primary.family_code
+      + summary.primary.retryable
+      + summary.secondary.stable_code
+      + summary.secondary.message_handle
+      + summary.secondary.severity_code
+      + summary.secondary.family_code
+      + summary.secondary.retryable;
   }
 }

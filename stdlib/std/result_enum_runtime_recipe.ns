@@ -6,9 +6,9 @@ mod cpu Main {
   extern "c" fn host_error_message(kind_handle: i64) -> i64;
   extern "c" fn host_error_severity(kind_handle: i64) -> i64;
 
-  enum ResultState {
-    Ok,
-    Err,
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
   }
 
   enum ErrorSeverity {
@@ -22,13 +22,6 @@ mod cpu Main {
     InputValidation,
     ResultRuntime,
     DiagnosticRuntime,
-  }
-
-  struct ResultRecord {
-    tag_handle: i64,
-    is_ok: i64,
-    value_handle: i64,
-    error_handle: i64
   }
 
   struct ErrorCode {
@@ -51,13 +44,15 @@ mod cpu Main {
     diagnostic: DiagnosticCode
   }
 
-  struct ResultProjectSummary {
-    primary_state_code: i64,
-    primary: ResultRecord,
-    primary_envelope: ErrorEnvelope,
-    secondary_state_code: i64,
-    secondary: ResultRecord,
-    secondary_envelope: ErrorEnvelope
+  struct ResultEnumRecipeSeed {
+    primary_tag_handle: i64,
+    secondary_tag_handle: i64,
+    fallback_tag_handle: i64
+  }
+
+  struct ResultEnumRecipeSummary {
+    primary_score: i64,
+    fallback_score: i64
   }
 
   fn kind_invalid_input() -> i64 {
@@ -70,27 +65,6 @@ mod cpu Main {
 
   fn kind_diagnostic_message() -> i64 {
     return 1303;
-  }
-
-  fn result_state_code(state: ResultState) -> i64 {
-    match state {
-      ResultState.Ok => {
-        return 1;
-      }
-      ResultState.Err => {
-        return 2;
-      }
-      _ => {
-        return 0;
-      }
-    }
-  }
-
-  fn classify_result_state(tag_handle: i64) -> ResultState {
-    if host_result_is_ok(tag_handle) == 1 {
-      return ResultState.Ok;
-    }
-    return ResultState.Err;
   }
 
   fn severity_code(severity: ErrorSeverity) -> i64 {
@@ -163,15 +137,6 @@ mod cpu Main {
     return 0;
   }
 
-  fn read_result(tag_handle: i64) -> ResultRecord {
-    return ResultRecord {
-      tag_handle: tag_handle,
-      is_ok: host_result_is_ok(tag_handle),
-      value_handle: host_result_value(tag_handle),
-      error_handle: host_result_error(tag_handle)
-    };
-  }
-
   fn build_error_code(kind_handle: i64) -> ErrorCode {
     let family: ErrorFamily = classify_error_family(kind_handle);
     return ErrorCode {
@@ -201,44 +166,58 @@ mod cpu Main {
     };
   }
 
-  fn capture_result_project() -> ResultProjectSummary {
-    let primary: ResultRecord = read_result(1207);
-    let secondary: ResultRecord = read_result(1308);
-    return ResultProjectSummary {
-      primary_state_code: result_state_code(classify_result_state(1207)),
-      primary: primary,
-      primary_envelope: build_error_envelope(primary.error_handle),
-      secondary_state_code: result_state_code(classify_result_state(1308)),
-      secondary: secondary,
-      secondary_envelope: build_error_envelope(secondary.error_handle)
+  fn result_from_host(tag_handle: i64) -> Result<i64, ErrorEnvelope> {
+    if host_result_is_ok(tag_handle) == 1 {
+      return Result.Ok(host_result_value(tag_handle));
+    }
+    return Result.Err(build_error_envelope(host_result_error(tag_handle)));
+  }
+
+  fn result_score(result: Result<i64, ErrorEnvelope>) -> i64 {
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(envelope) => {
+        return envelope.error.stable_code
+          + envelope.error.message_handle
+          + envelope.error.severity_code
+          + envelope.error.family_code
+          + envelope.error.retryable
+          + envelope.diagnostic.message_handle
+          + envelope.diagnostic.severity_code
+          + envelope.diagnostic.family_code;
+      }
+    }
+  }
+
+  fn combine_results(primary_tag_handle: i64, secondary_tag_handle: i64) -> Result<i64, ErrorEnvelope> {
+    let primary: i64 = result_from_host(primary_tag_handle)?;
+    let secondary: i64 = result_from_host(secondary_tag_handle)?;
+    return Result.Ok(primary + secondary);
+  }
+
+  fn capture_result_enum_recipe(seed: ResultEnumRecipeSeed) -> ResultEnumRecipeSummary {
+    return ResultEnumRecipeSummary {
+      primary_score: result_score(combine_results(seed.primary_tag_handle, seed.secondary_tag_handle)),
+      fallback_score: result_score(result_from_host(seed.fallback_tag_handle))
     };
   }
 
-  fn main() -> i64 {
-    let summary: ResultProjectSummary = capture_result_project();
-    return summary.primary_state_code
-      + summary.primary.is_ok
-      + summary.primary.value_handle
-      + summary.primary.error_handle
-      + summary.primary_envelope.error.stable_code
-      + summary.primary_envelope.error.message_handle
-      + summary.primary_envelope.error.severity_code
-      + summary.primary_envelope.error.family_code
-      + summary.primary_envelope.error.retryable
-      + summary.primary_envelope.diagnostic.message_handle
-      + summary.primary_envelope.diagnostic.severity_code
-      + summary.primary_envelope.diagnostic.family_code
-      + summary.secondary_state_code
-      + summary.secondary.is_ok
-      + summary.secondary.value_handle
-      + summary.secondary.error_handle
-      + summary.secondary_envelope.error.stable_code
-      + summary.secondary_envelope.error.message_handle
-      + summary.secondary_envelope.error.severity_code
-      + summary.secondary_envelope.error.family_code
-      + summary.secondary_envelope.error.retryable
-      + summary.secondary_envelope.diagnostic.message_handle
-      + summary.secondary_envelope.diagnostic.severity_code
-      + summary.secondary_envelope.diagnostic.family_code;
+  fn summarize_result_enum_recipe(
+    primary_tag_handle: i64,
+    secondary_tag_handle: i64,
+    fallback_tag_handle: i64
+  ) -> i64 {
+    let summary: ResultEnumRecipeSummary = capture_result_enum_recipe(ResultEnumRecipeSeed {
+      primary_tag_handle: primary_tag_handle,
+      secondary_tag_handle: secondary_tag_handle,
+      fallback_tag_handle: fallback_tag_handle
+    });
+    return summary.primary_score + summary.fallback_score;
+  }
+
+  fn main() {
+    print(summarize_result_enum_recipe(1207, 1308, 1207));
   }
 }

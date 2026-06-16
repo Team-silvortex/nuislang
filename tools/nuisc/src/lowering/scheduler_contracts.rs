@@ -22,6 +22,44 @@ pub(crate) fn assign_default_lanes(module: &mut YirModule) {
     }
 }
 
+// Lane policy:
+// - `contract` is reserved for scheduler/project metadata that should never participate in
+//   executable CPU lane serialization.
+// - `project_profile_*` executable/config nodes stay on profile lanes unless they are emitted as
+//   CPU text contracts.
+// - all other nodes fall back to manifest-declared defaults or semantic family heuristics.
+fn contract_metadata_lane_for_node<'a>(family: &str, node: &'a Node) -> Option<&'a str> {
+    if node.name.starts_with("scheduler_contract_") || node.name.starts_with("lowering_cpu_target_")
+    {
+        return Some("contract");
+    }
+    if node.name.starts_with("project_") && family == "cpu" && node.op.instruction == "text" {
+        return Some("contract");
+    }
+    None
+}
+
+fn project_profile_lane_for_node<'a>(family: &str, node: &'a Node) -> Option<&'a str> {
+    if !node.name.starts_with("project_profile_") {
+        return None;
+    }
+    match family {
+        "cpu" => Some("profile"),
+        "data" => Some(match node.op.semantic_op() {
+            SemanticOp::DataImmutableWindow => "profile_uplink",
+            SemanticOp::DataCopyWindow | SemanticOp::DataInputPipe => "profile_downlink",
+            SemanticOp::DataHandleTable | SemanticOp::DataBindCore | SemanticOp::DataMarker => {
+                "profile_control"
+            }
+            SemanticOp::DataMove => "profile_fabric",
+            _ => "profile_data",
+        }),
+        "shader" => Some("profile_setup"),
+        "kernel" | "npu" => Some("profile_compute"),
+        _ => None,
+    }
+}
+
 pub(crate) fn materialize_registered_scheduler_contract_nodes(module: &mut YirModule) {
     let resource_families = module
         .resources
@@ -406,36 +444,12 @@ fn default_lane_for_node<'a>(
     family: &str,
     node: &'a Node,
 ) -> &'a str {
-    if node.name.starts_with("scheduler_contract_") {
-        return "contract";
+    // Contract metadata is scheduler/project bookkeeping and must stay off executable CPU lanes.
+    if let Some(lane) = contract_metadata_lane_for_node(family, node) {
+        return lane;
     }
-    if node.name.starts_with("project_link_") {
-        return "contract";
-    }
-    if node.name.starts_with("project_profile_") {
-        if family == "cpu" && node.op.instruction == "text" {
-            return "contract";
-        }
-        if family == "cpu" {
-            return "profile";
-        }
-        if family == "data" {
-            return match node.op.semantic_op() {
-                SemanticOp::DataImmutableWindow => "profile_uplink",
-                SemanticOp::DataCopyWindow | SemanticOp::DataInputPipe => "profile_downlink",
-                SemanticOp::DataHandleTable | SemanticOp::DataBindCore | SemanticOp::DataMarker => {
-                    "profile_control"
-                }
-                SemanticOp::DataMove => "profile_fabric",
-                _ => "profile_data",
-            };
-        }
-        if family == "shader" {
-            return "profile_setup";
-        }
-        if family == "kernel" || family == "npu" {
-            return "profile_compute";
-        }
+    if let Some(lane) = project_profile_lane_for_node(family, node) {
+        return lane;
     }
     if let Some(lane) = lane_policy.get(&node.op.full_name()) {
         return lane.as_str();

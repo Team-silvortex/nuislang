@@ -2,12 +2,185 @@ mod cpu Main {
   extern "c" fn host_result_is_ok(tag_handle: i64) -> i64;
   extern "c" fn host_result_value(tag_handle: i64) -> i64;
   extern "c" fn host_result_error(tag_handle: i64) -> i64;
+  extern "c" fn host_error_code(kind_handle: i64) -> i64;
+  extern "c" fn host_error_message(kind_handle: i64) -> i64;
+  extern "c" fn host_error_severity(kind_handle: i64) -> i64;
+
+  enum ResultState {
+    Ok,
+    Err,
+  }
+
+  enum ErrorSeverity {
+    Info,
+    Warning,
+    Error,
+  }
+
+  enum ErrorFamily {
+    Unknown,
+    InputValidation,
+    ResultRuntime,
+    DiagnosticRuntime,
+  }
 
   struct ResultRecord {
     tag_handle: i64,
     is_ok: i64,
     value_handle: i64,
     error_handle: i64
+  }
+
+  struct ErrorCode {
+    kind_handle: i64,
+    stable_code: i64,
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64,
+    retryable: i64
+  }
+
+  struct DiagnosticCode {
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64
+  }
+
+  struct ErrorEnvelope {
+    error: ErrorCode,
+    diagnostic: DiagnosticCode
+  }
+
+  fn kind_invalid_input() -> i64 {
+    return 1101;
+  }
+
+  fn kind_result_missing() -> i64 {
+    return 1202;
+  }
+
+  fn kind_diagnostic_message() -> i64 {
+    return 1303;
+  }
+
+  fn result_state_code(state: ResultState) -> i64 {
+    match state {
+      ResultState.Ok => {
+        return 1;
+      }
+      ResultState.Err => {
+        return 2;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn classify_result_state(tag_handle: i64) -> ResultState {
+    if host_result_is_ok(tag_handle) == 1 {
+      return ResultState.Ok;
+    }
+    return ResultState.Err;
+  }
+
+  fn severity_code(severity: ErrorSeverity) -> i64 {
+    match severity {
+      ErrorSeverity.Info => {
+        return 1;
+      }
+      ErrorSeverity.Warning => {
+        return 2;
+      }
+      ErrorSeverity.Error => {
+        return 3;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn family_code(family: ErrorFamily) -> i64 {
+    match family {
+      ErrorFamily.Unknown => {
+        return 0;
+      }
+      ErrorFamily.InputValidation => {
+        return 11;
+      }
+      ErrorFamily.ResultRuntime => {
+        return 12;
+      }
+      ErrorFamily.DiagnosticRuntime => {
+        return 13;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn classify_error_severity(kind_handle: i64) -> ErrorSeverity {
+    if kind_handle == kind_invalid_input() {
+      return ErrorSeverity.Error;
+    }
+    if kind_handle == kind_result_missing() {
+      return ErrorSeverity.Warning;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorSeverity.Warning;
+    }
+    return ErrorSeverity.Info;
+  }
+
+  fn classify_error_family(kind_handle: i64) -> ErrorFamily {
+    if kind_handle == kind_invalid_input() {
+      return ErrorFamily.InputValidation;
+    }
+    if kind_handle == kind_result_missing() {
+      return ErrorFamily.ResultRuntime;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorFamily.DiagnosticRuntime;
+    }
+    return ErrorFamily.Unknown;
+  }
+
+  fn classify_error_retryable(kind_handle: i64) -> i64 {
+    if kind_handle == kind_result_missing() {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn build_error_code(kind_handle: i64) -> ErrorCode {
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    return ErrorCode {
+      kind_handle: kind_handle,
+      stable_code: host_error_code(kind_handle),
+      message_handle: host_error_message(kind_handle),
+      severity_code: host_error_severity(kind_handle),
+      family_code: family_code(family),
+      retryable: classify_error_retryable(kind_handle)
+    };
+  }
+
+  fn build_diagnostic_code(kind_handle: i64) -> DiagnosticCode {
+    let severity: ErrorSeverity = classify_error_severity(kind_handle);
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    return DiagnosticCode {
+      message_handle: host_error_message(kind_handle),
+      severity_code: severity_code(severity),
+      family_code: family_code(family)
+    };
+  }
+
+  fn build_error_envelope(kind_handle: i64) -> ErrorEnvelope {
+    return ErrorEnvelope {
+      error: build_error_code(kind_handle),
+      diagnostic: build_diagnostic_code(kind_handle)
+    };
   }
 
   fn read_result(tag_handle: i64) -> ResultRecord {
@@ -21,7 +194,20 @@ mod cpu Main {
 
   fn summarize_result(tag_handle: i64) -> i64 {
     let result: ResultRecord = read_result(tag_handle);
-    return result.is_ok + result.value_handle + result.error_handle;
+    let state: ResultState = classify_result_state(tag_handle);
+    let envelope: ErrorEnvelope = build_error_envelope(result.error_handle);
+    return result_state_code(state)
+      + result.is_ok
+      + result.value_handle
+      + result.error_handle
+      + envelope.error.stable_code
+      + envelope.error.message_handle
+      + envelope.error.severity_code
+      + envelope.error.family_code
+      + envelope.error.retryable
+      + envelope.diagnostic.message_handle
+      + envelope.diagnostic.severity_code
+      + envelope.diagnostic.family_code;
   }
 
   fn main() {

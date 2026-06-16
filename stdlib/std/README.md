@@ -158,8 +158,11 @@ Facade modules:
   - [clock_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_runtime.ns)
   - [clock_domain_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime.ns)
 * error and reporting
+  - [error_model_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_model_runtime.ns)
+  - [error_codes_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_codes_runtime.ns)
   - [error_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_runtime.ns)
   - [result_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_runtime.ns)
+  - [result_enum_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_enum_runtime.ns)
   - [diagnostic_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/diagnostic_runtime.ns)
 * config and persistence
   - [config_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_runtime.ns)

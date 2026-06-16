@@ -6,7 +6,26 @@ use super::support_contracts::{
     network_support_surface_contract, shader_support_surface_contract,
 };
 use super::validation_core::collect_project_domains;
-use super::{split_domain_unit, LoadedProject, ProjectAbiRequirement, ProjectAbiResolution};
+use super::{
+    split_domain_unit, LoadedProject, ProjectAbiIssue, ProjectAbiIssueKind,
+    ProjectAbiRequirement, ProjectAbiResolution, ProjectAbiSelectionCheck,
+};
+
+fn json_escape(value: &str) -> String {
+    let mut out = String::new();
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            ch if ch.is_control() => out.push_str(&format!("\\u{:04x}", ch as u32)),
+            ch => out.push(ch),
+        }
+    }
+    out
+}
 
 pub fn resolve_project_abi(project: &LoadedProject) -> Result<ProjectAbiResolution, String> {
     if !project.manifest.abi_requirements.is_empty() {
@@ -31,6 +50,158 @@ pub fn resolve_project_abi(project: &LoadedProject) -> Result<ProjectAbiResoluti
         requirements,
         explicit: false,
     })
+}
+
+pub fn validate_project_abi_selections(
+    project: &LoadedProject,
+    resolution: &ProjectAbiResolution,
+) -> Result<Vec<ProjectAbiSelectionCheck>, String> {
+    let project_domains = collect_project_domains(&project.manifest, &project.modules)?;
+    let mut views = resolution
+        .requirements
+        .iter()
+        .map(|item| {
+            let mut issues = Vec::new();
+            let mut abi_registered = false;
+            if resolution.explicit && !project_domains.contains(&item.domain) {
+                issues.push(ProjectAbiIssue {
+                    kind: ProjectAbiIssueKind::UnusedExplicitDomainAbi,
+                    message: format!(
+                        "project manifest ABI requirement `{}` targets domain `{}` which is not used by this project",
+                        item.abi, item.domain
+                    ),
+                });
+            }
+            match crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &item.domain) {
+                Ok(manifest) => {
+                    abi_registered = manifest
+                        .abi_profiles
+                        .iter()
+                        .any(|profile| profile == &item.abi);
+                    if !abi_registered {
+                        issues.push(ProjectAbiIssue {
+                            kind: ProjectAbiIssueKind::AbiNotRegistered,
+                            message: format!(
+                                "project requires ABI `{}` for domain `{}`, but nustar package `{}` declares [{}]",
+                                item.abi,
+                                item.domain,
+                                manifest.package_id,
+                                if manifest.abi_profiles.is_empty() {
+                                    "<none>".to_owned()
+                                } else {
+                                    manifest.abi_profiles.join(", ")
+                                }
+                            ),
+                        });
+                    }
+                }
+                Err(error) => issues.push(ProjectAbiIssue {
+                    kind: ProjectAbiIssueKind::DomainNotRegistered,
+                    message: error,
+                }),
+            }
+            ProjectAbiSelectionCheck {
+                domain: item.domain.clone(),
+                abi: Some(item.abi.clone()),
+                source: if resolution.explicit {
+                    "explicit".to_owned()
+                } else {
+                    "recommended".to_owned()
+                },
+                abi_registered,
+                ok: issues.is_empty(),
+                issues,
+            }
+        })
+        .collect::<Vec<_>>();
+    if resolution.explicit {
+        let required_domains = resolution
+            .requirements
+            .iter()
+            .map(|item| item.domain.clone())
+            .collect::<BTreeSet<_>>();
+        for domain in project_domains.difference(&required_domains) {
+            views.push(ProjectAbiSelectionCheck {
+                domain: domain.clone(),
+                abi: None,
+                source: "explicit".to_owned(),
+                abi_registered: false,
+                ok: false,
+                issues: vec![ProjectAbiIssue {
+                    kind: ProjectAbiIssueKind::MissingExplicitDomainAbi,
+                    message: format!(
+                        "project manifest declares ABI locking but is missing domain ABI entry for `{}`",
+                        domain
+                    ),
+                }],
+            });
+        }
+    }
+    views.sort_by(|lhs, rhs| lhs.domain.cmp(&rhs.domain));
+    Ok(views)
+}
+
+pub fn render_project_abi_selection_check_lines(check: &ProjectAbiSelectionCheck) -> Vec<String> {
+    let mut lines = vec![format!(
+        "abi_check: {} source={} abi={} ok={} abi_registered={} issues={}",
+        check.domain,
+        check.source,
+        check.abi.as_deref().unwrap_or("<none>"),
+        if check.ok { "yes" } else { "no" },
+        if check.abi_registered { "yes" } else { "no" },
+        check.issue_count()
+    )];
+    for issue in &check.issues {
+        lines.push(format!("abi_issue: {}", issue.summary().replace(": ", " ")));
+    }
+    lines
+}
+
+pub fn project_abi_selection_check_json(check: &ProjectAbiSelectionCheck) -> String {
+    let issues = check
+        .issues
+        .iter()
+        .map(|issue| {
+            format!(
+                "{{\"code\":\"{}\",\"kind\":\"{}\",\"message\":\"{}\"}}",
+                issue.kind.code(),
+                issue.kind.as_str(),
+                json_escape(&issue.message)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{\"domain\":\"{}\",\"abi\":{},\"source\":\"{}\",\"abi_registered\":{},\"ok\":{},\"issues\":[{}]}}",
+        json_escape(&check.domain),
+        check.abi
+            .as_deref()
+            .map(|value| format!("\"{}\"", json_escape(value)))
+            .unwrap_or_else(|| "null".to_owned()),
+        json_escape(&check.source),
+        if check.abi_registered { "true" } else { "false" },
+        if check.ok { "true" } else { "false" },
+        issues
+    )
+}
+
+pub fn ensure_project_abi_selections_valid(
+    project: &LoadedProject,
+    resolution: &ProjectAbiResolution,
+) -> Result<(), String> {
+    let failures = validate_project_abi_selections(project, resolution)?
+        .into_iter()
+        .filter(|check| !check.ok)
+        .map(|check| check.summary_line())
+        .collect::<Vec<_>>();
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "project ABI selection validation failed:\n{}",
+            failures.join("\n")
+        ))
+    }
 }
 
 pub(super) fn recommend_abi_profile_for_host(

@@ -191,6 +191,30 @@ fn materializes_project_abi_summary_entries_for_cpu_and_data() {
         .nodes
         .iter()
         .any(|node| node.name == "project_abi_graph_summary_entry"));
+    assert_eq!(
+        yir.node_lanes
+            .get("project_abi_cpu_selection_entry")
+            .map(String::as_str),
+        Some("contract")
+    );
+    assert_eq!(
+        yir.node_lanes
+            .get("project_abi_cpu_selection_summary_type")
+            .map(String::as_str),
+        Some("contract")
+    );
+    assert_eq!(
+        yir.node_lanes
+            .get("project_abi_graph_summary_entry")
+            .map(String::as_str),
+        Some("contract")
+    );
+    assert_eq!(
+        yir.node_lanes
+            .get("project_abi_graph_summary_type")
+            .map(String::as_str),
+        Some("contract")
+    );
 }
 
 #[test]
@@ -233,6 +257,143 @@ fn renders_project_abi_index_with_graph_summary_and_domain_details() {
     assert!(rendered.contains("network_target=present"));
     assert!(rendered.contains("domain\tcpu\tabi=cpu.arm64.apple_aapcs64"));
     assert!(rendered.contains("domain\tnetwork\tabi=network.socket.macos.arm64.v1"));
+}
+
+#[test]
+fn project_abi_selection_views_expose_registered_targets() {
+    let mut project = project_with_modules(vec![(
+        "network_unit.ns",
+        r#"
+        mod network NetworkUnit {
+          fn profile() {}
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "network".to_owned(),
+        abi: "network.socket.macos.arm64.v1".to_owned(),
+    }];
+
+    let resolution = resolve_project_abi(&project).unwrap();
+    let views = project_abi_selection_views(&resolution);
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].domain, "network");
+    assert_eq!(views[0].machine_arch.as_deref(), Some("arm64"));
+    assert_eq!(views[0].machine_os.as_deref(), Some("darwin"));
+
+    let lines = render_project_abi_selection_lines(&resolution);
+    assert!(lines
+        .iter()
+        .any(|line| line == "abi: network=network.socket.macos.arm64.v1"));
+    assert!(lines
+        .iter()
+        .any(|line| line == "  abi_target_machine: arm64-darwin"));
+    assert!(project_abi_selection_view_json(&views[0]).contains("\"abi_target_host_adaptive\":false"));
+}
+
+#[test]
+fn project_abi_selection_checks_report_registered_recommended_abis() {
+    let project = project_with_modules(vec![(
+        "network_unit.ns",
+        r#"
+        mod network NetworkUnit {
+          fn profile() {}
+        }
+        "#,
+    )]);
+
+    let resolution = resolve_project_abi(&project).unwrap();
+    let checks = validate_project_abi_selections(&project, &resolution).unwrap();
+    assert_eq!(checks.len(), 1);
+    assert!(checks[0].ok);
+    assert_eq!(checks[0].source, "recommended");
+    assert!(checks[0].abi_registered);
+    assert_eq!(checks[0].issue_count(), 0);
+    assert!(checks[0].summary_line().contains("source=recommended"));
+    let lines = render_project_abi_selection_check_lines(&checks[0]);
+    assert!(lines
+        .iter()
+        .any(|line| line.contains("abi_registered=yes")));
+    assert!(project_abi_selection_check_json(&checks[0]).contains("\"source\":\"recommended\""));
+}
+
+#[test]
+fn project_abi_selection_checks_report_missing_explicit_domain_entries() {
+    let mut project = project_with_modules(vec![
+        (
+            "main.ns",
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        ),
+        (
+            "network_unit.ns",
+            r#"
+            mod network NetworkUnit {
+              fn profile() {}
+            }
+            "#,
+        ),
+    ]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "cpu".to_owned(),
+        abi: "cpu.arm64.apple_aapcs64".to_owned(),
+    }];
+    let resolution = resolve_project_abi(&project).unwrap();
+    let checks = validate_project_abi_selections(&project, &resolution).unwrap();
+    let network = checks.iter().find(|check| check.domain == "network").unwrap();
+    assert!(!network.ok);
+    assert!(network
+        .issues
+        .iter()
+        .any(|issue| issue.kind == ProjectAbiIssueKind::MissingExplicitDomainAbi));
+    assert!(network
+        .issues
+        .iter()
+        .any(|issue| issue.kind.code() == "ABI001"));
+    assert!(network.summary_line().contains("ABI001 missing_explicit_domain_abi"));
+}
+
+#[test]
+fn project_lowering_selections_expose_registered_targets_and_selected_backend() {
+    let mut project = project_with_modules(vec![(
+        "main.ns",
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            return 1;
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "cpu".to_owned(),
+        abi: "cpu.arm64.apple_aapcs64".to_owned(),
+    }];
+
+    let resolution = resolve_project_abi(&project).unwrap();
+    let lowering = validate_project_lowering_selections(&resolution);
+    assert_eq!(lowering.len(), 1);
+    assert!(lowering[0].ok);
+    assert_eq!(lowering[0].issue_count(), 0);
+    assert_eq!(lowering[0].selected_lowering_target.as_deref(), Some("llvm"));
+    assert!(lowering[0]
+        .registered_lowering_targets
+        .iter()
+        .any(|target| target == "llvm"));
+    let lines = render_project_lowering_selection_lines(&lowering[0]);
+    assert!(lines
+        .iter()
+        .any(|line| line.contains("selected=llvm")));
+    assert!(lines
+        .iter()
+        .any(|line| line.contains("issues=0")));
+    assert!(lowering[0].summary_line().contains("selected=llvm"));
+    assert!(project_lowering_selection_json(&lowering[0]).contains("\"selected_lowering_target\":\"llvm\""));
 }
 
 #[test]

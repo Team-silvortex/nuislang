@@ -394,6 +394,9 @@ mod tests_async_network_runtime;
 #[path = "lowering/tests_async_runtime.rs"]
 mod tests_async_runtime;
 #[cfg(test)]
+#[path = "lowering/tests_lane_policy.rs"]
+mod tests_lane_policy;
+#[cfg(test)]
 #[path = "lowering/tests_branch_helpers.rs"]
 mod tests_branch_helpers;
 #[cfg(test)]
