@@ -159,11 +159,14 @@ Facade modules:
   - [clock_domain_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime.ns)
 * error and reporting
   - [error_model_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_model_runtime.ns)
+  - [error_bridge_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_bridge_runtime.ns)
   - [error_codes_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_codes_runtime.ns)
   - [error_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_runtime.ns)
   - [result_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_runtime.ns)
   - [result_enum_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_enum_runtime.ns)
   - [diagnostic_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/diagnostic_runtime.ns)
+  - bridge contract:
+    [std-result-bridge-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-result-bridge-contract.md)
 * config and persistence
   - [config_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_runtime.ns)
   - [kv_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/kv_runtime.ns)
@@ -203,6 +206,8 @@ Recipe modules:
 * result/diagnostic staging
   - use the local lane router:
     [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
+  - shared bridge rule:
+    [std-result-bridge-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-result-bridge-contract.md)
 * directory/stat staging
   - use the local lane router:
     [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)

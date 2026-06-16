@@ -9,9 +9,9 @@ use super::metadata::ModuleConstValue;
 use super::validation_helpers::validate_type_ref;
 use super::{
     ast_type_from_nir, bool_type, compatible_types, infer_nir_expr_type,
-    instantiate_struct_field_type, lower_expr_with_async,
-    lower_type_ref_with_aliases, resolve_declared_or_inferred, AstStmt, AstTypeAlias, AstTypeRef,
-    FunctionSignature, NirStmt, NirStructDef, NirTypeRef,
+    instantiate_struct_field_type, lower_expr_with_async, lower_type_ref_with_aliases,
+    resolve_declared_or_inferred, AstStmt, AstTypeAlias, AstTypeRef, FunctionSignature, NirStmt,
+    NirStructDef, NirTypeRef,
 };
 
 static TRY_EXPANSION_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -544,11 +544,8 @@ fn lower_if_expr_branch_with_async(
     struct_table: &BTreeMap<String, NirStructDef>,
     wrap_terminal: &dyn Fn(super::AstExpr) -> AstStmt,
 ) -> Result<Vec<NirStmt>, String> {
-    let rewritten_body = rewrite_control_expr_terminal_branch(
-        body,
-        wrap_terminal,
-        ControlExprKind::If,
-    )?;
+    let rewritten_body =
+        rewrite_control_expr_terminal_branch(body, wrap_terminal, ControlExprKind::If)?;
     lower_stmt_block_with_async(
         &rewritten_body,
         current_domain,
@@ -1534,11 +1531,7 @@ fn rewrite_try_payload_placeholder(stmt: AstStmt, payload_name: &str) -> Result<
             ty,
             value: rewrite_try_payload_placeholder_expr(value, payload_name),
         }),
-        AstStmt::Const {
-            name,
-            ty,
-            value,
-        } => Ok(AstStmt::Const {
+        AstStmt::Const { name, ty, value } => Ok(AstStmt::Const {
             name,
             ty,
             value: rewrite_try_payload_placeholder_expr(value, payload_name),
@@ -1599,7 +1592,10 @@ fn rewrite_try_payload_placeholder_expr(
             generic_args,
             args,
         } => super::AstExpr::MethodCall {
-            receiver: Box::new(rewrite_try_payload_placeholder_expr(*receiver, payload_name)),
+            receiver: Box::new(rewrite_try_payload_placeholder_expr(
+                *receiver,
+                payload_name,
+            )),
             method,
             generic_args,
             args: args
@@ -2021,8 +2017,16 @@ fn rewrite_control_expr_terminal_branch(
         } => {
             rewritten.push(AstStmt::If {
                 condition: condition.clone(),
-                then_body: rewrite_control_expr_terminal_branch(then_body, wrap, ControlExprKind::If)?,
-                else_body: rewrite_control_expr_terminal_branch(else_body, wrap, ControlExprKind::If)?,
+                then_body: rewrite_control_expr_terminal_branch(
+                    then_body,
+                    wrap,
+                    ControlExprKind::If,
+                )?,
+                else_body: rewrite_control_expr_terminal_branch(
+                    else_body,
+                    wrap,
+                    ControlExprKind::If,
+                )?,
             });
             return Ok(rewritten);
         }

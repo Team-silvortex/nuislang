@@ -73,8 +73,7 @@ where
         NirExpr::CpuExternCall { args, .. } => {
             args.iter().any(|arg| expr_contains_call(arg, predicate))
         }
-        NirExpr::CpuSpawn { args, .. }
-        | NirExpr::CpuThreadSpawn { args, .. } => {
+        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuThreadSpawn { args, .. } => {
             args.iter().any(|arg| expr_contains_call(arg, predicate))
         }
         _ => false,
@@ -1910,7 +1909,8 @@ fn monomorphizes_generic_function_from_outer_struct_literal_with_deferred_inner_
 }
 
 #[test]
-fn monomorphizes_generic_function_from_outer_struct_literal_with_deferred_inner_payload_inference() {
+fn monomorphizes_generic_function_from_outer_struct_literal_with_deferred_inner_payload_inference()
+{
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -2019,7 +2019,8 @@ fn monomorphizes_generic_function_from_inferred_alias_payload_constructor_argume
 }
 
 #[test]
-fn monomorphizes_generic_function_from_transparent_alias_outer_literal_with_deferred_inner_inference() {
+fn monomorphizes_generic_function_from_transparent_alias_outer_literal_with_deferred_inner_inference(
+) {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -2063,7 +2064,8 @@ fn monomorphizes_generic_function_from_transparent_alias_outer_literal_with_defe
 }
 
 #[test]
-fn monomorphizes_generic_function_from_non_transparent_alias_outer_literal_with_deferred_inner_inference() {
+fn monomorphizes_generic_function_from_non_transparent_alias_outer_literal_with_deferred_inner_inference(
+) {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {

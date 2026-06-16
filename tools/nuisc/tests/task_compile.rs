@@ -2540,8 +2540,9 @@ fn compiles_task_cli_tooling_project() {
 
 #[test]
 fn compiles_task_thread_mutex_project() {
-    let project =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo");
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo",
+    );
     nuisc::pipeline::compile_project(project).expect("task thread/mutex project should compile");
 }
 
@@ -2628,15 +2629,15 @@ fn lowers_task_cli_tooling_project_with_timeout_and_host_io_shape() {
         .expect("expected emit_timeout_cli function");
     assert!(emit_timeout.body.iter().any(|stmt| {
         matches!(
-            stmt,
-            NirStmt::Let {
-                name,
-                ty: Some(ty),
-                value: NirExpr::CpuExternCall { callee, .. },
-            } if name == "stderr_code"
-                && ty.render() == "i64"
-                && callee == "host_stderr_write"
-            )
+        stmt,
+        NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuExternCall { callee, .. },
+        } if name == "stderr_code"
+            && ty.render() == "i64"
+            && callee == "host_stderr_write"
+        )
     }));
 }
 
@@ -2751,18 +2752,14 @@ fn lowers_task_thread_mutex_project_with_thread_and_lock_shape() {
             } if name == "worker" && ty.render() == "Thread<i64>" && callee == "ping"
         )
     }));
-    assert!(join_thread_result.body.iter().any(|stmt| {
-        matches!(
-            stmt,
-            NirStmt::Return(Some(NirExpr::CpuThreadJoinResult(_)))
-        )
-    }));
-    assert!(join_thread_value.body.iter().any(|stmt| {
-        matches!(
-            stmt,
-            NirStmt::Return(Some(NirExpr::CpuThreadJoin(_)))
-        )
-    }));
+    assert!(join_thread_result
+        .body
+        .iter()
+        .any(|stmt| { matches!(stmt, NirStmt::Return(Some(NirExpr::CpuThreadJoinResult(_)))) }));
+    assert!(join_thread_value
+        .body
+        .iter()
+        .any(|stmt| { matches!(stmt, NirStmt::Return(Some(NirExpr::CpuThreadJoin(_)))) }));
     assert!(capture.body.iter().any(|stmt| {
         matches!(
             stmt,

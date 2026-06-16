@@ -5,8 +5,8 @@ use nuis_semantics::model::{
 };
 
 use super::super::{infer_ast_expr_type, FunctionSignature};
-use super::GenericImplMethodTemplate;
 use super::exprs::{call_arg_expected_type, rewrite_generic_calls_in_expr};
+use super::GenericImplMethodTemplate;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn hoist_direct_result_wrapper_args(

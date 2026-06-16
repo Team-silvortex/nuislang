@@ -94,7 +94,8 @@ reading an entire subtree.
   [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo),
   [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo),
   [task_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_demo),
-  [task_result_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo)
+  [task_result_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo),
+  [task_result_enum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_enum_demo)
 * CLI / workflow / host tooling:
   [tooling](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling)
   Start with:
@@ -113,7 +114,9 @@ reading an entire subtree.
   [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo),
   [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo),
   [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo),
-  [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo)
+  [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo),
+  [net_result_enum_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_result_enum_recipe_demo),
+  [shader_result_enum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_enum_demo)
 
 ## Control-Flow Mainline
 

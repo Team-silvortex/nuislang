@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use nuis_semantics::model::{AstExpr, AstModule, AstStmt};
 use crate::registry::RegisteredAbiTarget;
+use nuis_semantics::model::{AstExpr, AstModule, AstStmt};
 use yir_core::{Node, Operation, Resource, ResourceKind, YirModule};
 
 use super::{sanitize_ident, ProjectAbiResolution};
@@ -121,10 +121,8 @@ pub(super) fn resolve_registered_abi_target(
     else {
         return Ok(None);
     };
-    let manifest = crate::registry::load_manifest_for_domain(
-        std::path::Path::new("nustar-packages"),
-        domain,
-    )?;
+    let manifest =
+        crate::registry::load_manifest_for_domain(std::path::Path::new("nustar-packages"), domain)?;
     crate::registry::registered_abi_target(&manifest, abi).map(Some)
 }
 

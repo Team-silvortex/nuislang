@@ -5,11 +5,11 @@ use nuis_semantics::model::{
     AstModule, AstStmt, AstStructDef, AstTraitDef, AstTraitMethodSig, AstTypeAlias, AstTypeRef,
 };
 
+use super::function_context::render_function_validation_context;
 use super::validation_binding_env::{
     bind_destructure_fields_for_type, bind_match_pattern_for_type, collect_visible_structs,
     simple_match_value_type,
 };
-use super::function_context::render_function_validation_context;
 use super::validation_method_bounds::{
     collect_visible_trait_methods, validate_expr_generic_method_bounds,
 };
@@ -90,9 +90,12 @@ fn impl_targets_overlap(
     if lhs.name != rhs.name || lhs.generic_args.len() != rhs.generic_args.len() {
         return false;
     }
-    lhs.generic_args.iter().zip(&rhs.generic_args).all(|(lhs_arg, rhs_arg)| {
-        impl_targets_overlap(lhs_arg, lhs_generic_params, rhs_arg, rhs_generic_params)
-    })
+    lhs.generic_args
+        .iter()
+        .zip(&rhs.generic_args)
+        .all(|(lhs_arg, rhs_arg)| {
+            impl_targets_overlap(lhs_arg, lhs_generic_params, rhs_arg, rhs_generic_params)
+        })
 }
 
 fn validate_impl_method_signature_matches_trait(
@@ -891,9 +894,7 @@ fn validate_expr_generic_constraints(
                 )?;
             }
         }
-        AstExpr::Try(value)
-        | AstExpr::Await(value)
-        | AstExpr::FieldAccess { base: value, .. } => {
+        AstExpr::Try(value) | AstExpr::Await(value) | AstExpr::FieldAccess { base: value, .. } => {
             validate_expr_generic_constraints(
                 value,
                 visible_type_aliases,
@@ -923,10 +924,7 @@ fn validate_expr_generic_constraints(
                     visible_structs,
                     visible_enums,
                     generic_bounds,
-                    &format!(
-                        "{context} call `{callee}` generic argument #{}",
-                        index + 1
-                    ),
+                    &format!("{context} call `{callee}` generic argument #{}", index + 1),
                 )?;
             }
             for arg in args {
@@ -1623,7 +1621,11 @@ fn validate_ast_type_ref_generic_constraints_inner(
                 visible_trait_names,
                 &format!("struct `{}`", struct_definition.name),
             )?;
-            for (param, arg) in struct_definition.generic_params.iter().zip(&ty.generic_args) {
+            for (param, arg) in struct_definition
+                .generic_params
+                .iter()
+                .zip(&ty.generic_args)
+            {
                 if let Some(bounds) = struct_bounds.get(&param.name) {
                     for bound_name in bounds {
                         validate_generic_bound_satisfaction(
@@ -1719,13 +1721,13 @@ fn validate_ast_type_ref_generic_constraints_inner(
     validate_ast_type_ref_generic_constraints_inner(
         &expanded,
         visible_type_aliases,
-            impl_lookup,
-            visible_trait_names,
-            visible_structs,
-            visible_enums,
-            generic_bounds,
-            &expanded_context,
-            visiting,
+        impl_lookup,
+        visible_trait_names,
+        visible_structs,
+        visible_enums,
+        generic_bounds,
+        &expanded_context,
+        visiting,
     )?;
     visiting.remove(&visit_key);
     Ok(())

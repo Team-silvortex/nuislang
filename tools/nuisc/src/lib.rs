@@ -212,14 +212,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "  clock_bridge_default: {}",
                     capability.clock.bridge_default
                 );
-                println!(
-                    "  scheduler_contract_stack: {}",
-                    scheduler.contract_stack
-                );
-                println!(
-                    "  scheduler_result_roles: {}",
-                    scheduler.result_roles
-                );
+                println!("  scheduler_contract_stack: {}", scheduler.contract_stack);
+                println!("  scheduler_result_roles: {}", scheduler.result_roles);
                 if let Some(navigation) = scheduler.sample_navigation {
                     println!("  scheduler_sample_navigation: {}", navigation);
                 }
@@ -510,10 +504,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 );
             }
             if !capability.default_lanes.is_empty() {
-                println!(
-                    "  default_lanes: {}",
-                    capability.default_lanes.join(", ")
-                );
+                println!("  default_lanes: {}", capability.default_lanes.join(", "));
             }
             println!("  clock_domain_id: {}", capability.clock.domain_id);
             println!("  clock_kind: {}", capability.clock.kind);
@@ -1234,11 +1225,9 @@ mod tests {
 
     #[test]
     fn domain_contract_json_exposes_grouped_contract_sections() {
-        let contract = registry::load_domain_contract_for_domain(
-            Path::new(NUSTAR_REGISTRY_ROOT),
-            "network",
-        )
-        .expect("expected network domain contract");
+        let contract =
+            registry::load_domain_contract_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), "network")
+                .expect("expected network domain contract");
         let json = registry::domain_contract_json(&contract);
 
         assert!(json.contains("\"contract_schema\":\"nustar-domain-contract-v1\""));

@@ -71,8 +71,7 @@ where
         NirExpr::CpuExternCall { args, .. } => {
             args.iter().any(|arg| expr_contains_call(arg, predicate))
         }
-        NirExpr::CpuSpawn { args, .. }
-        | NirExpr::CpuThreadSpawn { args, .. } => {
+        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuThreadSpawn { args, .. } => {
             args.iter().any(|arg| expr_contains_call(arg, predicate))
         }
         _ => false,
@@ -1785,9 +1784,7 @@ fn rejects_result_map_higher_order_specialization_method_call_without_required_b
     .unwrap_err();
 
     assert!(
-        error.contains(
-            "function `result_map` body higher-order specialization body match-arm"
-        ),
+        error.contains("function `result_map` body higher-order specialization body match-arm"),
         "{error}"
     );
     assert!(
@@ -1853,9 +1850,7 @@ fn rejects_result_and_then_higher_order_specialization_method_call_without_requi
     .unwrap_err();
 
     assert!(
-        error.contains(
-            "function `result_and_then` body higher-order specialization body"
-        ),
+        error.contains("function `result_and_then` body higher-order specialization body"),
         "{error}"
     );
     assert!(
@@ -2226,7 +2221,8 @@ fn lowers_higher_order_lambda_returning_outer_literal_with_deferred_inner_infere
 }
 
 #[test]
-fn lowers_higher_order_lambda_without_explicit_return_type_returning_outer_literal_with_deferred_inner_inference() {
+fn lowers_higher_order_lambda_without_explicit_return_type_returning_outer_literal_with_deferred_inner_inference(
+) {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -2329,7 +2325,10 @@ fn lowers_higher_order_lambda_without_explicit_return_type_inside_if_result_cont
         .iter()
         .filter(|function| function.name.starts_with("__lambda_main_"))
         .count();
-    assert_eq!(lambda_count, 2, "expected one synthesized lambda per if branch");
+    assert_eq!(
+        lambda_count, 2,
+        "expected one synthesized lambda per if branch"
+    );
 
     let outer_helpers = module
         .functions
@@ -2342,7 +2341,10 @@ fn lowers_higher_order_lambda_without_explicit_return_type_inside_if_result_cont
                 )
         })
         .count();
-    assert_eq!(outer_helpers, 2, "expected both if branches to specialize apply to Outer<i64, String>");
+    assert_eq!(
+        outer_helpers, 2,
+        "expected both if branches to specialize apply to Outer<i64, String>"
+    );
 }
 
 #[test]
@@ -2395,7 +2397,10 @@ fn lowers_higher_order_lambda_without_explicit_return_type_inside_match_result_c
         .iter()
         .filter(|function| function.name.starts_with("__lambda_main_"))
         .count();
-    assert_eq!(lambda_count, 2, "expected one synthesized lambda per match arm");
+    assert_eq!(
+        lambda_count, 2,
+        "expected one synthesized lambda per match arm"
+    );
 
     let outer_helpers = module
         .functions
@@ -2408,7 +2413,10 @@ fn lowers_higher_order_lambda_without_explicit_return_type_inside_match_result_c
                 )
         })
         .count();
-    assert_eq!(outer_helpers, 2, "expected both match arms to specialize apply to Outer<i64, String>");
+    assert_eq!(
+        outer_helpers, 2,
+        "expected both match arms to specialize apply to Outer<i64, String>"
+    );
 }
 
 #[test]
@@ -2525,7 +2533,11 @@ fn lowers_method_call_lambda_without_explicit_return_type_returning_outer_litera
     let specialized = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_impl_Runner_for_Host_apply"))
+        .find(|function| {
+            function
+                .name
+                .starts_with("__hof_impl_Runner_for_Host_apply")
+        })
         .expect("expected specialized higher-order impl method helper");
     assert!(matches!(
         specialized.return_type.as_ref().map(|ty| ty.render()),
@@ -2636,7 +2648,11 @@ fn lowers_method_call_lambda_when_receiver_comes_from_if_expr() {
     let specialized = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_impl_Runner_for_Host_apply"))
+        .find(|function| {
+            function
+                .name
+                .starts_with("__hof_impl_Runner_for_Host_apply")
+        })
         .expect("expected specialized higher-order impl helper for if receiver");
     assert!(matches!(
         specialized.return_type.as_ref().map(|ty| ty.render()),
@@ -2689,7 +2705,11 @@ fn lowers_method_call_lambda_when_receiver_comes_from_match_expr() {
     let specialized = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_impl_Runner_for_Host_apply"))
+        .find(|function| {
+            function
+                .name
+                .starts_with("__hof_impl_Runner_for_Host_apply")
+        })
         .expect("expected specialized higher-order impl helper for match receiver");
     assert!(matches!(
         specialized.return_type.as_ref().map(|ty| ty.render()),
@@ -2739,7 +2759,11 @@ fn lowers_method_call_lambda_when_receiver_comes_from_method_chain() {
     let specialized = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_impl_Runner_for_Host_apply"))
+        .find(|function| {
+            function
+                .name
+                .starts_with("__hof_impl_Runner_for_Host_apply")
+        })
         .expect("expected specialized higher-order impl helper for chained receiver");
     assert!(matches!(
         specialized.return_type.as_ref().map(|ty| ty.render()),
@@ -2788,7 +2812,11 @@ fn lowers_method_call_lambda_when_receiver_comes_from_struct_field() {
     let specialized = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_impl_Runner_for_Host_apply"))
+        .find(|function| {
+            function
+                .name
+                .starts_with("__hof_impl_Runner_for_Host_apply")
+        })
         .expect("expected specialized higher-order impl helper for field receiver");
     assert!(matches!(
         specialized.return_type.as_ref().map(|ty| ty.render()),
@@ -2837,7 +2865,11 @@ fn lowers_method_call_lambda_when_typed_receiver_comes_from_struct_field() {
     let specialized = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_impl_Runner_for_Host_apply"))
+        .find(|function| {
+            function
+                .name
+                .starts_with("__hof_impl_Runner_for_Host_apply")
+        })
         .expect("expected specialized higher-order impl helper for typed field receiver");
     assert!(matches!(
         specialized.return_type.as_ref().map(|ty| ty.render()),
@@ -2890,7 +2922,11 @@ fn lowers_method_call_lambda_when_receiver_comes_from_nested_struct_field() {
     let specialized = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_impl_Runner_for_Host_apply"))
+        .find(|function| {
+            function
+                .name
+                .starts_with("__hof_impl_Runner_for_Host_apply")
+        })
         .expect("expected specialized higher-order impl helper for nested field receiver");
     assert!(matches!(
         specialized.return_type.as_ref().map(|ty| ty.render()),

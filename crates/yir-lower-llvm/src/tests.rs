@@ -82,8 +82,10 @@ fn emits_module_with_contract_metadata_nodes_on_cpu_without_fake_cycles() {
         resource: "cpu0".to_owned(),
         op: Operation::parse(
             "cpu.text",
-            vec!["arch=symbol:arm64;abi=symbol:cpu.arm64.apple_aapcs64;vector_bits=i64:128"
-                .to_owned()],
+            vec![
+                "arch=symbol:arm64;abi=symbol:cpu.arm64.apple_aapcs64;vector_bits=i64:128"
+                    .to_owned(),
+            ],
         )
         .unwrap(),
     });

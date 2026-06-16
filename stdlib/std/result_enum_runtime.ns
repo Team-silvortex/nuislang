@@ -155,11 +155,74 @@ mod cpu Main {
     };
   }
 
-  fn result_from_host(tag_handle: i64) -> Result<i64, ErrorEnvelope> {
+  fn lift_error_kind(kind_handle: i64) -> Result<i64, ErrorEnvelope> {
+    return Result.Err(build_error_envelope(kind_handle));
+  }
+
+  fn lift_host_result(tag_handle: i64) -> Result<i64, ErrorEnvelope> {
     if host_result_is_ok(tag_handle) == 1 {
       return Result.Ok(host_result_value(tag_handle));
     }
-    return Result.Err(build_error_envelope(host_result_error(tag_handle)));
+    return lift_error_kind(host_result_error(tag_handle));
+  }
+
+  fn result_is_ok<T, E>(result: Result<T, E>) -> bool {
+    match result {
+      Result.Ok(_) => {
+        return true;
+      }
+      Result.Err(_) => {
+        return false;
+      }
+    }
+  }
+
+  fn result_is_err<T, E>(result: Result<T, E>) -> bool {
+    return !result_is_ok(result);
+  }
+
+  fn result_unwrap_or<T, E>(result: Result<T, E>, fallback: T) -> T {
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(_) => {
+        return fallback;
+      }
+    }
+  }
+
+  fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(mapper(value));
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  fn result_map_err<T, E, F>(result: Result<T, E>, mapper: Fn1<E, F>) -> Result<T, F> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(value);
+      }
+      Result.Err(error) => {
+        return Result.Err(mapper(error));
+      }
+    }
+  }
+
+  fn raise_value(value: i64) -> i64 {
+    return value + 5;
+  }
+
+  fn soften_error(envelope: ErrorEnvelope) -> ErrorEnvelope {
+    if envelope.error.retryable == 1 {
+      return envelope;
+    }
+    return build_error_envelope(kind_diagnostic_message());
   }
 
   fn result_score(result: Result<i64, ErrorEnvelope>) -> i64 {
@@ -181,13 +244,24 @@ mod cpu Main {
   }
 
   fn combine_results(primary_tag_handle: i64, secondary_tag_handle: i64) -> Result<i64, ErrorEnvelope> {
-    let primary: i64 = result_from_host(primary_tag_handle)?;
-    let secondary: i64 = result_from_host(secondary_tag_handle)?;
+    let primary: i64 = lift_host_result(primary_tag_handle)?;
+    let secondary: i64 = lift_host_result(secondary_tag_handle)?;
     return Result.Ok(primary + secondary);
   }
 
   fn summarize_result_enum(primary_tag_handle: i64, secondary_tag_handle: i64) -> i64 {
-    return result_score(combine_results(primary_tag_handle, secondary_tag_handle));
+    let combined: Result<i64, ErrorEnvelope> = combine_results(primary_tag_handle, secondary_tag_handle);
+    let raised: Result<i64, ErrorEnvelope> = result_map(combined, raise_value);
+    let fallback: Result<i64, ErrorEnvelope> = result_map_err(
+      lift_host_result(primary_tag_handle),
+      soften_error
+    );
+    return result_score(raised)
+      + result_score(fallback)
+      + result_unwrap_or(raised, -10)
+      + result_unwrap_or(fallback, -20)
+      + if result_is_ok(raised) { 1 } else { 0 }
+      + if result_is_err(fallback) { 2 } else { 0 };
   }
 
   fn main() {

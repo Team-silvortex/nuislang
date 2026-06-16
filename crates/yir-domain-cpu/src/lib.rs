@@ -1003,8 +1003,7 @@ impl RegisteredMod for CpuMod {
                 if node.op.args.len() != 2 {
                     return Err(format!(
                         "node `{}` expects `cpu.{} <name> <resource> <callee> <result>`",
-                        node.name,
-                        node.op.instruction
+                        node.name, node.op.instruction
                     ));
                 }
                 Ok(InstructionSemantics::effect(vec![node.op.args[1].clone()]))
@@ -2556,10 +2555,7 @@ impl RegisteredMod for CpuMod {
                         node.resource, resource.kind.raw, label
                     ),
                 );
-                Ok(Value::Mutex(yir_core::MutexHandle {
-                    label,
-                    value,
-                }))
+                Ok(Value::Mutex(yir_core::MutexHandle { label, value }))
             }
             "mutex_value" => {
                 let guard = state.expect_mutex_guard(&node.op.args[0])?;
@@ -3860,7 +3856,9 @@ fn task_lifecycle_state_for_thread(thread: &yir_core::ThreadHandle) -> TaskLifec
     match thread.state {
         TaskLifecycleState::Cancelled => TaskLifecycleState::Cancelled,
         TaskLifecycleState::TimedOut => TaskLifecycleState::TimedOut,
-        TaskLifecycleState::Completed | TaskLifecycleState::Pending => TaskLifecycleState::Completed,
+        TaskLifecycleState::Completed | TaskLifecycleState::Pending => {
+            TaskLifecycleState::Completed
+        }
     }
 }
 

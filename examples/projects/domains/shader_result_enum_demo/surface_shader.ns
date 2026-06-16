@@ -1,0 +1,41 @@
+use data FabricPlane;
+
+mod shader SurfaceShader {
+  fn profile() {
+    const vertex_count: i64 = 4;
+    const instance_count: i64 = 1;
+    const packet_color_slot: i64 = 0;
+    const packet_speed_slot: i64 = 1;
+    const packet_radius_slot: i64 = 2;
+    const packet_tag: i64 = 17;
+    const material_mode: i64 = 2;
+    const pass_kind: i64 = 1;
+    const packet_field_count: i64 = 3;
+
+    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+    let profile_view: Viewport = shader_viewport(160, 120);
+    let profile_pipe: Pipeline = shader_pipeline("std_shader_result_enum_demo", "triangle_strip");
+    let profile_wgsl: ShaderModule = shader_inline_wgsl("std_shader_result_enum_demo", wgsl {
+      struct VsOut {
+        @builtin(position) pos: vec4<f32>,
+        @location(0) uv: vec2<f32>,
+      };
+
+      @vertex
+      fn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {
+        var out: VsOut;
+        let x: f32 = f32((vid << 1u) & 2u);
+        let y: f32 = f32(vid & 2u);
+        out.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
+        out.uv = vec2<f32>(x, y);
+        return out;
+      }
+
+      @fragment
+      fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+        let color = vec3<f32>(0.20 + uv.x * 0.30, 0.18 + uv.y * 0.32, 0.78);
+        return vec4<f32>(color, 1.0);
+      }
+    });
+  }
+}

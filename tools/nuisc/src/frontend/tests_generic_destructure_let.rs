@@ -352,7 +352,9 @@ fn lowers_destructure_after_outer_literal_with_deferred_inner_inference() {
                         )
             ));
         }
-        other => panic!("expected deferred-inference payload destructured binding, found {other:?}"),
+        other => {
+            panic!("expected deferred-inference payload destructured binding, found {other:?}")
+        }
     }
     match &module.functions[0].body[2] {
         NirStmt::Let { name, ty, value } => {

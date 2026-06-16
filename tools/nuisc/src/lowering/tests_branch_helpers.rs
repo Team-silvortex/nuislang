@@ -516,12 +516,13 @@ fn lowers_match_expression_with_mutex_branch_lifecycle_into_select() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_new"));
-    assert!(yir
-        .nodes
-        .iter()
-        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
-        .count()
-        >= 2);
+    assert!(
+        yir.nodes
+            .iter()
+            .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+            .count()
+            >= 2
+    );
     assert!(yir
         .nodes
         .iter()
@@ -1032,12 +1033,13 @@ fn lowers_if_expression_with_branch_local_task_observer_binding() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu" && node.op.instruction == "task_value"));
-    assert!(yir
-        .nodes
-        .iter()
-        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
-        .count()
-        >= 2);
+    assert!(
+        yir.nodes
+            .iter()
+            .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+            .count()
+            >= 2
+    );
 }
 
 #[test]
@@ -1120,12 +1122,13 @@ fn lowers_match_expression_with_branch_local_task_observer_binding() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu" && node.op.instruction == "task_value"));
-    assert!(yir
-        .nodes
-        .iter()
-        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
-        .count()
-        >= 2);
+    assert!(
+        yir.nodes
+            .iter()
+            .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+            .count()
+            >= 2
+    );
 }
 
 #[test]
@@ -1242,12 +1245,13 @@ fn lowers_effectful_mutex_unlock_branch_when_constant_condition_selects_active_p
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_unlock"));
-    assert!(yir
-        .nodes
-        .iter()
-        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
-        .count()
-        >= 2);
+    assert!(
+        yir.nodes
+            .iter()
+            .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+            .count()
+            >= 2
+    );
     assert!(yir
         .nodes
         .iter()
@@ -1374,12 +1378,13 @@ fn lowers_effectful_mutex_unlock_match_arm_when_constant_scrutinee_selects_activ
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_unlock"));
-    assert!(yir
-        .nodes
-        .iter()
-        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
-        .count()
-        >= 2);
+    assert!(
+        yir.nodes
+            .iter()
+            .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+            .count()
+            >= 2
+    );
     assert!(yir
         .nodes
         .iter()
@@ -2040,7 +2045,10 @@ fn lowers_dynamic_if_binding_by_selecting_timeout_inputs_before_timeout() {
     assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
     assert_eq!(async_call_count, 1, "expected one post-select async_call");
     assert_eq!(timeout_count, 1, "expected one post-select timeout");
-    assert!(select_count >= 2, "expected selected task and timeout inputs");
+    assert!(
+        select_count >= 2,
+        "expected selected task and timeout inputs"
+    );
 }
 
 #[test]
@@ -2097,7 +2105,10 @@ fn lowers_dynamic_if_binding_chain_by_selecting_timeout_inputs_before_timeout() 
     assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
     assert_eq!(async_call_count, 1, "expected one post-select async_call");
     assert_eq!(timeout_count, 1, "expected one post-select timeout");
-    assert!(select_count >= 2, "expected selected task and timeout inputs");
+    assert!(
+        select_count >= 2,
+        "expected selected task and timeout inputs"
+    );
 }
 
 #[test]
@@ -2155,7 +2166,10 @@ fn lowers_dynamic_match_binding_by_selecting_timeout_inputs_before_timeout() {
     assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
     assert_eq!(async_call_count, 1, "expected one post-select async_call");
     assert_eq!(timeout_count, 1, "expected one post-select timeout");
-    assert!(select_count >= 2, "expected selected task and timeout inputs");
+    assert!(
+        select_count >= 2,
+        "expected selected task and timeout inputs"
+    );
 }
 
 #[test]
@@ -2215,7 +2229,10 @@ fn lowers_dynamic_match_binding_chain_by_selecting_timeout_inputs_before_timeout
     assert_eq!(spawn_count, 1, "expected one post-select spawn_task");
     assert_eq!(async_call_count, 1, "expected one post-select async_call");
     assert_eq!(timeout_count, 1, "expected one post-select timeout");
-    assert!(select_count >= 2, "expected selected task and timeout inputs");
+    assert!(
+        select_count >= 2,
+        "expected selected task and timeout inputs"
+    );
 }
 
 // Thread handle production through branch-local selection.
@@ -2917,7 +2934,10 @@ fn lowers_dynamic_if_return_by_selecting_thread_spawn_input_before_thread_join_r
         join_result_count, 1,
         "expected one post-select thread_join_result"
     );
-    assert!(select_count >= 1, "expected selected thread_join_result input");
+    assert!(
+        select_count >= 1,
+        "expected selected thread_join_result input"
+    );
 }
 
 #[test]
@@ -2976,7 +2996,10 @@ fn lowers_dynamic_if_return_chain_by_selecting_thread_spawn_input_before_thread_
         join_result_count, 1,
         "expected one post-select thread_join_result"
     );
-    assert!(select_count >= 1, "expected selected thread_join_result input");
+    assert!(
+        select_count >= 1,
+        "expected selected thread_join_result input"
+    );
 }
 
 #[test]
@@ -3086,7 +3109,10 @@ fn lowers_dynamic_match_return_by_selecting_thread_spawn_input_before_thread_joi
         join_result_count, 1,
         "expected one post-select thread_join_result"
     );
-    assert!(select_count >= 1, "expected selected thread_join_result input");
+    assert!(
+        select_count >= 1,
+        "expected selected thread_join_result input"
+    );
 }
 
 #[test]
@@ -3148,7 +3174,10 @@ fn lowers_dynamic_match_return_chain_by_selecting_thread_spawn_input_before_thre
         join_result_count, 1,
         "expected one post-select thread_join_result"
     );
-    assert!(select_count >= 1, "expected selected thread_join_result input");
+    assert!(
+        select_count >= 1,
+        "expected selected thread_join_result input"
+    );
 }
 
 // Shared observer and pure-suffix paths for TaskResult<T>.
@@ -3217,7 +3246,10 @@ fn lowers_dynamic_if_task_result_binding_into_shared_observer_suffix() {
     assert_eq!(join_result_count, 1, "expected one shared join_result");
     assert_eq!(completed_count, 1, "expected one shared task_completed");
     assert_eq!(value_count, 1, "expected one shared task_value");
-    assert!(select_count >= 1, "expected select before shared observer suffix");
+    assert!(
+        select_count >= 1,
+        "expected select before shared observer suffix"
+    );
 }
 
 #[test]
@@ -3290,7 +3322,10 @@ fn lowers_dynamic_match_task_result_binding_into_shared_observer_suffix() {
     assert_eq!(join_result_count, 1, "expected one shared join_result");
     assert_eq!(completed_count, 1, "expected one shared task_completed");
     assert_eq!(value_count, 1, "expected one shared task_value");
-    assert!(select_count >= 1, "expected select before shared observer suffix");
+    assert!(
+        select_count >= 1,
+        "expected select before shared observer suffix"
+    );
 }
 
 #[test]
@@ -4933,7 +4968,8 @@ fn lowers_dynamic_if_timeout_cancelled_task_binding_into_shared_result_observer_
 }
 
 #[test]
-fn lowers_dynamic_match_timeout_cancelled_task_binding_into_shared_result_observer_and_pure_suffix() {
+fn lowers_dynamic_match_timeout_cancelled_task_binding_into_shared_result_observer_and_pure_suffix()
+{
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -5063,7 +5099,10 @@ fn lowers_dynamic_if_mutex_guard_binding_into_shared_observer_suffix() {
 
     assert_eq!(lock_count, 1, "expected one shared mutex_lock");
     assert_eq!(value_count, 1, "expected one shared mutex_value");
-    assert!(select_count >= 1, "expected select before shared mutex observer");
+    assert!(
+        select_count >= 1,
+        "expected select before shared mutex observer"
+    );
 }
 
 #[test]
@@ -5206,7 +5245,10 @@ fn lowers_dynamic_match_mutex_guard_binding_into_shared_observer_suffix() {
 
     assert_eq!(lock_count, 1, "expected one shared mutex_lock");
     assert_eq!(value_count, 1, "expected one shared mutex_value");
-    assert!(select_count >= 1, "expected select before shared mutex observer");
+    assert!(
+        select_count >= 1,
+        "expected select before shared mutex observer"
+    );
 }
 
 #[test]

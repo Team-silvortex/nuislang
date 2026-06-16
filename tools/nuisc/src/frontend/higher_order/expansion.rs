@@ -9,8 +9,8 @@ use super::super::validation_binding_env::instantiate_ast_struct_field_type;
 
 use super::super::generics::{specialize_ast_type_ref, unify_generic_type_pattern};
 use super::super::{
-    build_impl_method_function, impl_method_symbol_name, lower_type_ref, lower_type_ref_with_aliases,
-    resolve_ast_type_ref_aliases,
+    build_impl_method_function, impl_method_symbol_name, lower_type_ref,
+    lower_type_ref_with_aliases, resolve_ast_type_ref_aliases,
 };
 use super::callables::{
     function_type_matches_callable, is_callable_type_with_aliases, sanitize_symbol_fragment,
@@ -117,14 +117,16 @@ fn infer_impl_method_substitutions(
         return substitutions;
     };
     for (param, arg) in method_def.params.iter().skip(1).zip(args.iter()) {
-        let Some(arg_ty) =
-            infer_local_binding_type(arg, local_types, function_table, module_impls)
+        let Some(arg_ty) = infer_local_binding_type(arg, local_types, function_table, module_impls)
         else {
             continue;
         };
         unify_generic_receiver_pattern(&param.ty, &arg_ty, &generic_names, &mut substitutions);
     }
-    let method_return_ty = method_def.return_type.as_ref().unwrap_or(&definition.for_type);
+    let method_return_ty = method_def
+        .return_type
+        .as_ref()
+        .unwrap_or(&definition.for_type);
     if let Some(expected_result_type) = expected_result_type {
         unify_generic_receiver_pattern(
             method_return_ty,
@@ -191,8 +193,9 @@ fn infer_local_binding_type(
             is_ref: false,
         }),
         AstExpr::Var(name) => local_types.get(name).cloned(),
-        AstExpr::FieldAccess { .. } => render_local_access_path(value)
-            .and_then(|path| local_types.get(&path).cloned()),
+        AstExpr::FieldAccess { .. } => {
+            render_local_access_path(value).and_then(|path| local_types.get(&path).cloned())
+        }
         AstExpr::StructLiteral {
             type_name,
             type_args,
@@ -226,9 +229,7 @@ fn infer_local_binding_type(
                 infer_block_result_type(&arm.body, local_types, function_table, module_impls)
             });
             let first = arm_types.next()?;
-            if arm_types
-                .all(|ty| lower_type_ref(&first).render() == lower_type_ref(&ty).render())
-            {
+            if arm_types.all(|ty| lower_type_ref(&first).render() == lower_type_ref(&ty).render()) {
                 Some(first)
             } else {
                 None
@@ -243,8 +244,10 @@ fn infer_local_binding_type(
             let receiver_ty =
                 infer_local_binding_type(receiver, local_types, function_table, module_impls)?;
             for definition in module_impls {
-                let Some(method_index) =
-                    definition.methods.iter().position(|item| item.name == *method)
+                let Some(method_index) = definition
+                    .methods
+                    .iter()
+                    .position(|item| item.name == *method)
                 else {
                     continue;
                 };
@@ -266,8 +269,10 @@ fn infer_local_binding_type(
                     continue;
                 }
                 let method_def = &definition.methods[method_index];
-                let method_return_ty =
-                    method_def.return_type.as_ref().unwrap_or(&definition.for_type);
+                let method_return_ty = method_def
+                    .return_type
+                    .as_ref()
+                    .unwrap_or(&definition.for_type);
                 return Some(specialize_type_with_substitutions(
                     method_return_ty,
                     &substitutions,
@@ -348,7 +353,8 @@ pub(crate) fn expand_higher_order_functions(
         .collect::<BTreeMap<_, _>>();
     let mut method_template_lookup = BTreeMap::<(String, String), String>::new();
     for definition in &module.impls {
-        let lowered_for_type = lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases)?;
+        let lowered_for_type =
+            lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases)?;
         for method in &definition.methods {
             if !method.params.iter().any(|param| {
                 is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
@@ -477,7 +483,10 @@ pub(crate) fn rewrite_higher_order_calls_in_block(
             specialized_functions,
         )?;
         match &rewritten_stmt {
-            AstStmt::Let { name, ty, value, .. } | AstStmt::Const { name, ty, value } => {
+            AstStmt::Let {
+                name, ty, value, ..
+            }
+            | AstStmt::Const { name, ty, value } => {
                 if let Some(ty) = ty.clone() {
                     env.insert(name.clone(), ty);
                     if let Some(bound_ty) = env.get(name).cloned() {

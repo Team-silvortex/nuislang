@@ -105,15 +105,21 @@ fn concrete_constructor_head_from_expected(
         if expected.name == callee {
             return Some((callee.to_owned(), expected.generic_args.clone()));
         }
-        let resolved_expected = resolve_ast_type_ref_aliases(expected, visible_type_aliases).ok()?;
+        let resolved_expected =
+            resolve_ast_type_ref_aliases(expected, visible_type_aliases).ok()?;
         if resolved_expected.name == callee {
             return Some((callee.to_owned(), resolved_expected.generic_args));
         }
         return None;
     }
-    infer_alias_struct_target_from_expected(callee, Some(expected), visible_type_aliases, struct_table)
-        .ok()
-        .flatten()
+    infer_alias_struct_target_from_expected(
+        callee,
+        Some(expected),
+        visible_type_aliases,
+        struct_table,
+    )
+    .ok()
+    .flatten()
 }
 
 fn infer_alias_struct_target_from_expected(
@@ -167,7 +173,10 @@ fn substitute_alias_target(
     substitutions: &BTreeMap<String, AstTypeRef>,
 ) -> AstTypeRef {
     if target.generic_args.is_empty() && substitutions.contains_key(&target.name) {
-        return substitutions.get(&target.name).cloned().unwrap_or_else(|| target.clone());
+        return substitutions
+            .get(&target.name)
+            .cloned()
+            .unwrap_or_else(|| target.clone());
     }
     AstTypeRef {
         name: target.name.clone(),
@@ -181,7 +190,10 @@ fn substitute_alias_target(
     }
 }
 
-pub(super) fn explicit_receiver_expected_nir_type(receiver: &AstExpr, generic_args: &[AstTypeRef]) -> Option<nuis_semantics::model::NirTypeRef> {
+pub(super) fn explicit_receiver_expected_nir_type(
+    receiver: &AstExpr,
+    generic_args: &[AstTypeRef],
+) -> Option<nuis_semantics::model::NirTypeRef> {
     let expected = explicit_receiver_expected_type(receiver, generic_args, &BTreeMap::new())?;
     Some(lower_type_ref(&expected))
 }

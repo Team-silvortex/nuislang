@@ -3,14 +3,14 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::NirTypeRef;
 use yir_core::{Operation, YirModule};
 
+use super::ProjectAbiResolution;
 use super::{
     build_project_link_bridge_contract, collect_profile_int_bindings, ensure_project_resource,
     infer_data_handle_table_schema, infer_shader_packet_contract, merge_project_payload_contract,
-    payload_class_marker_name, payload_shape_marker_name, profile_apply::resolve_registered_abi_target,
-    profile_apply::target_config_tokens_for_domain, push_profile_node,
-    resolve_project_profile_target_name, sanitize_ident, LoadedProject,
+    payload_class_marker_name, payload_shape_marker_name,
+    profile_apply::resolve_registered_abi_target, profile_apply::target_config_tokens_for_domain,
+    push_profile_node, resolve_project_profile_target_name, sanitize_ident, LoadedProject,
 };
-use super::ProjectAbiResolution;
 
 pub(super) fn materialize_project_type_contract_nodes(
     project: &LoadedProject,
@@ -26,29 +26,23 @@ pub(super) fn materialize_project_type_contract_nodes(
             "data" => {
                 materialize_data_type_contract_nodes(project, &project_module.ast.unit, module)?
             }
-            "shader" => {
-                materialize_shader_type_contract_nodes(
-                    project,
-                    &project_module.ast.unit,
-                    abi_resolution,
-                    module,
-                )?
-            }
-            "kernel" => {
-                materialize_kernel_type_contract_nodes(
-                    project,
-                    &project_module.ast.unit,
-                    abi_resolution,
-                    module,
-                )?
-            }
-            "network" => {
-                materialize_network_type_contract_nodes(
-                    &project_module.ast.unit,
-                    abi_resolution,
-                    module,
-                )?
-            }
+            "shader" => materialize_shader_type_contract_nodes(
+                project,
+                &project_module.ast.unit,
+                abi_resolution,
+                module,
+            )?,
+            "kernel" => materialize_kernel_type_contract_nodes(
+                project,
+                &project_module.ast.unit,
+                abi_resolution,
+                module,
+            )?,
+            "network" => materialize_network_type_contract_nodes(
+                &project_module.ast.unit,
+                abi_resolution,
+                module,
+            )?,
             _ => {}
         }
     }
@@ -68,7 +62,9 @@ fn materialize_project_abi_summary_nodes(
         } else {
             "auto"
         };
-        let target = resolve_registered_abi_target(&requirement.domain, Some(abi_resolution)).ok().flatten();
+        let target = resolve_registered_abi_target(&requirement.domain, Some(abi_resolution))
+            .ok()
+            .flatten();
         let arch = target
             .as_ref()
             .map(|target| target.machine_arch.clone())

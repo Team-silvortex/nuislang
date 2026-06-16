@@ -1554,7 +1554,9 @@ fn lowers_outer_generic_struct_literal_when_later_field_completes_inner_payload_
                     && matches!(type_args.as_slice(), [lhs, rhs] if lhs.render() == "i64" && rhs.render() == "String")
             ));
         }
-        other => panic!("expected inferred outer generic struct let from payload route, found {other:?}"),
+        other => {
+            panic!("expected inferred outer generic struct let from payload route, found {other:?}")
+        }
     }
 }
 

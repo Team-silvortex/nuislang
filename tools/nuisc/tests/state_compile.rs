@@ -2280,8 +2280,7 @@ fn compiles_match_guard_or_state_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_or_state_demo",
     );
-    nuisc::pipeline::compile_project(project)
-        .expect("match guard-or state project should compile");
+    nuisc::pipeline::compile_project(project).expect("match guard-or state project should compile");
 }
 
 #[test]

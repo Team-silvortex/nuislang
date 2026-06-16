@@ -65,16 +65,14 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
                 effect: NirGlmEffect::DomainMove,
             })
         }
-        NirExpr::CpuThreadSpawn { .. } | NirExpr::CpuMutexNew(_) => {
-            Some(NirGlmProfile {
-                result_class: NirGlmValueClass::Res,
-                accesses: vec![NirGlmAccess {
-                    class: NirGlmValueClass::Val,
-                    mode: NirGlmUseMode::Read,
-                }],
-                effect: NirGlmEffect::None,
-            })
-        }
+        NirExpr::CpuThreadSpawn { .. } | NirExpr::CpuMutexNew(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Res,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Val,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::None,
+        }),
         NirExpr::CpuMutexLock(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Res,
             accesses: vec![NirGlmAccess {

@@ -805,7 +805,9 @@ fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLoweringState) -> 
             }
             .to_owned();
             let widened = fresh_reg(&mut state.next_reg);
-            state.body.push(format!("  {widened} = zext i1 {i1} to i64"));
+            state
+                .body
+                .push(format!("  {widened} = zext i1 {i1} to i64"));
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::Bool {

@@ -79,7 +79,7 @@ pub fn render_ast(module: &AstModule) -> String {
                     .map(render_ast_generic_param)
                     .collect::<Vec<_>>()
                     .join(", ")
-                )
+            )
         };
         let where_suffix = render_ast_where_clause(&alias.where_bounds);
         out.push_str(&format!(
@@ -258,7 +258,7 @@ pub fn render_nir(module: &NirModule) -> String {
                     .map(render_nir_generic_param)
                     .collect::<Vec<_>>()
                     .join(", ")
-                )
+            )
         };
         let where_suffix = render_nir_where_clause(&alias.where_bounds);
         out.push_str(&format!(
@@ -1482,7 +1482,8 @@ fn render_ast_generic_param(param: &AstGenericParam) -> String {
     format!(
         "{}: {}",
         param.name,
-        param.bounds
+        param
+            .bounds
             .iter()
             .map(render_ast_type)
             .collect::<Vec<_>>()
@@ -1497,7 +1498,8 @@ fn render_nir_generic_param(param: &NirGenericParam) -> String {
     format!(
         "{}: {}",
         param.name,
-        param.bounds
+        param
+            .bounds
             .iter()
             .map(render_nir_type)
             .collect::<Vec<_>>()

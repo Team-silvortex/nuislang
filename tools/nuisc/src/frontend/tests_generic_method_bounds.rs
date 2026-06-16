@@ -1784,7 +1784,8 @@ fn accepts_qualified_helper_trait_bound_for_equality_operator_with_multiple_boun
 }
 
 #[test]
-fn accepts_bare_bound_name_for_equality_operator_with_multiple_bounds_when_helper_variant_is_visible() {
+fn accepts_bare_bound_name_for_equality_operator_with_multiple_bounds_when_helper_variant_is_visible(
+) {
     let main_ast = parse_nuis_ast(
         r#"
         use cpu Helper;

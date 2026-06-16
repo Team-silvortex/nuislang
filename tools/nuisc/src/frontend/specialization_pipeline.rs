@@ -7,10 +7,10 @@ use nuis_semantics::model::{
 use super::higher_order::{is_callable_type_with_aliases, rewrite_higher_order_calls_in_function};
 use super::stmt_lowering::lower_stmt_sequence_with_async;
 use super::{
-    build_default_impl_method, build_default_impl_method_function, build_function_return_type_table,
-    build_impl_method_function, impl_method_lookup_key, impl_method_symbol_name,
-    infer_missing_function_return_type, is_public_visibility, lower_function,
-    lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
+    build_default_impl_method, build_default_impl_method_function,
+    build_function_return_type_table, build_impl_method_function, impl_method_lookup_key,
+    impl_method_symbol_name, infer_missing_function_return_type, is_public_visibility,
+    lower_function, lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
     rewrite_generic_calls_in_function, FunctionSignature, GenericImplMethodTemplate,
     ModuleConstValue,
 };
@@ -228,11 +228,7 @@ pub(super) fn build_lowered_functions_and_impls(
         };
         let lowered_for_type =
             lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases)?;
-        let mut impl_methods = definition
-            .methods
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut impl_methods = definition.methods.iter().cloned().collect::<Vec<_>>();
         for trait_method in &trait_def.methods {
             if trait_method.default_body.is_none()
                 || impl_methods
@@ -273,13 +269,21 @@ pub(super) fn build_lowered_functions_and_impls(
                 signature.clone(),
             );
             signatures.insert(symbol_name.clone(), signature);
-            if definition.methods.iter().any(|candidate| candidate.name == method.name) {
+            if definition
+                .methods
+                .iter()
+                .any(|candidate| candidate.name == method.name)
+            {
                 rewritten_module_functions.push(build_impl_method_function(
                     definition,
                     method,
                     &symbol_name,
                 ));
-            } else if let Some(trait_method) = trait_def.methods.iter().find(|candidate| candidate.name == method.name) {
+            } else if let Some(trait_method) = trait_def
+                .methods
+                .iter()
+                .find(|candidate| candidate.name == method.name)
+            {
                 rewritten_module_functions.push(build_default_impl_method_function(
                     definition,
                     trait_method,

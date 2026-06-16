@@ -116,6 +116,7 @@ name = "yir-lower-contract"
 version = "0.1.0"
 dependencies = [
  "yir-core",
+ "yir-syntax",
 ]
 
 [[package]]

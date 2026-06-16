@@ -4,9 +4,8 @@ use nuis_semantics::model::{AstExpr, NirExpr, NirResultFamily, NirStructDef, Nir
 
 use super::{
     ensure_mutex_guard_like, ensure_mutex_like, ensure_spawn_input_safe, ensure_task_like,
-    ensure_thread_like, i64_type, infer_nir_expr_type,
-    lower_nested_expr_with_async_and_consts, lower_result_observer_call_with_consts,
-    FunctionSignature, ModuleConstValue,
+    ensure_thread_like, i64_type, infer_nir_expr_type, lower_nested_expr_with_async_and_consts,
+    lower_result_observer_call_with_consts, FunctionSignature, ModuleConstValue,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -96,9 +95,7 @@ pub(super) fn lower_task_builtin_call(
                 );
             }
             let [call] = args else {
-                return Err(
-                    "thread_spawn(...) expects exactly one async function call".to_owned(),
-                );
+                return Err("thread_spawn(...) expects exactly one async function call".to_owned());
             };
             let AstExpr::Call {
                 callee: spawned_callee,
@@ -228,8 +225,7 @@ pub(super) fn lower_task_builtin_call(
         "thread_join" => {
             if current_domain != "cpu" {
                 return Err(
-                    "thread_join(...) is currently only allowed inside `mod cpu <unit>`"
-                        .to_owned(),
+                    "thread_join(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
                 );
             }
             let [thread] = args else {
@@ -256,9 +252,7 @@ pub(super) fn lower_task_builtin_call(
                 );
             }
             let [thread] = args else {
-                return Err(
-                    "thread_join_result(...) expects exactly one thread handle".to_owned(),
-                );
+                return Err("thread_join_result(...) expects exactly one thread handle".to_owned());
             };
             let lowered = lower_nested_expr_with_async_and_consts(
                 thread,
@@ -300,7 +294,10 @@ pub(super) fn lower_task_builtin_call(
             )?;
             let ty = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
                 .ok_or_else(|| "mutex_new(...) requires an explicit typed value".to_owned())?;
-            if ty.is_ref || ty.is_optional || ty.is_result_family() || ty.is_concurrency_bridge_family()
+            if ty.is_ref
+                || ty.is_optional
+                || ty.is_result_family()
+                || ty.is_concurrency_bridge_family()
             {
                 return Err(format!(
                     "mutex_new(...) expects a staged mutex payload value, found `{}`",

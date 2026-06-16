@@ -70,13 +70,19 @@ Current rule:
 ### Diagnostic And Reporting Edge
 
 * [error_model_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_model_runtime_recipe.ns)
+* [error_bridge_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_bridge_runtime_recipe.ns)
 * [error_codes_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_codes_runtime_recipe.ns)
 * [error_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_runtime_recipe.ns)
 * [result_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_runtime_recipe.ns)
 * [result_enum_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_enum_runtime_recipe.ns)
 * [diagnostic_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/diagnostic_runtime_recipe.ns)
 * [result_diagnostic_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_diagnostic_recipe.ns)
+* [task_result_enum_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_enum_recipe.ns)
 * [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
+* [net_result_enum_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_result_enum_recipe.ns)
+* [shader_result_enum_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/shader_result_enum_recipe.ns)
+* shared contract:
+  [std-result-bridge-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-result-bridge-contract.md)
 
 ## Companion Validation Router
 
@@ -107,8 +113,12 @@ Wider grouped route:
   [text_format_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_format_runtime_demo),
   [error_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/error_runtime_demo),
   [result_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_runtime_demo),
+  [result_enum_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_enum_runtime_demo),
   [diagnostic_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/diagnostic_runtime_demo),
-  [result_diagnostic_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_diagnostic_demo)
+  [result_diagnostic_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_diagnostic_demo),
+  [task_result_enum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_enum_demo),
+  [net_result_enum_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_result_enum_recipe_demo),
+  [shader_result_enum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_enum_demo)
 * cli/session probes:
   [cli_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_session_demo),
   [cli_shell_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_shell_session_demo),

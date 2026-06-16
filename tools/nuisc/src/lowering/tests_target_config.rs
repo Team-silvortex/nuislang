@@ -50,8 +50,7 @@ fn lowers_cpu_target_config_and_resource_kind_for_selected_abi() {
         vec!["arch=symbol:x86_64;abi=symbol:cpu.x86_64.sysv64;vector_bits=i64:128".to_owned()]
     );
     assert!(yir.edges.iter().any(|edge| {
-        edge.from == "lowering_cpu_target_contract_type"
-            && edge.to == "lowering_cpu_target_config"
+        edge.from == "lowering_cpu_target_contract_type" && edge.to == "lowering_cpu_target_config"
     }));
     assert_eq!(
         yir.node_lanes
@@ -120,7 +119,9 @@ fn rejects_nurs_extern_when_lowering_target_is_plain_c_abi() {
 
     let error = lower_nir_to_yir_builtin_cpu_with_target(&module, Some(&target)).unwrap_err();
 
-    assert!(error.contains("extern ABI `nurs` is not supported by lowering target `cpu.x86_64.sysv64`"));
+    assert!(
+        error.contains("extern ABI `nurs` is not supported by lowering target `cpu.x86_64.sysv64`")
+    );
 }
 
 #[test]

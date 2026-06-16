@@ -255,7 +255,11 @@ fn infer_generic_call_substitutions(
         .collect::<BTreeSet<_>>();
     let mut substitutions = BTreeMap::new();
     if explicit_generic_args.len() == function.generic_params.len() {
-        for (param, arg) in function.generic_params.iter().zip(explicit_generic_args.iter()) {
+        for (param, arg) in function
+            .generic_params
+            .iter()
+            .zip(explicit_generic_args.iter())
+        {
             substitutions.insert(param.name.clone(), arg.clone());
         }
     }
@@ -268,8 +272,7 @@ fn infer_generic_call_substitutions(
             visible_local_types,
             module_function_table,
             module_impls,
-        )
-        else {
+        ) else {
             continue;
         };
         unify_generic_type_pattern(&param.ty, &arg_ty, &generic_names, &mut substitutions);
@@ -321,8 +324,7 @@ fn infer_impl_method_substitutions(
             visible_local_types,
             module_function_table,
             module_impls,
-        )
-        else {
+        ) else {
             continue;
         };
         unify_generic_type_pattern(&param.ty, &arg_ty, &generic_names, &mut substitutions);
@@ -418,8 +420,9 @@ fn infer_local_binding_type(
                 .get(name)
                 .and_then(callable_type_from_function)
         }),
-        AstExpr::FieldAccess { .. } => render_local_access_path(value)
-            .and_then(|path| visible_local_types.get(&path).cloned()),
+        AstExpr::FieldAccess { .. } => {
+            render_local_access_path(value).and_then(|path| visible_local_types.get(&path).cloned())
+        }
         AstExpr::StructLiteral {
             type_name,
             type_args,
@@ -450,14 +453,12 @@ fn infer_local_binding_type(
         }),
         AstExpr::Unary { op, operand } => match op {
             AstUnaryOp::Not => Some(named_type("bool")),
-            AstUnaryOp::Neg => {
-                infer_local_binding_type(
-                    operand,
-                    visible_local_types,
-                    module_function_table,
-                    module_impls,
-                )
-            }
+            AstUnaryOp::Neg => infer_local_binding_type(
+                operand,
+                visible_local_types,
+                module_function_table,
+                module_impls,
+            ),
             AstUnaryOp::Deref => None,
         },
         AstExpr::Binary { op, lhs, rhs } => {
@@ -546,8 +547,10 @@ fn infer_local_binding_type(
                 module_impls,
             )?;
             for definition in module_impls {
-                let Some(method_index) =
-                    definition.methods.iter().position(|item| item.name == *method)
+                let Some(method_index) = definition
+                    .methods
+                    .iter()
+                    .position(|item| item.name == *method)
                 else {
                     continue;
                 };
@@ -567,8 +570,10 @@ fn infer_local_binding_type(
                     continue;
                 }
                 let method_def = &definition.methods[method_index];
-                let method_return_ty =
-                    method_def.return_type.as_ref().unwrap_or(&definition.for_type);
+                let method_return_ty = method_def
+                    .return_type
+                    .as_ref()
+                    .unwrap_or(&definition.for_type);
                 return Some(specialize_type_with_substitutions(
                     method_return_ty,
                     &substitutions,
@@ -587,14 +592,12 @@ fn infer_block_result_type(
     module_impls: &[AstImplDef],
 ) -> Option<AstTypeRef> {
     match body.last() {
-        Some(AstStmt::Return(Some(expr))) | Some(AstStmt::Expr(expr)) => {
-            infer_local_binding_type(
-                expr,
-                visible_local_types,
-                module_function_table,
-                module_impls,
-            )
-        }
+        Some(AstStmt::Return(Some(expr))) | Some(AstStmt::Expr(expr)) => infer_local_binding_type(
+            expr,
+            visible_local_types,
+            module_function_table,
+            module_impls,
+        ),
         _ => None,
     }
 }
@@ -780,7 +783,10 @@ fn inline_lambda_return_type_from_callable(
     if params.len() != arity || expected_callable_type.generic_args.len() != arity + 1 {
         return Ok(explicit_return_type.clone());
     }
-    for (param, expected) in params.iter().zip(expected_callable_type.generic_args[..arity].iter()) {
+    for (param, expected) in params
+        .iter()
+        .zip(expected_callable_type.generic_args[..arity].iter())
+    {
         if param.ty != *expected {
             return Ok(explicit_return_type.clone());
         }
@@ -836,15 +842,18 @@ fn expected_callable_type_for_method_arg(
     module_function_table: &BTreeMap<String, AstFunction>,
     module_impls: &[AstImplDef],
 ) -> Option<AstTypeRef> {
-    let receiver_ty =
-        infer_local_binding_type(
-            receiver,
-            visible_local_types,
-            module_function_table,
-            module_impls,
-        )?;
+    let receiver_ty = infer_local_binding_type(
+        receiver,
+        visible_local_types,
+        module_function_table,
+        module_impls,
+    )?;
     for definition in module_impls {
-        let Some(method_index) = definition.methods.iter().position(|item| item.name == method) else {
+        let Some(method_index) = definition
+            .methods
+            .iter()
+            .position(|item| item.name == method)
+        else {
             continue;
         };
         let substitutions = infer_impl_method_substitutions(
@@ -857,7 +866,8 @@ fn expected_callable_type_for_method_arg(
             module_function_table,
             module_impls,
         );
-        let specialized_for_type = specialize_type_with_substitutions(&definition.for_type, &substitutions);
+        let specialized_for_type =
+            specialize_type_with_substitutions(&definition.for_type, &substitutions);
         if specialized_for_type != receiver_ty {
             continue;
         }
@@ -1034,14 +1044,12 @@ fn expand_lambda_block(
                             &mut local_types,
                         );
                     }
-                } else if let Some(inferred_ty) =
-                    infer_local_binding_type(
-                        &rewritten_value,
-                        &local_types,
-                        module_function_table,
-                        module_impls,
-                    )
-                {
+                } else if let Some(inferred_ty) = infer_local_binding_type(
+                    &rewritten_value,
+                    &local_types,
+                    module_function_table,
+                    module_impls,
+                ) {
                     local_types.insert(name.clone(), inferred_ty);
                 }
                 extend_local_field_bindings_from_expr(
@@ -1071,14 +1079,12 @@ fn expand_lambda_block(
                     name: name.clone(),
                     value: rewritten_value.clone(),
                 });
-                if let Some(inferred_ty) =
-                    infer_local_binding_type(
-                        &rewritten_value,
-                        &local_types,
-                        module_function_table,
-                        module_impls,
-                    )
-                {
+                if let Some(inferred_ty) = infer_local_binding_type(
+                    &rewritten_value,
+                    &local_types,
+                    module_function_table,
+                    module_impls,
+                ) {
                     local_types.insert(name.clone(), inferred_ty);
                 }
                 extend_local_field_bindings_from_expr(
@@ -1153,14 +1159,12 @@ fn expand_lambda_block(
                             &mut local_types,
                         );
                     }
-                } else if let Some(inferred_ty) =
-                    infer_local_binding_type(
-                        &rewritten_value,
-                        &local_types,
-                        module_function_table,
-                        module_impls,
-                    )
-                {
+                } else if let Some(inferred_ty) = infer_local_binding_type(
+                    &rewritten_value,
+                    &local_types,
+                    module_function_table,
+                    module_impls,
+                ) {
                     local_types.insert(name.clone(), inferred_ty);
                 }
                 extend_local_field_bindings_from_expr(
@@ -1582,8 +1586,8 @@ fn rewrite_lambda_expr(
                         lambda_aliases,
                         visible_locals,
                         visible_local_types,
-        module_impls,
-        module_const_names,
+                        module_impls,
+                        module_const_names,
                         module_function_table,
                         owning_function_name,
                         counter,
@@ -1692,8 +1696,8 @@ fn rewrite_lambda_expr(
                             lambda_aliases,
                             visible_locals,
                             visible_local_types,
-                    module_impls,
-                    module_const_names,
+                            module_impls,
+                            module_const_names,
                             module_function_table,
                             owning_function_name,
                             counter,
@@ -1858,8 +1862,8 @@ fn rewrite_lambda_expr(
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
-                    module_impls,
-                    module_const_names,
+                module_impls,
+                module_const_names,
                 module_function_table,
                 owning_function_name,
                 counter,
@@ -1875,8 +1879,8 @@ fn rewrite_lambda_expr(
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
-                    module_impls,
-                    module_const_names,
+                module_impls,
+                module_const_names,
                 module_function_table,
                 owning_function_name,
                 counter,

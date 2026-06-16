@@ -394,9 +394,6 @@ mod tests_async_network_runtime;
 #[path = "lowering/tests_async_runtime.rs"]
 mod tests_async_runtime;
 #[cfg(test)]
-#[path = "lowering/tests_lane_policy.rs"]
-mod tests_lane_policy;
-#[cfg(test)]
 #[path = "lowering/tests_branch_helpers.rs"]
 mod tests_branch_helpers;
 #[cfg(test)]
@@ -414,6 +411,9 @@ mod tests_higher_order_direct_calls_fn23;
 #[cfg(test)]
 #[path = "lowering/tests_kernel_tensor.rs"]
 mod tests_kernel_tensor;
+#[cfg(test)]
+#[path = "lowering/tests_lane_policy.rs"]
+mod tests_lane_policy;
 #[cfg(test)]
 #[path = "lowering/tests_loop_flow.rs"]
 mod tests_loop_flow;

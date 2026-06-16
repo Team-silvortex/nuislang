@@ -468,9 +468,7 @@ fn glm_verifier_accepts_thread_task_value_inside_completed_branch() {
         NirStmt::Let {
             name: "result".to_owned(),
             ty: None,
-            value: NirExpr::CpuThreadJoinResult(Box::new(NirExpr::Var(
-                "thread".to_owned(),
-            ))),
+            value: NirExpr::CpuThreadJoinResult(Box::new(NirExpr::Var("thread".to_owned()))),
         },
         NirStmt::If {
             condition: NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var("result".to_owned()))),
@@ -544,9 +542,7 @@ fn glm_verifier_rejects_thread_task_value_inside_else_of_completed_branch() {
         NirStmt::Let {
             name: "result".to_owned(),
             ty: None,
-            value: NirExpr::CpuThreadJoinResult(Box::new(NirExpr::Var(
-                "thread".to_owned(),
-            ))),
+            value: NirExpr::CpuThreadJoinResult(Box::new(NirExpr::Var("thread".to_owned()))),
         },
         NirStmt::If {
             condition: NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var("result".to_owned()))),

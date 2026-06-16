@@ -61,8 +61,14 @@ fn rejects_unknown_generic_bound_trait_in_where_clause() {
     )
     .unwrap_err();
 
-    assert!(error.contains("where clause for generic parameter `T`"), "{error}");
-    assert!(error.contains("unknown generic bound trait `Missing`"), "{error}");
+    assert!(
+        error.contains("where clause for generic parameter `T`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("unknown generic bound trait `Missing`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -132,8 +138,14 @@ fn rejects_unknown_generic_bound_trait_in_enum_declaration() {
     )
     .unwrap_err();
 
-    assert!(error.contains("enum `Option` where clause for generic parameter `T`"), "{error}");
-    assert!(error.contains("unknown generic bound trait `Missing`"), "{error}");
+    assert!(
+        error.contains("enum `Option` where clause for generic parameter `T`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("unknown generic bound trait `Missing`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -164,8 +176,14 @@ fn rejects_enum_use_site_argument_that_violates_declared_bound() {
     )
     .unwrap_err();
 
-    assert!(error.contains("type `bool` does not satisfy bound `Addable`"), "{error}");
-    assert!(error.contains("via enum `Option` generic parameter `T`"), "{error}");
+    assert!(
+        error.contains("type `bool` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("via enum `Option` generic parameter `T`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -185,8 +203,14 @@ fn rejects_non_trait_shaped_generic_bound_in_where_clause() {
     )
     .unwrap_err();
 
-    assert!(error.contains("where clause for generic parameter `T`"), "{error}");
-    assert!(error.contains("generic bounds currently require a bare trait name"), "{error}");
+    assert!(
+        error.contains("where clause for generic parameter `T`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("generic bounds currently require a bare trait name"),
+        "{error}"
+    );
     assert!(error.contains("Pipe<i64>"), "{error}");
 }
 
@@ -461,9 +485,15 @@ fn rejects_unannotated_generic_struct_literal_explicit_type_arg_that_violates_bo
     )
     .unwrap_err();
 
-    assert!(error.contains("type `Text` does not satisfy bound `Addable`"), "{error}");
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
     assert!(error.contains("struct literal `Boxed`"), "{error}");
-    assert!(error.contains("via struct `Boxed` generic parameter `T`"), "{error}");
+    assert!(
+        error.contains("via struct `Boxed` generic parameter `T`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -502,9 +532,18 @@ fn rejects_lambda_body_local_alias_bound_failure() {
     )
     .unwrap_err();
 
-    assert!(error.contains("type `Text` does not satisfy bound `Addable`"), "{error}");
-    assert!(error.contains("function `keep` body lambda body local `local`"), "{error}");
-    assert!(error.contains("type alias `Alias` generic parameter `T`"), "{error}");
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `keep` body lambda body local `local`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("type alias `Alias` generic parameter `T`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -539,7 +578,10 @@ fn rejects_if_result_branch_struct_literal_type_arg_that_violates_bound_with_bra
     )
     .unwrap_err();
 
-    assert!(error.contains("type `Text` does not satisfy bound `Addable`"), "{error}");
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
     assert!(error.contains("function `main` body if-then"), "{error}");
     assert!(error.contains("struct literal `Boxed`"), "{error}");
 }
@@ -579,7 +621,10 @@ fn rejects_match_result_branch_struct_literal_type_arg_that_violates_bound_with_
     )
     .unwrap_err();
 
-    assert!(error.contains("type `Text` does not satisfy bound `Addable`"), "{error}");
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
     assert!(error.contains("function `main` body match-arm"), "{error}");
     assert!(error.contains("struct literal `Boxed`"), "{error}");
 }
@@ -791,7 +836,10 @@ fn reports_function_generic_call_arg_bound_failure_at_use_site() {
         error.contains("type `Text` does not satisfy bound `Addable`"),
         "{error}"
     );
-    assert!(error.contains("function `main` body call `keep` generic parameter `U`"), "{error}");
+    assert!(
+        error.contains("function `main` body call `keep` generic parameter `U`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -968,7 +1016,10 @@ fn reports_explicit_function_generic_arg_bound_failure_at_use_site() {
         error.contains("type `Text` does not satisfy bound `Addable`"),
         "{error}"
     );
-    assert!(error.contains("function `main` body call `keep` generic parameter `U`"), "{error}");
+    assert!(
+        error.contains("function `main` body call `keep` generic parameter `U`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -1009,7 +1060,9 @@ fn reports_inferred_function_generic_arg_bound_failure_inside_if_result_branch()
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` if-then call `keep` generic parameter `U`"),
+        error.contains(
+            "function `main` body local `value` if-then call `keep` generic parameter `U`"
+        ),
         "{error}"
     );
 }
@@ -1055,7 +1108,9 @@ fn reports_inferred_function_generic_arg_bound_failure_inside_match_result_branc
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` match-arm call `keep` generic parameter `U`"),
+        error.contains(
+            "function `main` body local `value` match-arm call `keep` generic parameter `U`"
+        ),
         "{error}"
     );
 }
@@ -1142,7 +1197,10 @@ fn reports_explicit_function_generic_arg_failure_for_second_required_bound() {
         error.contains("type `i64` does not satisfy bound `Printable`"),
         "{error}"
     );
-    assert!(error.contains("function `main` body call `keep` generic parameter `U`"), "{error}");
+    assert!(
+        error.contains("function `main` body call `keep` generic parameter `U`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -1214,7 +1272,10 @@ fn reports_explicit_function_generic_arg_bound_failure_from_where_clause() {
         error.contains("type `Text` does not satisfy bound `Addable`"),
         "{error}"
     );
-    assert!(error.contains("function `main` body call `keep` generic parameter `U`"), "{error}");
+    assert!(
+        error.contains("function `main` body call `keep` generic parameter `U`"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -1250,7 +1311,8 @@ fn reports_expected_type_driven_generic_bound_failure_at_local_use_site() {
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` call `typed_zero` generic parameter `T`"),
+        error
+            .contains("function `main` body local `value` call `typed_zero` generic parameter `T`"),
         "{error}"
     );
 }
@@ -1292,7 +1354,9 @@ fn reports_expected_type_driven_generic_bound_failure_inside_if_result_branch() 
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` if-then call `typed_zero` generic parameter `T`"),
+        error.contains(
+            "function `main` body local `value` if-then call `typed_zero` generic parameter `T`"
+        ),
         "{error}"
     );
 }
@@ -1376,7 +1440,9 @@ fn reports_alias_expected_type_driven_generic_bound_failure_at_local_use_site() 
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` via type alias `Alias` generic parameter `T`"),
+        error.contains(
+            "function `main` body local `value` via type alias `Alias` generic parameter `T`"
+        ),
         "{error}"
     );
 }
@@ -1418,7 +1484,9 @@ fn reports_struct_field_expected_type_driven_generic_bound_failure() {
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `wrapped` call `typed_zero` generic parameter `T`"),
+        error.contains(
+            "function `main` body local `wrapped` call `typed_zero` generic parameter `T`"
+        ),
         "{error}"
     );
 }
@@ -1461,7 +1529,8 @@ fn reports_enum_payload_expected_type_driven_generic_bound_failure() {
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` call `typed_zero` generic parameter `U`"),
+        error
+            .contains("function `main` body local `value` call `typed_zero` generic parameter `U`"),
         "{error}"
     );
 }
@@ -1510,7 +1579,9 @@ fn reports_nested_alias_struct_enum_expected_type_driven_generic_bound_failure()
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` via type alias `Alias` generic parameter `T`"),
+        error.contains(
+            "function `main` body local `value` via type alias `Alias` generic parameter `T`"
+        ),
         "{error}"
     );
 }
@@ -1563,13 +1634,16 @@ fn reports_nested_alias_struct_enum_expected_type_driven_generic_bound_failure_i
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` via type alias `Alias` generic parameter `T`"),
+        error.contains(
+            "function `main` body local `value` via type alias `Alias` generic parameter `T`"
+        ),
         "{error}"
     );
 }
 
 #[test]
-fn reports_nested_struct_enum_expected_type_driven_generic_bound_failure_without_alias_at_call_site() {
+fn reports_nested_struct_enum_expected_type_driven_generic_bound_failure_without_alias_at_call_site(
+) {
     let error = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -1610,13 +1684,15 @@ fn reports_nested_struct_enum_expected_type_driven_generic_bound_failure_without
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` call `typed_zero` generic parameter `U`"),
+        error
+            .contains("function `main` body local `value` call `typed_zero` generic parameter `U`"),
         "{error}"
     );
 }
 
 #[test]
-fn reports_nested_struct_enum_expected_type_driven_generic_bound_failure_without_alias_inside_if_branch_at_call_site() {
+fn reports_nested_struct_enum_expected_type_driven_generic_bound_failure_without_alias_inside_if_branch_at_call_site(
+) {
     let error = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -1661,7 +1737,9 @@ fn reports_nested_struct_enum_expected_type_driven_generic_bound_failure_without
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` if-then call `typed_zero` generic parameter `U`"),
+        error.contains(
+            "function `main` body local `value` if-then call `typed_zero` generic parameter `U`"
+        ),
         "{error}"
     );
 }
@@ -1822,7 +1900,8 @@ fn reports_error_style_result_payload_expected_type_driven_generic_bound_failure
 }
 
 #[test]
-fn reports_error_style_result_payload_expected_type_driven_generic_bound_failure_with_alias_precedence() {
+fn reports_error_style_result_payload_expected_type_driven_generic_bound_failure_with_alias_precedence(
+) {
     let error = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -1905,7 +1984,9 @@ fn reports_explicit_function_generic_arg_bound_failure_inside_if_result_branch()
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` if-then call `keep` generic parameter `U`"),
+        error.contains(
+            "function `main` body local `value` if-then call `keep` generic parameter `U`"
+        ),
         "{error}"
     );
 }
@@ -1944,7 +2025,9 @@ fn reports_explicit_function_generic_arg_bound_failure_inside_match_result_branc
         "{error}"
     );
     assert!(
-        error.contains("function `main` body local `value` match-arm call `keep` generic parameter `U`"),
+        error.contains(
+            "function `main` body local `value` match-arm call `keep` generic parameter `U`"
+        ),
         "{error}"
     );
 }
@@ -2173,7 +2256,10 @@ fn reports_ambiguous_function_generic_use_site_bound_across_helper_trait_variant
         error.contains("type `i64` ambiguously satisfies bound `Addable`"),
         "{error}"
     );
-    assert!(error.contains("function `main` body call `keep` generic parameter `U`"), "{error}");
+    assert!(
+        error.contains("function `main` body call `keep` generic parameter `U`"),
+        "{error}"
+    );
     assert!(error.contains("HelperA.Addable"), "{error}");
     assert!(error.contains("HelperB.Addable"), "{error}");
 }

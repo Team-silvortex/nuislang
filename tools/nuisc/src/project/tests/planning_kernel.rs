@@ -356,8 +356,7 @@ fn materializes_default_kernel_target_config_from_project_abi() {
         node.name == "project_profile_kernel_KernelUnit_kernel_target_config_auto"
             && node.op.module == "kernel"
             && node.op.instruction == "target_config"
-            && node.op.args
-                == vec!["apple_ane".to_owned(), "coreml".to_owned(), "1".to_owned()]
+            && node.op.args == vec!["apple_ane".to_owned(), "coreml".to_owned(), "1".to_owned()]
     }));
     assert!(yir.nodes.iter().any(|node| {
         node.name == "project_profile_kernel_KernelUnit_target_contract_type"

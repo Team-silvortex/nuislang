@@ -28,8 +28,7 @@ mod validation_core;
 
 pub use abi::{
     ensure_project_abi_selections_valid, project_abi_selection_check_json,
-    render_project_abi_selection_check_lines, resolve_project_abi,
-    validate_project_abi_selections,
+    render_project_abi_selection_check_lines, resolve_project_abi, validate_project_abi_selections,
 };
 #[cfg(test)]
 use abi::{host_calling_abi, host_object_format, recommend_abi_profile_for_host};
@@ -62,11 +61,10 @@ use profile_refs::push_project_dependency_edge_if_missing;
 use profile_targets::resolve_project_profile_target_name;
 pub use rendering::{
     describe_project_abi_graph, ensure_project_lowering_selections_valid, organize_project,
-    organize_project_exchanges, project_abi_selection_view_json,
-    project_abi_selection_views, project_lowering_selection_json,
-    render_project_abi_graph_line, render_project_abi_selection_lines,
-    render_project_abi_selection_view_lines, render_project_lowering_selection_lines,
-    validate_project_lowering_selections,
+    organize_project_exchanges, project_abi_selection_view_json, project_abi_selection_views,
+    project_lowering_selection_json, render_project_abi_graph_line,
+    render_project_abi_selection_lines, render_project_abi_selection_view_lines,
+    render_project_lowering_selection_lines, validate_project_lowering_selections,
 };
 use rendering::{
     render_project_abi_index, render_project_exchange_index, render_project_host_ffi_index,
@@ -352,9 +350,7 @@ impl ProjectLoweringSelectionView {
             "{} (abi={}, selected={}): {}",
             self.domain,
             self.abi.as_deref().unwrap_or("<none>"),
-            self.selected_lowering_target
-                .as_deref()
-                .unwrap_or("<none>"),
+            self.selected_lowering_target.as_deref().unwrap_or("<none>"),
             if self.issues.is_empty() {
                 "ok".to_owned()
             } else {

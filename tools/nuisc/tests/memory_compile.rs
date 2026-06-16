@@ -219,7 +219,11 @@ fn lowers_hello_task_result_control_flow_memory_source_with_unit_error_struct_sh
         artifacts.yir.nodes.iter().any(|node| {
             node.op.module == "cpu"
                 && node.op.instruction == "struct"
-                && node.op.args.first().is_some_and(|arg| arg == "Error.InvalidInput")
+                && node
+                    .op
+                    .args
+                    .first()
+                    .is_some_and(|arg| arg == "Error.InvalidInput")
                 && node.op.args.len() == 1
         }),
         "expected unit-variant error path to lower through zero-field cpu.struct"
@@ -266,7 +270,10 @@ fn lowers_hello_task_glm_status_path_memory_source_with_task_status_observer_sha
         .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
         .count();
 
-    assert_eq!(join_result_count, 3, "expected three task result observations");
+    assert_eq!(
+        join_result_count, 3,
+        "expected three task result observations"
+    );
     assert_eq!(completed_count, 1, "expected one completed observer path");
     assert_eq!(timed_out_count, 1, "expected one timed-out observer path");
     assert_eq!(cancelled_count, 1, "expected one cancelled observer path");
@@ -355,9 +362,8 @@ fn lowers_hello_task_glm_value_path_memory_source_with_completed_value_shape() {
 
 #[test]
 fn compiles_hello_task_glm_compare_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns",
-    );
+    let source =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_task_glm_compare memory source should compile");
 }
@@ -394,16 +400,24 @@ fn lowers_hello_task_glm_compare_memory_source_with_join_and_join_result_shape()
         .count();
 
     assert_eq!(join_count, 1, "expected one direct join path");
-    assert_eq!(join_result_count, 1, "expected one observed join_result path");
-    assert_eq!(timeout_count, 2, "expected one timeout per spawned task path");
-    assert_eq!(value_count, 1, "expected one observed payload extraction path");
+    assert_eq!(
+        join_result_count, 1,
+        "expected one observed join_result path"
+    );
+    assert_eq!(
+        timeout_count, 2,
+        "expected one timeout per spawned task path"
+    );
+    assert_eq!(
+        value_count, 1,
+        "expected one observed payload extraction path"
+    );
 }
 
 #[test]
 fn compiles_hello_task_glm_observe_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns",
-    );
+    let source =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_task_glm_observe memory source should compile");
 }
@@ -500,7 +514,10 @@ fn lowers_hello_task_glm_boundary_compare_memory_source_with_join_timeout_cancel
     assert_eq!(join_count, 1, "expected one direct join boundary path");
     assert_eq!(timeout_count, 1, "expected one timeout boundary path");
     assert_eq!(cancel_count, 1, "expected one cancel boundary path");
-    assert_eq!(join_result_count, 2, "expected observed timeout and cancel results");
+    assert_eq!(
+        join_result_count, 2,
+        "expected observed timeout and cancel results"
+    );
     assert_eq!(timed_out_count, 1, "expected one timed-out observer path");
     assert_eq!(cancelled_count, 1, "expected one cancelled observer path");
 }
@@ -544,7 +561,10 @@ fn lowers_hello_thread_mutex_observe_memory_source_with_thread_and_lock_shape() 
         .iter()
         .filter(|node| {
             node.op.module == "cpu"
-                && matches!(node.op.instruction.as_str(), "thread_spawn" | "spawn_thread")
+                && matches!(
+                    node.op.instruction.as_str(),
+                    "thread_spawn" | "spawn_thread"
+                )
         })
         .count();
     let thread_join_result_count = artifacts
@@ -567,15 +587,24 @@ fn lowers_hello_thread_mutex_observe_memory_source_with_thread_and_lock_shape() 
         .count();
 
     assert_eq!(mutex_new_count, 1, "expected one mutex allocation path");
-    assert_eq!(mutex_lock_count, 2, "expected initial and reopened lock paths");
+    assert_eq!(
+        mutex_lock_count, 2,
+        "expected initial and reopened lock paths"
+    );
     assert_eq!(mutex_unlock_count, 1, "expected one guard release path");
     assert_eq!(thread_spawn_count, 1, "expected one spawned thread path");
     assert_eq!(
         thread_join_result_count, 1,
         "expected one thread result observation path"
     );
-    assert_eq!(task_completed_count, 1, "expected one completion observer path");
-    assert_eq!(task_value_count, 1, "expected one joined payload extraction");
+    assert_eq!(
+        task_completed_count, 1,
+        "expected one completion observer path"
+    );
+    assert_eq!(
+        task_value_count, 1,
+        "expected one joined payload extraction"
+    );
 }
 
 #[test]
@@ -617,7 +646,10 @@ fn lowers_hello_thread_mutex_branch_observe_memory_source_with_shared_observer_b
         .iter()
         .filter(|node| {
             node.op.module == "cpu"
-                && matches!(node.op.instruction.as_str(), "thread_spawn" | "spawn_thread")
+                && matches!(
+                    node.op.instruction.as_str(),
+                    "thread_spawn" | "spawn_thread"
+                )
         })
         .count();
     let thread_join_result_count = artifacts
@@ -645,7 +677,10 @@ fn lowers_hello_thread_mutex_branch_observe_memory_source_with_shared_observer_b
         .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
         .count();
 
-    assert_eq!(mutex_new_count, 2, "expected one mutex allocation per branch source");
+    assert_eq!(
+        mutex_new_count, 2,
+        "expected one mutex allocation per branch source"
+    );
     assert_eq!(
         mutex_lock_count, 1,
         "expected one shared mutex_lock after match-selected mutex source"
@@ -662,9 +697,18 @@ fn lowers_hello_thread_mutex_branch_observe_memory_source_with_shared_observer_b
         thread_join_result_count, 1,
         "expected one shared thread_join_result after thread selection"
     );
-    assert_eq!(task_completed_count, 1, "expected one shared task_completed probe");
-    assert_eq!(task_value_count, 1, "expected one shared task_value observer");
-    assert!(select_count >= 2, "expected select-driven shared observer lowering");
+    assert_eq!(
+        task_completed_count, 1,
+        "expected one shared task_completed probe"
+    );
+    assert_eq!(
+        task_value_count, 1,
+        "expected one shared task_value observer"
+    );
+    assert!(
+        select_count >= 2,
+        "expected select-driven shared observer lowering"
+    );
 }
 
 #[test]
@@ -731,20 +775,30 @@ fn lowers_hello_thread_mutex_branch_suffix_memory_source_with_shared_pure_suffix
         thread_join_result_count, 1,
         "expected one shared thread_join_result"
     );
-    assert_eq!(task_completed_count, 1, "expected one shared task_completed");
+    assert_eq!(
+        task_completed_count, 1,
+        "expected one shared task_completed"
+    );
     assert_eq!(task_value_count, 1, "expected one shared task_value");
-    assert!(add_count >= 4, "expected multi-stage shared pure suffix adds");
-    assert!(select_count >= 2, "expected select-driven branch merging before suffixes");
+    assert!(
+        add_count >= 4,
+        "expected multi-stage shared pure suffix adds"
+    );
+    assert!(
+        select_count >= 2,
+        "expected select-driven branch merging before suffixes"
+    );
 }
 
 #[test]
-fn rejects_hello_thread_mutex_if_lock_branch_invalid_memory_source_with_precise_branch_boundary_diagnostic() {
+fn rejects_hello_thread_mutex_if_lock_branch_invalid_memory_source_with_precise_branch_boundary_diagnostic(
+) {
     let source = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns",
     );
-    let error = nuisc::pipeline::compile_source_path(source)
-        .err()
-        .expect("if-branch mutex lock invalid source should fail until branch-local lock lowering exists");
+    let error = nuisc::pipeline::compile_source_path(source).err().expect(
+        "if-branch mutex lock invalid source should fail until branch-local lock lowering exists",
+    );
     assert!(error.contains(
         "conditional `if`/lowered-`match` lowering does not yet support branch-local consuming task/thread/mutex runtime primitives"
     ));
@@ -754,7 +808,8 @@ fn rejects_hello_thread_mutex_if_lock_branch_invalid_memory_source_with_precise_
 }
 
 #[test]
-fn rejects_hello_thread_mutex_match_join_result_branch_invalid_memory_source_with_precise_branch_boundary_diagnostic() {
+fn rejects_hello_thread_mutex_match_join_result_branch_invalid_memory_source_with_precise_branch_boundary_diagnostic(
+) {
     let source = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns",
     );

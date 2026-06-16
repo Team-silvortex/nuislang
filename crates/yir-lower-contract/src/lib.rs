@@ -3,6 +3,248 @@ use std::collections::BTreeMap;
 use yir_core::{EdgeKind, Node, YirModule};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelLoweringContract {
+    pub stages: Vec<KernelStageContract>,
+    pub graphs: Vec<KernelComputeGraphContract>,
+    pub fabric_handle_tables: Vec<FabricHandleTableContract>,
+    pub fabric_core_bindings: Vec<FabricCoreBindingContract>,
+}
+
+impl KernelLoweringContract {
+    pub fn has_kernel_work(&self) -> bool {
+        !self.stages.is_empty()
+    }
+
+    pub fn has_backend_eligible_work(&self) -> bool {
+        self.stages
+            .iter()
+            .any(|stage| stage.lowering == KernelLoweringMode::BackendEligible)
+    }
+
+    pub fn requires_cpu_fallback(&self) -> bool {
+        self.stages
+            .iter()
+            .any(|stage| stage.lowering == KernelLoweringMode::CpuFallbackOnly)
+    }
+
+    pub fn render_text(&self) -> String {
+        let mut lines = Vec::new();
+        for table in &self.fabric_handle_tables {
+            lines.push(format!("fabric_handle_table={}", table.node));
+            for entry in &table.entries {
+                lines.push(format!("  handle {} -> {}", entry.slot, entry.resource));
+            }
+        }
+        for binding in &self.fabric_core_bindings {
+            lines.push(format!(
+                "fabric_core_binding={} resource={} core={}",
+                binding.node, binding.resource, binding.core_index
+            ));
+        }
+        for graph in &self.graphs {
+            lines.push(format!(
+                "graph={} resource={} lowering={} reason={}",
+                graph.id,
+                graph.resource,
+                graph.lowering.as_str(),
+                graph.reason
+            ));
+            if let Some(runtime) = &graph.target_runtime {
+                lines.push(format!("  target_runtime={runtime}"));
+            }
+            if let Some(arch) = &graph.target_arch {
+                lines.push(format!("  target_arch={arch}"));
+            }
+            if let Some(width) = graph.lane_width {
+                lines.push(format!("  lane_width={width}"));
+            }
+            lines.push(format!("  stage_count={}", graph.stages.len()));
+            for stage in &graph.stages {
+                lines.push(format!("  stage={stage}"));
+            }
+        }
+        for stage in &self.stages {
+            lines.push(format!(
+                "stage={} op={} resource={} lowering={} reason={}",
+                stage.node,
+                stage.op,
+                stage.resource,
+                stage.lowering.as_str(),
+                stage.reason
+            ));
+            if let Some(runtime) = &stage.target_runtime {
+                lines.push(format!("  target_runtime={runtime}"));
+            }
+            if let Some(arch) = &stage.target_arch {
+                lines.push(format!("  target_arch={arch}"));
+            }
+            if let Some(width) = stage.lane_width {
+                lines.push(format!("  lane_width={width}"));
+            }
+            if let Some(axis) = &stage.axis {
+                lines.push(format!("  axis={axis}"));
+            }
+            if let Some(k) = stage.topk {
+                lines.push(format!("  topk={k}"));
+            }
+            if let Some(rows) = stage.rows {
+                lines.push(format!("  rows={rows}"));
+            }
+            if let Some(cols) = stage.cols {
+                lines.push(format!("  cols={cols}"));
+            }
+            for input in &stage.inputs {
+                lines.push(format!("  input={input}"));
+            }
+            if let Some(table) = &stage.fabric_handle_table {
+                lines.push(format!("  fabric_handle_table={table}"));
+            }
+        }
+        lines.join("\n") + if lines.is_empty() { "" } else { "\n" }
+    }
+
+    pub fn render_package_manifest(&self) -> String {
+        let mut out = String::new();
+        out.push_str("manifest_version = 1\n");
+        out.push_str("package_kind = \"kernel_package\"\n");
+        out.push_str(&format!("graph_count = {}\n", self.graphs.len()));
+        out.push_str(&format!("stage_count = {}\n", self.stages.len()));
+        out.push_str(&format!(
+            "fabric_handle_table_count = {}\n",
+            self.fabric_handle_tables.len()
+        ));
+        out.push_str(&format!(
+            "fabric_core_binding_count = {}\n",
+            self.fabric_core_bindings.len()
+        ));
+        out.push_str(&format!(
+            "backend_eligible = {}\n",
+            self.has_backend_eligible_work()
+        ));
+        out.push_str(&format!(
+            "requires_cpu_fallback = {}\n",
+            self.requires_cpu_fallback()
+        ));
+
+        for table in &self.fabric_handle_tables {
+            out.push_str("\n[[fabric_handle_table]]\n");
+            out.push_str(&format!("id = \"{}\"\n", table.node));
+            for entry in &table.entries {
+                out.push_str("\n[[fabric_handle_table.entry]]\n");
+                out.push_str(&format!("slot = \"{}\"\n", escape_toml(&entry.slot)));
+                out.push_str(&format!(
+                    "resource = \"{}\"\n",
+                    escape_toml(&entry.resource)
+                ));
+            }
+        }
+
+        for binding in &self.fabric_core_bindings {
+            out.push_str("\n[[fabric_core_binding]]\n");
+            out.push_str(&format!("id = \"{}\"\n", binding.node));
+            out.push_str(&format!(
+                "resource = \"{}\"\n",
+                escape_toml(&binding.resource)
+            ));
+            out.push_str(&format!("core_index = {}\n", binding.core_index));
+        }
+
+        for graph in &self.graphs {
+            out.push_str("\n[[graph]]\n");
+            out.push_str(&format!("id = \"{}\"\n", graph.id));
+            out.push_str(&format!(
+                "resource = \"{}\"\n",
+                escape_toml(&graph.resource)
+            ));
+            out.push_str(&format!("lowering = \"{}\"\n", graph.lowering.as_str()));
+            out.push_str(&format!("reason = \"{}\"\n", escape_toml(&graph.reason)));
+            if let Some(runtime) = &graph.target_runtime {
+                out.push_str(&format!("target_runtime = \"{}\"\n", escape_toml(runtime)));
+            }
+            if let Some(arch) = &graph.target_arch {
+                out.push_str(&format!("target_arch = \"{}\"\n", escape_toml(arch)));
+            }
+            if let Some(width) = graph.lane_width {
+                out.push_str(&format!("lane_width = {}\n", width));
+            }
+            for stage in &graph.stages {
+                out.push_str("\n[[graph.stage]]\n");
+                out.push_str(&format!("id = \"{}\"\n", escape_toml(stage)));
+            }
+            for variant in graph.backend_variants() {
+                out.push_str("\n[[graph.variant]]\n");
+                out.push_str(&format!("backend = \"{}\"\n", variant.backend));
+                out.push_str(&format!("kind = \"{}\"\n", variant.kind));
+                out.push_str(&format!("status = \"{}\"\n", variant.status));
+                out.push_str(&format!("entry = \"{}\"\n", escape_toml(&variant.entry)));
+                out.push_str(&format!(
+                    "artifact = \"{}\"\n",
+                    escape_toml(&variant.artifact)
+                ));
+                out.push_str(&format!("notes = \"{}\"\n", escape_toml(&variant.notes)));
+            }
+        }
+
+        for stage in &self.stages {
+            out.push_str("\n[[stage]]\n");
+            out.push_str(&format!("id = \"{}\"\n", stage.node));
+            out.push_str(&format!("op = \"{}\"\n", stage.op));
+            out.push_str(&format!(
+                "resource = \"{}\"\n",
+                escape_toml(&stage.resource)
+            ));
+            out.push_str(&format!("lowering = \"{}\"\n", stage.lowering.as_str()));
+            out.push_str(&format!("reason = \"{}\"\n", escape_toml(&stage.reason)));
+            if let Some(runtime) = &stage.target_runtime {
+                out.push_str(&format!("target_runtime = \"{}\"\n", escape_toml(runtime)));
+            }
+            if let Some(arch) = &stage.target_arch {
+                out.push_str(&format!("target_arch = \"{}\"\n", escape_toml(arch)));
+            }
+            if let Some(width) = stage.lane_width {
+                out.push_str(&format!("lane_width = {}\n", width));
+            }
+            if let Some(axis) = &stage.axis {
+                out.push_str(&format!("axis = \"{}\"\n", escape_toml(axis)));
+            }
+            if let Some(k) = stage.topk {
+                out.push_str(&format!("topk = {}\n", k));
+            }
+            if let Some(rows) = stage.rows {
+                out.push_str(&format!("rows = {}\n", rows));
+            }
+            if let Some(cols) = stage.cols {
+                out.push_str(&format!("cols = {}\n", cols));
+            }
+            if let Some(table) = &stage.fabric_handle_table {
+                out.push_str(&format!(
+                    "fabric_handle_table = \"{}\"\n",
+                    escape_toml(table)
+                ));
+            }
+            for input in &stage.inputs {
+                out.push_str("\n[[stage.input]]\n");
+                out.push_str(&format!("source = \"{}\"\n", escape_toml(input)));
+            }
+            for variant in stage.backend_variants() {
+                out.push_str("\n[[stage.variant]]\n");
+                out.push_str(&format!("backend = \"{}\"\n", variant.backend));
+                out.push_str(&format!("kind = \"{}\"\n", variant.kind));
+                out.push_str(&format!("status = \"{}\"\n", variant.status));
+                out.push_str(&format!("entry = \"{}\"\n", escape_toml(&variant.entry)));
+                out.push_str(&format!(
+                    "artifact = \"{}\"\n",
+                    escape_toml(&variant.artifact)
+                ));
+                out.push_str(&format!("notes = \"{}\"\n", escape_toml(&variant.notes)));
+            }
+        }
+
+        out
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShaderLoweringContract {
     pub stages: Vec<ShaderStageContract>,
     pub fabric_handle_tables: Vec<FabricHandleTableContract>,
@@ -61,6 +303,12 @@ impl ShaderLoweringContract {
             }
             if let Some(topology) = &stage.topology {
                 lines.push(format!("  topology={}", topology));
+            }
+            if let Some(entry) = &stage.wgsl_entry {
+                lines.push(format!("  wgsl_entry={entry}"));
+            }
+            if let Some(source) = &stage.wgsl_source {
+                lines.push(format!("  wgsl_source_lines={}", source.lines().count()));
             }
             for binding in &stage.bindings {
                 lines.push(format!(
@@ -182,6 +430,12 @@ impl ShaderLoweringContract {
             if let Some(topology) = &stage.topology {
                 out.push_str(&format!("topology = \"{}\"\n", escape_toml(topology)));
             }
+            if let Some(entry) = &stage.wgsl_entry {
+                out.push_str(&format!("wgsl_entry = \"{}\"\n", escape_toml(entry)));
+            }
+            if let Some(source) = &stage.wgsl_source {
+                out.push_str(&format!("wgsl_source = \"{}\"\n", escape_toml(source)));
+            }
             if let Some(blend_mode) = &stage.blend_mode {
                 out.push_str(&format!(
                     "blend_enabled = {}\nblend_mode = \"{}\"\n",
@@ -264,6 +518,8 @@ pub struct ShaderStageContract {
     pub pipeline: Option<String>,
     pub target_format: Option<String>,
     pub topology: Option<String>,
+    pub wgsl_entry: Option<String>,
+    pub wgsl_source: Option<String>,
     pub fabric_handle_table: Option<String>,
     pub bindings: Vec<ShaderResourceBinding>,
     pub blend_mode: Option<String>,
@@ -316,6 +572,53 @@ pub struct ShaderBackendVariant {
     pub notes: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelStageContract {
+    pub node: String,
+    pub op: String,
+    pub resource: String,
+    pub lowering: KernelLoweringMode,
+    pub reason: String,
+    pub target_arch: Option<String>,
+    pub target_runtime: Option<String>,
+    pub lane_width: Option<usize>,
+    pub rows: Option<usize>,
+    pub cols: Option<usize>,
+    pub axis: Option<String>,
+    pub topk: Option<usize>,
+    pub inputs: Vec<String>,
+    pub fabric_handle_table: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelBackendVariant {
+    pub backend: &'static str,
+    pub kind: &'static str,
+    pub status: &'static str,
+    pub entry: String,
+    pub artifact: String,
+    pub notes: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ShaderInlineWgslModule {
+    resource: String,
+    entry: String,
+    source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelComputeGraphContract {
+    pub id: String,
+    pub resource: String,
+    pub lowering: KernelLoweringMode,
+    pub reason: String,
+    pub target_arch: Option<String>,
+    pub target_runtime: Option<String>,
+    pub lane_width: Option<usize>,
+    pub stages: Vec<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShaderLoweringMode {
     BackendEligible,
@@ -331,6 +634,21 @@ impl ShaderLoweringMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KernelLoweringMode {
+    BackendEligible,
+    CpuFallbackOnly,
+}
+
+impl KernelLoweringMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::BackendEligible => "backend_eligible",
+            Self::CpuFallbackOnly => "cpu_fallback_only",
+        }
+    }
+}
+
 impl ShaderStageContract {
     pub fn backend_variants(&self) -> Vec<ShaderBackendVariant> {
         if self.lowering != ShaderLoweringMode::BackendEligible {
@@ -341,37 +659,151 @@ impl ShaderStageContract {
         vec![
             ShaderBackendVariant {
                 backend: "metal",
-                kind: "library",
-                status: "planned",
+                kind: "msl-source",
+                status: "active",
                 entry: stage_id.clone(),
-                artifact: format!("metal/{stage_id}.metallib"),
-                notes: "Apple GPU backend artifact".to_owned(),
+                artifact: format!("metal/{stage_id}.metal"),
+                notes: "Apple GPU backend source artifact".to_owned(),
             },
             ShaderBackendVariant {
                 backend: "vulkan",
-                kind: "spirv",
-                status: "planned",
+                kind: "glsl450-source",
+                status: "active",
                 entry: stage_id.clone(),
-                artifact: format!("vulkan/{stage_id}.spv"),
-                notes: "Portable Vulkan/SPIR-V artifact".to_owned(),
+                artifact: format!("vulkan/{stage_id}.vk.glsl"),
+                notes: "Portable Vulkan GLSL source artifact".to_owned(),
             },
             ShaderBackendVariant {
                 backend: "directx",
-                kind: "dxil",
-                status: "planned",
+                kind: "hlsl-source",
+                status: "active",
                 entry: stage_id.clone(),
-                artifact: format!("directx/{stage_id}.dxil"),
-                notes: "Windows DirectX backend artifact".to_owned(),
+                artifact: format!("directx/{stage_id}.hlsl"),
+                notes: "Windows DirectX backend source artifact".to_owned(),
             },
             ShaderBackendVariant {
                 backend: "opengl",
-                kind: "glsl",
-                status: "planned",
+                kind: "glsl460-source",
+                status: "active",
                 entry: stage_id,
                 artifact: format!("opengl/{}.glsl", self.node),
-                notes: "Legacy OpenGL fallback artifact".to_owned(),
+                notes: "OpenGL GLSL 460 source artifact".to_owned(),
             },
         ]
+    }
+}
+
+impl KernelStageContract {
+    pub fn backend_variants(&self) -> Vec<KernelBackendVariant> {
+        let stage_id = self.node.clone();
+        match self.lowering {
+            KernelLoweringMode::BackendEligible => {
+                let preferred_backend = self.target_runtime.as_deref();
+                let mut variants = Vec::new();
+                if matches!(preferred_backend, Some("coreml")) {
+                    variants.push(KernelBackendVariant {
+                        backend: "coreml",
+                        kind: "mlmodel",
+                        status: "planned",
+                        entry: stage_id.clone(),
+                        artifact: format!("coreml/{stage_id}.mlmodel"),
+                        notes: "Apple ANE / CoreML compute artifact".to_owned(),
+                    });
+                    variants.push(KernelBackendVariant {
+                        backend: "mps-graph",
+                        kind: "graph",
+                        status: "planned",
+                        entry: stage_id.clone(),
+                        artifact: format!("mps-graph/{stage_id}.json"),
+                        notes: "Apple GPU graph fallback artifact".to_owned(),
+                    });
+                }
+                if matches!(preferred_backend, Some("vulkan")) {
+                    variants.push(KernelBackendVariant {
+                        backend: "vulkan",
+                        kind: "spirv",
+                        status: "planned",
+                        entry: stage_id.clone(),
+                        artifact: format!("vulkan/{stage_id}.spv"),
+                        notes: "Portable Vulkan compute artifact".to_owned(),
+                    });
+                }
+                variants.push(KernelBackendVariant {
+                    backend: "cpu-fallback",
+                    kind: "native",
+                    status: "planned",
+                    entry: stage_id,
+                    artifact: format!("cpu-fallback/{}.bc", self.node),
+                    notes: "Host CPU fallback artifact".to_owned(),
+                });
+                variants
+            }
+            KernelLoweringMode::CpuFallbackOnly => vec![KernelBackendVariant {
+                backend: "cpu-fallback",
+                kind: "native",
+                status: "active",
+                entry: stage_id,
+                artifact: format!("cpu-fallback/{}.bc", self.node),
+                notes: "Requires host CPU fallback because the op is outside the current backend portability subset".to_owned(),
+            }],
+        }
+    }
+}
+
+impl KernelComputeGraphContract {
+    pub fn backend_variants(&self) -> Vec<KernelBackendVariant> {
+        let entry = self.id.clone();
+        match self.lowering {
+            KernelLoweringMode::BackendEligible => {
+                let preferred_backend = self.target_runtime.as_deref();
+                let mut variants = Vec::new();
+                if matches!(preferred_backend, Some("coreml")) {
+                    variants.push(KernelBackendVariant {
+                        backend: "coreml",
+                        kind: "mlpackage",
+                        status: "planned",
+                        entry: entry.clone(),
+                        artifact: format!("coreml/{}.mlpackage", self.id),
+                        notes: "Fused kernel compute graph for Apple ANE / CoreML".to_owned(),
+                    });
+                    variants.push(KernelBackendVariant {
+                        backend: "mps-graph",
+                        kind: "graph",
+                        status: "planned",
+                        entry: entry.clone(),
+                        artifact: format!("mps-graph/{}.json", self.id),
+                        notes: "Fused kernel compute graph for Apple GPU fallback".to_owned(),
+                    });
+                }
+                if matches!(preferred_backend, Some("vulkan")) {
+                    variants.push(KernelBackendVariant {
+                        backend: "vulkan",
+                        kind: "spirv",
+                        status: "planned",
+                        entry: entry.clone(),
+                        artifact: format!("vulkan/{}.spv", self.id),
+                        notes: "Fused Vulkan compute graph artifact".to_owned(),
+                    });
+                }
+                variants.push(KernelBackendVariant {
+                    backend: "cpu-fallback",
+                    kind: "native",
+                    status: "planned",
+                    entry,
+                    artifact: format!("cpu-fallback/{}.bc", self.id),
+                    notes: "Fused host CPU fallback graph".to_owned(),
+                });
+                variants
+            }
+            KernelLoweringMode::CpuFallbackOnly => vec![KernelBackendVariant {
+                backend: "cpu-fallback",
+                kind: "native",
+                status: "active",
+                entry,
+                artifact: format!("cpu-fallback/{}.bc", self.id),
+                notes: "Graph requires host CPU fallback because one or more stages are outside the current backend portability subset".to_owned(),
+            }],
+        }
     }
 }
 
@@ -433,6 +865,20 @@ pub fn analyze_shader_lowering(module: &YirModule) -> ShaderLoweringContract {
                 })
         })
         .collect();
+    let inline_wgsl_modules: Vec<ShaderInlineWgslModule> = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "shader"
+                && node.op.instruction == "inline_wgsl"
+                && node.op.args.len() == 2
+        })
+        .map(|node| ShaderInlineWgslModule {
+            resource: node.resource.clone(),
+            entry: node.op.args[0].clone(),
+            source: decode_inline_shader_source(&node.op.args[1]),
+        })
+        .collect();
 
     for node in &module.nodes {
         if node.op.module != "shader" {
@@ -445,6 +891,7 @@ pub fn analyze_shader_lowering(module: &YirModule) -> ShaderLoweringContract {
                 &nodes,
                 &incoming,
                 &fabric_handle_tables,
+                &inline_wgsl_modules,
             )),
             "draw_ball" | "draw_sphere" => stages.push(ShaderStageContract {
                 node: node.name.clone(),
@@ -456,6 +903,8 @@ pub fn analyze_shader_lowering(module: &YirModule) -> ShaderLoweringContract {
                 pipeline: None,
                 target_format: None,
                 topology: None,
+                wgsl_entry: None,
+                wgsl_source: None,
                 fabric_handle_table: None,
                 bindings: Vec::new(),
                 blend_mode: None,
@@ -475,6 +924,8 @@ pub fn analyze_shader_lowering(module: &YirModule) -> ShaderLoweringContract {
                 pipeline: None,
                 target_format: None,
                 topology: None,
+                wgsl_entry: None,
+                wgsl_source: None,
                 fabric_handle_table: None,
                 bindings: Vec::new(),
                 blend_mode: None,
@@ -496,11 +947,58 @@ pub fn analyze_shader_lowering(module: &YirModule) -> ShaderLoweringContract {
     }
 }
 
+pub fn analyze_kernel_lowering(module: &YirModule) -> KernelLoweringContract {
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
+    let fabric_handle_tables = collect_fabric_handle_tables(module);
+    let fabric_core_bindings = collect_fabric_core_bindings(module);
+    let target_profiles = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "kernel"
+                && node.op.instruction == "target_config"
+                && node.op.args.len() == 3
+        })
+        .map(|node| {
+            (
+                node.resource.clone(),
+                KernelTargetProfile {
+                    arch: Some(node.op.args[0].clone()),
+                    runtime: Some(node.op.args[1].clone()),
+                    lane_width: node.op.args[2].parse::<usize>().ok(),
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let stages = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "kernel")
+        .filter_map(|node| {
+            analyze_kernel_stage(node, &nodes, &target_profiles, &fabric_handle_tables)
+        })
+        .collect::<Vec<_>>();
+    let graphs = build_kernel_graphs(&stages);
+
+    KernelLoweringContract {
+        stages,
+        graphs,
+        fabric_handle_tables,
+        fabric_core_bindings,
+    }
+}
+
 fn analyze_draw_instanced(
     node: &Node,
     nodes: &BTreeMap<&str, &Node>,
     incoming: &BTreeMap<&str, Vec<&str>>,
     fabric_handle_tables: &[FabricHandleTableContract],
+    inline_wgsl_modules: &[ShaderInlineWgslModule],
 ) -> ShaderStageContract {
     let Some(pass_name) = node.op.args.first() else {
         return ShaderStageContract {
@@ -512,6 +1010,8 @@ fn analyze_draw_instanced(
             pipeline: None,
             target_format: None,
             topology: None,
+            wgsl_entry: None,
+            wgsl_source: None,
             fabric_handle_table: None,
             bindings: Vec::new(),
             blend_mode: None,
@@ -534,6 +1034,8 @@ fn analyze_draw_instanced(
             pipeline: None,
             target_format: None,
             topology: None,
+            wgsl_entry: None,
+            wgsl_source: None,
             fabric_handle_table: None,
             bindings: Vec::new(),
             blend_mode: None,
@@ -556,6 +1058,8 @@ fn analyze_draw_instanced(
             pipeline: None,
             target_format: None,
             topology: None,
+            wgsl_entry: None,
+            wgsl_source: None,
             fabric_handle_table: None,
             bindings: Vec::new(),
             blend_mode: None,
@@ -575,6 +1079,13 @@ fn analyze_draw_instanced(
     let (pipeline_name, topology) = pipeline_node
         .and_then(parse_pipeline_signature)
         .unwrap_or((None, None));
+    let (wgsl_entry, wgsl_source) = find_matching_inline_wgsl(
+        &node.resource,
+        pipeline_name.as_deref(),
+        inline_wgsl_modules,
+    )
+    .map(|module| (Some(module.entry.clone()), Some(module.source.clone())))
+    .unwrap_or((None, None));
 
     let (lowering, reason) = classify_backend_eligibility(
         target_format.as_deref(),
@@ -629,6 +1140,8 @@ fn analyze_draw_instanced(
         pipeline: pipeline_name,
         target_format,
         topology,
+        wgsl_entry,
+        wgsl_source,
         fabric_handle_table,
         bindings,
         blend_mode,
@@ -683,6 +1196,425 @@ fn extract_bindings(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Vec<ShaderRes
                 sampler_filter,
                 sampler_address_mode,
             })
+        })
+        .collect()
+}
+
+fn find_matching_inline_wgsl<'a>(
+    resource: &str,
+    pipeline_name: Option<&str>,
+    inline_wgsl_modules: &'a [ShaderInlineWgslModule],
+) -> Option<&'a ShaderInlineWgslModule> {
+    inline_wgsl_modules
+        .iter()
+        .find(|module| {
+            module.resource == resource
+                && pipeline_name
+                    .map(|pipeline| pipeline == module.entry)
+                    .unwrap_or(true)
+        })
+        .or_else(|| {
+            inline_wgsl_modules
+                .iter()
+                .find(|module| module.resource == resource)
+        })
+}
+
+fn decode_inline_shader_source(raw: &str) -> String {
+    fn decode_once(raw: &str) -> String {
+        let mut out = String::new();
+        let mut chars = raw.chars();
+        while let Some(ch) = chars.next() {
+            if ch != '\\' {
+                out.push(ch);
+                continue;
+            }
+            match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('r') => out.push('\r'),
+                Some('t') => out.push('\t'),
+                Some('\\') => out.push('\\'),
+                Some('"') => out.push('"'),
+                Some(other) => {
+                    out.push('\\');
+                    out.push(other);
+                }
+                None => out.push('\\'),
+            }
+        }
+        out
+    }
+
+    let mut current = raw.to_owned();
+    for _ in 0..2 {
+        let decoded = decode_once(&current);
+        if decoded == current {
+            break;
+        }
+        current = decoded;
+    }
+    current
+}
+
+fn collect_fabric_handle_tables(module: &YirModule) -> Vec<FabricHandleTableContract> {
+    module
+        .nodes
+        .iter()
+        .filter(|node| {
+            matches!(node.op.module.as_str(), "data" | "fabric")
+                && node.op.instruction == "handle_table"
+        })
+        .map(|node| FabricHandleTableContract {
+            node: node.name.clone(),
+            entries: node
+                .op
+                .args
+                .iter()
+                .filter_map(|entry| entry.split_once('='))
+                .map(|(slot, resource)| FabricHandleEntry {
+                    slot: slot.trim().to_owned(),
+                    resource: resource.trim().to_owned(),
+                })
+                .collect(),
+        })
+        .collect()
+}
+
+fn collect_fabric_core_bindings(module: &YirModule) -> Vec<FabricCoreBindingContract> {
+    module
+        .nodes
+        .iter()
+        .filter(|node| {
+            matches!(node.op.module.as_str(), "data" | "fabric")
+                && node.op.instruction == "bind_core"
+                && node.op.args.len() == 1
+        })
+        .filter_map(|node| {
+            node.op.args[0]
+                .parse::<usize>()
+                .ok()
+                .map(|core_index| FabricCoreBindingContract {
+                    node: node.name.clone(),
+                    resource: node.resource.clone(),
+                    core_index,
+                })
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct KernelTargetProfile {
+    arch: Option<String>,
+    runtime: Option<String>,
+    lane_width: Option<usize>,
+}
+
+fn analyze_kernel_stage(
+    node: &Node,
+    nodes: &BTreeMap<&str, &Node>,
+    target_profiles: &BTreeMap<String, KernelTargetProfile>,
+    fabric_handle_tables: &[FabricHandleTableContract],
+) -> Option<KernelStageContract> {
+    if matches!(
+        node.op.instruction.as_str(),
+        "target_config"
+            | "observe"
+            | "is_config_ready"
+            | "value"
+            | "const_bool"
+            | "const_i32"
+            | "const_i64"
+            | "const_f32"
+            | "const_f64"
+            | "print"
+    ) {
+        return None;
+    }
+
+    let target_profile = target_profiles.get(&node.resource);
+    let runtime = target_profile.and_then(|profile| profile.runtime.clone());
+    let arch = target_profile.and_then(|profile| profile.arch.clone());
+    let lane_width = target_profile.and_then(|profile| profile.lane_width);
+    let rows = infer_kernel_rows(node, nodes);
+    let cols = infer_kernel_cols(node, nodes);
+    let axis = infer_kernel_axis(node);
+    let topk = infer_kernel_topk(node);
+    let inputs = infer_kernel_inputs(node);
+    let fabric_handle_table = fabric_handle_tables
+        .iter()
+        .find(|table| {
+            table
+                .entries
+                .iter()
+                .any(|entry| entry.resource == node.resource)
+        })
+        .map(|table| table.node.clone());
+
+    let (lowering, reason) = classify_kernel_backend_eligibility(
+        node.op.instruction.as_str(),
+        runtime.as_deref(),
+        rows,
+        cols,
+        axis.as_deref(),
+    );
+
+    Some(KernelStageContract {
+        node: node.name.clone(),
+        op: node.op.full_name(),
+        resource: node.resource.clone(),
+        lowering,
+        reason: reason.to_owned(),
+        target_arch: arch,
+        target_runtime: runtime,
+        lane_width,
+        rows,
+        cols,
+        axis,
+        topk,
+        inputs,
+        fabric_handle_table,
+    })
+}
+
+fn infer_kernel_rows(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Option<usize> {
+    match node.op.instruction.as_str() {
+        "tensor" | "fill" | "splat" if node.op.args.len() >= 2 => {
+            node.op.args[0].parse::<usize>().ok()
+        }
+        "reshape" if node.op.args.len() >= 3 => node.op.args[1].parse::<usize>().ok(),
+        "slice" if node.op.args.len() >= 5 => node.op.args[3].parse::<usize>().ok(),
+        "broadcast" if node.op.args.len() >= 3 => node.op.args[1].parse::<usize>().ok(),
+        "row" => Some(1),
+        "col" => nodes
+            .get(node.op.args.first()?.as_str())
+            .copied()
+            .and_then(|source| infer_kernel_rows(source, nodes)),
+        "shape" => Some(1),
+        "rows" | "cols" | "reduce_sum" | "reduce_mean" | "reduce_max" | "reduce_min" => Some(1),
+        "reduce_sum_axis" | "reduce_mean_axis" | "reduce_max_axis" | "reduce_min_axis"
+        | "argmax_axis" | "argmin_axis" | "topk_axis" | "sort_axis" => {
+            let source = nodes.get(node.op.args.first()?.as_str()).copied()?;
+            match node.op.args.get(1).map(|value| value.as_str()) {
+                Some("rows") => Some(1),
+                Some("cols") => infer_kernel_rows(source, nodes),
+                _ => None,
+            }
+        }
+        "argmax" | "argmin" | "element_at" => Some(1),
+        _ => None,
+    }
+}
+
+fn infer_kernel_cols(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Option<usize> {
+    match node.op.instruction.as_str() {
+        "tensor" | "fill" | "splat" if node.op.args.len() >= 2 => {
+            node.op.args[1].parse::<usize>().ok()
+        }
+        "reshape" if node.op.args.len() >= 3 => node.op.args[2].parse::<usize>().ok(),
+        "slice" if node.op.args.len() >= 5 => node.op.args[4].parse::<usize>().ok(),
+        "broadcast" if node.op.args.len() >= 3 => node.op.args[2].parse::<usize>().ok(),
+        "row" => nodes
+            .get(node.op.args.first()?.as_str())
+            .copied()
+            .and_then(|source| infer_kernel_cols(source, nodes)),
+        "col" => Some(1),
+        "shape" => Some(2),
+        "rows" | "cols" | "reduce_sum" | "reduce_mean" | "reduce_max" | "reduce_min" => Some(1),
+        "reduce_sum_axis" | "reduce_mean_axis" | "reduce_max_axis" | "reduce_min_axis"
+        | "argmax_axis" | "argmin_axis" | "topk_axis" | "sort_axis" => {
+            let source = nodes.get(node.op.args.first()?.as_str()).copied()?;
+            match node.op.args.get(1).map(|value| value.as_str()) {
+                Some("rows") => infer_kernel_cols(source, nodes),
+                Some("cols") => Some(1),
+                _ => None,
+            }
+        }
+        "argmax" | "argmin" | "element_at" => Some(1),
+        "topk" => node.op.args.get(1).and_then(|k| k.parse::<usize>().ok()),
+        _ => None,
+    }
+}
+
+fn infer_kernel_axis(node: &Node) -> Option<String> {
+    match node.op.instruction.as_str() {
+        "reduce_sum_axis" | "reduce_mean_axis" | "reduce_max_axis" | "reduce_min_axis"
+        | "argmax_axis" | "argmin_axis" | "topk_axis" | "sort_axis" | "relu_axis"
+        | "add_scalar_axis" | "mul_scalar_axis" => node.op.args.last().cloned(),
+        _ => None,
+    }
+}
+
+fn infer_kernel_topk(node: &Node) -> Option<usize> {
+    match node.op.instruction.as_str() {
+        "topk" => node
+            .op
+            .args
+            .get(1)
+            .and_then(|value| value.parse::<usize>().ok()),
+        "topk_axis" => node
+            .op
+            .args
+            .get(1)
+            .and_then(|value| value.parse::<usize>().ok()),
+        _ => None,
+    }
+}
+
+fn infer_kernel_inputs(node: &Node) -> Vec<String> {
+    match node.op.instruction.as_str() {
+        "tensor" | "fill" | "splat" | "const_bool" | "const_i32" | "const_i64" | "const_f32"
+        | "const_f64" | "target_config" => Vec::new(),
+        "reshape" => node.op.args.iter().take(1).cloned().collect(),
+        "slice" => node.op.args.iter().take(1).cloned().collect(),
+        "broadcast" => node.op.args.iter().take(1).cloned().collect(),
+        "topk" => node.op.args.iter().take(1).cloned().collect(),
+        "topk_axis" => node.op.args.iter().take(1).cloned().collect(),
+        "reduce_sum_axis" | "reduce_mean_axis" | "reduce_max_axis" | "reduce_min_axis"
+        | "argmax_axis" | "argmin_axis" | "sort_axis" | "relu_axis" | "add_scalar_axis"
+        | "mul_scalar_axis" => node.op.args.iter().take(1).cloned().collect(),
+        "element_at" => node.op.args.iter().take(1).cloned().collect(),
+        "print" => node.op.args.iter().take(1).cloned().collect(),
+        _ => node.op.args.clone(),
+    }
+}
+
+fn classify_kernel_backend_eligibility(
+    op: &str,
+    runtime: Option<&str>,
+    rows: Option<usize>,
+    cols: Option<usize>,
+    axis: Option<&str>,
+) -> (KernelLoweringMode, &'static str) {
+    let Some(runtime) = runtime else {
+        return (
+            KernelLoweringMode::CpuFallbackOnly,
+            "missing kernel.target_config runtime contract",
+        );
+    };
+
+    let portable_tensor_subset = matches!(
+        op,
+        "tensor"
+            | "fill"
+            | "splat"
+            | "add"
+            | "mul"
+            | "add_scalar"
+            | "mul_scalar"
+            | "matmul"
+            | "add_bias"
+            | "relu"
+            | "reshape"
+            | "slice"
+            | "broadcast"
+            | "reduce_sum"
+            | "reduce_mean"
+            | "reduce_max"
+            | "reduce_min"
+            | "reduce_sum_axis"
+            | "reduce_mean_axis"
+            | "reduce_max_axis"
+            | "reduce_min_axis"
+            | "row"
+            | "col"
+            | "shape"
+            | "rows"
+            | "cols"
+            | "element_at"
+    );
+
+    if !portable_tensor_subset {
+        return (
+            KernelLoweringMode::CpuFallbackOnly,
+            "op is outside the current portable kernel lowering subset",
+        );
+    }
+
+    if rows == Some(0) || cols == Some(0) {
+        return (
+            KernelLoweringMode::CpuFallbackOnly,
+            "zero-shaped kernel work cannot be lowered portably",
+        );
+    }
+
+    if let Some(axis) = axis {
+        if !matches!(axis, "rows" | "cols") {
+            return (
+                KernelLoweringMode::CpuFallbackOnly,
+                "axis contract is outside the current portable kernel lowering subset",
+            );
+        }
+    }
+
+    match runtime {
+        "coreml" => (
+            KernelLoweringMode::BackendEligible,
+            "stage fits the current CoreML/MPS graph lowering subset",
+        ),
+        "vulkan" => (
+            KernelLoweringMode::BackendEligible,
+            "stage fits the current Vulkan compute lowering subset",
+        ),
+        _ => (
+            KernelLoweringMode::CpuFallbackOnly,
+            "runtime is outside the current portable kernel lowering subset",
+        ),
+    }
+}
+
+fn build_kernel_graphs(stages: &[KernelStageContract]) -> Vec<KernelComputeGraphContract> {
+    let mut by_resource = BTreeMap::<String, Vec<&KernelStageContract>>::new();
+    for stage in stages {
+        by_resource
+            .entry(stage.resource.clone())
+            .or_default()
+            .push(stage);
+    }
+
+    by_resource
+        .into_iter()
+        .enumerate()
+        .map(|(index, (resource, resource_stages))| {
+            let lowering = if resource_stages
+                .iter()
+                .all(|stage| stage.lowering == KernelLoweringMode::BackendEligible)
+            {
+                KernelLoweringMode::BackendEligible
+            } else {
+                KernelLoweringMode::CpuFallbackOnly
+            };
+            let reason = if lowering == KernelLoweringMode::BackendEligible {
+                "graph fits the current fused kernel backend portability subset".to_owned()
+            } else {
+                "graph includes one or more stages outside the current fused kernel backend portability subset".to_owned()
+            };
+            let target_arch = resource_stages
+                .iter()
+                .find_map(|stage| stage.target_arch.clone());
+            let target_runtime = resource_stages
+                .iter()
+                .find_map(|stage| stage.target_runtime.clone());
+            let lane_width = resource_stages.iter().find_map(|stage| stage.lane_width);
+            let graph_name = resource
+                .rsplit('@')
+                .next()
+                .unwrap_or(resource.as_str())
+                .replace('.', "_");
+            let stages = resource_stages
+                .iter()
+                .map(|stage| stage.node.clone())
+                .collect::<Vec<_>>();
+
+            KernelComputeGraphContract {
+                id: format!("kernel_graph_{}_{}", index + 1, graph_name),
+                resource,
+                lowering,
+                reason,
+                target_arch,
+                target_runtime,
+                lane_width,
+                stages,
+            }
         })
         .collect()
 }
@@ -883,4 +1815,85 @@ fn classify_backend_eligibility(
 
 fn escape_toml(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_module(source: &str) -> YirModule {
+        yir_syntax::parse_module(source).expect("module should parse")
+    }
+
+    #[test]
+    fn kernel_contract_marks_coreml_matmul_pipeline_backend_eligible() {
+        let module = parse_module(
+            r#"yir 0.1
+
+resource kernel0 kernel.apple
+resource fabric0 data.fabric
+
+data.handle_table handles fabric0 host=cpu0,compute=kernel0
+kernel.target_config profile kernel0 apple_ane coreml 128
+kernel.tensor input kernel0 1 3 2,4,6
+kernel.tensor weights kernel0 3 2 1,-2,3,0,2,1
+kernel.matmul projected kernel0 input weights
+kernel.print trace kernel0 projected
+"#,
+        );
+
+        let contract = analyze_kernel_lowering(&module);
+        assert!(contract.has_kernel_work());
+        assert!(contract.has_backend_eligible_work());
+        assert!(!contract.requires_cpu_fallback());
+        assert_eq!(contract.stages.len(), 3);
+        assert_eq!(contract.graphs.len(), 1);
+        assert_eq!(
+            contract.graphs[0].lowering,
+            KernelLoweringMode::BackendEligible
+        );
+        assert!(contract
+            .render_package_manifest()
+            .contains("package_kind = \"kernel_package\""));
+        assert!(contract
+            .render_package_manifest()
+            .contains("backend = \"coreml\""));
+        assert!(contract.render_package_manifest().contains("[[graph]]"));
+    }
+
+    #[test]
+    fn kernel_contract_marks_topk_as_cpu_fallback_only() {
+        let module = parse_module(
+            r#"yir 0.1
+
+resource kernel0 kernel.apple
+
+kernel.target_config profile kernel0 apple_ane coreml 128
+kernel.tensor base kernel0 2 4 9,2,7,5,4,8,1,6
+kernel.topk top_rows kernel0 base 2
+kernel.print trace kernel0 top_rows
+"#,
+        );
+
+        let contract = analyze_kernel_lowering(&module);
+        assert!(contract.has_kernel_work());
+        assert!(contract.has_backend_eligible_work());
+        assert!(contract.requires_cpu_fallback());
+        assert_eq!(contract.stages.len(), 2);
+        assert_eq!(contract.graphs.len(), 1);
+        assert_eq!(
+            contract.graphs[0].lowering,
+            KernelLoweringMode::CpuFallbackOnly
+        );
+        let topk_stage = contract
+            .stages
+            .iter()
+            .find(|stage| stage.node == "top_rows")
+            .expect("topk stage should be present");
+        assert_eq!(topk_stage.lowering, KernelLoweringMode::CpuFallbackOnly);
+        assert!(contract.render_text().contains("cpu_fallback_only"));
+        assert!(contract
+            .render_package_manifest()
+            .contains("backend = \"cpu-fallback\""));
+    }
 }

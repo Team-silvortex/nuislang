@@ -1,0 +1,204 @@
+mod cpu Main {
+  extern "c" fn host_error_code(kind_handle: i64) -> i64;
+  extern "c" fn host_error_message(kind_handle: i64) -> i64;
+  extern "c" fn host_error_severity(kind_handle: i64) -> i64;
+
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  enum ErrorSeverity {
+    Info,
+    Warning,
+    Error,
+  }
+
+  enum ErrorFamily {
+    Unknown,
+    InputValidation,
+    ResultRuntime,
+    DiagnosticRuntime,
+  }
+
+  struct ErrorCode {
+    kind_handle: i64,
+    stable_code: i64,
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64,
+    retryable: i64
+  }
+
+  struct DiagnosticCode {
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64
+  }
+
+  struct ErrorEnvelope {
+    error: ErrorCode,
+    diagnostic: DiagnosticCode
+  }
+
+  struct ShaderResultEnumSummary {
+    pass_score: i64,
+    frame_score: i64
+  }
+
+  fn kind_result_missing() -> i64 {
+    return 1202;
+  }
+
+  fn kind_diagnostic_message() -> i64 {
+    return 1303;
+  }
+
+  fn severity_code(severity: ErrorSeverity) -> i64 {
+    match severity {
+      ErrorSeverity.Info => { return 1; }
+      ErrorSeverity.Warning => { return 2; }
+      ErrorSeverity.Error => { return 3; }
+      _ => { return 0; }
+    }
+  }
+
+  fn family_code(family: ErrorFamily) -> i64 {
+    match family {
+      ErrorFamily.Unknown => { return 0; }
+      ErrorFamily.InputValidation => { return 11; }
+      ErrorFamily.ResultRuntime => { return 12; }
+      ErrorFamily.DiagnosticRuntime => { return 13; }
+      _ => { return 0; }
+    }
+  }
+
+  fn classify_error_severity(kind_handle: i64) -> ErrorSeverity {
+    if kind_handle == kind_result_missing() {
+      return ErrorSeverity.Warning;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorSeverity.Warning;
+    }
+    return ErrorSeverity.Info;
+  }
+
+  fn classify_error_family(kind_handle: i64) -> ErrorFamily {
+    if kind_handle == kind_result_missing() {
+      return ErrorFamily.ResultRuntime;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorFamily.DiagnosticRuntime;
+    }
+    return ErrorFamily.Unknown;
+  }
+
+  fn classify_error_retryable(kind_handle: i64) -> i64 {
+    if kind_handle == kind_result_missing() {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn build_error_code(kind_handle: i64) -> ErrorCode {
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    return ErrorCode {
+      kind_handle: kind_handle,
+      stable_code: host_error_code(kind_handle),
+      message_handle: host_error_message(kind_handle),
+      severity_code: host_error_severity(kind_handle),
+      family_code: family_code(family),
+      retryable: classify_error_retryable(kind_handle)
+    };
+  }
+
+  fn build_diagnostic_code(kind_handle: i64) -> DiagnosticCode {
+    let severity: ErrorSeverity = classify_error_severity(kind_handle);
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    return DiagnosticCode {
+      message_handle: host_error_message(kind_handle),
+      severity_code: severity_code(severity),
+      family_code: family_code(family)
+    };
+  }
+
+  fn build_error_envelope(kind_handle: i64) -> ErrorEnvelope {
+    return ErrorEnvelope {
+      error: build_error_code(kind_handle),
+      diagnostic: build_diagnostic_code(kind_handle)
+    };
+  }
+
+  fn result_is_err<T, E>(result: Result<T, E>) -> bool {
+    match result {
+      Result.Ok(_) => { return false; }
+      Result.Err(_) => { return true; }
+    }
+  }
+
+  fn result_unwrap_or<T, E>(result: Result<T, E>, fallback: T) -> T {
+    match result {
+      Result.Ok(value) => { return value; }
+      Result.Err(_) => { return fallback; }
+    }
+  }
+
+  fn result_score(result: Result<i64, ErrorEnvelope>) -> i64 {
+    match result {
+      Result.Ok(value) => { return value; }
+      Result.Err(envelope) => {
+        return envelope.error.stable_code
+          + envelope.error.message_handle
+          + envelope.error.severity_code
+          + envelope.error.family_code
+          + envelope.error.retryable
+          + envelope.diagnostic.message_handle
+          + envelope.diagnostic.severity_code
+          + envelope.diagnostic.family_code;
+      }
+    }
+  }
+
+  fn lift_error_kind(kind_handle: i64) -> Result<i64, ErrorEnvelope> {
+    return Result.Err(build_error_envelope(kind_handle));
+  }
+
+  fn lift_pass_result(ready: bool, metric: i64) -> Result<i64, ErrorEnvelope> {
+    if ready {
+      return Result.Ok(metric);
+    }
+    return lift_error_kind(kind_result_missing());
+  }
+
+  fn lift_frame_result(ready: bool, metric: i64) -> Result<i64, ErrorEnvelope> {
+    if ready {
+      return Result.Ok(metric);
+    }
+    return lift_error_kind(kind_diagnostic_message());
+  }
+
+  fn summarize_shader_result_enum_recipe(
+    pass_ready: bool,
+    draw_ready: bool,
+    frame_ready: bool,
+    packet_tag: i64,
+    packet_field_count: i64
+  ) -> i64 {
+    let pass_metric: Result<i64, ErrorEnvelope> = lift_pass_result(pass_ready, packet_tag);
+    let draw_metric: Result<i64, ErrorEnvelope> =
+      lift_frame_result(draw_ready, packet_field_count + 7);
+    let frame_metric: Result<i64, ErrorEnvelope> =
+      lift_frame_result(frame_ready, packet_tag + packet_field_count);
+    return result_score(pass_metric)
+      + result_unwrap_or(pass_metric, -10)
+      + result_score(draw_metric)
+      + result_unwrap_or(draw_metric, -20)
+      + result_score(frame_metric)
+      + result_unwrap_or(frame_metric, -30)
+      + if result_is_err(frame_metric) { 3 } else { 0 };
+  }
+
+  fn main() {
+    print(summarize_shader_result_enum_recipe(true, true, true, 17, 3));
+  }
+}

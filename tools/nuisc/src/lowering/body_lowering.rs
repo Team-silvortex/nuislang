@@ -90,9 +90,7 @@ fn eval_const_i64_with_env(
         | NirExpr::CastI32ToI64(value)
         | NirExpr::CastBoolToI64(value)
         | NirExpr::CastF32ToI64(value)
-        | NirExpr::CastF64ToI64(value) => {
-            eval_const_i64_with_env(value, const_bindings, visited)
-        }
+        | NirExpr::CastF64ToI64(value) => eval_const_i64_with_env(value, const_bindings, visited),
         NirExpr::CastI64ToBool(value) => Some(i64::from(
             eval_const_i64_with_env(value, const_bindings, visited)? != 0,
         )),
@@ -226,16 +224,14 @@ fn lower_inline_stmts(
                 then_body,
                 else_body,
             } => {
-                if let Some(returned) =
-                    lower_if_stmt(
-                        condition,
-                        then_body,
-                        else_body,
-                        state,
-                        bindings,
-                        const_bindings,
-                    )?
-                {
+                if let Some(returned) = lower_if_stmt(
+                    condition,
+                    then_body,
+                    else_body,
+                    state,
+                    bindings,
+                    const_bindings,
+                )? {
                     return Ok(Some(returned));
                 }
             }

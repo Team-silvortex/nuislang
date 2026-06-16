@@ -54,8 +54,7 @@ pub(super) fn lower_match_stmt_with_async(
     };
     let wildcard_index = arms
         .iter()
-        .position(|arm| matches!(arm.pattern, AstMatchPattern::Wildcard) && arm.guard.is_none())
-        ;
+        .position(|arm| matches!(arm.pattern, AstMatchPattern::Wildcard) && arm.guard.is_none());
 
     let (arms_to_lower, mut else_body) = if let Some(wildcard_index) = wildcard_index {
         if wildcard_index != arms.len() - 1 {
@@ -211,7 +210,8 @@ fn exhaustive_option_or_result_variant_name(
         _ => return Ok(None),
     };
     let resolved_type_ref = resolve_ast_type_ref_aliases(type_ref, type_aliases)?;
-    let lowered_pattern_ty = lower_pattern_type_for_scrutinee(&resolved_type_ref, value_ty, type_aliases)?;
+    let lowered_pattern_ty =
+        lower_pattern_type_for_scrutinee(&resolved_type_ref, value_ty, type_aliases)?;
     let Some((parent, variant)) = lowered_pattern_ty.name.rsplit_once('.') else {
         return Ok(None);
     };

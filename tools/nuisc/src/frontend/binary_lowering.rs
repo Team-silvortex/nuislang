@@ -147,8 +147,7 @@ fn lower_overloaded_binary_operator(
     if !compatible_types(lhs_ty, rhs_ty) {
         return Ok(None);
     }
-    let Some(signature) =
-        find_impl_method_signature(signatures, trait_name, lhs_ty, method_name)
+    let Some(signature) = find_impl_method_signature(signatures, trait_name, lhs_ty, method_name)
     else {
         return Ok(None);
     };

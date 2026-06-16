@@ -92,7 +92,6 @@ mod cpu Main {
 
   fn build_error_code(kind_handle: i64) -> ErrorCode {
     let family: ErrorFamily = classify_error_family(kind_handle);
-    let _severity: ErrorSeverity = classify_error_severity(kind_handle);
     return ErrorCode {
       kind_handle: kind_handle,
       stable_code: host_error_code(kind_handle),

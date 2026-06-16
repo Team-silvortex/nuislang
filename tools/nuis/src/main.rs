@@ -152,9 +152,11 @@ fn handle_release_check(
     if nuisc::project::is_project_input(&input) {
         let project = nuisc::project::load_project(&input)?;
         let plan = nuisc::project::build_project_compilation_plan(&project)?;
-        let abi_checks = nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
+        let abi_checks =
+            nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
         let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
-        let lowering_checks = nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
+        let lowering_checks =
+            nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
         println!("release-check: abi");
         for check in &abi_checks {
             for line in nuisc::project::render_project_abi_selection_check_lines(check) {
@@ -1369,9 +1371,7 @@ fn project_lowering_checks_json(
         .collect()
 }
 
-fn project_abi_checks_json(
-    checks: &[nuisc::project::ProjectAbiSelectionCheck],
-) -> Vec<String> {
+fn project_abi_checks_json(checks: &[nuisc::project::ProjectAbiSelectionCheck]) -> Vec<String> {
     checks
         .iter()
         .map(nuisc::project::project_abi_selection_check_json)
@@ -1778,7 +1778,10 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
             println!("  domain: {}", item.domain);
             for line in nuisc::project::render_project_abi_selection_view_lines(&item) {
                 if let Some(detail) = line.strip_prefix("abi: ") {
-                    println!("    abi: {}", detail.split_once('=').map(|(_, abi)| abi).unwrap_or(detail));
+                    println!(
+                        "    abi: {}",
+                        detail.split_once('=').map(|(_, abi)| abi).unwrap_or(detail)
+                    );
                 } else {
                     println!("    {}", line.trim_start());
                 }
@@ -2335,7 +2338,8 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
         .dependencies
         .iter()
         .any(|dependency| !dependency.installed);
-    let abi_checks = nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
+    let abi_checks =
+        nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
     let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
     let lowering_checks =
         nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
@@ -2723,7 +2727,8 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
         .dependencies
         .iter()
         .any(|dependency| !dependency.installed);
-    let abi_checks = nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
+    let abi_checks =
+        nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
     let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
     let lowering_checks =
         nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
@@ -2949,12 +2954,18 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
         "abi_checks_ok",
         abi_checks.iter().all(|check| check.ok),
     ));
-    fields.push(json_usize_field("registry_checks_count", registry_checks.len()));
+    fields.push(json_usize_field(
+        "registry_checks_count",
+        registry_checks.len(),
+    ));
     fields.push(json_bool_field(
         "registry_checks_ok",
         registry_checks.iter().all(|check| check.ok),
     ));
-    fields.push(json_usize_field("lowering_checks_count", lowering_checks.len()));
+    fields.push(json_usize_field(
+        "lowering_checks_count",
+        lowering_checks.len(),
+    ));
     fields.push(json_bool_field(
         "lowering_checks_ok",
         lowering_checks.iter().all(|check| check.ok),
@@ -3047,10 +3058,7 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn print_domain_contract_group(
-    contract: &nuisc::registry::NustarDomainContract,
-    group: &str,
-) {
+fn print_domain_contract_group(contract: &nuisc::registry::NustarDomainContract, group: &str) {
     println!("    {}:", group);
     match group {
         nuisc::registry::NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY => {
@@ -3065,7 +3073,10 @@ fn print_domain_contract_group(
         nuisc::registry::NUSTAR_DOMAIN_CONTRACT_GROUP_ABI => {
             println!("      machine_abi_policy: {}", contract.machine_abi_policy);
             if !contract.abi_profiles.is_empty() {
-                print_scheduler_sample_field("      abi_profiles", &contract.abi_profiles.join("; "));
+                print_scheduler_sample_field(
+                    "      abi_profiles",
+                    &contract.abi_profiles.join("; "),
+                );
             }
         }
         nuisc::registry::NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE => {
@@ -3162,8 +3173,14 @@ fn print_project_scheduler_contract_view(domain: &str) -> Result<(), String> {
     println!("      entry_crate: {}", registration.entry_crate);
     println!("      ast_entry: {}", registration.ast_entry);
     println!("      nir_entry: {}", registration.nir_entry);
-    println!("      yir_lowering_entry: {}", registration.yir_lowering_entry);
-    println!("      part_verify_entry: {}", registration.part_verify_entry);
+    println!(
+        "      yir_lowering_entry: {}",
+        registration.yir_lowering_entry
+    );
+    println!(
+        "      part_verify_entry: {}",
+        registration.part_verify_entry
+    );
     if !registration.ast_surface.is_empty() {
         print_scheduler_sample_field("      ast_surface", &registration.ast_surface.join("; "));
     }
@@ -3171,10 +3188,7 @@ fn print_project_scheduler_contract_view(domain: &str) -> Result<(), String> {
         print_scheduler_sample_field("      nir_surface", &registration.nir_surface.join("; "));
     }
     if !registration.yir_lowering.is_empty() {
-        print_scheduler_sample_field(
-            "      yir_lowering",
-            &registration.yir_lowering.join("; "),
-        );
+        print_scheduler_sample_field("      yir_lowering", &registration.yir_lowering.join("; "));
     }
     if !registration.part_verify.is_empty() {
         print_scheduler_sample_field("      part_verify", &registration.part_verify.join("; "));
@@ -3706,9 +3720,8 @@ fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_workflow_frontdoor_surface, handle_check, handle_test,
-        project_abi_checks_json, project_compile_workflow_source_profile,
-        project_domain_registry_checks_json,
+        build_workflow_frontdoor_surface, handle_check, handle_test, project_abi_checks_json,
+        project_compile_workflow_source_profile, project_domain_registry_checks_json,
         resolve_runner_clock_domain, run_language_tests_for_source_file,
         scheduler_view_domain_record, scheduler_view_domain_record_json,
         single_source_workflow_source_profile, wait_for_test_child, RawTestOutcome,
@@ -4261,7 +4274,10 @@ mod cpu Main {
         assert!(!checks.is_empty());
         assert!(checks.iter().all(|check| check.ok));
         assert!(checks.iter().any(|check| check.domain == "network"));
-        let network = checks.iter().find(|check| check.domain == "network").unwrap();
+        let network = checks
+            .iter()
+            .find(|check| check.domain == "network")
+            .unwrap();
         assert!(network.abi_registered);
         assert!(network.issues.is_empty());
         assert_eq!(

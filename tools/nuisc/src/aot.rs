@@ -437,10 +437,7 @@ pub fn write_build_manifest(
             escape_toml_string(&project.abi_mode)
         ));
         if let Some(value) = &project.abi_graph_summary {
-            out.push_str(&format!(
-                "abi_graph = \"{}\"\n",
-                escape_toml_string(value)
-            ));
+            out.push_str(&format!("abi_graph = \"{}\"\n", escape_toml_string(value)));
         }
         if let Some(value) = &project.plan_summary {
             out.push_str(&format!(

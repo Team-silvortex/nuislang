@@ -46,11 +46,11 @@ mod tests_frontend_core;
 
 // Generic specialization and higher-order behavior.
 #[cfg(test)]
+mod tests_generic_constraints;
+#[cfg(test)]
 mod tests_generic_structs;
 #[cfg(test)]
 mod tests_generics;
-#[cfg(test)]
-mod tests_generic_constraints;
 #[cfg(test)]
 mod tests_higher_order;
 #[cfg(test)]
@@ -93,8 +93,8 @@ mod tests_try;
 mod tests_types_async_window;
 mod types;
 mod unary_lowering;
-mod validation_assignments;
 mod validation;
+mod validation_assignments;
 mod validation_binding_env;
 mod validation_generic_constraints;
 mod validation_helpers;
@@ -111,8 +111,8 @@ use self::annotations::{
 use self::binary_lowering::lower_binary_expr_with_async;
 use self::call_helpers::{
     ensure_mutex_guard_like, ensure_mutex_like, ensure_ref_like, ensure_spawn_input_safe,
-    ensure_task_like, ensure_thread_like,
-    lower_result_observer_call_with_consts, lower_result_wrapper_call_with_consts,
+    ensure_task_like, ensure_thread_like, lower_result_observer_call_with_consts,
+    lower_result_wrapper_call_with_consts,
 };
 use self::call_lowering::lower_call_expr_with_async;
 use self::call_routing::lower_routed_call_or_core_builtin;

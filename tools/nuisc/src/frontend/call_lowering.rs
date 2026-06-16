@@ -309,9 +309,10 @@ fn lower_payload_struct_constructor_sugar(
             is_ref: false,
         }
     } else if let Some(expected) = expected {
-        let expected_matches_parent = expected
-            .name
-            .eq(callee.rsplit_once('.').map(|(parent, _)| parent).unwrap_or_default());
+        let expected_matches_parent = expected.name.eq(callee
+            .rsplit_once('.')
+            .map(|(parent, _)| parent)
+            .unwrap_or_default());
         if expected.name != callee && !expected_matches_parent {
             return Err(format!(
                 "payload-style struct constructor `{callee}(...)` requires expected type `{callee}<...>` or its parent enum type, found `{}`",

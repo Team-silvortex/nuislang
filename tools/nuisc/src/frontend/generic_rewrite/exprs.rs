@@ -14,9 +14,9 @@ use super::super::{
     lower_type_ref, lower_type_ref_with_aliases, resolve_ast_type_ref_aliases,
     substitute_ast_type_alias_target, FunctionSignature,
 };
+use super::GenericImplMethodTemplate;
 use crate::frontend::generic_rewrite::rewrite_generic_calls_in_function;
 use crate::frontend::higher_order::rewrite_higher_order_calls_in_function;
-use super::GenericImplMethodTemplate;
 
 pub(super) fn rewrite_generic_calls_in_expr(
     expr: &AstExpr,
@@ -374,11 +374,12 @@ pub(super) fn rewrite_generic_calls_in_expr(
             generic_args,
             args,
         } => {
-            let explicit_receiver_expected = super::super::receiver_expected::explicit_receiver_expected_type(
-                receiver,
-                generic_args,
-                visible_type_aliases,
-            );
+            let explicit_receiver_expected =
+                super::super::receiver_expected::explicit_receiver_expected_type(
+                    receiver,
+                    generic_args,
+                    visible_type_aliases,
+                );
             let rewritten_args = args
                 .iter()
                 .map(|arg| {
@@ -431,12 +432,13 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 specialized_functions,
                 specialized_signatures,
             )?;
-            let rewritten_receiver = super::super::receiver_expected::specialize_receiver_constructor_from_expected(
-                &rewritten_receiver,
-                explicit_receiver_expected.as_ref(),
-                visible_type_aliases,
-                struct_table,
-            );
+            let rewritten_receiver =
+                super::super::receiver_expected::specialize_receiver_constructor_from_expected(
+                    &rewritten_receiver,
+                    explicit_receiver_expected.as_ref(),
+                    visible_type_aliases,
+                    struct_table,
+                );
             let mut call_args = vec![rewritten_receiver.clone()];
             call_args.extend(rewritten_args.clone());
             if let Some(specialized_name) = ensure_generic_impl_method_specialization(
@@ -538,14 +540,13 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 fields: fields
                     .iter()
                     .map(|(name, value)| {
-                        let literal_ty = concrete_literal_ty
-                        .clone()
-                        .unwrap_or_else(|| AstTypeRef {
-                            name: final_name.clone(),
-                            generic_args: final_args.clone(),
-                            is_optional: false,
-                            is_ref: false,
-                        });
+                        let literal_ty =
+                            concrete_literal_ty.clone().unwrap_or_else(|| AstTypeRef {
+                                name: final_name.clone(),
+                                generic_args: final_args.clone(),
+                                is_optional: false,
+                                is_ref: false,
+                            });
                         let field_expected =
                             struct_field_expected_type(&literal_ty, name, struct_table);
                         Ok((
@@ -746,7 +747,9 @@ fn builtin_binary_supported_ast(op: AstBinaryOp, lhs_ty: &AstTypeRef, rhs_ty: &A
         | AstBinaryOp::Div
         | AstBinaryOp::Rem => is_plain_numeric_scalar(lhs_ty),
         AstBinaryOp::Eq | AstBinaryOp::Ne => {
-            is_plain_integer_scalar(lhs_ty) || is_plain_float_scalar(lhs_ty) || is_plain_scalar(lhs_ty, "bool")
+            is_plain_integer_scalar(lhs_ty)
+                || is_plain_float_scalar(lhs_ty)
+                || is_plain_scalar(lhs_ty, "bool")
         }
         AstBinaryOp::Lt | AstBinaryOp::Le | AstBinaryOp::Gt | AstBinaryOp::Ge => {
             is_plain_numeric_scalar(lhs_ty)
@@ -762,7 +765,9 @@ fn builtin_unary_supported_ast(op: AstUnaryOp, operand_ty: &AstTypeRef) -> bool 
                 || is_plain_scalar(operand_ty, "f32")
                 || is_plain_scalar(operand_ty, "f64")
         }
-        AstUnaryOp::Deref => operand_ty.name == "Node" && operand_ty.is_ref && !operand_ty.is_optional,
+        AstUnaryOp::Deref => {
+            operand_ty.name == "Node" && operand_ty.is_ref && !operand_ty.is_optional
+        }
     }
 }
 
@@ -930,13 +935,11 @@ fn method_call_receiver_expected_type(
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
 ) -> Option<AstTypeRef> {
-    if let Some(explicit) =
-        super::super::receiver_expected::explicit_receiver_expected_type(
-            receiver,
-            generic_args,
-            visible_type_aliases,
-        )
-    {
+    if let Some(explicit) = super::super::receiver_expected::explicit_receiver_expected_type(
+        receiver,
+        generic_args,
+        visible_type_aliases,
+    ) {
         return Some(explicit);
     }
 
@@ -1095,7 +1098,10 @@ fn infer_alias_struct_literal_type_from_fields(
         alias_name,
         alias_definition,
         &field_patterns,
-        &fields.iter().map(|(_, value)| value.clone()).collect::<Vec<_>>(),
+        &fields
+            .iter()
+            .map(|(_, value)| value.clone())
+            .collect::<Vec<_>>(),
         visible_type_aliases,
         env,
         impl_lookup,
@@ -1284,9 +1290,7 @@ fn infer_alias_struct_target_from_expected(
     {
         return Ok(None);
     }
-    let generic_args = generic_args
-        .into_iter()
-        .collect::<Vec<_>>();
+    let generic_args = generic_args.into_iter().collect::<Vec<_>>();
     let substituted = substitute_ast_type_alias_target(
         &alias_definition.target,
         &alias_definition
@@ -1541,10 +1545,9 @@ fn ensure_generic_impl_method_specialization_from_receiver_expected(
     inference_args.extend(actual_args.iter().skip(1).cloned());
 
     let mut candidates = Vec::new();
-    for template in generic_impl_method_templates
-        .iter()
-        .filter(|template| template.method_name == method_name && template.function.params.len() == actual_args.len())
-    {
+    for template in generic_impl_method_templates.iter().filter(|template| {
+        template.method_name == method_name && template.function.params.len() == actual_args.len()
+    }) {
         if infer_generic_substitutions(
             &template.function,
             &[],
@@ -1931,10 +1934,15 @@ fn field_access_base_expected_type(
         resolve_ast_type_ref_aliases(field_expected?, visible_type_aliases).ok()?;
     let mut candidates = Vec::new();
     for definition in struct_table.values() {
-        let Some(field) = definition.fields.iter().find(|field| field.name == field_name) else {
+        let Some(field) = definition
+            .fields
+            .iter()
+            .find(|field| field.name == field_name)
+        else {
             continue;
         };
-        let resolved_field_ty = resolve_ast_type_ref_aliases(&field.ty, visible_type_aliases).ok()?;
+        let resolved_field_ty =
+            resolve_ast_type_ref_aliases(&field.ty, visible_type_aliases).ok()?;
         let generic_names = definition
             .generic_params
             .iter()

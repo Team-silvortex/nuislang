@@ -73,8 +73,7 @@ fn materializes_shader_and_network_resources_from_project_abi_targets() {
         node.name == "project_profile_network_NetworkUnit_network_target_config_auto"
             && node.op.module == "network"
             && node.op.instruction == "target_config"
-            && node.op.args
-                == vec!["arm64".to_owned(), "urlsession".to_owned(), "1".to_owned()]
+            && node.op.args == vec!["arm64".to_owned(), "urlsession".to_owned(), "1".to_owned()]
     }));
     assert!(yir.nodes.iter().any(|node| {
         node.name == "project_profile_shader_SurfaceShader_abi_selection_contract_type"
@@ -119,7 +118,9 @@ fn materializes_auto_abi_selection_contract_for_recommended_shader_target() {
     let contract = yir
         .nodes
         .iter()
-        .find(|node| node.name == "project_profile_shader_SurfaceShader_abi_selection_contract_type")
+        .find(|node| {
+            node.name == "project_profile_shader_SurfaceShader_abi_selection_contract_type"
+        })
         .unwrap();
     let value = contract.op.args.first().unwrap();
     assert!(value.starts_with("mode=symbol:auto;"));
@@ -288,7 +289,9 @@ fn project_abi_selection_views_expose_registered_targets() {
     assert!(lines
         .iter()
         .any(|line| line == "  abi_target_machine: arm64-darwin"));
-    assert!(project_abi_selection_view_json(&views[0]).contains("\"abi_target_host_adaptive\":false"));
+    assert!(
+        project_abi_selection_view_json(&views[0]).contains("\"abi_target_host_adaptive\":false")
+    );
 }
 
 #[test]
@@ -311,9 +314,7 @@ fn project_abi_selection_checks_report_registered_recommended_abis() {
     assert_eq!(checks[0].issue_count(), 0);
     assert!(checks[0].summary_line().contains("source=recommended"));
     let lines = render_project_abi_selection_check_lines(&checks[0]);
-    assert!(lines
-        .iter()
-        .any(|line| line.contains("abi_registered=yes")));
+    assert!(lines.iter().any(|line| line.contains("abi_registered=yes")));
     assert!(project_abi_selection_check_json(&checks[0]).contains("\"source\":\"recommended\""));
 }
 
@@ -345,7 +346,10 @@ fn project_abi_selection_checks_report_missing_explicit_domain_entries() {
     }];
     let resolution = resolve_project_abi(&project).unwrap();
     let checks = validate_project_abi_selections(&project, &resolution).unwrap();
-    let network = checks.iter().find(|check| check.domain == "network").unwrap();
+    let network = checks
+        .iter()
+        .find(|check| check.domain == "network")
+        .unwrap();
     assert!(!network.ok);
     assert!(network
         .issues
@@ -355,7 +359,9 @@ fn project_abi_selection_checks_report_missing_explicit_domain_entries() {
         .issues
         .iter()
         .any(|issue| issue.kind.code() == "ABI001"));
-    assert!(network.summary_line().contains("ABI001 missing_explicit_domain_abi"));
+    assert!(network
+        .summary_line()
+        .contains("ABI001 missing_explicit_domain_abi"));
 }
 
 #[test]
@@ -380,20 +386,20 @@ fn project_lowering_selections_expose_registered_targets_and_selected_backend() 
     assert_eq!(lowering.len(), 1);
     assert!(lowering[0].ok);
     assert_eq!(lowering[0].issue_count(), 0);
-    assert_eq!(lowering[0].selected_lowering_target.as_deref(), Some("llvm"));
+    assert_eq!(
+        lowering[0].selected_lowering_target.as_deref(),
+        Some("llvm")
+    );
     assert!(lowering[0]
         .registered_lowering_targets
         .iter()
         .any(|target| target == "llvm"));
     let lines = render_project_lowering_selection_lines(&lowering[0]);
-    assert!(lines
-        .iter()
-        .any(|line| line.contains("selected=llvm")));
-    assert!(lines
-        .iter()
-        .any(|line| line.contains("issues=0")));
+    assert!(lines.iter().any(|line| line.contains("selected=llvm")));
+    assert!(lines.iter().any(|line| line.contains("issues=0")));
     assert!(lowering[0].summary_line().contains("selected=llvm"));
-    assert!(project_lowering_selection_json(&lowering[0]).contains("\"selected_lowering_target\":\"llvm\""));
+    assert!(project_lowering_selection_json(&lowering[0])
+        .contains("\"selected_lowering_target\":\"llvm\""));
 }
 
 #[test]

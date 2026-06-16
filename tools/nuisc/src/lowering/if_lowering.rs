@@ -103,9 +103,11 @@ fn extract_selectable_cpu_call_runtime_expr(
     expr: &NirExpr,
 ) -> Option<(SelectableCpuCallRuntimeOp, &str, &[NirExpr])> {
     match expr {
-        NirExpr::CpuSpawn { callee, args } => {
-            Some((SelectableCpuCallRuntimeOp::Spawn, callee.as_str(), args.as_slice()))
-        }
+        NirExpr::CpuSpawn { callee, args } => Some((
+            SelectableCpuCallRuntimeOp::Spawn,
+            callee.as_str(),
+            args.as_slice(),
+        )),
         NirExpr::CpuThreadSpawn { callee, args } => Some((
             SelectableCpuCallRuntimeOp::ThreadSpawn,
             callee.as_str(),
@@ -128,7 +130,9 @@ fn extract_selectable_cpu_binary_runtime_expr(
 
 fn extract_binding_name_and_value(stmt: &NirStmt) -> Option<(&String, &NirExpr)> {
     match stmt {
-        NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => Some((name, value)),
+        NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+            Some((name, value))
+        }
         _ => None,
     }
 }
@@ -231,7 +235,8 @@ fn extract_selectable_cpu_unary_runtime_return_chain(
             }
 
             match last_stmt {
-                NirStmt::Return(Some(NirExpr::Var(var_name))) | NirStmt::Expr(NirExpr::Var(var_name))
+                NirStmt::Return(Some(NirExpr::Var(var_name)))
+                | NirStmt::Expr(NirExpr::Var(var_name))
                     if var_name == previous_name =>
                 {
                     Some((op, input))
@@ -271,7 +276,8 @@ fn extract_selectable_cpu_call_runtime_return_chain(
             }
 
             match last_stmt {
-                NirStmt::Return(Some(NirExpr::Var(var_name))) | NirStmt::Expr(NirExpr::Var(var_name))
+                NirStmt::Return(Some(NirExpr::Var(var_name)))
+                | NirStmt::Expr(NirExpr::Var(var_name))
                     if var_name == previous_name =>
                 {
                     Some((op, callee, args))
@@ -311,7 +317,8 @@ fn extract_selectable_cpu_binary_runtime_return_chain(
             }
 
             match last_stmt {
-                NirStmt::Return(Some(NirExpr::Var(var_name))) | NirStmt::Expr(NirExpr::Var(var_name))
+                NirStmt::Return(Some(NirExpr::Var(var_name)))
+                | NirStmt::Expr(NirExpr::Var(var_name))
                     if var_name == previous_name =>
                 {
                     Some((op, lhs, rhs))
@@ -328,9 +335,7 @@ fn build_selectable_cpu_unary_runtime_expr(
 ) -> NirExpr {
     match op {
         SelectableCpuUnaryRuntimeOp::Join => NirExpr::CpuJoin(Box::new(input.clone())),
-        SelectableCpuUnaryRuntimeOp::ThreadJoin => {
-            NirExpr::CpuThreadJoin(Box::new(input.clone()))
-        }
+        SelectableCpuUnaryRuntimeOp::ThreadJoin => NirExpr::CpuThreadJoin(Box::new(input.clone())),
         SelectableCpuUnaryRuntimeOp::JoinResult => NirExpr::CpuJoinResult(Box::new(input.clone())),
         SelectableCpuUnaryRuntimeOp::ThreadJoinResult => {
             NirExpr::CpuThreadJoinResult(Box::new(input.clone()))
@@ -369,7 +374,10 @@ fn lower_selected_cpu_unary_runtime_effect(
             | SelectableCpuUnaryRuntimeOp::ThreadJoinResult
             | SelectableCpuUnaryRuntimeOp::Cancel
     ) {
-        if let (Some((lhs_bin_op, lhs_bin_lhs, lhs_bin_rhs)), Some((rhs_bin_op, rhs_bin_lhs, rhs_bin_rhs))) = (
+        if let (
+            Some((lhs_bin_op, lhs_bin_lhs, lhs_bin_rhs)),
+            Some((rhs_bin_op, rhs_bin_lhs, rhs_bin_rhs)),
+        ) = (
             extract_selectable_cpu_binary_runtime_expr(lhs_input),
             extract_selectable_cpu_binary_runtime_expr(rhs_input),
         ) {
@@ -390,7 +398,10 @@ fn lower_selected_cpu_unary_runtime_effect(
                 let rhs_name = lower_expr(rhs_input, state, bindings)?;
                 lower_select(condition_name, lhs_name, rhs_name, state)?
             }
-        } else if let (Some((lhs_call_op, lhs_callee, lhs_args)), Some((rhs_call_op, rhs_callee, rhs_args))) = (
+        } else if let (
+            Some((lhs_call_op, lhs_callee, lhs_args)),
+            Some((rhs_call_op, rhs_callee, rhs_args)),
+        ) = (
             extract_selectable_cpu_call_runtime_expr(lhs_input),
             extract_selectable_cpu_call_runtime_expr(rhs_input),
         ) {
@@ -515,7 +526,10 @@ fn lower_selected_cpu_binary_runtime_effect(
             bindings,
         )? {
             lowered
-        } else if let (Some((lhs_call_op, lhs_callee, lhs_args)), Some((rhs_call_op, rhs_callee, rhs_args))) = (
+        } else if let (
+            Some((lhs_call_op, lhs_callee, lhs_args)),
+            Some((rhs_call_op, rhs_callee, rhs_args)),
+        ) = (
             extract_selectable_cpu_call_runtime_expr(lhs_lhs),
             extract_selectable_cpu_call_runtime_expr(rhs_lhs),
         ) {
@@ -610,8 +624,13 @@ fn lower_direct_selectable_runtime_binding(
 
     let lhs_expr = build_selectable_cpu_unary_runtime_expr(lhs_op, lhs_input);
     let rhs_expr = build_selectable_cpu_unary_runtime_expr(rhs_op, rhs_input);
-    let Some(value) =
-        lower_selected_cpu_unary_runtime_effect(condition_name, &lhs_expr, &rhs_expr, state, bindings)?
+    let Some(value) = lower_selected_cpu_unary_runtime_effect(
+        condition_name,
+        &lhs_expr,
+        &rhs_expr,
+        state,
+        bindings,
+    )?
     else {
         return Ok(None);
     };
@@ -902,7 +921,10 @@ fn expr_contains_conditional_effect_primitive(expr: &NirExpr) -> bool {
         NirExpr::Binary { lhs, rhs, .. }
         | NirExpr::KernelMatmul { lhs, rhs }
         | NirExpr::KernelZip { lhs, rhs, .. }
-        | NirExpr::KernelAddBias { input: lhs, bias: rhs } => {
+        | NirExpr::KernelAddBias {
+            input: lhs,
+            bias: rhs,
+        } => {
             expr_contains_conditional_effect_primitive(lhs)
                 || expr_contains_conditional_effect_primitive(rhs)
         }
@@ -915,16 +937,26 @@ fn expr_contains_conditional_effect_primitive(expr: &NirExpr) -> bool {
                 || expr_contains_conditional_effect_primitive(fill)
         }
         NirExpr::StoreValue { target, value }
-        | NirExpr::StoreNext { target, next: value } => {
+        | NirExpr::StoreNext {
+            target,
+            next: value,
+        } => {
             expr_contains_conditional_effect_primitive(target)
                 || expr_contains_conditional_effect_primitive(value)
         }
         NirExpr::LoadAt { buffer, index }
-        | NirExpr::DataReadWindow { window: buffer, index } => {
+        | NirExpr::DataReadWindow {
+            window: buffer,
+            index,
+        } => {
             expr_contains_conditional_effect_primitive(buffer)
                 || expr_contains_conditional_effect_primitive(index)
         }
-        NirExpr::StoreAt { buffer, index, value }
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        }
         | NirExpr::DataWriteWindow {
             window: buffer,
             index,
@@ -942,8 +974,7 @@ fn expr_contains_conditional_effect_primitive(expr: &NirExpr) -> bool {
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .any(|(_, value)| expr_contains_conditional_effect_primitive(value)),
-        NirExpr::KernelMap { input, scalar, .. }
-        | NirExpr::KernelMapAxis { input, scalar, .. } => {
+        NirExpr::KernelMap { input, scalar, .. } | NirExpr::KernelMapAxis { input, scalar, .. } => {
             expr_contains_conditional_effect_primitive(input)
                 || scalar
                     .as_ref()
@@ -1029,8 +1060,12 @@ fn stmt_contains_conditional_effect_primitive(stmt: &NirStmt) -> bool {
             else_body,
         } => {
             expr_contains_conditional_effect_primitive(condition)
-                || then_body.iter().any(stmt_contains_conditional_effect_primitive)
-                || else_body.iter().any(stmt_contains_conditional_effect_primitive)
+                || then_body
+                    .iter()
+                    .any(stmt_contains_conditional_effect_primitive)
+                || else_body
+                    .iter()
+                    .any(stmt_contains_conditional_effect_primitive)
         }
         NirStmt::While { condition, body } => {
             expr_contains_conditional_effect_primitive(condition)

@@ -8,8 +8,8 @@ use super::unary_lowering::lower_unary_expr_with_async;
 use super::validation_helpers::render_type_name;
 use super::{
     infer_nir_expr_type, instantiate_struct_field_type, lower_call_expr_with_async, named_type,
-    resolve_declared_or_inferred, struct_field_type, AstExpr, FunctionSignature,
-    NirExpr, NirStructDef, NirTypeRef,
+    resolve_declared_or_inferred, struct_field_type, AstExpr, FunctionSignature, NirExpr,
+    NirStructDef, NirTypeRef,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -909,8 +909,9 @@ fn infer_field_expr_type_for_generic_pattern(
             ) {
                 Ok(inferred) => Ok(Some(inferred)),
                 Err(error)
-                    if error
-                        .contains("cannot infer generic arguments for payload-style struct constructor") =>
+                    if error.contains(
+                        "cannot infer generic arguments for payload-style struct constructor",
+                    ) =>
                 {
                     Ok(None)
                 }
@@ -957,9 +958,13 @@ fn infer_generic_payload_constructor_type_from_arg_seeded(
         .iter()
         .map(|param| param.name.as_str())
         .collect::<Vec<_>>();
-    let mut substitutions =
-        seed_generic_substitutions_from_expected_pattern(definition, expected_pattern, placeholder_names);
-    let arg_pattern = specialize_nir_type_pattern_with_known_substitutions(field_ty, &substitutions);
+    let mut substitutions = seed_generic_substitutions_from_expected_pattern(
+        definition,
+        expected_pattern,
+        placeholder_names,
+    );
+    let arg_pattern =
+        specialize_nir_type_pattern_with_known_substitutions(field_ty, &substitutions);
     let Some(arg_ty) = infer_field_expr_type_for_generic_pattern(
         arg,
         &arg_pattern,
@@ -1036,7 +1041,10 @@ fn specialize_nir_type_pattern_with_known_substitutions(
         && !pattern.is_ref
         && substitutions.contains_key(&pattern.name)
     {
-        return substitutions.get(&pattern.name).cloned().unwrap_or_else(|| pattern.clone());
+        return substitutions
+            .get(&pattern.name)
+            .cloned()
+            .unwrap_or_else(|| pattern.clone());
     }
     NirTypeRef {
         name: pattern.name.clone(),
@@ -1050,7 +1058,10 @@ fn specialize_nir_type_pattern_with_known_substitutions(
     }
 }
 
-fn contains_placeholder_generic_name(ty: &NirTypeRef, placeholder_names: &BTreeSet<String>) -> bool {
+fn contains_placeholder_generic_name(
+    ty: &NirTypeRef,
+    placeholder_names: &BTreeSet<String>,
+) -> bool {
     (ty.generic_args.is_empty()
         && !ty.is_optional
         && !ty.is_ref

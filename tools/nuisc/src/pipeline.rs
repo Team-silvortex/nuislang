@@ -110,14 +110,11 @@ pub fn compile_project_plan_with_options(
     crate::registry::ensure_project_domain_registry_valid(plan)?;
     crate::project::ensure_project_lowering_selections_valid(&plan.abi_resolution)?;
     let (ast, nir, local_units) = prepare_project_nir(project)?;
-    let lowering_target = options
-        .lowering_target
-        .clone()
-        .or_else(|| {
-            project_lowering_target_for_domain(&nir.domain, &plan.abi_resolution)
-                .ok()
-                .and_then(|target| target)
-        });
+    let lowering_target = options.lowering_target.clone().or_else(|| {
+        project_lowering_target_for_domain(&nir.domain, &plan.abi_resolution)
+            .ok()
+            .and_then(|target| target)
+    });
     let prepared = prepare_pipeline(ast, nir, &local_units, |_, nir, _| {
         crate::project::validate_project_links_against_nir(project, nir)
     })?;
@@ -252,8 +249,11 @@ fn project_lowering_target_for_domain(
     if domain != "cpu" {
         return Ok(None);
     }
-    let target = crate::aot::resolve_cpu_build_target_from_abi(Path::new(NUSTAR_REGISTRY_ROOT), abi)?;
-    Ok(Some(crate::lowering::LoweringTargetConfig::from_cpu_build_target(&target)))
+    let target =
+        crate::aot::resolve_cpu_build_target_from_abi(Path::new(NUSTAR_REGISTRY_ROOT), abi)?;
+    Ok(Some(
+        crate::lowering::LoweringTargetConfig::from_cpu_build_target(&target),
+    ))
 }
 
 fn refresh_loaded_nustar(artifacts: &mut PipelineArtifacts) -> Result<(), String> {
@@ -308,7 +308,6 @@ fn validate_instantiated_units(module: &NirModule) -> Result<(), String> {
     }
     Ok(())
 }
-
 
 fn validate_used_units_with_local_units(
     module: &NirModule,

@@ -8,7 +8,7 @@ use std::{
 use yir_core::{Value, YirModule};
 use yir_exec::execute_module;
 use yir_host_render::rasterize_frame;
-use yir_lower_contract::analyze_shader_lowering;
+use yir_lower_contract::{analyze_kernel_lowering, analyze_shader_lowering};
 use yir_lower_llvm::emit_module;
 use yir_verify::verify_module;
 
@@ -59,6 +59,9 @@ fn run() -> Result<(), String> {
     let manifest_path = output_dir.join("bundle.txt");
     let shader_contract_path = output_dir.join("shader_contract.txt");
     let shader_package_path = output_dir.join("shader_package.toml");
+    let shader_validation_path = output_dir.join("shader_backend_validation.txt");
+    let kernel_contract_path = output_dir.join("kernel_contract.txt");
+    let kernel_package_path = output_dir.join("kernel_package.toml");
 
     let llvm_ir = emit_module(&module)?;
     fs::write(&ll_path, llvm_ir)
@@ -82,6 +85,7 @@ fn run() -> Result<(), String> {
     }
 
     let shader_contract = analyze_shader_lowering(&module);
+    let kernel_contract = analyze_kernel_lowering(&module);
     let primary_fabric_binding = extract_primary_fabric_binding(&shader_contract);
     manifest.push(format!(
         "fabric_handle_tables={}",
@@ -121,11 +125,23 @@ fn run() -> Result<(), String> {
                 shader_package_path.display()
             )
         })?;
+        emit_shader_backend_artifacts(&output_dir, &shader_contract)?;
+        let shader_validation = render_shader_backend_validation(&output_dir, &shader_contract)?;
+        fs::write(&shader_validation_path, shader_validation).map_err(|error| {
+            format!(
+                "failed to write `{}`: {error}",
+                shader_validation_path.display()
+            )
+        })?;
         manifest.push(format!(
             "shader_contract={}",
             shader_contract_path.display()
         ));
         manifest.push(format!("shader_package={}", shader_package_path.display()));
+        manifest.push(format!(
+            "shader_backend_validation={}",
+            shader_validation_path.display()
+        ));
         manifest.push(format!(
             "shader_backend_eligible={}",
             shader_contract.has_backend_eligible_work()
@@ -137,6 +153,41 @@ fn run() -> Result<(), String> {
     } else {
         manifest.push("shader_backend_eligible=false".to_owned());
         manifest.push("shader_requires_prerender_fallback=false".to_owned());
+    }
+    if kernel_contract.has_kernel_work() {
+        fs::write(&kernel_contract_path, kernel_contract.render_text()).map_err(|error| {
+            format!(
+                "failed to write `{}`: {error}",
+                kernel_contract_path.display()
+            )
+        })?;
+        fs::write(
+            &kernel_package_path,
+            kernel_contract.render_package_manifest(),
+        )
+        .map_err(|error| {
+            format!(
+                "failed to write `{}`: {error}",
+                kernel_package_path.display()
+            )
+        })?;
+        emit_kernel_backend_artifacts(&output_dir, &kernel_contract)?;
+        manifest.push(format!(
+            "kernel_contract={}",
+            kernel_contract_path.display()
+        ));
+        manifest.push(format!("kernel_package={}", kernel_package_path.display()));
+        manifest.push(format!(
+            "kernel_backend_eligible={}",
+            kernel_contract.has_backend_eligible_work()
+        ));
+        manifest.push(format!(
+            "kernel_requires_cpu_fallback={}",
+            kernel_contract.requires_cpu_fallback()
+        ));
+    } else {
+        manifest.push("kernel_backend_eligible=false".to_owned());
+        manifest.push("kernel_requires_cpu_fallback=false".to_owned());
     }
 
     let runtime_frame_support =
@@ -435,6 +486,1377 @@ fn render_fabric_boot_plan(events: &[FabricBootEvent]) -> String {
         out.push_str("    },\n");
     }
     out
+}
+
+fn emit_shader_backend_artifacts(
+    output_dir: &Path,
+    contract: &yir_lower_contract::ShaderLoweringContract,
+) -> Result<(), String> {
+    for stage in &contract.stages {
+        cleanup_legacy_shader_backend_artifacts(output_dir, stage)?;
+        let stage_summary = render_shader_stage_summary(stage);
+        for variant in stage.backend_variants() {
+            let artifact_path = output_dir.join(&variant.artifact);
+            if let Some(parent) = artifact_path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|error| format!("failed to create `{}`: {error}", parent.display()))?;
+            }
+            let artifact_body = render_shader_artifact_stub(stage, &variant, &stage_summary);
+            fs::write(&artifact_path, artifact_body).map_err(|error| {
+                format!("failed to write `{}`: {error}", artifact_path.display())
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn render_shader_backend_validation(
+    output_dir: &Path,
+    contract: &yir_lower_contract::ShaderLoweringContract,
+) -> Result<String, String> {
+    let mut lines = Vec::new();
+    for stage in &contract.stages {
+        let has_inline_wgsl = stage.wgsl_source.is_some();
+        lines.push(format!(
+            "stage={} inline_wgsl={}",
+            stage.node, has_inline_wgsl
+        ));
+        for variant in stage.backend_variants() {
+            let artifact_path = output_dir.join(&variant.artifact);
+            let artifact = fs::read_to_string(&artifact_path).map_err(|error| {
+                format!("failed to read `{}`: {error}", artifact_path.display())
+            })?;
+            let checks = shader_backend_checks(stage, variant.backend, &artifact);
+            let status = if checks.iter().all(|(_, ok)| *ok) {
+                "ok"
+            } else {
+                "fail"
+            };
+            let check_summary = checks
+                .iter()
+                .map(|(name, ok)| format!("{name}={ok}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            lines.push(format!(
+                "  backend={} kind={} status={} {}",
+                variant.backend, variant.kind, status, check_summary
+            ));
+        }
+    }
+    Ok(lines.join("\n") + "\n")
+}
+
+fn emit_kernel_backend_artifacts(
+    output_dir: &Path,
+    contract: &yir_lower_contract::KernelLoweringContract,
+) -> Result<(), String> {
+    for graph in &contract.graphs {
+        let graph_summary = render_kernel_graph_summary(graph);
+        for variant in graph.backend_variants() {
+            let artifact_path = output_dir.join(&variant.artifact);
+            if let Some(parent) = artifact_path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|error| format!("failed to create `{}`: {error}", parent.display()))?;
+            }
+            let artifact_body = render_kernel_graph_artifact_stub(graph, &variant, &graph_summary);
+            fs::write(&artifact_path, artifact_body).map_err(|error| {
+                format!("failed to write `{}`: {error}", artifact_path.display())
+            })?;
+        }
+    }
+
+    for stage in &contract.stages {
+        let stage_summary = render_kernel_stage_summary(stage);
+        for variant in stage.backend_variants() {
+            let artifact_path = output_dir.join(&variant.artifact);
+            if let Some(parent) = artifact_path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|error| format!("failed to create `{}`: {error}", parent.display()))?;
+            }
+            let artifact_body = render_kernel_stage_artifact_stub(stage, &variant, &stage_summary);
+            fs::write(&artifact_path, artifact_body).map_err(|error| {
+                format!("failed to write `{}`: {error}", artifact_path.display())
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn render_shader_stage_summary(stage: &yir_lower_contract::ShaderStageContract) -> String {
+    let mut lines = vec![
+        format!("stage={}", stage.node),
+        format!("op={}", stage.op),
+        format!("resource={}", stage.resource),
+        format!("lowering={}", stage.lowering.as_str()),
+        format!("reason={}", stage.reason),
+    ];
+    if let Some(pipeline) = &stage.pipeline {
+        lines.push(format!("pipeline={pipeline}"));
+    }
+    if let Some(target_format) = &stage.target_format {
+        lines.push(format!("target_format={target_format}"));
+    }
+    if let Some(topology) = &stage.topology {
+        lines.push(format!("topology={topology}"));
+    }
+    if let Some(entry) = &stage.wgsl_entry {
+        lines.push(format!("wgsl_entry={entry}"));
+    }
+    if let Some(source) = &stage.wgsl_source {
+        lines.push(format!("wgsl_source_lines={}", source.lines().count()));
+    }
+    for binding in &stage.bindings {
+        lines.push(format!(
+            "binding.slot={} kind={} source={}",
+            binding.slot, binding.kind, binding.source
+        ));
+    }
+    lines.join("\n") + "\n"
+}
+
+fn render_shader_artifact_stub(
+    stage: &yir_lower_contract::ShaderStageContract,
+    variant: &yir_lower_contract::ShaderBackendVariant,
+    summary: &str,
+) -> String {
+    match variant.backend {
+        "opengl" => render_shader_glsl_scaffold(stage, variant, summary),
+        "metal" => render_shader_metal_scaffold(stage, variant, summary),
+        "directx" => render_shader_hlsl_scaffold(stage, variant, summary),
+        "vulkan" => render_shader_vulkan_glsl_scaffold(stage, variant, summary),
+        other => format!(
+            "# nuis shader backend scaffold\nbackend={other}\nkind={}\nstatus={}\nentry={}\nartifact={}\n\n{}",
+            variant.kind, variant.status, variant.entry, variant.artifact, summary
+        ),
+    }
+}
+
+fn cleanup_legacy_shader_backend_artifacts(
+    output_dir: &Path,
+    stage: &yir_lower_contract::ShaderStageContract,
+) -> Result<(), String> {
+    let legacy_paths = [
+        output_dir.join(format!("metal/{}.metallib", stage.node)),
+        output_dir.join(format!("directx/{}.dxil", stage.node)),
+        output_dir.join(format!("vulkan/{}.spv", stage.node)),
+    ];
+    for path in legacy_paths {
+        if path.exists() {
+            fs::remove_file(&path)
+                .map_err(|error| format!("failed to remove `{}`: {error}", path.display()))?;
+        }
+    }
+    Ok(())
+}
+
+fn render_kernel_graph_summary(graph: &yir_lower_contract::KernelComputeGraphContract) -> String {
+    let mut lines = vec![
+        format!("graph={}", graph.id),
+        format!("resource={}", graph.resource),
+        format!("lowering={}", graph.lowering.as_str()),
+        format!("reason={}", graph.reason),
+        format!("stage_count={}", graph.stages.len()),
+    ];
+    if let Some(runtime) = &graph.target_runtime {
+        lines.push(format!("target_runtime={runtime}"));
+    }
+    if let Some(arch) = &graph.target_arch {
+        lines.push(format!("target_arch={arch}"));
+    }
+    if let Some(width) = graph.lane_width {
+        lines.push(format!("lane_width={width}"));
+    }
+    for stage in &graph.stages {
+        lines.push(format!("stage={stage}"));
+    }
+    lines.join("\n") + "\n"
+}
+
+fn render_kernel_graph_artifact_stub(
+    _graph: &yir_lower_contract::KernelComputeGraphContract,
+    variant: &yir_lower_contract::KernelBackendVariant,
+    summary: &str,
+) -> String {
+    match variant.kind {
+        "graph" => render_kernel_json_scaffold("kernel_graph", variant, summary),
+        "mlpackage" => render_kernel_manifest_scaffold("kernel_graph", variant, summary),
+        _ => format!(
+            "# nuis kernel graph backend scaffold\nbackend={}\nkind={}\nstatus={}\nentry={}\nartifact={}\n\n{}",
+            variant.backend, variant.kind, variant.status, variant.entry, variant.artifact, summary
+        ),
+    }
+}
+
+fn render_kernel_stage_summary(stage: &yir_lower_contract::KernelStageContract) -> String {
+    let mut lines = vec![
+        format!("stage={}", stage.node),
+        format!("op={}", stage.op),
+        format!("resource={}", stage.resource),
+        format!("lowering={}", stage.lowering.as_str()),
+        format!("reason={}", stage.reason),
+    ];
+    if let Some(runtime) = &stage.target_runtime {
+        lines.push(format!("target_runtime={runtime}"));
+    }
+    if let Some(arch) = &stage.target_arch {
+        lines.push(format!("target_arch={arch}"));
+    }
+    if let Some(width) = stage.lane_width {
+        lines.push(format!("lane_width={width}"));
+    }
+    if let Some(rows) = stage.rows {
+        lines.push(format!("rows={rows}"));
+    }
+    if let Some(cols) = stage.cols {
+        lines.push(format!("cols={cols}"));
+    }
+    if let Some(axis) = &stage.axis {
+        lines.push(format!("axis={axis}"));
+    }
+    if let Some(topk) = stage.topk {
+        lines.push(format!("topk={topk}"));
+    }
+    for input in &stage.inputs {
+        lines.push(format!("input={input}"));
+    }
+    lines.join("\n") + "\n"
+}
+
+fn render_kernel_stage_artifact_stub(
+    _stage: &yir_lower_contract::KernelStageContract,
+    variant: &yir_lower_contract::KernelBackendVariant,
+    summary: &str,
+) -> String {
+    match variant.kind {
+        "graph" => render_kernel_json_scaffold("kernel_stage", variant, summary),
+        "mlmodel" => render_kernel_manifest_scaffold("kernel_stage", variant, summary),
+        _ => format!(
+            "# nuis kernel stage backend scaffold\nbackend={}\nkind={}\nstatus={}\nentry={}\nartifact={}\n\n{}",
+            variant.backend, variant.kind, variant.status, variant.entry, variant.artifact, summary
+        ),
+    }
+}
+
+fn render_shader_glsl_scaffold(
+    stage: &yir_lower_contract::ShaderStageContract,
+    variant: &yir_lower_contract::ShaderBackendVariant,
+    summary: &str,
+) -> String {
+    let uses_texture = shader_stage_uses_texture(stage);
+    let fragment_body = shader_fragment_body(stage, ShaderTargetFlavor::OpenGl, uses_texture);
+    let wgsl_comment = render_wgsl_comment_block(
+        stage.wgsl_entry.as_deref(),
+        stage.wgsl_source.as_deref(),
+        "// ",
+    );
+    format!(
+        r#"#version 460 core
+// nuis shader backend scaffold
+// backend={backend}
+// entry={entry}
+// kind={kind}
+// status={status}
+//
+{wgsl_comment}
+//
+// contract:
+// {summary_comment}
+
+#ifdef NUIS_STAGE_VERTEX
+layout(location = 0) out vec2 v_uv;
+
+void main() {{
+    vec2 corners[4] = vec2[](
+        vec2(-1.0, -1.0),
+        vec2( 1.0, -1.0),
+        vec2(-1.0,  1.0),
+        vec2( 1.0,  1.0)
+    );
+    vec2 uvs[4] = vec2[](
+        vec2(0.0, 0.0),
+        vec2(1.0, 0.0),
+        vec2(0.0, 1.0),
+        vec2(1.0, 1.0)
+    );
+    int idx = min(gl_VertexID, 3);
+    gl_Position = vec4(corners[idx], 0.0, 1.0);
+    v_uv = uvs[idx];
+}}
+#endif
+
+#ifdef NUIS_STAGE_FRAGMENT
+layout(location = 0) in vec2 v_uv;
+layout(location = 0) out vec4 outColor;
+{texture_uniforms}
+
+void main() {{
+{fragment_body}
+}}
+#endif
+"#,
+        backend = variant.backend,
+        entry = variant.entry,
+        kind = variant.kind,
+        status = variant.status,
+        wgsl_comment = wgsl_comment,
+        texture_uniforms = if uses_texture {
+            "layout(binding = 2) uniform sampler2D u_texture0;"
+        } else {
+            ""
+        },
+        fragment_body = fragment_body,
+        summary_comment = summary
+            .lines()
+            .map(|line| format!("// {line}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    )
+}
+
+fn render_shader_metal_scaffold(
+    stage: &yir_lower_contract::ShaderStageContract,
+    variant: &yir_lower_contract::ShaderBackendVariant,
+    summary: &str,
+) -> String {
+    let uses_texture = shader_stage_uses_texture(stage);
+    let fragment_signature = if uses_texture {
+        "fragment float4 frame_fs(VsOut in [[stage_in]], texture2d<float> tex [[texture(0)]], sampler samp [[sampler(0)]])"
+    } else {
+        "fragment float4 frame_fs(VsOut in [[stage_in]])"
+    };
+    let fragment_body = shader_fragment_body(stage, ShaderTargetFlavor::Metal, uses_texture);
+    let wgsl_comment = render_wgsl_comment_block(
+        stage.wgsl_entry.as_deref(),
+        stage.wgsl_source.as_deref(),
+        "// ",
+    );
+    format!(
+        r#"// nuis shader backend scaffold
+// backend={backend}
+// entry={entry}
+// kind={kind}
+// status={status}
+//
+{wgsl_comment}
+//
+// contract:
+// {summary_comment}
+
+#include <metal_stdlib>
+using namespace metal;
+
+struct VsOut {{
+    float4 position [[position]];
+    float2 uv;
+}};
+
+vertex VsOut {entry}_vs(uint vid [[vertex_id]]) {{
+    float2 corners[4] = {{
+        float2(-1.0, -1.0),
+        float2( 1.0, -1.0),
+        float2(-1.0,  1.0),
+        float2( 1.0,  1.0),
+    }};
+    VsOut out;
+    float2 xy = corners[min(vid, 3u)];
+    out.position = float4(xy, 0.0, 1.0);
+    float2 uvs[4] = {{
+        float2(0.0, 0.0),
+        float2(1.0, 0.0),
+        float2(0.0, 1.0),
+        float2(1.0, 1.0),
+    }};
+    out.uv = uvs[min(vid, 3u)];
+    return out;
+}}
+
+{fragment_signature} {{
+{fragment_body}
+}}
+"#,
+        backend = variant.backend,
+        entry = variant.entry,
+        kind = variant.kind,
+        status = variant.status,
+        wgsl_comment = wgsl_comment,
+        fragment_signature =
+            fragment_signature.replace("frame_fs", &format!("{}_fs", variant.entry)),
+        fragment_body = fragment_body,
+        summary_comment = summary
+            .lines()
+            .map(|line| format!("// {line}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    )
+}
+
+fn render_shader_hlsl_scaffold(
+    stage: &yir_lower_contract::ShaderStageContract,
+    variant: &yir_lower_contract::ShaderBackendVariant,
+    summary: &str,
+) -> String {
+    let uses_texture = shader_stage_uses_texture(stage);
+    let fragment_prelude = if uses_texture {
+        "Texture2D shaderTexture : register(t0);\nSamplerState shaderSampler : register(s0);\n"
+    } else {
+        ""
+    };
+    let fragment_body = shader_fragment_body(stage, ShaderTargetFlavor::Hlsl, uses_texture);
+    let wgsl_comment = render_wgsl_comment_block(
+        stage.wgsl_entry.as_deref(),
+        stage.wgsl_source.as_deref(),
+        "// ",
+    );
+    format!(
+        r#"// nuis shader backend scaffold
+// backend={backend}
+// entry={entry}
+// kind={kind}
+// status={status}
+//
+{wgsl_comment}
+//
+// contract:
+// {summary_comment}
+
+struct VsOut {{
+    float4 position : SV_Position;
+    float2 uv : TEXCOORD0;
+}};
+
+VsOut {entry}_vs(uint vid : SV_VertexID) {{
+    float2 corners[4] = {{
+        float2(-1.0, -1.0),
+        float2( 1.0, -1.0),
+        float2(-1.0,  1.0),
+        float2( 1.0,  1.0),
+    }};
+    VsOut outp;
+    float2 xy = corners[min(vid, 3u)];
+    outp.position = float4(xy, 0.0, 1.0);
+    float2 uvs[4] = {{
+        float2(0.0, 0.0),
+        float2(1.0, 0.0),
+        float2(0.0, 1.0),
+        float2(1.0, 1.0),
+    }};
+    outp.uv = uvs[min(vid, 3u)];
+    return outp;
+}}
+
+{fragment_prelude}
+float4 {entry}_ps(VsOut input) : SV_Target0 {{
+{fragment_body}
+}}
+"#,
+        backend = variant.backend,
+        entry = variant.entry,
+        kind = variant.kind,
+        status = variant.status,
+        wgsl_comment = wgsl_comment,
+        fragment_prelude = fragment_prelude,
+        fragment_body = fragment_body,
+        summary_comment = summary
+            .lines()
+            .map(|line| format!("// {line}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    )
+}
+
+fn render_shader_vulkan_glsl_scaffold(
+    stage: &yir_lower_contract::ShaderStageContract,
+    variant: &yir_lower_contract::ShaderBackendVariant,
+    summary: &str,
+) -> String {
+    let uses_texture = shader_stage_uses_texture(stage);
+    let fragment_body = shader_fragment_body(stage, ShaderTargetFlavor::VulkanGlsl, uses_texture);
+    let wgsl_comment = render_wgsl_comment_block(
+        stage.wgsl_entry.as_deref(),
+        stage.wgsl_source.as_deref(),
+        "// ",
+    );
+    format!(
+        r#"#version 450
+// nuis shader backend scaffold
+// backend={backend}
+// entry={entry}
+// kind={kind}
+// status={status}
+//
+{wgsl_comment}
+//
+// contract:
+// {summary_comment}
+
+#ifdef NUIS_STAGE_VERTEX
+layout(location = 0) out vec2 v_uv;
+
+void main() {{
+    vec2 corners[4] = vec2[](
+        vec2(-1.0, -1.0),
+        vec2( 1.0, -1.0),
+        vec2(-1.0,  1.0),
+        vec2( 1.0,  1.0)
+    );
+    vec2 uvs[4] = vec2[](
+        vec2(0.0, 0.0),
+        vec2(1.0, 0.0),
+        vec2(0.0, 1.0),
+        vec2(1.0, 1.0)
+    );
+    int idx = min(gl_VertexIndex, 3);
+    gl_Position = vec4(corners[idx], 0.0, 1.0);
+    v_uv = uvs[idx];
+}}
+#endif
+
+#ifdef NUIS_STAGE_FRAGMENT
+layout(location = 0) in vec2 v_uv;
+layout(location = 0) out vec4 outColor;
+{texture_uniforms}
+
+void main() {{
+{fragment_body}
+}}
+#endif
+"#,
+        backend = variant.backend,
+        entry = variant.entry,
+        kind = variant.kind,
+        status = variant.status,
+        wgsl_comment = wgsl_comment,
+        texture_uniforms = if uses_texture {
+            "layout(set = 0, binding = 2) uniform sampler2D u_texture0;"
+        } else {
+            ""
+        },
+        fragment_body = fragment_body,
+        summary_comment = summary
+            .lines()
+            .map(|line| format!("// {line}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    )
+}
+
+fn shader_stage_uses_texture(stage: &yir_lower_contract::ShaderStageContract) -> bool {
+    let has_texture = stage
+        .bindings
+        .iter()
+        .any(|binding| binding.kind == "texture_binding");
+    let has_sampler = stage
+        .bindings
+        .iter()
+        .any(|binding| binding.kind == "sampler_binding");
+    has_texture && has_sampler
+}
+
+#[derive(Clone, Copy)]
+enum ShaderTargetFlavor {
+    OpenGl,
+    VulkanGlsl,
+    Metal,
+    Hlsl,
+}
+
+fn shader_fragment_body(
+    stage: &yir_lower_contract::ShaderStageContract,
+    flavor: ShaderTargetFlavor,
+    uses_texture: bool,
+) -> String {
+    if let Some(mapped) = try_map_simple_wgsl_vec4_return(stage, flavor) {
+        return mapped;
+    }
+
+    if let Some(wgsl) = stage.wgsl_source.as_deref() {
+        if let Some(return_expr) = extract_wgsl_fragment_lowerable_expr(wgsl) {
+            if let Some(mapped) = map_wgsl_expr_to_backend(&return_expr, flavor, uses_texture) {
+                return mapped;
+            }
+        }
+    }
+
+    match (flavor, uses_texture) {
+        (ShaderTargetFlavor::OpenGl, true) | (ShaderTargetFlavor::VulkanGlsl, true) => {
+            "    vec4 sampled = texture(u_texture0, v_uv);\n    outColor = sampled;".to_owned()
+        }
+        (ShaderTargetFlavor::OpenGl, false) | (ShaderTargetFlavor::VulkanGlsl, false) => {
+            "    outColor = vec4(0.82, 0.88, 0.97, 1.0);".to_owned()
+        }
+        (ShaderTargetFlavor::Metal, true) => "    return tex.sample(samp, in.uv);".to_owned(),
+        (ShaderTargetFlavor::Metal, false) => {
+            "    return float4(0.82, 0.88, 0.97, 1.0);".to_owned()
+        }
+        (ShaderTargetFlavor::Hlsl, true) => {
+            "    return shaderTexture.Sample(shaderSampler, input.uv);".to_owned()
+        }
+        (ShaderTargetFlavor::Hlsl, false) => "    return float4(0.82, 0.88, 0.97, 1.0);".to_owned(),
+    }
+}
+
+fn try_map_simple_wgsl_vec4_return(
+    stage: &yir_lower_contract::ShaderStageContract,
+    flavor: ShaderTargetFlavor,
+) -> Option<String> {
+    let wgsl = stage.wgsl_source.as_deref()?;
+    let expr = extract_wgsl_fragment_lowerable_expr(wgsl)?;
+    let inner = expr
+        .strip_prefix("vec4<f32>(")
+        .or_else(|| expr.strip_prefix("vec4("))?
+        .strip_suffix(')')?;
+    let comps = split_top_level_args(inner);
+    if comps.len() != 4 {
+        return None;
+    }
+    if comps
+        .iter()
+        .any(|component| !is_simple_wgsl_component_expr(component.trim()))
+    {
+        return None;
+    }
+
+    let mapped = comps
+        .iter()
+        .map(|component| map_wgsl_component_ref(component.trim(), flavor))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    Some(match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => {
+            format!("    outColor = vec4({mapped});")
+        }
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => {
+            let ctor = match flavor {
+                ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float4",
+                _ => "vec4",
+            };
+            format!("    return {ctor}({mapped});")
+        }
+    })
+}
+
+fn map_wgsl_component_ref(component: &str, flavor: ShaderTargetFlavor) -> String {
+    map_wgsl_expr_identifiers(component, flavor)
+}
+
+fn is_simple_wgsl_component_expr(component: &str) -> bool {
+    !component.contains('(') && !component.contains(')')
+}
+
+fn extract_wgsl_fragment_return_expr(wgsl: &str) -> Option<String> {
+    let fragment_pos = wgsl.find("@fragment")?;
+    let fragment_src = &wgsl[fragment_pos..];
+    let return_pos = fragment_src.find("return")?;
+    let after_return = &fragment_src[return_pos + "return".len()..];
+    let semicolon_pos = after_return.find(';')?;
+    Some(after_return[..semicolon_pos].trim().to_owned())
+}
+
+fn extract_wgsl_fragment_lowerable_expr(wgsl: &str) -> Option<String> {
+    let return_expr = extract_wgsl_fragment_return_expr(wgsl)?;
+    let fragment_pos = wgsl.find("@fragment")?;
+    let fragment_src = &wgsl[fragment_pos..];
+    let let_bindings = extract_wgsl_fragment_let_bindings(fragment_src);
+    Some(expand_wgsl_expr_bindings(&return_expr, &let_bindings))
+}
+
+fn extract_wgsl_fragment_let_bindings(fragment_src: &str) -> Vec<(String, String)> {
+    let mut bindings = Vec::new();
+    for raw_line in fragment_src.lines() {
+        let line = raw_line.trim();
+        if !line.starts_with("let ") {
+            continue;
+        }
+        let Some(eq_pos) = line.find('=') else {
+            continue;
+        };
+        let lhs = line["let ".len()..eq_pos].trim();
+        let name = lhs.split(':').next().map(str::trim).unwrap_or(lhs);
+        if name.is_empty() {
+            continue;
+        }
+        let rhs = line[eq_pos + 1..].trim().trim_end_matches(';').trim();
+        if rhs.is_empty() {
+            continue;
+        }
+        bindings.push((name.to_owned(), rhs.to_owned()));
+    }
+    bindings
+}
+
+fn expand_wgsl_expr_bindings(expr: &str, bindings: &[(String, String)]) -> String {
+    let mut expanded = expr.to_owned();
+    for _ in 0..bindings.len() {
+        let mut changed = false;
+        for (name, value) in bindings {
+            let next = replace_identifier_token(&expanded, name, &format!("({value})"));
+            if next != expanded {
+                expanded = next;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    expanded
+}
+
+fn replace_identifier_token(haystack: &str, name: &str, replacement: &str) -> String {
+    let chars = haystack.chars().collect::<Vec<_>>();
+    let name_chars = name.chars().collect::<Vec<_>>();
+    let mut out = String::with_capacity(haystack.len() + replacement.len());
+    let mut i = 0;
+    while i < chars.len() {
+        let matches_name =
+            i + name_chars.len() <= chars.len() && chars[i..i + name_chars.len()] == name_chars[..];
+        if matches_name {
+            let prev_ok = i == 0 || (!is_identifier_char(chars[i - 1]) && chars[i - 1] != '.');
+            let next_ok = i + name_chars.len() == chars.len()
+                || !is_identifier_char(chars[i + name_chars.len()]);
+            if prev_ok && next_ok {
+                out.push_str(replacement);
+                i += name_chars.len();
+                continue;
+            }
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
+fn is_identifier_char(ch: char) -> bool {
+    ch == '_' || ch.is_ascii_alphanumeric()
+}
+
+fn map_wgsl_expr_to_backend(
+    expr: &str,
+    flavor: ShaderTargetFlavor,
+    uses_texture: bool,
+) -> Option<String> {
+    let normalized_expr =
+        map_wgsl_expr_identifiers(&apply_backend_builtin_mapping(expr, flavor), flavor);
+    let mapped_expr = map_wgsl_texture_sample_expr(&normalized_expr, flavor, uses_texture)?;
+    let (prelude_lines, final_expr) = hoist_repeated_texture_samples(&mapped_expr, flavor);
+    let (prelude_lines, final_expr) =
+        hoist_repeated_math_subexpressions(prelude_lines, final_expr, flavor);
+    let prelude_lines = prelude_lines
+        .into_iter()
+        .map(|line| normalize_backend_expr(&line))
+        .collect::<Vec<_>>();
+    let final_expr = normalize_backend_expr(&final_expr);
+
+    Some(match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => {
+            if prelude_lines.is_empty() {
+                format!("    outColor = {};", final_expr)
+            } else {
+                format!(
+                    "{}\n    outColor = {};",
+                    prelude_lines.join("\n"),
+                    final_expr
+                )
+            }
+        }
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => {
+            if prelude_lines.is_empty() {
+                format!("    return {};", final_expr)
+            } else {
+                format!("{}\n    return {};", prelude_lines.join("\n"), final_expr)
+            }
+        }
+    })
+}
+
+fn apply_backend_builtin_mapping(expr: &str, flavor: ShaderTargetFlavor) -> String {
+    let mapped = expr
+        .replace(
+            "vec4<f32>",
+            match flavor {
+                ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec4",
+                ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float4",
+            },
+        )
+        .replace(
+            "vec3<f32>",
+            match flavor {
+                ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec3",
+                ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float3",
+            },
+        )
+        .replace(
+            "vec2<f32>",
+            match flavor {
+                ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec2",
+                ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float2",
+            },
+        )
+        .replace("@location(0)", "");
+
+    let mix_name = match flavor {
+        ShaderTargetFlavor::Hlsl => "lerp",
+        _ => "mix",
+    };
+    let fract_name = match flavor {
+        ShaderTargetFlavor::Hlsl => "frac",
+        _ => "fract",
+    };
+
+    let mapped = replace_identifier_token(&mapped, "mix", mix_name);
+    replace_identifier_token(&mapped, "fract", fract_name)
+}
+
+fn map_wgsl_expr_identifiers(expr: &str, flavor: ShaderTargetFlavor) -> String {
+    replace_identifier_token(
+        expr,
+        "uv",
+        match flavor {
+            ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "v_uv",
+            ShaderTargetFlavor::Metal => "in.uv",
+            ShaderTargetFlavor::Hlsl => "input.uv",
+        },
+    )
+}
+
+fn map_wgsl_texture_sample_expr(
+    expr: &str,
+    flavor: ShaderTargetFlavor,
+    uses_texture: bool,
+) -> Option<String> {
+    if expr.contains("textureSample(") && !uses_texture {
+        return None;
+    }
+    let mut mapped = expr.to_owned();
+    while let Some(call) = find_texture_sample_call(&mapped) {
+        let replacement = render_backend_texture_sample_call(&call.args, flavor)?;
+        mapped.replace_range(call.start..call.end, &replacement);
+    }
+    Some(mapped)
+}
+
+struct TextureSampleCall {
+    start: usize,
+    end: usize,
+    args: Vec<String>,
+}
+
+fn find_texture_sample_call(expr: &str) -> Option<TextureSampleCall> {
+    let start = expr.find("textureSample(")?;
+    let open = start + "textureSample".len();
+    let mut depth = 0usize;
+    let mut end = None;
+    for (idx, ch) in expr[open..].char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    end = Some(open + idx + ch.len_utf8());
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let end = end?;
+    let inner = &expr[open + 1..end - 1];
+    Some(TextureSampleCall {
+        start,
+        end,
+        args: split_top_level_args(inner),
+    })
+}
+
+fn render_backend_texture_sample_call(
+    args: &[String],
+    flavor: ShaderTargetFlavor,
+) -> Option<String> {
+    if args.len() != 3 {
+        return None;
+    }
+    let coord = args[2].trim();
+    Some(match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => {
+            format!("texture(u_texture0, {coord})")
+        }
+        ShaderTargetFlavor::Metal => format!("tex.sample(samp, {coord})"),
+        ShaderTargetFlavor::Hlsl => format!("shaderTexture.Sample(shaderSampler, {coord})"),
+    })
+}
+
+fn split_top_level_args(raw: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut depth = 0usize;
+    let mut start = 0usize;
+    for (idx, ch) in raw.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                args.push(raw[start..idx].trim().to_owned());
+                start = idx + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    let tail = raw[start..].trim();
+    if !tail.is_empty() {
+        args.push(tail.to_owned());
+    }
+    args
+}
+
+fn hoist_repeated_texture_samples(expr: &str, flavor: ShaderTargetFlavor) -> (Vec<String>, String) {
+    let sample_prefix = match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "texture(u_texture0, ",
+        ShaderTargetFlavor::Metal => "tex.sample(samp, ",
+        ShaderTargetFlavor::Hlsl => "shaderTexture.Sample(shaderSampler, ",
+    };
+    let sample_type = match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec4",
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float4",
+    };
+
+    let mut rewritten = expr.to_owned();
+    let mut prelude = Vec::new();
+    let mut slot = 0usize;
+    loop {
+        let calls = collect_function_calls(&rewritten, sample_prefix);
+        let Some(first) = calls.first() else {
+            break;
+        };
+        let target = first.text.clone();
+        let count = calls.iter().filter(|call| call.text == target).count();
+        if count <= 1 {
+            break;
+        }
+        let temp_name = format!("nuis_sample_{slot}");
+        slot += 1;
+        prelude.push(format!("    {sample_type} {temp_name} = {target};"));
+        rewritten = rewritten.replace(&target, &temp_name);
+    }
+    (prelude, rewritten)
+}
+
+fn hoist_repeated_math_subexpressions(
+    mut prelude: Vec<String>,
+    expr: String,
+    flavor: ShaderTargetFlavor,
+) -> (Vec<String>, String) {
+    let vec2_ty = match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec2",
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float2",
+    };
+
+    let mut rewritten = expr;
+    let joined = prelude.join("\n") + "\n" + &rewritten;
+    if let Some(call) =
+        canonical_uv_clamp_expr(flavor).filter(|call| joined.matches(call).count() >= 2)
+    {
+        let temp = "nuis_uv_0";
+        prelude = prelude
+            .into_iter()
+            .map(|line| {
+                line.replace(&format!("({call})"), temp)
+                    .replace(&call, temp)
+            })
+            .collect::<Vec<_>>();
+        prelude.insert(0, format!("    {vec2_ty} {temp} = {};", call));
+        prelude[0] = format!("    {vec2_ty} {temp} = {};", call);
+        rewritten = rewritten.replace(&call, temp);
+    }
+
+    if let Some(call) =
+        canonical_wave_expr(flavor).filter(|call| rewritten.matches(call).count() >= 2)
+    {
+        let temp = "nuis_wave_0";
+        prelude.push(format!("    {vec2_ty} {temp} = {};", call));
+        rewritten = rewritten.replace(&call, temp);
+    }
+
+    (prelude, rewritten)
+}
+
+fn canonical_uv_clamp_expr(flavor: ShaderTargetFlavor) -> Option<String> {
+    Some(match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => {
+            "clamp(v_uv, vec2(0.0, 0.0), vec2(1.0, 1.0))".to_owned()
+        }
+        ShaderTargetFlavor::Metal => "clamp(in.uv, float2(0.0, 0.0), float2(1.0, 1.0))".to_owned(),
+        ShaderTargetFlavor::Hlsl => {
+            "clamp(input.uv, float2(0.0, 0.0), float2(1.0, 1.0))".to_owned()
+        }
+    })
+}
+
+fn canonical_wave_expr(flavor: ShaderTargetFlavor) -> Option<String> {
+    let uv_temp = match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "nuis_uv_0",
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "nuis_uv_0",
+    };
+    Some(match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => {
+            format!("fract({uv_temp} * 3.0)")
+        }
+        ShaderTargetFlavor::Metal => format!("fract({uv_temp} * 3.0)"),
+        ShaderTargetFlavor::Hlsl => format!("frac({uv_temp} * 3.0)"),
+    })
+}
+
+fn normalize_backend_expr(expr: &str) -> String {
+    let mut normalized = expr.to_owned();
+    for _ in 0..8 {
+        let next = normalize_backend_expr_once(&normalized);
+        if next == normalized {
+            break;
+        }
+        normalized = next;
+    }
+    normalized
+}
+
+fn normalize_backend_expr_once(expr: &str) -> String {
+    let mut out = expr.to_owned();
+    out = strip_parens_around_member_bases(&out);
+    out = strip_parens_around_simple_atoms(&out);
+    out = remove_redundant_vec_ctor_swizzles(&out);
+    out = remove_wrapped_ctor_swizzles(&out);
+    out = remove_redundant_fn_result_swizzles(&out, "mix");
+    out = remove_redundant_fn_result_swizzles(&out, "lerp");
+    out = remove_wrapped_fn_result_swizzles(&out, "mix");
+    out = remove_wrapped_fn_result_swizzles(&out, "lerp");
+    out
+}
+
+fn strip_parens_around_member_bases(expr: &str) -> String {
+    let chars = expr.chars().collect::<Vec<_>>();
+    let mut out = String::with_capacity(expr.len());
+    let mut i = 0usize;
+    while i < chars.len() {
+        if chars[i] == '(' {
+            let mut j = i + 1;
+            let mut seen = false;
+            while j < chars.len() && is_simple_member_char(chars[j]) {
+                seen = true;
+                j += 1;
+            }
+            if seen
+                && j < chars.len()
+                && chars[j] == ')'
+                && j + 1 < chars.len()
+                && chars[j + 1] == '.'
+            {
+                for ch in &chars[i + 1..j] {
+                    out.push(*ch);
+                }
+                i = j + 1;
+                continue;
+            }
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
+fn is_simple_member_char(ch: char) -> bool {
+    is_identifier_char(ch) || ch == '.'
+}
+
+fn strip_parens_around_simple_atoms(expr: &str) -> String {
+    let chars = expr.chars().collect::<Vec<_>>();
+    let mut out = String::with_capacity(expr.len());
+    let mut i = 0usize;
+    while i < chars.len() {
+        if chars[i] == '(' {
+            let mut j = i + 1;
+            let mut seen = false;
+            while j < chars.len() && is_simple_member_char(chars[j]) {
+                seen = true;
+                j += 1;
+            }
+            if seen && j < chars.len() && chars[j] == ')' {
+                for ch in &chars[i + 1..j] {
+                    out.push(*ch);
+                }
+                i = j + 1;
+                continue;
+            }
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
+fn remove_redundant_vec_ctor_swizzles(expr: &str) -> String {
+    let mut out = expr.to_owned();
+    for ctor in ["vec2", "vec3", "vec4", "float2", "float3", "float4"] {
+        let full = format!("{ctor}(");
+        while let Some(start) = out.find(&full) {
+            let open = start + ctor.len();
+            let Some(end) = find_matching_paren(&out, open) else {
+                break;
+            };
+            let tail = &out[end + 1..];
+            let redundant = match ctor {
+                "vec2" | "float2" => tail.starts_with(".xy"),
+                "vec3" | "float3" => tail.starts_with(".xyz"),
+                "vec4" | "float4" => tail.starts_with(".xyzw"),
+                _ => false,
+            };
+            if redundant {
+                out.replace_range(end + 1..end + 1 + redundant_swizzle_len(ctor), "");
+                continue;
+            }
+            break;
+        }
+    }
+    out
+}
+
+fn remove_wrapped_ctor_swizzles(expr: &str) -> String {
+    let mut out = expr.to_owned();
+    for ctor in ["vec2", "vec3", "vec4", "float2", "float3", "float4"] {
+        out = remove_wrapped_call_swizzle(&out, ctor);
+    }
+    out
+}
+
+fn remove_redundant_fn_result_swizzles(expr: &str, fn_name: &str) -> String {
+    let mut out = expr.to_owned();
+    let needle = format!("{fn_name}(");
+    while let Some(start) = out.find(&needle) {
+        let open = start + fn_name.len();
+        let Some(end) = find_matching_paren(&out, open) else {
+            break;
+        };
+        if out[end + 1..].starts_with(".xyz") {
+            out.replace_range(end + 1..end + 5, "");
+            continue;
+        }
+        break;
+    }
+    out
+}
+
+fn remove_wrapped_fn_result_swizzles(expr: &str, fn_name: &str) -> String {
+    remove_wrapped_call_swizzle(expr, fn_name)
+}
+
+fn remove_wrapped_call_swizzle(expr: &str, name: &str) -> String {
+    let mut out = expr.to_owned();
+    let needle = format!("({name}(");
+    while let Some(start) = out.find(&needle) {
+        let open = start + 1 + name.len();
+        let Some(end) = find_matching_paren(&out, open) else {
+            break;
+        };
+        let swizzle = if out[end + 1..].starts_with(").xyzw") {
+            Some((".xyzw", 6usize))
+        } else if out[end + 1..].starts_with(").xyz") {
+            Some((".xyz", 5usize))
+        } else if out[end + 1..].starts_with(").xy") {
+            Some((".xy", 4usize))
+        } else {
+            None
+        };
+        let Some((suffix, remove_len)) = swizzle else {
+            break;
+        };
+        let inner = out[start + 1..end + 1].to_owned();
+        let replacement = if suffix == ".xyzw" { inner } else { inner };
+        out.replace_range(start..end + 1 + remove_len, &replacement);
+    }
+    out
+}
+
+fn redundant_swizzle_len(ctor: &str) -> usize {
+    match ctor {
+        "vec2" | "float2" => 3,
+        "vec3" | "float3" => 4,
+        "vec4" | "float4" => 5,
+        _ => 0,
+    }
+}
+
+fn find_matching_paren(expr: &str, open_idx: usize) -> Option<usize> {
+    let chars = expr.char_indices().collect::<Vec<_>>();
+    let start_pos = chars.iter().position(|(idx, _)| *idx == open_idx)?;
+    let mut depth = 0usize;
+    for (idx, ch) in chars.into_iter().skip(start_pos) {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(idx);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+#[derive(Clone)]
+struct FunctionCallMatch {
+    text: String,
+}
+
+fn collect_function_calls(expr: &str, prefix: &str) -> Vec<FunctionCallMatch> {
+    let mut calls = Vec::new();
+    let mut search_start = 0usize;
+    while let Some(rel_start) = expr[search_start..].find(prefix) {
+        let start = search_start + rel_start;
+        let Some(prefix_open_rel) = prefix.find('(') else {
+            break;
+        };
+        let open = start + prefix_open_rel;
+        let mut depth = 1usize;
+        let mut end = None;
+        for (idx, ch) in expr[open + 1..].char_indices() {
+            match ch {
+                '(' => depth += 1,
+                ')' => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        end = Some(open + 1 + idx + ch.len_utf8());
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let Some(end) = end else {
+            break;
+        };
+        calls.push(FunctionCallMatch {
+            text: expr[start..end].to_owned(),
+        });
+        search_start = end;
+    }
+    calls
+}
+
+fn render_wgsl_comment_block(
+    wgsl_entry: Option<&str>,
+    wgsl_source: Option<&str>,
+    prefix: &str,
+) -> String {
+    let Some(source) = wgsl_source else {
+        return format!("{prefix}original_wgsl=absent");
+    };
+    let mut lines = Vec::new();
+    if let Some(entry) = wgsl_entry {
+        lines.push(format!("{prefix}original_wgsl_entry={entry}"));
+    } else {
+        lines.push(format!("{prefix}original_wgsl_entry=unknown"));
+    }
+    lines.push(format!("{prefix}original_wgsl_begin"));
+    for line in source.lines() {
+        lines.push(format!("{prefix}{line}"));
+    }
+    lines.push(format!("{prefix}original_wgsl_end"));
+    lines.join("\n")
+}
+
+fn shader_backend_checks(
+    stage: &yir_lower_contract::ShaderStageContract,
+    backend: &str,
+    artifact: &str,
+) -> Vec<(&'static str, bool)> {
+    let expects_wgsl = stage.wgsl_source.is_some();
+    match backend {
+        "opengl" => vec![
+            (
+                "vertex_section",
+                artifact.contains("#ifdef NUIS_STAGE_VERTEX"),
+            ),
+            (
+                "fragment_section",
+                artifact.contains("#ifdef NUIS_STAGE_FRAGMENT"),
+            ),
+            (
+                "wgsl_origin",
+                !expects_wgsl || artifact.contains("original_wgsl_begin"),
+            ),
+        ],
+        "vulkan" => vec![
+            ("version_450", artifact.contains("#version 450")),
+            ("vertex_index", artifact.contains("gl_VertexIndex")),
+            (
+                "wgsl_origin",
+                !expects_wgsl || artifact.contains("original_wgsl_begin"),
+            ),
+        ],
+        "metal" => vec![
+            (
+                "metal_include",
+                artifact.contains("#include <metal_stdlib>"),
+            ),
+            ("vertex_fn", artifact.contains("vertex VsOut")),
+            (
+                "wgsl_origin",
+                !expects_wgsl || artifact.contains("original_wgsl_begin"),
+            ),
+        ],
+        "directx" => vec![
+            ("sv_position", artifact.contains("SV_Position")),
+            ("pixel_fn", artifact.contains(": SV_Target0")),
+            (
+                "wgsl_origin",
+                !expects_wgsl || artifact.contains("original_wgsl_begin"),
+            ),
+        ],
+        _ => vec![("non_empty", !artifact.trim().is_empty())],
+    }
+}
+
+fn render_kernel_json_scaffold(
+    subject: &str,
+    variant: &yir_lower_contract::KernelBackendVariant,
+    summary: &str,
+) -> String {
+    let summary_json = summary
+        .lines()
+        .map(|line| {
+            format!(
+                "    \"{}\"",
+                line.replace('\\', "\\\\").replace('"', "\\\"")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",\n");
+    format!(
+        "{{\n  \"schema\": \"nuis-{subject}-backend-scaffold-v1\",\n  \"backend\": \"{backend}\",\n  \"kind\": \"{kind}\",\n  \"status\": \"{status}\",\n  \"entry\": \"{entry}\",\n  \"artifact\": \"{artifact}\",\n  \"summary\": [\n{summary_json}\n  ]\n}}\n",
+        subject = subject,
+        backend = variant.backend,
+        kind = variant.kind,
+        status = variant.status,
+        entry = variant.entry,
+        artifact = variant.artifact,
+        summary_json = summary_json
+    )
+}
+
+fn render_kernel_manifest_scaffold(
+    subject: &str,
+    variant: &yir_lower_contract::KernelBackendVariant,
+    summary: &str,
+) -> String {
+    format!(
+        "schema = \"nuis-{subject}-backend-scaffold-v1\"\nbackend = \"{backend}\"\nkind = \"{kind}\"\nstatus = \"{status}\"\nentry = \"{entry}\"\nartifact = \"{artifact}\"\n\n[summary]\ntext = \"{summary_text}\"\n",
+        subject = subject,
+        backend = variant.backend,
+        kind = variant.kind,
+        status = variant.status,
+        entry = variant.entry,
+        artifact = variant.artifact,
+        summary_text = summary.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " | ")
+    )
 }
 
 fn c_string_literal(raw: &str) -> String {

@@ -400,7 +400,9 @@ fn lowers_match_binding_after_outer_literal_with_deferred_inner_inference() {
                 "expected lowered deferred-inference outer match if in while body, found {other:?}"
             ),
         },
-        other => panic!("expected while statement after deferred-inference outer binding, found {other:?}"),
+        other => panic!(
+            "expected while statement after deferred-inference outer binding, found {other:?}"
+        ),
     }
 }
 

@@ -79,11 +79,7 @@ fn lowers_try_let_into_result_match_propagation() {
         .unwrap();
     assert!(matches!(
         function.body.as_slice(),
-        [
-            NirStmt::Let { .. },
-            NirStmt::If { .. },
-            NirStmt::Return(_)
-        ]
+        [NirStmt::Let { .. }, NirStmt::If { .. }, NirStmt::Return(_)]
     ));
 }
 
@@ -128,11 +124,7 @@ fn lowers_try_inside_call_argument() {
         .unwrap();
     assert!(matches!(
         function.body.as_slice(),
-        [
-            NirStmt::Let { .. },
-            NirStmt::If { .. },
-            NirStmt::Return(_)
-        ]
+        [NirStmt::Let { .. }, NirStmt::If { .. }, NirStmt::Return(_)]
     ));
 }
 
@@ -173,11 +165,7 @@ fn lowers_try_inside_binary_expression() {
         .unwrap();
     assert!(matches!(
         function.body.as_slice(),
-        [
-            NirStmt::Let { .. },
-            NirStmt::If { .. },
-            NirStmt::Return(_)
-        ]
+        [NirStmt::Let { .. }, NirStmt::If { .. }, NirStmt::Return(_)]
     ));
 }
 
@@ -222,11 +210,7 @@ fn lowers_try_inside_method_receiver() {
         .unwrap();
     assert!(matches!(
         function.body.as_slice(),
-        [
-            NirStmt::Let { .. },
-            NirStmt::If { .. },
-            NirStmt::Return(_)
-        ]
+        [NirStmt::Let { .. }, NirStmt::If { .. }, NirStmt::Return(_)]
     ));
 }
 
@@ -275,11 +259,7 @@ fn lowers_try_inside_struct_field_value() {
         .unwrap();
     assert!(matches!(
         function.body.as_slice(),
-        [
-            NirStmt::Let { .. },
-            NirStmt::If { .. },
-            NirStmt::Return(_)
-        ]
+        [NirStmt::Let { .. }, NirStmt::If { .. }, NirStmt::Return(_)]
     ));
 }
 
@@ -328,11 +308,7 @@ fn lowers_try_inside_await_operand() {
         .unwrap();
     assert!(matches!(
         function.body.as_slice(),
-        [
-            NirStmt::Let { .. },
-            NirStmt::If { .. },
-            NirStmt::Return(_)
-        ]
+        [NirStmt::Let { .. }, NirStmt::If { .. }, NirStmt::Return(_)]
     ));
 }
 

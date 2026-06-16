@@ -1188,16 +1188,14 @@ fn verify_expr(
         )?,
         NirExpr::CpuSpawn { args, .. }
         | NirExpr::CpuThreadSpawn { args, .. }
-        | NirExpr::CpuExternCall { args, .. } => {
-            verify_expr_sequence(
-                args.iter(),
-                moved,
-                borrows,
-                borrow_bindings,
-                data_bindings,
-                task_result_facts,
-            )?
-        }
+        | NirExpr::CpuExternCall { args, .. } => verify_expr_sequence(
+            args.iter(),
+            moved,
+            borrows,
+            borrow_bindings,
+            data_bindings,
+            task_result_facts,
+        )?,
         NirExpr::CpuTimeout { task, limit } => {
             verify_expr(
                 task,

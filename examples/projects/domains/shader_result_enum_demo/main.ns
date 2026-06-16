@@ -1,0 +1,328 @@
+use data FabricPlane;
+use shader SurfaceShader;
+
+mod cpu Main {
+  extern "c" fn host_error_code(kind_handle: i64) -> i64;
+  extern "c" fn host_error_message(kind_handle: i64) -> i64;
+  extern "c" fn host_error_severity(kind_handle: i64) -> i64;
+
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  enum ErrorSeverity {
+    Info,
+    Warning,
+    Error,
+  }
+
+  enum ErrorFamily {
+    Unknown,
+    InputValidation,
+    ResultRuntime,
+    DiagnosticRuntime,
+  }
+
+  struct ErrorCode {
+    kind_handle: i64,
+    stable_code: i64,
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64,
+    retryable: i64
+  }
+
+  struct DiagnosticCode {
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64
+  }
+
+  struct ErrorEnvelope {
+    error: ErrorCode,
+    diagnostic: DiagnosticCode
+  }
+
+  struct ShaderResultEnumProjectSummary {
+    pass_score: i64,
+    draw_score: i64,
+    frame_score: i64,
+    host_frame_ready: i64
+  }
+
+  type ShaderPacketWindow = Window<SurfaceShaderPacket>;
+  type HostFrameWindow = Window<Frame>;
+
+  fn kind_result_missing() -> i64 {
+    return 1202;
+  }
+
+  fn kind_diagnostic_message() -> i64 {
+    return 1303;
+  }
+
+  fn severity_code(severity: ErrorSeverity) -> i64 {
+    match severity {
+      ErrorSeverity.Info => {
+        return 1;
+      }
+      ErrorSeverity.Warning => {
+        return 2;
+      }
+      ErrorSeverity.Error => {
+        return 3;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn family_code(family: ErrorFamily) -> i64 {
+    match family {
+      ErrorFamily.Unknown => {
+        return 0;
+      }
+      ErrorFamily.InputValidation => {
+        return 11;
+      }
+      ErrorFamily.ResultRuntime => {
+        return 12;
+      }
+      ErrorFamily.DiagnosticRuntime => {
+        return 13;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn classify_error_severity(kind_handle: i64) -> ErrorSeverity {
+    if kind_handle == kind_result_missing() {
+      return ErrorSeverity.Warning;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorSeverity.Warning;
+    }
+    return ErrorSeverity.Info;
+  }
+
+  fn classify_error_family(kind_handle: i64) -> ErrorFamily {
+    if kind_handle == kind_result_missing() {
+      return ErrorFamily.ResultRuntime;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorFamily.DiagnosticRuntime;
+    }
+    return ErrorFamily.Unknown;
+  }
+
+  fn classify_error_retryable(kind_handle: i64) -> i64 {
+    if kind_handle == kind_result_missing() {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn build_error_code(kind_handle: i64) -> ErrorCode {
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    return ErrorCode {
+      kind_handle: kind_handle,
+      stable_code: host_error_code(kind_handle),
+      message_handle: host_error_message(kind_handle),
+      severity_code: host_error_severity(kind_handle),
+      family_code: family_code(family),
+      retryable: classify_error_retryable(kind_handle)
+    };
+  }
+
+  fn build_diagnostic_code(kind_handle: i64) -> DiagnosticCode {
+    let severity: ErrorSeverity = classify_error_severity(kind_handle);
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    return DiagnosticCode {
+      message_handle: host_error_message(kind_handle),
+      severity_code: severity_code(severity),
+      family_code: family_code(family)
+    };
+  }
+
+  fn build_error_envelope(kind_handle: i64) -> ErrorEnvelope {
+    return ErrorEnvelope {
+      error: build_error_code(kind_handle),
+      diagnostic: build_diagnostic_code(kind_handle)
+    };
+  }
+
+  fn result_is_err<T, E>(result: Result<T, E>) -> bool {
+    match result {
+      Result.Ok(_) => {
+        return false;
+      }
+      Result.Err(_) => {
+        return true;
+      }
+    }
+  }
+
+  fn result_unwrap_or<T, E>(result: Result<T, E>, fallback: T) -> T {
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(_) => {
+        return fallback;
+      }
+    }
+  }
+
+  fn result_score(result: Result<i64, ErrorEnvelope>) -> i64 {
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(envelope) => {
+        return envelope.error.stable_code
+          + envelope.error.message_handle
+          + envelope.error.severity_code
+          + envelope.error.family_code
+          + envelope.error.retryable
+          + envelope.diagnostic.message_handle
+          + envelope.diagnostic.severity_code
+          + envelope.diagnostic.family_code;
+      }
+    }
+  }
+
+  fn lift_error_kind(kind_handle: i64) -> Result<i64, ErrorEnvelope> {
+    return Result.Err(build_error_envelope(kind_handle));
+  }
+
+  fn lift_pass_result(result: ShaderResult<Pass>) -> Result<Pass, ErrorEnvelope> {
+    if shader_pass_ready(result) {
+      return Result.Ok(shader_value(result));
+    }
+    return Result.Err(build_error_envelope(kind_result_missing()));
+  }
+
+  fn lift_frame_result(result: ShaderResult<Frame>, bias: i64) -> Result<i64, ErrorEnvelope> {
+    if shader_frame_ready(result) {
+      return Result.Ok(bias);
+    }
+    return lift_error_kind(kind_diagnostic_message());
+  }
+
+  fn raise_metric(value: i64) -> i64 {
+    return value + 7;
+  }
+
+  fn map_ok_metric(result: Result<i64, ErrorEnvelope>) -> Result<i64, ErrorEnvelope> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(raise_metric(value));
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  fn pass_metric(result: Result<Pass, ErrorEnvelope>, metric: i64) -> Result<i64, ErrorEnvelope> {
+    match result {
+      Result.Ok(_) => {
+        return Result.Ok(metric);
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  fn draw_metric_from_pass(
+    result: Result<Pass, ErrorEnvelope>,
+    packet: Window<SurfaceShaderPacket>,
+    packet_field_count: i64
+  ) -> Result<i64, ErrorEnvelope> {
+    match result {
+      Result.Ok(pass_value) => {
+        let draw_result: ShaderResult<Frame> = shader_result(
+          shader_profile_draw_instanced("SurfaceShader", pass_value, packet)
+        );
+        return map_ok_metric(lift_frame_result(draw_result, packet_field_count));
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  fn capture_shader_result_enum_project() -> ShaderResultEnumProjectSummary {
+    cpu_bind_core(0);
+    cpu_window(320, 200, "shader_result_enum_demo");
+
+    const base_color: i64 = 104;
+    const base_speed: i64 = 16;
+    const base_radius: i64 = 72;
+    const speed_scale: i64 = 2;
+    const color_delta: i64 = 0;
+    const speed_delta: i64 = 0;
+    const radius_delta: i64 = 0;
+
+    let packet_tag: i64 = shader_profile_packet_tag("SurfaceShader");
+    let packet_field_count: i64 = shader_profile_packet_field_count("SurfaceShader");
+    let color_slot: i64 = shader_profile_packet_color_slot("SurfaceShader");
+    let speed_slot: i64 = shader_profile_packet_speed_slot("SurfaceShader");
+    let radius_slot: i64 = shader_profile_packet_radius_slot("SurfaceShader");
+
+    let panel_color: i64 =
+      shader_profile_color_seed("SurfaceShader", base_color + color_slot, color_delta);
+    let panel_speed: i64 = shader_profile_speed_seed(
+      "SurfaceShader",
+      speed_delta + speed_slot,
+      speed_scale,
+      base_speed
+    );
+    let panel_radius: i64 =
+      shader_profile_radius_seed("SurfaceShader", base_radius + radius_slot, radius_delta);
+    let render_controls: SurfaceShaderPacket =
+      shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius);
+
+    data_profile_bind_core("FabricPlane");
+    let gpu_packet_draw: ShaderPacketWindow =
+      data_profile_send_uplink("FabricPlane", render_controls);
+    let gpu_packet_render: ShaderPacketWindow =
+      data_profile_send_uplink("FabricPlane", render_controls);
+
+    let pass_metric: Result<i64, ErrorEnvelope> = pass_metric(
+      lift_pass_result(shader_result(shader_profile_begin_pass("SurfaceShader"))),
+      packet_tag
+    );
+    let draw_metric: Result<i64, ErrorEnvelope> = draw_metric_from_pass(
+      lift_pass_result(shader_result(shader_profile_begin_pass("SurfaceShader"))),
+      gpu_packet_draw,
+      packet_field_count
+    );
+    let frame_result_raw: ShaderResult<Frame> =
+      shader_result(shader_profile_render("SurfaceShader", gpu_packet_render));
+    let frame_metric_result: Result<i64, ErrorEnvelope> =
+      lift_frame_result(frame_result_raw, packet_tag + packet_field_count);
+    let host_frame: HostFrameWindow =
+      data_profile_send_downlink("FabricPlane", shader_value(frame_result_raw));
+    cpu_present_frame(host_frame);
+
+    return ShaderResultEnumProjectSummary {
+      pass_score: result_score(pass_metric) + result_unwrap_or(pass_metric, -10),
+      draw_score: result_score(draw_metric) + result_unwrap_or(draw_metric, -20),
+      frame_score: result_score(frame_metric_result)
+        + result_unwrap_or(frame_metric_result, -30)
+        + if result_is_err(frame_metric_result) { 3 } else { 0 },
+      host_frame_ready: 1
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: ShaderResultEnumProjectSummary = capture_shader_result_enum_project();
+    return summary.pass_score + summary.draw_score + summary.frame_score + summary.host_frame_ready;
+  }
+}

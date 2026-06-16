@@ -227,9 +227,7 @@ pub(super) fn validate_expr_generic_method_bounds(
             )?;
         }
         AstExpr::Instantiate { .. } => {}
-        AstExpr::Try(value)
-        | AstExpr::Await(value)
-        | AstExpr::FieldAccess { base: value, .. } => {
+        AstExpr::Try(value) | AstExpr::Await(value) | AstExpr::FieldAccess { base: value, .. } => {
             validate_expr_generic_method_bounds(
                 value,
                 visible_type_aliases,
@@ -880,7 +878,8 @@ fn validate_generic_receiver_method_bound(
         generic_param_names,
         generic_bounds,
         context,
-    )? else {
+    )?
+    else {
         return Ok(());
     };
 
@@ -983,7 +982,8 @@ fn validate_generic_receiver_operator_bound(
         generic_param_names,
         generic_bounds,
         context,
-    )? else {
+    )?
+    else {
         return Ok(());
     };
 
@@ -1072,7 +1072,8 @@ fn validate_explicit_trait_call_bound(
         generic_param_names,
         generic_bounds,
         context,
-    )? else {
+    )?
+    else {
         if impl_lookup.contains_key(&(trait_name.to_owned(), receiver_rendered.clone())) {
             return Ok(());
         }

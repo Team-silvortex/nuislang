@@ -159,7 +159,10 @@ fn parses_struct_and_type_alias_where_clauses_into_ast() {
     assert_eq!(ast.structs[0].where_bounds[0].bounds[0].name, "Addable");
     assert_eq!(ast.type_aliases[0].where_bounds.len(), 1);
     assert_eq!(ast.type_aliases[0].where_bounds[0].param_name, "T");
-    assert_eq!(ast.type_aliases[0].where_bounds[0].bounds[0].name, "Addable");
+    assert_eq!(
+        ast.type_aliases[0].where_bounds[0].bounds[0].name,
+        "Addable"
+    );
 }
 
 #[test]

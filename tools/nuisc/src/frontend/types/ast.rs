@@ -1353,8 +1353,11 @@ fn infer_ast_expr_type_for_pattern_inner(
                 .iter()
                 .map(|param| param.name.clone())
                 .collect::<BTreeSet<_>>();
-            let seed =
-                seed_ast_generic_substitutions_from_expected(definition, expected_pattern, placeholder_names);
+            let seed = seed_ast_generic_substitutions_from_expected(
+                definition,
+                expected_pattern,
+                placeholder_names,
+            );
             infer_struct_literal_ast_type_seeded(
                 type_name,
                 definition,
@@ -1382,8 +1385,11 @@ fn infer_ast_expr_type_for_pattern_inner(
                 .iter()
                 .map(|param| param.name.clone())
                 .collect::<BTreeSet<_>>();
-            let seed =
-                seed_ast_generic_substitutions_from_expected(definition, expected_pattern, placeholder_names);
+            let seed = seed_ast_generic_substitutions_from_expected(
+                definition,
+                expected_pattern,
+                placeholder_names,
+            );
             infer_payload_constructor_ast_type_seeded(
                 callee,
                 definition,

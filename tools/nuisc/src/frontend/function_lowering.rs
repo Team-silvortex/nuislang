@@ -74,7 +74,11 @@ pub(super) fn find_impl_method_signature<'a>(
         return Some(signature);
     }
 
-    let mut suffixes = vec![format!(".for.{}.{}", sanitize_impl_type_name(for_type), method)];
+    let mut suffixes = vec![format!(
+        ".for.{}.{}",
+        sanitize_impl_type_name(for_type),
+        method
+    )];
     if let Some(parent) = parent_enum_type(for_type) {
         suffixes.push(format!(
             ".for.{}.{}",

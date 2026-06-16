@@ -247,7 +247,11 @@ pub(super) fn validate_generic_bound_satisfaction(
     let short_name = required_bound.rsplit('.').next().unwrap_or(required_bound);
     let matching_variants = impl_lookup
         .keys()
-        .filter(|(_, for_type)| impl_lookup_types(&resolved).iter().any(|candidate| candidate == for_type))
+        .filter(|(_, for_type)| {
+            impl_lookup_types(&resolved)
+                .iter()
+                .any(|candidate| candidate == for_type)
+        })
         .map(|(trait_name, _)| trait_name)
         .filter(|trait_name| {
             trait_name.as_str() != required_bound

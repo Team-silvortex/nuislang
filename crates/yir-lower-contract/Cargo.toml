@@ -10,3 +10,6 @@ description = "Analyze YIR shader lowering eligibility and fallback requirements
 
 [dependencies]
 yir-core = { path = "../yir-core" }
+
+[dev-dependencies]
+yir-syntax = { path = "../yir-syntax" }

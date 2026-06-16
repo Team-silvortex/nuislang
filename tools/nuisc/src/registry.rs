@@ -623,7 +623,10 @@ pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
         ),
     ];
     let scheduler_contract_fields = vec![
-        json_field("scheduler_contract_stack", &contract.scheduler.contract_stack),
+        json_field(
+            "scheduler_contract_stack",
+            &contract.scheduler.contract_stack,
+        ),
         json_field("scheduler_clock", &contract.scheduler.clock.brief()),
         json_field("scheduler_result_roles", &contract.scheduler.result_roles),
         json_optional_string_field(
@@ -680,7 +683,10 @@ pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
             NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER,
             &scheduler_contract_fields,
         ),
-        json_object_field(NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET, &std_net_extension_fields),
+        json_object_field(
+            NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET,
+            &std_net_extension_fields,
+        ),
     ];
     format!("{{{}}}", contract_fields.join(","))
 }
@@ -706,7 +712,10 @@ pub fn domain_contract_json(contract: &NustarDomainContract) -> String {
             &contract.capability.support_profile_slots,
         ),
         json_string_array_field("default_lanes", &contract.capability.default_lanes),
-        json_field("scheduler_contract_stack", &contract.scheduler.contract_stack),
+        json_field(
+            "scheduler_contract_stack",
+            &contract.scheduler.contract_stack,
+        ),
         json_field("scheduler_clock", &contract.scheduler.clock.brief()),
         json_field("scheduler_result_roles", &contract.scheduler.result_roles),
         json_optional_string_field(
@@ -1259,14 +1268,12 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'
         ("network", "network.profile.send.v1") => &["send_window", "stream_window"],
         ("network", "network.profile.recv.v1") => &["recv_window", "stream_window"],
         ("network", "network.profile.close.v1") => &[],
-        ("network", "network.profile.timeout.v1") => {
-            &[
-                "connect_timeout_ms",
-                "read_timeout_ms",
-                "write_timeout_ms",
-                "timeout_budget",
-            ]
-        }
+        ("network", "network.profile.timeout.v1") => &[
+            "connect_timeout_ms",
+            "read_timeout_ms",
+            "write_timeout_ms",
+            "timeout_budget",
+        ],
         ("network", "network.profile.retry.v1") => &["retry_budget"],
         ("network", "network.profile.endpoint-kind.v1") => &["endpoint_kind"],
         ("network", "network.profile.stream-window.v1") => {
@@ -2751,8 +2758,13 @@ mod cpu Main {
             .iter()
             .find(|item| item.domain_family == "network")
             .unwrap();
-        assert!(network.manifest_path.ends_with("nustar-packages/network.toml"));
-        assert_eq!(network.contract.contract_schema, NUSTAR_DOMAIN_CONTRACT_SCHEMA);
+        assert!(network
+            .manifest_path
+            .ends_with("nustar-packages/network.toml"));
+        assert_eq!(
+            network.contract.contract_schema,
+            NUSTAR_DOMAIN_CONTRACT_SCHEMA
+        );
         assert!(network
             .contract
             .extension_groups
@@ -2765,7 +2777,10 @@ mod cpu Main {
         let plan = test_project_plan("network", "network.socket.macos.arm64.v1");
         let checks = validate_project_domain_registry(&plan);
         assert!(checks.iter().all(|check| check.issues.is_empty()));
-        let network = checks.iter().find(|check| check.domain == "network").unwrap();
+        let network = checks
+            .iter()
+            .find(|check| check.domain == "network")
+            .unwrap();
         assert_eq!(network.issue_count(), 0);
         assert!(network.summary_line().contains(": ok"));
         ensure_project_domain_registry_valid(&plan).unwrap();
@@ -2775,7 +2790,10 @@ mod cpu Main {
     fn ensure_project_domain_registry_valid_rejects_unknown_abi() {
         let plan = test_project_plan("network", "network.socket.unknown.v1");
         let checks = validate_project_domain_registry(&plan);
-        let network = checks.iter().find(|check| check.domain == "network").unwrap();
+        let network = checks
+            .iter()
+            .find(|check| check.domain == "network")
+            .unwrap();
         assert!(network
             .issues
             .iter()
@@ -2807,7 +2825,9 @@ mod cpu Main {
         let lines = render_project_domain_registry_check_lines(&check);
         assert!(!lines.is_empty());
         assert!(lines[0].contains("issues=1"));
-        assert!(lines.iter().any(|line| line.contains("NRG003 abi_not_registered")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("NRG003 abi_not_registered")));
     }
 
     #[test]
@@ -2892,10 +2912,7 @@ mod cpu Main {
             .iter()
             .find(|binding| binding.domain_family == "data")
             .expect("data binding should be present");
-        for surface in [
-            "data.profile.bind-core.v1",
-            "data.profile.window-layout.v1",
-        ] {
+        for surface in ["data.profile.bind-core.v1", "data.profile.window-layout.v1"] {
             assert!(
                 binding
                     .matched_support_surface

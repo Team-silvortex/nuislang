@@ -1,0 +1,255 @@
+mod cpu Main {
+  extern "c" fn host_error_code(kind_handle: i64) -> i64;
+  extern "c" fn host_error_message(kind_handle: i64) -> i64;
+  extern "c" fn host_error_severity(kind_handle: i64) -> i64;
+
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  enum ErrorSeverity {
+    Info,
+    Warning,
+    Error,
+  }
+
+  enum ErrorFamily {
+    Unknown,
+    InputValidation,
+    ResultRuntime,
+    DiagnosticRuntime,
+  }
+
+  struct ErrorCode {
+    kind_handle: i64,
+    stable_code: i64,
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64,
+    retryable: i64
+  }
+
+  struct DiagnosticCode {
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64
+  }
+
+  struct ErrorEnvelope {
+    error: ErrorCode,
+    diagnostic: DiagnosticCode
+  }
+
+  struct TaskResultEnumSummary {
+    primary_score: i64,
+    timed_score: i64,
+    cancelled_score: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 6;
+  }
+
+  fn kind_result_missing() -> i64 {
+    return 1202;
+  }
+
+  fn kind_diagnostic_message() -> i64 {
+    return 1303;
+  }
+
+  fn severity_code(severity: ErrorSeverity) -> i64 {
+    match severity {
+      ErrorSeverity.Info => {
+        return 1;
+      }
+      ErrorSeverity.Warning => {
+        return 2;
+      }
+      ErrorSeverity.Error => {
+        return 3;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn family_code(family: ErrorFamily) -> i64 {
+    match family {
+      ErrorFamily.Unknown => {
+        return 0;
+      }
+      ErrorFamily.InputValidation => {
+        return 11;
+      }
+      ErrorFamily.ResultRuntime => {
+        return 12;
+      }
+      ErrorFamily.DiagnosticRuntime => {
+        return 13;
+      }
+      _ => {
+        return 0;
+      }
+    }
+  }
+
+  fn classify_error_severity(kind_handle: i64) -> ErrorSeverity {
+    if kind_handle == kind_result_missing() {
+      return ErrorSeverity.Warning;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorSeverity.Warning;
+    }
+    return ErrorSeverity.Info;
+  }
+
+  fn classify_error_family(kind_handle: i64) -> ErrorFamily {
+    if kind_handle == kind_result_missing() {
+      return ErrorFamily.ResultRuntime;
+    }
+    if kind_handle == kind_diagnostic_message() {
+      return ErrorFamily.DiagnosticRuntime;
+    }
+    return ErrorFamily.Unknown;
+  }
+
+  fn classify_error_retryable(kind_handle: i64) -> i64 {
+    if kind_handle == kind_result_missing() {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn build_error_code(kind_handle: i64) -> ErrorCode {
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    return ErrorCode {
+      kind_handle: kind_handle,
+      stable_code: host_error_code(kind_handle),
+      message_handle: host_error_message(kind_handle),
+      severity_code: host_error_severity(kind_handle),
+      family_code: family_code(family),
+      retryable: classify_error_retryable(kind_handle)
+    };
+  }
+
+  fn build_diagnostic_code(kind_handle: i64) -> DiagnosticCode {
+    let severity: ErrorSeverity = classify_error_severity(kind_handle);
+    let family: ErrorFamily = classify_error_family(kind_handle);
+    return DiagnosticCode {
+      message_handle: host_error_message(kind_handle),
+      severity_code: severity_code(severity),
+      family_code: family_code(family)
+    };
+  }
+
+  fn build_error_envelope(kind_handle: i64) -> ErrorEnvelope {
+    return ErrorEnvelope {
+      error: build_error_code(kind_handle),
+      diagnostic: build_diagnostic_code(kind_handle)
+    };
+  }
+
+  fn result_is_err<T, E>(result: Result<T, E>) -> bool {
+    match result {
+      Result.Ok(_) => {
+        return false;
+      }
+      Result.Err(_) => {
+        return true;
+      }
+    }
+  }
+
+  fn result_unwrap_or<T, E>(result: Result<T, E>, fallback: T) -> T {
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(_) => {
+        return fallback;
+      }
+    }
+  }
+
+  fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(mapper(value));
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  fn result_score(result: Result<i64, ErrorEnvelope>) -> i64 {
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(envelope) => {
+        return envelope.error.stable_code
+          + envelope.error.message_handle
+          + envelope.error.severity_code
+          + envelope.error.family_code
+          + envelope.error.retryable
+          + envelope.diagnostic.message_handle
+          + envelope.diagnostic.severity_code
+          + envelope.diagnostic.family_code;
+      }
+    }
+  }
+
+  fn lift_error_kind(kind_handle: i64) -> Result<i64, ErrorEnvelope> {
+    return Result.Err(build_error_envelope(kind_handle));
+  }
+
+  fn lift_task_result(result: TaskResult<i64>) -> Result<i64, ErrorEnvelope> {
+    if task_completed(result) {
+      return Result.Ok(task_value(result));
+    }
+    if task_timed_out(result) {
+      return lift_error_kind(kind_result_missing());
+    }
+    if task_cancelled(result) {
+      return lift_error_kind(kind_diagnostic_message());
+    }
+    return lift_error_kind(kind_result_missing());
+  }
+
+  fn raise_value(value: i64) -> i64 {
+    return value + 4;
+  }
+
+  fn capture_task_result_enum(seed: i64, limit: i64) -> TaskResultEnumSummary {
+    let completed_result: TaskResult<i64> = join_result(spawn(ping(seed)));
+    let timed_result: TaskResult<i64> = join_result(timeout(spawn(ping(seed)), limit));
+    let cancelled_result: TaskResult<i64> = join_result(cancel(spawn(ping(seed))));
+
+    let primary: Result<i64, ErrorEnvelope> = result_map(lift_task_result(completed_result), raise_value);
+    let timed: Result<i64, ErrorEnvelope> = lift_task_result(timed_result);
+    let cancelled: Result<i64, ErrorEnvelope> = lift_task_result(cancelled_result);
+
+    return TaskResultEnumSummary {
+      primary_score: result_score(primary) + result_unwrap_or(primary, -10),
+      timed_score: result_score(timed)
+        + result_unwrap_or(timed, -20)
+        + if result_is_err(timed) { 2 } else { 0 },
+      cancelled_score: result_score(cancelled)
+        + result_unwrap_or(cancelled, -30)
+        + if result_is_err(cancelled) { 3 } else { 0 }
+    };
+  }
+
+  fn summarize_task_result_enum_recipe(seed: i64, limit: i64) -> i64 {
+    let summary: TaskResultEnumSummary = capture_task_result_enum(seed, limit);
+    return summary.primary_score + summary.timed_score + summary.cancelled_score;
+  }
+
+  fn main() {
+    print(summarize_task_result_enum_recipe(7, 0));
+  }
+}

@@ -87,9 +87,7 @@ pub fn project_abi_selection_view_json(item: &ProjectAbiSelectionView) -> String
     )
 }
 
-pub fn render_project_abi_selection_lines(
-    resolution: &ProjectAbiResolution,
-) -> Vec<String> {
+pub fn render_project_abi_selection_lines(resolution: &ProjectAbiResolution) -> Vec<String> {
     project_abi_selection_views(resolution)
         .into_iter()
         .flat_map(|item| render_project_abi_selection_view_lines(&item))
@@ -101,7 +99,10 @@ pub fn render_project_abi_selection_view_lines(item: &ProjectAbiSelectionView) -
     if let (Some(machine_arch), Some(machine_os)) =
         (item.machine_arch.as_deref(), item.machine_os.as_deref())
     {
-        lines.push(format!("  abi_target_machine: {}-{}", machine_arch, machine_os));
+        lines.push(format!(
+            "  abi_target_machine: {}-{}",
+            machine_arch, machine_os
+        ));
     }
     if let Some(object_format) = item.object_format.as_deref() {
         lines.push(format!("  abi_target_object: {}", object_format));
@@ -201,17 +202,13 @@ pub fn validate_project_lowering_selections(
     views
 }
 
-pub fn render_project_lowering_selection_lines(
-    view: &ProjectLoweringSelectionView,
-) -> Vec<String> {
+pub fn render_project_lowering_selection_lines(view: &ProjectLoweringSelectionView) -> Vec<String> {
     let mut lines = vec![format!(
         "lowering: {} abi={} ok={} selected={} registered={} issues={}",
         view.domain,
         view.abi.as_deref().unwrap_or("<none>"),
         if view.ok { "yes" } else { "no" },
-        view.selected_lowering_target
-            .as_deref()
-            .unwrap_or("<none>"),
+        view.selected_lowering_target.as_deref().unwrap_or("<none>"),
         if view.registered_lowering_targets.is_empty() {
             "<none>".to_owned()
         } else {
@@ -220,7 +217,10 @@ pub fn render_project_lowering_selection_lines(
         view.issue_count()
     )];
     for issue in &view.issues {
-        lines.push(format!("lowering_issue: {}", issue.summary().replace(": ", " ")));
+        lines.push(format!(
+            "lowering_issue: {}",
+            issue.summary().replace(": ", " ")
+        ));
     }
     lines
 }

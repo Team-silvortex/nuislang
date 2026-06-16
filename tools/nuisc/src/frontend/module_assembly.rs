@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use nuis_semantics::model::{
     AstEnumDef, AstEnumVariantKind, AstImplDef, AstModule, AstStructDef, AstStructField,
-    AstTypeAlias, AstVisibility, NirEnumDef, NirEnumVariant, NirEnumVariantKind,
-    NirExternFunction, NirExternInterface, NirGenericParam, NirStructDef, NirStructField,
-    NirTypeAlias, NirWherePredicate,
+    AstTypeAlias, AstVisibility, NirEnumDef, NirEnumVariant, NirEnumVariantKind, NirExternFunction,
+    NirExternInterface, NirGenericParam, NirStructDef, NirStructField, NirTypeAlias,
+    NirWherePredicate,
 };
 
 use super::{

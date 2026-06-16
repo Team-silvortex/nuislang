@@ -6,8 +6,8 @@ use nuis_semantics::model::{
 };
 
 use super::types::{ast_type_from_nir, infer_ast_expr_type};
-use super::validation_trait_bounds::validate_generic_parameter_use_site_bound_with_context;
 use super::validation_binding_env::instantiate_ast_struct_field_type;
+use super::validation_trait_bounds::validate_generic_parameter_use_site_bound_with_context;
 use super::{lower_type_ref, resolve_ast_type_ref_aliases};
 
 pub(crate) fn infer_generic_substitutions(
@@ -236,16 +236,13 @@ pub(crate) fn unify_generic_type_pattern(
         && pattern.generic_args.len() == concrete.generic_args.len()
         && pattern.is_optional == concrete.is_optional
         && pattern.is_ref == concrete.is_ref;
-    let enum_parent_shape = concrete
-        .name
-        .rsplit_once('.')
-        .is_some_and(|(parent, _)| {
-            pattern.name == parent
-                && pattern.is_optional == concrete.is_optional
-                && pattern.is_ref == concrete.is_ref
-                && (pattern.generic_args.len() == concrete.generic_args.len()
-                    || concrete.generic_args.is_empty())
-        });
+    let enum_parent_shape = concrete.name.rsplit_once('.').is_some_and(|(parent, _)| {
+        pattern.name == parent
+            && pattern.is_optional == concrete.is_optional
+            && pattern.is_ref == concrete.is_ref
+            && (pattern.generic_args.len() == concrete.generic_args.len()
+                || concrete.generic_args.is_empty())
+    });
     if !same_shape && !enum_parent_shape {
         return Err(format!(
             "generic function `{}` could not match expected type pattern `{}` with concrete type `{}`",

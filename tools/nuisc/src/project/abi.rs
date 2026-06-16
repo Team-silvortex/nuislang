@@ -7,8 +7,8 @@ use super::support_contracts::{
 };
 use super::validation_core::collect_project_domains;
 use super::{
-    split_domain_unit, LoadedProject, ProjectAbiIssue, ProjectAbiIssueKind,
-    ProjectAbiRequirement, ProjectAbiResolution, ProjectAbiSelectionCheck,
+    split_domain_unit, LoadedProject, ProjectAbiIssue, ProjectAbiIssueKind, ProjectAbiRequirement,
+    ProjectAbiResolution, ProjectAbiSelectionCheck,
 };
 
 fn json_escape(value: &str) -> String {

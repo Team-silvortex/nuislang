@@ -2097,27 +2097,29 @@ fn verify_target_contract_text(
         ));
     }
     let fields = parse_semicolon_kv_contract(node_name, value, "target contract")?;
-    let arch = fields.get("arch").copied().ok_or_else(|| {
-        format!("project contract node `{node_name}` is missing `arch` field")
-    })?;
-    let runtime = fields.get("runtime").copied().ok_or_else(|| {
-        format!("project contract node `{node_name}` is missing `runtime` field")
-    })?;
+    let arch = fields
+        .get("arch")
+        .copied()
+        .ok_or_else(|| format!("project contract node `{node_name}` is missing `arch` field"))?;
+    let runtime = fields
+        .get("runtime")
+        .copied()
+        .ok_or_else(|| format!("project contract node `{node_name}` is missing `runtime` field"))?;
     let lane_width = fields.get("lane_width").copied().ok_or_else(|| {
         format!("project contract node `{node_name}` is missing `lane_width` field")
     })?;
-    let arch = arch.strip_prefix("symbol:").ok_or_else(|| {
-        format!("project contract node `{node_name}` expects `arch=symbol:...`")
-    })?;
+    let arch = arch
+        .strip_prefix("symbol:")
+        .ok_or_else(|| format!("project contract node `{node_name}` expects `arch=symbol:...`"))?;
     let runtime = runtime.strip_prefix("symbol:").ok_or_else(|| {
         format!("project contract node `{node_name}` expects `runtime=symbol:...`")
     })?;
     let lane_width = lane_width.strip_prefix("i64:").ok_or_else(|| {
         format!("project contract node `{node_name}` expects `lane_width=i64:...`")
     })?;
-    let lane_width = lane_width.parse::<i64>().map_err(|_| {
-        format!("project contract node `{node_name}` has non-integer lane_width")
-    })?;
+    let lane_width = lane_width
+        .parse::<i64>()
+        .map_err(|_| format!("project contract node `{node_name}` has non-integer lane_width"))?;
     if lane_width <= 0 {
         return Err(format!(
             "project contract node `{node_name}` requires `lane_width > 0`, got `{lane_width}`"
@@ -2173,7 +2175,11 @@ fn verify_target_contract_text(
     Ok(())
 }
 
-fn verify_cpu_target_contract_text(node_name: &str, value: &str, target: &Node) -> Result<(), String> {
+fn verify_cpu_target_contract_text(
+    node_name: &str,
+    value: &str,
+    target: &Node,
+) -> Result<(), String> {
     if target.op.module != "cpu" || target.op.instruction != "target_config" {
         return Err(format!(
             "lowering contract node `{node_name}` must target `cpu.target_config`, got `{}.{}`",
@@ -2181,27 +2187,29 @@ fn verify_cpu_target_contract_text(node_name: &str, value: &str, target: &Node) 
         ));
     }
     let fields = parse_semicolon_kv_contract(node_name, value, "cpu target contract")?;
-    let arch = fields.get("arch").copied().ok_or_else(|| {
-        format!("lowering contract node `{node_name}` is missing `arch` field")
-    })?;
-    let abi = fields.get("abi").copied().ok_or_else(|| {
-        format!("lowering contract node `{node_name}` is missing `abi` field")
-    })?;
+    let arch = fields
+        .get("arch")
+        .copied()
+        .ok_or_else(|| format!("lowering contract node `{node_name}` is missing `arch` field"))?;
+    let abi = fields
+        .get("abi")
+        .copied()
+        .ok_or_else(|| format!("lowering contract node `{node_name}` is missing `abi` field"))?;
     let vector_bits = fields.get("vector_bits").copied().ok_or_else(|| {
         format!("lowering contract node `{node_name}` is missing `vector_bits` field")
     })?;
-    let arch = arch.strip_prefix("symbol:").ok_or_else(|| {
-        format!("lowering contract node `{node_name}` expects `arch=symbol:...`")
-    })?;
-    let abi = abi.strip_prefix("symbol:").ok_or_else(|| {
-        format!("lowering contract node `{node_name}` expects `abi=symbol:...`")
-    })?;
+    let arch = arch
+        .strip_prefix("symbol:")
+        .ok_or_else(|| format!("lowering contract node `{node_name}` expects `arch=symbol:...`"))?;
+    let abi = abi
+        .strip_prefix("symbol:")
+        .ok_or_else(|| format!("lowering contract node `{node_name}` expects `abi=symbol:...`"))?;
     let vector_bits = vector_bits.strip_prefix("i64:").ok_or_else(|| {
         format!("lowering contract node `{node_name}` expects `vector_bits=i64:...`")
     })?;
-    let vector_bits = vector_bits.parse::<i64>().map_err(|_| {
-        format!("lowering contract node `{node_name}` has non-integer vector_bits")
-    })?;
+    let vector_bits = vector_bits
+        .parse::<i64>()
+        .map_err(|_| format!("lowering contract node `{node_name}` has non-integer vector_bits"))?;
     if vector_bits <= 0 {
         return Err(format!(
             "lowering contract node `{node_name}` requires `vector_bits > 0`, got `{vector_bits}`"
@@ -4185,7 +4193,12 @@ mod tests {
                     "cpu.text",
                     &[payload],
                 ),
-                node("project_abi_cpu_selection_entry", "cpu0", "cpu.text", &[payload]),
+                node(
+                    "project_abi_cpu_selection_entry",
+                    "cpu0",
+                    "cpu.text",
+                    &[payload],
+                ),
             ],
             edges: vec![dep(
                 "project_abi_cpu_selection_summary_type",
@@ -4207,8 +4220,18 @@ mod tests {
                 kind: ResourceKind::parse("cpu.arm64"),
             }],
             nodes: vec![
-                node("project_abi_graph_summary_type", "cpu0", "cpu.text", &[payload]),
-                node("project_abi_graph_summary_entry", "cpu0", "cpu.text", &[payload]),
+                node(
+                    "project_abi_graph_summary_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[payload],
+                ),
+                node(
+                    "project_abi_graph_summary_entry",
+                    "cpu0",
+                    "cpu.text",
+                    &[payload],
+                ),
             ],
             edges: vec![dep(
                 "project_abi_graph_summary_type",
@@ -4236,7 +4259,12 @@ mod tests {
                     "cpu.text",
                     &[bad],
                 ),
-                node("project_abi_data_selection_entry", "cpu0", "cpu.text", &[bad]),
+                node(
+                    "project_abi_data_selection_entry",
+                    "cpu0",
+                    "cpu.text",
+                    &[bad],
+                ),
             ],
             edges: vec![dep(
                 "project_abi_data_selection_summary_type",

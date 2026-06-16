@@ -367,7 +367,6 @@ fn lowers_result_error_patterns_into_nested_variant_checks() {
                     && matches!(value, NirExpr::FieldAccess { field, .. } if field == "value")
             )
     ));
-
 }
 
 #[test]
@@ -758,7 +757,9 @@ fn lowers_receiver_method_call_with_explicit_generic_args_on_enum_variants() {
             value: NirExpr::Call { callee, .. },
             ..
         }) => callee.clone(),
-        other => panic!("expected specialized receiver explicit-generic method call, found {other:?}"),
+        other => {
+            panic!("expected specialized receiver explicit-generic method call, found {other:?}")
+        }
     };
     assert!(specialized_name.starts_with("impl.Addable.for.Option_T_.twice__"));
 }
@@ -833,7 +834,9 @@ fn lowers_receiver_method_call_with_explicit_generic_args_anchoring_none_variant
             value: NirExpr::Call { callee, .. },
             ..
         }) => callee.clone(),
-        other => panic!("expected specialized explicit-generic none-variant method call, found {other:?}"),
+        other => panic!(
+            "expected specialized explicit-generic none-variant method call, found {other:?}"
+        ),
     };
     assert!(specialized_name.starts_with("impl.Addable.for.Option_T_.twice__"));
 }

@@ -12,14 +12,14 @@ nir_surface = ["nir.kernel.surface.v1", "nir.tensor.surface.v1"]
 yir_lowering = ["yir.kernel.lowering.v1", "yir.tensor-lowering.v1"]
 part_verify = ["verify.kernel.shape.v1", "verify.kernel.broadcast.v1"]
 support_surface = ["kernel.profile.bind-core.v1", "kernel.profile.queue-depth.v1", "kernel.profile.batch-lanes.v1", "kernel.profile.entry.v1"]
-support_profile_slots = ["bind_core", "queue_depth", "batch_lanes"]
+support_profile_slots = ["bind_core", "queue_depth", "batch_lanes", "entry"]
 default_lanes = ["kernel.target_config=compute", "kernel.tensor=compute", "kernel.fill=compute", "kernel.splat=compute", "kernel.add=compute", "kernel.mul=compute", "kernel.add_scalar=compute", "kernel.mul_scalar=compute", "kernel.matmul=compute", "kernel.add_bias=compute", "kernel.relu=compute", "kernel.reshape=compute", "kernel.slice=compute", "kernel.row=compute", "kernel.col=compute", "kernel.shape=compute", "kernel.rows=compute", "kernel.cols=compute", "kernel.element_at=compute", "kernel.broadcast=compute", "kernel.reduce_sum=compute", "kernel.reduce_sum_axis=compute", "kernel.reduce_max=compute", "kernel.reduce_max_axis=compute", "kernel.reduce_mean=compute", "kernel.reduce_mean_axis=compute", "kernel.reduce_min=compute", "kernel.reduce_min_axis=compute", "kernel.argmax=compute", "kernel.argmax_axis=compute", "kernel.argmin=compute", "kernel.argmin_axis=compute", "kernel.sort=compute", "kernel.topk=compute", "kernel.topk_axis=compute", "kernel.print=compute"]
 binary_extension = "nustar"
 package_layout = "single-envelope"
 machine_abi_policy = "exact-match"
 abi_profiles = ["kernel.apple_ane.coreml.v1", "kernel.cpu-fallback.v1", "kernel.cpu-fallback.sysv64.v1", "kernel.cpu-fallback.win64.v1", "kernel.vulkan.compute.spv1_6.v1"]
 abi_capabilities = ["kernel.apple_ane.coreml.v1:surface:kernel.profile.*|op:kernel.*", "kernel.cpu-fallback.v1:surface:kernel.profile.*|op:kernel.*", "kernel.cpu-fallback.sysv64.v1:surface:kernel.profile.*|op:kernel.*", "kernel.cpu-fallback.win64.v1:surface:kernel.profile.*|op:kernel.*", "kernel.vulkan.compute.spv1_6.v1:surface:kernel.profile.*|op:kernel.*"]
-abi_targets = ["kernel.apple_ane.coreml.v1:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin|backend=coreml", "kernel.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host|backend=cpu-fallback", "kernel.cpu-fallback.sysv64.v1:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu|backend=cpu-fallback", "kernel.cpu-fallback.win64.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc|backend=cpu-fallback"]
+abi_targets = ["kernel.apple_ane.coreml.v1:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin|backend=coreml", "kernel.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host|backend=cpu-fallback", "kernel.cpu-fallback.sysv64.v1:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu|backend=cpu-fallback", "kernel.cpu-fallback.win64.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc|backend=cpu-fallback", "kernel.vulkan.compute.spv1_6.v1:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu|backend=vulkan"]
 implementation_kinds = ["native-stub", "native-dylib", "llvm-bc"]
 loader_entry = "nustar.bootstrap.v1"
 loader_abi = "nustar-loader-v1"
@@ -31,5 +31,5 @@ clock_bridge_default = "global->dispatch:bridge"
 profiles = ["aot"]
 resource_families = ["kernel", "kernel.apple", "npu", "npu.apple"]
 unit_types = ["KernelUnit", "TensorProgram", "ComputeGraph"]
-lowering_targets = ["coreml", "mps-graph", "ane"]
+lowering_targets = ["coreml", "mps-graph", "ane", "cpu-fallback", "vulkan"]
 ops = ["kernel.target_config", "kernel.tensor", "kernel.fill", "kernel.splat", "kernel.add", "kernel.mul", "kernel.add_scalar", "kernel.mul_scalar", "kernel.matmul", "kernel.add_bias", "kernel.relu", "kernel.reshape", "kernel.slice", "kernel.row", "kernel.col", "kernel.shape", "kernel.rows", "kernel.cols", "kernel.element_at", "kernel.broadcast", "kernel.reduce_sum", "kernel.reduce_sum_axis", "kernel.reduce_max", "kernel.reduce_max_axis", "kernel.reduce_mean", "kernel.reduce_mean_axis", "kernel.reduce_min", "kernel.reduce_min_axis", "kernel.argmax", "kernel.argmax_axis", "kernel.argmin", "kernel.argmin_axis", "kernel.sort", "kernel.topk", "kernel.topk_axis", "kernel.print"]
