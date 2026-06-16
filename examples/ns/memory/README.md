@@ -34,11 +34,26 @@ Start here:
 * [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
   smallest direct `spawn -> join` payload path
 * [hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns)
-  smallest direct `if` / `match` + `Result<Task<_>, _>` + `await` + `?` path
+  smallest direct `if` / `match` + `Result<Task<_>, _>` + `await` + `?` path,
+  now also promoted to source compile-closure coverage
 * [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
-  narrowest status-only task path
+  narrowest status-only task path,
+  now also promoted to source compile-closure coverage
+* [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
+  narrowest timeout/cancel lifecycle task path,
+  now also promoted to source compile-closure coverage
 * [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
-  narrowest completed-value task path
+  narrowest completed-value task path,
+  now also promoted to source compile-closure coverage
+* [hello_thread_mutex_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns)
+  narrowest staged `Thread<T>` / `Mutex<T>` observation path,
+  now also promoted to source compile-closure coverage
+* [hello_thread_mutex_branch_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns)
+  narrowest staged thread/lock branch-selected observer path,
+  now also promoted to source compile-closure coverage
+* [hello_thread_mutex_branch_suffix.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns)
+  staged thread/lock branch-selected observer path with shared pure suffix,
+  now also promoted to source compile-closure coverage
 
 ## Short Task Map
 
@@ -61,6 +76,32 @@ Start here:
   - [hello_task_glm_join_nonconsuming_probe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns)
     - now best read as a negative probe for `join(...)` / `join_result(...)`
       double-consume, not as a still-legal shape
+* staged thread/lock observation
+  - [hello_thread_mutex_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns)
+  - [hello_thread_mutex_branch_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns)
+  - [hello_thread_mutex_branch_suffix.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns)
+
+## Current Compile-Closure Set
+
+These examples now survive real source compile coverage under
+[tools/nuisc/tests/memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs):
+
+* [hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns)
+* [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
+* [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
+* [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
+* [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
+* [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
+* [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
+* [hello_thread_mutex_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns)
+* [hello_thread_mutex_branch_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns)
+* [hello_thread_mutex_branch_suffix.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns)
+
+Read this set as:
+
+* the current checked-in source-level task/GLM observation spine
+* plus the first short single-file staged thread/lock observation anchors
+* not yet the whole task/thread example inventory
 
 ## Reading Rule
 

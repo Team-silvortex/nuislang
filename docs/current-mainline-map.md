@@ -17,12 +17,14 @@ If you only need the shortest current late-`0.19.*` reading route, use this orde
 6. [versioning/nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
 7. [versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
 8. [versioning/nuis-0.20.0-generic-validation-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
-9. [versioning/nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
-10. [versioning/nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
-11. [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
-12. [versioning/nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
-13. [versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
-14. [versioning/nuis-0.19.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-release-checklist.md)
+9. [versioning/nuis-0.20.0-receiver-generic-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-receiver-generic-regression-matrix.md)
+10. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
+11. [versioning/nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
+12. [versioning/nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
+13. [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
+14. [versioning/nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
+15. [versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+16. [versioning/nuis-0.19.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-release-checklist.md)
 
 Short rule:
 
@@ -40,12 +42,18 @@ Short rule:
   [versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 * current `0.20.* -> alpha` roadmap:
   [versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
+* current alpha mainline boundary index:
+  [reference/alpha-mainline-boundary-index.md](/Users/Shared/chroot/dev/nuislang/docs/reference/alpha-mainline-boundary-index.md)
 * current frontend-vs-CLI boundary note:
   [versioning/nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
 * current branch-runtime lowering matrix:
   [versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
 * current generic-validation regression matrix:
   [versioning/nuis-0.20.0-generic-validation-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
+* current receiver-generic regression matrix:
+  [versioning/nuis-0.20.0-receiver-generic-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-receiver-generic-regression-matrix.md)
+* current `std` refactor frontdoor:
+  [versioning/nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
 * current compile-gap checklist:
   [versioning/nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
 * current goals / gates:
@@ -123,12 +131,22 @@ Current example-tree rule:
   [reference/cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md)
   shortest rule:
   `Task<T> remains the current async contract; staged Thread<T>/Mutex<T>/MutexGuard<T> now exist as explicit handle/resource families rather than disguised plain values`
+  current boundary summary:
+  [reference/cpu-thread-lock-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-boundary.md)
+  current single-file source anchor:
+  [hello_thread_mutex_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns)
+  current branch-observer source anchor:
+  [hello_thread_mutex_branch_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns)
+  current branch-observer-plus-suffix source anchor:
+  [hello_thread_mutex_branch_suffix.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns)
   current project anchor:
   [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo)
 * annotation / intrinsic future edge:
   [reference/annotation-intrinsic-stdlib-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/annotation-intrinsic-stdlib-sketch.md)
   shortest rule:
   `official annotations are preferred frontend conventions; registered nustar capability contracts are the stable truth`
+* current `nustar` capability split boundary:
+  [reference/nustar-capability-split-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nustar-capability-split-boundary.md)
 * launcher / container / linker future edge:
   [reference/nuis-launcher-container-linker-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-launcher-container-linker-sketch.md)
   shortest rule:
@@ -199,6 +217,14 @@ Use these when you want the shortest explanation of how the current layers stack
   [std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
   current compile-closure anchor:
   `generic helper -> bridge packet/envelope -> lifted lambda -> session summary`
+* task compile-closure anchor set:
+  [hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns) /
+  [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns) /
+  [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns) /
+  [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns) /
+  [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns) /
+  [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns) /
+  [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
 * `nustar` replaceability:
   frontend surface syntax may vary ->
   registration completeness / standards legality validate ->

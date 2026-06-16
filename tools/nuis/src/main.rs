@@ -54,8 +54,8 @@ fn run() -> Result<(), String> {
             println!("  nustar_loading: lazy");
             println!("  external_projects: yalivia, vulpoya");
         }
-        cli::CommandKind::Registry => {
-            nuisc::run(nuisc::CommandKind::Registry)?;
+        cli::CommandKind::Registry { json } => {
+            nuisc::run(nuisc::CommandKind::Registry { json })?;
         }
         cli::CommandKind::Fmt { input } => {
             nuisc::run(nuisc::CommandKind::Fmt { input })?;
@@ -1241,13 +1241,43 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
 struct SchedulerViewDomainRecord {
     domain: String,
     package: Option<String>,
+    contract_schema: String,
+    contract_groups: Vec<String>,
+    extension_groups: Vec<String>,
+    frontend: String,
+    shared_contract_json: String,
+    shared_registration_json: String,
+    manifest_path: String,
+    entry_crate: String,
+    ast_entry: String,
+    nir_entry: String,
+    yir_lowering_entry: String,
+    part_verify_entry: String,
+    ast_surface: Vec<String>,
+    nir_surface: Vec<String>,
+    yir_lowering: Vec<String>,
+    part_verify: Vec<String>,
+    resource_families: Vec<String>,
+    unit_types: Vec<String>,
+    lowering_targets: Vec<String>,
+    ops: Vec<String>,
     abi: Option<String>,
+    abi_profiles: Vec<String>,
     abi_target_machine: Option<String>,
     abi_target_object: Option<String>,
     abi_target_calling: Option<String>,
     abi_target_clang: Option<String>,
     abi_target_backend: Option<String>,
     abi_target_host_adaptive: Option<bool>,
+    loader_abi: String,
+    loader_entry: String,
+    machine_abi_policy: String,
+    host_ffi_surface: Vec<String>,
+    host_ffi_abis: Vec<String>,
+    host_ffi_bridge: Option<String>,
+    support_surface: Vec<String>,
+    support_profile_slots: Vec<String>,
+    default_lanes: Vec<String>,
     scheduler_contract_stack: String,
     scheduler_clock: String,
     scheduler_result_roles: String,
@@ -1257,6 +1287,8 @@ struct SchedulerViewDomainRecord {
     scheduler_summary_api: String,
     scheduler_summary_samples: Option<String>,
     scheduler_observer_classes: String,
+    std_net_navigation: Option<String>,
+    std_net_samples: Option<String>,
 }
 
 fn json_escape_local(value: &str) -> String {
@@ -1312,6 +1344,10 @@ fn json_string_array_field(name: &str, values: &[String]) -> String {
 
 fn json_object_field(name: &str, fields: &[String]) -> String {
     format!("\"{}\":{{{}}}", name, fields.join(","))
+}
+
+fn json_embedded_object_field(name: &str, object_json: &str) -> String {
+    format!("\"{}\":{}", name, object_json)
 }
 
 fn json_object_array_field(name: &str, values: &[String]) -> String {
@@ -1609,8 +1645,11 @@ fn scheduler_view_domain_record(
     package: Option<String>,
     abi: Option<String>,
 ) -> Result<SchedulerViewDomainRecord, String> {
-    let manifest =
-        nuisc::registry::load_manifest_for_domain(std::path::Path::new("nustar-packages"), domain)?;
+    let registration = nuisc::registry::load_domain_registration_for_domain(
+        std::path::Path::new("nustar-packages"),
+        domain,
+    )?;
+    let contract = registration.contract.clone();
     let mut abi_target_machine = None;
     let mut abi_target_object = None;
     let mut abi_target_calling = None;
@@ -1618,6 +1657,8 @@ fn scheduler_view_domain_record(
     let mut abi_target_backend = None;
     let mut abi_target_host_adaptive = None;
     if let Some(abi_name) = abi.as_deref() {
+        let manifest =
+            nuisc::registry::load_manifest_for_domain(std::path::Path::new("nustar-packages"), domain)?;
         if let Ok(target) = nuisc::registry::registered_abi_target(&manifest, abi_name) {
             abi_target_machine = Some(format!("{}-{}", target.machine_arch, target.machine_os));
             abi_target_object = Some(target.object_format.to_owned());
@@ -1629,29 +1670,55 @@ fn scheduler_view_domain_record(
     }
     Ok(SchedulerViewDomainRecord {
         domain: domain.to_owned(),
-        package,
+        package: package.or_else(|| Some(contract.package_id.clone())),
+        contract_schema: contract.contract_schema,
+        contract_groups: contract.contract_groups,
+        extension_groups: contract.extension_groups,
+        frontend: contract.frontend,
+        shared_contract_json: nuisc::registry::domain_contract_object_json(&registration.contract),
+        shared_registration_json: nuisc::registry::domain_registration_object_json(&registration),
+        manifest_path: registration.manifest_path,
+        entry_crate: registration.entry_crate,
+        ast_entry: registration.ast_entry,
+        nir_entry: registration.nir_entry,
+        yir_lowering_entry: registration.yir_lowering_entry,
+        part_verify_entry: registration.part_verify_entry,
+        ast_surface: registration.ast_surface,
+        nir_surface: registration.nir_surface,
+        yir_lowering: registration.yir_lowering,
+        part_verify: registration.part_verify,
+        resource_families: registration.resource_families,
+        unit_types: registration.unit_types,
+        lowering_targets: registration.lowering_targets,
+        ops: registration.ops,
         abi,
+        abi_profiles: contract.abi_profiles,
         abi_target_machine,
         abi_target_object,
         abi_target_calling,
         abi_target_clang,
         abi_target_backend,
         abi_target_host_adaptive,
-        scheduler_contract_stack: nuisc::scheduler_contract_stack_brief().to_owned(),
-        scheduler_clock: format!(
-            "{} [{}] bridge={}",
-            manifest.clock_domain_id, manifest.clock_kind, manifest.clock_bridge_default
-        ),
-        scheduler_result_roles: nuisc::scheduler_result_roles_brief().to_owned(),
-        scheduler_sample_navigation: nuisc::scheduler_sample_navigation_brief(domain)
-            .map(str::to_owned),
-        scheduler_result_samples: nuisc::scheduler_result_samples_brief(domain).map(str::to_owned),
-        scheduler_transport_samples: nuisc::scheduler_transport_samples_brief(domain)
-            .map(str::to_owned),
-        scheduler_summary_api: nuisc::scheduler_summary_api_brief().to_owned(),
-        scheduler_summary_samples: nuisc::scheduler_summary_samples_brief(domain)
-            .map(str::to_owned),
-        scheduler_observer_classes: nuisc::scheduler_observer_classes_brief().to_owned(),
+        loader_abi: contract.loader_abi,
+        loader_entry: contract.loader_entry,
+        machine_abi_policy: contract.machine_abi_policy,
+        host_ffi_surface: contract.host_ffi_surface,
+        host_ffi_abis: contract.host_ffi_abis,
+        host_ffi_bridge: contract.host_ffi_bridge,
+        support_surface: contract.capability.support_surface,
+        support_profile_slots: contract.capability.support_profile_slots,
+        default_lanes: contract.capability.default_lanes,
+        scheduler_contract_stack: contract.scheduler.contract_stack,
+        scheduler_clock: contract.scheduler.clock.brief(),
+        scheduler_result_roles: contract.scheduler.result_roles,
+        scheduler_sample_navigation: contract.scheduler.sample_navigation,
+        scheduler_result_samples: contract.scheduler.result_samples,
+        scheduler_transport_samples: contract.scheduler.transport_samples,
+        scheduler_summary_api: contract.scheduler.summary_api,
+        scheduler_summary_samples: contract.scheduler.summary_samples,
+        scheduler_observer_classes: contract.scheduler.observer_classes,
+        std_net_navigation: contract.std_net.sample_navigation,
+        std_net_samples: contract.std_net.recipe_samples,
     })
 }
 
@@ -1659,13 +1726,41 @@ fn scheduler_view_domain_record_json(record: &SchedulerViewDomainRecord) -> Stri
     let fields = vec![
         json_field("domain", &record.domain),
         json_optional_string_field("package", record.package.as_deref()),
+        json_field("contract_schema", &record.contract_schema),
+        json_string_array_field("contract_groups", &record.contract_groups),
+        json_string_array_field("extension_groups", &record.extension_groups),
+        json_field("frontend", &record.frontend),
+        json_field("manifest_path", &record.manifest_path),
+        json_field("entry_crate", &record.entry_crate),
+        json_field("ast_entry", &record.ast_entry),
+        json_field("nir_entry", &record.nir_entry),
+        json_field("yir_lowering_entry", &record.yir_lowering_entry),
+        json_field("part_verify_entry", &record.part_verify_entry),
+        json_string_array_field("ast_surface", &record.ast_surface),
+        json_string_array_field("nir_surface", &record.nir_surface),
+        json_string_array_field("yir_lowering", &record.yir_lowering),
+        json_string_array_field("part_verify", &record.part_verify),
+        json_string_array_field("resource_families", &record.resource_families),
+        json_string_array_field("unit_types", &record.unit_types),
+        json_string_array_field("lowering_targets", &record.lowering_targets),
+        json_string_array_field("ops", &record.ops),
         json_optional_string_field("abi", record.abi.as_deref()),
+        json_string_array_field("abi_profiles", &record.abi_profiles),
         json_optional_string_field("abi_target_machine", record.abi_target_machine.as_deref()),
         json_optional_string_field("abi_target_object", record.abi_target_object.as_deref()),
         json_optional_string_field("abi_target_calling", record.abi_target_calling.as_deref()),
         json_optional_string_field("abi_target_clang", record.abi_target_clang.as_deref()),
         json_optional_string_field("abi_target_backend", record.abi_target_backend.as_deref()),
         json_optional_bool_field("abi_target_host_adaptive", record.abi_target_host_adaptive),
+        json_field("loader_abi", &record.loader_abi),
+        json_field("loader_entry", &record.loader_entry),
+        json_field("machine_abi_policy", &record.machine_abi_policy),
+        json_string_array_field("host_ffi_surface", &record.host_ffi_surface),
+        json_string_array_field("host_ffi_abis", &record.host_ffi_abis),
+        json_optional_string_field("host_ffi_bridge", record.host_ffi_bridge.as_deref()),
+        json_string_array_field("support_surface", &record.support_surface),
+        json_string_array_field("support_profile_slots", &record.support_profile_slots),
+        json_string_array_field("default_lanes", &record.default_lanes),
         json_field("scheduler_contract_stack", &record.scheduler_contract_stack),
         json_field("scheduler_clock", &record.scheduler_clock),
         json_field("scheduler_result_roles", &record.scheduler_result_roles),
@@ -1690,6 +1785,10 @@ fn scheduler_view_domain_record_json(record: &SchedulerViewDomainRecord) -> Stri
             "scheduler_observer_classes",
             &record.scheduler_observer_classes,
         ),
+        json_optional_string_field("std_net_navigation", record.std_net_navigation.as_deref()),
+        json_optional_string_field("std_net_samples", record.std_net_samples.as_deref()),
+        json_embedded_object_field("contract", &record.shared_contract_json),
+        json_embedded_object_field("registration", &record.shared_registration_json),
     ];
     format!("{{{}}}", fields.join(","))
 }
@@ -3020,46 +3119,165 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
+fn print_domain_contract_group(
+    contract: &nuisc::registry::NustarDomainContract,
+    group: &str,
+) {
+    println!("    {}:", group);
+    match group {
+        nuisc::registry::NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY => {
+            println!("      package: {}", contract.package_id);
+            println!("      contract_schema: {}", contract.contract_schema);
+            println!("      frontend: {}", contract.frontend);
+        }
+        nuisc::registry::NUSTAR_DOMAIN_CONTRACT_GROUP_LOADER => {
+            println!("      loader_abi: {}", contract.loader_abi);
+            println!("      loader_entry: {}", contract.loader_entry);
+        }
+        nuisc::registry::NUSTAR_DOMAIN_CONTRACT_GROUP_ABI => {
+            println!("      machine_abi_policy: {}", contract.machine_abi_policy);
+            if !contract.abi_profiles.is_empty() {
+                print_scheduler_sample_field("      abi_profiles", &contract.abi_profiles.join("; "));
+            }
+        }
+        nuisc::registry::NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE => {
+            if !contract.host_ffi_surface.is_empty() {
+                print_scheduler_sample_field(
+                    "      host_ffi_surface",
+                    &contract.host_ffi_surface.join("; "),
+                );
+                print_scheduler_sample_field(
+                    "      host_ffi_abis",
+                    &contract.host_ffi_abis.join("; "),
+                );
+            }
+            if let Some(host_ffi_bridge) = contract.host_ffi_bridge.as_deref() {
+                println!("      host_ffi_bridge: {}", host_ffi_bridge);
+            }
+        }
+        nuisc::registry::NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME => {
+            if !contract.capability.support_surface.is_empty() {
+                print_scheduler_sample_field(
+                    "      support_surface",
+                    &contract.capability.support_surface.join("; "),
+                );
+            }
+            if !contract.capability.support_profile_slots.is_empty() {
+                print_scheduler_sample_field(
+                    "      support_profile_slots",
+                    &contract.capability.support_profile_slots.join("; "),
+                );
+            }
+            if !contract.capability.default_lanes.is_empty() {
+                print_scheduler_sample_field(
+                    "      default_lanes",
+                    &contract.capability.default_lanes.join("; "),
+                );
+            }
+            println!(
+                "      scheduler_clock: {}",
+                contract.scheduler.clock.brief()
+            );
+        }
+        nuisc::registry::NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER => {
+            println!(
+                "      scheduler_contract_stack: {}",
+                contract.scheduler.contract_stack
+            );
+            println!(
+                "      scheduler_result_roles: {}",
+                contract.scheduler.result_roles
+            );
+            println!(
+                "      scheduler_summary_api: {}",
+                contract.scheduler.summary_api
+            );
+            println!(
+                "      scheduler_observer_classes: {}",
+                contract.scheduler.observer_classes
+            );
+            if let Some(navigation) = contract.scheduler.sample_navigation.as_deref() {
+                println!("      scheduler_sample_navigation: {}", navigation);
+            }
+            if let Some(samples) = contract.scheduler.result_samples.as_deref() {
+                print_scheduler_sample_field("      scheduler_result_samples", samples);
+            }
+            if let Some(samples) = contract.scheduler.transport_samples.as_deref() {
+                print_scheduler_sample_field("      scheduler_transport_samples", samples);
+            }
+            if let Some(samples) = contract.scheduler.summary_samples.as_deref() {
+                print_scheduler_sample_field("      scheduler_summary_samples", samples);
+            }
+        }
+        nuisc::registry::NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET => {
+            if let Some(navigation) = contract.std_net.sample_navigation.as_deref() {
+                println!("      std_net_navigation: {}", navigation);
+            }
+            if let Some(samples) = contract.std_net.recipe_samples.as_deref() {
+                print_scheduler_sample_field("      std_net_samples", samples);
+            }
+        }
+        _ => {
+            println!("      <unrecognized contract group>");
+        }
+    }
+}
+
 fn print_project_scheduler_contract_view(domain: &str) -> Result<(), String> {
-    let manifest =
-        nuisc::registry::load_manifest_for_domain(std::path::Path::new("nustar-packages"), domain)?;
-    println!(
-        "    scheduler_contract_stack: {}",
-        nuisc::scheduler_contract_stack_brief()
-    );
-    println!(
-        "    scheduler_clock: {} [{}] bridge={}",
-        manifest.clock_domain_id, manifest.clock_kind, manifest.clock_bridge_default
-    );
-    println!(
-        "    scheduler_result_roles: {}",
-        nuisc::scheduler_result_roles_brief()
-    );
-    if let Some(navigation) = nuisc::scheduler_sample_navigation_brief(domain) {
-        println!("    scheduler_sample_navigation: {}", navigation);
+    let registration = nuisc::registry::load_domain_registration_for_domain(
+        std::path::Path::new("nustar-packages"),
+        domain,
+    )?;
+    let contract = registration.contract;
+    println!("    registration:");
+    println!("      manifest_path: {}", registration.manifest_path);
+    println!("      entry_crate: {}", registration.entry_crate);
+    println!("      ast_entry: {}", registration.ast_entry);
+    println!("      nir_entry: {}", registration.nir_entry);
+    println!("      yir_lowering_entry: {}", registration.yir_lowering_entry);
+    println!("      part_verify_entry: {}", registration.part_verify_entry);
+    if !registration.ast_surface.is_empty() {
+        print_scheduler_sample_field("      ast_surface", &registration.ast_surface.join("; "));
     }
-    if let Some(samples) = nuisc::scheduler_result_samples_brief(domain) {
-        print_scheduler_sample_field("scheduler_result_samples", samples);
+    if !registration.nir_surface.is_empty() {
+        print_scheduler_sample_field("      nir_surface", &registration.nir_surface.join("; "));
     }
-    if let Some(samples) = nuisc::scheduler_transport_samples_brief(domain) {
-        print_scheduler_sample_field("scheduler_transport_samples", samples);
+    if !registration.yir_lowering.is_empty() {
+        print_scheduler_sample_field(
+            "      yir_lowering",
+            &registration.yir_lowering.join("; "),
+        );
     }
-    println!(
-        "    scheduler_summary_api: {}",
-        nuisc::scheduler_summary_api_brief()
-    );
-    if let Some(samples) = nuisc::scheduler_summary_samples_brief(domain) {
-        print_scheduler_sample_field("scheduler_summary_samples", samples);
+    if !registration.part_verify.is_empty() {
+        print_scheduler_sample_field("      part_verify", &registration.part_verify.join("; "));
     }
-    println!(
-        "    scheduler_observer_classes: {}",
-        nuisc::scheduler_observer_classes_brief()
-    );
-    if let Some(navigation) = nuisc::std_net_sample_navigation_brief(domain) {
-        println!("    std_net_navigation: {}", navigation);
+    if !registration.resource_families.is_empty() {
+        print_scheduler_sample_field(
+            "      resource_families",
+            &registration.resource_families.join("; "),
+        );
     }
-    if let Some(samples) = nuisc::std_net_recipe_samples_brief(domain) {
-        print_scheduler_sample_field("std_net_samples", samples);
+    if !registration.unit_types.is_empty() {
+        print_scheduler_sample_field("      unit_types", &registration.unit_types.join("; "));
+    }
+    if !registration.lowering_targets.is_empty() {
+        print_scheduler_sample_field(
+            "      lowering_targets",
+            &registration.lowering_targets.join("; "),
+        );
+    }
+    if !registration.ops.is_empty() {
+        print_scheduler_sample_field("      ops", &registration.ops.join("; "));
+    }
+    print_scheduler_sample_field("contract_groups", &contract.contract_groups.join("; "));
+    if !contract.extension_groups.is_empty() {
+        print_scheduler_sample_field("extension_groups", &contract.extension_groups.join("; "));
+    }
+    for group in &contract.contract_groups {
+        print_domain_contract_group(&contract, group);
+    }
+    for group in &contract.extension_groups {
+        print_domain_contract_group(&contract, group);
     }
     Ok(())
 }
@@ -3562,7 +3780,8 @@ mod tests {
     use super::{
         build_workflow_frontdoor_surface, handle_check, handle_test,
         project_compile_workflow_source_profile, resolve_runner_clock_domain,
-        run_language_tests_for_source_file, single_source_workflow_source_profile,
+        run_language_tests_for_source_file, scheduler_view_domain_record,
+        scheduler_view_domain_record_json, single_source_workflow_source_profile,
         wait_for_test_child, RawTestOutcome, WorkflowRecommendation,
     };
     use std::{
@@ -4061,6 +4280,26 @@ mod cpu Main {
             nuis_semantics::model::NirHostReadSurface::ClockTick
         );
         assert_eq!(resolved.source, "host_monotonic_deadline");
+    }
+
+    #[test]
+    fn scheduler_view_domain_record_json_exposes_registration_section() {
+        let record = scheduler_view_domain_record("network", None, None)
+            .expect("expected network scheduler registration record");
+        let json = scheduler_view_domain_record_json(&record);
+
+        assert!(json.contains("\"registration\":{"));
+        assert!(json.contains("\"manifest_path\":\""));
+        assert!(json.contains("network.toml"));
+        assert!(json.contains("\"entry_crate\":"));
+        assert!(json.contains("\"ast_entry\":"));
+        assert!(json.contains("\"nir_entry\":"));
+        assert!(json.contains("\"yir_lowering_entry\":"));
+        assert!(json.contains("\"part_verify_entry\":"));
+        assert!(json.contains("\"resource_families\":["));
+        assert!(json.contains("\"unit_types\":["));
+        assert!(json.contains("\"lowering_targets\":["));
+        assert!(json.contains("\"ops\":["));
     }
 
     #[test]

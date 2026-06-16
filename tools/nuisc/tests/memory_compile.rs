@@ -201,6 +201,575 @@ fn compiles_hello_byte_buffer_memory_source() {
 }
 
 #[test]
+fn compiles_hello_task_result_control_flow_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_task_result_control_flow memory source should compile");
+}
+
+#[test]
+fn lowers_hello_task_result_control_flow_memory_source_with_unit_error_struct_shape() {
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns",
+    );
+
+    assert!(
+        artifacts.yir.nodes.iter().any(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "struct"
+                && node.op.args.first().is_some_and(|arg| arg == "Error.InvalidInput")
+                && node.op.args.len() == 1
+        }),
+        "expected unit-variant error path to lower through zero-field cpu.struct"
+    );
+}
+
+#[test]
+fn compiles_hello_task_glm_status_path_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_task_glm_status_path memory source should compile");
+}
+
+#[test]
+fn lowers_hello_task_glm_status_path_memory_source_with_task_status_observer_shape() {
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns",
+    );
+
+    let join_result_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let timed_out_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_timed_out")
+        .count();
+    let cancelled_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
+        .count();
+
+    assert_eq!(join_result_count, 3, "expected three task result observations");
+    assert_eq!(completed_count, 1, "expected one completed observer path");
+    assert_eq!(timed_out_count, 1, "expected one timed-out observer path");
+    assert_eq!(cancelled_count, 1, "expected one cancelled observer path");
+}
+
+#[test]
+fn compiles_hello_task_glm_lifecycle_path_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_task_glm_lifecycle_path memory source should compile");
+}
+
+#[test]
+fn lowers_hello_task_glm_lifecycle_path_memory_source_with_timeout_cancel_chain_shape() {
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns",
+    );
+
+    let timeout_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let cancel_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let join_result_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+
+    assert_eq!(timeout_count, 1, "expected one timeout lifecycle path");
+    assert_eq!(cancel_count, 1, "expected one cancel lifecycle path");
+    assert_eq!(
+        join_result_count, 2,
+        "expected one join_result per lifecycle task observation"
+    );
+}
+
+#[test]
+fn compiles_hello_task_glm_value_path_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_task_glm_value_path memory source should compile");
+}
+
+#[test]
+fn lowers_hello_task_glm_value_path_memory_source_with_completed_value_shape() {
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns",
+    );
+
+    let join_result_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(join_result_count, 1, "expected one task result observation");
+    assert_eq!(completed_count, 1, "expected one completed probe");
+    assert_eq!(value_count, 1, "expected one payload extraction path");
+}
+
+#[test]
+fn compiles_hello_task_glm_compare_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_task_glm_compare memory source should compile");
+}
+
+#[test]
+fn lowers_hello_task_glm_compare_memory_source_with_join_and_join_result_shape() {
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns",
+    );
+
+    let join_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join")
+        .count();
+    let join_result_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let timeout_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let value_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(join_count, 1, "expected one direct join path");
+    assert_eq!(join_result_count, 1, "expected one observed join_result path");
+    assert_eq!(timeout_count, 2, "expected one timeout per spawned task path");
+    assert_eq!(value_count, 1, "expected one observed payload extraction path");
+}
+
+#[test]
+fn compiles_hello_task_glm_observe_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_task_glm_observe memory source should compile");
+}
+
+#[test]
+fn lowers_hello_task_glm_observe_memory_source_with_timeout_observer_shape() {
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns",
+    );
+
+    let timeout_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let join_result_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let completed_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let value_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(timeout_count, 1, "expected one timeout wrapper");
+    assert_eq!(join_result_count, 1, "expected one observed task result");
+    assert_eq!(completed_count, 1, "expected one completed probe");
+    assert_eq!(value_count, 1, "expected one observed payload extraction");
+}
+
+#[test]
+fn compiles_hello_task_glm_boundary_compare_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_task_glm_boundary_compare memory source should compile");
+}
+
+#[test]
+fn lowers_hello_task_glm_boundary_compare_memory_source_with_join_timeout_cancel_boundary_shape() {
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns",
+    );
+
+    let join_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join")
+        .count();
+    let timeout_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "timeout")
+        .count();
+    let cancel_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "cancel")
+        .count();
+    let join_result_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+        .count();
+    let timed_out_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_timed_out")
+        .count();
+    let cancelled_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled")
+        .count();
+
+    assert_eq!(join_count, 1, "expected one direct join boundary path");
+    assert_eq!(timeout_count, 1, "expected one timeout boundary path");
+    assert_eq!(cancel_count, 1, "expected one cancel boundary path");
+    assert_eq!(join_result_count, 2, "expected observed timeout and cancel results");
+    assert_eq!(timed_out_count, 1, "expected one timed-out observer path");
+    assert_eq!(cancelled_count, 1, "expected one cancelled observer path");
+}
+
+#[test]
+fn compiles_hello_thread_mutex_observe_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_thread_mutex_observe memory source should compile");
+}
+
+#[test]
+fn lowers_hello_thread_mutex_observe_memory_source_with_thread_and_lock_shape() {
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns",
+    );
+
+    let mutex_new_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_new")
+        .count();
+    let mutex_lock_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+        .count();
+    let mutex_unlock_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_unlock")
+        .count();
+    let thread_spawn_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && matches!(node.op.instruction.as_str(), "thread_spawn" | "spawn_thread")
+        })
+        .count();
+    let thread_join_result_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let task_completed_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let task_value_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+
+    assert_eq!(mutex_new_count, 1, "expected one mutex allocation path");
+    assert_eq!(mutex_lock_count, 2, "expected initial and reopened lock paths");
+    assert_eq!(mutex_unlock_count, 1, "expected one guard release path");
+    assert_eq!(thread_spawn_count, 1, "expected one spawned thread path");
+    assert_eq!(
+        thread_join_result_count, 1,
+        "expected one thread result observation path"
+    );
+    assert_eq!(task_completed_count, 1, "expected one completion observer path");
+    assert_eq!(task_value_count, 1, "expected one joined payload extraction");
+}
+
+#[test]
+fn compiles_hello_thread_mutex_branch_observe_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_thread_mutex_branch_observe memory source should compile");
+}
+
+#[test]
+fn lowers_hello_thread_mutex_branch_observe_memory_source_with_shared_observer_branch_shape() {
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns",
+    );
+
+    let mutex_new_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_new")
+        .count();
+    let mutex_lock_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+        .count();
+    let mutex_value_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value")
+        .count();
+    let thread_spawn_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && matches!(node.op.instruction.as_str(), "thread_spawn" | "spawn_thread")
+        })
+        .count();
+    let thread_join_result_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let task_completed_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let task_value_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let select_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(mutex_new_count, 2, "expected one mutex allocation per branch source");
+    assert_eq!(
+        mutex_lock_count, 1,
+        "expected one shared mutex_lock after match-selected mutex source"
+    );
+    assert_eq!(
+        mutex_value_count, 1,
+        "expected one shared mutex_value observer after guard selection"
+    );
+    assert_eq!(
+        thread_spawn_count, 2,
+        "expected one thread spawn per pre-branch thread source"
+    );
+    assert_eq!(
+        thread_join_result_count, 1,
+        "expected one shared thread_join_result after thread selection"
+    );
+    assert_eq!(task_completed_count, 1, "expected one shared task_completed probe");
+    assert_eq!(task_value_count, 1, "expected one shared task_value observer");
+    assert!(select_count >= 2, "expected select-driven shared observer lowering");
+}
+
+#[test]
+fn compiles_hello_thread_mutex_branch_suffix_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_thread_mutex_branch_suffix memory source should compile");
+}
+
+#[test]
+fn lowers_hello_thread_mutex_branch_suffix_memory_source_with_shared_pure_suffix_shape() {
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns",
+    );
+
+    let mutex_lock_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+        .count();
+    let mutex_value_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value")
+        .count();
+    let thread_join_result_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result")
+        .count();
+    let task_completed_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+        .count();
+    let task_value_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+        .count();
+    let add_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .count();
+    let select_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+
+    assert_eq!(mutex_lock_count, 1, "expected one shared mutex_lock");
+    assert_eq!(mutex_value_count, 1, "expected one shared mutex_value");
+    assert_eq!(
+        thread_join_result_count, 1,
+        "expected one shared thread_join_result"
+    );
+    assert_eq!(task_completed_count, 1, "expected one shared task_completed");
+    assert_eq!(task_value_count, 1, "expected one shared task_value");
+    assert!(add_count >= 4, "expected multi-stage shared pure suffix adds");
+    assert!(select_count >= 2, "expected select-driven branch merging before suffixes");
+}
+
+#[test]
+fn rejects_hello_thread_mutex_if_lock_branch_invalid_memory_source_with_precise_branch_boundary_diagnostic() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns",
+    );
+    let error = nuisc::pipeline::compile_source_path(source)
+        .err()
+        .expect("if-branch mutex lock invalid source should fail until branch-local lock lowering exists");
+    assert!(error.contains(
+        "conditional `if`/lowered-`match` lowering does not yet support branch-local consuming task/thread/mutex runtime primitives"
+    ));
+    assert!(error.contains(
+        "hoist those effects before the branch or reduce each branch to pure/select-compatible values"
+    ));
+}
+
+#[test]
+fn rejects_hello_thread_mutex_match_join_result_branch_invalid_memory_source_with_precise_branch_boundary_diagnostic() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns",
+    );
+    let error = nuisc::pipeline::compile_source_path(source)
+        .err()
+        .expect("match-branch thread join_result invalid source should fail until branch-local thread result lowering exists");
+    assert!(error.contains(
+        "conditional `if`/lowered-`match` lowering does not yet support branch-local consuming task/thread/mutex runtime primitives"
+    ));
+    assert!(error.contains(
+        "hoist those effects before the branch or reduce each branch to pure/select-compatible values"
+    ));
+}
+
+#[test]
 fn lowers_hello_byte_buffer_memory_source_with_byte_intrinsic_shape() {
     let artifacts = compiled_source(
         "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns",

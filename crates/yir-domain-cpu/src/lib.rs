@@ -891,9 +891,9 @@ impl RegisteredMod for CpuMod {
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
             "struct" => {
-                if node.op.args.len() < 2 {
+                if node.op.args.is_empty() {
                     return Err(format!(
-                        "node `{}` expects `cpu.struct <name> <resource> <type_name> <field=value>...`",
+                        "node `{}` expects `cpu.struct <name> <resource> <type_name> [field=value]...`",
                         node.name
                     ));
                 }

@@ -1,0 +1,19 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  fn main() -> i64 {
+    let argc: i64 = host_argv_count();
+    let left: Mutex<i64> = mutex_new(11);
+    let right: Mutex<i64> = mutex_new(19);
+    let value: i64 = if argc < 2 {
+      let guard: MutexGuard<i64> = mutex_lock(left);
+      let observed: i64 = mutex_value(guard);
+      observed + 1
+    } else {
+      let guard: MutexGuard<i64> = mutex_lock(right);
+      let observed: i64 = mutex_value(guard);
+      observed + 2
+    };
+    return value;
+  }
+}

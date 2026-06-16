@@ -7,6 +7,9 @@ Canonical short map:
 * [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
   Use that file for the shortest current reading path across task, host I/O,
   persistence, and filesystem surfaces. Use this README for local detail only.
+* [docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
+  Use that file for the current `0.20.*` refactor order and the current
+  “which lane do we normalize first?” answer.
 
 Current source-style rule:
 
@@ -14,6 +17,74 @@ Current source-style rule:
   `ptr.value`, `ptr.next`, `buffer.len`, and `buffer[index]`
 * builtin helper names remain relevant as lowering/runtime vocabulary, not as
   the preferred source-level style
+
+## Current Refactor Frontdoor
+
+For the current `0.20.*` line, do not read `std` as one flat bucket first.
+
+Read it in this order:
+
+1. command/workflow/tooling
+2. host I/O and text
+3. task/runtime
+4. filesystem/path/location
+5. net/session
+
+Current practical rule:
+
+* normalize one lane frontdoor first
+* only then widen or relocate that lane
+* keep net using the dedicated local router instead of re-listing every file
+  as if it were just another small family
+
+Current frontdoor docs:
+
+* [docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
+* [docs/reference/std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
+* [docs/reference/std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
+* [tooling/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/tooling/README.md)
+* [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
+* [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
+* [task/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/task/README.md)
+* [persistence/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/persistence/README.md)
+
+## Current Mainline Lanes
+
+Use these as the primary cluster names when placing new work:
+
+* command/workflow/tooling
+  - local router:
+    [tooling/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/tooling/README.md)
+  - frontdoor chain:
+    [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
+    ->
+    [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
+    ->
+    [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
+    ->
+    [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
+* host I/O and text
+  - local router:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
+  - shortest lane route:
+    `io_runtime_recipe -> terminal_io_recipe -> host_text_runtime_recipe -> report_runtime_recipe`
+* task/runtime
+  - local router:
+    [task/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/task/README.md)
+  - shortest lane route:
+    `task_runtime_recipe -> task_lifecycle_recipe -> task_result_policy_recipe -> task_scheduler_recipe -> task_cli_recipe`
+* filesystem/path/location
+  - local router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
+  - shortest lane route:
+    `path_runtime_recipe -> directory_stat_recipe -> file_runtime_recipe -> location_runtime_recipe`
+  - persistence companion:
+    [persistence/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/persistence/README.md)
+* net/session
+  - local router:
+    [network/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/network/README.md)
+  - contract:
+    [docs/reference/std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
 
 ## Current Status
 
@@ -120,44 +191,24 @@ Recipe modules:
     [std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
   - shortest route:
     [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-  - [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
-  - [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
-  - [task_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime_recipe.ns)
-  - [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
-  - [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
-  - [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
-  - [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
-  - [task_fallback_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_fallback_recipe.ns)
-  - [task_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_policy_recipe.ns)
-  - [task_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_batch_recipe.ns)
-  - [task_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_windowed_batch_recipe.ns)
-  - [task_result_family_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_family_recipe.ns)
-  - [task_result_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_policy_recipe.ns)
-  - [task_result_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_batch_recipe.ns)
-  - [task_result_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_windowed_batch_recipe.ns)
-  - [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  - cross-lane companions:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md),
+    [task/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/task/README.md)
 * checker/reporter tooling
-  - [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
+  - use the local lane router:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
 * result/diagnostic staging
-  - [error_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_runtime_recipe.ns)
-  - [result_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_runtime_recipe.ns)
-  - [diagnostic_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/diagnostic_runtime_recipe.ns)
-  - [result_diagnostic_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_diagnostic_recipe.ns)
+  - use the local lane router:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
 * directory/stat staging
-  - [fs_metadata_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/fs_metadata_runtime_recipe.ns)
-  - [directory_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_runtime_recipe.ns)
-  - [stat_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stat_runtime_recipe.ns)
-  - [directory_stat_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_stat_recipe.ns)
+  - use the local lane router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
 * directory/create staging
-  - [directory_create_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_create_recipe.ns)
+  - use the local lane router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
 * automation/workflow tooling
-  - [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
-  - [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
-  - [workflow_frontdoor_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_frontdoor_runtime_recipe.ns)
-  - [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
-  - [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
-  - [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
-  - [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
+  - local lane router:
+    [tooling/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/tooling/README.md)
   - current recipe shape:
     the checked-in workflow example is now a four-step gate with executed-step
     counting, blocked-step reporting, and per-step launch/cwd/timeout summary
@@ -185,50 +236,51 @@ Recipe modules:
     thin `project` / `single-file` source-kind split, debug-workflow mirror,
     and one grouped front-door summary surface
 * location/runtime staging
-  - [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
+  - use the local lane router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
 * kv/runtime staging
-  - [kv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/kv_runtime_recipe.ns)
+  - use the local companion router:
+    [persistence/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/persistence/README.md)
 * cache/runtime staging
-  - [cache_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cache_runtime_recipe.ns)
+  - use the local companion router:
+    [persistence/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/persistence/README.md)
 * config/cache staging
-  - [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
+  - use the local companion router:
+    [persistence/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/persistence/README.md)
 * shell-oriented command bridge
-  - [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-  - [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-  - [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
-  - [command_text_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_text_builder_recipe.ns)
+  - use the local lane router:
+    [tooling/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/tooling/README.md)
 * path/runtime staging
-  - [path_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_runtime_recipe.ns)
+  - use the local lane router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
 * path/rename staging
-  - [path_rename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_rename_recipe.ns)
+  - use the local lane router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
 * path/remove staging
-  - [path_remove_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_remove_recipe.ns)
+  - use the local lane router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
 * file/output staging
-  - [file_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_runtime_recipe.ns)
-  - [file_output_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_output_recipe.ns)
+  - use the local lane router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
 * terminal/io staging
-  - [io_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_runtime_recipe.ns)
-  - [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
-  - [cli_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_session_recipe.ns)
-  - [cli_shell_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_shell_session_recipe.ns)
-  - [cli_report_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_report_session_recipe.ns)
+  - use the local lane router:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
 * line-input staging
-  - [line_input_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_recipe.ns)
+  - use the local lane router:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
 * text/json staging
-  - [json_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/json_runtime_recipe.ns)
-  - [host_text_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/host_text_runtime_recipe.ns)
-  - [text_format_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_format_runtime_recipe.ns)
-  - [text_json_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_json_recipe.ns)
+  - use the local lane router:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
 * clock/test timing alignment
-  - [clock_test_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_test_recipe.ns)
-  - [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
-  - [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
+  - local timing base:
+    [time_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/time_runtime_recipe.ns),
+    [clock_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_runtime_recipe.ns),
+    [clock_domain_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime_recipe.ns)
+  - task timing bridge:
+    [task/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/task/README.md)
 * time/clock
-  - [time_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/time_runtime_recipe.ns)
-  - [sleep_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/sleep_runtime_recipe.ns)
-  - [clock_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_runtime_recipe.ns)
-  - [clock_domain_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime_recipe.ns)
-  - [clock_test_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_test_recipe.ns)
+  - shortest local route:
+    `time_runtime_recipe -> sleep_runtime_recipe -> clock_runtime_recipe -> clock_domain_runtime_recipe -> clock_test_recipe`
 
 ## Local Detail
 
@@ -253,15 +305,12 @@ For shell-oriented workflow orchestration, the current reusable shape is:
 
 Read these together when working on host command/workflow plumbing:
 
-* [command_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime.ns)
-* [subprocess_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime.ns)
-* [workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime.ns)
-* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-* [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
-* [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
-* [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
-* [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
+* local lane router:
+  [tooling/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/tooling/README.md)
+* lane contract:
+  [std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+* shortest lane route:
+  `command_runtime_recipe -> subprocess_runtime_recipe -> workflow_runtime_recipe -> cli_compile_workflow_recipe`
 
 For the current `std net` and `httpish` recipes, prefer one repeated shape
 instead of inventing a new layout every time.
@@ -303,13 +352,17 @@ Current network-facing examples of this rule:
 ### First File Per Main Cluster
 
 * task-facing async/task
-  - start with [task_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime_recipe.ns)
+  - start with the local lane router:
+    [task/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/task/README.md)
 * tooling-facing host/runtime
-  - start with [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
+  - start with the local lane router:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
 * state/location/persistence
-  - start with [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
+  - start with the local companion router:
+    [persistence/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/persistence/README.md)
 * filesystem read/write/mutate
-  - start with [path_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_runtime_recipe.ns)
+  - start with the local lane router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
 * inspection/formatting
   - start with [directory_stat_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_stat_recipe.ns)
 
@@ -318,41 +371,23 @@ Current network-facing examples of this rule:
 Read these lanes as `pure layer -> wider composition layer`.
 
 * task
-  - [task_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime_recipe.ns)
-  - [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
-  - [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
-  - [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
-  - [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
-  - [task_fallback_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_fallback_recipe.ns)
-  - [task_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_policy_recipe.ns)
-  - [task_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_batch_recipe.ns)
-  - [task_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_windowed_batch_recipe.ns)
-  - [task_result_family_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_family_recipe.ns)
-  - [task_result_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_policy_recipe.ns)
-  - [task_result_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_batch_recipe.ns)
-  - [task_result_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_windowed_batch_recipe.ns)
-  - [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
-  - [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
-  - [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  - use the local lane router:
+    [task/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/task/README.md)
+  - shortest lane route:
+    `task_runtime_recipe -> task_lifecycle_recipe -> task_result_policy_recipe -> task_scheduler_recipe -> task_cli_recipe`
 * host I/O
-  - [io_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_runtime_recipe.ns)
-  - [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
-  - [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
-  - [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
-  - [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
-  - [cli_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_session_recipe.ns)
-  - [cli_shell_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_shell_session_recipe.ns)
-  - [cli_report_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_report_session_recipe.ns)
+  - use the local lane router:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
+  - shortest lane route:
+    `io_runtime_recipe -> terminal_io_recipe -> host_text_runtime_recipe -> report_runtime_recipe`
 * text/data
-  - [host_text_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/host_text_runtime_recipe.ns)
-  - [text_format_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_format_runtime_recipe.ns)
-  - [json_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/json_runtime_recipe.ns)
-  - [text_json_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_json_recipe.ns)
+  - use the local lane router:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
 * command/tooling
-  - [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-  - [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-  - [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
-  - [command_text_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_text_builder_recipe.ns)
+  - use the local lane router:
+    [tooling/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/tooling/README.md)
+  - shortest lane route:
+    `command_runtime_recipe -> subprocess_runtime_recipe -> workflow_runtime_recipe -> cli_compile_workflow_recipe`
 * net
   - keep the root lane short and use the dedicated router:
     [stdlib/std/network/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/network/README.md)
@@ -360,75 +395,37 @@ Read these lanes as `pure layer -> wider composition layer`.
     `profile core -> transport edge -> syscall edge -> socket edge -> control edge -> protocol edge -> http edge -> result spine -> task spine -> session`
   - contract wording:
     [std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
-    [net_result_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_result_recipe_demo),
-    [net_result_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_result_bridge_recipe_demo),
-    [net_task_policy_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_task_policy_recipe_demo),
-    [net_task_batch_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_task_batch_recipe_demo),
-    [net_task_windowed_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_task_windowed_recipe_demo),
-    [net_task_windowed_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_task_windowed_bridge_recipe_demo),
-    [net_control_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_control_session_recipe_demo),
-    [net_transport_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_transport_session_recipe_demo),
-    [net_tcp_listener_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_listener_session_recipe_demo),
-    [net_owned_transport_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_transport_session_recipe_demo),
-    [net_transport_path_compare_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_transport_path_compare_recipe_demo),
-    [net_dnsish_path_compare_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_path_compare_recipe_demo),
-    [net_httpish_path_compare_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_path_compare_recipe_demo),
-    [net_protocol_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_session_recipe_demo),
-    [net_datagram_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_session_recipe_demo),
-    [net_owned_datagram_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_datagram_session_recipe_demo),
-    [net_udp_bound_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_bound_session_recipe_demo),
-    [net_datagram_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_exchange_session_recipe_demo),
-    [net_datagram_pipeline_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_pipeline_recipe_demo),
-    [net_dnsish_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_exchange_session_recipe_demo),
-    [net_owned_dnsish_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_dnsish_exchange_session_recipe_demo),
-    [net_dnsish_pipeline_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_pipeline_recipe_demo),
-    [net_owned_dnsish_pipeline_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_dnsish_pipeline_recipe_demo),
-    [net_httpish_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_session_recipe_demo),
-    [net_httpish_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_session_recipe_demo),
-    [net_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_recipe_demo)
+  - companion route:
+    [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 * time/clock
-  - [time_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/time_runtime_recipe.ns)
-  - [sleep_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/sleep_runtime_recipe.ns)
-  - [clock_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_runtime_recipe.ns)
-  - [clock_domain_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime_recipe.ns)
-  - [clock_test_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_test_recipe.ns)
+  - shortest local route:
+    `time_runtime_recipe -> sleep_runtime_recipe -> clock_runtime_recipe -> clock_domain_runtime_recipe -> clock_test_recipe`
 * filesystem metadata
-  - [fs_metadata_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/fs_metadata_runtime_recipe.ns)
-  - [directory_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_runtime_recipe.ns)
-  - [stat_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stat_runtime_recipe.ns)
-  - [directory_stat_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_stat_recipe.ns)
+  - use the local lane router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
 * data/window/fabric
-  - [window_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/window_runtime_recipe.ns)
-  - [pipe_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/pipe_runtime_recipe.ns)
-  - [fabric_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/fabric_runtime_recipe.ns)
-  - [handle_table_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/handle_table_runtime_recipe.ns)
-  - [window_fabric_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/window_fabric_recipe.ns)
+  - shortest local route:
+    `window_runtime_recipe -> pipe_runtime_recipe -> fabric_runtime_recipe -> handle_table_runtime_recipe -> window_fabric_recipe`
 
 ### Local Mini-Maps
 
 * path naming/inspection
-  - [path_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_runtime_recipe.ns)
-  - [path_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_recipe.ns)
-  - [path_depth_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_depth_recipe.ns)
-  - [path_filename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_recipe.ns)
-  - [path_stem_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_recipe.ns)
-  - [path_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_recipe.ns)
-  - [path_extension_is_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_is_recipe.ns)
-* host I/O and tooling
-  - [argv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/argv_runtime_recipe.ns)
-  - [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
-  - [process_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/process_runtime_recipe.ns)
+  - use the local lane router:
+    [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
+  - shortest route inside the lane:
+    `path_runtime_recipe -> path_parent_recipe/path_depth_recipe -> path_filename_recipe/path_stem_recipe/path_extension_recipe`
+* host I/O and local runtime
+  - process-facing local runtime:
+    [argv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/argv_runtime_recipe.ns),
+    [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns),
+    [process_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/process_runtime_recipe.ns)
   - [time_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/time_runtime_recipe.ns)
   - [clock_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_runtime_recipe.ns)
   - [clock_domain_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime_recipe.ns)
-  - [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
-  - [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
-  - [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
-  - [cli_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_session_recipe.ns)
-  - [cli_shell_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_shell_session_recipe.ns)
-  - [cli_report_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_report_session_recipe.ns)
-  - [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
-  - [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
+  - host read/write and text/report routing:
+    [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
+  - command/workflow-specific routing:
+    [tooling/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/tooling/README.md)
 * time/clock
   - [time_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/time_runtime_recipe.ns)
   - [sleep_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/sleep_runtime_recipe.ns)
@@ -447,29 +444,15 @@ Read these lanes as `pure layer -> wider composition layer`.
     [clock_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/clock_runtime_demo),
     [clock_domain_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/clock_domain_runtime_demo)
 * persistence
-  - [cwd_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cwd_runtime_recipe.ns)
-  - [temp_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/temp_runtime_recipe.ns)
-  - [home_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/home_runtime_recipe.ns)
-  - [kv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/kv_runtime_recipe.ns)
-  - [cache_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cache_runtime_recipe.ns)
-  - [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
+  - use the local companion router:
+    [persistence/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/persistence/README.md)
+  - shortest subgroup route:
+    `cwd_runtime_recipe -> location_runtime_recipe -> kv_runtime_recipe -> config_cache_recipe`
 * task-facing
-  - [task_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime_recipe.ns)
-  - [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
-  - [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
-  - [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
-  - [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
-  - [task_fallback_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_fallback_recipe.ns)
-  - [task_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_policy_recipe.ns)
-  - [task_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_batch_recipe.ns)
-  - [task_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_windowed_batch_recipe.ns)
-  - [task_result_family_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_family_recipe.ns)
-  - [task_result_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_policy_recipe.ns)
-  - [task_result_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_batch_recipe.ns)
-  - [task_result_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_windowed_batch_recipe.ns)
-  - [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
-  - [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
-  - [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  - use the local lane router:
+    [task/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/task/README.md)
+  - shortest lane route:
+    `task_runtime_recipe -> task_lifecycle_recipe -> task_result_policy_recipe -> task_scheduler_recipe -> task_cli_recipe`
   - timing bridge base:
     [time_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/time_runtime_recipe.ns),
     [clock_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_runtime_recipe.ns),

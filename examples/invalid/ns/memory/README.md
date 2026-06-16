@@ -19,3 +19,5 @@ This folder contains ownership/lifetime failures:
 * `hello_task_glm_nested_instance_struct_payload_invalid.ns`
 * `hello_task_glm_result_payload_invalid.ns`
 * `hello_task_glm_nested_result_struct_payload_invalid.ns`
+* `hello_thread_mutex_if_lock_branch_invalid.ns`
+* `hello_thread_mutex_match_join_result_branch_invalid.ns`

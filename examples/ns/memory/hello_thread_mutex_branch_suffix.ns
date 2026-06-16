@@ -1,0 +1,46 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 9;
+  }
+
+  fn observe_thread_result(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn main() -> i64 {
+    let argc: i64 = host_argv_count();
+
+    let left_lock: Mutex<i64> = mutex_new(11);
+    let right_lock: Mutex<i64> = mutex_new(19);
+    let guard: MutexGuard<i64> = match argc {
+      0 => {
+        let locked: MutexGuard<i64> = mutex_lock(left_lock);
+        locked
+      }
+      _ => {
+        let locked: MutexGuard<i64> = mutex_lock(right_lock);
+        locked
+      }
+    };
+    let observed_lock: i64 = mutex_value(guard);
+    let widened_lock: i64 = observed_lock + 1;
+
+    let left_thread: Thread<i64> = thread_spawn(ping(widened_lock));
+    let right_thread: Thread<i64> = thread_spawn(ping(widened_lock + 1));
+    let chosen: Thread<i64> = if argc < 2 {
+      left_thread
+    } else {
+      right_thread
+    };
+    let joined: TaskResult<i64> = thread_join_result(chosen);
+    let observed_thread: i64 = observe_thread_result(joined);
+    let widened_thread: i64 = observed_thread + 2;
+
+    return widened_lock + widened_thread;
+  }
+}

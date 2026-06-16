@@ -11,6 +11,8 @@ If you want the current line instead of historical backfill, start with:
 * [nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
 * [nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
 * [nuis-0.20.0-generic-validation-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
+* [nuis-0.20.0-receiver-generic-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-receiver-generic-regression-matrix.md)
+* [nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
 * [nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
 * [nuis-0.20.x-to-alpha-bootstrap-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
 * [nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
@@ -32,6 +34,11 @@ Use that set when the question is:
 * which branch-local runtime-lowering rewrites are already test-backed
 * which generic validation surfaces are already regression-backed across
   explicit calls, struct literals, `if` / `match`, and lambda bodies
+* which receiver explicit-generic method-call surfaces are already
+  regression-backed across helper, async, task, result, and control-flow
+  wrappers
+* which `std` lanes should be normalized first during the `0.20.*` refactor
+  instead of being treated as one flat bucket
 * which specific `0.20.*` compile-chain gaps are still being actively closed
 * how `0.20.*` is supposed to hand off into `alpha-0.0.1`
 * which project/frontend/workflow matrices should still be treated as live

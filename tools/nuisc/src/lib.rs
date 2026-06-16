@@ -42,80 +42,8 @@ fn json_escape(value: &str) -> String {
     out
 }
 
-pub fn scheduler_contract_stack_brief() -> &'static str {
-    "placement -> timing -> result observation -> async summary observation -> observer classification"
-}
-
-pub fn scheduler_result_roles_brief() -> &'static str {
-    "entry=result-entry, probe=result-ready-probe, value=result-payload-value; variants=config_ready|send_ready|recv_ready|connect_ready|accept_ready|closed"
-}
-
-pub fn scheduler_sample_navigation_brief(domain: &str) -> Option<&'static str> {
-    match domain {
-        "shader" => Some("policy -> windowed"),
-        "kernel" => Some("policy -> windowed"),
-        "network" => Some("result_ladder -> transport_split_ladder -> transport_summary_ladder -> summary_classes"),
-        _ => None,
-    }
-}
-
-pub fn scheduler_result_samples_brief(domain: &str) -> Option<&'static str> {
-    match domain {
-        "network" => Some(
-            "result_ladder=network_result_profile_demo -> network_connect_result_demo -> network_accept_result_demo -> network_result_task_policy_demo -> network_result_task_batch_demo -> network_result_task_windowed_batch_demo -> network_result_session_bridge_demo; control_ladder=network_connect_result_demo -> network_accept_result_demo -> network_connect_accept_task_policy_demo -> network_connect_accept_task_batch_demo -> network_connect_accept_task_windowed_batch_demo",
-        ),
-        _ => None,
-    }
-}
-
-pub fn scheduler_transport_samples_brief(domain: &str) -> Option<&'static str> {
-    match domain {
-        "network" => Some(
-            "transport_runtime=network_host_handle_runtime_demo -> network_host_handle_transport_runtime_demo -> network_owned_transport_result_demo -> network_host_transport_runtime_demo -> network_transport_result_demo; transport_split_ladder=network_transport_result_policy_split_demo -> network_transport_result_batch_split_demo -> network_transport_result_windowed_split_demo -> network_transport_result_session_bridge_split_demo; transport_summary_ladder=network_owned_transport_result_task_policy_demo -> network_owned_transport_result_task_batch_demo -> network_owned_transport_result_task_windowed_batch_demo -> network_owned_transport_result_session_bridge_demo -> network_transport_result_task_policy_demo -> network_transport_result_task_batch_demo -> network_transport_result_task_windowed_batch_demo -> network_transport_result_session_bridge_demo",
-        ),
-        _ => None,
-    }
-}
-
-pub fn scheduler_summary_api_brief() -> &'static str {
-    "policy=async-policy-summary, batch=async-batch-summary, windowed=async-windowed-summary; classes=transport_split|transport_windowed_split|transport_session_bridge_split|control_split|control_windowed|control_session_bridge"
-}
-
-pub fn scheduler_observer_classes_brief() -> &'static str {
-    "source=profile-backed|result-backed|summary-backed; stage=entry|ready|payload|policy|batch|windowed; scope=local|cross-lane|cross-domain|bridge-visible; branch=primary|secondary|fallback|send|recv"
-}
-
-pub fn scheduler_summary_samples_brief(domain: &str) -> Option<&'static str> {
-    match domain {
-        "shader" => Some(
-            "policy=shader_async_policy_profile_demo -> shader_async_fallback_profile_demo; windowed=shader_async_batch_profile_demo -> shader_async_windowed_batch_profile_demo",
-        ),
-        "kernel" => Some(
-            "policy=kernel_async_tensor_policy_profile_demo -> kernel_async_tensor_fallback_profile_demo; windowed=kernel_async_tensor_batch_profile_demo -> kernel_async_tensor_windowed_batch_profile_demo",
-        ),
-        "network" => Some(
-            "transport_split=network_transport_result_policy_split_demo -> network_transport_result_batch_split_demo -> network_transport_result_windowed_split_demo -> network_transport_result_session_bridge_split_demo; control_split=network_connect_accept_task_policy_demo -> network_connect_accept_task_batch_demo -> network_connect_accept_task_windowed_batch_demo",
-        ),
-        _ => None,
-    }
-}
-
-pub fn std_net_sample_navigation_brief(domain: &str) -> Option<&'static str> {
-    match domain {
-        "network" => {
-            Some("profile_core -> transport_edge -> syscall_edge -> socket_edge -> control_edge -> protocol_edge -> http_edge -> result_spine -> task_spine -> session")
-        }
-        _ => None,
-    }
-}
-
-pub fn std_net_recipe_samples_brief(domain: &str) -> Option<&'static str> {
-    match domain {
-        "network" => Some(
-            "profile_core=net_endpoint_recipe -> net_endpoint_recipe_demo; transport_edge=net_ip_packet_recipe -> net_tcp_stream_recipe -> net_udp_datagram_recipe -> net_ip_packet_recipe_demo -> net_tcp_stream_recipe_demo -> net_udp_datagram_recipe_demo; syscall_edge=net_tcp_open_recipe -> net_udp_open_recipe -> net_udp_bind_recipe -> net_udp_bound_socket_recipe -> net_udp_datagram_flow_recipe -> net_tcp_listener_recipe -> net_tcp_client_flow_recipe -> net_tcp_server_flow_recipe -> net_tcp_accepted_socket_recipe -> net_owned_send_recipe -> net_owned_recv_recipe -> net_owned_accept_recipe -> net_owned_close_recipe -> net_tcp_open_recipe_demo -> net_udp_open_recipe_demo -> net_udp_bind_recipe_demo -> net_udp_bound_socket_recipe_demo -> net_udp_datagram_flow_recipe_demo -> net_tcp_listener_recipe_demo -> net_tcp_client_flow_recipe_demo -> net_tcp_server_flow_recipe_demo -> net_tcp_accepted_socket_recipe_demo -> net_owned_send_recipe_demo -> net_owned_recv_recipe_demo -> net_owned_accept_recipe_demo -> net_owned_close_recipe_demo; flow_group=tcp client flow -> tcp server flow -> udp datagram flow; flow=net_tcp_client_flow_recipe -> net_tcp_server_flow_recipe -> net_udp_datagram_flow_recipe -> net_tcp_client_flow_recipe_demo -> net_tcp_server_flow_recipe_demo -> net_udp_datagram_flow_recipe_demo; socket_edge=net_tcp_connect_socket_recipe -> net_tcp_client_flow_recipe -> net_tcp_socket_recipe -> net_tcp_server_socket_recipe -> net_tcp_server_flow_recipe -> net_tcp_accepted_socket_recipe -> net_udp_bound_socket_recipe -> net_udp_datagram_flow_recipe -> net_udp_socket_recipe -> net_ip_socket_recipe -> net_tcp_connect_socket_recipe_demo -> net_tcp_client_flow_recipe_demo -> net_tcp_socket_recipe_demo -> net_tcp_server_socket_recipe_demo -> net_tcp_server_flow_recipe_demo -> net_tcp_accepted_socket_recipe_demo -> net_udp_bound_socket_recipe_demo -> net_udp_datagram_flow_recipe_demo -> net_udp_socket_recipe_demo -> net_ip_socket_recipe_demo; control_edge=net_connect_recipe -> net_listen_recipe -> net_close_recipe -> net_connect_recipe_demo -> net_listen_recipe_demo -> net_close_recipe_demo; protocol_edge=net_protocol_experiment_recipe -> net_line_protocol_recipe -> net_datagram_protocol_recipe -> net_dnsish_protocol_recipe -> net_dnsish_query_recipe -> net_httpish_protocol_recipe -> net_httpish_request_recipe -> net_httpish_response_recipe -> net_httpish_roundtrip_recipe -> net_protocol_experiment_recipe_demo -> net_line_protocol_recipe_demo -> net_datagram_protocol_recipe_demo -> net_dnsish_protocol_recipe_demo -> net_dnsish_query_recipe_demo -> net_httpish_protocol_recipe_demo -> net_httpish_request_recipe_demo -> net_httpish_response_recipe_demo -> net_httpish_roundtrip_recipe_demo; http_edge=net_http_client_recipe -> net_http_request_builder_recipe -> net_http_client_headers_recipe -> net_http_client_url_recipe -> net_http_client_body_recipe -> net_http_client_status_recipe -> net_http_request_recipe -> net_http_response_recipe -> net_http_client_exchange_recipe -> net_http_client_session_recipe -> net_http_client_get_recipe -> net_http_client_post_recipe -> net_http_client_recipe_demo -> net_http_request_builder_recipe_demo -> net_http_client_headers_recipe_demo -> net_http_client_url_recipe_demo -> net_http_client_body_recipe_demo -> net_http_client_status_recipe_demo -> net_http_request_recipe_demo -> net_http_response_recipe_demo -> net_http_client_exchange_recipe_demo -> net_http_client_session_recipe_demo -> net_http_client_get_recipe_demo -> net_http_client_post_recipe_demo; result_spine=net_result_recipe -> net_result_bridge_recipe -> net_result_recipe_demo -> net_result_bridge_recipe_demo; task_spine=net_task_policy_recipe -> net_task_batch_recipe -> net_task_windowed_recipe -> net_task_windowed_bridge_recipe -> net_task_policy_recipe_demo -> net_task_batch_recipe_demo -> net_task_windowed_recipe_demo -> net_task_windowed_bridge_recipe_demo; compare_group=transport compare -> dnsish compare -> httpish compare; compare=net_transport_path_compare_recipe -> net_dnsish_path_compare_recipe -> net_httpish_path_compare_recipe -> net_transport_path_compare_recipe_demo -> net_dnsish_path_compare_recipe_demo -> net_httpish_path_compare_recipe_demo; owned_session=net_owned_transport_session_recipe -> net_owned_datagram_session_recipe -> net_owned_dnsish_exchange_session_recipe -> net_owned_dnsish_pipeline_recipe -> net_owned_transport_session_recipe_demo -> net_owned_datagram_session_recipe_demo -> net_owned_dnsish_exchange_session_recipe_demo -> net_owned_dnsish_pipeline_recipe_demo; session=net_control_session_recipe -> net_transport_session_recipe -> net_owned_transport_session_recipe -> net_tcp_listener_session_recipe -> net_transport_path_compare_recipe -> net_protocol_session_recipe -> net_datagram_session_recipe -> net_owned_datagram_session_recipe -> net_udp_bound_session_recipe -> net_datagram_exchange_session_recipe -> net_datagram_pipeline_recipe -> net_dnsish_exchange_session_recipe -> net_owned_dnsish_exchange_session_recipe -> net_dnsish_path_compare_recipe -> net_dnsish_pipeline_recipe -> net_owned_dnsish_pipeline_recipe -> net_http_client_session_recipe -> net_httpish_session_recipe -> net_httpish_exchange_session_recipe -> net_httpish_path_compare_recipe -> net_session_recipe -> net_control_session_recipe_demo -> net_transport_session_recipe_demo -> net_owned_transport_session_recipe_demo -> net_tcp_listener_session_recipe_demo -> net_transport_path_compare_recipe_demo -> net_protocol_session_recipe_demo -> net_datagram_session_recipe_demo -> net_owned_datagram_session_recipe_demo -> net_udp_bound_session_recipe_demo -> net_datagram_exchange_session_recipe_demo -> net_datagram_pipeline_recipe_demo -> net_dnsish_exchange_session_recipe_demo -> net_owned_dnsish_exchange_session_recipe_demo -> net_dnsish_path_compare_recipe_demo -> net_dnsish_pipeline_recipe_demo -> net_owned_dnsish_pipeline_recipe_demo -> net_http_client_session_recipe_demo -> net_httpish_session_recipe_demo -> net_httpish_exchange_session_recipe_demo -> net_httpish_path_compare_recipe_demo -> net_session_recipe_demo",
-        ),
-        _ => None,
-    }
+fn json_bool_field(name: &str, value: bool) -> String {
+    format!("\"{}\":{}", name, if value { "true" } else { "false" })
 }
 
 pub fn project_compile_workflow_brief() -> &'static str {
@@ -191,15 +119,37 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 );
             }
         }
-        CommandKind::Registry => {
-            let manifests = registry::load_all_manifests(Path::new("nustar-packages"))?;
-            if manifests.is_empty() {
+        CommandKind::Registry { json } => {
+            let registrations = registry::load_registered_domains(Path::new("nustar-packages"))?;
+            if registrations.is_empty() {
                 let placeholder_error = errors::NuiscError {
                     message: "no nustar packages discovered",
                 };
                 return Err(placeholder_error.message.to_owned());
             }
-            for manifest in manifests {
+            if json {
+                let contracts = registrations
+                    .iter()
+                    .map(registry::domain_registration_json)
+                    .collect::<Vec<_>>();
+                println!(
+                    "{{{},{},{}}}",
+                    format!(
+                        "\"contract_schema\":\"{}\"",
+                        registry::NUSTAR_DOMAIN_CONTRACT_SCHEMA
+                    ),
+                    json_bool_field("registry_indexed", true),
+                    format!("\"domains\":[{}]", contracts.join(","))
+                );
+                return Ok(());
+            }
+            for registration in registrations {
+                let manifest = registry::load_manifest_for_domain(
+                    Path::new("nustar-packages"),
+                    &registration.domain_family,
+                )?;
+                let capability = registry::capability_summary(&manifest);
+                let scheduler = registry::scheduler_summary(&manifest);
                 println!("package: {}", manifest.package_id);
                 println!("  schema: {}", manifest.manifest_schema);
                 println!("  domain: {}", manifest.domain_family);
@@ -239,48 +189,53 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     println!("  host_ffi_abis: {}", manifest.host_ffi_abis.join(", "));
                     println!("  host_ffi_bridge: {}", manifest.host_ffi_bridge);
                 }
-                if !manifest.support_surface.is_empty() {
-                    println!("  support_surface: {}", manifest.support_surface.join(", "));
-                }
-                if !manifest.support_profile_slots.is_empty() {
+                if !capability.support_surface.is_empty() {
                     println!(
-                        "  support_profile_slots: {}",
-                        manifest.support_profile_slots.join(", ")
+                        "  support_surface: {}",
+                        capability.support_surface.join(", ")
                     );
                 }
-                if !manifest.default_lanes.is_empty() {
-                    println!("  default_lanes: {}", manifest.default_lanes.join(", "));
+                if !capability.support_profile_slots.is_empty() {
+                    println!(
+                        "  support_profile_slots: {}",
+                        capability.support_profile_slots.join(", ")
+                    );
                 }
-                println!("  clock_domain_id: {}", manifest.clock_domain_id);
-                println!("  clock_kind: {}", manifest.clock_kind);
-                println!("  clock_epoch_kind: {}", manifest.clock_epoch_kind);
-                println!("  clock_resolution: {}", manifest.clock_resolution);
-                println!("  clock_bridge_default: {}", manifest.clock_bridge_default);
+                if !capability.default_lanes.is_empty() {
+                    println!("  default_lanes: {}", capability.default_lanes.join(", "));
+                }
+                println!("  clock_domain_id: {}", capability.clock.domain_id);
+                println!("  clock_kind: {}", capability.clock.kind);
+                println!("  clock_epoch_kind: {}", capability.clock.epoch_kind);
+                println!("  clock_resolution: {}", capability.clock.resolution);
+                println!(
+                    "  clock_bridge_default: {}",
+                    capability.clock.bridge_default
+                );
                 println!(
                     "  scheduler_contract_stack: {}",
-                    scheduler_contract_stack_brief()
+                    scheduler.contract_stack
                 );
                 println!(
                     "  scheduler_result_roles: {}",
-                    scheduler_result_roles_brief()
+                    scheduler.result_roles
                 );
-                if let Some(navigation) = scheduler_sample_navigation_brief(&manifest.domain_family)
-                {
+                if let Some(navigation) = scheduler.sample_navigation {
                     println!("  scheduler_sample_navigation: {}", navigation);
                 }
-                if let Some(samples) = scheduler_result_samples_brief(&manifest.domain_family) {
+                if let Some(samples) = scheduler.result_samples {
                     println!("  scheduler_result_samples: {}", samples);
                 }
-                if let Some(samples) = scheduler_transport_samples_brief(&manifest.domain_family) {
+                if let Some(samples) = scheduler.transport_samples {
                     println!("  scheduler_transport_samples: {}", samples);
                 }
-                println!("  scheduler_summary_api: {}", scheduler_summary_api_brief());
-                if let Some(samples) = scheduler_summary_samples_brief(&manifest.domain_family) {
+                println!("  scheduler_summary_api: {}", scheduler.summary_api);
+                if let Some(samples) = scheduler.summary_samples {
                     println!("  scheduler_summary_samples: {}", samples);
                 }
                 println!(
                     "  scheduler_observer_classes: {}",
-                    scheduler_observer_classes_brief()
+                    scheduler.observer_classes
                 );
                 println!("  profiles: {}", manifest.profiles.join(", "));
                 println!(
@@ -501,6 +456,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         }
         CommandKind::InspectNustar { input } => {
             let binary = nustar_binary::read_from_path(&input)?;
+            let capability = registry::capability_summary(&binary.manifest);
             println!("nustar binary: {}", input.display());
             println!("  package: {}", binary.manifest.package_id);
             println!("  domain: {}", binary.manifest.domain_family);
@@ -541,31 +497,31 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 );
                 println!("  host_ffi_bridge: {}", binary.manifest.host_ffi_bridge);
             }
-            if !binary.manifest.support_surface.is_empty() {
+            if !capability.support_surface.is_empty() {
                 println!(
                     "  support_surface: {}",
-                    binary.manifest.support_surface.join(", ")
+                    capability.support_surface.join(", ")
                 );
             }
-            if !binary.manifest.support_profile_slots.is_empty() {
+            if !capability.support_profile_slots.is_empty() {
                 println!(
                     "  support_profile_slots: {}",
-                    binary.manifest.support_profile_slots.join(", ")
+                    capability.support_profile_slots.join(", ")
                 );
             }
-            if !binary.manifest.default_lanes.is_empty() {
+            if !capability.default_lanes.is_empty() {
                 println!(
                     "  default_lanes: {}",
-                    binary.manifest.default_lanes.join(", ")
+                    capability.default_lanes.join(", ")
                 );
             }
-            println!("  clock_domain_id: {}", binary.manifest.clock_domain_id);
-            println!("  clock_kind: {}", binary.manifest.clock_kind);
-            println!("  clock_epoch_kind: {}", binary.manifest.clock_epoch_kind);
-            println!("  clock_resolution: {}", binary.manifest.clock_resolution);
+            println!("  clock_domain_id: {}", capability.clock.domain_id);
+            println!("  clock_kind: {}", capability.clock.kind);
+            println!("  clock_epoch_kind: {}", capability.clock.epoch_kind);
+            println!("  clock_resolution: {}", capability.clock.resolution);
             println!(
                 "  clock_bridge_default: {}",
-                binary.manifest.clock_bridge_default
+                capability.clock.bridge_default
             );
             println!("  format_version: {}", binary.format_version);
             println!("  abi: {}", binary.abi_tag);
@@ -602,9 +558,33 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         CommandKind::LoaderContract { package_id } => {
             let manifest = registry::load_manifest(Path::new("nustar-packages"), &package_id)?;
             let binary = nustar_binary::default_binary(manifest, Vec::new());
+            let capability = registry::capability_summary(&binary.manifest);
             println!("loader contract: {}", binary.manifest.package_id);
             println!("  loader_abi: {}", binary.manifest.loader_abi);
             println!("  loader_entry: {}", binary.manifest.loader_entry);
+            if !capability.support_surface.is_empty() {
+                println!(
+                    "  support_surface: {}",
+                    capability.support_surface.join(", ")
+                );
+            }
+            if !capability.support_profile_slots.is_empty() {
+                println!(
+                    "  support_profile_slots: {}",
+                    capability.support_profile_slots.join(", ")
+                );
+            }
+            if !capability.default_lanes.is_empty() {
+                println!("  default_lanes: {}", capability.default_lanes.join(", "));
+            }
+            println!("  clock_domain_id: {}", capability.clock.domain_id);
+            println!("  clock_kind: {}", capability.clock.kind);
+            println!("  clock_epoch_kind: {}", capability.clock.epoch_kind);
+            println!("  clock_resolution: {}", capability.clock.resolution);
+            println!(
+                "  clock_bridge_default: {}",
+                capability.clock.bridge_default
+            );
             println!(
                 "  canonical_entry_signature: {}",
                 nustar_binary::CANONICAL_ENTRY_SIGNATURE
@@ -1246,4 +1226,53 @@ pub fn run(command: CommandKind) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn domain_contract_json_exposes_grouped_contract_sections() {
+        let contract = registry::load_domain_contract_for_domain(
+            Path::new(NUSTAR_REGISTRY_ROOT),
+            "network",
+        )
+        .expect("expected network domain contract");
+        let json = registry::domain_contract_json(&contract);
+
+        assert!(json.contains("\"contract_schema\":\"nustar-domain-contract-v1\""));
+        assert!(json.contains("\"contract\":{"));
+        assert!(json.contains("\"schema\":\"nustar-domain-contract-v1\""));
+        assert!(json.contains("\"groups\":[\"package_identity\""));
+        assert!(json.contains("\"package_identity\":{"));
+        assert!(json.contains("\"loader_contract\":{"));
+        assert!(json.contains("\"abi_contract\":{"));
+        assert!(json.contains("\"host_bridge_contract\":{"));
+        assert!(json.contains("\"runtime_capability_contract\":{"));
+        assert!(json.contains("\"scheduler_contract\":{"));
+        assert!(json.contains("\"std_net_extension\":{"));
+        assert!(json.contains("\"domain\":\"network\""));
+    }
+
+    #[test]
+    fn domain_registration_json_exposes_registration_section() {
+        let registration = registry::load_registered_domains(Path::new(NUSTAR_REGISTRY_ROOT))
+            .expect("expected registered domains")
+            .into_iter()
+            .find(|item| item.domain_family == "network")
+            .expect("expected network registration");
+        let json = registry::domain_registration_json(&registration);
+
+        assert!(json.contains("\"registration\":{"));
+        assert!(json.contains("\"manifest_path\":"));
+        assert!(json.contains("\"entry_crate\":"));
+        assert!(json.contains("\"ast_entry\":"));
+        assert!(json.contains("\"nir_entry\":"));
+        assert!(json.contains("\"yir_lowering_entry\":"));
+        assert!(json.contains("\"part_verify_entry\":"));
+        assert!(json.contains("\"ast_surface\":["));
+        assert!(json.contains("\"nir_surface\":["));
+        assert!(json.contains("\"ops\":["));
+    }
 }

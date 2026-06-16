@@ -1,0 +1,25 @@
+mod cpu Main {
+  async fn ping(seed: i64) -> i64 {
+    return seed + 9;
+  }
+
+  fn capture_mutex_value(lock: Mutex<i64>) -> i64 {
+    let guard: MutexGuard<i64> = mutex_lock(lock);
+    let value: i64 = mutex_value(guard);
+    let reopened: Mutex<i64> = mutex_unlock(guard);
+    let reopened_guard: MutexGuard<i64> = mutex_lock(reopened);
+    return value + mutex_value(reopened_guard);
+  }
+
+  fn main() -> i64 {
+    let observed: i64 = capture_mutex_value(mutex_new(7));
+    let worker: Thread<i64> = thread_spawn(ping(observed));
+    let joined: TaskResult<i64> = thread_join_result(worker);
+
+    if task_completed(joined) {
+      return observed + task_value(joined);
+    }
+
+    return observed;
+  }
+}

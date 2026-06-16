@@ -44,9 +44,21 @@ Readable single-file source anchor:
 
 * [examples/ns/memory/hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns)
 
+Current promoted source compile-closure set:
+
+* [hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns)
+* [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
+* [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
+* [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
+* [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
+* [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
+* [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
+
 ## Current CLI / Deeper-Pipeline Boundary
 
-The same source surface is not yet uniformly accepted by every deeper route.
+The same source surface is still not yet uniformly accepted by every deeper
+route, but a small checked-in task/GLM observation set now survives the deeper
+source pipeline too.
 
 Two practical examples already seen on the current mainline:
 
@@ -82,6 +94,15 @@ uses:
 
 instead of placing `spawn(...)`-originating effects directly inside each
 control-flow branch.
+
+Current note:
+
+* this promoted source set is now defended in
+  [tools/nuisc/src/frontend/tests_try.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_try.rs)
+  for frontend/NIR truth, and in
+  [tools/nuisc/tests/memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+  for source compile-closure truth
+* the remaining boundary is broader than this promoted source set
 
 ## Current Verification Strategy
 

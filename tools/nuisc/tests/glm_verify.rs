@@ -455,6 +455,36 @@ fn glm_verifier_accepts_task_value_inside_completed_branch() {
 }
 
 #[test]
+fn glm_verifier_accepts_thread_task_value_inside_completed_branch() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "thread".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "result".to_owned(),
+            ty: None,
+            value: NirExpr::CpuThreadJoinResult(Box::new(NirExpr::Var(
+                "thread".to_owned(),
+            ))),
+        },
+        NirStmt::If {
+            condition: NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var("result".to_owned()))),
+            then_body: vec![NirStmt::Expr(NirExpr::CpuTaskValue(Box::new(
+                NirExpr::Var("result".to_owned()),
+            )))],
+            else_body: vec![],
+        },
+    ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
 fn glm_verifier_rejects_thread_join_after_join_result_of_same_thread() {
     let module = module_with_body(vec![
         NirStmt::Let {
@@ -498,6 +528,39 @@ fn glm_verifier_rejects_second_mutex_lock_of_same_mutex() {
 
     let error = verify_nir_module(&module).unwrap_err();
     assert!(error.contains("use of moved value `lock`"));
+}
+
+#[test]
+fn glm_verifier_rejects_thread_task_value_inside_else_of_completed_branch() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "thread".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "result".to_owned(),
+            ty: None,
+            value: NirExpr::CpuThreadJoinResult(Box::new(NirExpr::Var(
+                "thread".to_owned(),
+            ))),
+        },
+        NirStmt::If {
+            condition: NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var("result".to_owned()))),
+            then_body: vec![],
+            else_body: vec![NirStmt::Expr(NirExpr::CpuTaskValue(Box::new(
+                NirExpr::Var("result".to_owned()),
+            )))],
+        },
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(
+        error.contains("cannot extract task_value from `result` on a non-completed lifecycle path")
+    );
 }
 
 #[test]
@@ -643,6 +706,59 @@ fn glm_verifier_accepts_branch_local_mutex_consumption_without_post_merge_reuse(
             )))),
         ],
     }]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
+fn glm_verifier_rejects_guard_use_after_if_branch_unlocks_it() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "guard".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::If {
+            condition: NirExpr::Bool(true),
+            then_body: vec![NirStmt::Expr(NirExpr::CpuMutexUnlock(Box::new(
+                NirExpr::Var("guard".to_owned()),
+            )))],
+            else_body: vec![],
+        },
+        NirStmt::Expr(NirExpr::CpuMutexValue(Box::new(NirExpr::Var(
+            "guard".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `guard`"));
+}
+
+#[test]
+fn glm_verifier_accepts_guard_read_inside_branch_and_after_merge() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "guard".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::If {
+            condition: NirExpr::Bool(true),
+            then_body: vec![NirStmt::Expr(NirExpr::CpuMutexValue(Box::new(
+                NirExpr::Var("guard".to_owned()),
+            )))],
+            else_body: vec![],
+        },
+        NirStmt::Expr(NirExpr::CpuMutexValue(Box::new(NirExpr::Var(
+            "guard".to_owned(),
+        )))),
+    ]);
 
     verify_nir_module(&module).unwrap();
 }

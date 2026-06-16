@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 9;
+  }
+
+  fn main() -> i64 {
+    let arm: i64 = host_argv_count();
+    let value: i64 = match arm {
+      0 => {
+        let joined: TaskResult<i64> = thread_join_result(thread_spawn(ping(5)));
+        if task_completed(joined) {
+          task_value(joined)
+        } else {
+          0
+        }
+      }
+      _ => {
+        let joined: TaskResult<i64> = thread_join_result(thread_spawn(ping(9)));
+        if task_completed(joined) {
+          task_value(joined)
+        } else {
+          0
+        }
+      }
+    };
+    return value;
+  }
+}

@@ -3,7 +3,9 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandKind {
     Status,
-    Registry,
+    Registry {
+        json: bool,
+    },
     Fmt {
         input: PathBuf,
     },
@@ -68,7 +70,17 @@ where
     let command = args.next().unwrap_or_else(|| "status".to_owned());
     match command.as_str() {
         "status" => Ok(CommandKind::Status),
-        "registry" => Ok(CommandKind::Registry),
+        "registry" => {
+            let mut json = false;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else {
+                    return Err("usage: nuisc registry [--json]".to_owned());
+                }
+            }
+            Ok(CommandKind::Registry { json })
+        }
         "fmt" => Ok(CommandKind::Fmt {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),

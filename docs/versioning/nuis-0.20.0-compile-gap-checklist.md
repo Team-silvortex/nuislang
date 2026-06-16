@@ -82,21 +82,37 @@ Done when:
 Status:
 
 * some new `.ns` examples are currently strongest as frontend/NIR anchors
-* not all of them are yet honest full CLI/source-compile closure anchors
+* a small checked-in task/GLM source anchor set has now been promoted into
+  real source compile-closure regressions
 
-Current source anchor:
+Promoted source anchors:
 
 * [hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns)
+* [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
+* [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
+* [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
+* [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
+* [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
+* [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
 
 Current protection:
 
 * [tools/nuisc/src/frontend/tests_try.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_try.rs)
+* [tools/nuisc/tests/memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+
+Current note:
+
+* this source set now survives `compile_source_path(...)`
+* the checked-in regressions also assert key lowered task/runtime observer
+  shapes in `dump-yir`-equivalent coverage
+* the first promotion in this set required the zero-field `cpu.struct`
+  aggregate fix for unit enum payloads such as `Error.InvalidInput`
 
 Done when:
 
-* a source example can move from “frontend/NIR-true anchor” into “full compile
-  closure anchor” without needing shape concessions that hide the feature being
-  demonstrated
+* more source examples can move from “frontend/NIR-true anchor” into “full
+  compile closure anchor” without needing shape concessions that hide the
+  feature being demonstrated
 
 ### 4. Gate Separation Discipline
 

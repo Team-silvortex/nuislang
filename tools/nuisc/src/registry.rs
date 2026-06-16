@@ -8,6 +8,54 @@ use nuis_semantics::model::{NirExpr, NirModule, NirStmt};
 use yir_core::YirModule;
 
 const INDEX_FILE: &str = "index.toml";
+pub const NUSTAR_DOMAIN_CONTRACT_SCHEMA: &str = "nustar-domain-contract-v1";
+pub const NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY: &str = "package_identity";
+pub const NUSTAR_DOMAIN_CONTRACT_GROUP_LOADER: &str = "loader_contract";
+pub const NUSTAR_DOMAIN_CONTRACT_GROUP_ABI: &str = "abi_contract";
+pub const NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE: &str = "host_bridge_contract";
+pub const NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME: &str = "runtime_capability_contract";
+pub const NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER: &str = "scheduler_contract";
+pub const NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET: &str = "std_net_extension";
+
+fn json_escape(value: &str) -> String {
+    let mut out = String::new();
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            ch if ch.is_control() => out.push_str(&format!("\\u{:04x}", ch as u32)),
+            ch => out.push(ch),
+        }
+    }
+    out
+}
+
+fn json_field(name: &str, value: &str) -> String {
+    format!("\"{}\":\"{}\"", name, json_escape(value))
+}
+
+fn json_optional_string_field(name: &str, value: Option<&str>) -> String {
+    match value {
+        Some(value) => format!("\"{}\":\"{}\"", name, json_escape(value)),
+        None => format!("\"{}\":null", name),
+    }
+}
+
+fn json_string_array_field(name: &str, values: &[String]) -> String {
+    let entries = values
+        .iter()
+        .map(|value| format!("\"{}\"", json_escape(value)))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("\"{}\":[{}]", name, entries)
+}
+
+fn json_object_field(name: &str, fields: &[String]) -> String {
+    format!("\"{}\":{{{}}}", name, fields.join(","))
+}
 
 fn resolve_registry_root(root: &Path) -> PathBuf {
     if root.exists() {
@@ -123,6 +171,486 @@ pub struct NustarBindingPlan {
     pub bindings: Vec<NustarBinding>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarClockSummary {
+    pub domain_id: String,
+    pub kind: String,
+    pub epoch_kind: String,
+    pub resolution: String,
+    pub bridge_default: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarCapabilitySummary {
+    pub support_surface: Vec<String>,
+    pub support_profile_slots: Vec<String>,
+    pub default_lanes: Vec<String>,
+    pub clock: NustarClockSummary,
+}
+
+impl NustarClockSummary {
+    pub fn brief(&self) -> String {
+        format!(
+            "{} [{}] bridge={}",
+            self.domain_id, self.kind, self.bridge_default
+        )
+    }
+}
+
+pub fn capability_summary(manifest: &NustarPackageManifest) -> NustarCapabilitySummary {
+    NustarCapabilitySummary {
+        support_surface: manifest.support_surface.clone(),
+        support_profile_slots: manifest.support_profile_slots.clone(),
+        default_lanes: manifest.default_lanes.clone(),
+        clock: NustarClockSummary {
+            domain_id: manifest.clock_domain_id.clone(),
+            kind: manifest.clock_kind.clone(),
+            epoch_kind: manifest.clock_epoch_kind.clone(),
+            resolution: manifest.clock_resolution.clone(),
+            bridge_default: manifest.clock_bridge_default.clone(),
+        },
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarSchedulerSummary {
+    pub contract_stack: String,
+    pub clock: NustarClockSummary,
+    pub result_roles: String,
+    pub sample_navigation: Option<String>,
+    pub result_samples: Option<String>,
+    pub transport_samples: Option<String>,
+    pub summary_api: String,
+    pub summary_samples: Option<String>,
+    pub observer_classes: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarStdNetSummary {
+    pub sample_navigation: Option<String>,
+    pub recipe_samples: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarDomainContract {
+    pub contract_schema: String,
+    pub contract_groups: Vec<String>,
+    pub extension_groups: Vec<String>,
+    pub package_id: String,
+    pub domain_family: String,
+    pub frontend: String,
+    pub loader_abi: String,
+    pub loader_entry: String,
+    pub machine_abi_policy: String,
+    pub abi_profiles: Vec<String>,
+    pub host_ffi_surface: Vec<String>,
+    pub host_ffi_abis: Vec<String>,
+    pub host_ffi_bridge: Option<String>,
+    pub capability: NustarCapabilitySummary,
+    pub scheduler: NustarSchedulerSummary,
+    pub std_net: NustarStdNetSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarDomainRegistration {
+    pub manifest_path: String,
+    pub package_id: String,
+    pub domain_family: String,
+    pub frontend: String,
+    pub entry_crate: String,
+    pub ast_entry: String,
+    pub nir_entry: String,
+    pub yir_lowering_entry: String,
+    pub part_verify_entry: String,
+    pub ast_surface: Vec<String>,
+    pub nir_surface: Vec<String>,
+    pub yir_lowering: Vec<String>,
+    pub part_verify: Vec<String>,
+    pub resource_families: Vec<String>,
+    pub unit_types: Vec<String>,
+    pub lowering_targets: Vec<String>,
+    pub ops: Vec<String>,
+    pub contract: NustarDomainContract,
+}
+
+pub fn domain_contract(manifest: &NustarPackageManifest) -> NustarDomainContract {
+    let mut contract_groups = vec![
+        NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY.to_owned(),
+        NUSTAR_DOMAIN_CONTRACT_GROUP_LOADER.to_owned(),
+        NUSTAR_DOMAIN_CONTRACT_GROUP_ABI.to_owned(),
+        NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME.to_owned(),
+        NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER.to_owned(),
+    ];
+    if !manifest.host_ffi_surface.is_empty() {
+        contract_groups.push(NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE.to_owned());
+    }
+    let mut extension_groups = Vec::new();
+    if manifest.domain_family == "network" {
+        extension_groups.push(NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET.to_owned());
+    }
+    NustarDomainContract {
+        contract_schema: NUSTAR_DOMAIN_CONTRACT_SCHEMA.to_owned(),
+        contract_groups,
+        extension_groups,
+        package_id: manifest.package_id.clone(),
+        domain_family: manifest.domain_family.clone(),
+        frontend: manifest.frontend.clone(),
+        loader_abi: manifest.loader_abi.clone(),
+        loader_entry: manifest.loader_entry.clone(),
+        machine_abi_policy: manifest.machine_abi_policy.clone(),
+        abi_profiles: manifest.abi_profiles.clone(),
+        host_ffi_surface: manifest.host_ffi_surface.clone(),
+        host_ffi_abis: manifest.host_ffi_abis.clone(),
+        host_ffi_bridge: if manifest.host_ffi_surface.is_empty() {
+            None
+        } else {
+            Some(manifest.host_ffi_bridge.clone())
+        },
+        capability: capability_summary(manifest),
+        scheduler: scheduler_summary(manifest),
+        std_net: std_net_summary(&manifest.domain_family),
+    }
+}
+
+pub fn load_domain_contract_for_domain(
+    root: &Path,
+    domain_family: &str,
+) -> Result<NustarDomainContract, String> {
+    let manifest = load_manifest_for_domain(root, domain_family)?;
+    Ok(domain_contract(&manifest))
+}
+
+pub fn domain_registration(
+    root: &Path,
+    entry: &NustarPackageIndexEntry,
+) -> Result<NustarDomainRegistration, String> {
+    let root = resolve_registry_root(root);
+    let path = manifest_path(&root, entry);
+    let source = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    let manifest = parse_manifest(&source, &path)?;
+    Ok(NustarDomainRegistration {
+        manifest_path: path.display().to_string(),
+        package_id: manifest.package_id.clone(),
+        domain_family: manifest.domain_family.clone(),
+        frontend: manifest.frontend.clone(),
+        entry_crate: manifest.entry_crate.clone(),
+        ast_entry: manifest.ast_entry.clone(),
+        nir_entry: manifest.nir_entry.clone(),
+        yir_lowering_entry: manifest.yir_lowering_entry.clone(),
+        part_verify_entry: manifest.part_verify_entry.clone(),
+        ast_surface: manifest.ast_surface.clone(),
+        nir_surface: manifest.nir_surface.clone(),
+        yir_lowering: manifest.yir_lowering.clone(),
+        part_verify: manifest.part_verify.clone(),
+        resource_families: manifest.resource_families.clone(),
+        unit_types: manifest.unit_types.clone(),
+        lowering_targets: manifest.lowering_targets.clone(),
+        ops: manifest.ops.clone(),
+        contract: domain_contract(&manifest),
+    })
+}
+
+pub fn load_registered_domains(root: &Path) -> Result<Vec<NustarDomainRegistration>, String> {
+    let root = resolve_registry_root(root);
+    let mut registrations = load_index(&root)?
+        .into_iter()
+        .map(|entry| domain_registration(&root, &entry))
+        .collect::<Result<Vec<_>, _>>()?;
+    registrations.sort_by(|lhs, rhs| lhs.package_id.cmp(&rhs.package_id));
+    Ok(registrations)
+}
+
+pub fn load_domain_registration_for_domain(
+    root: &Path,
+    domain_family: &str,
+) -> Result<NustarDomainRegistration, String> {
+    let root = resolve_registry_root(root);
+    let entry = load_index(&root)?
+        .into_iter()
+        .find(|entry| entry.domain_family == domain_family)
+        .ok_or_else(|| {
+            format!(
+                "no nustar package is indexed for mod domain `{domain_family}` in `{}`",
+                root.join(INDEX_FILE).display()
+            )
+        })?;
+    domain_registration(&root, &entry)
+}
+
+pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
+    let package_identity_fields = vec![
+        json_field("package", &contract.package_id),
+        json_field("domain", &contract.domain_family),
+        json_field("frontend", &contract.frontend),
+    ];
+    let loader_contract_fields = vec![
+        json_field("loader_abi", &contract.loader_abi),
+        json_field("loader_entry", &contract.loader_entry),
+    ];
+    let abi_contract_fields = vec![
+        json_field("machine_abi_policy", &contract.machine_abi_policy),
+        json_string_array_field("abi_profiles", &contract.abi_profiles),
+    ];
+    let host_bridge_contract_fields = vec![
+        json_string_array_field("host_ffi_surface", &contract.host_ffi_surface),
+        json_string_array_field("host_ffi_abis", &contract.host_ffi_abis),
+        json_optional_string_field("host_ffi_bridge", contract.host_ffi_bridge.as_deref()),
+    ];
+    let runtime_capability_contract_fields = vec![
+        json_string_array_field("support_surface", &contract.capability.support_surface),
+        json_string_array_field(
+            "support_profile_slots",
+            &contract.capability.support_profile_slots,
+        ),
+        json_string_array_field("default_lanes", &contract.capability.default_lanes),
+        json_field("clock_domain_id", &contract.capability.clock.domain_id),
+        json_field("clock_kind", &contract.capability.clock.kind),
+        json_field("clock_epoch_kind", &contract.capability.clock.epoch_kind),
+        json_field("clock_resolution", &contract.capability.clock.resolution),
+        json_field(
+            "clock_bridge_default",
+            &contract.capability.clock.bridge_default,
+        ),
+    ];
+    let scheduler_contract_fields = vec![
+        json_field("scheduler_contract_stack", &contract.scheduler.contract_stack),
+        json_field("scheduler_clock", &contract.scheduler.clock.brief()),
+        json_field("scheduler_result_roles", &contract.scheduler.result_roles),
+        json_optional_string_field(
+            "scheduler_sample_navigation",
+            contract.scheduler.sample_navigation.as_deref(),
+        ),
+        json_optional_string_field(
+            "scheduler_result_samples",
+            contract.scheduler.result_samples.as_deref(),
+        ),
+        json_optional_string_field(
+            "scheduler_transport_samples",
+            contract.scheduler.transport_samples.as_deref(),
+        ),
+        json_field("scheduler_summary_api", &contract.scheduler.summary_api),
+        json_optional_string_field(
+            "scheduler_summary_samples",
+            contract.scheduler.summary_samples.as_deref(),
+        ),
+        json_field(
+            "scheduler_observer_classes",
+            &contract.scheduler.observer_classes,
+        ),
+    ];
+    let std_net_extension_fields = vec![
+        json_optional_string_field(
+            "std_net_navigation",
+            contract.std_net.sample_navigation.as_deref(),
+        ),
+        json_optional_string_field(
+            "std_net_samples",
+            contract.std_net.recipe_samples.as_deref(),
+        ),
+    ];
+    let contract_fields = vec![
+        json_field("schema", &contract.contract_schema),
+        json_string_array_field("groups", &contract.contract_groups),
+        json_string_array_field("extensions", &contract.extension_groups),
+        json_object_field(
+            NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY,
+            &package_identity_fields,
+        ),
+        json_object_field(NUSTAR_DOMAIN_CONTRACT_GROUP_LOADER, &loader_contract_fields),
+        json_object_field(NUSTAR_DOMAIN_CONTRACT_GROUP_ABI, &abi_contract_fields),
+        json_object_field(
+            NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE,
+            &host_bridge_contract_fields,
+        ),
+        json_object_field(
+            NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME,
+            &runtime_capability_contract_fields,
+        ),
+        json_object_field(
+            NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER,
+            &scheduler_contract_fields,
+        ),
+        json_object_field(NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET, &std_net_extension_fields),
+    ];
+    format!("{{{}}}", contract_fields.join(","))
+}
+
+pub fn domain_contract_json(contract: &NustarDomainContract) -> String {
+    let fields = vec![
+        json_field("package", &contract.package_id),
+        json_field("domain", &contract.domain_family),
+        json_field("contract_schema", &contract.contract_schema),
+        json_string_array_field("contract_groups", &contract.contract_groups),
+        json_string_array_field("extension_groups", &contract.extension_groups),
+        json_field("frontend", &contract.frontend),
+        json_field("loader_abi", &contract.loader_abi),
+        json_field("loader_entry", &contract.loader_entry),
+        json_field("machine_abi_policy", &contract.machine_abi_policy),
+        json_string_array_field("abi_profiles", &contract.abi_profiles),
+        json_string_array_field("host_ffi_surface", &contract.host_ffi_surface),
+        json_string_array_field("host_ffi_abis", &contract.host_ffi_abis),
+        json_optional_string_field("host_ffi_bridge", contract.host_ffi_bridge.as_deref()),
+        json_string_array_field("support_surface", &contract.capability.support_surface),
+        json_string_array_field(
+            "support_profile_slots",
+            &contract.capability.support_profile_slots,
+        ),
+        json_string_array_field("default_lanes", &contract.capability.default_lanes),
+        json_field("scheduler_contract_stack", &contract.scheduler.contract_stack),
+        json_field("scheduler_clock", &contract.scheduler.clock.brief()),
+        json_field("scheduler_result_roles", &contract.scheduler.result_roles),
+        json_optional_string_field(
+            "scheduler_sample_navigation",
+            contract.scheduler.sample_navigation.as_deref(),
+        ),
+        json_optional_string_field(
+            "scheduler_result_samples",
+            contract.scheduler.result_samples.as_deref(),
+        ),
+        json_optional_string_field(
+            "scheduler_transport_samples",
+            contract.scheduler.transport_samples.as_deref(),
+        ),
+        json_field("scheduler_summary_api", &contract.scheduler.summary_api),
+        json_optional_string_field(
+            "scheduler_summary_samples",
+            contract.scheduler.summary_samples.as_deref(),
+        ),
+        json_field(
+            "scheduler_observer_classes",
+            &contract.scheduler.observer_classes,
+        ),
+        json_optional_string_field(
+            "std_net_navigation",
+            contract.std_net.sample_navigation.as_deref(),
+        ),
+        json_optional_string_field(
+            "std_net_samples",
+            contract.std_net.recipe_samples.as_deref(),
+        ),
+        format!("\"contract\":{}", domain_contract_object_json(contract)),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub fn domain_registration_object_json(registration: &NustarDomainRegistration) -> String {
+    let registration_fields = vec![
+        json_field("manifest_path", &registration.manifest_path),
+        json_field("entry_crate", &registration.entry_crate),
+        json_field("ast_entry", &registration.ast_entry),
+        json_field("nir_entry", &registration.nir_entry),
+        json_field("yir_lowering_entry", &registration.yir_lowering_entry),
+        json_field("part_verify_entry", &registration.part_verify_entry),
+        json_string_array_field("ast_surface", &registration.ast_surface),
+        json_string_array_field("nir_surface", &registration.nir_surface),
+        json_string_array_field("yir_lowering", &registration.yir_lowering),
+        json_string_array_field("part_verify", &registration.part_verify),
+        json_string_array_field("resource_families", &registration.resource_families),
+        json_string_array_field("unit_types", &registration.unit_types),
+        json_string_array_field("lowering_targets", &registration.lowering_targets),
+        json_string_array_field("ops", &registration.ops),
+    ];
+    format!("{{{}}}", registration_fields.join(","))
+}
+
+pub fn domain_registration_json(registration: &NustarDomainRegistration) -> String {
+    let mut fields = domain_contract_json(&registration.contract);
+    fields.pop();
+    fields.push_str(&format!(
+        ",\"registration\":{}",
+        domain_registration_object_json(registration)
+    ));
+    fields.push('}');
+    fields
+}
+
+pub fn scheduler_summary(manifest: &NustarPackageManifest) -> NustarSchedulerSummary {
+    let domain = manifest.domain_family.as_str();
+    NustarSchedulerSummary {
+        contract_stack:
+            "placement -> timing -> result observation -> async summary observation -> observer classification"
+                .to_owned(),
+        clock: capability_summary(manifest).clock,
+        result_roles: "entry=result-entry, probe=result-ready-probe, value=result-payload-value; variants=config_ready|send_ready|recv_ready|connect_ready|accept_ready|closed".to_owned(),
+        sample_navigation: scheduler_sample_navigation(domain).map(str::to_owned),
+        result_samples: scheduler_result_samples(domain).map(str::to_owned),
+        transport_samples: scheduler_transport_samples(domain).map(str::to_owned),
+        summary_api: "policy=async-policy-summary, batch=async-batch-summary, windowed=async-windowed-summary; classes=transport_split|transport_windowed_split|transport_session_bridge_split|control_split|control_windowed|control_session_bridge".to_owned(),
+        summary_samples: scheduler_summary_samples(domain).map(str::to_owned),
+        observer_classes: "source=profile-backed|result-backed|summary-backed; stage=entry|ready|payload|policy|batch|windowed; scope=local|cross-lane|cross-domain|bridge-visible; branch=primary|secondary|fallback|send|recv".to_owned(),
+    }
+}
+
+pub fn std_net_summary(domain: &str) -> NustarStdNetSummary {
+    NustarStdNetSummary {
+        sample_navigation: std_net_sample_navigation(domain).map(str::to_owned),
+        recipe_samples: std_net_recipe_samples(domain).map(str::to_owned),
+    }
+}
+
+fn scheduler_sample_navigation(domain: &str) -> Option<&'static str> {
+    match domain {
+        "shader" => Some("policy -> windowed"),
+        "kernel" => Some("policy -> windowed"),
+        "network" => Some(
+            "result_ladder -> transport_split_ladder -> transport_summary_ladder -> summary_classes",
+        ),
+        _ => None,
+    }
+}
+
+fn scheduler_result_samples(domain: &str) -> Option<&'static str> {
+    match domain {
+        "network" => Some(
+            "result_ladder=network_result_profile_demo -> network_connect_result_demo -> network_accept_result_demo -> network_result_task_policy_demo -> network_result_task_batch_demo -> network_result_task_windowed_batch_demo -> network_result_session_bridge_demo; control_ladder=network_connect_result_demo -> network_accept_result_demo -> network_connect_accept_task_policy_demo -> network_connect_accept_task_batch_demo -> network_connect_accept_task_windowed_batch_demo",
+        ),
+        _ => None,
+    }
+}
+
+fn scheduler_transport_samples(domain: &str) -> Option<&'static str> {
+    match domain {
+        "network" => Some(
+            "transport_runtime=network_host_handle_runtime_demo -> network_host_handle_transport_runtime_demo -> network_owned_transport_result_demo -> network_host_transport_runtime_demo -> network_transport_result_demo; transport_split_ladder=network_transport_result_policy_split_demo -> network_transport_result_batch_split_demo -> network_transport_result_windowed_split_demo -> network_transport_result_session_bridge_split_demo; transport_summary_ladder=network_owned_transport_result_task_policy_demo -> network_owned_transport_result_task_batch_demo -> network_owned_transport_result_task_windowed_batch_demo -> network_owned_transport_result_session_bridge_demo -> network_transport_result_task_policy_demo -> network_transport_result_task_batch_demo -> network_transport_result_task_windowed_batch_demo -> network_transport_result_session_bridge_demo",
+        ),
+        _ => None,
+    }
+}
+
+fn scheduler_summary_samples(domain: &str) -> Option<&'static str> {
+    match domain {
+        "shader" => Some(
+            "policy=shader_async_policy_profile_demo -> shader_async_fallback_profile_demo; windowed=shader_async_batch_profile_demo -> shader_async_windowed_batch_profile_demo",
+        ),
+        "kernel" => Some(
+            "policy=kernel_async_tensor_policy_profile_demo -> kernel_async_tensor_fallback_profile_demo; windowed=kernel_async_tensor_batch_profile_demo -> kernel_async_tensor_windowed_batch_profile_demo",
+        ),
+        "network" => Some(
+            "transport_split=network_transport_result_policy_split_demo -> network_transport_result_batch_split_demo -> network_transport_result_windowed_split_demo -> network_transport_result_session_bridge_split_demo; control_split=network_connect_accept_task_policy_demo -> network_connect_accept_task_batch_demo -> network_connect_accept_task_windowed_batch_demo",
+        ),
+        _ => None,
+    }
+}
+
+fn std_net_sample_navigation(domain: &str) -> Option<&'static str> {
+    match domain {
+        "network" => {
+            Some("profile_core -> transport_edge -> syscall_edge -> socket_edge -> control_edge -> protocol_edge -> http_edge -> result_spine -> task_spine -> session")
+        }
+        _ => None,
+    }
+}
+
+fn std_net_recipe_samples(domain: &str) -> Option<&'static str> {
+    match domain {
+        "network" => Some(
+            "profile_core=net_endpoint_recipe -> net_endpoint_recipe_demo; transport_edge=net_ip_packet_recipe -> net_tcp_stream_recipe -> net_udp_datagram_recipe -> net_ip_packet_recipe_demo -> net_tcp_stream_recipe_demo -> net_udp_datagram_recipe_demo; syscall_edge=net_tcp_open_recipe -> net_udp_open_recipe -> net_udp_bind_recipe -> net_udp_bound_socket_recipe -> net_udp_datagram_flow_recipe -> net_tcp_listener_recipe -> net_tcp_client_flow_recipe -> net_tcp_server_flow_recipe -> net_tcp_accepted_socket_recipe -> net_owned_send_recipe -> net_owned_recv_recipe -> net_owned_accept_recipe -> net_owned_close_recipe -> net_tcp_open_recipe_demo -> net_udp_open_recipe_demo -> net_udp_bind_recipe_demo -> net_udp_bound_socket_recipe_demo -> net_udp_datagram_flow_recipe_demo -> net_tcp_listener_recipe_demo -> net_tcp_client_flow_recipe_demo -> net_tcp_server_flow_recipe_demo -> net_tcp_accepted_socket_recipe_demo -> net_owned_send_recipe_demo -> net_owned_recv_recipe_demo -> net_owned_accept_recipe_demo -> net_owned_close_recipe_demo; flow_group=tcp client flow -> tcp server flow -> udp datagram flow; flow=net_tcp_client_flow_recipe -> net_tcp_server_flow_recipe -> net_udp_datagram_flow_recipe -> net_tcp_client_flow_recipe_demo -> net_tcp_server_flow_recipe_demo -> net_udp_datagram_flow_recipe_demo; socket_edge=net_tcp_connect_socket_recipe -> net_tcp_client_flow_recipe -> net_tcp_socket_recipe -> net_tcp_server_socket_recipe -> net_tcp_server_flow_recipe -> net_tcp_accepted_socket_recipe -> net_udp_bound_socket_recipe -> net_udp_datagram_flow_recipe -> net_udp_socket_recipe -> net_ip_socket_recipe -> net_tcp_connect_socket_recipe_demo -> net_tcp_client_flow_recipe_demo -> net_tcp_socket_recipe_demo -> net_tcp_server_socket_recipe_demo -> net_tcp_server_flow_recipe_demo -> net_tcp_accepted_socket_recipe_demo -> net_udp_bound_socket_recipe_demo -> net_udp_datagram_flow_recipe_demo -> net_udp_socket_recipe_demo -> net_ip_socket_recipe_demo; control_edge=net_connect_recipe -> net_listen_recipe -> net_close_recipe -> net_connect_recipe_demo -> net_listen_recipe_demo -> net_close_recipe_demo; protocol_edge=net_protocol_experiment_recipe -> net_line_protocol_recipe -> net_datagram_protocol_recipe -> net_dnsish_protocol_recipe -> net_dnsish_query_recipe -> net_httpish_protocol_recipe -> net_httpish_request_recipe -> net_httpish_response_recipe -> net_httpish_roundtrip_recipe -> net_protocol_experiment_recipe_demo -> net_line_protocol_recipe_demo -> net_datagram_protocol_recipe_demo -> net_dnsish_protocol_recipe_demo -> net_dnsish_query_recipe_demo -> net_httpish_protocol_recipe_demo -> net_httpish_request_recipe_demo -> net_httpish_response_recipe_demo -> net_httpish_roundtrip_recipe_demo; http_edge=net_http_client_recipe -> net_http_request_builder_recipe -> net_http_client_headers_recipe -> net_http_client_url_recipe -> net_http_client_body_recipe -> net_http_client_status_recipe -> net_http_request_recipe -> net_http_response_recipe -> net_http_client_exchange_recipe -> net_http_client_session_recipe -> net_http_client_get_recipe -> net_http_client_post_recipe -> net_http_client_recipe_demo -> net_http_request_builder_recipe_demo -> net_http_client_headers_recipe_demo -> net_http_client_url_recipe_demo -> net_http_client_body_recipe_demo -> net_http_client_status_recipe_demo -> net_http_request_recipe_demo -> net_http_response_recipe_demo -> net_http_client_exchange_recipe_demo -> net_http_client_session_recipe_demo -> net_http_client_get_recipe_demo -> net_http_client_post_recipe_demo; result_spine=net_result_recipe -> net_result_bridge_recipe -> net_result_recipe_demo -> net_result_bridge_recipe_demo; task_spine=net_task_policy_recipe -> net_task_batch_recipe -> net_task_windowed_recipe -> net_task_windowed_bridge_recipe -> net_task_policy_recipe_demo -> net_task_batch_recipe_demo -> net_task_windowed_recipe_demo -> net_task_windowed_bridge_recipe_demo; compare_group=transport compare -> dnsish compare -> httpish compare; compare=net_transport_path_compare_recipe -> net_dnsish_path_compare_recipe -> net_httpish_path_compare_recipe -> net_transport_path_compare_recipe_demo -> net_dnsish_path_compare_recipe_demo -> net_httpish_path_compare_recipe_demo; owned_session=net_owned_transport_session_recipe -> net_owned_datagram_session_recipe -> net_owned_dnsish_exchange_session_recipe -> net_owned_dnsish_pipeline_recipe -> net_owned_transport_session_recipe_demo -> net_owned_datagram_session_recipe_demo -> net_owned_dnsish_exchange_session_recipe_demo -> net_owned_dnsish_pipeline_recipe_demo; session=net_control_session_recipe -> net_transport_session_recipe -> net_owned_transport_session_recipe -> net_tcp_listener_session_recipe -> net_transport_path_compare_recipe -> net_protocol_session_recipe -> net_datagram_session_recipe -> net_owned_datagram_session_recipe -> net_udp_bound_session_recipe -> net_datagram_exchange_session_recipe -> net_datagram_pipeline_recipe -> net_dnsish_exchange_session_recipe -> net_owned_dnsish_exchange_session_recipe -> net_dnsish_path_compare_recipe -> net_dnsish_pipeline_recipe -> net_owned_dnsish_pipeline_recipe -> net_http_client_session_recipe -> net_httpish_session_recipe -> net_httpish_exchange_session_recipe -> net_httpish_path_compare_recipe -> net_session_recipe -> net_control_session_recipe_demo -> net_transport_session_recipe_demo -> net_owned_transport_session_recipe_demo -> net_tcp_listener_session_recipe_demo -> net_transport_path_compare_recipe_demo -> net_protocol_session_recipe_demo -> net_datagram_session_recipe_demo -> net_owned_datagram_session_recipe_demo -> net_udp_bound_session_recipe_demo -> net_datagram_exchange_session_recipe_demo -> net_datagram_pipeline_recipe_demo -> net_dnsish_exchange_session_recipe_demo -> net_owned_dnsish_exchange_session_recipe_demo -> net_dnsish_path_compare_recipe_demo -> net_dnsish_pipeline_recipe_demo -> net_owned_dnsish_pipeline_recipe_demo -> net_http_client_session_recipe_demo -> net_httpish_session_recipe_demo -> net_httpish_exchange_session_recipe_demo -> net_httpish_path_compare_recipe_demo -> net_session_recipe_demo",
+        ),
+        _ => None,
+    }
+}
+
 pub fn load_index(root: &Path) -> Result<Vec<NustarPackageIndexEntry>, String> {
     let path = root.join(INDEX_FILE);
     if !path.exists() {
@@ -233,7 +761,20 @@ pub fn plan_bindings(
     declared_used_units: &[(String, String)],
     declared_externs: &[(String, String)],
 ) -> Result<NustarBindingPlan, String> {
-    let manifests = load_required_manifests(root, module)?;
+    let mut manifests = load_required_manifests(root, module)?;
+    let mut loaded_domains = manifests
+        .iter()
+        .map(|manifest| manifest.domain_family.clone())
+        .collect::<BTreeSet<_>>();
+    if loaded_domains.insert(domain.to_owned()) {
+        manifests.push(load_manifest_for_domain(root, domain)?);
+    }
+    for (used_domain, _) in declared_used_units {
+        if loaded_domains.insert(used_domain.clone()) {
+            manifests.push(load_manifest_for_domain(root, used_domain)?);
+        }
+    }
+    manifests.sort_by(|lhs, rhs| lhs.package_id.cmp(&rhs.package_id));
     validate_unit_binding(&manifests, domain, unit)?;
     let mut bindings = Vec::new();
 
@@ -496,6 +1037,36 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'
             "marker:uplink_window_policy",
             "marker:downlink_window_policy",
         ],
+        ("network", "network.profile.bind-core.v1") => &["bind_core"],
+        ("network", "network.profile.connect.v1") => {
+            &["remote_port", "connect_timeout_ms", "endpoint_kind"]
+        }
+        ("network", "network.profile.accept.v1") => &[
+            "local_port",
+            "read_timeout_ms",
+            "write_timeout_ms",
+            "endpoint_kind",
+        ],
+        ("network", "network.profile.send.v1") => &["send_window", "stream_window"],
+        ("network", "network.profile.recv.v1") => &["recv_window", "stream_window"],
+        ("network", "network.profile.close.v1") => &[],
+        ("network", "network.profile.timeout.v1") => {
+            &[
+                "connect_timeout_ms",
+                "read_timeout_ms",
+                "write_timeout_ms",
+                "timeout_budget",
+            ]
+        }
+        ("network", "network.profile.retry.v1") => &["retry_budget"],
+        ("network", "network.profile.endpoint-kind.v1") => &["endpoint_kind"],
+        ("network", "network.profile.stream-window.v1") => {
+            &["stream_window", "recv_window", "send_window"]
+        }
+        ("network", "network.profile.transport.v1") => &["transport_family"],
+        ("network", "network.profile.protocol.v1") => {
+            &["protocol_kind", "protocol_version", "protocol_header_bytes"]
+        }
         _ => &[],
     }
 }
@@ -678,6 +1249,70 @@ fn collect_support_usage_expr(
             surfaces.insert(surface.to_owned());
             slots.insert(slot);
         }
+        NirExpr::NetworkProfileBindCoreRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.bind-core.v1".to_owned());
+            slots.insert("bind_core".to_owned());
+        }
+        NirExpr::NetworkProfileEndpointKindRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.endpoint-kind.v1".to_owned());
+            slots.insert("endpoint_kind".to_owned());
+        }
+        NirExpr::NetworkProfileTransportFamilyRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.transport.v1".to_owned());
+            slots.insert("transport_family".to_owned());
+        }
+        NirExpr::NetworkProfileLocalPortRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.accept.v1".to_owned());
+            slots.insert("local_port".to_owned());
+        }
+        NirExpr::NetworkProfileRemotePortRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.connect.v1".to_owned());
+            slots.insert("remote_port".to_owned());
+        }
+        NirExpr::NetworkProfileConnectTimeoutRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.timeout.v1".to_owned());
+            slots.insert("connect_timeout_ms".to_owned());
+        }
+        NirExpr::NetworkProfileReadTimeoutRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.timeout.v1".to_owned());
+            slots.insert("read_timeout_ms".to_owned());
+        }
+        NirExpr::NetworkProfileWriteTimeoutRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.timeout.v1".to_owned());
+            slots.insert("write_timeout_ms".to_owned());
+        }
+        NirExpr::NetworkProfileTimeoutBudgetRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.timeout.v1".to_owned());
+            slots.insert("timeout_budget".to_owned());
+        }
+        NirExpr::NetworkProfileRetryBudgetRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.retry.v1".to_owned());
+            slots.insert("retry_budget".to_owned());
+        }
+        NirExpr::NetworkProfileStreamWindowRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.stream-window.v1".to_owned());
+            slots.insert("stream_window".to_owned());
+        }
+        NirExpr::NetworkProfileRecvWindowRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.recv.v1".to_owned());
+            slots.insert("recv_window".to_owned());
+        }
+        NirExpr::NetworkProfileSendWindowRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.send.v1".to_owned());
+            slots.insert("send_window".to_owned());
+        }
+        NirExpr::NetworkProfileProtocolKindRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.protocol.v1".to_owned());
+            slots.insert("protocol_kind".to_owned());
+        }
+        NirExpr::NetworkProfileProtocolVersionRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.protocol.v1".to_owned());
+            slots.insert("protocol_version".to_owned());
+        }
+        NirExpr::NetworkProfileProtocolHeaderBytesRef { .. } if domain_family == "network" => {
+            surfaces.insert("network.profile.protocol.v1".to_owned());
+            slots.insert("protocol_header_bytes".to_owned());
+        }
         NirExpr::KernelProfileBindCoreRef { .. } if domain_family == "kernel" => {
             surfaces.insert("kernel.profile.bind-core.v1".to_owned());
             slots.insert("bind_core".to_owned());
@@ -732,6 +1367,11 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         | NirExpr::DataWindowed(inner)
         | NirExpr::DataValue(inner)
         | NirExpr::DataFreezeWindow(inner)
+        | NirExpr::NetworkConfigReady(inner)
+        | NirExpr::NetworkSendReady(inner)
+        | NirExpr::NetworkRecvReady(inner)
+        | NirExpr::NetworkAcceptReady(inner)
+        | NirExpr::NetworkValue(inner)
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
@@ -772,6 +1412,7 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
             f(value);
         }
         NirExpr::DataResult { value: input, .. }
+        | NirExpr::NetworkResult { value: input, .. }
         | NirExpr::ShaderResult { value: input, .. }
         | NirExpr::KernelResult { value: input, .. } => f(input),
         NirExpr::DataReadWindow { window, index } => {
@@ -1542,6 +2183,71 @@ fn parse_array(raw: &str) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pipeline;
+
+    const DATA_BINDING_SOURCE: &str = r#"
+use data FabricPlane;
+
+mod cpu Main {
+  fn capture_data_profile_summary() -> i64 {
+    let bind_core: Unit = data_profile_bind_core("FabricPlane");
+    let window_offset: i64 = data_profile_window_offset("FabricPlane");
+    let uplink_len: i64 = data_profile_uplink_len("FabricPlane");
+    let downlink_len: i64 = data_profile_downlink_len("FabricPlane");
+    let _ = bind_core;
+    return window_offset + uplink_len + downlink_len;
+  }
+
+  fn main() {
+    print(capture_data_profile_summary());
+  }
+}
+"#;
+
+    fn binding_plan_from_source(source: &str) -> NustarBindingPlan {
+        let artifacts = pipeline::compile_source(source).expect("source should compile");
+        let declared_used_units = artifacts
+            .ast
+            .uses
+            .iter()
+            .map(|item| (item.domain.clone(), item.unit.clone()))
+            .collect::<Vec<_>>();
+        let declared_externs = artifacts
+            .ast
+            .externs
+            .iter()
+            .map(|item| (item.abi.clone(), item.name.clone()))
+            .chain(
+                artifacts
+                    .ast
+                    .extern_interfaces
+                    .iter()
+                    .flat_map(|interface| {
+                        interface.methods.iter().map(move |method| {
+                            (
+                                method.abi.clone(),
+                                format!("{}__{}", interface.name, method.name),
+                            )
+                        })
+                    }),
+            )
+            .collect::<Vec<_>>();
+
+        let registry_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("nustar-packages");
+        plan_bindings(
+            &registry_root,
+            &artifacts.nir,
+            &artifacts.yir,
+            &artifacts.ast.domain,
+            &artifacts.ast.unit,
+            &declared_used_units,
+            &declared_externs,
+        )
+        .expect("binding plan should resolve")
+    }
 
     fn cpu_manifest_with_host_target() -> NustarPackageManifest {
         NustarPackageManifest {
@@ -1655,5 +2361,373 @@ mod tests {
         assert!(manifest
             .default_lanes
             .contains(&"network.recv=rx".to_owned()));
+    }
+
+    #[test]
+    fn cpu_manifest_contract_is_registered() {
+        let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "cpu").unwrap();
+        assert_eq!(manifest.package_id, "official.cpu");
+        assert_eq!(manifest.loader_abi, "nustar-loader-v1");
+        assert_eq!(manifest.loader_entry, "nustar.bootstrap.v1");
+        assert_eq!(manifest.machine_abi_policy, "exact-match");
+        assert_eq!(manifest.clock_domain_id, "cpu.clock.host.v1");
+        assert_eq!(manifest.clock_kind, "host-monotonic");
+        assert_eq!(manifest.clock_bridge_default, "global->monotonic:bridge");
+        assert!(manifest
+            .host_ffi_surface
+            .contains(&"cpu.host-ffi.nurs.v1".to_owned()));
+        assert!(manifest
+            .host_ffi_surface
+            .contains(&"cpu.host-ffi.c-bridge.v1".to_owned()));
+        assert!(manifest.host_ffi_abis.contains(&"nurs".to_owned()));
+        assert!(manifest.host_ffi_abis.contains(&"c".to_owned()));
+        assert!(manifest
+            .default_lanes
+            .contains(&"cpu.window=main".to_owned()));
+        assert!(manifest
+            .default_lanes
+            .contains(&"cpu.alloc_node=mem".to_owned()));
+        assert!(manifest
+            .default_lanes
+            .contains(&"cpu.instantiate_unit=main".to_owned()));
+        assert!(manifest
+            .abi_profiles
+            .contains(&"cpu.arm64.apple_aapcs64".to_owned()));
+    }
+
+    #[test]
+    fn scheduler_summary_uses_manifest_clock_and_domain_samples() {
+        let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
+        let summary = scheduler_summary(&manifest);
+        assert_eq!(summary.clock.domain_id, "network.clock.io.v1");
+        assert_eq!(summary.clock.kind, "io-monotonic");
+        assert_eq!(
+            summary.sample_navigation.as_deref(),
+            Some(
+                "result_ladder -> transport_split_ladder -> transport_summary_ladder -> summary_classes"
+            )
+        );
+        assert!(summary
+            .result_samples
+            .as_deref()
+            .unwrap_or_default()
+            .contains("network_result_profile_demo"));
+        assert!(summary
+            .transport_samples
+            .as_deref()
+            .unwrap_or_default()
+            .contains("network_transport_result_policy_split_demo"));
+    }
+
+    #[test]
+    fn capability_summary_tracks_support_and_clock_contract() {
+        let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
+        let summary = capability_summary(&manifest);
+        assert!(summary
+            .support_surface
+            .contains(&"network.profile.transport.v1".to_owned()));
+        assert!(summary
+            .support_profile_slots
+            .contains(&"protocol_kind".to_owned()));
+        assert!(summary
+            .default_lanes
+            .contains(&"network.send=tx".to_owned()));
+        assert_eq!(summary.clock.domain_id, "network.clock.io.v1");
+        assert_eq!(summary.clock.bridge_default, "global->io:bridge");
+    }
+
+    #[test]
+    fn domain_contract_collects_registered_runtime_and_loader_facts() {
+        let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
+        let contract = domain_contract(&manifest);
+        assert_eq!(contract.contract_schema, NUSTAR_DOMAIN_CONTRACT_SCHEMA);
+        assert!(contract
+            .contract_groups
+            .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY.to_owned()));
+        assert!(contract
+            .contract_groups
+            .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_LOADER.to_owned()));
+        assert!(contract
+            .contract_groups
+            .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_ABI.to_owned()));
+        assert!(contract
+            .contract_groups
+            .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME.to_owned()));
+        assert!(contract
+            .contract_groups
+            .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER.to_owned()));
+        assert!(contract
+            .extension_groups
+            .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET.to_owned()));
+        assert_eq!(contract.package_id, "official.network");
+        assert_eq!(contract.domain_family, "network");
+        assert_eq!(contract.frontend, "nustar-network");
+        assert_eq!(contract.loader_abi, "nustar-loader-v1");
+        assert_eq!(contract.loader_entry, "nustar.bootstrap.v1");
+        assert_eq!(contract.machine_abi_policy, "exact-match");
+        assert!(contract
+            .abi_profiles
+            .contains(&"network.socket.v1".to_owned()));
+        assert!(contract
+            .capability
+            .support_surface
+            .contains(&"network.profile.transport.v1".to_owned()));
+        assert_eq!(contract.scheduler.clock.domain_id, "network.clock.io.v1");
+        assert!(contract
+            .std_net
+            .recipe_samples
+            .as_deref()
+            .unwrap_or_default()
+            .contains("net_http_client_recipe"));
+    }
+
+    #[test]
+    fn std_net_summary_is_owned_by_registry() {
+        let summary = std_net_summary("network");
+        assert_eq!(
+            summary.sample_navigation.as_deref(),
+            Some(
+                "profile_core -> transport_edge -> syscall_edge -> socket_edge -> control_edge -> protocol_edge -> http_edge -> result_spine -> task_spine -> session"
+            )
+        );
+        assert!(summary
+            .recipe_samples
+            .as_deref()
+            .unwrap_or_default()
+            .contains("net_http_client_recipe"));
+    }
+
+    #[test]
+    fn load_registered_domains_covers_all_indexed_nustar_modules() {
+        let registrations = load_registered_domains(Path::new("nustar-packages")).unwrap();
+        let domains = registrations
+            .iter()
+            .map(|item| item.domain_family.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(domains, vec!["cpu", "data", "kernel", "network", "shader"]);
+        let network = registrations
+            .iter()
+            .find(|item| item.domain_family == "network")
+            .unwrap();
+        assert!(network.manifest_path.ends_with("nustar-packages/network.toml"));
+        assert_eq!(network.contract.contract_schema, NUSTAR_DOMAIN_CONTRACT_SCHEMA);
+        assert!(network
+            .contract
+            .extension_groups
+            .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET.to_owned()));
+        assert!(!network.ops.is_empty());
+    }
+
+    #[test]
+    fn network_binding_plan_detects_profile_surfaces_and_slots() {
+        let source = r#"
+use network NetworkUnit;
+
+mod cpu Main {
+  fn capture_network_profile_summary() -> i64 {
+    let bind_core: i64 = network_profile_bind_core("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    return bind_core + endpoint_kind + timeout_budget + retry_budget + stream_window + recv_window + send_window;
+  }
+
+  fn main() {
+    print(capture_network_profile_summary());
+  }
+}
+"#;
+        let plan = binding_plan_from_source(source);
+
+        let binding = plan
+            .bindings
+            .iter()
+            .find(|binding| binding.domain_family == "network")
+            .expect("network binding should be present");
+
+        for surface in [
+            "network.profile.bind-core.v1",
+            "network.profile.endpoint-kind.v1",
+            "network.profile.timeout.v1",
+            "network.profile.retry.v1",
+            "network.profile.stream-window.v1",
+            "network.profile.recv.v1",
+            "network.profile.send.v1",
+        ] {
+            assert!(
+                binding
+                    .matched_support_surface
+                    .iter()
+                    .any(|candidate| candidate == surface),
+                "expected matched network surface `{surface}`"
+            );
+        }
+
+        for slot in [
+            "bind_core",
+            "endpoint_kind",
+            "timeout_budget",
+            "retry_budget",
+            "stream_window",
+            "recv_window",
+            "send_window",
+        ] {
+            assert!(
+                binding
+                    .matched_support_profile_slots
+                    .iter()
+                    .any(|candidate| candidate == slot),
+                "expected matched network slot `{slot}`"
+            );
+            assert!(
+                binding
+                    .covered_support_profile_slots
+                    .iter()
+                    .any(|candidate| candidate == slot),
+                "expected covered network slot `{slot}`"
+            );
+        }
+    }
+
+    #[test]
+    fn data_binding_plan_detects_profile_surfaces_and_slots() {
+        let plan = binding_plan_from_source(DATA_BINDING_SOURCE);
+        let binding = plan
+            .bindings
+            .iter()
+            .find(|binding| binding.domain_family == "data")
+            .expect("data binding should be present");
+        for surface in [
+            "data.profile.bind-core.v1",
+            "data.profile.window-layout.v1",
+        ] {
+            assert!(
+                binding
+                    .matched_support_surface
+                    .iter()
+                    .any(|candidate| candidate == surface),
+                "expected matched data surface `{surface}`"
+            );
+        }
+        for slot in ["bind_core", "window_offset", "uplink_len", "downlink_len"] {
+            assert!(
+                binding
+                    .matched_support_profile_slots
+                    .iter()
+                    .any(|candidate| candidate == slot),
+                "expected matched data slot `{slot}`"
+            );
+        }
+    }
+
+    #[test]
+    fn kernel_binding_plan_detects_profile_surfaces_and_slots() {
+        let source = r#"
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn capture_kernel_profile_summary() -> i64 {
+    let bind_core: i64 = kernel_profile_bind_core("KernelUnit");
+    let queue_depth: i64 = kernel_profile_queue_depth("KernelUnit");
+    let batch_lanes: i64 = kernel_profile_batch_lanes("KernelUnit");
+    return bind_core + queue_depth + batch_lanes;
+  }
+
+  fn main() {
+    print(capture_kernel_profile_summary());
+  }
+}
+"#;
+        let plan = binding_plan_from_source(source);
+        let binding = plan
+            .bindings
+            .iter()
+            .find(|binding| binding.domain_family == "kernel")
+            .expect("kernel binding should be present");
+        for surface in [
+            "kernel.profile.bind-core.v1",
+            "kernel.profile.queue-depth.v1",
+            "kernel.profile.batch-lanes.v1",
+        ] {
+            assert!(
+                binding
+                    .matched_support_surface
+                    .iter()
+                    .any(|candidate| candidate == surface),
+                "expected matched kernel surface `{surface}`"
+            );
+        }
+        for slot in ["bind_core", "queue_depth", "batch_lanes"] {
+            assert!(
+                binding
+                    .matched_support_profile_slots
+                    .iter()
+                    .any(|candidate| candidate == slot),
+                "expected matched kernel slot `{slot}`"
+            );
+        }
+    }
+
+    #[test]
+    fn shader_binding_plan_detects_profile_surfaces_and_slots() {
+        let source = r#"
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn capture_shader_profile_summary() -> i64 {
+    let target: Target = shader_profile_target("SurfaceShader");
+    let viewport: Viewport = shader_profile_viewport("SurfaceShader");
+    let pipeline: Pipeline = shader_profile_pipeline("SurfaceShader");
+    let vertex_count: i64 = shader_profile_vertex_count("SurfaceShader");
+    let instance_count: i64 = shader_profile_instance_count("SurfaceShader");
+    let _ = target;
+    let _ = viewport;
+    let _ = pipeline;
+    return vertex_count + instance_count;
+  }
+
+  fn main() {
+    print(capture_shader_profile_summary());
+  }
+}
+"#;
+        let plan = binding_plan_from_source(source);
+        let binding = plan
+            .bindings
+            .iter()
+            .find(|binding| binding.domain_family == "shader")
+            .expect("shader binding should be present");
+        for surface in [
+            "shader.profile.target.v1",
+            "shader.profile.viewport.v1",
+            "shader.profile.pipeline.v1",
+            "shader.profile.draw-budget.v1",
+        ] {
+            assert!(
+                binding
+                    .matched_support_surface
+                    .iter()
+                    .any(|candidate| candidate == surface),
+                "expected matched shader surface `{surface}`"
+            );
+        }
+        for slot in [
+            "target",
+            "viewport",
+            "pipeline",
+            "vertex_count",
+            "instance_count",
+        ] {
+            assert!(
+                binding
+                    .matched_support_profile_slots
+                    .iter()
+                    .any(|candidate| candidate == slot),
+                "expected matched shader slot `{slot}`"
+            );
+        }
     }
 }

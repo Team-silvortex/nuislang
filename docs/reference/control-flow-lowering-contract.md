@@ -90,6 +90,8 @@ Current truth:
 Regression anchor:
 
 * [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
+* [hello_thread_mutex_if_lock_branch_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns)
+* [hello_thread_mutex_match_join_result_branch_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns)
 
 Working rule:
 
