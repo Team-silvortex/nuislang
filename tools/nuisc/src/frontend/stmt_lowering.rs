@@ -1370,6 +1370,7 @@ fn expand_nested_try_expr_as_stmt(
         super::AstExpr::MethodCall {
             receiver,
             method,
+            generic_args,
             args,
         } => {
             if let Some(expanded) = expand_nested_try_expr_as_stmt(
@@ -1378,6 +1379,7 @@ fn expand_nested_try_expr_as_stmt(
                     wrap(super::AstExpr::MethodCall {
                         receiver: Box::new(rewritten),
                         method: method.clone(),
+                        generic_args: generic_args.clone(),
                         args: args.clone(),
                     })
                 },
@@ -1401,6 +1403,7 @@ fn expand_nested_try_expr_as_stmt(
                         wrap(super::AstExpr::MethodCall {
                             receiver: receiver.clone(),
                             method: method.clone(),
+                            generic_args: generic_args.clone(),
                             args: rewritten_args,
                         })
                     },
@@ -1593,10 +1596,12 @@ fn rewrite_try_payload_placeholder_expr(
         super::AstExpr::MethodCall {
             receiver,
             method,
+            generic_args,
             args,
         } => super::AstExpr::MethodCall {
             receiver: Box::new(rewrite_try_payload_placeholder_expr(*receiver, payload_name)),
             method,
+            generic_args,
             args: args
                 .into_iter()
                 .map(|arg| rewrite_try_payload_placeholder_expr(arg, payload_name))
@@ -1881,6 +1886,7 @@ fn expand_nested_control_expr_as_stmt(
         super::AstExpr::MethodCall {
             receiver,
             method,
+            generic_args,
             args,
         } => {
             if let Some(expanded) = expand_nested_control_expr_as_stmt(
@@ -1889,6 +1895,7 @@ fn expand_nested_control_expr_as_stmt(
                     wrap(super::AstExpr::MethodCall {
                         receiver: Box::new(rewritten),
                         method: method.clone(),
+                        generic_args: generic_args.clone(),
                         args: args.clone(),
                     })
                 },
@@ -1906,6 +1913,7 @@ fn expand_nested_control_expr_as_stmt(
                         wrap(super::AstExpr::MethodCall {
                             receiver: receiver.clone(),
                             method: method.clone(),
+                            generic_args: generic_args.clone(),
                             args: rewritten_args,
                         })
                     },

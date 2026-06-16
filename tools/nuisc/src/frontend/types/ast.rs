@@ -994,6 +994,7 @@ pub(crate) fn infer_ast_expr_type_inner(
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args: _,
             args,
         } => {
             if let Some(trait_name) = super::super::render_field_access_path(receiver) {

@@ -276,20 +276,24 @@ pub(super) fn validate_generic_bound_satisfaction(
     ))
 }
 
-pub(super) fn validate_generic_parameter_use_site_bound(
+pub(super) fn validate_generic_parameter_use_site_bound_with_context(
     generic_name: &str,
     ty: &AstTypeRef,
     required_bound: &str,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    parent_context: Option<&str>,
 ) -> Result<(), String> {
+    let context = parent_context
+        .map(|parent| format!("{parent} generic parameter `{generic_name}`"))
+        .unwrap_or_else(|| format!("generic parameter `{generic_name}`"));
     validate_generic_bound_satisfaction(
         ty,
         required_bound,
         visible_type_aliases,
         impl_lookup,
         &BTreeMap::new(),
-        &format!("generic parameter `{generic_name}`"),
+        &context,
     )
 }
 

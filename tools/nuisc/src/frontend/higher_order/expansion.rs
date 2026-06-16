@@ -237,6 +237,7 @@ fn infer_local_binding_type(
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args: _,
             args,
         } => {
             let receiver_ty =
@@ -995,6 +996,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args,
             args,
         } => {
             if let Some(receiver_ty) =
@@ -1056,6 +1058,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                     specialized_functions,
                 )?),
                 method: method.clone(),
+                generic_args: generic_args.clone(),
                 args: args
                     .iter()
                     .map(|arg| {

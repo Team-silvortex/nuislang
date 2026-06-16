@@ -418,11 +418,17 @@ impl Parser {
         };
         self.expect_symbol(')')?;
         let return_type = self.parse_optional_return_type()?;
-        self.expect_symbol(';')?;
+        let default_body = if self.peek_symbol('{') {
+            Some(self.parse_block()?)
+        } else {
+            self.expect_symbol(';')?;
+            None
+        };
         Ok(AstTraitMethodSig {
             name,
             params,
             return_type,
+            default_body,
         })
     }
 
@@ -1877,6 +1883,8 @@ impl Parser {
             } else if self.peek_symbol('.') {
                 self.expect_symbol('.')?;
                 let member = self.expect_ident()?;
+                let explicit_generic_args =
+                    self.try_parse_expr_type_arg_list_followed_by_call_only()?;
                 if self.peek_symbol('(') {
                     self.expect_symbol('(')?;
                     let args = self.parse_argument_list(')')?;
@@ -1885,18 +1893,21 @@ impl Parser {
                         base: Box::new(expr.clone()),
                         field: member.clone(),
                     };
-                    expr = if self.qualified_expr_prefers_constructor(&namespace_candidate) {
+                    expr = if self.qualified_expr_prefers_constructor(&namespace_candidate)
+                        && (!args.is_empty() || matches!(expr, AstExpr::Var(_)))
+                    {
                         AstExpr::Call {
                             callee: self
                                 .qualified_expr_path(&namespace_candidate)
                                 .expect("qualified constructor path exists"),
-                            generic_args: Vec::new(),
+                            generic_args: explicit_generic_args.unwrap_or_default(),
                             args,
                         }
                     } else {
                         AstExpr::MethodCall {
                             receiver: Box::new(expr),
                             method: member,
+                            generic_args: explicit_generic_args.unwrap_or_default(),
                             args,
                         }
                     };
@@ -2058,6 +2069,27 @@ impl Parser {
             {
                 Ok(Some(type_args))
             }
+            Ok(_) => {
+                self.cursor = checkpoint;
+                Ok(None)
+            }
+            Err(_) => {
+                self.cursor = checkpoint;
+                Ok(None)
+            }
+        }
+    }
+
+    fn try_parse_expr_type_arg_list_followed_by_call_only(
+        &mut self,
+    ) -> Result<Option<Vec<AstTypeRef>>, String> {
+        if !self.peek_symbol('<') {
+            return Ok(None);
+        }
+        let checkpoint = self.cursor;
+        let parsed = self.parse_type_arg_list();
+        match parsed {
+            Ok(type_args) if self.peek_symbol('(') => Ok(Some(type_args)),
             Ok(_) => {
                 self.cursor = checkpoint;
                 Ok(None)

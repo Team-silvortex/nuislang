@@ -674,6 +674,50 @@ fn reports_missing_bound_for_explicit_trait_qualified_call_on_type_param() {
 }
 
 #[test]
+fn reports_missing_bound_for_explicit_trait_qualified_call_on_alias_wrapped_type_param() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          type Alias<T> = T;
+          type Outer<T> = Alias<T>;
+
+          fn bump<T>(value: Outer<T>) -> T {
+            return Addable.add(value, value);
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "function `bump` body via type alias `Alias` target via type alias `Outer` target"
+        ),
+        "{error}"
+    );
+    assert!(
+        error.contains(
+            "calls trait method `Addable.add` on generic parameter `T` without required bound `Addable`"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
 fn accepts_explicit_trait_qualified_call_on_bound_type_param() {
     let module = parse_nuis_module(
         r#"

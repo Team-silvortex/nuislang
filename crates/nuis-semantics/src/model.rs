@@ -155,6 +155,7 @@ pub struct AstTraitMethodSig {
     pub name: String,
     pub params: Vec<AstParam>,
     pub return_type: Option<AstTypeRef>,
+    pub default_body: Option<Vec<AstStmt>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -361,6 +362,7 @@ pub enum AstExpr {
     MethodCall {
         receiver: Box<AstExpr>,
         method: String,
+        generic_args: Vec<AstTypeRef>,
         args: Vec<AstExpr>,
     },
     StructLiteral {

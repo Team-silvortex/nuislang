@@ -8,8 +8,8 @@ use super::unary_lowering::lower_unary_expr_with_async;
 use super::validation_helpers::render_type_name;
 use super::{
     infer_nir_expr_type, instantiate_struct_field_type, lower_call_expr_with_async, named_type,
-    resolve_declared_or_inferred, struct_field_type, AstExpr, FunctionSignature, NirExpr,
-    NirStructDef, NirTypeRef,
+    resolve_declared_or_inferred, struct_field_type, AstExpr, FunctionSignature,
+    NirExpr, NirStructDef, NirTypeRef,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -213,11 +213,19 @@ pub(super) fn lower_expr_with_async(
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args,
             args,
         } => {
+            let receiver_expected =
+                super::receiver_expected::explicit_receiver_expected_nir_type(receiver, generic_args);
             if let Some(receiver_name) = super::render_field_access_path(receiver) {
                 let signature_key = format!("{receiver_name}.{method}");
                 if let Some(signature) = signatures.get(&signature_key) {
+                    if !generic_args.is_empty() {
+                        return Err(format!(
+                            "method `{signature_key}` does not accept explicit generic arguments in the current frontend"
+                        ));
+                    }
                     let lowered_args = args
                         .iter()
                         .zip(signature.params.iter())
@@ -296,7 +304,7 @@ pub(super) fn lower_expr_with_async(
                     receiver.as_ref(),
                     AstExpr::Var(name) if bindings.contains_key(name)
                 );
-                if !is_shadowed_simple_local {
+                if !is_shadowed_simple_local && !args.is_empty() {
                     let Some(first_arg_expr) = args.first() else {
                         return Err(format!("trait method `{signature_key}` expects at least 1 arg"));
                     };
@@ -313,6 +321,16 @@ pub(super) fn lower_expr_with_async(
                     if let Some(receiver_ty) =
                         infer_nir_expr_type(&lowered_first_arg, bindings, signatures, struct_table)
                     {
+                        if !generic_args.is_empty()
+                            && receiver_ty.generic_args.len() != generic_args.len()
+                        {
+                            return Err(format!(
+                                "trait method `{signature_key}` for `{}` expects {} explicit receiver generic argument(s), found {}",
+                                receiver_ty.render(),
+                                receiver_ty.generic_args.len(),
+                                generic_args.len()
+                            ));
+                        }
                         for symbol_name in
                             super::impl_method_symbol_names(&receiver_name, &receiver_ty, method)
                         {
@@ -365,11 +383,36 @@ pub(super) fn lower_expr_with_async(
                 module_consts,
                 signatures,
                 struct_table,
-                None,
+                receiver_expected.as_ref(),
             )?;
             if let Some(receiver_ty) =
                 infer_nir_expr_type(&lowered_receiver, bindings, signatures, struct_table)
             {
+                if !generic_args.is_empty() {
+                    if receiver_ty.generic_args.len() != generic_args.len() {
+                        return Err(format!(
+                            "method `{method}` for `{}` expects {} explicit receiver generic argument(s), found {}",
+                            receiver_ty.render(),
+                            receiver_ty.generic_args.len(),
+                            generic_args.len()
+                        ));
+                    }
+                    let lowered_explicit = generic_args
+                        .iter()
+                        .map(super::lower_type_ref)
+                        .collect::<Vec<_>>();
+                    if lowered_explicit != receiver_ty.generic_args {
+                        return Err(format!(
+                            "method `{method}` explicit receiver generic arguments `<{}>` do not match inferred receiver type `{}`",
+                            lowered_explicit
+                                .iter()
+                                .map(|ty| ty.render())
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                            receiver_ty.render()
+                        ));
+                    }
+                }
                 for signature_key in super::impl_method_lookup_keys(&receiver_ty, method) {
                     if let Some(signature) = signatures.get(&signature_key) {
                         let mut lowered_args = vec![lowered_receiver.clone()];

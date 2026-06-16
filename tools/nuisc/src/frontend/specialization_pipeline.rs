@@ -7,9 +7,10 @@ use nuis_semantics::model::{
 use super::higher_order::{is_callable_type_with_aliases, rewrite_higher_order_calls_in_function};
 use super::stmt_lowering::lower_stmt_sequence_with_async;
 use super::{
-    build_function_return_type_table, build_impl_method_function, impl_method_lookup_key,
-    impl_method_symbol_name, infer_missing_function_return_type, is_public_visibility,
-    lower_function, lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
+    build_default_impl_method, build_default_impl_method_function, build_function_return_type_table,
+    build_impl_method_function, impl_method_lookup_key, impl_method_symbol_name,
+    infer_missing_function_return_type, is_public_visibility, lower_function,
+    lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
     rewrite_generic_calls_in_function, FunctionSignature, GenericImplMethodTemplate,
     ModuleConstValue,
 };
@@ -31,6 +32,21 @@ pub(super) fn build_lowered_functions_and_impls(
     generic_templates: &BTreeMap<String, AstFunction>,
     concrete_module_functions: &[AstFunction],
 ) -> Result<(Vec<NirFunction>, Vec<NirTraitDef>, Vec<NirImplDef>), String> {
+    let mut trait_defs = module
+        .traits
+        .iter()
+        .map(|definition| (definition.name.clone(), definition))
+        .collect::<BTreeMap<_, _>>();
+    for helper in local_cpu_helpers {
+        for definition in helper
+            .traits
+            .iter()
+            .filter(|definition| is_public_visibility(definition.visibility))
+        {
+            trait_defs.insert(definition.name.clone(), definition);
+            trait_defs.insert(format!("{}.{}", helper.unit, definition.name), definition);
+        }
+    }
     let generic_impl_method_templates = module
         .impls
         .iter()
@@ -38,23 +54,43 @@ pub(super) fn build_lowered_functions_and_impls(
             !definition.generic_params.is_empty() || !definition.where_bounds.is_empty()
         })
         .flat_map(|definition| {
+            let Some(trait_def) = trait_defs.get(&definition.trait_name) else {
+                return Vec::new().into_iter();
+            };
             let lowered_for_type =
                 lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases).ok();
-            definition.methods.iter().filter_map(move |method| {
-                lowered_for_type.as_ref().map(|lowered_for_type| GenericImplMethodTemplate {
-                    trait_name: definition.trait_name.clone(),
-                    method_name: method.name.clone(),
-                    function: build_impl_method_function(
-                        definition,
-                        method,
-                        &impl_method_symbol_name(
-                            &definition.trait_name,
-                            lowered_for_type,
-                            &method.name,
-                        ),
-                    ),
+            let mut impl_methods = definition.methods.clone();
+            for trait_method in &trait_def.methods {
+                if trait_method.default_body.is_none()
+                    || impl_methods
+                        .iter()
+                        .any(|method| method.name == trait_method.name)
+                {
+                    continue;
+                }
+                impl_methods.push(build_default_impl_method(definition, trait_method));
+            }
+            impl_methods
+                .into_iter()
+                .filter_map(move |method| {
+                    lowered_for_type
+                        .as_ref()
+                        .map(|lowered_for_type| GenericImplMethodTemplate {
+                            trait_name: definition.trait_name.clone(),
+                            method_name: method.name.clone(),
+                            function: build_impl_method_function(
+                                definition,
+                                &method,
+                                &impl_method_symbol_name(
+                                    &definition.trait_name,
+                                    lowered_for_type,
+                                    &method.name,
+                                ),
+                            ),
+                        })
                 })
-            })
+                .collect::<Vec<_>>()
+                .into_iter()
         })
         .collect::<Vec<_>>();
     let higher_order_templates = module
@@ -187,9 +223,27 @@ pub(super) fn build_lowered_functions_and_impls(
         if !definition.generic_params.is_empty() || !definition.where_bounds.is_empty() {
             continue;
         }
+        let Some(trait_def) = trait_defs.get(&definition.trait_name) else {
+            continue;
+        };
         let lowered_for_type =
             lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases)?;
-        for method in &definition.methods {
+        let mut impl_methods = definition
+            .methods
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        for trait_method in &trait_def.methods {
+            if trait_method.default_body.is_none()
+                || impl_methods
+                    .iter()
+                    .any(|method| method.name == trait_method.name)
+            {
+                continue;
+            }
+            impl_methods.push(build_default_impl_method(definition, trait_method));
+        }
+        for method in &impl_methods {
             if method.params.iter().any(|param| {
                 is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
             }) {
@@ -219,11 +273,19 @@ pub(super) fn build_lowered_functions_and_impls(
                 signature.clone(),
             );
             signatures.insert(symbol_name.clone(), signature);
-            rewritten_module_functions.push(build_impl_method_function(
-                definition,
-                method,
-                &symbol_name,
-            ));
+            if definition.methods.iter().any(|candidate| candidate.name == method.name) {
+                rewritten_module_functions.push(build_impl_method_function(
+                    definition,
+                    method,
+                    &symbol_name,
+                ));
+            } else if let Some(trait_method) = trait_def.methods.iter().find(|candidate| candidate.name == method.name) {
+                rewritten_module_functions.push(build_default_impl_method_function(
+                    definition,
+                    trait_method,
+                    &symbol_name,
+                ));
+            }
         }
     }
 
@@ -338,8 +400,22 @@ pub(super) fn build_lowered_functions_and_impls(
         if !definition.generic_params.is_empty() || !definition.where_bounds.is_empty() {
             continue;
         }
+        let Some(trait_def) = trait_defs.get(&definition.trait_name) else {
+            continue;
+        };
+        let mut all_methods = definition.methods.clone();
+        for trait_method in &trait_def.methods {
+            if trait_method.default_body.is_none()
+                || all_methods
+                    .iter()
+                    .any(|method| method.name == trait_method.name)
+            {
+                continue;
+            }
+            all_methods.push(build_default_impl_method(definition, trait_method));
+        }
         let mut methods = Vec::new();
-        for method in &definition.methods {
+        for method in &all_methods {
             if method.params.iter().any(|param| {
                 is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
             }) {

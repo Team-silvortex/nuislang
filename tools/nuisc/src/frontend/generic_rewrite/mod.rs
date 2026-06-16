@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use nuis_semantics::model::{AstFunction, AstImplDef, AstStructDef, AstTypeAlias, AstTypeRef};
 
 use self::blocks::rewrite_generic_calls_in_block;
-use super::FunctionSignature;
+use super::{function_context::render_function_body_context, FunctionSignature};
 
 #[derive(Clone)]
 pub(super) struct GenericImplMethodTemplate {
@@ -39,6 +39,7 @@ pub(super) fn rewrite_generic_calls_in_function(
     }
     let body = rewrite_generic_calls_in_block(
         &function.body,
+        &render_function_body_context(&function.name),
         function.return_type.as_ref(),
         &mut env,
         visible_type_aliases,

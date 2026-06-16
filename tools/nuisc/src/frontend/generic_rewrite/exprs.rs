@@ -20,6 +20,7 @@ use super::GenericImplMethodTemplate;
 
 pub(super) fn rewrite_generic_calls_in_expr(
     expr: &AstExpr,
+    context: &str,
     expected: Option<&AstTypeRef>,
     env: &BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -46,6 +47,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
             AstExpr::If {
                 condition: Box::new(rewrite_generic_calls_in_expr(
                     condition,
+                    context,
                     Some(&super::super::ast_named_type("bool")),
                     env,
                     visible_type_aliases,
@@ -63,6 +65,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 )?),
                 then_body: super::blocks::rewrite_generic_calls_in_block(
                     then_body,
+                    &format!("{context} if-then"),
                     expected,
                     &mut then_env,
                     visible_type_aliases,
@@ -80,6 +83,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 )?,
                 else_body: super::blocks::rewrite_generic_calls_in_block(
                     else_body,
+                    &format!("{context} if-else"),
                     expected,
                     &mut else_env,
                     visible_type_aliases,
@@ -100,6 +104,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
         AstExpr::Match { value, arms } => AstExpr::Match {
             value: Box::new(rewrite_generic_calls_in_expr(
                 value,
+                context,
                 None,
                 env,
                 visible_type_aliases,
@@ -124,6 +129,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                         guard: match &arm.guard {
                             Some(guard) => Some(rewrite_generic_calls_in_expr(
                                 guard,
+                                context,
                                 Some(&super::super::ast_named_type("bool")),
                                 &arm_env,
                                 visible_type_aliases,
@@ -143,6 +149,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                         },
                         body: super::blocks::rewrite_generic_calls_in_block(
                             &arm.body,
+                            &format!("{context} match-arm"),
                             expected,
                             &mut arm_env,
                             visible_type_aliases,
@@ -164,6 +171,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
         },
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_generic_calls_in_expr(
             value,
+            context,
             expected,
             env,
             visible_type_aliases,
@@ -182,6 +190,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
         AstExpr::Unary { op, operand } => {
             let rewritten_operand = rewrite_generic_calls_in_expr(
                 operand,
+                context,
                 expected,
                 env,
                 visible_type_aliases,
@@ -268,6 +277,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                     );
                     rewrite_generic_calls_in_expr(
                         arg,
+                        context,
                         arg_expected.as_ref(),
                         env,
                         visible_type_aliases,
@@ -318,6 +328,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                     &rewritten_generic_args,
                     &rewritten_args,
                     expected,
+                    &format!("{context} call `{callee}`"),
                     env,
                     visible_type_aliases,
                     generic_templates,
@@ -360,13 +371,20 @@ pub(super) fn rewrite_generic_calls_in_expr(
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args,
             args,
         } => {
+            let explicit_receiver_expected = super::super::receiver_expected::explicit_receiver_expected_type(
+                receiver,
+                generic_args,
+                visible_type_aliases,
+            );
             let rewritten_args = args
                 .iter()
                 .map(|arg| {
                     rewrite_generic_calls_in_expr(
                         arg,
+                        context,
                         None,
                         env,
                         visible_type_aliases,
@@ -385,7 +403,9 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let receiver_expected = method_call_receiver_expected_type(
+                receiver,
                 method,
+                generic_args,
                 &rewritten_args,
                 env,
                 visible_type_aliases,
@@ -395,6 +415,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
             );
             let rewritten_receiver = rewrite_generic_calls_in_expr(
                 receiver,
+                context,
                 receiver_expected.as_ref(),
                 env,
                 visible_type_aliases,
@@ -410,6 +431,12 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 specialized_functions,
                 specialized_signatures,
             )?;
+            let rewritten_receiver = super::super::receiver_expected::specialize_receiver_constructor_from_expected(
+                &rewritten_receiver,
+                explicit_receiver_expected.as_ref(),
+                visible_type_aliases,
+                struct_table,
+            );
             let mut call_args = vec![rewritten_receiver.clone()];
             call_args.extend(rewritten_args.clone());
             if let Some(specialized_name) = ensure_generic_impl_method_specialization(
@@ -437,9 +464,39 @@ pub(super) fn rewrite_generic_calls_in_expr(
                     args: call_args,
                 }
             } else {
+                if let Some(explicit_receiver_expected) = receiver_expected.as_ref() {
+                    if let Some(specialized_name) =
+                        ensure_generic_impl_method_specialization_from_receiver_expected(
+                            method,
+                            explicit_receiver_expected,
+                            &call_args,
+                            expected,
+                            env,
+                            visible_type_aliases,
+                            generic_templates,
+                            generic_impl_method_templates,
+                            higher_order_templates,
+                            function_table,
+                            signatures,
+                            impl_lookup,
+                            struct_table,
+                            function_return_types,
+                            specialization_cache,
+                            specialized_functions,
+                            specialized_signatures,
+                        )?
+                    {
+                        return Ok(AstExpr::Call {
+                            callee: specialized_name,
+                            generic_args: Vec::new(),
+                            args: call_args,
+                        });
+                    }
+                }
                 AstExpr::MethodCall {
                     receiver: Box::new(rewritten_receiver),
                     method: method.clone(),
+                    generic_args: generic_args.clone(),
                     args: rewritten_args,
                 }
             }
@@ -461,21 +518,31 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 function_return_types,
             )?
             .unwrap_or_else(|| (type_name.clone(), type_args.clone()));
+            let concrete_literal_ty = concrete_struct_literal_type(
+                &rewritten_head.0,
+                &rewritten_head.1,
+                expected,
+                visible_type_aliases,
+            );
+            let final_name = concrete_literal_ty
+                .as_ref()
+                .map(|ty| ty.name.clone())
+                .unwrap_or_else(|| rewritten_head.0.clone());
+            let final_args = concrete_literal_ty
+                .as_ref()
+                .map(|ty| ty.generic_args.clone())
+                .unwrap_or_else(|| rewritten_head.1.clone());
             AstExpr::StructLiteral {
-                type_name: rewritten_head.0.clone(),
-                type_args: rewritten_head.1.clone(),
+                type_name: final_name.clone(),
+                type_args: final_args.clone(),
                 fields: fields
                     .iter()
                     .map(|(name, value)| {
-                        let literal_ty = concrete_struct_literal_type(
-                            &rewritten_head.0,
-                            &rewritten_head.1,
-                            expected,
-                            visible_type_aliases,
-                        )
+                        let literal_ty = concrete_literal_ty
+                        .clone()
                         .unwrap_or_else(|| AstTypeRef {
-                            name: rewritten_head.0.clone(),
-                            generic_args: rewritten_head.1.clone(),
+                            name: final_name.clone(),
+                            generic_args: final_args.clone(),
                             is_optional: false,
                             is_ref: false,
                         });
@@ -485,6 +552,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                             name.clone(),
                             rewrite_generic_calls_in_expr(
                                 value,
+                                context,
                                 field_expected.as_ref(),
                                 env,
                                 visible_type_aliases,
@@ -505,29 +573,39 @@ pub(super) fn rewrite_generic_calls_in_expr(
                     .collect::<Result<Vec<_>, String>>()?,
             }
         }
-        AstExpr::FieldAccess { base, field } => AstExpr::FieldAccess {
-            base: Box::new(rewrite_generic_calls_in_expr(
-                base,
-                None,
-                env,
+        AstExpr::FieldAccess { base, field } => {
+            let base_expected = field_access_base_expected_type(
+                expected,
+                field,
                 visible_type_aliases,
-                generic_templates,
-                generic_impl_method_templates,
-                higher_order_templates,
-                function_table,
-                signatures,
-                impl_lookup,
                 struct_table,
-                function_return_types,
-                specialization_cache,
-                specialized_functions,
-                specialized_signatures,
-            )?),
-            field: field.clone(),
-        },
+            );
+            AstExpr::FieldAccess {
+                base: Box::new(rewrite_generic_calls_in_expr(
+                    base,
+                    context,
+                    base_expected.as_ref(),
+                    env,
+                    visible_type_aliases,
+                    generic_templates,
+                    generic_impl_method_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?),
+                field: field.clone(),
+            }
+        }
         AstExpr::Binary { op, lhs, rhs } => {
             let rewritten_lhs = rewrite_generic_calls_in_expr(
                 lhs,
+                context,
                 None,
                 env,
                 visible_type_aliases,
@@ -545,6 +623,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
             )?;
             let rewritten_rhs = rewrite_generic_calls_in_expr(
                 rhs,
+                context,
                 None,
                 env,
                 visible_type_aliases,
@@ -841,7 +920,9 @@ fn resolved_struct_literal_alias(
 }
 
 fn method_call_receiver_expected_type(
+    receiver: &AstExpr,
     method: &str,
+    generic_args: &[AstTypeRef],
     args: &[AstExpr],
     env: &BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -849,6 +930,16 @@ fn method_call_receiver_expected_type(
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
 ) -> Option<AstTypeRef> {
+    if let Some(explicit) =
+        super::super::receiver_expected::explicit_receiver_expected_type(
+            receiver,
+            generic_args,
+            visible_type_aliases,
+        )
+    {
+        return Some(explicit);
+    }
+
     let arg_types = args
         .iter()
         .map(|arg| {
@@ -889,7 +980,16 @@ fn method_call_receiver_expected_type(
             })
             .collect::<Vec<_>>();
     if candidates.len() == 1 {
-        return candidates.pop();
+        let candidate = candidates.pop()?;
+        if !generic_args.is_empty() && candidate.generic_args.len() == generic_args.len() {
+            return Some(AstTypeRef {
+                name: candidate.name,
+                generic_args: generic_args.to_vec(),
+                is_optional: candidate.is_optional,
+                is_ref: candidate.is_ref,
+            });
+        }
+        return Some(candidate);
     }
     None
 }
@@ -1222,6 +1322,7 @@ pub(super) fn ensure_generic_specialization(
     explicit_generic_args: &[AstTypeRef],
     args: &[AstExpr],
     expected: Option<&AstTypeRef>,
+    context: &str,
     env: &BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
@@ -1246,6 +1347,7 @@ pub(super) fn ensure_generic_specialization(
         impl_lookup,
         struct_table,
         function_return_types,
+        Some(context),
     )?;
     let specialized_name = format!(
         "{}__{}",
@@ -1365,6 +1467,7 @@ fn ensure_generic_impl_method_specialization(
             impl_lookup,
             struct_table,
             function_return_types,
+            None,
         )
         .is_ok()
         {
@@ -1392,6 +1495,92 @@ fn ensure_generic_impl_method_specialization(
         &[],
         args,
         expected,
+        method_name,
+        env,
+        visible_type_aliases,
+        generic_templates,
+        generic_impl_method_templates,
+        higher_order_templates,
+        function_table,
+        signatures,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    )?))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ensure_generic_impl_method_specialization_from_receiver_expected(
+    method_name: &str,
+    receiver_expected: &AstTypeRef,
+    actual_args: &[AstExpr],
+    expected: Option<&AstTypeRef>,
+    env: &BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    generic_templates: &BTreeMap<String, AstFunction>,
+    generic_impl_method_templates: &[GenericImplMethodTemplate],
+    higher_order_templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    specialization_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+) -> Result<Option<String>, String> {
+    let inference_receiver = AstExpr::StructLiteral {
+        type_name: receiver_expected.name.clone(),
+        type_args: receiver_expected.generic_args.clone(),
+        fields: Vec::new(),
+    };
+    let mut inference_args = vec![inference_receiver];
+    inference_args.extend(actual_args.iter().skip(1).cloned());
+
+    let mut candidates = Vec::new();
+    for template in generic_impl_method_templates
+        .iter()
+        .filter(|template| template.method_name == method_name && template.function.params.len() == actual_args.len())
+    {
+        if infer_generic_substitutions(
+            &template.function,
+            &[],
+            &inference_args,
+            expected,
+            env,
+            visible_type_aliases,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            None,
+        )
+        .is_ok()
+        {
+            candidates.push(template);
+        }
+    }
+    if candidates.len() > 1 {
+        return Err(format!(
+            "generic impl method resolution for `{method_name}` is ambiguous under explicit receiver generic anchoring; matching impl method templates: {}",
+            candidates
+                .iter()
+                .map(|template| template.function.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    let Some(template) = candidates.into_iter().next() else {
+        return Ok(None);
+    };
+    Ok(Some(ensure_generic_specialization(
+        &template.function,
+        &[],
+        &inference_args,
+        expected,
+        method_name,
         env,
         visible_type_aliases,
         generic_templates,
@@ -1539,7 +1728,8 @@ fn generic_template_arg_expected_type_from_return(
         .into_iter()
         .map(|(name, ty)| (name, lower_type_ref(&ty)))
         .collect::<BTreeMap<_, _>>();
-    specialize_ast_type_ref(&param.ty, &lowered_substitutions).ok()
+    let specialized = specialize_ast_type_ref(&param.ty, &lowered_substitutions).ok()?;
+    (!contains_ast_placeholder_generic_name(&specialized, &generic_names)).then_some(specialized)
 }
 
 fn generic_signature_arg_expected_type_from_return(
@@ -1586,7 +1776,8 @@ fn generic_signature_arg_expected_type_from_return(
         .into_iter()
         .map(|(name, ty)| (name, lower_type_ref(&ty)))
         .collect::<BTreeMap<_, _>>();
-    specialize_ast_type_ref(&param_ty, &lowered_substitutions).ok()
+    let specialized = specialize_ast_type_ref(&param_ty, &lowered_substitutions).ok()?;
+    (!contains_ast_placeholder_generic_name(&specialized, &generic_names)).then_some(specialized)
 }
 
 fn task_builtin_arg_expected_type(
@@ -1648,7 +1839,20 @@ fn constructor_value_expected_type(
             return None;
         }
         if generic_args.is_empty() {
-            expected.filter(|expected| expected.name == callee).cloned()
+            expected
+                .filter(|expected| expected.name == callee)
+                .cloned()
+                .or_else(|| {
+                    let (parent_name, _) = callee.rsplit_once('.')?;
+                    let resolved_expected =
+                        resolve_ast_type_ref_aliases(expected?, visible_type_aliases).ok()?;
+                    (resolved_expected.name == parent_name).then_some(AstTypeRef {
+                        name: callee.to_owned(),
+                        generic_args: resolved_expected.generic_args,
+                        is_optional: false,
+                        is_ref: false,
+                    })
+                })
         } else {
             Some(AstTypeRef {
                 name: callee.to_owned(),
@@ -1715,4 +1919,59 @@ fn struct_field_expected_type(
             literal_ty, definition, &field.ty,
         ),
     )
+}
+
+fn field_access_base_expected_type(
+    field_expected: Option<&AstTypeRef>,
+    field_name: &str,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+) -> Option<AstTypeRef> {
+    let resolved_expected =
+        resolve_ast_type_ref_aliases(field_expected?, visible_type_aliases).ok()?;
+    let mut candidates = Vec::new();
+    for definition in struct_table.values() {
+        let Some(field) = definition.fields.iter().find(|field| field.name == field_name) else {
+            continue;
+        };
+        let resolved_field_ty = resolve_ast_type_ref_aliases(&field.ty, visible_type_aliases).ok()?;
+        let generic_names = definition
+            .generic_params
+            .iter()
+            .map(|param| param.name.clone())
+            .collect::<BTreeSet<_>>();
+        let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+        if unify_generic_type_pattern(
+            &resolved_field_ty,
+            &resolved_expected,
+            &generic_names,
+            &mut substitutions,
+            &definition.name,
+        )
+        .is_err()
+        {
+            continue;
+        }
+        let Some(generic_args) = definition
+            .generic_params
+            .iter()
+            .map(|param| substitutions.get(&param.name).cloned())
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        if generic_args
+            .iter()
+            .any(|arg| contains_ast_placeholder_generic_name(arg, &generic_names))
+        {
+            continue;
+        }
+        candidates.push(AstTypeRef {
+            name: definition.name.clone(),
+            generic_args,
+            is_optional: false,
+            is_ref: false,
+        });
+    }
+    (candidates.len() == 1).then(|| candidates.pop()).flatten()
 }

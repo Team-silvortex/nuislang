@@ -13,6 +13,7 @@ use super::GenericImplMethodTemplate;
 #[allow(clippy::too_many_arguments)]
 pub(super) fn rewrite_generic_calls_in_block(
     body: &[AstStmt],
+    context: &str,
     current_return_type: Option<&AstTypeRef>,
     env: &mut BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -41,6 +42,7 @@ pub(super) fn rewrite_generic_calls_in_block(
         );
         rewritten.extend(rewrite_generic_stmt_with_hoists(
             stmt,
+            context,
             let_fallback_expected.as_ref(),
             current_return_type,
             env,
@@ -64,6 +66,7 @@ pub(super) fn rewrite_generic_calls_in_block(
 #[allow(clippy::too_many_arguments)]
 fn rewrite_generic_stmt_with_hoists(
     stmt: &AstStmt,
+    context: &str,
     let_fallback_expected: Option<&AstTypeRef>,
     current_return_type: Option<&AstTypeRef>,
     env: &mut BTreeMap<String, AstTypeRef>,
@@ -95,6 +98,7 @@ fn rewrite_generic_stmt_with_hoists(
             else {
                 return Ok(vec![rewrite_generic_calls_in_stmt(
                     stmt,
+                    context,
                     let_fallback_expected,
                     current_return_type,
                     env,
@@ -115,6 +119,7 @@ fn rewrite_generic_stmt_with_hoists(
             if !generic_templates.contains_key(callee) {
                 return Ok(vec![rewrite_generic_calls_in_stmt(
                     stmt,
+                    context,
                     let_fallback_expected,
                     current_return_type,
                     env,
@@ -138,6 +143,7 @@ fn rewrite_generic_stmt_with_hoists(
                 args,
                 ty.as_ref(),
                 name,
+                &format!("{context} local `{name}`"),
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -158,6 +164,7 @@ fn rewrite_generic_stmt_with_hoists(
                     generic_args: generic_args.clone(),
                     args: rewritten_args,
                 },
+                &format!("{context} local `{name}`"),
                 ty.as_ref().or(let_fallback_expected),
                 env,
                 visible_type_aliases,
@@ -207,6 +214,7 @@ fn rewrite_generic_stmt_with_hoists(
                 args,
                 current_return_type,
                 "__nuis_generic_return_arg",
+                context,
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -227,6 +235,7 @@ fn rewrite_generic_stmt_with_hoists(
                     generic_args: generic_args.clone(),
                     args: rewritten_args,
                 },
+                context,
                 current_return_type,
                 env,
                 visible_type_aliases,
@@ -247,6 +256,7 @@ fn rewrite_generic_stmt_with_hoists(
         }
         _ => Ok(vec![rewrite_generic_calls_in_stmt(
             stmt,
+            context,
             let_fallback_expected,
             current_return_type,
             env,
@@ -269,6 +279,7 @@ fn rewrite_generic_stmt_with_hoists(
 #[allow(clippy::too_many_arguments)]
 fn rewrite_generic_calls_in_stmt(
     stmt: &AstStmt,
+    context: &str,
     let_fallback_expected: Option<&AstTypeRef>,
     current_return_type: Option<&AstTypeRef>,
     env: &mut BTreeMap<String, AstTypeRef>,
@@ -294,6 +305,7 @@ fn rewrite_generic_calls_in_stmt(
         } => {
             let rewritten_value = rewrite_generic_calls_in_expr(
                 value,
+                &format!("{context} local `{name}`"),
                 ty.as_ref().or(let_fallback_expected),
                 env,
                 visible_type_aliases,
@@ -335,6 +347,7 @@ fn rewrite_generic_calls_in_stmt(
             name: name.clone(),
             value: rewrite_generic_calls_in_expr(
                 value,
+                &format!("{context} local `{name}`"),
                 env.get(name),
                 env,
                 visible_type_aliases,
@@ -360,6 +373,7 @@ fn rewrite_generic_calls_in_stmt(
             fields: fields.clone(),
             value: rewrite_generic_calls_in_expr(
                 value,
+                &format!("{context} destructure"),
                 type_ref.as_ref(),
                 env,
                 visible_type_aliases,
@@ -379,6 +393,7 @@ fn rewrite_generic_calls_in_stmt(
         AstStmt::Const { name, ty, value } => {
             let rewritten_value = rewrite_generic_calls_in_expr(
                 value,
+                &format!("{context} const `{name}`"),
                 ty.as_ref(),
                 env,
                 visible_type_aliases,
@@ -414,6 +429,7 @@ fn rewrite_generic_calls_in_stmt(
         }
         AstStmt::Print(value) => AstStmt::Print(rewrite_generic_calls_in_expr(
             value,
+            context,
             None,
             env,
             visible_type_aliases,
@@ -431,6 +447,7 @@ fn rewrite_generic_calls_in_stmt(
         )?),
         AstStmt::Await(value) => AstStmt::Await(rewrite_generic_calls_in_expr(
             value,
+            context,
             None,
             env,
             visible_type_aliases,
@@ -453,6 +470,7 @@ fn rewrite_generic_calls_in_stmt(
         } => {
             let rewritten_condition = rewrite_generic_calls_in_expr(
                 condition,
+                context,
                 None,
                 env,
                 visible_type_aliases,
@@ -474,6 +492,7 @@ fn rewrite_generic_calls_in_stmt(
                 condition: rewritten_condition,
                 then_body: rewrite_generic_calls_in_block(
                     then_body,
+                    &format!("{context} if-then"),
                     current_return_type,
                     &mut then_env,
                     visible_type_aliases,
@@ -491,6 +510,7 @@ fn rewrite_generic_calls_in_stmt(
                 )?,
                 else_body: rewrite_generic_calls_in_block(
                     else_body,
+                    &format!("{context} if-else"),
                     current_return_type,
                     &mut else_env,
                     visible_type_aliases,
@@ -511,6 +531,7 @@ fn rewrite_generic_calls_in_stmt(
         AstStmt::Match { value, arms } => {
             let rewritten_value = rewrite_generic_calls_in_expr(
                 value,
+                context,
                 None,
                 env,
                 visible_type_aliases,
@@ -537,6 +558,7 @@ fn rewrite_generic_calls_in_stmt(
                 value: rewritten_value,
                 arms: rewrite_generic_calls_in_match_arms(
                     arms,
+                    context,
                     scrutinee_type.as_ref(),
                     current_return_type,
                     env,
@@ -558,6 +580,7 @@ fn rewrite_generic_calls_in_stmt(
         AstStmt::While { condition, body } => {
             let rewritten_condition = rewrite_generic_calls_in_expr(
                 condition,
+                context,
                 None,
                 env,
                 visible_type_aliases,
@@ -578,6 +601,7 @@ fn rewrite_generic_calls_in_stmt(
                 condition: rewritten_condition,
                 body: rewrite_generic_calls_in_block(
                     body,
+                    &format!("{context} while-body"),
                     current_return_type,
                     &mut loop_env,
                     visible_type_aliases,
@@ -597,6 +621,7 @@ fn rewrite_generic_calls_in_stmt(
         }
         AstStmt::Expr(expr) => AstStmt::Expr(rewrite_generic_calls_in_expr(
             expr,
+            context,
             None,
             env,
             visible_type_aliases,
@@ -615,6 +640,7 @@ fn rewrite_generic_calls_in_stmt(
         AstStmt::Return(value) => AstStmt::Return(match value {
             Some(value) => Some(rewrite_generic_calls_in_expr(
                 value,
+                context,
                 current_return_type,
                 env,
                 visible_type_aliases,
@@ -748,6 +774,7 @@ fn expected_type_for_var_from_following_stmts(
 #[allow(clippy::too_many_arguments)]
 fn rewrite_generic_calls_in_match_arms(
     arms: &[AstMatchArm],
+    context: &str,
     scrutinee_type: Option<&AstTypeRef>,
     current_return_type: Option<&AstTypeRef>,
     env: &BTreeMap<String, AstTypeRef>,
@@ -784,6 +811,7 @@ fn rewrite_generic_calls_in_match_arms(
                 .map(|guard| {
                     rewrite_generic_calls_in_expr(
                         guard,
+                        context,
                         Some(&ast_named_type("bool")),
                         &mut arm_env,
                         visible_type_aliases,
@@ -803,6 +831,7 @@ fn rewrite_generic_calls_in_match_arms(
                 .transpose()?,
             body: rewrite_generic_calls_in_block(
                 &arm.body,
+                &format!("{context} match-arm"),
                 current_return_type,
                 &mut arm_env,
                 visible_type_aliases,

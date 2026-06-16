@@ -105,6 +105,7 @@ pub(super) fn lower_call_expr_with_async(
     }
     if let Some(explicit_trait_call) = lower_explicit_trait_qualified_call(
         callee,
+        generic_args,
         args,
         current_domain,
         current_function_is_async,
@@ -112,6 +113,7 @@ pub(super) fn lower_call_expr_with_async(
         module_consts,
         signatures,
         struct_table,
+        expected,
         allow_async_calls,
     )? {
         return Ok(explicit_trait_call);
@@ -157,6 +159,7 @@ fn suggest_function_name(
 #[allow(clippy::too_many_arguments)]
 fn lower_explicit_trait_qualified_call(
     callee: &str,
+    generic_args: &[nuis_semantics::model::AstTypeRef],
     args: &[AstExpr],
     current_domain: &str,
     current_function_is_async: bool,
@@ -164,12 +167,13 @@ fn lower_explicit_trait_qualified_call(
     module_consts: &BTreeMap<String, ModuleConstValue>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
+    expected: Option<&NirTypeRef>,
     allow_async_calls: bool,
 ) -> Result<Option<NirExpr>, String> {
     let Some((trait_name, method)) = callee.rsplit_once('.') else {
         return Ok(None);
     };
-    if signatures.contains_key(callee) || args.is_empty() {
+    if signatures.contains_key(callee) {
         return Ok(None);
     }
 
@@ -189,10 +193,33 @@ fn lower_explicit_trait_qualified_call(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let Some(receiver_ty) =
-        infer_nir_expr_type(&lowered_args[0], bindings, signatures, struct_table)
-    else {
-        return Ok(None);
+    let receiver_ty = if let Some(first_arg) = lowered_args.first() {
+        let Some(receiver_ty) = infer_nir_expr_type(first_arg, bindings, signatures, struct_table)
+        else {
+            return Ok(None);
+        };
+        if !generic_args.is_empty() {
+            return Err(format!(
+                "trait method `{callee}` does not accept explicit generic arguments when a receiver argument is already present"
+            ));
+        }
+        receiver_ty
+    } else {
+        match generic_args {
+            [receiver_ty] => super::lower_type_ref(receiver_ty),
+            [] if expected.is_some() => expected.cloned().unwrap(),
+            [] => {
+                return Err(format!(
+                    "trait method `{callee}` without receiver argument cannot infer `Self`; add an explicit self type like `{callee}<Type>()` or place the call in a context with a concrete expected return type"
+                ))
+            }
+            _ => {
+                return Err(format!(
+                    "trait method `{callee}` without receiver argument expects exactly 1 explicit self type argument, found {}",
+                    generic_args.len()
+                ))
+            }
+        }
     };
     let Some(signature) = impl_method_symbol_names(trait_name, &receiver_ty, method)
         .into_iter()

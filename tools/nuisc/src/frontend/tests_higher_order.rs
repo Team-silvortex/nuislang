@@ -1741,6 +1741,132 @@ fn rejects_generic_higher_order_specialization_without_required_bound_inside_nes
 }
 
 #[test]
+fn rejects_result_map_higher_order_specialization_method_call_without_required_bound() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                let mapped = mapper(value);
+                return Result.Ok(mapped.add(mapped));
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn bump<T, E>(input: Result<T, E>) -> Result<T, E> {
+            return result_map(input, |x: T| -> T { return x; });
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "function `result_map` body higher-order specialization body match-arm"
+        ),
+        "{error}"
+    );
+    assert!(
+        error.contains(
+            "calls method `add` on generic parameter `T` without required bound `Addable`"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn rejects_result_and_then_higher_order_specialization_method_call_without_required_bound() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn result_and_then<T, R, E>(
+            result: Result<T, E>,
+            mapper: Fn1<T, Result<R, E>>
+          ) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                let mapped = mapper(value);
+                match mapped {
+                  Result.Ok(inner) => {
+                    return Result.Ok(inner.add(inner));
+                  }
+                  Result.Err(error) => {
+                    return Result.Err(error);
+                  }
+                }
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn bump<T, E>(input: Result<T, E>) -> Result<T, E> {
+            return result_and_then(input, |x: T| -> Result<T, E> { return Result.Ok(x); });
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "function `result_and_then` body higher-order specialization body"
+        ),
+        "{error}"
+    );
+    assert!(
+        error.contains(
+            "calls method `add` on generic parameter `T` without required bound `Addable`"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
 fn lowers_generic_lambda_method_call_with_present_bound() {
     let module = parse_nuis_module(
         r#"

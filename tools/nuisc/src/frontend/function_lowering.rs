@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{
-    AstFunction, AstImplDef, AstTypeAlias, AstTypeRef, AstVisibility, NirFunction,
-    NirGenericParam, NirStructDef, NirTypeRef, NirWherePredicate,
+    AstFunction, AstImplDef, AstImplMethod, AstTraitMethodSig, AstTypeAlias, AstTypeRef,
+    AstVisibility, NirFunction, NirGenericParam, NirStructDef, NirTypeRef, NirWherePredicate,
 };
 
 use super::stmt_lowering::lower_stmt_block_with_async;
@@ -143,6 +143,59 @@ pub(super) fn build_impl_method_function(
         }),
         body: method.body.clone(),
     }
+}
+
+fn substitute_self_type_ref(ty: &AstTypeRef, self_type: &AstTypeRef) -> AstTypeRef {
+    let substituted = if ty.name == "Self" && ty.generic_args.is_empty() {
+        self_type.clone()
+    } else {
+        AstTypeRef {
+            name: ty.name.clone(),
+            generic_args: ty
+                .generic_args
+                .iter()
+                .map(|arg| substitute_self_type_ref(arg, self_type))
+                .collect(),
+            is_optional: ty.is_optional,
+            is_ref: ty.is_ref,
+        }
+    };
+    AstTypeRef {
+        is_optional: ty.is_optional,
+        is_ref: ty.is_ref,
+        ..substituted
+    }
+}
+
+pub(super) fn build_default_impl_method(
+    definition: &AstImplDef,
+    trait_method: &AstTraitMethodSig,
+) -> AstImplMethod {
+    AstImplMethod {
+        name: trait_method.name.clone(),
+        params: trait_method
+            .params
+            .iter()
+            .map(|param| nuis_semantics::model::AstParam {
+                name: param.name.clone(),
+                ty: substitute_self_type_ref(&param.ty, &definition.for_type),
+            })
+            .collect(),
+        return_type: trait_method
+            .return_type
+            .as_ref()
+            .map(|ty| substitute_self_type_ref(ty, &definition.for_type)),
+        body: trait_method.default_body.clone().unwrap_or_default(),
+    }
+}
+
+pub(super) fn build_default_impl_method_function(
+    definition: &AstImplDef,
+    trait_method: &AstTraitMethodSig,
+    symbol_name: &str,
+) -> AstFunction {
+    let method = build_default_impl_method(definition, trait_method);
+    build_impl_method_function(definition, &method, symbol_name)
 }
 
 pub(super) fn lower_function(

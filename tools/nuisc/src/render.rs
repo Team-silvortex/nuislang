@@ -488,11 +488,13 @@ fn render_ast_expr(value: &AstExpr) -> String {
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args,
             args,
         } => format!(
-            "{}.{}({})",
+            "{}.{}{}({})",
             render_ast_expr(receiver),
             method,
+            render_ast_generic_args(generic_args),
             args.iter()
                 .map(render_ast_expr)
                 .collect::<Vec<_>>()
@@ -1781,7 +1783,26 @@ fn render_ast_trait_method_sig(method: &AstTraitMethodSig) -> String {
         .as_ref()
         .map(|ty| format!(" -> {}", render_ast_type(ty)))
         .unwrap_or_default();
-    format!("    fn {}({}){}\n", method.name, params, return_suffix)
+    match &method.default_body {
+        Some(body) => format!(
+            "    fn {}({}){} {}\n",
+            method.name,
+            params,
+            return_suffix,
+            render_ast_stmt_block_inline(body)
+        ),
+        None => format!("    fn {}({}){};\n", method.name, params, return_suffix),
+    }
+}
+
+fn render_ast_stmt_block_inline(body: &[AstStmt]) -> String {
+    format!(
+        "{{ {} }}",
+        body.iter()
+            .map(render_ast_stmt_inline)
+            .collect::<Vec<_>>()
+            .join("; ")
+    )
 }
 
 fn render_nir_trait_method_sig(method: &NirTraitMethodSig) -> String {

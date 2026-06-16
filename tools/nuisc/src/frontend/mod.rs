@@ -9,6 +9,7 @@ mod data_builtins;
 mod data_profile_builtins;
 mod direct_calls;
 mod expr_lowering;
+mod function_context;
 mod function_lowering;
 mod generic_rewrite;
 mod generics;
@@ -25,6 +26,7 @@ mod name_suggestions;
 mod network_builtins;
 mod nova_builtins;
 mod parser;
+mod receiver_expected;
 mod return_inference;
 mod shader_builtins;
 mod signature_building;
@@ -122,8 +124,9 @@ use self::expr_lowering::{
 };
 use self::function_lowering::find_impl_method_signature;
 use self::function_lowering::{
-    build_impl_method_function, impl_method_lookup_key, impl_method_lookup_keys,
-    impl_method_symbol_name, impl_method_symbol_names, lower_function,
+    build_default_impl_method, build_default_impl_method_function, build_impl_method_function,
+    impl_method_lookup_key, impl_method_lookup_keys, impl_method_symbol_name,
+    impl_method_symbol_names, lower_function,
 };
 use self::generic_rewrite::{rewrite_generic_calls_in_function, GenericImplMethodTemplate};
 use self::higher_order::expand_higher_order_functions;

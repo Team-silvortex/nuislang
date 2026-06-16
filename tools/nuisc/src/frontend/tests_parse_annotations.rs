@@ -2,7 +2,7 @@ use super::lower_project_ast_to_nir;
 use super::parse_nuis_ast;
 use super::parse_nuis_module;
 use nuis_semantics::model::{
-    AstVisibility, NirExpr, NirStmt, NirVisibility, TestClockDomain, TestClockPolicy,
+    AstStmt, AstVisibility, NirExpr, NirStmt, NirVisibility, TestClockDomain, TestClockPolicy,
 };
 
 #[test]
@@ -269,6 +269,111 @@ fn rejects_pub_trait_methods_in_current_frontend() {
         error.contains("trait methods do not support independent `pub` visibility"),
         "unexpected error: {error}"
     );
+}
+
+#[test]
+fn parses_trait_default_method_body_into_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn zero() -> i64 {
+              return 0;
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let method = &ast.traits[0].methods[0];
+    let default_body = method.default_body.as_ref().unwrap();
+    assert_eq!(method.name, "zero");
+    assert!(matches!(default_body[0], AstStmt::Return(_)));
+}
+
+#[test]
+fn parses_explicit_generic_args_on_qualified_trait_call() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            return Addable.zero<i64>();
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        function.body.first(),
+        Some(AstStmt::Return(Some(nuis_semantics::model::AstExpr::Call { callee, generic_args, args })))
+            if callee == "Addable.zero"
+                && args.is_empty()
+                && generic_args.len() == 1
+                && generic_args[0].name == "i64"
+    ));
+}
+
+#[test]
+fn parses_explicit_generic_args_on_receiver_method_call() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          fn main() {
+            Option.Some(2).twice<i64>();
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        function.body.first(),
+        Some(AstStmt::Expr(nuis_semantics::model::AstExpr::MethodCall { method, generic_args, args, .. }))
+            if method == "twice"
+                && generic_args.len() == 1
+                && generic_args[0].name == "i64"
+                && args.is_empty()
+    ));
+}
+
+#[test]
+fn parses_unit_variant_receiver_method_call_with_explicit_generic_args() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          fn main() {
+            Option.None.twice<i64>();
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        function.body.first(),
+        Some(AstStmt::Expr(nuis_semantics::model::AstExpr::MethodCall { method, generic_args, args, .. }))
+            if method == "twice"
+                && generic_args.len() == 1
+                && generic_args[0].name == "i64"
+                && args.is_empty()
+    ));
 }
 
 #[test]

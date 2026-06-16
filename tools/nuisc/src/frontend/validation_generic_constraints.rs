@@ -9,6 +9,7 @@ use super::validation_binding_env::{
     bind_destructure_fields_for_type, bind_match_pattern_for_type, collect_visible_structs,
     simple_match_value_type,
 };
+use super::function_context::render_function_validation_context;
 use super::validation_method_bounds::{
     collect_visible_trait_methods, validate_expr_generic_method_bounds,
 };
@@ -20,16 +21,6 @@ use super::{
     build_function_return_type_table, infer_ast_expr_type, lower_type_ref,
     lower_type_ref_with_aliases, substitute_ast_type_alias_target,
 };
-
-fn render_validation_function_context(function_name: &str) -> String {
-    if let Some(owner) = lambda_owner_name(function_name) {
-        format!("function `{owner}` body lambda")
-    } else if let Some(template) = higher_order_template_name(function_name) {
-        format!("function `{template}` body higher-order specialization")
-    } else {
-        format!("function `{function_name}`")
-    }
-}
 
 fn collect_visible_enums(
     module: &AstModule,
@@ -50,26 +41,6 @@ fn collect_visible_enums(
         }
     }
     enums
-}
-
-fn lambda_owner_name(function_name: &str) -> Option<&str> {
-    let remainder = function_name.strip_prefix("__lambda_")?;
-    let unspecialized = remainder
-        .split_once("__")
-        .map(|(base, _)| base)
-        .unwrap_or(remainder);
-    let (owner, counter) = unspecialized.rsplit_once('_')?;
-    counter
-        .chars()
-        .all(|ch| ch.is_ascii_digit())
-        .then_some(owner)
-}
-
-fn higher_order_template_name(function_name: &str) -> Option<&str> {
-    let remainder = function_name.strip_prefix("__hof_")?;
-    remainder
-        .split_once("___lambda_")
-        .map(|(template, _)| template)
 }
 
 fn substitute_self_type(ty: &AstTypeRef, self_type: &AstTypeRef) -> AstTypeRef {
@@ -270,10 +241,13 @@ fn validate_trait_impl_coherence(
         }
         for trait_method in &trait_def.methods {
             let Some(impl_method) = impl_methods.get(&trait_method.name) else {
-                return Err(format!(
-                    "impl `{}` for `{}` is missing required trait method `{}`",
-                    definition.trait_name, rendered_for_type, trait_method.name
-                ));
+                if trait_method.default_body.is_none() {
+                    return Err(format!(
+                        "impl `{}` for `{}` is missing required trait method `{}`",
+                        definition.trait_name, rendered_for_type, trait_method.name
+                    ));
+                }
+                continue;
             };
             validate_impl_method_signature_matches_trait(
                 &definition.trait_name,
@@ -668,7 +642,7 @@ fn validate_function_generic_constraints(
     visible_enums: &BTreeMap<String, AstEnumDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
 ) -> Result<(), String> {
-    let function_context = render_validation_function_context(&function.name);
+    let function_context = render_function_validation_context(&function.name);
     let generic_bounds = build_generic_bound_env(
         &function.generic_params,
         &function.where_bounds,
@@ -1006,6 +980,7 @@ fn validate_expr_generic_constraints(
         }
         AstExpr::MethodCall {
             receiver,
+            generic_args,
             args,
             ..
         } => {
@@ -1023,6 +998,18 @@ fn validate_expr_generic_constraints(
                 local_type_env,
                 context,
             )?;
+            for (index, generic_arg) in generic_args.iter().enumerate() {
+                validate_ast_type_ref_generic_constraints(
+                    generic_arg,
+                    visible_type_aliases,
+                    impl_lookup,
+                    visible_trait_names,
+                    visible_structs,
+                    visible_enums,
+                    generic_bounds,
+                    &format!("{context} method call generic argument #{}", index + 1),
+                )?;
+            }
             for arg in args {
                 validate_expr_generic_constraints(
                     arg,
@@ -1179,6 +1166,11 @@ fn validate_stmt_generic_constraints(
                 context,
             )?;
             if let Some(ty) = ty {
+                // Keep explicit annotation validation as its own pass after
+                // walking the value expression. In deep expected-type chains,
+                // this is where constrained aliases intentionally get a chance
+                // to report their own bound failure context, even if an inner
+                // generic call was also inferable from the same expected type.
                 validate_ast_type_ref_generic_constraints(
                     ty,
                     visible_type_aliases,
@@ -1697,6 +1689,10 @@ fn validate_ast_type_ref_generic_constraints_inner(
         visible_trait_names,
         &format!("type alias `{}`", alias_definition.name),
     )?;
+    // Alias parameter bounds are checked before expanding the alias target.
+    // That makes constrained aliases the current diagnostic owner for deep
+    // expected-type chains that successfully reconstruct all the way out to an
+    // alias application like Alias<Text>.
     for (param, arg) in alias_definition.generic_params.iter().zip(&ty.generic_args) {
         if let Some(bounds) = alias_bounds.get(&param.name) {
             for bound_name in bounds {

@@ -15,6 +15,7 @@ pub(super) fn hoist_direct_result_wrapper_args(
     args: &[AstExpr],
     expected: Option<&AstTypeRef>,
     temp_prefix: &str,
+    context: &str,
     env: &mut BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
@@ -44,6 +45,7 @@ pub(super) fn hoist_direct_result_wrapper_args(
         );
         let rewritten_arg = rewrite_generic_calls_in_expr(
             arg,
+            context,
             arg_expected.as_ref(),
             env,
             visible_type_aliases,

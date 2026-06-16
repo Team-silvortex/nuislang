@@ -315,6 +315,34 @@ fn rejects_impl_missing_required_trait_method() {
 }
 
 #[test]
+fn accepts_impl_omitting_trait_method_with_default_body() {
+    parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+
+            fn zero() -> Self {
+              return Addable.add(0, 0);
+            }
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+}
+
+#[test]
 fn rejects_impl_extra_method_not_declared_by_trait() {
     let error = parse_nuis_module(
         r#"
@@ -760,9 +788,10 @@ fn reports_function_generic_call_arg_bound_failure_at_use_site() {
     .unwrap_err();
 
     assert!(
-        error.contains("type `Text` does not satisfy bound `Addable` for generic parameter `U`"),
+        error.contains("type `Text` does not satisfy bound `Addable`"),
         "{error}"
     );
+    assert!(error.contains("function `main` body call `keep` generic parameter `U`"), "{error}");
 }
 
 #[test]
@@ -936,7 +965,143 @@ fn reports_explicit_function_generic_arg_bound_failure_at_use_site() {
     .unwrap_err();
 
     assert!(
-        error.contains("type `Text` does not satisfy bound `Addable` for generic parameter `U`"),
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(error.contains("function `main` body call `keep` generic parameter `U`"), "{error}");
+}
+
+#[test]
+fn reports_inferred_function_generic_arg_bound_failure_inside_if_result_branch() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn keep<U: Addable>(value: U) -> U {
+            return value;
+          }
+
+          fn main() -> i64 {
+            let value = if true {
+              let text: Text = "hi";
+              keep(text)
+            } else {
+              keep(0)
+            };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` if-then call `keep` generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_inferred_function_generic_arg_bound_failure_inside_match_result_branch() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn keep<U: Addable>(value: U) -> U {
+            return value;
+          }
+
+          fn main() -> i64 {
+            let value = match 1 {
+              1 => {
+                let text: Text = "hi";
+                keep(text)
+              }
+              _ => {
+                keep(0)
+              }
+            };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` match-arm call `keep` generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_inferred_function_generic_arg_bound_failure_inside_lambda_body() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply<T>(value: T, mapper: Fn1<T, T>) -> T {
+            return mapper(value);
+          }
+
+          fn keep<U: Addable>(value: U) -> U {
+            return value;
+          }
+
+          fn main() -> i64 {
+            let value = apply(0, |x: i64| -> i64 {
+              let text: Text = "hi";
+              keep(text);
+              return x;
+            });
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body lambda body call `keep` generic parameter `U`"),
         "{error}"
     );
 }
@@ -974,9 +1139,10 @@ fn reports_explicit_function_generic_arg_failure_for_second_required_bound() {
     .unwrap_err();
 
     assert!(
-        error.contains("type `i64` does not satisfy bound `Printable` for generic parameter `U`"),
+        error.contains("type `i64` does not satisfy bound `Printable`"),
         "{error}"
     );
+    assert!(error.contains("function `main` body call `keep` generic parameter `U`"), "{error}");
 }
 
 #[test]
@@ -1045,7 +1211,665 @@ fn reports_explicit_function_generic_arg_bound_failure_from_where_clause() {
     .unwrap_err();
 
     assert!(
-        error.contains("type `Text` does not satisfy bound `Addable` for generic parameter `U`"),
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(error.contains("function `main` body call `keep` generic parameter `U`"), "{error}");
+}
+
+#[test]
+fn reports_expected_type_driven_generic_bound_failure_at_local_use_site() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn typed_zero<T: Addable>() -> T {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let value: Text = typed_zero();
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` call `typed_zero` generic parameter `T`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_expected_type_driven_generic_bound_failure_inside_if_result_branch() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn typed_zero<T: Addable>() -> T {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let value: Text = if true {
+              typed_zero()
+            } else {
+              "ok"
+            };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` if-then call `typed_zero` generic parameter `T`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_expected_type_driven_generic_bound_failure_inside_lambda_body() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply<T>(value: T, mapper: Fn1<T, T>) -> T {
+            return mapper(value);
+          }
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let value = apply("ok", |_x: Text| -> Text {
+              return typed_zero();
+            });
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body lambda body call `typed_zero` generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_alias_expected_type_driven_generic_bound_failure_at_local_use_site() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          type Alias<T: Addable> = T;
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let value: Alias<Text> = typed_zero();
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` via type alias `Alias` generic parameter `T`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_struct_field_expected_type_driven_generic_bound_failure() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Wrapper {
+            value: Text,
+          }
+
+          fn typed_zero<T: Addable>() -> T {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let wrapped: Wrapper = Wrapper { value: typed_zero() };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `wrapped` call `typed_zero` generic parameter `T`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_enum_payload_expected_type_driven_generic_bound_failure() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let value: Option<Text> = Option.Some(typed_zero());
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` call `typed_zero` generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_nested_alias_struct_enum_expected_type_driven_generic_bound_failure() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          type Alias<T: Addable> = T;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let value: Option<Boxed<Alias<Text>>> = Option.Some(Boxed { value: typed_zero() });
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` via type alias `Alias` generic parameter `T`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_nested_alias_struct_enum_expected_type_driven_generic_bound_failure_inside_if_branch() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          type Alias<T: Addable> = T;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let value: Option<Boxed<Alias<Text>>> = if true {
+              Option.Some(Boxed { value: typed_zero() })
+            } else {
+              Option.None
+            };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` via type alias `Alias` generic parameter `T`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_nested_struct_enum_expected_type_driven_generic_bound_failure_without_alias_at_call_site() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let value: Option<Boxed<Text>> = Option.Some(Boxed { value: typed_zero() });
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` call `typed_zero` generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_nested_struct_enum_expected_type_driven_generic_bound_failure_without_alias_inside_if_branch_at_call_site() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let value: Option<Boxed<Text>> = if true {
+              Option.Some(Boxed { value: typed_zero() })
+            } else {
+              Option.None
+            };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` if-then call `typed_zero` generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_return_expected_type_driven_generic_bound_failure_without_alias_at_call_site() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn build() -> Option<Boxed<Text>> {
+            return Option.Some(Boxed { value: typed_zero() });
+          }
+
+          fn main() -> i64 {
+            let _value = build();
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `build` body call `typed_zero` generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_return_expected_type_driven_generic_bound_failure_with_outer_alias_precedence() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          type Alias<T: Addable> = T;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn build() -> Option<Boxed<Alias<Text>>> {
+            return Option.Some(Boxed { value: typed_zero() });
+          }
+
+          fn main() -> i64 {
+            let _value = build();
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `build` return type via type alias `Alias` generic parameter `T`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_error_style_result_payload_expected_type_driven_generic_bound_failure_at_call_site() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn build() -> Result<Boxed<Text>, i64> {
+            return Result.Ok(Boxed { value: typed_zero() });
+          }
+
+          fn main() -> i64 {
+            let _value = build();
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `build` body call `typed_zero` generic parameter `U`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_error_style_result_payload_expected_type_driven_generic_bound_failure_with_alias_precedence() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          type Alias<T: Addable> = T;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn typed_zero<U: Addable>() -> U {
+            return 0;
+          }
+
+          fn build() -> Result<Boxed<Alias<Text>>, i64> {
+            return Result.Ok(Boxed { value: typed_zero() });
+          }
+
+          fn main() -> i64 {
+            let _value = build();
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `build` return type via type alias `Alias` generic parameter `T`"),
         "{error}"
     );
 }
@@ -1077,7 +1901,11 @@ fn reports_explicit_function_generic_arg_bound_failure_inside_if_result_branch()
     .unwrap_err();
 
     assert!(
-        error.contains("type `Text` does not satisfy bound `Addable` for generic parameter `U`"),
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` if-then call `keep` generic parameter `U`"),
         "{error}"
     );
 }
@@ -1112,7 +1940,11 @@ fn reports_explicit_function_generic_arg_bound_failure_inside_match_result_branc
     .unwrap_err();
 
     assert!(
-        error.contains("type `Text` does not satisfy bound `Addable` for generic parameter `U`"),
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body local `value` match-arm call `keep` generic parameter `U`"),
         "{error}"
     );
 }
@@ -1147,7 +1979,11 @@ fn reports_explicit_function_generic_arg_bound_failure_inside_lambda_body() {
     .unwrap_err();
 
     assert!(
-        error.contains("type `Text` does not satisfy bound `Addable` for generic parameter `U`"),
+        error.contains("type `Text` does not satisfy bound `Addable`"),
+        "{error}"
+    );
+    assert!(
+        error.contains("function `main` body lambda body call `keep` generic parameter `U`"),
         "{error}"
     );
 }
@@ -1334,9 +2170,10 @@ fn reports_ambiguous_function_generic_use_site_bound_across_helper_trait_variant
     let error =
         super::lower_project_ast_to_nir(&main_ast, &[helper_a_ast, helper_b_ast]).unwrap_err();
     assert!(
-        error.contains("type `i64` ambiguously satisfies bound `Addable` for generic parameter `U`"),
+        error.contains("type `i64` ambiguously satisfies bound `Addable`"),
         "{error}"
     );
+    assert!(error.contains("function `main` body call `keep` generic parameter `U`"), "{error}");
     assert!(error.contains("HelperA.Addable"), "{error}");
     assert!(error.contains("HelperB.Addable"), "{error}");
 }

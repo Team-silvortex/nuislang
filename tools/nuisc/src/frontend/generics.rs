@@ -6,7 +6,7 @@ use nuis_semantics::model::{
 };
 
 use super::types::{ast_type_from_nir, infer_ast_expr_type};
-use super::validation_trait_bounds::validate_generic_parameter_use_site_bound;
+use super::validation_trait_bounds::validate_generic_parameter_use_site_bound_with_context;
 use super::validation_binding_env::instantiate_ast_struct_field_type;
 use super::{lower_type_ref, resolve_ast_type_ref_aliases};
 
@@ -20,6 +20,7 @@ pub(crate) fn infer_generic_substitutions(
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    context: Option<&str>,
 ) -> Result<BTreeMap<String, NirTypeRef>, String> {
     if template.params.len() != args.len() {
         return Err(format!(
@@ -36,6 +37,18 @@ pub(crate) fn infer_generic_substitutions(
         .collect::<BTreeSet<_>>();
     let mut substitutions =
         explicit_generic_substitutions(template, explicit_generic_args, visible_type_aliases)?;
+    if let (Some(return_pattern), Some(expected_ty)) = (template.return_type.as_ref(), expected) {
+        let resolved_return_pattern =
+            resolve_ast_type_ref_aliases(return_pattern, visible_type_aliases)?;
+        let resolved_expected_ty = resolve_ast_type_ref_aliases(expected_ty, visible_type_aliases)?;
+        unify_generic_type_pattern(
+            &resolved_return_pattern,
+            &resolved_expected_ty,
+            &generic_names,
+            &mut substitutions,
+            &template.name,
+        )?;
+    }
     for (param, arg) in template.params.iter().zip(args) {
         let resolved_param_ty = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
         if !contains_unresolved_generic_placeholders(
@@ -67,18 +80,6 @@ pub(crate) fn infer_generic_substitutions(
             &template.name,
         )?;
     }
-    if let (Some(return_pattern), Some(expected_ty)) = (template.return_type.as_ref(), expected) {
-        let resolved_return_pattern =
-            resolve_ast_type_ref_aliases(return_pattern, visible_type_aliases)?;
-        let resolved_expected_ty = resolve_ast_type_ref_aliases(expected_ty, visible_type_aliases)?;
-        unify_generic_type_pattern(
-            &resolved_return_pattern,
-            &resolved_expected_ty,
-            &generic_names,
-            &mut substitutions,
-            &template.name,
-        )?;
-    }
     let lowered_substitutions = substitutions
         .into_iter()
         .map(|(name, ty)| (name, lower_type_ref(&ty)))
@@ -92,12 +93,13 @@ pub(crate) fn infer_generic_substitutions(
         };
         for bound in &generic.bounds {
             let concrete_ast = ast_type_from_nir(concrete);
-            validate_generic_parameter_use_site_bound(
+            validate_generic_parameter_use_site_bound_with_context(
                 &generic.name,
                 &concrete_ast,
                 &bound.name,
                 visible_type_aliases,
                 impl_lookup,
+                context,
             )?;
         }
     }
@@ -110,12 +112,13 @@ pub(crate) fn infer_generic_substitutions(
         };
         let concrete_ast = ast_type_from_nir(concrete);
         for bound in &predicate.bounds {
-            validate_generic_parameter_use_site_bound(
+            validate_generic_parameter_use_site_bound_with_context(
                 &predicate.param_name,
                 &concrete_ast,
                 &bound.name,
                 visible_type_aliases,
                 impl_lookup,
+                context,
             )?;
         }
     }
@@ -459,10 +462,12 @@ fn specialize_expr_types(
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args,
             args,
         } => AstExpr::MethodCall {
             receiver: Box::new(specialize_expr_types(receiver, substitutions)?),
             method: method.clone(),
+            generic_args: generic_args.clone(),
             args: args
                 .iter()
                 .map(|arg| specialize_expr_types(arg, substitutions))

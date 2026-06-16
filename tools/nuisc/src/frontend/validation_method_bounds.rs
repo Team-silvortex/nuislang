@@ -332,6 +332,7 @@ pub(super) fn validate_expr_generic_method_bounds(
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args: _,
             args,
         } => {
             if let Some(receiver_name) = super::render_field_access_path(receiver) {

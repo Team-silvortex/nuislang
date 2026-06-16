@@ -534,6 +534,7 @@ pub(crate) fn rewrite_higher_order_template_expr(
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args,
             args,
         } => AstExpr::MethodCall {
             receiver: Box::new(rewrite_higher_order_template_expr(
@@ -546,6 +547,7 @@ pub(crate) fn rewrite_higher_order_template_expr(
                 specialized_functions,
             )?),
             method: method.clone(),
+            generic_args: generic_args.clone(),
             args: args
                 .iter()
                 .map(|arg| {

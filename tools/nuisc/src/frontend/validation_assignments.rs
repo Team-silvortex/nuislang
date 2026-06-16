@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstDestructureBinding, AstDestructureField};
 
+use super::function_context::render_function_body_context;
 use super::{AstExpr, AstModule, AstStmt};
 use nuis_semantics::model::{AstFunction, AstImplMethod};
 
@@ -25,7 +26,7 @@ fn validate_function(function: &AstFunction) -> Result<(), String> {
     validate_stmt_block(
         &function.body,
         &mut env,
-        &format!("function `{}` body", function.name),
+        &render_function_body_context(&function.name),
     )
 }
 

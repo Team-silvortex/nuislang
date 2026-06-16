@@ -536,6 +536,7 @@ fn infer_local_binding_type(
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args: _,
             args,
         } => {
             let receiver_ty = infer_local_binding_type(
@@ -1714,6 +1715,7 @@ fn rewrite_lambda_expr(
         AstExpr::MethodCall {
             receiver,
             method,
+            generic_args,
             args,
         } => {
             let rewritten_receiver = Box::new(rewrite_lambda_expr(
@@ -1796,6 +1798,7 @@ fn rewrite_lambda_expr(
             AstExpr::MethodCall {
                 receiver: rewritten_receiver,
                 method: method.clone(),
+                generic_args: generic_args.clone(),
                 args: rewritten_args,
             }
         }
