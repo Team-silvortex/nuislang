@@ -149,6 +149,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     &registration.domain_family,
                 )?;
                 let capability = registry::capability_summary(&manifest);
+                let execution = registry::execution_summary(&manifest);
                 let scheduler = registry::scheduler_summary(&manifest);
                 println!("package: {}", manifest.package_id);
                 println!("  schema: {}", manifest.manifest_schema);
@@ -212,6 +213,18 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "  clock_bridge_default: {}",
                     capability.clock.bridge_default
                 );
+                println!(
+                    "  execution_skeleton_version: {}",
+                    execution.skeleton_version
+                );
+                println!("  execution_function_kind: {}", execution.function_kind);
+                println!("  execution_graph_kind: {}", execution.graph_kind);
+                println!("  execution_domain: {}", execution.execution_domain);
+                println!(
+                    "  execution_default_time_mode: {}",
+                    execution.default_time_mode
+                );
+                println!("  execution_contract_family: {}", execution.contract_family);
                 println!("  scheduler_contract_stack: {}", scheduler.contract_stack);
                 println!("  scheduler_result_roles: {}", scheduler.result_roles);
                 if let Some(navigation) = scheduler.sample_navigation {

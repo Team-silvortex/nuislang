@@ -15,6 +15,7 @@ pub const NUSTAR_DOMAIN_CONTRACT_GROUP_ABI: &str = "abi_contract";
 pub const NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE: &str = "host_bridge_contract";
 pub const NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME: &str = "runtime_capability_contract";
 pub const NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER: &str = "scheduler_contract";
+pub const NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION: &str = "execution_skeleton_contract";
 pub const NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET: &str = "std_net_extension";
 
 fn json_escape(value: &str) -> String {
@@ -192,6 +193,17 @@ pub struct NustarCapabilitySummary {
     pub clock: NustarClockSummary,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarExecutionSummary {
+    pub skeleton_version: String,
+    pub function_kind: String,
+    pub graph_kind: String,
+    pub execution_domain: String,
+    pub default_time_mode: String,
+    pub contract_family: String,
+    pub lowering_targets: Vec<String>,
+}
+
 impl NustarClockSummary {
     pub fn brief(&self) -> String {
         format!(
@@ -213,6 +225,18 @@ pub fn capability_summary(manifest: &NustarPackageManifest) -> NustarCapabilityS
             resolution: manifest.clock_resolution.clone(),
             bridge_default: manifest.clock_bridge_default.clone(),
         },
+    }
+}
+
+pub fn execution_summary(manifest: &NustarPackageManifest) -> NustarExecutionSummary {
+    NustarExecutionSummary {
+        skeleton_version: "nustar-execution-skeleton-v1".to_owned(),
+        function_kind: "function-node".to_owned(),
+        graph_kind: "function-graph".to_owned(),
+        execution_domain: manifest.domain_family.clone(),
+        default_time_mode: "logical".to_owned(),
+        contract_family: format!("nustar.{}", manifest.domain_family),
+        lowering_targets: manifest.lowering_targets.clone(),
     }
 }
 
@@ -251,6 +275,7 @@ pub struct NustarDomainContract {
     pub host_ffi_abis: Vec<String>,
     pub host_ffi_bridge: Option<String>,
     pub capability: NustarCapabilitySummary,
+    pub execution: NustarExecutionSummary,
     pub scheduler: NustarSchedulerSummary,
     pub std_net: NustarStdNetSummary,
 }
@@ -412,6 +437,7 @@ pub fn domain_contract(manifest: &NustarPackageManifest) -> NustarDomainContract
         NUSTAR_DOMAIN_CONTRACT_GROUP_LOADER.to_owned(),
         NUSTAR_DOMAIN_CONTRACT_GROUP_ABI.to_owned(),
         NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME.to_owned(),
+        NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION.to_owned(),
         NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER.to_owned(),
     ];
     if !manifest.host_ffi_surface.is_empty() {
@@ -440,6 +466,7 @@ pub fn domain_contract(manifest: &NustarPackageManifest) -> NustarDomainContract
             Some(manifest.host_ffi_bridge.clone())
         },
         capability: capability_summary(manifest),
+        execution: execution_summary(manifest),
         scheduler: scheduler_summary(manifest),
         std_net: std_net_summary(&manifest.domain_family),
     }
@@ -622,6 +649,15 @@ pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
             &contract.capability.clock.bridge_default,
         ),
     ];
+    let execution_contract_fields = vec![
+        json_field("skeleton_version", &contract.execution.skeleton_version),
+        json_field("function_kind", &contract.execution.function_kind),
+        json_field("graph_kind", &contract.execution.graph_kind),
+        json_field("execution_domain", &contract.execution.execution_domain),
+        json_field("default_time_mode", &contract.execution.default_time_mode),
+        json_field("contract_family", &contract.execution.contract_family),
+        json_string_array_field("lowering_targets", &contract.execution.lowering_targets),
+    ];
     let scheduler_contract_fields = vec![
         json_field(
             "scheduler_contract_stack",
@@ -680,6 +716,10 @@ pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
             &runtime_capability_contract_fields,
         ),
         json_object_field(
+            NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION,
+            &execution_contract_fields,
+        ),
+        json_object_field(
             NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER,
             &scheduler_contract_fields,
         ),
@@ -712,6 +752,25 @@ pub fn domain_contract_json(contract: &NustarDomainContract) -> String {
             &contract.capability.support_profile_slots,
         ),
         json_string_array_field("default_lanes", &contract.capability.default_lanes),
+        json_field(
+            "execution_skeleton_version",
+            &contract.execution.skeleton_version,
+        ),
+        json_field("execution_function_kind", &contract.execution.function_kind),
+        json_field("execution_graph_kind", &contract.execution.graph_kind),
+        json_field("execution_domain", &contract.execution.execution_domain),
+        json_field(
+            "execution_default_time_mode",
+            &contract.execution.default_time_mode,
+        ),
+        json_field(
+            "execution_contract_family",
+            &contract.execution.contract_family,
+        ),
+        json_string_array_field(
+            "execution_lowering_targets",
+            &contract.execution.lowering_targets,
+        ),
         json_field(
             "scheduler_contract_stack",
             &contract.scheduler.contract_stack,
@@ -2686,6 +2745,19 @@ mod cpu Main {
     }
 
     #[test]
+    fn execution_summary_derives_minimum_execution_skeleton() {
+        let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "kernel").unwrap();
+        let summary = execution_summary(&manifest);
+        assert_eq!(summary.skeleton_version, "nustar-execution-skeleton-v1");
+        assert_eq!(summary.function_kind, "function-node");
+        assert_eq!(summary.graph_kind, "function-graph");
+        assert_eq!(summary.execution_domain, "kernel");
+        assert_eq!(summary.default_time_mode, "logical");
+        assert_eq!(summary.contract_family, "nustar.kernel");
+        assert!(summary.lowering_targets.contains(&"coreml".to_owned()));
+    }
+
+    #[test]
     fn domain_contract_collects_registered_runtime_and_loader_facts() {
         let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
         let contract = domain_contract(&manifest);
@@ -2702,6 +2774,9 @@ mod cpu Main {
         assert!(contract
             .contract_groups
             .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME.to_owned()));
+        assert!(contract
+            .contract_groups
+            .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION.to_owned()));
         assert!(contract
             .contract_groups
             .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER.to_owned()));
@@ -2721,6 +2796,8 @@ mod cpu Main {
             .capability
             .support_surface
             .contains(&"network.profile.transport.v1".to_owned()));
+        assert_eq!(contract.execution.execution_domain, "network");
+        assert_eq!(contract.execution.contract_family, "nustar.network");
         assert_eq!(contract.scheduler.clock.domain_id, "network.clock.io.v1");
         assert!(contract
             .std_net
@@ -2728,6 +2805,9 @@ mod cpu Main {
             .as_deref()
             .unwrap_or_default()
             .contains("net_http_client_recipe"));
+        let json = domain_contract_json(&contract);
+        assert!(json.contains("\"execution_skeleton_version\":\"nustar-execution-skeleton-v1\""));
+        assert!(json.contains("\"execution_contract_family\":\"nustar.network\""));
     }
 
     #[test]

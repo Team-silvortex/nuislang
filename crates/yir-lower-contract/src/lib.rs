@@ -49,6 +49,10 @@ impl KernelLoweringContract {
                 graph.lowering.as_str(),
                 graph.reason
             ));
+            lines.push(format!("  function={}", graph.function));
+            lines.push(format!("  node_kind={}", graph.node_kind));
+            lines.push(format!("  execution_domain={}", graph.execution_domain));
+            lines.push(format!("  time_mode={}", graph.time_mode));
             if let Some(runtime) = &graph.target_runtime {
                 lines.push(format!("  target_runtime={runtime}"));
             }
@@ -72,6 +76,10 @@ impl KernelLoweringContract {
                 stage.lowering.as_str(),
                 stage.reason
             ));
+            lines.push(format!("  function={}", stage.function));
+            lines.push(format!("  node_kind={}", stage.node_kind));
+            lines.push(format!("  execution_domain={}", stage.execution_domain));
+            lines.push(format!("  time_mode={}", stage.time_mode));
             if let Some(runtime) = &stage.target_runtime {
                 lines.push(format!("  target_runtime={runtime}"));
             }
@@ -153,6 +161,22 @@ impl KernelLoweringContract {
             out.push_str("\n[[graph]]\n");
             out.push_str(&format!("id = \"{}\"\n", graph.id));
             out.push_str(&format!(
+                "function = \"{}\"\n",
+                escape_toml(&graph.function)
+            ));
+            out.push_str(&format!(
+                "node_kind = \"{}\"\n",
+                escape_toml(&graph.node_kind)
+            ));
+            out.push_str(&format!(
+                "execution_domain = \"{}\"\n",
+                escape_toml(&graph.execution_domain)
+            ));
+            out.push_str(&format!(
+                "time_mode = \"{}\"\n",
+                escape_toml(&graph.time_mode)
+            ));
+            out.push_str(&format!(
                 "resource = \"{}\"\n",
                 escape_toml(&graph.resource)
             ));
@@ -188,6 +212,22 @@ impl KernelLoweringContract {
         for stage in &self.stages {
             out.push_str("\n[[stage]]\n");
             out.push_str(&format!("id = \"{}\"\n", stage.node));
+            out.push_str(&format!(
+                "function = \"{}\"\n",
+                escape_toml(&stage.function)
+            ));
+            out.push_str(&format!(
+                "node_kind = \"{}\"\n",
+                escape_toml(&stage.node_kind)
+            ));
+            out.push_str(&format!(
+                "execution_domain = \"{}\"\n",
+                escape_toml(&stage.execution_domain)
+            ));
+            out.push_str(&format!(
+                "time_mode = \"{}\"\n",
+                escape_toml(&stage.time_mode)
+            ));
             out.push_str(&format!("op = \"{}\"\n", stage.op));
             out.push_str(&format!(
                 "resource = \"{}\"\n",
@@ -309,6 +349,42 @@ impl ShaderLoweringContract {
             }
             if let Some(source) = &stage.wgsl_source {
                 lines.push(format!("  wgsl_source_lines={}", source.lines().count()));
+            }
+            for shader_ir in &stage.shader_ir_stages {
+                lines.push(format!("  shader_ir_stage={}", shader_ir.stage));
+                lines.push(format!("  shader_ir_function={}", shader_ir.function));
+                lines.push(format!("  shader_ir_node_kind={}", shader_ir.node_kind));
+                lines.push(format!(
+                    "  shader_ir_execution_domain={}",
+                    shader_ir.execution_domain
+                ));
+                lines.push(format!("  shader_ir_time_mode={}", shader_ir.time_mode));
+                lines.push(format!(
+                    "  shader_ir_contract_family={}",
+                    shader_ir.contract_family
+                ));
+                lines.push(format!("  shader_ir_time_domain={}", shader_ir.time_domain));
+                lines.push(format!("  shader_ir_glm_scope={}", shader_ir.glm_scope));
+                lines.push(format!(
+                    "  shader_ir_instruction_count={}",
+                    shader_ir.instructions.len()
+                ));
+                for inst in &shader_ir.instructions {
+                    lines.push(format!(
+                        "  shader_ir_inst result={} op={} ty={}",
+                        inst.result,
+                        inst.op,
+                        inst.ty.as_deref().unwrap_or("infer")
+                    ));
+                    lines.push(format!("    expr={}", inst.expr));
+                    for arg in &inst.args {
+                        lines.push(format!("    arg={arg}"));
+                    }
+                }
+                lines.push(format!(
+                    "  shader_ir_term op={} expr={}",
+                    shader_ir.terminator.op, shader_ir.terminator.expr
+                ));
             }
             for binding in &stage.bindings {
                 lines.push(format!(
@@ -436,6 +512,38 @@ impl ShaderLoweringContract {
             if let Some(source) = &stage.wgsl_source {
                 out.push_str(&format!("wgsl_source = \"{}\"\n", escape_toml(source)));
             }
+            for shader_ir in &stage.shader_ir_stages {
+                out.push_str(&format!(
+                    "shader_ir_stage = \"{}\"\nshader_ir_function = \"{}\"\nshader_ir_node_kind = \"{}\"\nshader_ir_execution_domain = \"{}\"\nshader_ir_time_mode = \"{}\"\nshader_ir_contract_family = \"{}\"\nshader_ir_time_domain = \"{}\"\nshader_ir_glm_scope = \"{}\"\nshader_ir_instruction_count = {}\n",
+                    escape_toml(&shader_ir.stage),
+                    escape_toml(&shader_ir.function),
+                    escape_toml(&shader_ir.node_kind),
+                    escape_toml(&shader_ir.execution_domain),
+                    escape_toml(&shader_ir.time_mode),
+                    escape_toml(&shader_ir.contract_family),
+                    escape_toml(&shader_ir.time_domain),
+                    escape_toml(&shader_ir.glm_scope),
+                    shader_ir.instructions.len()
+                ));
+                out.push_str(&format!(
+                    "shader_ir_terminator_op = \"{}\"\nshader_ir_terminator_expr = \"{}\"\n",
+                    escape_toml(&shader_ir.terminator.op),
+                    escape_toml(&shader_ir.terminator.expr)
+                ));
+                for inst in &shader_ir.instructions {
+                    out.push_str("\n[[stage.shader_ir_instruction]]\n");
+                    out.push_str(&format!("result = \"{}\"\n", escape_toml(&inst.result)));
+                    out.push_str(&format!("op = \"{}\"\n", escape_toml(&inst.op)));
+                    if let Some(ty) = &inst.ty {
+                        out.push_str(&format!("ty = \"{}\"\n", escape_toml(ty)));
+                    }
+                    out.push_str(&format!("expr = \"{}\"\n", escape_toml(&inst.expr)));
+                    for arg in &inst.args {
+                        out.push_str("\n[[stage.shader_ir_instruction.arg]]\n");
+                        out.push_str(&format!("value = \"{}\"\n", escape_toml(arg)));
+                    }
+                }
+            }
             if let Some(blend_mode) = &stage.blend_mode {
                 out.push_str(&format!(
                     "blend_enabled = {}\nblend_mode = \"{}\"\n",
@@ -529,7 +637,41 @@ pub struct ShaderStageContract {
     pub depth_write_enabled: Option<bool>,
     pub cull_mode: Option<String>,
     pub front_face: Option<String>,
+    pub shader_ir_stages: Vec<ShaderIrStageContract>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarContractStage {
+    pub stage: String,
+    pub function: String,
+    pub node_kind: String,
+    pub execution_domain: String,
+    pub time_mode: String,
+    pub contract_family: String,
+    pub time_domain: String,
+    pub glm_scope: String,
+    pub instructions: Vec<NustarContractInstruction>,
+    pub terminator: NustarContractTerminator,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarContractInstruction {
+    pub result: String,
+    pub ty: Option<String>,
+    pub op: String,
+    pub args: Vec<String>,
+    pub expr: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarContractTerminator {
+    pub op: String,
+    pub expr: String,
+}
+
+pub type ShaderIrStageContract = NustarContractStage;
+pub type ShaderIrInstruction = NustarContractInstruction;
+pub type ShaderIrTerminator = NustarContractTerminator;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FabricHandleTableContract {
@@ -575,6 +717,10 @@ pub struct ShaderBackendVariant {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KernelStageContract {
     pub node: String,
+    pub function: String,
+    pub node_kind: String,
+    pub execution_domain: String,
+    pub time_mode: String,
     pub op: String,
     pub resource: String,
     pub lowering: KernelLoweringMode,
@@ -610,6 +756,10 @@ struct ShaderInlineWgslModule {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KernelComputeGraphContract {
     pub id: String,
+    pub function: String,
+    pub node_kind: String,
+    pub execution_domain: String,
+    pub time_mode: String,
     pub resource: String,
     pub lowering: KernelLoweringMode,
     pub reason: String,
@@ -914,6 +1064,7 @@ pub fn analyze_shader_lowering(module: &YirModule) -> ShaderLoweringContract {
                 depth_write_enabled: None,
                 cull_mode: None,
                 front_face: None,
+                shader_ir_stages: Vec::new(),
             }),
             "dispatch" => stages.push(ShaderStageContract {
                 node: node.name.clone(),
@@ -935,6 +1086,7 @@ pub fn analyze_shader_lowering(module: &YirModule) -> ShaderLoweringContract {
                 depth_write_enabled: None,
                 cull_mode: None,
                 front_face: None,
+                shader_ir_stages: Vec::new(),
             }),
             _ => {}
         }
@@ -1021,6 +1173,7 @@ fn analyze_draw_instanced(
             depth_write_enabled: None,
             cull_mode: None,
             front_face: None,
+            shader_ir_stages: Vec::new(),
         };
     };
 
@@ -1045,6 +1198,7 @@ fn analyze_draw_instanced(
             depth_write_enabled: None,
             cull_mode: None,
             front_face: None,
+            shader_ir_stages: Vec::new(),
         };
     };
 
@@ -1069,6 +1223,7 @@ fn analyze_draw_instanced(
             depth_write_enabled: None,
             cull_mode: None,
             front_face: None,
+            shader_ir_stages: Vec::new(),
         };
     }
 
@@ -1130,6 +1285,10 @@ fn analyze_draw_instanced(
                 .any(|entry| entry.resource == node.resource)
         })
         .map(|table| table.node.clone());
+    let shader_ir_stages = wgsl_source
+        .as_deref()
+        .map(build_shader_ir_stage_contracts)
+        .unwrap_or_default();
 
     ShaderStageContract {
         node: node.name.clone(),
@@ -1151,7 +1310,151 @@ fn analyze_draw_instanced(
         depth_write_enabled,
         cull_mode,
         front_face,
+        shader_ir_stages,
     }
+}
+
+fn build_shader_ir_stage_contracts(wgsl_source: &str) -> Vec<NustarContractStage> {
+    let mut stages = Vec::new();
+    if let Some(vertex_src) = extract_shader_stage_source(wgsl_source, "@vertex", "@fragment") {
+        if let Some(stage) = build_shader_ir_stage_contract("vertex", &vertex_src) {
+            stages.push(stage);
+        }
+    }
+    if let Some(fragment_src) = extract_shader_stage_source(wgsl_source, "@fragment", "") {
+        if let Some(stage) = build_shader_ir_stage_contract("fragment", &fragment_src) {
+            stages.push(stage);
+        }
+    }
+    stages
+}
+
+fn build_shader_ir_stage_contract(
+    stage_name: &str,
+    stage_src: &str,
+) -> Option<NustarContractStage> {
+    let mut instructions = Vec::new();
+    for raw_line in stage_src.lines() {
+        let line = raw_line.trim();
+        if line.starts_with("let ") {
+            let Some(eq_pos) = line.find('=') else {
+                continue;
+            };
+            let lhs = line["let ".len()..eq_pos].trim();
+            let rhs = line[eq_pos + 1..].trim().trim_end_matches(';').trim();
+            if rhs.is_empty() {
+                continue;
+            }
+            let (result, ty) = if let Some(colon_pos) = lhs.find(':') {
+                (
+                    lhs[..colon_pos].trim().to_owned(),
+                    Some(lhs[colon_pos + 1..].trim().to_owned()),
+                )
+            } else {
+                (lhs.to_owned(), None)
+            };
+            if result.is_empty() {
+                continue;
+            }
+            instructions.push(NustarContractInstruction {
+                result,
+                ty,
+                op: classify_shader_ir_op(rhs),
+                args: collect_shader_ir_args(rhs),
+                expr: rhs.to_owned(),
+            });
+        } else if line.contains('=') && line.ends_with(';') && !line.starts_with("return ") {
+            let eq_pos = line.find('=').expect("checked contains =");
+            let lhs = line[..eq_pos].trim();
+            let rhs = line[eq_pos + 1..].trim().trim_end_matches(';').trim();
+            if lhs.is_empty() || rhs.is_empty() {
+                continue;
+            }
+            instructions.push(NustarContractInstruction {
+                result: lhs.to_owned(),
+                ty: None,
+                op: "assign".to_owned(),
+                args: collect_shader_ir_args(rhs),
+                expr: rhs.to_owned(),
+            });
+        }
+    }
+
+    let return_expr = extract_fragment_return_expr_from_source(stage_src)?;
+    Some(NustarContractStage {
+        stage: stage_name.to_owned(),
+        function: format!("shader.{stage_name}"),
+        node_kind: "function-node".to_owned(),
+        execution_domain: "shader".to_owned(),
+        time_mode: "logical".to_owned(),
+        contract_family: "nustar.shader".to_owned(),
+        time_domain: format!("shader.stage.{stage_name}"),
+        glm_scope: format!("shader::{stage_name}"),
+        instructions,
+        terminator: NustarContractTerminator {
+            op: "return".to_owned(),
+            expr: return_expr,
+        },
+    })
+}
+
+fn extract_shader_stage_source(
+    wgsl_source: &str,
+    stage_marker: &str,
+    next_marker: &str,
+) -> Option<String> {
+    let start = wgsl_source.find(stage_marker)?;
+    let tail = &wgsl_source[start..];
+    if next_marker.is_empty() {
+        return Some(tail.to_owned());
+    }
+    let end = tail.find(next_marker)?;
+    Some(tail[..end].to_owned())
+}
+
+fn classify_shader_ir_op(expr: &str) -> String {
+    if expr.contains("textureSample(") {
+        "sample_texture".to_owned()
+    } else if expr.contains("smoothstep(") {
+        "smoothstep".to_owned()
+    } else if expr.contains("normalize(") {
+        "normalize".to_owned()
+    } else if expr.contains("dot(") {
+        "dot".to_owned()
+    } else if expr.contains("clamp(") {
+        "clamp".to_owned()
+    } else if expr.contains("fract(") {
+        "fract".to_owned()
+    } else if expr.contains("mix(") {
+        "mix".to_owned()
+    } else if expr.contains("vec4") || expr.contains("vec3") || expr.contains("vec2") {
+        "construct".to_owned()
+    } else {
+        "expr".to_owned()
+    }
+}
+
+fn collect_shader_ir_args(expr: &str) -> Vec<String> {
+    if let Some(open) = expr.find('(') {
+        if let Some(close) = expr.rfind(')') {
+            if close > open {
+                return expr[open + 1..close]
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|arg| !arg.is_empty())
+                    .map(ToOwned::to_owned)
+                    .collect();
+            }
+        }
+    }
+    Vec::new()
+}
+
+fn extract_fragment_return_expr_from_source(fragment_src: &str) -> Option<String> {
+    let return_pos = fragment_src.find("return")?;
+    let after_return = &fragment_src[return_pos + "return".len()..];
+    let semicolon_pos = after_return.find(';')?;
+    Some(after_return[..semicolon_pos].trim().to_owned())
 }
 
 fn extract_bindings(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Vec<ShaderResourceBinding> {
@@ -1360,6 +1663,10 @@ fn analyze_kernel_stage(
 
     Some(KernelStageContract {
         node: node.name.clone(),
+        function: format!("kernel.{}", node.name),
+        node_kind: "function-node".to_owned(),
+        execution_domain: "kernel".to_owned(),
+        time_mode: "logical".to_owned(),
         op: node.op.full_name(),
         resource: node.resource.clone(),
         lowering,
@@ -1607,6 +1914,10 @@ fn build_kernel_graphs(stages: &[KernelStageContract]) -> Vec<KernelComputeGraph
 
             KernelComputeGraphContract {
                 id: format!("kernel_graph_{}_{}", index + 1, graph_name),
+                function: format!("kernel.graph.{}", graph_name),
+                node_kind: "function-graph".to_owned(),
+                execution_domain: "kernel".to_owned(),
+                time_mode: "logical".to_owned(),
                 resource,
                 lowering,
                 reason,
@@ -1848,13 +2159,24 @@ kernel.print trace kernel0 projected
         assert!(!contract.requires_cpu_fallback());
         assert_eq!(contract.stages.len(), 3);
         assert_eq!(contract.graphs.len(), 1);
+        assert_eq!(contract.stages[0].node_kind, "function-node");
+        assert_eq!(contract.stages[0].execution_domain, "kernel");
+        assert_eq!(contract.stages[0].time_mode, "logical");
+        assert!(contract.stages[0].function.starts_with("kernel."));
         assert_eq!(
             contract.graphs[0].lowering,
             KernelLoweringMode::BackendEligible
         );
+        assert_eq!(contract.graphs[0].node_kind, "function-graph");
+        assert_eq!(contract.graphs[0].execution_domain, "kernel");
+        assert_eq!(contract.graphs[0].time_mode, "logical");
+        assert!(contract.graphs[0].function.starts_with("kernel.graph."));
         assert!(contract
             .render_package_manifest()
             .contains("package_kind = \"kernel_package\""));
+        assert!(contract
+            .render_package_manifest()
+            .contains("execution_domain = \"kernel\""));
         assert!(contract
             .render_package_manifest()
             .contains("backend = \"coreml\""));
@@ -1890,10 +2212,82 @@ kernel.print trace kernel0 top_rows
             .iter()
             .find(|stage| stage.node == "top_rows")
             .expect("topk stage should be present");
+        assert_eq!(topk_stage.node_kind, "function-node");
+        assert_eq!(topk_stage.execution_domain, "kernel");
         assert_eq!(topk_stage.lowering, KernelLoweringMode::CpuFallbackOnly);
+        assert!(contract.render_text().contains("node_kind=function-graph"));
         assert!(contract.render_text().contains("cpu_fallback_only"));
         assert!(contract
             .render_package_manifest()
             .contains("backend = \"cpu-fallback\""));
+    }
+
+    #[test]
+    fn shader_contract_extracts_fragment_shader_ir() {
+        let module = parse_module(
+            r#"yir 0.1
+
+resource shader0 shader.render
+
+shader.target main_target shader0 rgba8_unorm 40 24
+shader.viewport main_view shader0 40 24
+shader.pipeline lit_pipe shader0 lit_sphere triangle_strip
+shader.inline_wgsl lit_pipe_wgsl shader0 lit_sphere "struct VsOut {\n  @builtin(position) pos: vec4<f32>,\n  @location(0) uv: vec2<f32>,\n};\n\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {\n  var out: VsOut;\n  out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);\n  out.uv = vec2<f32>(0.0, 0.0);\n  return out;\n}\n\n@fragment\nfn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {\n  let uv2: vec2<f32> = clamp(uv, vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 1.0));\n  let sampled: vec4<f32> = textureSample(albedo_texture, albedo_sampler, uv2);\n  let mixed: vec3<f32> = mix(sampled.xyz, vec3<f32>(uv2.xy, 1.0), 0.35);\n  return vec4<f32>(mixed.xyz, sampled.w);\n}"
+shader.texture2d checker shader0 r8_unorm 2 2 8,16,24,32
+shader.sampler clamp_sampler shader0 nearest clamp
+shader.uniform material_uniform shader0 0 lit_pipe
+shader.attachment color_attachment shader0 1 main_target
+shader.texture_binding albedo_texture shader0 2 checker
+shader.sampler_binding albedo_sampler shader0 3 clamp_sampler
+shader.bind_set material_bindings shader0 lit_pipe material_uniform color_attachment albedo_texture albedo_sampler
+shader.begin_pass main_pass shader0 main_target lit_pipe main_view
+shader.draw_instanced frame shader0 main_pass lit_pipe 4 1 material_bindings
+"#,
+        );
+
+        let contract = analyze_shader_lowering(&module);
+        let stage = contract
+            .stages
+            .iter()
+            .find(|stage| stage.node == "frame")
+            .expect("frame stage should be present");
+        let shader_ir = stage
+            .shader_ir_stages
+            .iter()
+            .find(|shader_ir| shader_ir.stage == "fragment")
+            .expect("fragment shader ir should exist");
+        assert_eq!(shader_ir.stage, "fragment");
+        assert_eq!(shader_ir.function, "shader.fragment");
+        assert_eq!(shader_ir.node_kind, "function-node");
+        assert_eq!(shader_ir.execution_domain, "shader");
+        assert_eq!(shader_ir.time_mode, "logical");
+        assert_eq!(shader_ir.contract_family, "nustar.shader");
+        assert_eq!(shader_ir.time_domain, "shader.stage.fragment");
+        assert_eq!(shader_ir.glm_scope, "shader::fragment");
+        assert_eq!(shader_ir.instructions.len(), 3);
+        assert_eq!(shader_ir.instructions[0].result, "uv2");
+        assert_eq!(shader_ir.instructions[0].op, "clamp");
+        assert_eq!(shader_ir.instructions[1].op, "sample_texture");
+        assert_eq!(shader_ir.terminator.op, "return");
+        assert!(stage
+            .shader_ir_stages
+            .iter()
+            .any(|shader_ir| shader_ir.stage == "vertex"));
+        assert!(contract.render_text().contains("shader_ir_stage=fragment"));
+        assert!(contract
+            .render_text()
+            .contains("shader_ir_function=shader.fragment"));
+        assert!(contract
+            .render_text()
+            .contains("shader_ir_contract_family=nustar.shader"));
+        assert!(contract
+            .render_package_manifest()
+            .contains("shader_ir_instruction_count = 3"));
+        assert!(contract
+            .render_package_manifest()
+            .contains("shader_ir_execution_domain = \"shader\""));
+        assert!(contract
+            .render_package_manifest()
+            .contains("shader_ir_time_domain = \"shader.stage.fragment\""));
     }
 }

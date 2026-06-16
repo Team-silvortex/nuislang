@@ -743,6 +743,8 @@ fn render_shader_glsl_scaffold(
     summary: &str,
 ) -> String {
     let uses_texture = shader_stage_uses_texture(stage);
+    let vertex_body = shader_vertex_body(stage, ShaderTargetFlavor::OpenGl)
+        .unwrap_or_else(default_glsl_vertex_body);
     let fragment_body = shader_fragment_body(stage, ShaderTargetFlavor::OpenGl, uses_texture);
     let wgsl_comment = render_wgsl_comment_block(
         stage.wgsl_entry.as_deref(),
@@ -766,21 +768,7 @@ fn render_shader_glsl_scaffold(
 layout(location = 0) out vec2 v_uv;
 
 void main() {{
-    vec2 corners[4] = vec2[](
-        vec2(-1.0, -1.0),
-        vec2( 1.0, -1.0),
-        vec2(-1.0,  1.0),
-        vec2( 1.0,  1.0)
-    );
-    vec2 uvs[4] = vec2[](
-        vec2(0.0, 0.0),
-        vec2(1.0, 0.0),
-        vec2(0.0, 1.0),
-        vec2(1.0, 1.0)
-    );
-    int idx = min(gl_VertexID, 3);
-    gl_Position = vec4(corners[idx], 0.0, 1.0);
-    v_uv = uvs[idx];
+{vertex_body}
 }}
 #endif
 
@@ -804,6 +792,7 @@ void main() {{
         } else {
             ""
         },
+        vertex_body = vertex_body,
         fragment_body = fragment_body,
         summary_comment = summary
             .lines()
@@ -819,6 +808,8 @@ fn render_shader_metal_scaffold(
     summary: &str,
 ) -> String {
     let uses_texture = shader_stage_uses_texture(stage);
+    let vertex_body = shader_vertex_body(stage, ShaderTargetFlavor::Metal)
+        .unwrap_or_else(default_metal_vertex_body);
     let fragment_signature = if uses_texture {
         "fragment float4 frame_fs(VsOut in [[stage_in]], texture2d<float> tex [[texture(0)]], sampler samp [[sampler(0)]])"
     } else {
@@ -851,22 +842,8 @@ struct VsOut {{
 }};
 
 vertex VsOut {entry}_vs(uint vid [[vertex_id]]) {{
-    float2 corners[4] = {{
-        float2(-1.0, -1.0),
-        float2( 1.0, -1.0),
-        float2(-1.0,  1.0),
-        float2( 1.0,  1.0),
-    }};
     VsOut out;
-    float2 xy = corners[min(vid, 3u)];
-    out.position = float4(xy, 0.0, 1.0);
-    float2 uvs[4] = {{
-        float2(0.0, 0.0),
-        float2(1.0, 0.0),
-        float2(0.0, 1.0),
-        float2(1.0, 1.0),
-    }};
-    out.uv = uvs[min(vid, 3u)];
+{vertex_body}
     return out;
 }}
 
@@ -881,6 +858,7 @@ vertex VsOut {entry}_vs(uint vid [[vertex_id]]) {{
         wgsl_comment = wgsl_comment,
         fragment_signature =
             fragment_signature.replace("frame_fs", &format!("{}_fs", variant.entry)),
+        vertex_body = vertex_body,
         fragment_body = fragment_body,
         summary_comment = summary
             .lines()
@@ -896,6 +874,8 @@ fn render_shader_hlsl_scaffold(
     summary: &str,
 ) -> String {
     let uses_texture = shader_stage_uses_texture(stage);
+    let vertex_body = shader_vertex_body(stage, ShaderTargetFlavor::Hlsl)
+        .unwrap_or_else(default_hlsl_vertex_body);
     let fragment_prelude = if uses_texture {
         "Texture2D shaderTexture : register(t0);\nSamplerState shaderSampler : register(s0);\n"
     } else {
@@ -925,22 +905,8 @@ struct VsOut {{
 }};
 
 VsOut {entry}_vs(uint vid : SV_VertexID) {{
-    float2 corners[4] = {{
-        float2(-1.0, -1.0),
-        float2( 1.0, -1.0),
-        float2(-1.0,  1.0),
-        float2( 1.0,  1.0),
-    }};
     VsOut outp;
-    float2 xy = corners[min(vid, 3u)];
-    outp.position = float4(xy, 0.0, 1.0);
-    float2 uvs[4] = {{
-        float2(0.0, 0.0),
-        float2(1.0, 0.0),
-        float2(0.0, 1.0),
-        float2(1.0, 1.0),
-    }};
-    outp.uv = uvs[min(vid, 3u)];
+{vertex_body}
     return outp;
 }}
 
@@ -955,6 +921,7 @@ float4 {entry}_ps(VsOut input) : SV_Target0 {{
         status = variant.status,
         wgsl_comment = wgsl_comment,
         fragment_prelude = fragment_prelude,
+        vertex_body = vertex_body,
         fragment_body = fragment_body,
         summary_comment = summary
             .lines()
@@ -970,6 +937,8 @@ fn render_shader_vulkan_glsl_scaffold(
     summary: &str,
 ) -> String {
     let uses_texture = shader_stage_uses_texture(stage);
+    let vertex_body = shader_vertex_body(stage, ShaderTargetFlavor::VulkanGlsl)
+        .unwrap_or_else(default_vulkan_vertex_body);
     let fragment_body = shader_fragment_body(stage, ShaderTargetFlavor::VulkanGlsl, uses_texture);
     let wgsl_comment = render_wgsl_comment_block(
         stage.wgsl_entry.as_deref(),
@@ -993,21 +962,7 @@ fn render_shader_vulkan_glsl_scaffold(
 layout(location = 0) out vec2 v_uv;
 
 void main() {{
-    vec2 corners[4] = vec2[](
-        vec2(-1.0, -1.0),
-        vec2( 1.0, -1.0),
-        vec2(-1.0,  1.0),
-        vec2( 1.0,  1.0)
-    );
-    vec2 uvs[4] = vec2[](
-        vec2(0.0, 0.0),
-        vec2(1.0, 0.0),
-        vec2(0.0, 1.0),
-        vec2(1.0, 1.0)
-    );
-    int idx = min(gl_VertexIndex, 3);
-    gl_Position = vec4(corners[idx], 0.0, 1.0);
-    v_uv = uvs[idx];
+{vertex_body}
 }}
 #endif
 
@@ -1031,6 +986,7 @@ void main() {{
         } else {
             ""
         },
+        vertex_body = vertex_body,
         fragment_body = fragment_body,
         summary_comment = summary
             .lines()
@@ -1060,11 +1016,105 @@ enum ShaderTargetFlavor {
     Hlsl,
 }
 
+fn shader_vertex_body(
+    stage: &yir_lower_contract::ShaderStageContract,
+    flavor: ShaderTargetFlavor,
+) -> Option<String> {
+    let shader_ir = stage
+        .shader_ir_stages
+        .iter()
+        .find(|shader_ir| shader_ir.stage == "vertex")?;
+    let mut lines = Vec::new();
+    for inst in &shader_ir.instructions {
+        let expr = compile_backend_vertex_expr(&inst.expr, flavor)?;
+        match inst.result.as_str() {
+            "out.pos" => lines.push(vertex_output_assign("position", &expr, flavor)),
+            "out.uv" => lines.push(vertex_output_assign("uv", &expr, flavor)),
+            other => {
+                let ty = inst
+                    .ty
+                    .as_deref()
+                    .map(|ty| map_wgsl_type_to_backend(ty, flavor))
+                    .unwrap_or_else(|| infer_backend_type(&inst.expr, flavor));
+                lines.push(format!("    {ty} {other} = {expr};"));
+            }
+        }
+    }
+    Some(lines.join("\n"))
+}
+
+fn compile_backend_vertex_expr(expr: &str, flavor: ShaderTargetFlavor) -> Option<String> {
+    let mapped = apply_backend_builtin_mapping(expr, flavor)
+        .replace("f32(", "float(")
+        .replace("1u", "1")
+        .replace("2u", "2");
+    let mapped = replace_identifier_token(
+        &mapped,
+        "vid",
+        match flavor {
+            ShaderTargetFlavor::OpenGl => "gl_VertexID",
+            ShaderTargetFlavor::VulkanGlsl => "gl_VertexIndex",
+            ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "vid",
+        },
+    );
+    Some(normalize_backend_expr(&mapped))
+}
+
+fn vertex_output_assign(field: &str, expr: &str, flavor: ShaderTargetFlavor) -> String {
+    match (field, flavor) {
+        ("position", ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl) => {
+            format!("    gl_Position = {expr};")
+        }
+        ("uv", ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl) => {
+            format!("    v_uv = {expr};")
+        }
+        ("position", ShaderTargetFlavor::Metal) => format!("    out.position = {expr};"),
+        ("uv", ShaderTargetFlavor::Metal) => format!("    out.uv = {expr};"),
+        ("position", ShaderTargetFlavor::Hlsl) => format!("    outp.position = {expr};"),
+        ("uv", ShaderTargetFlavor::Hlsl) => format!("    outp.uv = {expr};"),
+        _ => format!("    {field} = {expr};"),
+    }
+}
+
+fn default_glsl_vertex_body() -> String {
+    "    vec2 corners[4] = vec2[](\n        vec2(-1.0, -1.0),\n        vec2( 1.0, -1.0),\n        vec2(-1.0,  1.0),\n        vec2( 1.0,  1.0)\n    );\n    vec2 uvs[4] = vec2[](\n        vec2(0.0, 0.0),\n        vec2(1.0, 0.0),\n        vec2(0.0, 1.0),\n        vec2(1.0, 1.0)\n    );\n    int idx = min(gl_VertexID, 3);\n    gl_Position = vec4(corners[idx], 0.0, 1.0);\n    v_uv = uvs[idx];".to_owned()
+}
+
+fn default_vulkan_vertex_body() -> String {
+    "    vec2 corners[4] = vec2[](\n        vec2(-1.0, -1.0),\n        vec2( 1.0, -1.0),\n        vec2(-1.0,  1.0),\n        vec2( 1.0,  1.0)\n    );\n    vec2 uvs[4] = vec2[](\n        vec2(0.0, 0.0),\n        vec2(1.0, 0.0),\n        vec2(0.0, 1.0),\n        vec2(1.0, 1.0)\n    );\n    int idx = min(gl_VertexIndex, 3);\n    gl_Position = vec4(corners[idx], 0.0, 1.0);\n    v_uv = uvs[idx];".to_owned()
+}
+
+fn default_metal_vertex_body() -> String {
+    "    float2 corners[4] = {\n        float2(-1.0, -1.0),\n        float2( 1.0, -1.0),\n        float2(-1.0,  1.0),\n        float2( 1.0,  1.0),\n    };\n    float2 xy = corners[min(vid, 3u)];\n    out.position = float4(xy, 0.0, 1.0);\n    float2 uvs[4] = {\n        float2(0.0, 0.0),\n        float2(1.0, 0.0),\n        float2(0.0, 1.0),\n        float2(1.0, 1.0),\n    };\n    out.uv = uvs[min(vid, 3u)];".to_owned()
+}
+
+fn default_hlsl_vertex_body() -> String {
+    "    float2 corners[4] = {\n        float2(-1.0, -1.0),\n        float2( 1.0, -1.0),\n        float2(-1.0,  1.0),\n        float2( 1.0,  1.0),\n    };\n    float2 xy = corners[min(vid, 3u)];\n    outp.position = float4(xy, 0.0, 1.0);\n    float2 uvs[4] = {\n        float2(0.0, 0.0),\n        float2(1.0, 0.0),\n        float2(0.0, 1.0),\n        float2(1.0, 1.0),\n    };\n    outp.uv = uvs[min(vid, 3u)];".to_owned()
+}
+
 fn shader_fragment_body(
     stage: &yir_lower_contract::ShaderStageContract,
     flavor: ShaderTargetFlavor,
     uses_texture: bool,
 ) -> String {
+    if let Some(shader_ir) = stage
+        .shader_ir_stages
+        .iter()
+        .find(|shader_ir| shader_ir.stage == "fragment")
+    {
+        if let Some(mapped) = render_shader_ir_fragment(shader_ir, flavor, uses_texture) {
+            return mapped;
+        }
+    }
+
+    if let Some(wgsl) = stage.wgsl_source.as_deref() {
+        if let Some(model) = extract_wgsl_fragment_model(wgsl) {
+            if let Some(mapped) = render_wgsl_fragment_model(&model, flavor, uses_texture) {
+                return mapped;
+            }
+        }
+    }
+
     if let Some(mapped) = try_map_simple_wgsl_vec4_return(stage, flavor) {
         return mapped;
     }
@@ -1093,6 +1143,17 @@ fn shader_fragment_body(
         }
         (ShaderTargetFlavor::Hlsl, false) => "    return float4(0.82, 0.88, 0.97, 1.0);".to_owned(),
     }
+}
+
+struct WgslFragmentBinding {
+    name: String,
+    ty: Option<String>,
+    expr: String,
+}
+
+struct WgslFragmentModel {
+    bindings: Vec<WgslFragmentBinding>,
+    return_expr: String,
 }
 
 fn try_map_simple_wgsl_vec4_return(
@@ -1151,6 +1212,47 @@ fn extract_wgsl_fragment_return_expr(wgsl: &str) -> Option<String> {
     let after_return = &fragment_src[return_pos + "return".len()..];
     let semicolon_pos = after_return.find(';')?;
     Some(after_return[..semicolon_pos].trim().to_owned())
+}
+
+fn extract_wgsl_fragment_model(wgsl: &str) -> Option<WgslFragmentModel> {
+    let fragment_pos = wgsl.find("@fragment")?;
+    let fragment_src = &wgsl[fragment_pos..];
+    let return_expr = extract_wgsl_fragment_return_expr(wgsl)?;
+    let mut bindings = Vec::new();
+    for raw_line in fragment_src.lines() {
+        let line = raw_line.trim();
+        if !line.starts_with("let ") {
+            continue;
+        }
+        let Some(eq_pos) = line.find('=') else {
+            continue;
+        };
+        let lhs = line["let ".len()..eq_pos].trim();
+        let rhs = line[eq_pos + 1..].trim().trim_end_matches(';').trim();
+        if rhs.is_empty() {
+            continue;
+        }
+        let (name, ty) = if let Some(colon_pos) = lhs.find(':') {
+            (
+                lhs[..colon_pos].trim().to_owned(),
+                Some(lhs[colon_pos + 1..].trim().to_owned()),
+            )
+        } else {
+            (lhs.to_owned(), None)
+        };
+        if name.is_empty() {
+            continue;
+        }
+        bindings.push(WgslFragmentBinding {
+            name,
+            ty,
+            expr: rhs.to_owned(),
+        });
+    }
+    Some(WgslFragmentModel {
+        bindings,
+        return_expr,
+    })
 }
 
 fn extract_wgsl_fragment_lowerable_expr(wgsl: &str) -> Option<String> {
@@ -1231,6 +1333,124 @@ fn is_identifier_char(ch: char) -> bool {
     ch == '_' || ch.is_ascii_alphanumeric()
 }
 
+fn render_wgsl_fragment_model(
+    model: &WgslFragmentModel,
+    flavor: ShaderTargetFlavor,
+    uses_texture: bool,
+) -> Option<String> {
+    let mut lines = Vec::new();
+    for binding in &model.bindings {
+        let ty = binding
+            .ty
+            .as_deref()
+            .map(|ty| map_wgsl_type_to_backend(ty, flavor))
+            .unwrap_or_else(|| infer_backend_type(&binding.expr, flavor));
+        let expr = compile_backend_expr(&binding.expr, flavor, uses_texture)?;
+        lines.push(format!("    {ty} {} = {expr};", binding.name));
+    }
+    let return_expr = compile_backend_expr(&model.return_expr, flavor, uses_texture)?;
+    match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => {
+            lines.push(format!("    outColor = {return_expr};"));
+        }
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => {
+            lines.push(format!("    return {return_expr};"));
+        }
+    }
+    Some(lines.join("\n"))
+}
+
+fn render_shader_ir_fragment(
+    shader_ir: &yir_lower_contract::NustarContractStage,
+    flavor: ShaderTargetFlavor,
+    uses_texture: bool,
+) -> Option<String> {
+    if shader_ir.stage != "fragment" {
+        return None;
+    }
+
+    let mut lines = Vec::new();
+    for inst in &shader_ir.instructions {
+        let ty = inst
+            .ty
+            .as_deref()
+            .map(|ty| map_wgsl_type_to_backend(ty, flavor))
+            .unwrap_or_else(|| infer_backend_type(&inst.expr, flavor));
+        let expr = compile_backend_expr(&inst.expr, flavor, uses_texture)?;
+        lines.push(format!("    {ty} {} = {expr};", inst.result));
+    }
+
+    let return_expr = compile_backend_expr(&shader_ir.terminator.expr, flavor, uses_texture)?;
+    match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => {
+            lines.push(format!("    outColor = {return_expr};"));
+        }
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => {
+            lines.push(format!("    return {return_expr};"));
+        }
+    }
+
+    Some(lines.join("\n"))
+}
+
+fn compile_backend_expr(
+    expr: &str,
+    flavor: ShaderTargetFlavor,
+    uses_texture: bool,
+) -> Option<String> {
+    let normalized_expr =
+        map_wgsl_expr_identifiers(&apply_backend_builtin_mapping(expr, flavor), flavor);
+    let mapped_expr = map_wgsl_texture_sample_expr(&normalized_expr, flavor, uses_texture)?;
+    Some(normalize_backend_expr(&mapped_expr))
+}
+
+fn map_wgsl_type_to_backend(ty: &str, flavor: ShaderTargetFlavor) -> String {
+    ty.replace(
+        "vec4<f32>",
+        match flavor {
+            ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec4",
+            ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float4",
+        },
+    )
+    .replace(
+        "vec3<f32>",
+        match flavor {
+            ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec3",
+            ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float3",
+        },
+    )
+    .replace(
+        "vec2<f32>",
+        match flavor {
+            ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec2",
+            ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float2",
+        },
+    )
+    .replace("f32", "float")
+    .replace("u32", "uint")
+}
+
+fn infer_backend_type(expr: &str, flavor: ShaderTargetFlavor) -> String {
+    if expr.contains("vec4") || expr.contains("textureSample(") {
+        match flavor {
+            ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec4".to_owned(),
+            ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float4".to_owned(),
+        }
+    } else if expr.contains("vec3") || expr.contains(".xyz") {
+        match flavor {
+            ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec3".to_owned(),
+            ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float3".to_owned(),
+        }
+    } else if expr.contains("vec2") || expr.contains(".xy") {
+        match flavor {
+            ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec2".to_owned(),
+            ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float2".to_owned(),
+        }
+    } else {
+        "float".to_owned()
+    }
+}
+
 fn map_wgsl_expr_to_backend(
     expr: &str,
     flavor: ShaderTargetFlavor,
@@ -1247,6 +1467,8 @@ fn map_wgsl_expr_to_backend(
         .map(|line| normalize_backend_expr(&line))
         .collect::<Vec<_>>();
     let final_expr = normalize_backend_expr(&final_expr);
+    let (prelude_lines, final_expr) =
+        hoist_normalized_math_subexpressions(prelude_lines, final_expr, flavor);
 
     Some(match flavor {
         ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => {
@@ -1503,6 +1725,93 @@ fn canonical_wave_expr(flavor: ShaderTargetFlavor) -> Option<String> {
         ShaderTargetFlavor::Metal => format!("fract({uv_temp} * 3.0)"),
         ShaderTargetFlavor::Hlsl => format!("frac({uv_temp} * 3.0)"),
     })
+}
+
+fn hoist_normalized_math_subexpressions(
+    prelude: Vec<String>,
+    expr: String,
+    flavor: ShaderTargetFlavor,
+) -> (Vec<String>, String) {
+    let vec2_ty = match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec2",
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float2",
+    };
+    let vec3_ty = match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec3",
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float3",
+    };
+    let scalar_ty = match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "float",
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float",
+    };
+
+    let mut prelude = prelude;
+    let mut rewritten = expr;
+    let wave_expr = match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => {
+            "fract(nuis_uv_0 * 3.0)".to_owned()
+        }
+        ShaderTargetFlavor::Metal => "fract(nuis_uv_0 * 3.0)".to_owned(),
+        ShaderTargetFlavor::Hlsl => "frac(nuis_uv_0 * 3.0)".to_owned(),
+    };
+    let wave_xy_expr = format!("({wave_expr}).xy");
+    let joined = prelude.join("\n") + "\n" + &rewritten;
+    if joined.matches(&wave_xy_expr).count() >= 2 {
+        let temp = "nuis_wave_0";
+        prelude = prelude
+            .into_iter()
+            .map(|line| line.replace(&wave_xy_expr, &format!("{temp}.xy")))
+            .collect::<Vec<_>>();
+        rewritten = rewritten.replace(&wave_xy_expr, &format!("{temp}.xy"));
+        prelude.push(format!("    {vec2_ty} {temp} = {wave_expr};"));
+    }
+
+    let light_expr = canonical_light_expr(flavor);
+    let joined = prelude.join("\n") + "\n" + &rewritten;
+    if joined.matches(&light_expr).count() >= 1 {
+        let temp = "nuis_light_0";
+        prelude = prelude
+            .into_iter()
+            .map(|line| line.replace(&light_expr, temp))
+            .collect::<Vec<_>>();
+        rewritten = rewritten.replace(&light_expr, temp);
+        prelude.push(format!("    {scalar_ty} {temp} = {light_expr};"));
+    }
+
+    let tint_expr = canonical_tint_expr(flavor);
+    let tint_xyz_expr = format!("({tint_expr}).xyz");
+    let joined = prelude.join("\n") + "\n" + &rewritten;
+    if joined.matches(&tint_xyz_expr).count() >= 1 {
+        let temp = "nuis_tint_0";
+        prelude = prelude
+            .into_iter()
+            .map(|line| line.replace(&tint_xyz_expr, &format!("{temp}.xyz")))
+            .collect::<Vec<_>>();
+        rewritten = rewritten.replace(&tint_xyz_expr, &format!("{temp}.xyz"));
+        prelude.push(format!("    {vec3_ty} {temp} = {tint_expr};"));
+    }
+
+    (prelude, rewritten)
+}
+
+fn canonical_light_expr(flavor: ShaderTargetFlavor) -> String {
+    let vec3_ty = match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec3",
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float3",
+    };
+    format!(
+        "smoothstep(0.15, 0.95, dot((normalize({vec3_ty}(nuis_wave_0.xy, 0.5))), (normalize({vec3_ty}(0.4, 0.6, 0.7)))))"
+    )
+}
+
+fn canonical_tint_expr(flavor: ShaderTargetFlavor) -> String {
+    let vec3_ty = match flavor {
+        ShaderTargetFlavor::OpenGl | ShaderTargetFlavor::VulkanGlsl => "vec3",
+        ShaderTargetFlavor::Metal | ShaderTargetFlavor::Hlsl => "float3",
+    };
+    format!(
+        "clamp(nuis_sample_0.xyz * nuis_light_0 + {vec3_ty}(nuis_wave_0.xy, 1.0 - nuis_uv_0.x) * 0.25, {vec3_ty}(0.0, 0.0, 0.0), {vec3_ty}(1.0, 1.0, 1.0))"
+    )
 }
 
 fn normalize_backend_expr(expr: &str) -> String {
