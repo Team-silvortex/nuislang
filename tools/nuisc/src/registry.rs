@@ -154,6 +154,7 @@ pub struct NustarBinding {
     pub support_surface: Vec<String>,
     pub support_profile_slots: Vec<String>,
     pub default_lanes: Vec<String>,
+    pub execution: NustarExecutionSummary,
     pub matched_support_surface: Vec<String>,
     pub matched_support_profile_slots: Vec<String>,
     pub covered_support_profile_slots: Vec<String>,
@@ -307,6 +308,7 @@ pub enum ProjectDomainRegistryIssueKind {
     DomainNotRegistered,
     ContractSchemaMismatch,
     AbiNotRegistered,
+    ExecutionContractMismatch,
 }
 
 impl ProjectDomainRegistryIssueKind {
@@ -315,6 +317,7 @@ impl ProjectDomainRegistryIssueKind {
             Self::DomainNotRegistered => "domain_not_registered",
             Self::ContractSchemaMismatch => "contract_schema_mismatch",
             Self::AbiNotRegistered => "abi_not_registered",
+            Self::ExecutionContractMismatch => "execution_contract_mismatch",
         }
     }
 
@@ -323,6 +326,7 @@ impl ProjectDomainRegistryIssueKind {
             Self::DomainNotRegistered => "NRG001",
             Self::ContractSchemaMismatch => "NRG002",
             Self::AbiNotRegistered => "NRG003",
+            Self::ExecutionContractMismatch => "NRG004",
         }
     }
 }
@@ -574,6 +578,32 @@ pub fn validate_project_domain_registry(
                                 "abi `{}` is not declared by registered profiles",
                                 item.abi
                             ),
+                        });
+                    }
+                    if registration.contract.execution.execution_domain != item.domain {
+                        issues.push(ProjectDomainRegistryIssue {
+                            kind: ProjectDomainRegistryIssueKind::ExecutionContractMismatch,
+                            message: format!(
+                                "execution domain `{}` does not match project domain `{}`",
+                                registration.contract.execution.execution_domain, item.domain
+                            ),
+                        });
+                    }
+                    if registration.contract.execution.contract_family
+                        != format!("nustar.{}", item.domain)
+                    {
+                        issues.push(ProjectDomainRegistryIssue {
+                            kind: ProjectDomainRegistryIssueKind::ExecutionContractMismatch,
+                            message: format!(
+                                "execution contract family `{}` does not match expected `nustar.{}`",
+                                registration.contract.execution.contract_family, item.domain
+                            ),
+                        });
+                    }
+                    if registration.contract.execution.lowering_targets.is_empty() {
+                        issues.push(ProjectDomainRegistryIssue {
+                            kind: ProjectDomainRegistryIssueKind::ExecutionContractMismatch,
+                            message: "execution skeleton declares no lowering targets".to_owned(),
                         });
                     }
                 }
@@ -1056,6 +1086,7 @@ pub fn plan_bindings(
     let mut bindings = Vec::new();
 
     for manifest in manifests {
+        let execution = execution_summary(&manifest);
         let registered_units = manifest
             .unit_types
             .iter()
@@ -1170,6 +1201,7 @@ pub fn plan_bindings(
             support_surface: manifest.support_surface,
             support_profile_slots: manifest.support_profile_slots,
             default_lanes: manifest.default_lanes,
+            execution,
             matched_support_surface,
             matched_support_profile_slots,
             covered_support_profile_slots,
@@ -2863,6 +2895,7 @@ mod cpu Main {
             .unwrap();
         assert_eq!(network.issue_count(), 0);
         assert!(network.summary_line().contains(": ok"));
+        assert_eq!(network.abi_registered, true);
         ensure_project_domain_registry_valid(&plan).unwrap();
     }
 
@@ -2889,6 +2922,38 @@ mod cpu Main {
         assert!(error.contains("network.socket.unknown.v1"));
         assert!(error.contains("NRG003"));
         assert!(error.contains("abi_not_registered"));
+    }
+
+    #[test]
+    fn binding_plan_carries_execution_skeleton_summary() {
+        let plan = binding_plan_from_source(
+            r#"
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    print(0);
+  }
+}
+"#,
+        );
+        let shader = plan
+            .bindings
+            .iter()
+            .find(|binding| binding.domain_family == "shader")
+            .expect("shader binding should exist");
+        assert_eq!(
+            shader.execution.skeleton_version,
+            "nustar-execution-skeleton-v1"
+        );
+        assert_eq!(shader.execution.function_kind, "function-node");
+        assert_eq!(shader.execution.graph_kind, "function-graph");
+        assert_eq!(shader.execution.execution_domain, "shader");
+        assert_eq!(shader.execution.contract_family, "nustar.shader");
+        assert!(shader
+            .execution
+            .lowering_targets
+            .contains(&"metal".to_owned()));
     }
 
     #[test]

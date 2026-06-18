@@ -22,8 +22,36 @@ pub enum CommandKind {
     LoaderContract {
         package_id: String,
     },
+    PackEnvelope {
+        input: PathBuf,
+        output: PathBuf,
+    },
+    UnpackEnvelope {
+        input: PathBuf,
+        output: PathBuf,
+    },
+    InspectEnvelope {
+        input: PathBuf,
+    },
+    InspectArtifact {
+        input: PathBuf,
+        json: bool,
+    },
+    ArtifactReport {
+        input: PathBuf,
+        json: bool,
+    },
+    VerifyArtifact {
+        input: PathBuf,
+        json: bool,
+    },
+    UnpackArtifact {
+        input: PathBuf,
+        output_dir: PathBuf,
+    },
     VerifyBuildManifest {
         manifest: PathBuf,
+        json: bool,
     },
     CacheStatus {
         input: Option<PathBuf>,
@@ -111,11 +139,129 @@ where
                 .next()
                 .ok_or_else(|| "usage: nuisc loader-contract <package-id>".to_owned())?,
         }),
-        "verify-build-manifest" => Ok(CommandKind::VerifyBuildManifest {
-            manifest: PathBuf::from(args.next().ok_or_else(|| {
-                "usage: nuisc verify-build-manifest <nuis.build.manifest.toml>".to_owned()
+        "pack-envelope" => Ok(CommandKind::PackEnvelope {
+            input: PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuisc pack-envelope <nuis.executable.envelope.toml|nuis.build.manifest.toml> <output.nenv>"
+                    .to_owned()
+            })?),
+            output: PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuisc pack-envelope <nuis.executable.envelope.toml|nuis.build.manifest.toml> <output.nenv>"
+                    .to_owned()
             })?),
         }),
+        "unpack-envelope" => Ok(CommandKind::UnpackEnvelope {
+            input: PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuisc unpack-envelope <input.nenv> <output.toml>".to_owned()
+            })?),
+            output: PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuisc unpack-envelope <input.nenv> <output.toml>".to_owned()
+            })?),
+        }),
+        "inspect-envelope" => Ok(CommandKind::InspectEnvelope {
+            input: PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuisc inspect-envelope <nuis.executable.envelope.toml|nuis.build.manifest.toml|envelope.bin>".to_owned()
+            })?),
+        }),
+        "inspect-artifact" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::InspectArtifact {
+                input: input.ok_or_else(|| {
+                    "usage: nuisc inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
+        "artifact-report" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc artifact-report [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::ArtifactReport {
+                input: input.ok_or_else(|| {
+                    "usage: nuisc artifact-report [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
+        "verify-artifact" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc verify-artifact [--json] <nuis.compiled.artifact>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::VerifyArtifact {
+                input: input.ok_or_else(|| {
+                    "usage: nuisc verify-artifact [--json] <nuis.compiled.artifact>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
+        "unpack-artifact" => Ok(CommandKind::UnpackArtifact {
+            input: PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuisc unpack-artifact <nuis.compiled.artifact> <output-dir>".to_owned()
+            })?),
+            output_dir: PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuisc unpack-artifact <nuis.compiled.artifact> <output-dir>".to_owned()
+            })?),
+        }),
+        "verify-build-manifest" => {
+            let mut json = false;
+            let mut manifest = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if manifest.is_none() {
+                    manifest = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc verify-build-manifest [--json] <nuis.build.manifest.toml>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::VerifyBuildManifest {
+                manifest: manifest.ok_or_else(|| {
+                    "usage: nuisc verify-build-manifest [--json] <nuis.build.manifest.toml>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
         "cache-status" => {
             let mut verbose_cache = false;
             let mut all = false;
@@ -284,7 +430,171 @@ where
             })
         }
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_args, CommandKind};
+    use std::path::PathBuf;
+
+    #[test]
+    fn parse_pack_envelope_command() {
+        let command = parse_args(
+            vec![
+                "pack-envelope".to_owned(),
+                "nuis.build.manifest.toml".to_owned(),
+                "out.nenv".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::PackEnvelope {
+                input: PathBuf::from("nuis.build.manifest.toml"),
+                output: PathBuf::from("out.nenv"),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_unpack_envelope_command() {
+        let command = parse_args(
+            vec![
+                "unpack-envelope".to_owned(),
+                "artifact.nenv".to_owned(),
+                "out.toml".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::UnpackEnvelope {
+                input: PathBuf::from("artifact.nenv"),
+                output: PathBuf::from("out.toml"),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_artifact_command() {
+        let command = parse_args(
+            vec![
+                "inspect-artifact".to_owned(),
+                "nuis.compiled.artifact".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectArtifact {
+                input: PathBuf::from("nuis.compiled.artifact"),
+                json: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_verify_artifact_command() {
+        let command = parse_args(
+            vec![
+                "verify-artifact".to_owned(),
+                "nuis.compiled.artifact".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::VerifyArtifact {
+                input: PathBuf::from("nuis.compiled.artifact"),
+                json: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_artifact_report_json_command() {
+        let command = parse_args(
+            vec![
+                "artifact-report".to_owned(),
+                "--json".to_owned(),
+                "nuis.compiled.artifact".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::ArtifactReport {
+                input: PathBuf::from("nuis.compiled.artifact"),
+                json: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_artifact_json_command() {
+        let command = parse_args(
+            vec![
+                "inspect-artifact".to_owned(),
+                "--json".to_owned(),
+                "nuis.compiled.artifact".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectArtifact {
+                input: PathBuf::from("nuis.compiled.artifact"),
+                json: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_verify_artifact_json_command() {
+        let command = parse_args(
+            vec![
+                "verify-artifact".to_owned(),
+                "--json".to_owned(),
+                "nuis.compiled.artifact".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::VerifyArtifact {
+                input: PathBuf::from("nuis.compiled.artifact"),
+                json: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_verify_build_manifest_json_command() {
+        let command = parse_args(
+            vec![
+                "verify-build-manifest".to_owned(),
+                "--json".to_owned(),
+                "nuis.build.manifest.toml".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::VerifyBuildManifest {
+                manifest: PathBuf::from("nuis.build.manifest.toml"),
+                json: true,
+            }
+        );
     }
 }

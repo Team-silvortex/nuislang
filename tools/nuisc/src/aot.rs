@@ -11,6 +11,11 @@ use yir_core::YirModule;
 
 use crate::render;
 
+const NUIS_ENVELOPE_BINARY_MAGIC: &[u8; 4] = b"NENV";
+const NUIS_ENVELOPE_BINARY_VERSION: u16 = 1;
+const NUIS_COMPILED_ARTIFACT_MAGIC: &[u8; 4] = b"NART";
+const NUIS_COMPILED_ARTIFACT_VERSION: u16 = 1;
+
 pub struct CompileArtifacts {
     pub ast_path: String,
     pub nir_path: String,
@@ -45,6 +50,55 @@ pub struct BuildManifestContext {
     pub compile_cache: Option<BuildManifestCacheInfo>,
     pub project: Option<BuildManifestProjectInfo>,
     pub cpu_target: CpuBuildTarget,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BuildManifestExecutionContract {
+    package_id: String,
+    domain_family: String,
+    execution: crate::registry::NustarExecutionSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NuisExecutableEnvelope {
+    pub schema: String,
+    pub executable_kind: String,
+    pub package_count: usize,
+    pub domain_families: Vec<String>,
+    pub contract_families: Vec<String>,
+    pub function_kind: String,
+    pub graph_kind: String,
+    pub default_time_mode: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NuisLifecycleContract {
+    pub schema: String,
+    pub bootstrap_entry: String,
+    pub tick_policy: String,
+    pub shutdown_policy: String,
+    pub yalivia_rpc: String,
+    pub hook_surface: Vec<String>,
+    pub export_surface: Vec<String>,
+    pub runtime_capability_flags: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NuisCompiledArtifact {
+    pub schema: String,
+    pub packaging_mode: String,
+    pub cpu_target_abi: String,
+    pub cpu_target_machine_arch: String,
+    pub cpu_target_machine_os: String,
+    pub cpu_target_object_format: String,
+    pub cpu_target_calling_abi: String,
+    pub binary_name: String,
+    pub binary_bytes: usize,
+    pub build_manifest_bytes: usize,
+    pub envelope: NuisExecutableEnvelope,
+    pub lifecycle: NuisLifecycleContract,
+    pub build_manifest_source: String,
+    pub binary_blob: Vec<u8>,
 }
 
 pub struct BuildManifestCacheInfo {
@@ -288,6 +342,8 @@ pub fn write_build_manifest(
     context: &BuildManifestContext,
 ) -> Result<String, String> {
     let path = output_dir.join("nuis.build.manifest.toml");
+    let envelope_path = output_dir.join("nuis.executable.envelope.toml");
+    let artifact_path = output_dir.join("nuis.compiled.artifact");
     let generated_at_unix = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| format!("failed to read current time: {error}"))?
@@ -298,6 +354,17 @@ pub fn write_build_manifest(
     let mut loaded_nustar = context.loaded_nustar.clone();
     loaded_nustar.sort();
     loaded_nustar.dedup();
+    let execution_contracts = resolve_execution_contracts(&loaded_nustar)?;
+    let envelope = build_nuis_envelope(&execution_contracts, &written.packaging_mode);
+    let lifecycle = build_nuis_lifecycle_contract(&envelope, &written.packaging_mode);
+    let compiled_binary_name = Path::new(&written.binary_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("nuis-binary")
+        .to_owned();
+    let compiled_binary_bytes = fs::metadata(&written.binary_path)
+        .map_err(|error| format!("failed to stat `{}`: {error}", written.binary_path))?
+        .len() as usize;
 
     let artifacts = vec![
         ("ast".to_owned(), PathBuf::from(&written.ast_path)),
@@ -384,6 +451,94 @@ pub fn write_build_manifest(
         "loaded_nustar = {}\n",
         render_string_array(&loaded_nustar)
     ));
+    write_nuis_executable_envelope(&envelope_path, &envelope)?;
+    out.push('\n');
+    out.push_str("[nuis_envelope]\n");
+    out.push_str(&format!(
+        "path = \"{}\"\n",
+        escape_toml_string(&envelope_path.display().to_string())
+    ));
+    out.push_str(&format!(
+        "schema = \"{}\"\n",
+        escape_toml_string(&envelope.schema)
+    ));
+    out.push_str(&format!(
+        "executable_kind = \"{}\"\n",
+        escape_toml_string(&envelope.executable_kind)
+    ));
+    out.push_str(&format!("package_count = {}\n", envelope.package_count));
+    out.push_str(&format!(
+        "domain_families = {}\n",
+        render_string_array(&envelope.domain_families)
+    ));
+    out.push_str(&format!(
+        "contract_families = {}\n",
+        render_string_array(&envelope.contract_families)
+    ));
+    out.push_str(&format!(
+        "function_kind = \"{}\"\n",
+        escape_toml_string(&envelope.function_kind)
+    ));
+    out.push_str(&format!(
+        "graph_kind = \"{}\"\n",
+        escape_toml_string(&envelope.graph_kind)
+    ));
+    out.push_str(&format!(
+        "default_time_mode = \"{}\"\n",
+        escape_toml_string(&envelope.default_time_mode)
+    ));
+    out.push('\n');
+    out.push_str("[nuis_artifact]\n");
+    out.push_str(&format!(
+        "artifact_path = \"{}\"\n",
+        escape_toml_string(&artifact_path.display().to_string())
+    ));
+    out.push_str(&format!(
+        "artifact_schema = \"{}\"\n",
+        escape_toml_string("nuis-compiled-artifact-v1")
+    ));
+    out.push_str(&format!(
+        "artifact_binary_name = \"{}\"\n",
+        escape_toml_string(&compiled_binary_name)
+    ));
+    out.push_str(&format!(
+        "artifact_binary_bytes = {}\n",
+        compiled_binary_bytes
+    ));
+    out.push('\n');
+    out.push_str("[nuis_lifecycle]\n");
+    out.push_str(&format!(
+        "lifecycle_schema = \"{}\"\n",
+        escape_toml_string(&lifecycle.schema)
+    ));
+    out.push_str(&format!(
+        "lifecycle_bootstrap_entry = \"{}\"\n",
+        escape_toml_string(&lifecycle.bootstrap_entry)
+    ));
+    out.push_str(&format!(
+        "lifecycle_tick_policy = \"{}\"\n",
+        escape_toml_string(&lifecycle.tick_policy)
+    ));
+    out.push_str(&format!(
+        "lifecycle_shutdown_policy = \"{}\"\n",
+        escape_toml_string(&lifecycle.shutdown_policy)
+    ));
+    out.push_str(&format!(
+        "lifecycle_yalivia_rpc = \"{}\"\n",
+        escape_toml_string(&lifecycle.yalivia_rpc)
+    ));
+    out.push_str(&format!(
+        "lifecycle_hook_surface = {}\n",
+        render_string_array(&lifecycle.hook_surface)
+    ));
+    out.push_str(&format!(
+        "lifecycle_export_surface = {}\n",
+        render_string_array(&lifecycle.export_surface)
+    ));
+    out.push_str(&format!(
+        "lifecycle_runtime_capability_flags = {}\n",
+        render_string_array(&lifecycle.runtime_capability_flags)
+    ));
     if let Some(cache) = &context.compile_cache {
         out.push_str(&format!(
             "compile_cache_status = \"{}\"\n",
@@ -423,6 +578,47 @@ pub fn write_build_manifest(
         ));
         out.push_str(&format!("bytes = {}\n", bytes.len()));
         out.push_str(&format!("fnv1a64 = \"{}\"\n", fnv1a64_hex(&bytes)));
+    }
+
+    for contract in &execution_contracts {
+        out.push('\n');
+        out.push_str("[[execution_contract]]\n");
+        out.push_str(&format!(
+            "package_id = \"{}\"\n",
+            escape_toml_string(&contract.package_id)
+        ));
+        out.push_str(&format!(
+            "domain_family = \"{}\"\n",
+            escape_toml_string(&contract.domain_family)
+        ));
+        out.push_str(&format!(
+            "skeleton_version = \"{}\"\n",
+            escape_toml_string(&contract.execution.skeleton_version)
+        ));
+        out.push_str(&format!(
+            "function_kind = \"{}\"\n",
+            escape_toml_string(&contract.execution.function_kind)
+        ));
+        out.push_str(&format!(
+            "graph_kind = \"{}\"\n",
+            escape_toml_string(&contract.execution.graph_kind)
+        ));
+        out.push_str(&format!(
+            "execution_domain = \"{}\"\n",
+            escape_toml_string(&contract.execution.execution_domain)
+        ));
+        out.push_str(&format!(
+            "default_time_mode = \"{}\"\n",
+            escape_toml_string(&contract.execution.default_time_mode)
+        ));
+        out.push_str(&format!(
+            "contract_family = \"{}\"\n",
+            escape_toml_string(&contract.execution.contract_family)
+        ));
+        out.push_str(&format!(
+            "lowering_targets = {}\n",
+            render_string_array(&contract.execution.lowering_targets)
+        ));
     }
 
     if let Some(project) = &context.project {
@@ -508,9 +704,757 @@ pub fn write_build_manifest(
         }
     }
 
+    let compiled_artifact =
+        build_nuis_compiled_artifact(written, context, &envelope, &lifecycle, &out)?;
+    write_nuis_compiled_artifact(&artifact_path, &compiled_artifact)?;
     fs::write(&path, out)
         .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
     Ok(path.display().to_string())
+}
+
+pub fn render_nuis_executable_envelope(envelope: &NuisExecutableEnvelope) -> String {
+    let mut out = String::new();
+    out.push_str("envelope_schema = \"nuis-executable-envelope-v1\"\n");
+    out.push_str(&format!(
+        "executable_kind = \"{}\"\n",
+        escape_toml_string(&envelope.executable_kind)
+    ));
+    out.push_str(&format!("package_count = {}\n", envelope.package_count));
+    out.push_str(&format!(
+        "domain_families = {}\n",
+        render_string_array(&envelope.domain_families)
+    ));
+    out.push_str(&format!(
+        "contract_families = {}\n",
+        render_string_array(&envelope.contract_families)
+    ));
+    out.push_str(&format!(
+        "function_kind = \"{}\"\n",
+        escape_toml_string(&envelope.function_kind)
+    ));
+    out.push_str(&format!(
+        "graph_kind = \"{}\"\n",
+        escape_toml_string(&envelope.graph_kind)
+    ));
+    out.push_str(&format!(
+        "default_time_mode = \"{}\"\n",
+        escape_toml_string(&envelope.default_time_mode)
+    ));
+    out
+}
+
+pub fn encode_nuis_executable_envelope_binary(
+    envelope: &NuisExecutableEnvelope,
+) -> Result<Vec<u8>, String> {
+    let payload = render_nuis_executable_envelope(envelope).into_bytes();
+    let payload_len = u32::try_from(payload.len())
+        .map_err(|_| "nuis executable envelope payload exceeds 4 GiB".to_owned())?;
+    let mut out = Vec::with_capacity(4 + 2 + 4 + payload.len());
+    out.extend_from_slice(NUIS_ENVELOPE_BINARY_MAGIC);
+    out.extend_from_slice(&NUIS_ENVELOPE_BINARY_VERSION.to_le_bytes());
+    out.extend_from_slice(&payload_len.to_le_bytes());
+    out.extend_from_slice(&payload);
+    Ok(out)
+}
+
+fn encode_u32_len(len: usize, what: &str) -> Result<[u8; 4], String> {
+    let len =
+        u32::try_from(len).map_err(|_| format!("{what} exceeds 4 GiB and cannot be encoded"))?;
+    Ok(len.to_le_bytes())
+}
+
+pub fn decode_nuis_executable_envelope_binary(
+    bytes: &[u8],
+) -> Result<NuisExecutableEnvelope, String> {
+    if bytes.len() < 10 {
+        return Err("nuis executable envelope binary is too short".to_owned());
+    }
+    if &bytes[..4] != NUIS_ENVELOPE_BINARY_MAGIC {
+        return Err("nuis executable envelope binary has invalid magic".to_owned());
+    }
+    let version = u16::from_le_bytes([bytes[4], bytes[5]]);
+    if version != NUIS_ENVELOPE_BINARY_VERSION {
+        return Err(format!(
+            "unsupported nuis executable envelope binary version `{version}`"
+        ));
+    }
+    let payload_len = u32::from_le_bytes([bytes[6], bytes[7], bytes[8], bytes[9]]) as usize;
+    if bytes.len() != 10 + payload_len {
+        return Err(format!(
+            "nuis executable envelope binary length mismatch: header says {payload_len} payload bytes, actual {}",
+            bytes.len().saturating_sub(10)
+        ));
+    }
+    let payload = std::str::from_utf8(&bytes[10..])
+        .map_err(|error| format!("nuis executable envelope payload is not valid UTF-8: {error}"))?;
+    parse_nuis_executable_envelope_from_source(payload, Path::new("<nuis-envelope-binary>"))
+}
+
+pub fn write_nuis_executable_envelope(
+    path: &Path,
+    envelope: &NuisExecutableEnvelope,
+) -> Result<(), String> {
+    let out = render_nuis_executable_envelope(envelope);
+    fs::write(path, out).map_err(|error| format!("failed to write `{}`: {error}", path.display()))
+}
+
+fn build_nuis_compiled_artifact(
+    written: &CompileArtifacts,
+    context: &BuildManifestContext,
+    envelope: &NuisExecutableEnvelope,
+    lifecycle: &NuisLifecycleContract,
+    build_manifest_source: &str,
+) -> Result<NuisCompiledArtifact, String> {
+    let binary_blob = fs::read(&written.binary_path).map_err(|error| {
+        format!(
+            "failed to read compiled binary `{}`: {error}",
+            written.binary_path
+        )
+    })?;
+    let binary_name = Path::new(&written.binary_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("nuis-binary")
+        .to_owned();
+    Ok(NuisCompiledArtifact {
+        schema: "nuis-compiled-artifact-v1".to_owned(),
+        packaging_mode: written.packaging_mode.clone(),
+        cpu_target_abi: context.cpu_target.abi.clone(),
+        cpu_target_machine_arch: context.cpu_target.machine_arch.clone(),
+        cpu_target_machine_os: context.cpu_target.machine_os.clone(),
+        cpu_target_object_format: context.cpu_target.object_format.clone(),
+        cpu_target_calling_abi: context.cpu_target.calling_abi.clone(),
+        binary_name,
+        binary_bytes: binary_blob.len(),
+        build_manifest_bytes: build_manifest_source.len(),
+        envelope: envelope.clone(),
+        lifecycle: lifecycle.clone(),
+        build_manifest_source: build_manifest_source.to_owned(),
+        binary_blob,
+    })
+}
+
+pub fn encode_nuis_compiled_artifact_binary(
+    artifact: &NuisCompiledArtifact,
+) -> Result<Vec<u8>, String> {
+    let envelope = encode_nuis_executable_envelope_binary(&artifact.envelope)?;
+    let packaging_mode = artifact.packaging_mode.as_bytes();
+    let cpu_target_abi = artifact.cpu_target_abi.as_bytes();
+    let cpu_target_machine_arch = artifact.cpu_target_machine_arch.as_bytes();
+    let cpu_target_machine_os = artifact.cpu_target_machine_os.as_bytes();
+    let cpu_target_object_format = artifact.cpu_target_object_format.as_bytes();
+    let cpu_target_calling_abi = artifact.cpu_target_calling_abi.as_bytes();
+    let binary_name = artifact.binary_name.as_bytes();
+    let lifecycle_schema = artifact.lifecycle.schema.as_bytes();
+    let lifecycle_bootstrap_entry = artifact.lifecycle.bootstrap_entry.as_bytes();
+    let lifecycle_tick_policy = artifact.lifecycle.tick_policy.as_bytes();
+    let lifecycle_shutdown_policy = artifact.lifecycle.shutdown_policy.as_bytes();
+    let lifecycle_yalivia_rpc = artifact.lifecycle.yalivia_rpc.as_bytes();
+    let lifecycle_hook_surface = render_string_array(&artifact.lifecycle.hook_surface).into_bytes();
+    let lifecycle_export_surface =
+        render_string_array(&artifact.lifecycle.export_surface).into_bytes();
+    let lifecycle_runtime_capability_flags =
+        render_string_array(&artifact.lifecycle.runtime_capability_flags).into_bytes();
+    let build_manifest_source = artifact.build_manifest_source.as_bytes();
+    let binary_blob = &artifact.binary_blob;
+    let mut out = Vec::new();
+    out.extend_from_slice(NUIS_COMPILED_ARTIFACT_MAGIC);
+    out.extend_from_slice(&NUIS_COMPILED_ARTIFACT_VERSION.to_le_bytes());
+    out.extend_from_slice(&encode_u32_len(
+        envelope.len(),
+        "compiled artifact envelope",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        packaging_mode.len(),
+        "compiled artifact packaging_mode",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        cpu_target_abi.len(),
+        "compiled artifact cpu_target_abi",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        cpu_target_machine_arch.len(),
+        "compiled artifact cpu_target_machine_arch",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        cpu_target_machine_os.len(),
+        "compiled artifact cpu_target_machine_os",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        cpu_target_object_format.len(),
+        "compiled artifact cpu_target_object_format",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        cpu_target_calling_abi.len(),
+        "compiled artifact cpu_target_calling_abi",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        binary_name.len(),
+        "compiled artifact binary_name",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        lifecycle_schema.len(),
+        "compiled artifact lifecycle_schema",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        lifecycle_bootstrap_entry.len(),
+        "compiled artifact lifecycle_bootstrap_entry",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        lifecycle_tick_policy.len(),
+        "compiled artifact lifecycle_tick_policy",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        lifecycle_shutdown_policy.len(),
+        "compiled artifact lifecycle_shutdown_policy",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        lifecycle_yalivia_rpc.len(),
+        "compiled artifact lifecycle_yalivia_rpc",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        lifecycle_hook_surface.len(),
+        "compiled artifact lifecycle_hook_surface",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        lifecycle_export_surface.len(),
+        "compiled artifact lifecycle_export_surface",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        lifecycle_runtime_capability_flags.len(),
+        "compiled artifact lifecycle_runtime_capability_flags",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        build_manifest_source.len(),
+        "compiled artifact build_manifest_source",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        binary_blob.len(),
+        "compiled artifact binary_blob",
+    )?);
+    out.extend_from_slice(envelope.as_slice());
+    out.extend_from_slice(packaging_mode);
+    out.extend_from_slice(cpu_target_abi);
+    out.extend_from_slice(cpu_target_machine_arch);
+    out.extend_from_slice(cpu_target_machine_os);
+    out.extend_from_slice(cpu_target_object_format);
+    out.extend_from_slice(cpu_target_calling_abi);
+    out.extend_from_slice(binary_name);
+    out.extend_from_slice(lifecycle_schema);
+    out.extend_from_slice(lifecycle_bootstrap_entry);
+    out.extend_from_slice(lifecycle_tick_policy);
+    out.extend_from_slice(lifecycle_shutdown_policy);
+    out.extend_from_slice(lifecycle_yalivia_rpc);
+    out.extend_from_slice(lifecycle_hook_surface.as_slice());
+    out.extend_from_slice(lifecycle_export_surface.as_slice());
+    out.extend_from_slice(lifecycle_runtime_capability_flags.as_slice());
+    out.extend_from_slice(build_manifest_source);
+    out.extend_from_slice(binary_blob);
+    Ok(out)
+}
+
+pub fn decode_nuis_compiled_artifact_binary(bytes: &[u8]) -> Result<NuisCompiledArtifact, String> {
+    if bytes.len() < 78 {
+        return Err("nuis compiled artifact binary is too short".to_owned());
+    }
+    if &bytes[..4] != NUIS_COMPILED_ARTIFACT_MAGIC {
+        return Err("nuis compiled artifact binary has invalid magic".to_owned());
+    }
+    let version = u16::from_le_bytes([bytes[4], bytes[5]]);
+    if version != NUIS_COMPILED_ARTIFACT_VERSION {
+        return Err(format!(
+            "unsupported nuis compiled artifact binary version `{version}`"
+        ));
+    }
+    let mut offset = 6usize;
+    let next_len = |bytes: &[u8], offset: &mut usize| -> Result<usize, String> {
+        if *offset + 4 > bytes.len() {
+            return Err("nuis compiled artifact binary header is truncated".to_owned());
+        }
+        let value = u32::from_le_bytes([
+            bytes[*offset],
+            bytes[*offset + 1],
+            bytes[*offset + 2],
+            bytes[*offset + 3],
+        ]) as usize;
+        *offset += 4;
+        Ok(value)
+    };
+    let envelope_len = next_len(bytes, &mut offset)?;
+    let packaging_mode_len = next_len(bytes, &mut offset)?;
+    let cpu_target_abi_len = next_len(bytes, &mut offset)?;
+    let cpu_target_machine_arch_len = next_len(bytes, &mut offset)?;
+    let cpu_target_machine_os_len = next_len(bytes, &mut offset)?;
+    let cpu_target_object_format_len = next_len(bytes, &mut offset)?;
+    let cpu_target_calling_abi_len = next_len(bytes, &mut offset)?;
+    let binary_name_len = next_len(bytes, &mut offset)?;
+    let lifecycle_schema_len = next_len(bytes, &mut offset)?;
+    let lifecycle_bootstrap_entry_len = next_len(bytes, &mut offset)?;
+    let lifecycle_tick_policy_len = next_len(bytes, &mut offset)?;
+    let lifecycle_shutdown_policy_len = next_len(bytes, &mut offset)?;
+    let lifecycle_yalivia_rpc_len = next_len(bytes, &mut offset)?;
+    let lifecycle_hook_surface_len = next_len(bytes, &mut offset)?;
+    let lifecycle_export_surface_len = next_len(bytes, &mut offset)?;
+    let lifecycle_runtime_capability_flags_len = next_len(bytes, &mut offset)?;
+    let build_manifest_source_len = next_len(bytes, &mut offset)?;
+    let binary_blob_len = next_len(bytes, &mut offset)?;
+    let total_payload_len = envelope_len
+        + packaging_mode_len
+        + cpu_target_abi_len
+        + cpu_target_machine_arch_len
+        + cpu_target_machine_os_len
+        + cpu_target_object_format_len
+        + cpu_target_calling_abi_len
+        + binary_name_len
+        + lifecycle_schema_len
+        + lifecycle_bootstrap_entry_len
+        + lifecycle_tick_policy_len
+        + lifecycle_shutdown_policy_len
+        + lifecycle_yalivia_rpc_len
+        + lifecycle_hook_surface_len
+        + lifecycle_export_surface_len
+        + lifecycle_runtime_capability_flags_len
+        + build_manifest_source_len
+        + binary_blob_len;
+    if bytes.len() != offset + total_payload_len {
+        return Err(format!(
+            "nuis compiled artifact binary length mismatch: header says {total_payload_len} payload bytes, actual {}",
+            bytes.len().saturating_sub(offset)
+        ));
+    }
+    let take_bytes = |bytes: &[u8], offset: &mut usize, len: usize| -> Result<Vec<u8>, String> {
+        if *offset + len > bytes.len() {
+            return Err("nuis compiled artifact binary payload is truncated".to_owned());
+        }
+        let value = bytes[*offset..*offset + len].to_vec();
+        *offset += len;
+        Ok(value)
+    };
+    let envelope =
+        decode_nuis_executable_envelope_binary(&take_bytes(bytes, &mut offset, envelope_len)?)?;
+    let packaging_mode = String::from_utf8(take_bytes(bytes, &mut offset, packaging_mode_len)?)
+        .map_err(|error| format!("compiled artifact packaging_mode is not valid UTF-8: {error}"))?;
+    let cpu_target_abi = String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_abi_len)?)
+        .map_err(|error| format!("compiled artifact cpu_target_abi is not valid UTF-8: {error}"))?;
+    let cpu_target_machine_arch =
+        String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_machine_arch_len)?).map_err(
+            |error| {
+                format!("compiled artifact cpu_target_machine_arch is not valid UTF-8: {error}")
+            },
+        )?;
+    let cpu_target_machine_os =
+        String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_machine_os_len)?).map_err(
+            |error| format!("compiled artifact cpu_target_machine_os is not valid UTF-8: {error}"),
+        )?;
+    let cpu_target_object_format = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        cpu_target_object_format_len,
+    )?)
+    .map_err(|error| {
+        format!("compiled artifact cpu_target_object_format is not valid UTF-8: {error}")
+    })?;
+    let cpu_target_calling_abi =
+        String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_calling_abi_len)?).map_err(
+            |error| format!("compiled artifact cpu_target_calling_abi is not valid UTF-8: {error}"),
+        )?;
+    let binary_name = String::from_utf8(take_bytes(bytes, &mut offset, binary_name_len)?)
+        .map_err(|error| format!("compiled artifact binary_name is not valid UTF-8: {error}"))?;
+    let lifecycle_schema = String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_schema_len)?)
+        .map_err(|error| {
+            format!("compiled artifact lifecycle_schema is not valid UTF-8: {error}")
+        })?;
+    let lifecycle_bootstrap_entry = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        lifecycle_bootstrap_entry_len,
+    )?)
+    .map_err(|error| {
+        format!("compiled artifact lifecycle_bootstrap_entry is not valid UTF-8: {error}")
+    })?;
+    let lifecycle_tick_policy =
+        String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_tick_policy_len)?).map_err(
+            |error| format!("compiled artifact lifecycle_tick_policy is not valid UTF-8: {error}"),
+        )?;
+    let lifecycle_shutdown_policy = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        lifecycle_shutdown_policy_len,
+    )?)
+    .map_err(|error| {
+        format!("compiled artifact lifecycle_shutdown_policy is not valid UTF-8: {error}")
+    })?;
+    let lifecycle_yalivia_rpc =
+        String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_yalivia_rpc_len)?).map_err(
+            |error| format!("compiled artifact lifecycle_yalivia_rpc is not valid UTF-8: {error}"),
+        )?;
+    let lifecycle_hook_surface_source =
+        String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_hook_surface_len)?).map_err(
+            |error| format!("compiled artifact lifecycle_hook_surface is not valid UTF-8: {error}"),
+        )?;
+    let lifecycle_export_surface_source = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        lifecycle_export_surface_len,
+    )?)
+    .map_err(|error| {
+        format!("compiled artifact lifecycle_export_surface is not valid UTF-8: {error}")
+    })?;
+    let lifecycle_runtime_capability_flags_source = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        lifecycle_runtime_capability_flags_len,
+    )?)
+    .map_err(|error| {
+        format!("compiled artifact lifecycle_runtime_capability_flags is not valid UTF-8: {error}")
+    })?;
+    let build_manifest_source =
+        String::from_utf8(take_bytes(bytes, &mut offset, build_manifest_source_len)?).map_err(
+            |error| format!("compiled artifact build_manifest_source is not valid UTF-8: {error}"),
+        )?;
+    let binary_blob = take_bytes(bytes, &mut offset, binary_blob_len)?;
+    Ok(NuisCompiledArtifact {
+        schema: "nuis-compiled-artifact-v1".to_owned(),
+        packaging_mode,
+        cpu_target_abi,
+        cpu_target_machine_arch,
+        cpu_target_machine_os,
+        cpu_target_object_format,
+        cpu_target_calling_abi,
+        binary_name,
+        binary_bytes: binary_blob.len(),
+        build_manifest_bytes: build_manifest_source.len(),
+        envelope,
+        lifecycle: NuisLifecycleContract {
+            schema: lifecycle_schema,
+            bootstrap_entry: lifecycle_bootstrap_entry,
+            tick_policy: lifecycle_tick_policy,
+            shutdown_policy: lifecycle_shutdown_policy,
+            yalivia_rpc: lifecycle_yalivia_rpc,
+            hook_surface: parse_optional_toml_string_array(
+                &format!("hook_surface = {lifecycle_hook_surface_source}"),
+                "hook_surface",
+            )
+            .unwrap_or_default(),
+            export_surface: parse_optional_toml_string_array(
+                &format!("export_surface = {lifecycle_export_surface_source}"),
+                "export_surface",
+            )
+            .unwrap_or_default(),
+            runtime_capability_flags: parse_optional_toml_string_array(
+                &format!("runtime_capability_flags = {lifecycle_runtime_capability_flags_source}"),
+                "runtime_capability_flags",
+            )
+            .unwrap_or_default(),
+        },
+        build_manifest_source,
+        binary_blob,
+    })
+}
+
+pub fn write_nuis_compiled_artifact(
+    path: &Path,
+    artifact: &NuisCompiledArtifact,
+) -> Result<(), String> {
+    let out = encode_nuis_compiled_artifact_binary(artifact)?;
+    fs::write(path, out).map_err(|error| format!("failed to write `{}`: {error}", path.display()))
+}
+
+pub fn parse_nuis_compiled_artifact(path: &Path) -> Result<NuisCompiledArtifact, String> {
+    let bytes =
+        fs::read(path).map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    decode_nuis_compiled_artifact_binary(&bytes)
+}
+
+pub fn render_relocated_unpacked_build_manifest(
+    artifact: &NuisCompiledArtifact,
+    output_dir: &Path,
+    envelope_path: &Path,
+    artifact_path: &Path,
+    binary_path: &Path,
+) -> Result<String, String> {
+    let mut out = String::new();
+    let source = &artifact.build_manifest_source;
+    let mut skip_section = false;
+    let strip_project_path_keys = [
+        "manifest_copy = ",
+        "plan_index = ",
+        "organization_index = ",
+        "exchange_index = ",
+        "modules_index = ",
+        "links_index = ",
+        "packet_index = ",
+        "host_ffi_index = ",
+        "abi_index = ",
+    ];
+
+    for raw in source.lines() {
+        let line = raw.trim();
+        if line == "[nuis_envelope]" || line == "[nuis_artifact]" || line == "[artifacts]" {
+            skip_section = true;
+            continue;
+        }
+        if line == "[[artifact_hash]]" {
+            skip_section = true;
+            continue;
+        }
+        if skip_section && line.starts_with('[') {
+            skip_section = false;
+        }
+        if skip_section {
+            continue;
+        }
+        if line.starts_with("output_dir = ") {
+            out.push_str(&format!(
+                "output_dir = \"{}\"\n",
+                escape_toml_string(&output_dir.display().to_string())
+            ));
+            continue;
+        }
+        if strip_project_path_keys
+            .iter()
+            .any(|prefix| line.starts_with(prefix))
+        {
+            continue;
+        }
+        out.push_str(raw);
+        out.push('\n');
+    }
+
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
+    if !out.ends_with("\n\n") {
+        out.push('\n');
+    }
+
+    out.push_str("[nuis_envelope]\n");
+    out.push_str(&format!(
+        "path = \"{}\"\n",
+        escape_toml_string(&envelope_path.display().to_string())
+    ));
+    out.push_str(&format!(
+        "schema = \"{}\"\n",
+        escape_toml_string(&artifact.envelope.schema)
+    ));
+    out.push_str(&format!(
+        "executable_kind = \"{}\"\n",
+        escape_toml_string(&artifact.envelope.executable_kind)
+    ));
+    out.push_str(&format!(
+        "package_count = {}\n",
+        artifact.envelope.package_count
+    ));
+    out.push_str(&format!(
+        "domain_families = {}\n",
+        render_string_array(&artifact.envelope.domain_families)
+    ));
+    out.push_str(&format!(
+        "contract_families = {}\n",
+        render_string_array(&artifact.envelope.contract_families)
+    ));
+    out.push_str(&format!(
+        "function_kind = \"{}\"\n",
+        escape_toml_string(&artifact.envelope.function_kind)
+    ));
+    out.push_str(&format!(
+        "graph_kind = \"{}\"\n",
+        escape_toml_string(&artifact.envelope.graph_kind)
+    ));
+    out.push_str(&format!(
+        "default_time_mode = \"{}\"\n",
+        escape_toml_string(&artifact.envelope.default_time_mode)
+    ));
+    out.push('\n');
+
+    out.push_str("[nuis_artifact]\n");
+    out.push_str(&format!(
+        "artifact_path = \"{}\"\n",
+        escape_toml_string(&artifact_path.display().to_string())
+    ));
+    out.push_str(&format!(
+        "artifact_schema = \"{}\"\n",
+        escape_toml_string(&artifact.schema)
+    ));
+    out.push_str(&format!(
+        "artifact_binary_name = \"{}\"\n",
+        escape_toml_string(&artifact.binary_name)
+    ));
+    out.push_str(&format!(
+        "artifact_binary_bytes = {}\n",
+        artifact.binary_bytes
+    ));
+    out.push('\n');
+
+    out.push_str("[artifacts]\n");
+    out.push_str(&format!(
+        "binary = \"{}\"\n",
+        escape_toml_string(&binary_path.display().to_string())
+    ));
+    out.push_str(&format!(
+        "envelope = \"{}\"\n",
+        escape_toml_string(&envelope_path.display().to_string())
+    ));
+    out.push('\n');
+
+    for (kind, path) in [("binary", binary_path), ("envelope", envelope_path)] {
+        let bytes = fs::read(path).map_err(|error| {
+            format!(
+                "failed to read unpacked artifact `{}`: {error}",
+                path.display()
+            )
+        })?;
+        out.push_str("[[artifact_hash]]\n");
+        out.push_str(&format!("kind = \"{}\"\n", escape_toml_string(kind)));
+        out.push_str(&format!(
+            "path = \"{}\"\n",
+            escape_toml_string(&path.display().to_string())
+        ));
+        out.push_str(&format!("bytes = {}\n", bytes.len()));
+        out.push_str(&format!("fnv1a64 = \"{}\"\n", fnv1a64_hex(&bytes)));
+        out.push('\n');
+    }
+
+    Ok(out)
+}
+
+fn resolve_execution_contracts(
+    loaded_nustar: &[String],
+) -> Result<Vec<BuildManifestExecutionContract>, String> {
+    let mut contracts = Vec::new();
+    for package_id in loaded_nustar {
+        let manifest =
+            match crate::registry::load_manifest(Path::new("nustar-packages"), package_id) {
+                Ok(manifest) => manifest,
+                Err(package_error) => {
+                    let Some(domain) = package_id.strip_prefix("official.") else {
+                        return Err(package_error);
+                    };
+                    crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), domain)
+                        .map_err(|_| package_error)?
+                }
+            };
+        contracts.push(BuildManifestExecutionContract {
+            package_id: manifest.package_id.clone(),
+            domain_family: manifest.domain_family.clone(),
+            execution: crate::registry::execution_summary(&manifest),
+        });
+    }
+    Ok(contracts)
+}
+
+fn build_nuis_envelope(
+    execution_contracts: &[BuildManifestExecutionContract],
+    packaging_mode: &str,
+) -> NuisExecutableEnvelope {
+    let mut domain_families = execution_contracts
+        .iter()
+        .map(|item| item.domain_family.clone())
+        .collect::<Vec<_>>();
+    domain_families.sort();
+    domain_families.dedup();
+
+    let mut contract_families = execution_contracts
+        .iter()
+        .map(|item| item.execution.contract_family.clone())
+        .collect::<Vec<_>>();
+    contract_families.sort();
+    contract_families.dedup();
+
+    let function_kind = execution_contracts
+        .first()
+        .map(|item| item.execution.function_kind.clone())
+        .unwrap_or_else(|| "function-node".to_owned());
+    let graph_kind = execution_contracts
+        .first()
+        .map(|item| item.execution.graph_kind.clone())
+        .unwrap_or_else(|| "function-graph".to_owned());
+    let default_time_mode = execution_contracts
+        .first()
+        .map(|item| item.execution.default_time_mode.clone())
+        .unwrap_or_else(|| "logical".to_owned());
+
+    NuisExecutableEnvelope {
+        schema: "nuis-executable-envelope-v1".to_owned(),
+        executable_kind: packaging_mode.to_owned(),
+        package_count: execution_contracts.len(),
+        domain_families,
+        contract_families,
+        function_kind,
+        graph_kind,
+        default_time_mode,
+    }
+}
+
+fn build_nuis_lifecycle_contract(
+    envelope: &NuisExecutableEnvelope,
+    packaging_mode: &str,
+) -> NuisLifecycleContract {
+    let mut hook_surface = vec![
+        "on_bridge_bind".to_owned(),
+        "on_scheduler_tick".to_owned(),
+        "on_task_poll".to_owned(),
+        "on_result_commit".to_owned(),
+        "on_summary_flush".to_owned(),
+        "on_managed_rpc".to_owned(),
+        "on_shutdown_prepare".to_owned(),
+    ];
+    if envelope
+        .contract_families
+        .iter()
+        .any(|family| family == "nustar.network")
+    {
+        hook_surface.push("on_network_bridge_progress".to_owned());
+    }
+    if envelope
+        .contract_families
+        .iter()
+        .any(|family| family == "nustar.shader" || family == "nustar.kernel")
+    {
+        hook_surface.push("on_hetero_submission_progress".to_owned());
+    }
+    let mut export_surface = vec![
+        "nuis_lifecycle_bootstrap_export_v1".to_owned(),
+        "nuis_lifecycle_tick_export_v1".to_owned(),
+        "nuis_lifecycle_shutdown_export_v1".to_owned(),
+        "nuis_lifecycle_yalivia_rpc_export_v1".to_owned(),
+    ];
+    let mut runtime_capability_flags = vec![
+        "runtime.bootstrap".to_owned(),
+        "runtime.tick".to_owned(),
+        "runtime.shutdown".to_owned(),
+        "runtime.rpc.yalivia".to_owned(),
+    ];
+    if envelope
+        .contract_families
+        .iter()
+        .any(|family| family == "nustar.network")
+    {
+        export_surface.push("nuis_lifecycle_network_bridge_progress_export_v1".to_owned());
+        runtime_capability_flags.push("runtime.progress.network".to_owned());
+    }
+    if envelope
+        .contract_families
+        .iter()
+        .any(|family| family == "nustar.shader" || family == "nustar.kernel")
+    {
+        export_surface.push("nuis_lifecycle_hetero_submission_progress_export_v1".to_owned());
+        runtime_capability_flags.push("runtime.progress.hetero".to_owned());
+    }
+    NuisLifecycleContract {
+        schema: "nuis-lifecycle-contract-v1".to_owned(),
+        bootstrap_entry: "nuis.bootstrap.lifecycle.v1".to_owned(),
+        tick_policy: if packaging_mode == "native-cpu-llvm" {
+            "owned-pump.active-wait-drain".to_owned()
+        } else {
+            "owned-pump.bootstrap-adaptive".to_owned()
+        },
+        shutdown_policy: "flush-summaries-then-release-bridges".to_owned(),
+        yalivia_rpc: "optional.lifecycle-hook-rpc.v1".to_owned(),
+        hook_surface,
+        export_surface,
+        runtime_capability_flags,
+    }
 }
 
 fn fnv1a64_hex(bytes: &[u8]) -> String {
@@ -617,6 +1561,24 @@ pub struct BuildManifestVerifyReport {
     pub input: String,
     pub output_dir: String,
     pub packaging_mode: String,
+    pub envelope_path: String,
+    pub envelope_schema: String,
+    pub envelope_package_count: usize,
+    pub artifact_path: String,
+    pub artifact_schema: String,
+    pub artifact_binary_name: String,
+    pub artifact_binary_bytes: usize,
+    pub lifecycle_schema: String,
+    pub lifecycle_bootstrap_entry: String,
+    pub lifecycle_tick_policy: String,
+    pub lifecycle_shutdown_policy: String,
+    pub lifecycle_yalivia_rpc: String,
+    pub lifecycle_hook_count: usize,
+    pub lifecycle_hook_surface: Vec<String>,
+    pub lifecycle_export_count: usize,
+    pub lifecycle_export_surface: Vec<String>,
+    pub lifecycle_runtime_capability_flags: Vec<String>,
+    pub execution_contracts_checked: usize,
     pub cpu_target_abi: String,
     pub cpu_target_machine_arch: String,
     pub cpu_target_machine_os: String,
@@ -633,6 +1595,35 @@ pub struct BuildManifestVerifyReport {
     pub project_metadata_checked: usize,
 }
 
+pub struct NuisCompiledArtifactVerifyReport {
+    pub schema: String,
+    pub packaging_mode: String,
+    pub binary_name: String,
+    pub binary_bytes: usize,
+    pub build_manifest_bytes: usize,
+    pub envelope_schema: String,
+    pub envelope_package_count: usize,
+    pub lifecycle_schema: String,
+    pub lifecycle_bootstrap_entry: String,
+    pub lifecycle_tick_policy: String,
+    pub lifecycle_shutdown_policy: String,
+    pub lifecycle_yalivia_rpc: String,
+    pub lifecycle_hook_count: usize,
+    pub lifecycle_hook_surface: Vec<String>,
+    pub lifecycle_export_count: usize,
+    pub lifecycle_export_surface: Vec<String>,
+    pub lifecycle_runtime_capability_flags: Vec<String>,
+    pub lifecycle_contract_consistent: bool,
+    pub lifecycle_runtime_capability_flags_consistent: bool,
+    pub execution_contracts_checked: usize,
+    pub cpu_target_abi: String,
+    pub cpu_target_machine_arch: String,
+    pub cpu_target_machine_os: String,
+    pub cpu_target_object_format: String,
+    pub cpu_target_calling_abi: String,
+    pub artifact_roundtrip_verified: bool,
+}
+
 pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, String> {
     let source = fs::read_to_string(path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
@@ -647,6 +1638,70 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let input = parse_required_toml_string(&source, "input", path)?;
     let output_dir = parse_required_toml_string(&source, "output_dir", path)?;
     let packaging_mode = parse_required_toml_string(&source, "packaging_mode", path)?;
+    let envelope_path = parse_required_toml_string(&source, "path", path)?;
+    let envelope_schema = parse_required_toml_string(&source, "schema", path)?;
+    if envelope_schema != "nuis-executable-envelope-v1" {
+        return Err(format!(
+            "`{}` has unsupported nuis envelope schema `{}`; expected `nuis-executable-envelope-v1`",
+            path.display(),
+            envelope_schema
+        ));
+    }
+    let envelope_package_count = parse_required_toml_usize(&source, "package_count", path)?;
+    let artifact_path = parse_required_toml_string(&source, "artifact_path", path)?;
+    let artifact_schema = parse_required_toml_string(&source, "artifact_schema", path)?;
+    if artifact_schema != "nuis-compiled-artifact-v1" {
+        return Err(format!(
+            "`{}` has unsupported nuis artifact schema `{}`; expected `nuis-compiled-artifact-v1`",
+            path.display(),
+            artifact_schema
+        ));
+    }
+    let artifact_binary_name = parse_required_toml_string(&source, "artifact_binary_name", path)?;
+    let artifact_binary_bytes = parse_required_toml_usize(&source, "artifact_binary_bytes", path)?;
+    let lifecycle_schema = parse_required_toml_string(&source, "lifecycle_schema", path)?;
+    if lifecycle_schema != "nuis-lifecycle-contract-v1" {
+        return Err(format!(
+            "`{}` has unsupported lifecycle schema `{}`; expected `nuis-lifecycle-contract-v1`",
+            path.display(),
+            lifecycle_schema
+        ));
+    }
+    let lifecycle_bootstrap_entry =
+        parse_required_toml_string(&source, "lifecycle_bootstrap_entry", path)?;
+    let lifecycle_tick_policy = parse_required_toml_string(&source, "lifecycle_tick_policy", path)?;
+    let lifecycle_shutdown_policy =
+        parse_required_toml_string(&source, "lifecycle_shutdown_policy", path)?;
+    let lifecycle_yalivia_rpc = parse_required_toml_string(&source, "lifecycle_yalivia_rpc", path)?;
+    let lifecycle_hook_surface =
+        parse_required_toml_string_array(&source, "lifecycle_hook_surface", path)?;
+    let lifecycle_export_surface =
+        parse_required_toml_string_array(&source, "lifecycle_export_surface", path)?;
+    let lifecycle_runtime_capability_flags =
+        parse_required_toml_string_array(&source, "lifecycle_runtime_capability_flags", path)?;
+    let envelope_function_kind = parse_required_toml_string(&source, "function_kind", path)?;
+    if envelope_function_kind != "function-node" {
+        return Err(format!(
+            "`{}` has unsupported nuis envelope function_kind `{}`; expected `function-node`",
+            path.display(),
+            envelope_function_kind
+        ));
+    }
+    let envelope_graph_kind = parse_required_toml_string(&source, "graph_kind", path)?;
+    if envelope_graph_kind != "function-graph" {
+        return Err(format!(
+            "`{}` has unsupported nuis envelope graph_kind `{}`; expected `function-graph`",
+            path.display(),
+            envelope_graph_kind
+        ));
+    }
+    let envelope_time_mode = parse_required_toml_string(&source, "default_time_mode", path)?;
+    if envelope_time_mode.is_empty() {
+        return Err(format!(
+            "`{}` has empty nuis envelope default_time_mode",
+            path.display()
+        ));
+    }
     let cpu_target_abi = parse_required_toml_string(&source, "cpu_target_abi", path)?;
     let cpu_target_machine_arch =
         parse_required_toml_string(&source, "cpu_target_machine_arch", path)?;
@@ -669,6 +1724,104 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         return Err(format!(
             "`{}` does not contain any `[[artifact_hash]]` blocks",
             path.display()
+        ));
+    }
+
+    let execution_contracts_checked = source
+        .lines()
+        .filter(|line| line.trim() == "[[execution_contract]]")
+        .count();
+    if execution_contracts_checked != envelope_package_count {
+        return Err(format!(
+            "`{}` execution_contract block count mismatch: envelope package_count={}, blocks={}",
+            path.display(),
+            envelope_package_count,
+            execution_contracts_checked
+        ));
+    }
+    let parsed_envelope = parse_nuis_executable_envelope(Path::new(&envelope_path))?;
+    if parsed_envelope.schema != envelope_schema {
+        return Err(format!(
+            "`{}` nuis envelope schema mismatch between manifest and `{}`",
+            path.display(),
+            envelope_path
+        ));
+    }
+    if parsed_envelope.package_count != envelope_package_count {
+        return Err(format!(
+            "`{}` nuis envelope package_count mismatch between manifest and `{}`",
+            path.display(),
+            envelope_path
+        ));
+    }
+    if parsed_envelope.executable_kind != packaging_mode {
+        return Err(format!(
+            "`{}` nuis envelope executable_kind mismatch between manifest and `{}`",
+            path.display(),
+            envelope_path
+        ));
+    }
+    let parsed_artifact = parse_nuis_compiled_artifact(Path::new(&artifact_path))?;
+    if parsed_artifact.schema != artifact_schema {
+        return Err(format!(
+            "`{}` nuis artifact schema mismatch between manifest and `{}`",
+            path.display(),
+            artifact_path
+        ));
+    }
+    if parsed_artifact.packaging_mode != packaging_mode {
+        return Err(format!(
+            "`{}` nuis artifact packaging_mode mismatch between manifest and `{}`",
+            path.display(),
+            artifact_path
+        ));
+    }
+    if parsed_artifact.binary_name != artifact_binary_name {
+        return Err(format!(
+            "`{}` nuis artifact binary_name mismatch between manifest and `{}`",
+            path.display(),
+            artifact_path
+        ));
+    }
+    if parsed_artifact.binary_bytes != artifact_binary_bytes {
+        return Err(format!(
+            "`{}` nuis artifact binary_bytes mismatch between manifest and `{}`",
+            path.display(),
+            artifact_path
+        ));
+    }
+    if parsed_artifact.build_manifest_source != source {
+        return Err(format!(
+            "`{}` nuis artifact embedded build manifest does not match manifest source",
+            path.display()
+        ));
+    }
+    if parsed_artifact.envelope != parsed_envelope {
+        return Err(format!(
+            "`{}` nuis artifact envelope mismatch between manifest and `{}`",
+            path.display(),
+            artifact_path
+        ));
+    }
+    if parsed_artifact.lifecycle.schema != "nuis-lifecycle-contract-v1" {
+        return Err(format!(
+            "`{}` nuis artifact lifecycle schema mismatch: expected `nuis-lifecycle-contract-v1`, found `{}`",
+            path.display(),
+            parsed_artifact.lifecycle.schema
+        ));
+    }
+    if parsed_artifact.lifecycle.bootstrap_entry != lifecycle_bootstrap_entry
+        || parsed_artifact.lifecycle.tick_policy != lifecycle_tick_policy
+        || parsed_artifact.lifecycle.shutdown_policy != lifecycle_shutdown_policy
+        || parsed_artifact.lifecycle.yalivia_rpc != lifecycle_yalivia_rpc
+        || parsed_artifact.lifecycle.hook_surface != lifecycle_hook_surface
+        || parsed_artifact.lifecycle.export_surface != lifecycle_export_surface
+        || parsed_artifact.lifecycle.runtime_capability_flags != lifecycle_runtime_capability_flags
+    {
+        return Err(format!(
+            "`{}` nuis artifact lifecycle contract mismatch between manifest and `{}`",
+            path.display(),
+            artifact_path
         ));
     }
 
@@ -729,6 +1882,24 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         input,
         output_dir,
         packaging_mode,
+        envelope_path,
+        envelope_schema,
+        envelope_package_count,
+        artifact_path,
+        artifact_schema,
+        artifact_binary_name,
+        artifact_binary_bytes,
+        lifecycle_schema: parsed_artifact.lifecycle.schema.clone(),
+        lifecycle_bootstrap_entry,
+        lifecycle_tick_policy,
+        lifecycle_shutdown_policy,
+        lifecycle_yalivia_rpc,
+        lifecycle_hook_count: lifecycle_hook_surface.len(),
+        lifecycle_hook_surface: lifecycle_hook_surface.clone(),
+        lifecycle_export_count: lifecycle_export_surface.len(),
+        lifecycle_export_surface: lifecycle_export_surface.clone(),
+        lifecycle_runtime_capability_flags: lifecycle_runtime_capability_flags.clone(),
+        execution_contracts_checked,
         cpu_target_abi,
         cpu_target_machine_arch,
         cpu_target_machine_os,
@@ -743,6 +1914,149 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         project_packet_index,
         artifacts_checked: artifacts.len(),
         project_metadata_checked,
+    })
+}
+
+pub fn verify_nuis_compiled_artifact(
+    path: &Path,
+) -> Result<NuisCompiledArtifactVerifyReport, String> {
+    let artifact = parse_nuis_compiled_artifact(path)?;
+    if artifact.schema != "nuis-compiled-artifact-v1" {
+        return Err(format!(
+            "`{}` has unsupported nuis artifact schema `{}`; expected `nuis-compiled-artifact-v1`",
+            path.display(),
+            artifact.schema
+        ));
+    }
+    if artifact.binary_blob.len() != artifact.binary_bytes {
+        return Err(format!(
+            "`{}` binary byte length mismatch: declared={}, actual={}",
+            path.display(),
+            artifact.binary_bytes,
+            artifact.binary_blob.len()
+        ));
+    }
+    if artifact.build_manifest_source.len() != artifact.build_manifest_bytes {
+        return Err(format!(
+            "`{}` build manifest byte length mismatch: declared={}, actual={}",
+            path.display(),
+            artifact.build_manifest_bytes,
+            artifact.build_manifest_source.len()
+        ));
+    }
+    let expected_lifecycle =
+        build_nuis_lifecycle_contract(&artifact.envelope, &artifact.packaging_mode);
+    if artifact.lifecycle != expected_lifecycle {
+        return Err(format!(
+            "`{}` lifecycle contract mismatch: artifact lifecycle does not match the expected contract derived from envelope/package mode",
+            path.display()
+        ));
+    }
+
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("failed to read current time: {error}"))?
+        .as_nanos();
+    let temp_root = std::env::temp_dir().join(format!("nuis_artifact_verify_{nonce}"));
+    fs::create_dir_all(&temp_root)
+        .map_err(|error| format!("failed to create `{}`: {error}", temp_root.display()))?;
+
+    let manifest_path = temp_root.join("nuis.build.manifest.toml");
+    let envelope_path = temp_root.join("nuis.executable.envelope.toml");
+    let artifact_path = temp_root.join("nuis.compiled.artifact");
+    let binary_path = temp_root.join(&artifact.binary_name);
+
+    fs::write(&binary_path, &artifact.binary_blob)
+        .map_err(|error| format!("failed to write `{}`: {error}", binary_path.display()))?;
+    write_nuis_executable_envelope(&envelope_path, &artifact.envelope)?;
+
+    let relocated_manifest = render_relocated_unpacked_build_manifest(
+        &artifact,
+        &temp_root,
+        &envelope_path,
+        &artifact_path,
+        &binary_path,
+    )?;
+    let mut relocated_artifact = artifact.clone();
+    relocated_artifact.build_manifest_source = relocated_manifest.clone();
+    relocated_artifact.build_manifest_bytes = relocated_manifest.len();
+    write_nuis_compiled_artifact(&artifact_path, &relocated_artifact)?;
+    fs::write(&manifest_path, &relocated_manifest)
+        .map_err(|error| format!("failed to write `{}`: {error}", manifest_path.display()))?;
+
+    let manifest_report = verify_build_manifest(&manifest_path)?;
+    let _ = fs::remove_dir_all(&temp_root);
+
+    Ok(NuisCompiledArtifactVerifyReport {
+        schema: artifact.schema,
+        packaging_mode: artifact.packaging_mode,
+        binary_name: artifact.binary_name,
+        binary_bytes: artifact.binary_bytes,
+        build_manifest_bytes: artifact.build_manifest_bytes,
+        envelope_schema: artifact.envelope.schema,
+        envelope_package_count: artifact.envelope.package_count,
+        lifecycle_schema: artifact.lifecycle.schema,
+        lifecycle_bootstrap_entry: artifact.lifecycle.bootstrap_entry,
+        lifecycle_tick_policy: artifact.lifecycle.tick_policy,
+        lifecycle_shutdown_policy: artifact.lifecycle.shutdown_policy,
+        lifecycle_yalivia_rpc: artifact.lifecycle.yalivia_rpc,
+        lifecycle_hook_count: artifact.lifecycle.hook_surface.len(),
+        lifecycle_hook_surface: artifact.lifecycle.hook_surface.clone(),
+        lifecycle_export_count: artifact.lifecycle.export_surface.len(),
+        lifecycle_export_surface: artifact.lifecycle.export_surface.clone(),
+        lifecycle_runtime_capability_flags: artifact.lifecycle.runtime_capability_flags.clone(),
+        lifecycle_contract_consistent: true,
+        lifecycle_runtime_capability_flags_consistent: true,
+        execution_contracts_checked: manifest_report.execution_contracts_checked,
+        cpu_target_abi: artifact.cpu_target_abi,
+        cpu_target_machine_arch: artifact.cpu_target_machine_arch,
+        cpu_target_machine_os: artifact.cpu_target_machine_os,
+        cpu_target_object_format: artifact.cpu_target_object_format,
+        cpu_target_calling_abi: artifact.cpu_target_calling_abi,
+        artifact_roundtrip_verified: true,
+    })
+}
+
+pub fn parse_nuis_executable_envelope(path: &Path) -> Result<NuisExecutableEnvelope, String> {
+    let source = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    parse_nuis_executable_envelope_from_source(&source, path)
+}
+
+pub fn parse_nuis_executable_envelope_from_source(
+    source: &str,
+    path: &Path,
+) -> Result<NuisExecutableEnvelope, String> {
+    let schema = parse_optional_toml_string(source, "envelope_schema")
+        .or_else(|| parse_optional_toml_string(source, "schema"))
+        .ok_or_else(|| format!("`{}` is missing required key `schema`", path.display()))?;
+    let executable_kind = parse_required_toml_string(source, "executable_kind", path)?;
+    let package_count = parse_required_toml_usize(source, "package_count", path)?;
+    let domain_families = parse_required_toml_string_array(source, "domain_families", path)?;
+    let contract_families = parse_required_toml_string_array(source, "contract_families", path)?;
+    let function_kind = parse_required_toml_string(source, "function_kind", path)?;
+    let graph_kind = parse_required_toml_string(source, "graph_kind", path)?;
+    let default_time_mode = parse_required_toml_string(source, "default_time_mode", path)?;
+
+    if package_count != domain_families.len() || package_count != contract_families.len() {
+        return Err(format!(
+            "`{}` nuis envelope package_count mismatch: package_count={}, domains={}, contract_families={}",
+            path.display(),
+            package_count,
+            domain_families.len(),
+            contract_families.len()
+        ));
+    }
+
+    Ok(NuisExecutableEnvelope {
+        schema,
+        executable_kind,
+        package_count,
+        domain_families,
+        contract_families,
+        function_kind,
+        graph_kind,
+        default_time_mode,
     })
 }
 
@@ -817,6 +2131,20 @@ fn parse_required_toml_bool(source: &str, key: &str, path: &Path) -> Result<bool
         .ok_or_else(|| format!("`{}` is missing required key `{key}`", path.display()))
 }
 
+fn parse_required_toml_usize(source: &str, key: &str, path: &Path) -> Result<usize, String> {
+    parse_optional_toml_usize(source, key)
+        .ok_or_else(|| format!("`{}` is missing required key `{key}`", path.display()))
+}
+
+fn parse_required_toml_string_array(
+    source: &str,
+    key: &str,
+    path: &Path,
+) -> Result<Vec<String>, String> {
+    parse_optional_toml_string_array(source, key)
+        .ok_or_else(|| format!("`{}` is missing required key `{key}`", path.display()))
+}
+
 fn parse_optional_toml_string(source: &str, key: &str) -> Option<String> {
     let prefix = format!("{key} = ");
     for raw in source.lines() {
@@ -842,6 +2170,44 @@ fn parse_optional_toml_bool(source: &str, key: &str) -> Option<bool> {
                 "false" => Some(false),
                 _ => None,
             };
+        }
+    }
+    None
+}
+
+fn parse_optional_toml_usize(source: &str, key: &str) -> Option<usize> {
+    let prefix = format!("{key} = ");
+    for raw in source.lines() {
+        let line = raw.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            return rest.trim().parse::<usize>().ok();
+        }
+    }
+    None
+}
+
+fn parse_optional_toml_string_array(source: &str, key: &str) -> Option<Vec<String>> {
+    let prefix = format!("{key} = ");
+    for raw in source.lines() {
+        let line = raw.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            let value = rest.trim();
+            if !value.starts_with('[') || !value.ends_with(']') {
+                return None;
+            }
+            let inner = value[1..value.len() - 1].trim();
+            if inner.is_empty() {
+                return Some(Vec::new());
+            }
+            let mut items = Vec::new();
+            for part in inner.split(',') {
+                let item = part.trim();
+                if !item.starts_with('"') || !item.ends_with('"') || item.len() < 2 {
+                    return None;
+                }
+                items.push(item[1..item.len() - 1].to_owned());
+            }
+            return Some(items);
         }
     }
     None
@@ -1008,8 +2374,51 @@ fn compile_native_binary(
     }
 }
 
+fn ast_uses_network_lifecycle_surface(ast: &AstModule) -> bool {
+    ast.domain == "network"
+        || ast
+            .externs
+            .iter()
+            .any(|function| function.name.starts_with("host_network_"))
+}
+
+fn ast_uses_hetero_lifecycle_surface(ast: &AstModule) -> bool {
+    ast.domain == "shader"
+        || ast.domain == "kernel"
+        || ast.externs.iter().any(|function| {
+            function.name.starts_with("host_shader_") || function.name.starts_with("host_kernel_")
+        })
+}
+
+fn ast_hetero_lifecycle_surface_slots(ast: &AstModule) -> usize {
+    let mut slots = 0usize;
+    if ast.domain == "shader" || ast.domain == "kernel" {
+        slots += 1;
+    }
+    slots
+        + ast
+            .externs
+            .iter()
+            .filter(|function| {
+                function.name.starts_with("host_shader_")
+                    || function.name.starts_with("host_kernel_")
+            })
+            .count()
+}
+
 fn c_shim_source(ast: &AstModule) -> String {
     let mut out = String::new();
+    let network_lifecycle_enabled = if ast_uses_network_lifecycle_surface(ast) {
+        "1"
+    } else {
+        "0"
+    };
+    let hetero_lifecycle_enabled = if ast_uses_hetero_lifecycle_surface(ast) {
+        "1"
+    } else {
+        "0"
+    };
+    let hetero_lifecycle_surface_slots = ast_hetero_lifecycle_surface_slots(ast);
     out.push_str(
         r#"#include <stdint.h>
 #include <stdio.h>
@@ -1054,6 +2463,138 @@ static int nuis_host_subprocess_done[256];
 static int nuis_host_subprocess_timed_out[256];
 static int64_t nuis_host_subprocess_deadline_ns[256];
 static int64_t nuis_host_subprocess_len = 0;
+"#,
+    );
+    out.push_str(&format!(
+        "static int64_t nuis_lifecycle_network_enabled = {network_lifecycle_enabled};\n"
+    ));
+    out.push_str(&format!(
+        "static int64_t nuis_lifecycle_hetero_enabled = {hetero_lifecycle_enabled};\n"
+    ));
+    out.push_str(&format!(
+        "static int64_t nuis_lifecycle_hetero_surface_slots = {hetero_lifecycle_surface_slots};\n"
+    ));
+    out.push_str(
+        r#"
+
+typedef struct {
+    int64_t phase;
+    int64_t tick_count;
+    int64_t task_poll_count;
+    int64_t summary_flush_count;
+    int64_t network_bridge_progress_count;
+    int64_t hetero_submission_progress_count;
+    int64_t last_status;
+    int64_t yalivia_rpc_enabled;
+} NuisLifecycleState;
+
+static NuisLifecycleState nuis_lifecycle_state = {0, 0, 0, 0, 0, 0, 0, 1};
+
+static void nuis_lifecycle_state_reset(void) {
+    nuis_lifecycle_state.phase = 0;
+    nuis_lifecycle_state.tick_count = 0;
+    nuis_lifecycle_state.task_poll_count = 0;
+    nuis_lifecycle_state.summary_flush_count = 0;
+    nuis_lifecycle_state.network_bridge_progress_count = 0;
+    nuis_lifecycle_state.hetero_submission_progress_count = 0;
+    nuis_lifecycle_state.last_status = 0;
+    nuis_lifecycle_state.yalivia_rpc_enabled = 1;
+}
+
+static int64_t nuis_lifecycle_on_bridge_bind_v1(void) {
+    return 0;
+}
+
+static int64_t nuis_lifecycle_on_scheduler_tick_v1(int64_t tick) {
+    return tick;
+}
+
+static int64_t nuis_lifecycle_on_task_poll_v1(void) {
+    nuis_lifecycle_state.task_poll_count += 1;
+    return nuis_lifecycle_state.task_poll_count;
+}
+
+static int64_t nuis_lifecycle_on_result_commit_v1(int64_t status) {
+    nuis_lifecycle_state.last_status = status;
+    return status;
+}
+
+static int64_t nuis_lifecycle_on_summary_flush_v1(void) {
+    nuis_lifecycle_state.summary_flush_count += 1;
+    return nuis_lifecycle_state.summary_flush_count;
+}
+
+static int64_t nuis_lifecycle_sample_network_bridge_progress_v1(void) {
+    return nuis_host_network_fd_len;
+}
+
+static int64_t nuis_lifecycle_on_network_bridge_progress_v1(void) {
+    if (nuis_lifecycle_network_enabled == 0) return 0;
+    int64_t observed = nuis_lifecycle_sample_network_bridge_progress_v1();
+    if (observed > nuis_lifecycle_state.network_bridge_progress_count) {
+        nuis_lifecycle_state.network_bridge_progress_count = observed;
+    } else if (observed > 0) {
+        nuis_lifecycle_state.network_bridge_progress_count += 1;
+    }
+    return nuis_lifecycle_state.network_bridge_progress_count;
+}
+
+static int64_t nuis_lifecycle_sample_hetero_submission_progress_v1(void) {
+    return nuis_lifecycle_hetero_surface_slots;
+}
+
+static int64_t nuis_lifecycle_on_hetero_submission_progress_v1(void) {
+    if (nuis_lifecycle_hetero_enabled == 0) return 0;
+    int64_t observed = nuis_lifecycle_sample_hetero_submission_progress_v1();
+    if (observed > nuis_lifecycle_state.hetero_submission_progress_count) {
+        nuis_lifecycle_state.hetero_submission_progress_count = observed;
+    } else if (observed > 0) {
+        nuis_lifecycle_state.hetero_submission_progress_count += 1;
+    }
+    return nuis_lifecycle_state.hetero_submission_progress_count;
+}
+
+static int64_t nuis_lifecycle_on_managed_rpc_v1(void) {
+    return nuis_lifecycle_state.yalivia_rpc_enabled;
+}
+
+static int64_t nuis_lifecycle_on_shutdown_prepare_v1(int64_t status) {
+    nuis_lifecycle_state.last_status = status;
+    return status;
+}
+
+static int64_t nuis_lifecycle_bootstrap_entry_v1(void) {
+    nuis_lifecycle_state_reset();
+    nuis_lifecycle_state.phase = 1;
+    (void)nuis_lifecycle_on_bridge_bind_v1();
+    (void)nuis_lifecycle_on_managed_rpc_v1();
+    return 0;
+}
+
+static int64_t nuis_lifecycle_tick_once_v1(void) {
+    if (nuis_lifecycle_state.phase == 0) return 0;
+    if (nuis_lifecycle_state.phase == 3) return nuis_lifecycle_state.last_status;
+    nuis_lifecycle_state.phase = 2;
+    nuis_lifecycle_state.tick_count += 1;
+    (void)nuis_lifecycle_on_scheduler_tick_v1(nuis_lifecycle_state.tick_count);
+    (void)nuis_lifecycle_on_task_poll_v1();
+    (void)nuis_lifecycle_on_network_bridge_progress_v1();
+    (void)nuis_lifecycle_on_hetero_submission_progress_v1();
+    return nuis_lifecycle_state.tick_count;
+}
+
+static int64_t nuis_lifecycle_shutdown_v1(int64_t status) {
+    (void)nuis_lifecycle_on_result_commit_v1(status);
+    (void)nuis_lifecycle_on_summary_flush_v1();
+    (void)nuis_lifecycle_on_shutdown_prepare_v1(status);
+    nuis_lifecycle_state.phase = 3;
+    nuis_lifecycle_state.last_status = status;
+    return status;
+}
+
+static int64_t nuis_lifecycle_yalivia_rpc_hook_v1(void) {
+    return nuis_lifecycle_state.yalivia_rpc_enabled;
+}
 
 static int64_t nuis_host_text_register(const char* text) {
     if (text == NULL) return 0;
@@ -3102,13 +4643,20 @@ int64_t host_mix_tick(int64_t base, int64_t tick) {
         out.push('\n');
         out.push_str(&render_exported_entry_wrapper(&export_name));
     }
+    out.push('\n');
+    out.push_str(&render_lifecycle_export_wrappers());
     out.push_str(
         r#"
 
 int main(int argc, char** argv) {
     nuis_argc = argc;
     nuis_argv = argv;
-    return (int)nuis_yir_entry();
+    if (nuis_lifecycle_bootstrap_entry_v1() != 0) {
+        return 1;
+    }
+    int64_t entry_status = nuis_yir_entry();
+    (void)nuis_lifecycle_tick_once_v1();
+    return (int)nuis_lifecycle_shutdown_v1(entry_status);
 }
 "#,
     );
@@ -3135,6 +4683,34 @@ fn collect_exported_entry_symbols(ast: &AstModule) -> Vec<String> {
 
 fn render_exported_entry_wrapper(symbol: &str) -> String {
     format!("int64_t {symbol}(void) {{\n    return nuis_yir_entry();\n}}\n")
+}
+
+fn render_lifecycle_export_wrappers() -> String {
+    r#"int64_t nuis_lifecycle_bootstrap_export_v1(void) {
+    return nuis_lifecycle_bootstrap_entry_v1();
+}
+
+int64_t nuis_lifecycle_tick_export_v1(void) {
+    return nuis_lifecycle_tick_once_v1();
+}
+
+int64_t nuis_lifecycle_shutdown_export_v1(int64_t status) {
+    return nuis_lifecycle_shutdown_v1(status);
+}
+
+int64_t nuis_lifecycle_yalivia_rpc_export_v1(void) {
+    return nuis_lifecycle_yalivia_rpc_hook_v1();
+}
+
+int64_t nuis_lifecycle_network_bridge_progress_export_v1(void) {
+    return nuis_lifecycle_state.network_bridge_progress_count;
+}
+
+int64_t nuis_lifecycle_hetero_submission_progress_export_v1(void) {
+    return nuis_lifecycle_state.hetero_submission_progress_count;
+}
+"#
+    .to_owned()
 }
 
 fn collect_host_ffi_symbols(ast: &AstModule) -> BTreeMap<String, AstExternFunction> {
@@ -3887,9 +5463,13 @@ fn c_type_for_ast_type(ty: &AstTypeRef) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        c_shim_source, resolve_cpu_build_target_from_abi, verify_build_manifest,
+        build_nuis_lifecycle_contract, c_shim_source, decode_nuis_compiled_artifact_binary,
+        decode_nuis_executable_envelope_binary, encode_nuis_compiled_artifact_binary,
+        encode_nuis_executable_envelope_binary, parse_nuis_compiled_artifact,
+        parse_nuis_executable_envelope, render_nuis_executable_envelope,
+        resolve_cpu_build_target_from_abi, verify_build_manifest, verify_nuis_compiled_artifact,
         BuildManifestCacheInfo, BuildManifestContext, BuildManifestProjectInfo, CompileArtifacts,
-        CpuBuildTarget,
+        CpuBuildTarget, NuisExecutableEnvelope,
     };
     use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef, AstVisibility};
     use std::{
@@ -4040,9 +5620,122 @@ mod tests {
         )
         .unwrap();
         let manifest_text = std::fs::read_to_string(&manifest).unwrap();
+        assert!(manifest_text.contains("[nuis_envelope]"));
+        assert!(manifest_text.contains("path = "));
+        assert!(manifest_text.contains("schema = \"nuis-executable-envelope-v1\""));
+        assert!(manifest_text.contains("[nuis_artifact]"));
+        assert!(manifest_text.contains("artifact_schema = \"nuis-compiled-artifact-v1\""));
+        assert!(manifest_text.contains("domain_families = [\"cpu\"]"));
         assert!(manifest_text.contains("abi_graph = "));
         assert!(manifest_text.contains("graph\tmode=explicit"));
+        assert!(manifest_text.contains("[[execution_contract]]"));
+        assert!(manifest_text.contains("package_id = \"official.cpu\""));
+        assert!(manifest_text.contains("contract_family = \"nustar.cpu\""));
+        let envelope = parse_nuis_executable_envelope(PathBuf::from(&manifest).as_path()).unwrap();
+        assert_eq!(envelope.schema, "nuis-executable-envelope-v1");
+        assert_eq!(envelope.executable_kind, "native-cpu-llvm");
+        assert_eq!(envelope.package_count, 1);
+        assert_eq!(envelope.domain_families, vec!["cpu".to_owned()]);
+        assert_eq!(envelope.contract_families, vec!["nustar.cpu".to_owned()]);
+        let rendered_envelope = render_nuis_executable_envelope(&envelope);
+        assert!(rendered_envelope.contains("envelope_schema = \"nuis-executable-envelope-v1\""));
+        assert!(rendered_envelope.contains("executable_kind = \"native-cpu-llvm\""));
+        let encoded_envelope = encode_nuis_executable_envelope_binary(&envelope).unwrap();
+        let decoded_envelope = decode_nuis_executable_envelope_binary(&encoded_envelope).unwrap();
+        assert_eq!(decoded_envelope, envelope);
+        let compiled_artifact = parse_nuis_compiled_artifact(
+            PathBuf::from(&dir).join("nuis.compiled.artifact").as_path(),
+        )
+        .unwrap();
+        assert_eq!(compiled_artifact.schema, "nuis-compiled-artifact-v1");
+        assert_eq!(compiled_artifact.packaging_mode, "native-cpu-llvm");
+        assert_eq!(compiled_artifact.binary_name, "demo.bin");
+        assert_eq!(compiled_artifact.binary_blob, b"bin".to_vec());
+        assert_eq!(compiled_artifact.build_manifest_source, manifest_text);
+        assert_eq!(compiled_artifact.build_manifest_bytes, manifest_text.len());
+        assert_eq!(compiled_artifact.envelope, envelope);
+        assert_eq!(
+            compiled_artifact.lifecycle.schema,
+            "nuis-lifecycle-contract-v1"
+        );
+        assert_eq!(
+            compiled_artifact.lifecycle.bootstrap_entry,
+            "nuis.bootstrap.lifecycle.v1"
+        );
+        assert_eq!(compiled_artifact.lifecycle.export_surface.len(), 4);
+        assert_eq!(
+            compiled_artifact.lifecycle.runtime_capability_flags.len(),
+            4
+        );
+        assert!(compiled_artifact
+            .lifecycle
+            .export_surface
+            .contains(&"nuis_lifecycle_tick_export_v1".to_owned()));
+        assert!(compiled_artifact
+            .lifecycle
+            .runtime_capability_flags
+            .contains(&"runtime.tick".to_owned()));
+        assert!(manifest_text.contains("[nuis_lifecycle]"));
+        assert!(manifest_text.contains("lifecycle_schema = \"nuis-lifecycle-contract-v1\""));
+        assert!(manifest_text.contains("lifecycle_export_surface = ["));
+        let unpacked_dir = dir.join("unpacked");
+        fs::create_dir_all(&unpacked_dir).unwrap();
+        let unpacked_envelope = unpacked_dir.join("nuis.executable.envelope.toml");
+        let unpacked_artifact = unpacked_dir.join("nuis.compiled.artifact");
+        let unpacked_binary = unpacked_dir.join("demo.bin");
+        fs::write(&unpacked_binary, &compiled_artifact.binary_blob).unwrap();
+        super::write_nuis_executable_envelope(&unpacked_envelope, &compiled_artifact.envelope)
+            .unwrap();
+        let relocated_manifest = super::render_relocated_unpacked_build_manifest(
+            &compiled_artifact,
+            &unpacked_dir,
+            &unpacked_envelope,
+            &unpacked_artifact,
+            &unpacked_binary,
+        )
+        .unwrap();
+        assert!(
+            relocated_manifest.contains(&format!("output_dir = \"{}\"", unpacked_dir.display()))
+        );
+        assert!(relocated_manifest.contains(&format!(
+            "artifact_path = \"{}\"",
+            unpacked_artifact.display()
+        )));
+        assert!(!relocated_manifest.contains("plan_index = "));
+        let encoded_artifact = encode_nuis_compiled_artifact_binary(&compiled_artifact).unwrap();
+        let decoded_artifact = decode_nuis_compiled_artifact_binary(&encoded_artifact).unwrap();
+        assert_eq!(decoded_artifact, compiled_artifact);
+        let artifact_verify_report = verify_nuis_compiled_artifact(
+            PathBuf::from(&dir).join("nuis.compiled.artifact").as_path(),
+        )
+        .unwrap();
+        assert!(artifact_verify_report.lifecycle_contract_consistent);
+        assert!(artifact_verify_report.lifecycle_runtime_capability_flags_consistent);
         let report = verify_build_manifest(PathBuf::from(manifest).as_path()).unwrap();
+        assert!(std::path::Path::new(&report.envelope_path).exists());
+        assert!(std::path::Path::new(&report.artifact_path).exists());
+        assert_eq!(report.envelope_schema, "nuis-executable-envelope-v1");
+        assert_eq!(report.envelope_package_count, 1);
+        assert_eq!(report.artifact_schema, "nuis-compiled-artifact-v1");
+        assert_eq!(report.artifact_binary_name, "demo.bin");
+        assert_eq!(report.artifact_binary_bytes, 3);
+        assert_eq!(report.lifecycle_schema, "nuis-lifecycle-contract-v1");
+        assert_eq!(
+            report.lifecycle_bootstrap_entry,
+            "nuis.bootstrap.lifecycle.v1"
+        );
+        assert!(report.lifecycle_hook_count >= 7);
+        assert!(report
+            .lifecycle_hook_surface
+            .contains(&"on_scheduler_tick".to_owned()));
+        assert_eq!(report.lifecycle_export_count, 4);
+        assert!(report
+            .lifecycle_export_surface
+            .contains(&"nuis_lifecycle_shutdown_export_v1".to_owned()));
+        assert!(report
+            .lifecycle_runtime_capability_flags
+            .contains(&"runtime.shutdown".to_owned()));
+        assert_eq!(report.execution_contracts_checked, 1);
         assert_eq!(report.cpu_target_abi, cpu_target.abi);
         assert_eq!(report.cpu_target_machine_arch, cpu_target.machine_arch);
         assert_eq!(report.cpu_target_machine_os, cpu_target.machine_os);
@@ -5263,9 +6956,126 @@ mod tests {
         let shim = c_shim_source(&ast);
         assert!(shim.contains("int main(int argc, char** argv)"));
         assert!(shim.contains("nuis_argc = argc;"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_network_enabled = 0;"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_hetero_enabled = 0;"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_hetero_surface_slots = 0;"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_bootstrap_entry_v1(void)"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_tick_once_v1(void)"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_shutdown_v1(int64_t status)"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_yalivia_rpc_hook_v1(void)"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_on_bridge_bind_v1(void)"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_on_scheduler_tick_v1(int64_t tick)"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_on_task_poll_v1(void)"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_on_result_commit_v1(int64_t status)"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_on_summary_flush_v1(void)"));
+        assert!(
+            shim.contains("static int64_t nuis_lifecycle_sample_network_bridge_progress_v1(void)")
+        );
+        assert!(shim
+            .contains("static int64_t nuis_lifecycle_sample_hetero_submission_progress_v1(void)"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_on_network_bridge_progress_v1(void)"));
+        assert!(
+            shim.contains("static int64_t nuis_lifecycle_on_hetero_submission_progress_v1(void)")
+        );
+        assert!(shim.contains("static int64_t nuis_lifecycle_on_managed_rpc_v1(void)"));
+        assert!(
+            shim.contains("static int64_t nuis_lifecycle_on_shutdown_prepare_v1(int64_t status)")
+        );
+        assert!(shim.contains("int64_t nuis_lifecycle_bootstrap_export_v1(void) {"));
+        assert!(shim.contains("return nuis_lifecycle_bootstrap_entry_v1();"));
+        assert!(shim.contains("int64_t nuis_lifecycle_tick_export_v1(void) {"));
+        assert!(shim.contains("return nuis_lifecycle_tick_once_v1();"));
+        assert!(shim.contains("int64_t nuis_lifecycle_shutdown_export_v1(int64_t status) {"));
+        assert!(shim.contains("return nuis_lifecycle_shutdown_v1(status);"));
+        assert!(shim.contains("int64_t nuis_lifecycle_yalivia_rpc_export_v1(void) {"));
+        assert!(shim.contains("return nuis_lifecycle_yalivia_rpc_hook_v1();"));
+        assert!(shim.contains("int64_t nuis_lifecycle_network_bridge_progress_export_v1(void) {"));
+        assert!(shim.contains("return nuis_lifecycle_state.network_bridge_progress_count;"));
+        assert!(
+            shim.contains("int64_t nuis_lifecycle_hetero_submission_progress_export_v1(void) {")
+        );
+        assert!(shim.contains("return nuis_lifecycle_state.hetero_submission_progress_count;"));
+        assert!(shim.contains("if (nuis_lifecycle_bootstrap_entry_v1() != 0) {"));
+        assert!(shim.contains("(void)nuis_lifecycle_on_bridge_bind_v1();"));
+        assert!(shim.contains("(void)nuis_lifecycle_on_managed_rpc_v1();"));
+        assert!(shim.contains("int64_t entry_status = nuis_yir_entry();"));
+        assert!(shim.contains("(void)nuis_lifecycle_tick_once_v1();"));
+        assert!(shim.contains(
+            "(void)nuis_lifecycle_on_scheduler_tick_v1(nuis_lifecycle_state.tick_count);"
+        ));
+        assert!(shim.contains("(void)nuis_lifecycle_on_task_poll_v1();"));
+        assert!(shim.contains("(void)nuis_lifecycle_on_network_bridge_progress_v1();"));
+        assert!(shim.contains("(void)nuis_lifecycle_on_hetero_submission_progress_v1();"));
+        assert!(shim.contains("(void)nuis_lifecycle_on_result_commit_v1(status);"));
+        assert!(shim.contains("(void)nuis_lifecycle_on_summary_flush_v1();"));
+        assert!(shim.contains("(void)nuis_lifecycle_on_shutdown_prepare_v1(status);"));
+        assert!(shim.contains("return (int)nuis_lifecycle_shutdown_v1(entry_status);"));
         assert!(shim.contains("return nuis_host_argv_count();"));
         assert!(shim.contains("return nuis_host_cwd_handle();"));
         assert!(shim.contains("return nuis_host_monotonic_time_ns();"));
+    }
+
+    #[test]
+    fn lifecycle_contract_expands_export_surface_for_network_and_hetero_domains() {
+        let envelope = NuisExecutableEnvelope {
+            schema: "nuis-executable-envelope-v1".to_owned(),
+            executable_kind: "native-cpu-llvm".to_owned(),
+            package_count: 3,
+            domain_families: vec!["cpu".to_owned(), "network".to_owned(), "kernel".to_owned()],
+            contract_families: vec![
+                "nustar.cpu".to_owned(),
+                "nustar.network".to_owned(),
+                "nustar.kernel".to_owned(),
+            ],
+            function_kind: "function-node".to_owned(),
+            graph_kind: "function-graph".to_owned(),
+            default_time_mode: "host-monotonic".to_owned(),
+        };
+
+        let lifecycle = build_nuis_lifecycle_contract(&envelope, "native-cpu-llvm");
+        assert!(lifecycle
+            .hook_surface
+            .contains(&"on_network_bridge_progress".to_owned()));
+        assert!(lifecycle
+            .hook_surface
+            .contains(&"on_hetero_submission_progress".to_owned()));
+        assert!(lifecycle
+            .export_surface
+            .contains(&"nuis_lifecycle_network_bridge_progress_export_v1".to_owned()));
+        assert!(lifecycle
+            .export_surface
+            .contains(&"nuis_lifecycle_hetero_submission_progress_export_v1".to_owned()));
+        assert_eq!(lifecycle.export_surface.len(), 6);
+        assert!(lifecycle
+            .runtime_capability_flags
+            .contains(&"runtime.progress.network".to_owned()));
+        assert!(lifecycle
+            .runtime_capability_flags
+            .contains(&"runtime.progress.hetero".to_owned()));
+    }
+
+    #[test]
+    fn c_shim_source_enables_hetero_lifecycle_surface_for_shader_modules() {
+        let ast = AstModule {
+            uses: Vec::new(),
+            domain: "shader".to_owned(),
+            unit: "SurfaceShader".to_owned(),
+            externs: Vec::new(),
+            extern_interfaces: Vec::new(),
+            consts: Vec::new(),
+            type_aliases: Vec::new(),
+            structs: Vec::new(),
+            enums: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
+            functions: Vec::new(),
+        };
+
+        let shim = c_shim_source(&ast);
+        assert!(shim.contains("static int64_t nuis_lifecycle_network_enabled = 0;"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_hetero_enabled = 1;"));
+        assert!(shim.contains("static int64_t nuis_lifecycle_hetero_surface_slots = 1;"));
+        assert!(shim.contains("return nuis_lifecycle_hetero_surface_slots;"));
     }
 
     #[test]
@@ -6017,6 +7827,8 @@ mod tests {
         };
 
         let shim = c_shim_source(&ast);
+        assert!(shim.contains("static int64_t nuis_lifecycle_network_enabled = 1;"));
+        assert!(shim.contains("return nuis_host_network_fd_len;"));
         assert!(shim.contains(
             "return nuis_host_network_connect_probe(local_port, remote_port, connect_timeout_ms);"
         ));

@@ -15,7 +15,8 @@ pub mod project;
 pub mod registry;
 pub mod render;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub use cli::CommandKind;
 
@@ -46,6 +47,23 @@ fn json_bool_field(name: &str, value: bool) -> String {
     format!("\"{}\":{}", name, if value { "true" } else { "false" })
 }
 
+fn json_string_field(name: &str, value: &str) -> String {
+    format!("\"{}\":\"{}\"", name, json_escape(value))
+}
+
+fn json_usize_field(name: &str, value: usize) -> String {
+    format!("\"{}\":{}", name, value)
+}
+
+fn json_string_array_field(name: &str, values: &[String]) -> String {
+    let entries = values
+        .iter()
+        .map(|value| format!("\"{}\"", json_escape(value)))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("\"{}\":[{}]", name, entries)
+}
+
 pub fn project_compile_workflow_brief() -> &'static str {
     "health -> structure -> scheduler -> abi_lock -> check -> test -> build -> release_check"
 }
@@ -73,6 +91,281 @@ fn compile_command_input(input: &Path) -> Result<CompiledCommandInput, String> {
         resolved,
         artifacts,
     })
+}
+
+fn load_nuis_executable_envelope(input: &Path) -> Result<aot::NuisExecutableEnvelope, String> {
+    let bytes = std::fs::read(input)
+        .map_err(|error| format!("failed to read `{}`: {error}", input.display()))?;
+    if bytes.starts_with(b"NENV") {
+        aot::decode_nuis_executable_envelope_binary(&bytes)
+    } else if input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name == "nuis.build.manifest.toml")
+        .unwrap_or(false)
+    {
+        let report = aot::verify_build_manifest(input)?;
+        aot::parse_nuis_executable_envelope(Path::new(&report.envelope_path))
+    } else {
+        aot::parse_nuis_executable_envelope(input)
+    }
+}
+
+fn load_nuis_compiled_artifact(input: &Path) -> Result<aot::NuisCompiledArtifact, String> {
+    let bytes = std::fs::read(input)
+        .map_err(|error| format!("failed to read `{}`: {error}", input.display()))?;
+    if bytes.starts_with(b"NART") {
+        aot::decode_nuis_compiled_artifact_binary(&bytes)
+    } else if input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name == "nuis.build.manifest.toml")
+        .unwrap_or(false)
+    {
+        let report = aot::verify_build_manifest(input)?;
+        aot::parse_nuis_compiled_artifact(Path::new(&report.artifact_path))
+    } else {
+        aot::parse_nuis_compiled_artifact(input)
+    }
+}
+
+fn inspect_artifact_json(input: &Path, artifact: &aot::NuisCompiledArtifact) -> String {
+    let fields = vec![
+        json_string_field("kind", "nuis_artifact_inspect"),
+        json_string_field("input", &input.display().to_string()),
+        json_string_field("schema", &artifact.schema),
+        json_string_field("packaging_mode", &artifact.packaging_mode),
+        json_string_field("cpu_target_abi", &artifact.cpu_target_abi),
+        json_string_field("cpu_target_machine_arch", &artifact.cpu_target_machine_arch),
+        json_string_field("cpu_target_machine_os", &artifact.cpu_target_machine_os),
+        json_string_field(
+            "cpu_target_object_format",
+            &artifact.cpu_target_object_format,
+        ),
+        json_string_field("cpu_target_calling_abi", &artifact.cpu_target_calling_abi),
+        json_string_field("binary_name", &artifact.binary_name),
+        json_usize_field("binary_bytes", artifact.binary_bytes),
+        json_usize_field("build_manifest_bytes", artifact.build_manifest_bytes),
+        json_string_field("envelope_schema", &artifact.envelope.schema),
+        json_string_array_field(
+            "envelope_contract_families",
+            &artifact.envelope.contract_families,
+        ),
+        json_string_field("lifecycle_schema", &artifact.lifecycle.schema),
+        json_string_field(
+            "lifecycle_bootstrap_entry",
+            &artifact.lifecycle.bootstrap_entry,
+        ),
+        json_string_field("lifecycle_tick_policy", &artifact.lifecycle.tick_policy),
+        json_string_field(
+            "lifecycle_shutdown_policy",
+            &artifact.lifecycle.shutdown_policy,
+        ),
+        json_string_field("lifecycle_yalivia_rpc", &artifact.lifecycle.yalivia_rpc),
+        json_usize_field(
+            "lifecycle_hook_count",
+            artifact.lifecycle.hook_surface.len(),
+        ),
+        json_string_array_field("lifecycle_hook_surface", &artifact.lifecycle.hook_surface),
+        json_usize_field(
+            "lifecycle_export_count",
+            artifact.lifecycle.export_surface.len(),
+        ),
+        json_string_array_field(
+            "lifecycle_export_surface",
+            &artifact.lifecycle.export_surface,
+        ),
+        json_string_array_field(
+            "lifecycle_runtime_capability_flags",
+            &artifact.lifecycle.runtime_capability_flags,
+        ),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn verify_artifact_json(input: &Path, report: &aot::NuisCompiledArtifactVerifyReport) -> String {
+    let fields = vec![
+        json_string_field("kind", "nuis_artifact_verify"),
+        json_string_field("input", &input.display().to_string()),
+        json_string_field("schema", &report.schema),
+        json_string_field("packaging_mode", &report.packaging_mode),
+        json_string_field("binary_name", &report.binary_name),
+        json_usize_field("binary_bytes", report.binary_bytes),
+        json_usize_field("build_manifest_bytes", report.build_manifest_bytes),
+        json_string_field("envelope_schema", &report.envelope_schema),
+        json_usize_field("envelope_package_count", report.envelope_package_count),
+        json_string_field("lifecycle_schema", &report.lifecycle_schema),
+        json_string_field(
+            "lifecycle_bootstrap_entry",
+            &report.lifecycle_bootstrap_entry,
+        ),
+        json_string_field("lifecycle_tick_policy", &report.lifecycle_tick_policy),
+        json_string_field(
+            "lifecycle_shutdown_policy",
+            &report.lifecycle_shutdown_policy,
+        ),
+        json_string_field("lifecycle_yalivia_rpc", &report.lifecycle_yalivia_rpc),
+        json_usize_field("lifecycle_hook_count", report.lifecycle_hook_count),
+        json_string_array_field("lifecycle_hook_surface", &report.lifecycle_hook_surface),
+        json_usize_field("lifecycle_export_count", report.lifecycle_export_count),
+        json_string_array_field("lifecycle_export_surface", &report.lifecycle_export_surface),
+        json_string_array_field(
+            "lifecycle_runtime_capability_flags",
+            &report.lifecycle_runtime_capability_flags,
+        ),
+        json_bool_field(
+            "lifecycle_contract_consistent",
+            report.lifecycle_contract_consistent,
+        ),
+        json_bool_field(
+            "lifecycle_runtime_capability_flags_consistent",
+            report.lifecycle_runtime_capability_flags_consistent,
+        ),
+        json_usize_field(
+            "execution_contracts_checked",
+            report.execution_contracts_checked,
+        ),
+        json_string_field("cpu_target_abi", &report.cpu_target_abi),
+        json_string_field("cpu_target_machine_arch", &report.cpu_target_machine_arch),
+        json_string_field("cpu_target_machine_os", &report.cpu_target_machine_os),
+        json_string_field("cpu_target_object_format", &report.cpu_target_object_format),
+        json_string_field("cpu_target_calling_abi", &report.cpu_target_calling_abi),
+        json_bool_field(
+            "artifact_roundtrip_verified",
+            report.artifact_roundtrip_verified,
+        ),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyReport) -> String {
+    let fields = vec![
+        json_string_field("kind", "nuis_build_manifest_verify"),
+        json_string_field("input", &input.display().to_string()),
+        json_string_field("schema", &report.schema),
+        json_string_field("manifest_input", &report.input),
+        json_string_field("output_dir", &report.output_dir),
+        json_string_field("packaging_mode", &report.packaging_mode),
+        json_string_field("envelope_path", &report.envelope_path),
+        json_string_field("envelope_schema", &report.envelope_schema),
+        json_usize_field("envelope_package_count", report.envelope_package_count),
+        json_string_field("artifact_path", &report.artifact_path),
+        json_string_field("artifact_schema", &report.artifact_schema),
+        json_string_field("artifact_binary_name", &report.artifact_binary_name),
+        json_usize_field("artifact_binary_bytes", report.artifact_binary_bytes),
+        json_string_field("lifecycle_schema", &report.lifecycle_schema),
+        json_string_field(
+            "lifecycle_bootstrap_entry",
+            &report.lifecycle_bootstrap_entry,
+        ),
+        json_string_field("lifecycle_tick_policy", &report.lifecycle_tick_policy),
+        json_string_field(
+            "lifecycle_shutdown_policy",
+            &report.lifecycle_shutdown_policy,
+        ),
+        json_string_field("lifecycle_yalivia_rpc", &report.lifecycle_yalivia_rpc),
+        json_usize_field("lifecycle_hook_count", report.lifecycle_hook_count),
+        json_string_array_field("lifecycle_hook_surface", &report.lifecycle_hook_surface),
+        json_usize_field("lifecycle_export_count", report.lifecycle_export_count),
+        json_string_array_field("lifecycle_export_surface", &report.lifecycle_export_surface),
+        json_string_array_field(
+            "lifecycle_runtime_capability_flags",
+            &report.lifecycle_runtime_capability_flags,
+        ),
+        json_usize_field(
+            "execution_contracts_checked",
+            report.execution_contracts_checked,
+        ),
+        json_string_field("cpu_target_abi", &report.cpu_target_abi),
+        json_string_field("cpu_target_machine_arch", &report.cpu_target_machine_arch),
+        json_string_field("cpu_target_machine_os", &report.cpu_target_machine_os),
+        json_string_field("cpu_target_object_format", &report.cpu_target_object_format),
+        json_string_field("cpu_target_calling_abi", &report.cpu_target_calling_abi),
+        json_string_field("cpu_target_clang", &report.cpu_target_clang),
+        json_bool_field("cpu_target_cross", report.cpu_target_cross),
+        json_usize_field("artifacts_checked", report.artifacts_checked),
+        json_usize_field("project_metadata_checked", report.project_metadata_checked),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn reconstruct_manifest_report_from_artifact(
+    input: &Path,
+    artifact: &aot::NuisCompiledArtifact,
+) -> Result<(PathBuf, aot::BuildManifestVerifyReport), String> {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("failed to read current time: {error}"))?
+        .as_nanos();
+    let temp_root = std::env::temp_dir().join(format!("nuis_artifact_report_{nonce}"));
+    std::fs::create_dir_all(&temp_root)
+        .map_err(|error| format!("failed to create `{}`: {error}", temp_root.display()))?;
+
+    let manifest_path = temp_root.join("nuis.build.manifest.toml");
+    let envelope_path = temp_root.join("nuis.executable.envelope.toml");
+    let artifact_path = temp_root.join("nuis.compiled.artifact");
+    let binary_path = temp_root.join(&artifact.binary_name);
+
+    let result = (|| {
+        std::fs::write(&binary_path, &artifact.binary_blob)
+            .map_err(|error| format!("failed to write `{}`: {error}", binary_path.display()))?;
+        aot::write_nuis_executable_envelope(&envelope_path, &artifact.envelope)?;
+        let relocated_manifest = aot::render_relocated_unpacked_build_manifest(
+            artifact,
+            &temp_root,
+            &envelope_path,
+            &artifact_path,
+            &binary_path,
+        )?;
+        let mut relocated_artifact = artifact.clone();
+        relocated_artifact.build_manifest_source = relocated_manifest.clone();
+        relocated_artifact.build_manifest_bytes = relocated_manifest.len();
+        aot::write_nuis_compiled_artifact(&artifact_path, &relocated_artifact)?;
+        std::fs::write(&manifest_path, relocated_manifest)
+            .map_err(|error| format!("failed to write `{}`: {error}", manifest_path.display()))?;
+        let report = aot::verify_build_manifest(&manifest_path)?;
+        Ok((manifest_path.clone(), report))
+    })();
+
+    let _ = std::fs::remove_dir_all(&temp_root);
+    result.map_err(|error: String| {
+        format!(
+            "failed to reconstruct build manifest context for `{}`: {error}",
+            input.display()
+        )
+    })
+}
+
+fn artifact_report_json(
+    input: &Path,
+    artifact: &aot::NuisCompiledArtifact,
+    artifact_verify_input: &Path,
+    artifact_verify: &aot::NuisCompiledArtifactVerifyReport,
+    manifest_input: &Path,
+    manifest_verify: &aot::BuildManifestVerifyReport,
+    manifest_verify_reconstructed: bool,
+) -> String {
+    let fields = vec![
+        json_string_field("kind", "nuis_artifact_report"),
+        json_string_field("input", &input.display().to_string()),
+        json_bool_field(
+            "manifest_verify_reconstructed",
+            manifest_verify_reconstructed,
+        ),
+        format!(
+            "\"artifact_inspect\":{}",
+            inspect_artifact_json(input, artifact)
+        ),
+        format!(
+            "\"artifact_verify\":{}",
+            verify_artifact_json(artifact_verify_input, artifact_verify)
+        ),
+        format!(
+            "\"manifest_verify\":{}",
+            verify_build_manifest_json(manifest_input, manifest_verify)
+        ),
+    ];
+    format!("{{{}}}", fields.join(","))
 }
 
 fn print_project_context(resolved: &pipeline::ResolvedCompileInput) {
@@ -349,6 +642,30 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 }
                 if !binding.default_lanes.is_empty() {
                     println!("  default_lanes: {}", binding.default_lanes.join(", "));
+                }
+                println!(
+                    "  execution_skeleton_version: {}",
+                    binding.execution.skeleton_version
+                );
+                println!(
+                    "  execution_function_kind: {}",
+                    binding.execution.function_kind
+                );
+                println!("  execution_graph_kind: {}", binding.execution.graph_kind);
+                println!("  execution_domain: {}", binding.execution.execution_domain);
+                println!(
+                    "  execution_default_time_mode: {}",
+                    binding.execution.default_time_mode
+                );
+                println!(
+                    "  execution_contract_family: {}",
+                    binding.execution.contract_family
+                );
+                if !binding.execution.lowering_targets.is_empty() {
+                    println!(
+                        "  execution_lowering_targets: {}",
+                        binding.execution.lowering_targets.join(", ")
+                    );
                 }
                 if !binding.matched_support_surface.is_empty() {
                     println!(
@@ -639,13 +956,373 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("    notes: {}", contract.notes);
             }
         }
-        CommandKind::VerifyBuildManifest { manifest } => {
+        CommandKind::PackEnvelope { input, output } => {
+            let envelope = load_nuis_executable_envelope(&input)?;
+            let encoded = aot::encode_nuis_executable_envelope_binary(&envelope)?;
+            std::fs::write(&output, encoded)
+                .map_err(|error| format!("failed to write `{}`: {error}", output.display()))?;
+            println!("packed nuis envelope: {}", output.display());
+            println!("  source: {}", input.display());
+            println!("  schema: {}", envelope.schema);
+            println!("  executable_kind: {}", envelope.executable_kind);
+            println!("  package_count: {}", envelope.package_count);
+        }
+        CommandKind::UnpackEnvelope { input, output } => {
+            let envelope = load_nuis_executable_envelope(&input)?;
+            aot::write_nuis_executable_envelope(&output, &envelope)?;
+            println!("unpacked nuis envelope: {}", output.display());
+            println!("  source: {}", input.display());
+            println!("  schema: {}", envelope.schema);
+            println!("  executable_kind: {}", envelope.executable_kind);
+            println!("  package_count: {}", envelope.package_count);
+        }
+        CommandKind::InspectEnvelope { input } => {
+            let envelope = load_nuis_executable_envelope(&input)?;
+            println!("nuis envelope: {}", input.display());
+            println!("  schema: {}", envelope.schema);
+            println!("  executable_kind: {}", envelope.executable_kind);
+            println!("  package_count: {}", envelope.package_count);
+            println!("  domain_families: {}", envelope.domain_families.join(", "));
+            println!(
+                "  contract_families: {}",
+                envelope.contract_families.join(", ")
+            );
+            println!("  function_kind: {}", envelope.function_kind);
+            println!("  graph_kind: {}", envelope.graph_kind);
+            println!("  default_time_mode: {}", envelope.default_time_mode);
+        }
+        CommandKind::InspectArtifact { input, json } => {
+            let artifact = load_nuis_compiled_artifact(&input)?;
+            if json {
+                println!("{}", inspect_artifact_json(&input, &artifact));
+                return Ok(());
+            }
+            println!("nuis artifact: {}", input.display());
+            println!("  schema: {}", artifact.schema);
+            println!("  packaging_mode: {}", artifact.packaging_mode);
+            println!("  cpu_target_abi: {}", artifact.cpu_target_abi);
+            println!(
+                "  cpu_target_machine: {}-{}",
+                artifact.cpu_target_machine_arch, artifact.cpu_target_machine_os
+            );
+            println!(
+                "  cpu_target_object_format: {}",
+                artifact.cpu_target_object_format
+            );
+            println!(
+                "  cpu_target_calling_abi: {}",
+                artifact.cpu_target_calling_abi
+            );
+            println!("  binary_name: {}", artifact.binary_name);
+            println!("  binary_bytes: {}", artifact.binary_bytes);
+            println!("  build_manifest_bytes: {}", artifact.build_manifest_bytes);
+            println!("  envelope_schema: {}", artifact.envelope.schema);
+            println!(
+                "  envelope_contract_families: {}",
+                artifact.envelope.contract_families.join(", ")
+            );
+            println!("  lifecycle_schema: {}", artifact.lifecycle.schema);
+            println!(
+                "  lifecycle_bootstrap_entry: {}",
+                artifact.lifecycle.bootstrap_entry
+            );
+            println!(
+                "  lifecycle_tick_policy: {}",
+                artifact.lifecycle.tick_policy
+            );
+            println!(
+                "  lifecycle_shutdown_policy: {}",
+                artifact.lifecycle.shutdown_policy
+            );
+            println!(
+                "  lifecycle_yalivia_rpc: {}",
+                artifact.lifecycle.yalivia_rpc
+            );
+            println!(
+                "  lifecycle_hook_count: {}",
+                artifact.lifecycle.hook_surface.len()
+            );
+            println!(
+                "  lifecycle_hook_surface: {}",
+                artifact.lifecycle.hook_surface.join(", ")
+            );
+            println!(
+                "  lifecycle_export_count: {}",
+                artifact.lifecycle.export_surface.len()
+            );
+            println!(
+                "  lifecycle_export_surface: {}",
+                artifact.lifecycle.export_surface.join(", ")
+            );
+            println!(
+                "  lifecycle_runtime_capability_flags: {}",
+                artifact.lifecycle.runtime_capability_flags.join(", ")
+            );
+        }
+        CommandKind::ArtifactReport { input, json } => {
+            let is_manifest_input = input
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name == "nuis.build.manifest.toml")
+                .unwrap_or(false);
+            let artifact = load_nuis_compiled_artifact(&input)?;
+            let artifact_verify_input = if is_manifest_input {
+                let manifest_report = aot::verify_build_manifest(&input)?;
+                PathBuf::from(manifest_report.artifact_path)
+            } else {
+                input.clone()
+            };
+            let artifact_verify = aot::verify_nuis_compiled_artifact(&artifact_verify_input)?;
+            let (manifest_input, manifest_verify, manifest_verify_reconstructed) =
+                if is_manifest_input {
+                    let report = aot::verify_build_manifest(&input)?;
+                    (input.clone(), report, false)
+                } else {
+                    let (manifest_input, manifest_verify) =
+                        reconstruct_manifest_report_from_artifact(&input, &artifact)?;
+                    (manifest_input, manifest_verify, true)
+                };
+            if json {
+                println!(
+                    "{}",
+                    artifact_report_json(
+                        &input,
+                        &artifact,
+                        &artifact_verify_input,
+                        &artifact_verify,
+                        &manifest_input,
+                        &manifest_verify,
+                        manifest_verify_reconstructed,
+                    )
+                );
+                return Ok(());
+            }
+            println!("nuis artifact report: {}", input.display());
+            println!("  artifact_schema: {}", artifact.schema);
+            println!("  packaging_mode: {}", artifact.packaging_mode);
+            println!("  binary_name: {}", artifact.binary_name);
+            println!(
+                "  artifact_roundtrip_verified: {}",
+                if artifact_verify.artifact_roundtrip_verified {
+                    "true"
+                } else {
+                    "false"
+                }
+            );
+            println!(
+                "  lifecycle_contract_consistent: {}",
+                if artifact_verify.lifecycle_contract_consistent {
+                    "true"
+                } else {
+                    "false"
+                }
+            );
+            println!(
+                "  lifecycle_runtime_capability_flags_consistent: {}",
+                if artifact_verify.lifecycle_runtime_capability_flags_consistent {
+                    "true"
+                } else {
+                    "false"
+                }
+            );
+            println!("  manifest_schema: {}", manifest_verify.schema);
+            println!("  manifest_input: {}", manifest_input.display());
+            println!(
+                "  manifest_verify_reconstructed: {}",
+                if manifest_verify_reconstructed {
+                    "true"
+                } else {
+                    "false"
+                }
+            );
+            println!(
+                "  manifest_artifact_path: {}",
+                manifest_verify.artifact_path
+            );
+            println!(
+                "  execution_contracts_checked: {}",
+                manifest_verify.execution_contracts_checked
+            );
+            println!(
+                "  lifecycle_runtime_capability_flags: {}",
+                manifest_verify
+                    .lifecycle_runtime_capability_flags
+                    .join(", ")
+            );
+        }
+        CommandKind::VerifyArtifact { input, json } => {
+            let report = aot::verify_nuis_compiled_artifact(&input)?;
+            if json {
+                println!("{}", verify_artifact_json(&input, &report));
+                return Ok(());
+            }
+            println!("nuis artifact verified: {}", input.display());
+            println!("  schema: {}", report.schema);
+            println!("  packaging_mode: {}", report.packaging_mode);
+            println!("  binary_name: {}", report.binary_name);
+            println!("  binary_bytes: {}", report.binary_bytes);
+            println!("  build_manifest_bytes: {}", report.build_manifest_bytes);
+            println!("  envelope_schema: {}", report.envelope_schema);
+            println!(
+                "  envelope_package_count: {}",
+                report.envelope_package_count
+            );
+            println!("  lifecycle_schema: {}", report.lifecycle_schema);
+            println!(
+                "  lifecycle_bootstrap_entry: {}",
+                report.lifecycle_bootstrap_entry
+            );
+            println!("  lifecycle_tick_policy: {}", report.lifecycle_tick_policy);
+            println!(
+                "  lifecycle_shutdown_policy: {}",
+                report.lifecycle_shutdown_policy
+            );
+            println!("  lifecycle_yalivia_rpc: {}", report.lifecycle_yalivia_rpc);
+            println!("  lifecycle_hook_count: {}", report.lifecycle_hook_count);
+            println!(
+                "  lifecycle_hook_surface: {}",
+                report.lifecycle_hook_surface.join(", ")
+            );
+            println!(
+                "  lifecycle_export_count: {}",
+                report.lifecycle_export_count
+            );
+            println!(
+                "  lifecycle_export_surface: {}",
+                report.lifecycle_export_surface.join(", ")
+            );
+            println!(
+                "  lifecycle_runtime_capability_flags: {}",
+                report.lifecycle_runtime_capability_flags.join(", ")
+            );
+            println!(
+                "  lifecycle_contract_consistent: {}",
+                if report.lifecycle_contract_consistent {
+                    "true"
+                } else {
+                    "false"
+                }
+            );
+            println!(
+                "  lifecycle_runtime_capability_flags_consistent: {}",
+                if report.lifecycle_runtime_capability_flags_consistent {
+                    "true"
+                } else {
+                    "false"
+                }
+            );
+            println!(
+                "  execution_contracts_checked: {}",
+                report.execution_contracts_checked
+            );
+            println!("  cpu_target_abi: {}", report.cpu_target_abi);
+            println!(
+                "  cpu_target_machine: {}-{}",
+                report.cpu_target_machine_arch, report.cpu_target_machine_os
+            );
+            println!(
+                "  cpu_target_object_format: {}",
+                report.cpu_target_object_format
+            );
+            println!(
+                "  cpu_target_calling_abi: {}",
+                report.cpu_target_calling_abi
+            );
+            println!(
+                "  artifact_roundtrip_verified: {}",
+                if report.artifact_roundtrip_verified {
+                    "true"
+                } else {
+                    "false"
+                }
+            );
+        }
+        CommandKind::UnpackArtifact { input, output_dir } => {
+            let artifact = load_nuis_compiled_artifact(&input)?;
+            std::fs::create_dir_all(&output_dir)
+                .map_err(|error| format!("failed to create `{}`: {error}", output_dir.display()))?;
+            let envelope_path = output_dir.join("nuis.executable.envelope.toml");
+            let manifest_path = output_dir.join("nuis.build.manifest.toml");
+            let artifact_path = output_dir.join("nuis.compiled.artifact");
+            let binary_path = output_dir.join(&artifact.binary_name);
+            aot::write_nuis_executable_envelope(&envelope_path, &artifact.envelope)?;
+            std::fs::write(&binary_path, &artifact.binary_blob)
+                .map_err(|error| format!("failed to write `{}`: {error}", binary_path.display()))?;
+            let relocated_manifest = aot::render_relocated_unpacked_build_manifest(
+                &artifact,
+                &output_dir,
+                &envelope_path,
+                &artifact_path,
+                &binary_path,
+            )?;
+            let mut relocated_artifact = artifact.clone();
+            relocated_artifact.build_manifest_source = relocated_manifest.clone();
+            relocated_artifact.build_manifest_bytes = relocated_manifest.len();
+            aot::write_nuis_compiled_artifact(&artifact_path, &relocated_artifact)?;
+            std::fs::write(&manifest_path, relocated_manifest).map_err(|error| {
+                format!("failed to write `{}`: {error}", manifest_path.display())
+            })?;
+            println!("unpacked nuis artifact: {}", output_dir.display());
+            println!("  source: {}", input.display());
+            println!("  manifest: {}", manifest_path.display());
+            println!("  envelope: {}", envelope_path.display());
+            println!("  artifact: {}", artifact_path.display());
+            println!("  binary: {}", binary_path.display());
+            println!("  packaging_mode: {}", artifact.packaging_mode);
+        }
+        CommandKind::VerifyBuildManifest { manifest, json } => {
             let report = aot::verify_build_manifest(&manifest)?;
+            if json {
+                println!("{}", verify_build_manifest_json(&manifest, &report));
+                return Ok(());
+            }
             println!("build manifest verified: {}", manifest.display());
             println!("  schema: {}", report.schema);
             println!("  input: {}", report.input);
             println!("  output_dir: {}", report.output_dir);
             println!("  packaging_mode: {}", report.packaging_mode);
+            println!("  envelope_path: {}", report.envelope_path);
+            println!("  envelope_schema: {}", report.envelope_schema);
+            println!(
+                "  envelope_package_count: {}",
+                report.envelope_package_count
+            );
+            println!("  artifact_path: {}", report.artifact_path);
+            println!("  artifact_schema: {}", report.artifact_schema);
+            println!("  artifact_binary_name: {}", report.artifact_binary_name);
+            println!("  artifact_binary_bytes: {}", report.artifact_binary_bytes);
+            println!("  lifecycle_schema: {}", report.lifecycle_schema);
+            println!(
+                "  lifecycle_bootstrap_entry: {}",
+                report.lifecycle_bootstrap_entry
+            );
+            println!("  lifecycle_tick_policy: {}", report.lifecycle_tick_policy);
+            println!(
+                "  lifecycle_shutdown_policy: {}",
+                report.lifecycle_shutdown_policy
+            );
+            println!("  lifecycle_yalivia_rpc: {}", report.lifecycle_yalivia_rpc);
+            println!("  lifecycle_hook_count: {}", report.lifecycle_hook_count);
+            println!(
+                "  lifecycle_hook_surface: {}",
+                report.lifecycle_hook_surface.join(", ")
+            );
+            println!(
+                "  lifecycle_export_count: {}",
+                report.lifecycle_export_count
+            );
+            println!(
+                "  lifecycle_export_surface: {}",
+                report.lifecycle_export_surface.join(", ")
+            );
+            println!(
+                "  lifecycle_runtime_capability_flags: {}",
+                report.lifecycle_runtime_capability_flags.join(", ")
+            );
+            println!(
+                "  execution_contracts_checked: {}",
+                report.execution_contracts_checked
+            );
             println!("  cpu_target_abi: {}", report.cpu_target_abi);
             println!(
                 "  cpu_target_machine: {}-{}",
@@ -1214,6 +1891,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("llvm_ir: {}", written.llvm_ir_path);
             println!("packaging_mode: {}", written.packaging_mode);
             println!("binary: {}", written.binary_path);
+            println!(
+                "compiled_artifact: {}",
+                output_dir.join("nuis.compiled.artifact").display()
+            );
             println!("build_manifest: {}", build_manifest);
             if let Some(metadata) = &project_metadata {
                 println!("project_manifest: {}", metadata.manifest_copy_path);
