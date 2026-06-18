@@ -584,6 +584,52 @@ fn lowers_nested_match_inside_if_branch_with_multiple_try_operands() {
 }
 
 #[test]
+fn lowers_tail_try_stmt_inside_match_statement_arm_without_implicit_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Error {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn fetch(seed: i64) -> Result<i64, Error> {
+            if seed > 0 {
+              return Result.Ok(seed);
+            }
+            return Result.Err(Error.InvalidInput);
+          }
+
+          fn main(seed: i64) -> Result<i64, Error> {
+            match seed {
+              1 => {
+                let value: i64 = fetch(1)?;
+              }
+              _ => {
+                let value: i64 = fetch(seed)?;
+              }
+            }
+            return Result.Ok(3);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(count_ifs(&function.body) >= 3, "{:?}", function.body);
+    assert!(matches!(function.body.last(), Some(NirStmt::Return(_))));
+}
+
+#[test]
 fn lowers_match_expression_as_call_argument_alongside_try_argument() {
     let module = parse_nuis_module(
         r#"

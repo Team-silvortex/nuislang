@@ -112,6 +112,83 @@ fn lowers_immediate_no_capture_lambda_invocation_into_private_synth_function() {
 }
 
 #[test]
+fn parses_lambda_tail_expression_body_as_implicit_return() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let inc = |x: i64| -> i64 { x + 1 };
+            return inc(6);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    match &function.body[0] {
+        AstStmt::Let {
+            value: AstExpr::Lambda { body, .. },
+            ..
+        } => {
+            assert!(matches!(
+                body.as_slice(),
+                [AstStmt::Return(Some(AstExpr::Binary { .. }))]
+            ));
+        }
+        other => panic!("expected lambda in let binding, found {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_no_capture_lambda_without_explicit_return_type_with_tail_if_expr() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn apply(x: i64, f: Fn1<i64, i64>) -> i64 {
+            return f(x);
+          }
+
+          fn main() -> i64 {
+            return apply(6, |x: i64| {
+              if x == 6 {
+                x + 1
+              } else {
+                x
+              }
+            });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__lambda_main_"))
+        .expect("expected synthesized lambda function");
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_apply_"))
+        .expect("expected synthesized higher-order specialization");
+    assert!(matches!(
+        lambda.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+    assert!(matches!(
+        specialized.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == &lambda.name && matches!(args.as_slice(), [NirExpr::Var(name)] if name == "x")
+    ));
+}
+
+#[test]
 fn lowers_lambda_capture_of_outer_local_into_extra_helper_arg() {
     let module = parse_nuis_module(
         r#"
@@ -414,6 +491,51 @@ fn lowers_no_capture_lambda_passed_to_named_fn2_function() {
 }
 
 #[test]
+fn lowers_no_capture_lambda_without_explicit_return_type_passed_to_named_fn2_with_tail_if_expr() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn apply2(x: i64, y: i64, f: Fn2<i64, i64, i64>) -> i64 {
+            return f(x, y);
+          }
+
+          fn main() -> i64 {
+            return apply2(6, 1, |x: i64, y: i64| {
+              if x > y {
+                x - y
+              } else {
+                y - x
+              }
+            });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__lambda_main_"))
+        .expect("expected synthesized lambda function");
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_apply2_"))
+        .expect("expected synthesized higher-order specialization");
+    assert!(matches!(
+        lambda.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+    assert!(matches!(
+        specialized.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == &lambda.name
+                && matches!(args.as_slice(), [NirExpr::Var(x), NirExpr::Var(y)] if x == "x" && y == "y")
+    ));
+}
+
+#[test]
 fn lowers_named_function_passed_to_named_fn2_function() {
     let module = parse_nuis_module(
         r#"
@@ -498,6 +620,55 @@ fn lowers_no_capture_lambda_passed_to_named_fn3_function() {
     assert_eq!(specialized.params[0].name, "x");
     assert_eq!(specialized.params[1].name, "y");
     assert_eq!(specialized.params[2].name, "z");
+    assert!(matches!(
+        specialized.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == &lambda.name
+                && matches!(args.as_slice(), [NirExpr::Var(x), NirExpr::Var(y), NirExpr::Var(z)] if x == "x" && y == "y" && z == "z")
+    ));
+}
+
+#[test]
+fn lowers_no_capture_lambda_without_explicit_return_type_passed_to_named_fn3_with_tail_match_expr()
+{
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn apply3(x: i64, y: i64, z: i64, f: Fn3<i64, i64, i64, i64>) -> i64 {
+            return f(x, y, z);
+          }
+
+          fn main() -> i64 {
+            return apply3(6, 1, 2, |x: i64, y: i64, z: i64| {
+              match z {
+                2 => {
+                  x + y + z
+                },
+                _ => {
+                  x
+                }
+              }
+            });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__lambda_main_"))
+        .expect("expected synthesized lambda function");
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_apply3_"))
+        .expect("expected synthesized higher-order specialization");
+    assert!(matches!(
+        lambda.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
     assert!(matches!(
         specialized.body.as_slice(),
         [NirStmt::Return(Some(NirExpr::Call { callee, args }))]

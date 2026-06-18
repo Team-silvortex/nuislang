@@ -419,7 +419,7 @@ impl Parser {
         self.expect_symbol(')')?;
         let return_type = self.parse_optional_return_type()?;
         let default_body = if self.peek_symbol('{') {
-            Some(self.parse_block()?)
+            Some(self.parse_block_with_tail_expr()?)
         } else {
             self.expect_symbol(';')?;
             None
@@ -485,7 +485,7 @@ impl Parser {
         };
         self.expect_symbol(')')?;
         let return_type = self.parse_optional_return_type()?;
-        let body = self.parse_block()?;
+        let body = self.parse_block_with_tail_expr()?;
         Ok(AstImplMethod {
             name,
             params,
@@ -695,7 +695,7 @@ impl Parser {
         } else {
             Vec::new()
         };
-        let body = self.parse_block()?;
+        let body = self.parse_block_with_tail_expr()?;
 
         Ok(AstFunction {
             visibility,
@@ -1573,10 +1573,10 @@ impl Parser {
     fn parse_if_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("if")?;
         let condition = self.parse_condition_expr()?;
-        let then_body = self.parse_block()?;
+        let then_body = self.parse_stmt_block()?;
         let else_body = if self.peek_word("else") {
             self.expect_word("else")?;
-            self.parse_block()?
+            self.parse_stmt_block()?
         } else {
             Vec::new()
         };
@@ -1590,16 +1590,19 @@ impl Parser {
     fn parse_while_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("while")?;
         let condition = self.parse_condition_expr()?;
-        let body = self.parse_block()?;
+        let body = self.parse_stmt_block()?;
         Ok(AstStmt::While { condition, body })
     }
 
     fn parse_match_stmt(&mut self) -> Result<AstStmt, String> {
-        let (value, arms) = self.parse_match_expr_parts()?;
+        let (value, arms) = self.parse_match_expr_parts(false)?;
         Ok(AstStmt::Match { value, arms })
     }
 
-    fn parse_match_expr_parts(&mut self) -> Result<(AstExpr, Vec<AstMatchArm>), String> {
+    fn parse_match_expr_parts(
+        &mut self,
+        allow_tail_expr_in_arm: bool,
+    ) -> Result<(AstExpr, Vec<AstMatchArm>), String> {
         self.expect_word("match")?;
         let value = self.parse_match_scrutinee_expr()?;
         self.expect_symbol('{')?;
@@ -1614,7 +1617,11 @@ impl Parser {
             };
             self.expect_symbol('=')?;
             self.expect_symbol('>')?;
-            let body = self.parse_block()?;
+            let body = if allow_tail_expr_in_arm {
+                self.parse_block_with_tail_expr()?
+            } else {
+                self.parse_stmt_block()?
+            };
             arms.push(AstMatchArm {
                 pattern,
                 guard,
@@ -1961,7 +1968,7 @@ impl Parser {
                 };
                 self.expect_symbol('|')?;
                 let return_type = self.parse_optional_return_type()?;
-                let body = self.parse_block()?;
+                let body = self.parse_block_with_tail_expr()?;
                 Ok(AstExpr::Lambda {
                     params,
                     return_type,
@@ -1970,12 +1977,12 @@ impl Parser {
             }
             Some(Token::Word(word)) if word == "if" => {
                 let condition = self.parse_condition_expr()?;
-                let then_body = self.parse_block()?;
+                let then_body = self.parse_block_with_tail_expr()?;
                 if !self.peek_word("else") {
                     return Err("`if` expression currently requires `else`".to_owned());
                 }
                 self.expect_word("else")?;
-                let else_body = self.parse_block()?;
+                let else_body = self.parse_block_with_tail_expr()?;
                 Ok(AstExpr::If {
                     condition: Box::new(condition),
                     then_body,
@@ -1984,7 +1991,7 @@ impl Parser {
             }
             Some(Token::Word(word)) if word == "match" => {
                 self.cursor = self.cursor.saturating_sub(1);
-                let (value, arms) = self.parse_match_expr_parts()?;
+                let (value, arms) = self.parse_match_expr_parts(true)?;
                 Ok(AstExpr::Match {
                     value: Box::new(value),
                     arms,
@@ -2117,17 +2124,24 @@ impl Parser {
         Ok(params)
     }
 
-    fn parse_block(&mut self) -> Result<Vec<AstStmt>, String> {
+    fn parse_block_with_tail_expr(&mut self) -> Result<Vec<AstStmt>, String> {
         self.expect_symbol('{')?;
-        let body = self.parse_block_body()?;
+        let body = self.parse_block_body(true)?;
         self.expect_symbol('}')?;
         Ok(body)
     }
 
-    fn parse_block_body(&mut self) -> Result<Vec<AstStmt>, String> {
+    fn parse_stmt_block(&mut self) -> Result<Vec<AstStmt>, String> {
+        self.expect_symbol('{')?;
+        let body = self.parse_block_body(false)?;
+        self.expect_symbol('}')?;
+        Ok(body)
+    }
+
+    fn parse_block_body(&mut self, allow_tail_expr_stmt: bool) -> Result<Vec<AstStmt>, String> {
         let mut body = Vec::new();
         while !self.peek_symbol('}') {
-            if self.can_start_tail_expr_stmt() {
+            if allow_tail_expr_stmt && self.can_start_tail_expr_stmt() {
                 let checkpoint = self.cursor;
                 let parsed_expr = self.parse_expr();
                 match parsed_expr {

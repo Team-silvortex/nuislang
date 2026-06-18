@@ -2062,8 +2062,12 @@ fn rewrite_control_expr_terminal_branch(
             rewritten.push(wrap(value.clone()));
             Ok(rewritten)
         }
+        AstStmt::Break | AstStmt::Continue => {
+            rewritten.push(last.clone());
+            Ok(rewritten)
+        }
         _ => Err(format!(
-            "`{}` expression {} currently requires a tail expression result in each {}",
+            "`{}` expression {} currently requires either a tail expression result or terminal loop control (`break`/`continue`) in each {}",
             kind.keyword(),
             kind.branch_name(),
             kind.branch_name()

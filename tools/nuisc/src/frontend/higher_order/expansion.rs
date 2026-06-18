@@ -7,7 +7,9 @@ use nuis_semantics::model::{
 
 use super::super::validation_binding_env::instantiate_ast_struct_field_type;
 
-use super::super::generics::{specialize_ast_type_ref, unify_generic_type_pattern};
+use super::super::generics::{
+    specialize_ast_type_ref, specialize_function_template, unify_generic_type_pattern,
+};
 use super::super::{
     build_impl_method_function, impl_method_symbol_name, lower_type_ref,
     lower_type_ref_with_aliases, resolve_ast_type_ref_aliases,
@@ -235,6 +237,11 @@ fn infer_local_binding_type(
                 None
             }
         }
+        AstExpr::Try(value) => {
+            let result_ty =
+                infer_local_binding_type(value, local_types, function_table, module_impls)?;
+            result_payload_type(&result_ty)
+        }
         AstExpr::MethodCall {
             receiver,
             method,
@@ -296,6 +303,97 @@ fn infer_block_result_type(
         }
         _ => None,
     }
+}
+
+fn result_payload_type(ty: &AstTypeRef) -> Option<AstTypeRef> {
+    if ty.is_optional || ty.is_ref || ty.name != "Result" || ty.generic_args.len() != 2 {
+        return None;
+    }
+    Some(ty.generic_args[0].clone())
+}
+
+fn expected_try_operand_type(
+    expected_payload: Option<&AstTypeRef>,
+    current_return_type: Option<&AstTypeRef>,
+) -> Option<AstTypeRef> {
+    let payload = expected_payload?;
+    let function_result = current_return_type?;
+    if function_result.is_optional || function_result.is_ref {
+        return None;
+    }
+    if function_result.name != "Result" || function_result.generic_args.len() != 2 {
+        return None;
+    }
+    Some(AstTypeRef {
+        name: "Result".to_owned(),
+        generic_args: vec![payload.clone(), function_result.generic_args[1].clone()],
+        is_optional: false,
+        is_ref: false,
+    })
+}
+
+fn expected_await_operand_type(expected_payload: Option<&AstTypeRef>) -> Option<AstTypeRef> {
+    let payload = expected_payload?;
+    Some(AstTypeRef {
+        name: "Task".to_owned(),
+        generic_args: vec![payload.clone()],
+        is_optional: false,
+        is_ref: false,
+    })
+}
+
+fn infer_higher_order_substitutions(
+    template: &AstFunction,
+    args: &[AstExpr],
+    expected: Option<&AstTypeRef>,
+    local_types: &BTreeMap<String, AstTypeRef>,
+    function_table: &BTreeMap<String, AstFunction>,
+    module_impls: &[AstImplDef],
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<BTreeMap<String, nuis_semantics::model::NirTypeRef>, String> {
+    let generic_names = template
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    if generic_names.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+    if let (Some(return_pattern), Some(expected_ty)) = (template.return_type.as_ref(), expected) {
+        let resolved_return_pattern =
+            resolve_ast_type_ref_aliases(return_pattern, visible_type_aliases)?;
+        let resolved_expected_ty = resolve_ast_type_ref_aliases(expected_ty, visible_type_aliases)?;
+        unify_generic_type_pattern(
+            &resolved_return_pattern,
+            &resolved_expected_ty,
+            &generic_names,
+            &mut substitutions,
+            &template.name,
+        )?;
+    }
+    for (param, arg) in template.params.iter().zip(args) {
+        if is_callable_type_with_aliases(&param.ty, visible_type_aliases)? {
+            continue;
+        }
+        let Some(arg_ty) = infer_local_binding_type(arg, local_types, function_table, module_impls)
+        else {
+            continue;
+        };
+        let resolved_param_ty = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
+        let resolved_arg_ty = resolve_ast_type_ref_aliases(&arg_ty, visible_type_aliases)?;
+        unify_generic_type_pattern(
+            &resolved_param_ty,
+            &resolved_arg_ty,
+            &generic_names,
+            &mut substitutions,
+            &template.name,
+        )?;
+    }
+    Ok(substitutions
+        .into_iter()
+        .map(|(name, ty)| (name, lower_type_ref(&ty)))
+        .collect())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -557,6 +655,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             value: rewrite_higher_order_calls_in_expr(
                 value,
                 ty.as_ref(),
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -571,6 +670,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             name: name.clone(),
             value: rewrite_higher_order_calls_in_expr(
                 value,
+                current_return_type,
                 current_return_type,
                 local_types,
                 templates,
@@ -592,6 +692,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             value: rewrite_higher_order_calls_in_expr(
                 value,
                 type_ref.as_ref(),
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -608,6 +709,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             value: rewrite_higher_order_calls_in_expr(
                 value,
                 ty.as_ref(),
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -621,6 +723,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         AstStmt::Print(value) => AstStmt::Print(rewrite_higher_order_calls_in_expr(
             value,
             None,
+            current_return_type,
             local_types,
             templates,
             function_table,
@@ -633,6 +736,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         AstStmt::Await(value) => AstStmt::Await(rewrite_higher_order_calls_in_expr(
             value,
             None,
+            current_return_type,
             local_types,
             templates,
             function_table,
@@ -650,6 +754,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             condition: rewrite_higher_order_calls_in_expr(
                 condition,
                 None,
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -690,6 +795,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             value: rewrite_higher_order_calls_in_expr(
                 value,
                 None,
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -711,6 +817,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                                 rewrite_higher_order_calls_in_expr(
                                     guard,
                                     None,
+                                    current_return_type,
                                     local_types,
                                     templates,
                                     function_table,
@@ -743,6 +850,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             condition: rewrite_higher_order_calls_in_expr(
                 condition,
                 None,
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -769,6 +877,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         AstStmt::Expr(expr) => AstStmt::Expr(rewrite_higher_order_calls_in_expr(
             expr,
             None,
+            current_return_type,
             local_types,
             templates,
             function_table,
@@ -780,6 +889,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         )?),
         AstStmt::Return(Some(value)) => AstStmt::Return(Some(rewrite_higher_order_calls_in_expr(
             value,
+            current_return_type,
             current_return_type,
             local_types,
             templates,
@@ -799,6 +909,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
 pub(crate) fn rewrite_higher_order_calls_in_expr(
     expr: &AstExpr,
     expected: Option<&AstTypeRef>,
+    current_return_type: Option<&AstTypeRef>,
     local_types: &BTreeMap<String, AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
@@ -817,6 +928,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             condition: Box::new(rewrite_higher_order_calls_in_expr(
                 condition,
                 Some(&super::super::ast_named_type("bool")),
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -857,6 +969,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             value: Box::new(rewrite_higher_order_calls_in_expr(
                 value,
                 None,
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -875,6 +988,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                             Some(guard) => Some(rewrite_higher_order_calls_in_expr(
                                 guard,
                                 Some(&super::super::ast_named_type("bool")),
+                                current_return_type,
                                 local_types,
                                 templates,
                                 function_table,
@@ -913,29 +1027,36 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             generic_args,
             None,
             expected,
-            templates,
-            function_table,
-            visible_type_aliases,
-            specialized_cache,
-            specialized_functions,
-        )?,
-        AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_higher_order_calls_in_expr(
-            value,
-            expected,
             local_types,
             templates,
             function_table,
             module_impls,
-            method_template_lookup,
             visible_type_aliases,
             specialized_cache,
             specialized_functions,
-        )?)),
+        )?,
+        AstExpr::Await(value) => {
+            let await_expected = expected_await_operand_type(expected);
+            AstExpr::Await(Box::new(rewrite_higher_order_calls_in_expr(
+                value,
+                await_expected.as_ref(),
+                current_return_type,
+                local_types,
+                templates,
+                function_table,
+                module_impls,
+                method_template_lookup,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?))
+        }
         AstExpr::Unary { op, operand } => AstExpr::Unary {
             op: *op,
             operand: Box::new(rewrite_higher_order_calls_in_expr(
                 operand,
                 expected,
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -959,6 +1080,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                     rewrite_higher_order_calls_in_expr(
                         arg,
                         None,
+                        current_return_type,
                         local_types,
                         templates,
                         function_table,
@@ -971,10 +1093,27 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         },
+        AstExpr::Try(value) => {
+            let try_expected = expected_try_operand_type(expected, current_return_type);
+            AstExpr::Try(Box::new(rewrite_higher_order_calls_in_expr(
+                value,
+                try_expected.as_ref(),
+                current_return_type,
+                local_types,
+                templates,
+                function_table,
+                module_impls,
+                method_template_lookup,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?))
+        }
         AstExpr::Invoke { callee, args } => AstExpr::Invoke {
             callee: Box::new(rewrite_higher_order_calls_in_expr(
                 callee,
                 None,
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -990,6 +1129,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                     rewrite_higher_order_calls_in_expr(
                         arg,
                         None,
+                        current_return_type,
                         local_types,
                         templates,
                         function_table,
@@ -1023,8 +1163,10 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                         &[],
                         None,
                         expected,
+                        local_types,
                         templates,
                         function_table,
+                        module_impls,
                         visible_type_aliases,
                         specialized_cache,
                         specialized_functions,
@@ -1045,8 +1187,10 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                         &[],
                         None,
                         expected,
+                        local_types,
                         templates,
                         function_table,
+                        module_impls,
                         visible_type_aliases,
                         specialized_cache,
                         specialized_functions,
@@ -1057,6 +1201,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 receiver: Box::new(rewrite_higher_order_calls_in_expr(
                     receiver,
                     None,
+                    current_return_type,
                     local_types,
                     templates,
                     function_table,
@@ -1074,6 +1219,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                         rewrite_higher_order_calls_in_expr(
                             arg,
                             None,
+                            current_return_type,
                             local_types,
                             templates,
                             function_table,
@@ -1102,6 +1248,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                         rewrite_higher_order_calls_in_expr(
                             value,
                             None,
+                            current_return_type,
                             local_types,
                             templates,
                             function_table,
@@ -1119,6 +1266,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             base: Box::new(rewrite_higher_order_calls_in_expr(
                 base,
                 None,
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -1135,6 +1283,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             lhs: Box::new(rewrite_higher_order_calls_in_expr(
                 lhs,
                 None,
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -1147,6 +1296,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             rhs: Box::new(rewrite_higher_order_calls_in_expr(
                 rhs,
                 None,
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -1167,8 +1317,10 @@ pub(crate) fn specialize_higher_order_call(
     explicit_generic_args: &[AstTypeRef],
     template_callable_bindings: Option<&BTreeMap<String, BoundCallable>>,
     expected: Option<&AstTypeRef>,
+    local_types: &BTreeMap<String, AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
+    module_impls: &[AstImplDef],
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     specialized_cache: &mut BTreeSet<String>,
     specialized_functions: &mut Vec<AstFunction>,
@@ -1312,11 +1464,58 @@ pub(crate) fn specialize_higher_order_call(
         }
     }
 
-    let specialized_name = format!(
-        "__hof_{}_{}",
-        sanitize_symbol_fragment(callee),
-        callable_fragments.join("__")
-    );
+    let inferred_substitutions = infer_higher_order_substitutions(
+        template,
+        args,
+        expected,
+        local_types,
+        function_table,
+        module_impls,
+        visible_type_aliases,
+    )?;
+    let type_fragments = template
+        .generic_params
+        .iter()
+        .filter_map(|param| {
+            inferred_substitutions
+                .get(&param.name)
+                .map(|ty| sanitize_symbol_fragment(&ty.render()))
+        })
+        .collect::<Vec<_>>();
+    if !inferred_substitutions.is_empty() {
+        for binding in callable_bindings.values_mut() {
+            let Some(callable) = function_table.get(&binding.symbol) else {
+                continue;
+            };
+            let specialized_callable_name =
+                format!("{}__{}", binding.symbol, type_fragments.join("__"));
+            if specialized_cache.insert(specialized_callable_name.clone()) {
+                let specialized_callable = specialize_function_template(
+                    callable,
+                    &specialized_callable_name,
+                    &inferred_substitutions,
+                )?;
+                specialized_functions.push(specialized_callable);
+            }
+            binding.symbol = specialized_callable_name;
+        }
+    }
+
+    let callable_fragment = callable_fragments.join("__");
+    let specialized_name = if type_fragments.is_empty() {
+        format!(
+            "__hof_{}_{}",
+            sanitize_symbol_fragment(callee),
+            callable_fragment
+        )
+    } else {
+        format!(
+            "__hof_{}_{}__{}",
+            sanitize_symbol_fragment(callee),
+            callable_fragment,
+            type_fragments.join("__")
+        )
+    };
     if specialized_cache.insert(specialized_name.clone()) {
         let specialized = specialize_higher_order_template(
             template,
@@ -1328,12 +1527,17 @@ pub(crate) fn specialize_higher_order_call(
             specialized_cache,
             specialized_functions,
         )?;
+        let specialized = if inferred_substitutions.is_empty() {
+            specialized
+        } else {
+            specialize_function_template(&specialized, &specialized_name, &inferred_substitutions)?
+        };
         specialized_functions.push(specialized.clone());
     }
 
     Ok(AstExpr::Call {
         callee: specialized_name,
-        generic_args: explicit_generic_args.to_vec(),
+        generic_args: Vec::new(),
         args: ordinary_args,
     })
 }
@@ -1362,6 +1566,7 @@ fn rewrite_higher_order_argument_expr(
     rewrite_higher_order_calls_in_expr(
         expr,
         expected,
+        None,
         &BTreeMap::new(),
         templates,
         function_table,
