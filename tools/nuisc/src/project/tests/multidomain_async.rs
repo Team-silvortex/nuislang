@@ -3,52 +3,33 @@ use std::{
     collections::BTreeMap,
     fs,
     path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
 };
 use yir_core::EdgeKind;
 
+// Base project builders and shared support-module fixtures for multidomain tests.
 fn multidomain_project_with_entry(
     entry_source: &str,
     extra_modules: Vec<(&str, &str)>,
 ) -> LoadedProject {
-    let mut modules = vec![("main.ns", entry_source)];
-    modules.extend(extra_modules);
-
-    LoadedProject {
-        root: PathBuf::from("."),
-        manifest_path: PathBuf::from("nuis.toml"),
-        manifest: NuisProjectManifest {
-            name: "multidomain_test".to_owned(),
-            entry: "main.ns".to_owned(),
-            modules: modules.iter().map(|(path, _)| (*path).to_owned()).collect(),
-            tests: vec![],
-            links: vec![],
-            abi_requirements: vec![
-                ProjectAbiRequirement {
-                    domain: "cpu".to_owned(),
-                    abi: "cpu.arm64.apple_aapcs64".to_owned(),
-                },
-                ProjectAbiRequirement {
-                    domain: "network".to_owned(),
-                    abi: "network.socket.macos.arm64.v1".to_owned(),
-                },
-                ProjectAbiRequirement {
-                    domain: "kernel".to_owned(),
-                    abi: "kernel.apple_ane.coreml.v1".to_owned(),
-                },
-            ],
-            galaxy_dependencies: vec![],
-        },
-        entry_path: PathBuf::from("main.ns"),
-        entry_source: entry_source.to_owned(),
-        modules: modules
-            .into_iter()
-            .map(|(path, source)| ProjectModule {
-                path: PathBuf::from(path),
-                ast: crate::frontend::parse_nuis_ast(source).unwrap(),
-            })
-            .collect(),
-    }
+    test_support::loaded_project_fixture(
+        "multidomain_test",
+        vec![
+            ProjectAbiRequirement {
+                domain: "cpu".to_owned(),
+                abi: "cpu.arm64.apple_aapcs64".to_owned(),
+            },
+            ProjectAbiRequirement {
+                domain: "network".to_owned(),
+                abi: "network.socket.macos.arm64.v1".to_owned(),
+            },
+            ProjectAbiRequirement {
+                domain: "kernel".to_owned(),
+                abi: "kernel.apple_ane.coreml.v1".to_owned(),
+            },
+        ],
+        entry_source,
+        extra_modules,
+    )
 }
 
 fn multidomain_support_modules() -> Vec<(&'static str, &'static str)> {
@@ -82,6 +63,8 @@ fn multidomain_support_modules() -> Vec<(&'static str, &'static str)> {
         (
             "kernel_unit.ns",
             r#"
+            use data FabricPlane;
+
             mod kernel KernelUnit {
               fn profile() {
                 const bind_core: i64 = 2;
@@ -100,6 +83,8 @@ fn kernel_data_support_modules() -> Vec<(&'static str, &'static str)> {
         (
             "kernel_unit.ns",
             r#"
+            use data FabricPlane;
+
             mod kernel KernelUnit {
               fn profile() {
                 const bind_core: i64 = 2;
@@ -150,6 +135,1040 @@ fn kernel_data_support_modules() -> Vec<(&'static str, &'static str)> {
             "#,
         ),
     ]
+}
+
+// Reusable source snippets for bridge/task-helper entrypoints and route-validation variants.
+fn reverse_network_data_bridge_module() -> &'static str {
+    r#"
+    use network NetworkUnit;
+    use data FabricPlane;
+
+    mod cpu NetworkDataBridge {
+      pub fn probe_roundtrip() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let send_window: NetworkResult<i64> =
+          network_result(network_profile_send_window("NetworkUnit"));
+        let value: i64 =
+          network_value(bind_core)
+          + network_value(endpoint_kind)
+          + network_value(send_window);
+        data_profile_bind_core("FabricPlane");
+        let handles: HandleTable<FabricPlaneBindings> =
+          data_profile_handle_table("FabricPlane");
+        let uplink: Window<i64> =
+          data_profile_send_uplink("FabricPlane", value);
+        let downlink: Window<Window<i64>> =
+          data_profile_send_downlink("FabricPlane", uplink);
+        print(handles);
+        print(downlink);
+        return value;
+      }
+    }
+    "#
+}
+
+fn reverse_network_data_bridge_entry() -> &'static str {
+    r#"
+    use cpu NetworkDataBridge;
+    use network NetworkUnit;
+    use data FabricPlane;
+
+    mod cpu Main {
+      fn main() -> i64 {
+        return NetworkDataBridge.probe_roundtrip();
+      }
+    }
+    "#
+}
+
+fn reverse_kernel_data_bridge_module() -> &'static str {
+    r#"
+    use kernel KernelUnit;
+    use data FabricPlane;
+
+    mod cpu KernelDataBridge {
+      pub fn probe_roundtrip() -> i64 {
+        let bind_core: KernelResult<i64> =
+          kernel_result(kernel_profile_bind_core("KernelUnit"));
+        let queue_depth: KernelResult<i64> =
+          kernel_result(kernel_profile_queue_depth("KernelUnit"));
+        let batch_lanes: KernelResult<i64> =
+          kernel_result(kernel_profile_batch_lanes("KernelUnit"));
+        let value: i64 =
+          kernel_value(bind_core)
+          + kernel_value(queue_depth)
+          + kernel_value(batch_lanes);
+        data_profile_bind_core("FabricPlane");
+        let handles: HandleTable<FabricPlaneBindings> =
+          data_profile_handle_table("FabricPlane");
+        let uplink: Window<i64> =
+          data_profile_send_uplink("FabricPlane", value);
+        let downlink: Window<Window<i64>> =
+          data_profile_send_downlink("FabricPlane", uplink);
+        print(handles);
+        print(downlink);
+        return value;
+      }
+    }
+    "#
+}
+
+fn forward_network_data_bridge_missing_downlink_module() -> &'static str {
+    r#"
+    use network NetworkUnit;
+    use data FabricPlane;
+
+    mod cpu NetworkDataBridge {
+      pub fn probe_roundtrip() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let send_window: NetworkResult<i64> =
+          network_result(network_profile_send_window("NetworkUnit"));
+        let value: i64 =
+          network_value(bind_core)
+          + network_value(endpoint_kind)
+          + network_value(send_window);
+        data_profile_bind_core("FabricPlane");
+        let handles: HandleTable<FabricPlaneBindings> =
+          data_profile_handle_table("FabricPlane");
+        let uplink: Window<i64> =
+          data_profile_send_uplink("FabricPlane", value);
+        print(handles);
+        print(uplink);
+        return value;
+      }
+    }
+    "#
+}
+
+fn kernel_task_async_shapes_entry() -> &'static str {
+    r#"
+    use cpu KernelTaskAsyncShapes;
+    use data FabricPlane;
+    use kernel KernelUnit;
+
+    mod cpu Main {
+      fn main() {
+        let roundtrip_seed: i64 = KernelTaskAsyncShapes.roundtrip_seed();
+        let uplink: Window<i64> = KernelTaskAsyncShapes.send_roundtrip(roundtrip_seed);
+        let downlink: Window<Window<i64>> =
+          KernelTaskAsyncShapes.receive_roundtrip(uplink);
+        print(downlink);
+      }
+    }
+    "#
+}
+
+fn kernel_task_async_shapes_module() -> &'static str {
+    r#"
+    use data FabricPlane;
+    use kernel KernelUnit;
+
+    mod cpu KernelTaskAsyncShapes {
+      pub fn roundtrip_seed() -> i64 {
+        let bind_core: KernelResult<i64> =
+          kernel_result(kernel_profile_bind_core("KernelUnit"));
+        let queue_depth: KernelResult<i64> =
+          kernel_result(kernel_profile_queue_depth("KernelUnit"));
+        let batch_lanes: KernelResult<i64> =
+          kernel_result(kernel_profile_batch_lanes("KernelUnit"));
+        return kernel_value(bind_core)
+          + kernel_value(queue_depth)
+          + kernel_value(batch_lanes);
+      }
+
+      pub fn send_roundtrip(value: i64) -> Window<i64> {
+        data_profile_bind_core("FabricPlane");
+        let handles: HandleTable<FabricPlaneBindings> =
+          data_profile_handle_table("FabricPlane");
+        return data_profile_send_uplink("FabricPlane", value);
+      }
+
+      pub fn receive_roundtrip(uplink: Window<i64>) -> Window<Window<i64>> {
+        return data_profile_send_downlink("FabricPlane", uplink);
+      }
+    }
+    "#
+}
+
+fn network_task_async_probe_entry() -> &'static str {
+    r#"
+    use cpu NetworkTaskAsyncShapes;
+    use network NetworkUnit;
+
+    mod cpu Main {
+      fn main() -> i64 {
+        return NetworkTaskAsyncShapes.probe();
+      }
+    }
+    "#
+}
+
+fn network_task_async_probe_module() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu NetworkTaskAsyncShapes {
+      pub fn probe() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let send_window: NetworkResult<i64> =
+          network_result(network_profile_send_window("NetworkUnit"));
+        if network_config_ready(bind_core) {
+          return network_value(bind_core)
+            + network_value(endpoint_kind)
+            + network_value(send_window);
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_task_async_transport_entry() -> &'static str {
+    r#"
+    use cpu NetworkTaskAsyncShapes;
+    use network NetworkUnit;
+
+    mod cpu Main {
+      fn main() -> i64 {
+        return NetworkTaskAsyncShapes.transport_probe();
+      }
+    }
+    "#
+}
+
+fn network_task_async_transport_module() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu NetworkTaskAsyncShapes {
+      pub fn transport_probe() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let transport_family: NetworkResult<i64> =
+          network_result(network_profile_transport_family("NetworkUnit"));
+        let protocol_kind: NetworkResult<i64> =
+          network_result(network_profile_protocol_kind("NetworkUnit"));
+        let protocol_version: NetworkResult<i64> =
+          network_result(network_profile_protocol_version("NetworkUnit"));
+        if network_config_ready(bind_core) {
+          return network_value(bind_core)
+            + network_value(endpoint_kind)
+            + network_value(transport_family)
+            + network_value(protocol_kind)
+            + network_value(protocol_version);
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn direct_network_bind_core_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        if network_config_ready(bind_core) {
+          return network_value(bind_core);
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn direct_network_protocol_kind_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let protocol_kind: NetworkResult<i64> =
+          network_result(network_profile_protocol_kind("NetworkUnit"));
+        if network_config_ready(bind_core) {
+          return network_value(bind_core)
+            + network_value(endpoint_kind)
+            + network_value(protocol_kind);
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_support_modules_without_protocol_kind() -> Vec<(&'static str, &'static str)> {
+    vec![(
+        "network_unit.ns",
+        r#"
+        mod network NetworkUnit {
+          fn profile() {
+            const bind_core: i64 = 2;
+            const endpoint_kind: i64 = 1;
+            const transport_family: i64 = 6;
+            const local_port: i64 = 9000;
+            const remote_port: i64 = 443;
+            const connect_timeout_ms: i64 = 250;
+            const read_timeout_ms: i64 = 125;
+            const write_timeout_ms: i64 = 150;
+            const retry_budget: i64 = 3;
+            const stream_window: i64 = 64;
+            const recv_window: i64 = 32;
+            const send_window: i64 = 32;
+          }
+        }
+        "#,
+    )]
+}
+
+fn network_host_transport_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_send_probe(
+        stream_window: i64,
+        send_window: i64,
+        remote_port: i64
+      ) -> i64;
+      extern "c" fn host_network_recv_probe(
+        stream_window: i64,
+        recv_window: i64,
+        local_port: i64
+      ) -> i64;
+      extern "c" fn host_network_close(handle: i64) -> i64;
+
+      fn main() -> i64 {
+        let local_port: i64 = network_profile_local_port("NetworkUnit");
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+        let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+        let send_window: i64 = network_profile_send_window("NetworkUnit");
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let send_result: NetworkResult<i64> = network_result(
+          host_network_send_probe(stream_window, send_window, remote_port)
+        );
+        let recv_result: NetworkResult<i64> = network_result(
+          host_network_recv_probe(stream_window, recv_window, local_port)
+        );
+        let close_result: NetworkResult<i64> =
+          network_result(host_network_close(local_port));
+        if network_config_ready(bind_core) {
+          return network_value(bind_core)
+            + network_value(endpoint_kind)
+            + network_value(send_result)
+            + network_value(recv_result)
+            + network_value(close_result);
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_host_transport_missing_routing_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_send_probe(
+        stream_window: i64,
+        send_window: i64,
+        remote_port: i64
+      ) -> i64;
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let send_result: NetworkResult<i64> =
+          network_result(host_network_send_probe(64, 32, 443));
+        if network_config_ready(bind_core) {
+          return network_value(bind_core)
+            + network_value(endpoint_kind)
+            + network_value(send_result);
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_owned_udp_open_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_udp_datagram(
+        local_port: i64,
+        remote_port: i64
+      ) -> i64;
+      extern "c" fn host_network_send_owned(
+        handle: i64,
+        stream_window: i64,
+        send_window: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      fn main() -> i64 {
+        let local_port: i64 = network_profile_local_port("NetworkUnit");
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+        let send_window: i64 = network_profile_send_window("NetworkUnit");
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let handle: i64 = host_network_open_udp_datagram(local_port, remote_port);
+        let send_result: NetworkResult<i64> =
+          network_result(host_network_send_owned(handle, stream_window, send_window));
+        let close_value: i64 = host_network_close_owned(handle);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core)
+            + network_value(endpoint_kind)
+            + network_value(send_result)
+            + close_value;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_owned_udp_open_missing_routing_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_udp_datagram(
+        local_port: i64,
+        remote_port: i64
+      ) -> i64;
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let handle: i64 = host_network_open_udp_datagram(9000, 443);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core)
+            + network_value(endpoint_kind)
+            + handle;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_accept_owned_without_listener_source_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_accept_owned(
+        listener_handle: i64,
+        read_timeout_ms: i64,
+        write_timeout_ms: i64
+      ) -> i64;
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+        let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+        let accept_result: NetworkResult<i64> = network_result(
+          host_network_accept_owned(7, read_timeout_ms, write_timeout_ms)
+        );
+        if network_config_ready(bind_core) {
+          return network_value(bind_core)
+            + network_value(endpoint_kind)
+            + network_value(accept_result);
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_without_owned_handle_source_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let close_value: i64 = host_network_close_owned(9);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core)
+            + network_value(endpoint_kind)
+            + close_value;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_after_shadowing_handle_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_tcp_stream(
+        remote_port: i64,
+        connect_timeout_ms: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+        let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+        let handle: i64 = 7;
+        let close_value: i64 = host_network_close_owned(handle);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_after_while_shadowing_handle_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_tcp_stream(
+        remote_port: i64,
+        connect_timeout_ms: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+        let keep_running: bool = false;
+        let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+        while keep_running {
+          let handle: i64 = 7;
+        }
+        let close_value: i64 = host_network_close_owned(handle);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_through_helper_parameter_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_tcp_stream(
+        remote_port: i64,
+        connect_timeout_ms: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      fn close_handle(handle: i64) -> i64 {
+        return host_network_close_owned(handle);
+      }
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+        let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+        let close_value: i64 = close_handle(handle);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_through_spawned_helper_parameter_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_tcp_stream(
+        remote_port: i64,
+        connect_timeout_ms: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      async fn close_handle(handle: i64) -> i64 {
+        return host_network_close_owned(handle);
+      }
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+        let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+        let close_task: Task<i64> = spawn(close_handle(handle));
+        let close_joined: TaskResult<i64> = join_result(close_task);
+        if network_config_ready(bind_core) {
+          if task_completed(close_joined) {
+            return network_value(bind_core)
+              + network_value(endpoint_kind)
+              + task_value(close_joined);
+          }
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_through_helper_returned_handle_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_tcp_stream(
+        remote_port: i64,
+        connect_timeout_ms: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      fn open_handle(remote_port: i64, connect_timeout_ms: i64) -> i64 {
+        return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+      }
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+        let handle: i64 = open_handle(remote_port, connect_timeout_ms);
+        let close_value: i64 = host_network_close_owned(handle);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_through_nested_helper_returned_handle_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_tcp_stream(
+        remote_port: i64,
+        connect_timeout_ms: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      fn open_handle(remote_port: i64, connect_timeout_ms: i64) -> i64 {
+        return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+      }
+
+      fn forward_open(remote_port: i64, connect_timeout_ms: i64) -> i64 {
+        return open_handle(remote_port, connect_timeout_ms);
+      }
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+        let handle: i64 = forward_open(remote_port, connect_timeout_ms);
+        let close_value: i64 = host_network_close_owned(handle);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_through_network_result_helper_returned_handle_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_tcp_stream(
+        remote_port: i64,
+        connect_timeout_ms: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      fn open_handle_result(
+        remote_port: i64,
+        connect_timeout_ms: i64
+      ) -> NetworkResult<i64> {
+        return network_result(host_network_open_tcp_stream(remote_port, connect_timeout_ms));
+      }
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+        let opened: NetworkResult<i64> = open_handle_result(remote_port, connect_timeout_ms);
+        let handle: i64 = network_value(opened);
+        let close_value: i64 = host_network_close_owned(handle);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_through_recursive_helper_returned_handle_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_tcp_stream(
+        remote_port: i64,
+        connect_timeout_ms: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      fn open_handle_recursive(step: i64, remote_port: i64, connect_timeout_ms: i64) -> i64 {
+        if step < 1 {
+          return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+        }
+        return open_handle_recursive(0, remote_port, connect_timeout_ms);
+      }
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+        let handle: i64 = open_handle_recursive(1, remote_port, connect_timeout_ms);
+        let close_value: i64 = host_network_close_owned(handle);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_through_timed_and_cancelled_spawned_helper_parameter_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_tcp_stream(
+        remote_port: i64,
+        connect_timeout_ms: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      async fn close_handle(handle: i64) -> i64 {
+        return host_network_close_owned(handle);
+      }
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+        let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+        let timed_close: TaskResult<i64> =
+          join_result(timeout(spawn(close_handle(handle)), connect_timeout_ms));
+        let cancelled_close: TaskResult<i64> =
+          join_result(cancel(spawn(close_handle(handle))));
+        if network_config_ready(bind_core)
+          && task_timed_out(timed_close)
+          && task_cancelled(cancelled_close) {
+          return network_value(bind_core) + network_value(endpoint_kind);
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+fn network_close_owned_through_datagram_helper_returned_handle_entry() -> &'static str {
+    r#"
+    use network NetworkUnit;
+
+    mod cpu Main {
+      extern "c" fn host_network_open_udp_datagram(
+        local_port: i64,
+        remote_port: i64
+      ) -> i64;
+      extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+      fn open_handle(local_port: i64, remote_port: i64) -> i64 {
+        return host_network_open_udp_datagram(local_port, remote_port);
+      }
+
+      fn main() -> i64 {
+        let bind_core: NetworkResult<i64> =
+          network_result(network_profile_bind_core("NetworkUnit"));
+        let endpoint_kind: NetworkResult<i64> =
+          network_result(network_profile_endpoint_kind("NetworkUnit"));
+        let local_port: i64 = network_profile_local_port("NetworkUnit");
+        let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+        let handle: i64 = open_handle(local_port, remote_port);
+        let close_value: i64 = host_network_close_owned(handle);
+        if network_config_ready(bind_core) {
+          return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+        }
+        return 0;
+      }
+    }
+    "#
+}
+
+// Data-plane profile variants used by forward/reverse bridge contract tests.
+fn network_fabric_plane_module(include_network_to_cpu: bool) -> String {
+    let reverse_marker = if include_network_to_cpu {
+        "            let network_to_cpu: Marker<NetworkToCpu> = data_marker(\"network_to_cpu\");\n"
+    } else {
+        ""
+    };
+    format!(
+        r#"
+        mod data FabricPlane {{
+          fn profile() {{
+            const window_offset: i64 = 0;
+            const uplink_len: i64 = 1;
+            const downlink_len: i64 = 1;
+
+            data_bind_core(1);
+            let profile_handles: HandleTable<FabricPlaneBindings> =
+              data_handle_table("host=cpu0", "network=network0");
+            let cpu_to_network: Marker<CpuToNetwork> = data_marker("cpu_to_network");
+{reverse_marker}            let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+            let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+            let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+            let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+            let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+            let downlink_payload_class: Marker<PayloadClassWindow> =
+              data_marker("downlink_payload_class");
+            let uplink_payload_shape: Marker<PayloadShapeWindowi64> =
+              data_marker("uplink_payload_shape");
+            let downlink_payload_shape: Marker<PayloadShapeWindowWindowi64> =
+              data_marker("downlink_payload_shape");
+            let uplink_window_policy: Marker<UplinkWindowPolicy> =
+              data_marker("uplink_window_policy");
+            let downlink_window_policy: Marker<DownlinkWindowPolicy> =
+              data_marker("downlink_window_policy");
+            let uplink_window_mut: WindowMut<i64> =
+              data_copy_window(window_offset, window_offset, uplink_len);
+            let uplink_window: Window<i64> = data_freeze_window(uplink_window_mut);
+            let downlink_window_mut: WindowMut<i64> =
+              data_copy_window(window_offset, window_offset, downlink_len);
+            let downlink_window: Window<i64> = data_freeze_window(downlink_window_mut);
+          }}
+        }}
+        "#
+    )
+}
+
+fn kernel_fabric_plane_module(include_kernel_to_cpu: bool) -> String {
+    let reverse_marker = if include_kernel_to_cpu {
+        "            let kernel_to_cpu: Marker<KernelToCpu> = data_marker(\"kernel_to_cpu\");\n"
+    } else {
+        ""
+    };
+    format!(
+        r#"
+        mod data FabricPlane {{
+          fn profile() {{
+            const window_offset: i64 = 0;
+            const uplink_len: i64 = 1;
+            const downlink_len: i64 = 1;
+
+            data_bind_core(1);
+            let profile_handles: HandleTable<FabricPlaneBindings> =
+              data_handle_table("host=cpu0", "compute=kernel0");
+            let cpu_to_kernel: Marker<CpuToKernel> = data_marker("cpu_to_kernel");
+{reverse_marker}            let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+            let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+            let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+            let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+            let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+            let downlink_payload_class: Marker<PayloadClassWindow> =
+              data_marker("downlink_payload_class");
+            let uplink_payload_shape: Marker<PayloadShapeWindowi64> =
+              data_marker("uplink_payload_shape");
+            let downlink_payload_shape: Marker<PayloadShapeWindowWindowi64> =
+              data_marker("downlink_payload_shape");
+            let uplink_window_policy: Marker<UplinkWindowPolicy> =
+              data_marker("uplink_window_policy");
+            let downlink_window_policy: Marker<DownlinkWindowPolicy> =
+              data_marker("downlink_window_policy");
+            let uplink_window_mut: WindowMut<i64> =
+              data_copy_window(window_offset, window_offset, uplink_len);
+            let uplink_window: Window<i64> = data_freeze_window(uplink_window_mut);
+            let downlink_window_mut: WindowMut<i64> =
+              data_copy_window(window_offset, window_offset, downlink_len);
+            let downlink_window: Window<i64> = data_freeze_window(downlink_window_mut);
+          }}
+        }}
+        "#
+    )
+}
+
+// Higher-level project builders that bind common entry/module combinations to manifest links.
+fn reverse_network_data_bridge_project(bridge_source: &'static str) -> LoadedProject {
+    network_data_project_with_entry(reverse_network_data_bridge_entry(), {
+        let mut modules = network_data_support_modules();
+        modules.push(("network_data_bridge.ns", bridge_source));
+        modules
+    })
+}
+
+fn reverse_network_data_bridge_project_with_link(
+    bridge_source: &'static str,
+    from: &str,
+    to: &str,
+) -> LoadedProject {
+    let mut project = reverse_network_data_bridge_project(bridge_source);
+    project.manifest.links = vec![ProjectLink {
+        from: from.to_owned(),
+        to: to.to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+    project
+}
+
+fn forward_network_data_bridge_project(bridge_source: &'static str) -> LoadedProject {
+    reverse_network_data_bridge_project(bridge_source)
+}
+
+fn forward_network_data_bridge_project_with_link(bridge_source: &'static str) -> LoadedProject {
+    let mut project = forward_network_data_bridge_project(bridge_source);
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+    project
+}
+
+fn kernel_task_async_shapes_project() -> LoadedProject {
+    kernel_data_project_with_entry(kernel_task_async_shapes_entry(), {
+        let mut modules = kernel_data_support_modules();
+        modules.push(("kernel_task_async_shapes.ns", kernel_task_async_shapes_module()));
+        modules
+    })
+}
+
+fn kernel_task_async_shapes_project_with_link() -> LoadedProject {
+    let mut project = kernel_task_async_shapes_project();
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "kernel.KernelUnit".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+    project
+}
+
+fn network_task_async_project(entry_source: &str, module_source: &'static str) -> LoadedProject {
+    multidomain_project_with_entry(entry_source, {
+        let mut modules = multidomain_support_modules();
+        modules.push(("network_task_async_shapes.ns", module_source));
+        modules
+    })
+}
+
+fn network_task_async_project_with_link(
+    entry_source: &str,
+    module_source: &'static str,
+) -> LoadedProject {
+    let mut project = network_task_async_project(entry_source, module_source);
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+    project
+}
+
+fn direct_network_project_with_link(
+    entry_source: &str,
+    modules: Vec<(&'static str, &'static str)>,
+) -> LoadedProject {
+    let mut project = multidomain_project_with_entry(entry_source, modules);
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+    project
+}
+
+fn direct_network_default_project_with_link(entry_source: &str) -> LoadedProject {
+    direct_network_project_with_link(entry_source, multidomain_support_modules())
 }
 
 fn network_data_support_modules() -> Vec<(&'static str, &'static str)> {
@@ -222,103 +1241,60 @@ fn network_data_support_modules() -> Vec<(&'static str, &'static str)> {
     ]
 }
 
+// Temp project writers used by compile-path smoke tests.
 fn kernel_data_project_with_entry(
     entry_source: &str,
     extra_modules: Vec<(&str, &str)>,
 ) -> LoadedProject {
-    let mut modules = vec![("main.ns", entry_source)];
-    modules.extend(extra_modules);
-
-    LoadedProject {
-        root: PathBuf::from("."),
-        manifest_path: PathBuf::from("nuis.toml"),
-        manifest: NuisProjectManifest {
-            name: "kernel_data_test".to_owned(),
-            entry: "main.ns".to_owned(),
-            modules: modules.iter().map(|(path, _)| (*path).to_owned()).collect(),
-            tests: vec![],
-            links: vec![],
-            abi_requirements: vec![
-                ProjectAbiRequirement {
-                    domain: "cpu".to_owned(),
-                    abi: "cpu.arm64.apple_aapcs64".to_owned(),
-                },
-                ProjectAbiRequirement {
-                    domain: "kernel".to_owned(),
-                    abi: "kernel.apple_ane.coreml.v1".to_owned(),
-                },
-                ProjectAbiRequirement {
-                    domain: "data".to_owned(),
-                    abi: "data.fabric.macos.arm64.v1".to_owned(),
-                },
-            ],
-            galaxy_dependencies: vec![],
-        },
-        entry_path: PathBuf::from("main.ns"),
-        entry_source: entry_source.to_owned(),
-        modules: modules
-            .into_iter()
-            .map(|(path, source)| ProjectModule {
-                path: PathBuf::from(path),
-                ast: crate::frontend::parse_nuis_ast(source).unwrap(),
-            })
-            .collect(),
-    }
+    test_support::loaded_project_fixture(
+        "kernel_data_test",
+        vec![
+            ProjectAbiRequirement {
+                domain: "cpu".to_owned(),
+                abi: "cpu.arm64.apple_aapcs64".to_owned(),
+            },
+            ProjectAbiRequirement {
+                domain: "kernel".to_owned(),
+                abi: "kernel.apple_ane.coreml.v1".to_owned(),
+            },
+            ProjectAbiRequirement {
+                domain: "data".to_owned(),
+                abi: "data.fabric.macos.arm64.v1".to_owned(),
+            },
+        ],
+        entry_source,
+        extra_modules,
+    )
 }
 
 fn network_data_project_with_entry(
     entry_source: &str,
     extra_modules: Vec<(&str, &str)>,
 ) -> LoadedProject {
-    let mut modules = vec![("main.ns", entry_source)];
-    modules.extend(extra_modules);
-
-    LoadedProject {
-        root: PathBuf::from("."),
-        manifest_path: PathBuf::from("nuis.toml"),
-        manifest: NuisProjectManifest {
-            name: "network_data_test".to_owned(),
-            entry: "main.ns".to_owned(),
-            modules: modules.iter().map(|(path, _)| (*path).to_owned()).collect(),
-            tests: vec![],
-            links: vec![],
-            abi_requirements: vec![
-                ProjectAbiRequirement {
-                    domain: "cpu".to_owned(),
-                    abi: "cpu.arm64.apple_aapcs64".to_owned(),
-                },
-                ProjectAbiRequirement {
-                    domain: "network".to_owned(),
-                    abi: "network.socket.macos.arm64.v1".to_owned(),
-                },
-                ProjectAbiRequirement {
-                    domain: "data".to_owned(),
-                    abi: "data.fabric.macos.arm64.v1".to_owned(),
-                },
-            ],
-            galaxy_dependencies: vec![],
-        },
-        entry_path: PathBuf::from("main.ns"),
-        entry_source: entry_source.to_owned(),
-        modules: modules
-            .into_iter()
-            .map(|(path, source)| ProjectModule {
-                path: PathBuf::from(path),
-                ast: crate::frontend::parse_nuis_ast(source).unwrap(),
-            })
-            .collect(),
-    }
+    test_support::loaded_project_fixture(
+        "network_data_test",
+        vec![
+            ProjectAbiRequirement {
+                domain: "cpu".to_owned(),
+                abi: "cpu.arm64.apple_aapcs64".to_owned(),
+            },
+            ProjectAbiRequirement {
+                domain: "network".to_owned(),
+                abi: "network.socket.macos.arm64.v1".to_owned(),
+            },
+            ProjectAbiRequirement {
+                domain: "data".to_owned(),
+                abi: "data.fabric.macos.arm64.v1".to_owned(),
+            },
+        ],
+        entry_source,
+        extra_modules,
+    )
 }
 
 fn write_temp_project(name: &str, entry_source: &str, extra_modules: Vec<(&str, &str)>) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("nuisc_{name}_{nonce}"));
-    fs::create_dir_all(&root).unwrap();
-    fs::write(
-        root.join("nuis.toml"),
+    test_support::write_temp_project_fixture(
+        name,
         r#"
 name = "multidomain_test"
 version = "0.1.0"
@@ -331,13 +1307,9 @@ abi = [
 ]
 "#
         .trim_start(),
+        entry_source,
+        extra_modules,
     )
-    .unwrap();
-    fs::write(root.join("main.ns"), entry_source).unwrap();
-    for (path, source) in extra_modules {
-        fs::write(root.join(path), source).unwrap();
-    }
-    root
 }
 
 fn write_temp_network_data_project(
@@ -346,13 +1318,6 @@ fn write_temp_network_data_project(
     extra_modules: Vec<(&str, &str)>,
     links: &[&str],
 ) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("nuisc_{name}_{nonce}"));
-    fs::create_dir_all(&root).unwrap();
-
     let mut manifest = r#"
 name = "network_data_test"
 version = "0.1.0"
@@ -366,24 +1331,34 @@ abi = [
 "#
     .trim_start()
     .to_owned();
-    if !links.is_empty() {
-        manifest.push_str("links = [\n");
-        for link in links {
-            manifest.push_str("  \"");
-            manifest.push_str(link);
-            manifest.push_str("\",\n");
-        }
-        manifest.push_str("]\n");
-    }
-
-    fs::write(root.join("nuis.toml"), manifest).unwrap();
-    fs::write(root.join("main.ns"), entry_source).unwrap();
-    for (path, source) in extra_modules {
-        fs::write(root.join(path), source).unwrap();
-    }
-    root
+    test_support::append_manifest_links(&mut manifest, links);
+    test_support::write_temp_project_fixture(name, &manifest, entry_source, extra_modules)
 }
 
+fn write_temp_kernel_data_project(
+    name: &str,
+    entry_source: &str,
+    extra_modules: Vec<(&str, &str)>,
+    links: &[&str],
+) -> PathBuf {
+    let mut manifest = r#"
+name = "kernel_data_test"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "kernel_unit.ns", "fabric_plane.ns", "kernel_data_bridge.ns"]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "kernel=kernel.apple_ane.coreml.v1",
+  "data=data.fabric.macos.arm64.v1",
+]
+"#
+    .trim_start()
+    .to_owned();
+    test_support::append_manifest_links(&mut manifest, links);
+    test_support::write_temp_project_fixture(name, &manifest, entry_source, extra_modules)
+}
+
+// Compile-path smoke tests.
 #[test]
 fn compiles_multidomain_async_probe_project() {
     let project = multidomain_project_with_entry(
@@ -562,51 +1537,10 @@ fn compiles_multidomain_data_orchestration_project_after_cycle_fix() {
 fn compiles_reverse_network_project_via_data_bridge() {
     let root = write_temp_network_data_project(
         "reverse_network_via_data_bridge",
-        r#"
-        use cpu NetworkDataBridge;
-        use network NetworkUnit;
-        use data FabricPlane;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            return NetworkDataBridge.probe_roundtrip();
-          }
-        }
-        "#,
+        reverse_network_data_bridge_entry(),
         {
             let mut modules = network_data_support_modules();
-            modules.push((
-                "network_data_bridge.ns",
-                r#"
-                use network NetworkUnit;
-                use data FabricPlane;
-
-                mod cpu NetworkDataBridge {
-                  pub fn probe_roundtrip() -> i64 {
-                    let bind_core: NetworkResult<i64> =
-                      network_result(network_profile_bind_core("NetworkUnit"));
-                    let endpoint_kind: NetworkResult<i64> =
-                      network_result(network_profile_endpoint_kind("NetworkUnit"));
-                    let send_window: NetworkResult<i64> =
-                      network_result(network_profile_send_window("NetworkUnit"));
-                    let value: i64 =
-                      network_value(bind_core)
-                      + network_value(endpoint_kind)
-                      + network_value(send_window);
-                    data_profile_bind_core("FabricPlane");
-                    let handles: HandleTable<FabricPlaneBindings> =
-                      data_profile_handle_table("FabricPlane");
-                    let uplink: Window<i64> =
-                      data_profile_send_uplink("FabricPlane", value);
-                    let downlink: Window<Window<i64>> =
-                      data_profile_send_downlink("FabricPlane", uplink);
-                    print(handles);
-                    print(downlink);
-                    return value;
-                  }
-                }
-                "#,
-            ));
+            modules.push(("network_data_bridge.ns", reverse_network_data_bridge_module()));
             modules
         },
         &["network.NetworkUnit -> cpu.Main via data.FabricPlane"],
@@ -630,60 +1564,103 @@ fn compiles_reverse_network_project_via_data_bridge() {
 }
 
 #[test]
-fn infers_kernel_data_route_payload_types_through_shared_cpu_helper() {
-    let project = kernel_data_project_with_entry(
+fn compiles_reverse_kernel_project_via_data_bridge() {
+    let root = write_temp_kernel_data_project(
+        "reverse_kernel_via_data_bridge",
         r#"
-        use cpu KernelTaskAsyncShapes;
-        use data FabricPlane;
+        use cpu KernelDataBridge;
         use kernel KernelUnit;
+        use data FabricPlane;
 
         mod cpu Main {
-          fn main() {
-            let roundtrip_seed: i64 = KernelTaskAsyncShapes.roundtrip_seed();
-            let uplink: Window<i64> = KernelTaskAsyncShapes.send_roundtrip(roundtrip_seed);
-            let downlink: Window<Window<i64>> =
-              KernelTaskAsyncShapes.receive_roundtrip(uplink);
-            print(downlink);
+          fn main() -> i64 {
+            return KernelDataBridge.probe_roundtrip();
           }
         }
         "#,
         {
             let mut modules = kernel_data_support_modules();
-            modules.push((
-                "kernel_task_async_shapes.ns",
-                r#"
-                use data FabricPlane;
-                use kernel KernelUnit;
-
-                mod cpu KernelTaskAsyncShapes {
-                  pub fn roundtrip_seed() -> i64 {
-                    let bind_core: KernelResult<i64> =
-                      kernel_result(kernel_profile_bind_core("KernelUnit"));
-                    let queue_depth: KernelResult<i64> =
-                      kernel_result(kernel_profile_queue_depth("KernelUnit"));
-                    let batch_lanes: KernelResult<i64> =
-                      kernel_result(kernel_profile_batch_lanes("KernelUnit"));
-                    return kernel_value(bind_core)
-                      + kernel_value(queue_depth)
-                      + kernel_value(batch_lanes);
-                  }
-
-                  pub fn send_roundtrip(value: i64) -> Window<i64> {
-                    data_profile_bind_core("FabricPlane");
-                    let handles: HandleTable<FabricPlaneBindings> =
-                      data_profile_handle_table("FabricPlane");
-                    return data_profile_send_uplink("FabricPlane", value);
-                  }
-
-                  pub fn receive_roundtrip(uplink: Window<i64>) -> Window<Window<i64>> {
-                    return data_profile_send_downlink("FabricPlane", uplink);
-                  }
-                }
-                "#,
-            ));
+            modules.push(("kernel_data_bridge.ns", reverse_kernel_data_bridge_module()));
             modules
         },
+        &["kernel.KernelUnit -> cpu.Main via data.FabricPlane"],
     );
+    let artifacts = crate::pipeline::compile_source_path(&root).unwrap();
+    let _ = fs::remove_dir_all(&root);
+
+    assert!(artifacts
+        .loaded_nustar
+        .iter()
+        .any(|package| package == "official.kernel"));
+    assert!(artifacts
+        .loaded_nustar
+        .iter()
+        .any(|package| package == "official.data"));
+    assert!(artifacts
+        .yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "kernel" && node.op.instruction == "observe"));
+}
+
+#[test]
+fn rejects_reverse_network_project_via_data_bridge_when_network_to_data_xfer_is_missing() {
+    let root = write_temp_network_data_project(
+        "reverse_network_via_data_bridge_missing_xfer",
+        reverse_network_data_bridge_entry(),
+        {
+            let mut modules = network_data_support_modules();
+            modules.push(("network_data_bridge.ns", reverse_network_data_bridge_module()));
+            let fabric_plane = network_fabric_plane_module(false);
+            modules.push(("fabric_plane.ns", Box::leak(fabric_plane.into_boxed_str())));
+            modules
+        },
+        &["network.NetworkUnit -> cpu.Main via data.FabricPlane"],
+    );
+    let err = match crate::pipeline::compile_source_path(&root) {
+        Ok(_) => panic!("expected reverse network/data bridge compile to fail"),
+        Err(err) => err,
+    };
+    let _ = fs::remove_dir_all(&root);
+    assert!(err.contains("requires a `network` -> `data` xfer segment"));
+}
+
+#[test]
+fn rejects_reverse_kernel_project_via_data_bridge_when_kernel_to_data_xfer_is_missing() {
+    let root = write_temp_kernel_data_project(
+        "reverse_kernel_via_data_bridge_missing_xfer",
+        r#"
+        use cpu KernelDataBridge;
+        use kernel KernelUnit;
+        use data FabricPlane;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return KernelDataBridge.probe_roundtrip();
+          }
+        }
+        "#,
+        {
+            let mut modules = kernel_data_support_modules();
+            modules.push(("kernel_data_bridge.ns", reverse_kernel_data_bridge_module()));
+            let fabric_plane = kernel_fabric_plane_module(false);
+            modules.push(("fabric_plane.ns", Box::leak(fabric_plane.into_boxed_str())));
+            modules
+        },
+        &["kernel.KernelUnit -> cpu.Main via data.FabricPlane"],
+    );
+    let err = match crate::pipeline::compile_source_path(&root) {
+        Ok(_) => panic!("expected reverse kernel/data bridge compile to fail"),
+        Err(err) => err,
+    };
+    let _ = fs::remove_dir_all(&root);
+    assert!(err.contains("requires a `kernel` -> `data` xfer segment"));
+}
+
+// Shared helper inference and bridge-link validation tests.
+#[test]
+fn infers_kernel_data_route_payload_types_through_shared_cpu_helper() {
+    let project = kernel_task_async_shapes_project();
 
     let uplink = infer_project_route_payload_type(&project, "cpu.Main", "FabricPlane", true)
         .unwrap()
@@ -698,65 +1675,7 @@ fn infers_kernel_data_route_payload_types_through_shared_cpu_helper() {
 
 #[test]
 fn validates_kernel_project_links_against_nir_with_shared_cpu_helper_indirection() {
-    let project = kernel_data_project_with_entry(
-        r#"
-        use cpu KernelTaskAsyncShapes;
-        use data FabricPlane;
-        use kernel KernelUnit;
-
-        mod cpu Main {
-          fn main() {
-            let roundtrip_seed: i64 = KernelTaskAsyncShapes.roundtrip_seed();
-            let uplink: Window<i64> = KernelTaskAsyncShapes.send_roundtrip(roundtrip_seed);
-            let downlink: Window<Window<i64>> =
-              KernelTaskAsyncShapes.receive_roundtrip(uplink);
-            print(downlink);
-          }
-        }
-        "#,
-        {
-            let mut modules = kernel_data_support_modules();
-            modules.push((
-                "kernel_task_async_shapes.ns",
-                r#"
-                use data FabricPlane;
-                use kernel KernelUnit;
-
-                mod cpu KernelTaskAsyncShapes {
-                  pub fn roundtrip_seed() -> i64 {
-                    let bind_core: KernelResult<i64> =
-                      kernel_result(kernel_profile_bind_core("KernelUnit"));
-                    let queue_depth: KernelResult<i64> =
-                      kernel_result(kernel_profile_queue_depth("KernelUnit"));
-                    let batch_lanes: KernelResult<i64> =
-                      kernel_result(kernel_profile_batch_lanes("KernelUnit"));
-                    return kernel_value(bind_core)
-                      + kernel_value(queue_depth)
-                      + kernel_value(batch_lanes);
-                  }
-
-                  pub fn send_roundtrip(value: i64) -> Window<i64> {
-                    data_profile_bind_core("FabricPlane");
-                    let handles: HandleTable<FabricPlaneBindings> =
-                      data_profile_handle_table("FabricPlane");
-                    return data_profile_send_uplink("FabricPlane", value);
-                  }
-
-                  pub fn receive_roundtrip(uplink: Window<i64>) -> Window<Window<i64>> {
-                    return data_profile_send_downlink("FabricPlane", uplink);
-                  }
-                }
-                "#,
-            ));
-            modules
-        },
-    );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "kernel.KernelUnit".to_owned(),
-        via: Some("data.FabricPlane".to_owned()),
-    }];
+    let project = kernel_task_async_shapes_project_with_link();
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -764,51 +1683,10 @@ fn validates_kernel_project_links_against_nir_with_shared_cpu_helper_indirection
 
 #[test]
 fn validates_network_project_links_against_nir_with_shared_cpu_helper_indirection() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use cpu NetworkTaskAsyncShapes;
-        use network NetworkUnit;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            return NetworkTaskAsyncShapes.probe();
-          }
-        }
-        "#,
-        {
-            let mut modules = multidomain_support_modules();
-            modules.push((
-                "network_task_async_shapes.ns",
-                r#"
-                use network NetworkUnit;
-
-                mod cpu NetworkTaskAsyncShapes {
-                  pub fn probe() -> i64 {
-                    let bind_core: NetworkResult<i64> =
-                      network_result(network_profile_bind_core("NetworkUnit"));
-                    let endpoint_kind: NetworkResult<i64> =
-                      network_result(network_profile_endpoint_kind("NetworkUnit"));
-                    let send_window: NetworkResult<i64> =
-                      network_result(network_profile_send_window("NetworkUnit"));
-                    if network_config_ready(bind_core) {
-                      return network_value(bind_core)
-                        + network_value(endpoint_kind)
-                        + network_value(send_window);
-                    }
-                    return 0;
-                  }
-                }
-                "#,
-            ));
-            modules
-        },
+    let project = network_task_async_project_with_link(
+        network_task_async_probe_entry(),
+        network_task_async_probe_module(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -816,61 +1694,9 @@ fn validates_network_project_links_against_nir_with_shared_cpu_helper_indirectio
 
 #[test]
 fn validates_network_project_links_against_nir_via_data_bridge() {
-    let project = network_data_project_with_entry(
-        r#"
-        use cpu NetworkDataBridge;
-        use network NetworkUnit;
-        use data FabricPlane;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            return NetworkDataBridge.probe_roundtrip();
-          }
-        }
-        "#,
-        {
-            let mut modules = network_data_support_modules();
-            modules.push((
-                "network_data_bridge.ns",
-                r#"
-                use network NetworkUnit;
-                use data FabricPlane;
-
-                mod cpu NetworkDataBridge {
-                  pub fn probe_roundtrip() -> i64 {
-                    let bind_core: NetworkResult<i64> =
-                      network_result(network_profile_bind_core("NetworkUnit"));
-                    let endpoint_kind: NetworkResult<i64> =
-                      network_result(network_profile_endpoint_kind("NetworkUnit"));
-                    let send_window: NetworkResult<i64> =
-                      network_result(network_profile_send_window("NetworkUnit"));
-                    let value: i64 =
-                      network_value(bind_core)
-                      + network_value(endpoint_kind)
-                      + network_value(send_window);
-                    data_profile_bind_core("FabricPlane");
-                    let handles: HandleTable<FabricPlaneBindings> =
-                      data_profile_handle_table("FabricPlane");
-                    let uplink: Window<i64> =
-                      data_profile_send_uplink("FabricPlane", value);
-                    let downlink: Window<Window<i64>> =
-                      data_profile_send_downlink("FabricPlane", uplink);
-                    print(handles);
-                    print(downlink);
-                    return value;
-                  }
-                }
-                "#,
-            ));
-            modules
-        },
+    let project = forward_network_data_bridge_project_with_link(
+        reverse_network_data_bridge_module(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: Some("data.FabricPlane".to_owned()),
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -878,59 +1704,8 @@ fn validates_network_project_links_against_nir_via_data_bridge() {
 
 #[test]
 fn rejects_network_project_links_via_data_bridge_missing_downlink_usage() {
-    let project = network_data_project_with_entry(
-        r#"
-        use cpu NetworkDataBridge;
-        use network NetworkUnit;
-        use data FabricPlane;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            return NetworkDataBridge.probe_roundtrip();
-          }
-        }
-        "#,
-        {
-            let mut modules = network_data_support_modules();
-            modules.push((
-                "network_data_bridge.ns",
-                r#"
-                use network NetworkUnit;
-                use data FabricPlane;
-
-                mod cpu NetworkDataBridge {
-                  pub fn probe_roundtrip() -> i64 {
-                    let bind_core: NetworkResult<i64> =
-                      network_result(network_profile_bind_core("NetworkUnit"));
-                    let endpoint_kind: NetworkResult<i64> =
-                      network_result(network_profile_endpoint_kind("NetworkUnit"));
-                    let send_window: NetworkResult<i64> =
-                      network_result(network_profile_send_window("NetworkUnit"));
-                    let value: i64 =
-                      network_value(bind_core)
-                      + network_value(endpoint_kind)
-                      + network_value(send_window);
-                    data_profile_bind_core("FabricPlane");
-                    let handles: HandleTable<FabricPlaneBindings> =
-                      data_profile_handle_table("FabricPlane");
-                    let uplink: Window<i64> =
-                      data_profile_send_uplink("FabricPlane", value);
-                    print(handles);
-                    print(uplink);
-                    return value;
-                  }
-                }
-                "#,
-            ));
-            modules
-        },
-    );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: Some("data.FabricPlane".to_owned()),
-    }];
+    let project =
+        forward_network_data_bridge_project_with_link(forward_network_data_bridge_missing_downlink_module());
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -939,61 +1714,9 @@ fn rejects_network_project_links_via_data_bridge_missing_downlink_usage() {
 
 #[test]
 fn validates_network_project_links_against_yir_via_data_bridge() {
-    let project = network_data_project_with_entry(
-        r#"
-        use cpu NetworkDataBridge;
-        use network NetworkUnit;
-        use data FabricPlane;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            return NetworkDataBridge.probe_roundtrip();
-          }
-        }
-        "#,
-        {
-            let mut modules = network_data_support_modules();
-            modules.push((
-                "network_data_bridge.ns",
-                r#"
-                use network NetworkUnit;
-                use data FabricPlane;
-
-                mod cpu NetworkDataBridge {
-                  pub fn probe_roundtrip() -> i64 {
-                    let bind_core: NetworkResult<i64> =
-                      network_result(network_profile_bind_core("NetworkUnit"));
-                    let endpoint_kind: NetworkResult<i64> =
-                      network_result(network_profile_endpoint_kind("NetworkUnit"));
-                    let send_window: NetworkResult<i64> =
-                      network_result(network_profile_send_window("NetworkUnit"));
-                    let value: i64 =
-                      network_value(bind_core)
-                      + network_value(endpoint_kind)
-                      + network_value(send_window);
-                    data_profile_bind_core("FabricPlane");
-                    let handles: HandleTable<FabricPlaneBindings> =
-                      data_profile_handle_table("FabricPlane");
-                    let uplink: Window<i64> =
-                      data_profile_send_uplink("FabricPlane", value);
-                    let downlink: Window<Window<i64>> =
-                      data_profile_send_downlink("FabricPlane", uplink);
-                    print(handles);
-                    print(downlink);
-                    return value;
-                  }
-                }
-                "#,
-            ));
-            modules
-        },
+    let project = forward_network_data_bridge_project_with_link(
+        reverse_network_data_bridge_module(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: Some("data.FabricPlane".to_owned()),
-    }];
 
     let mut yir = YirModule::new("0.1");
     apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
@@ -1003,61 +1726,9 @@ fn validates_network_project_links_against_yir_via_data_bridge() {
 
 #[test]
 fn rejects_network_project_links_against_yir_when_data_to_network_xfer_is_missing() {
-    let project = network_data_project_with_entry(
-        r#"
-        use cpu NetworkDataBridge;
-        use network NetworkUnit;
-        use data FabricPlane;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            return NetworkDataBridge.probe_roundtrip();
-          }
-        }
-        "#,
-        {
-            let mut modules = network_data_support_modules();
-            modules.push((
-                "network_data_bridge.ns",
-                r#"
-                use network NetworkUnit;
-                use data FabricPlane;
-
-                mod cpu NetworkDataBridge {
-                  pub fn probe_roundtrip() -> i64 {
-                    let bind_core: NetworkResult<i64> =
-                      network_result(network_profile_bind_core("NetworkUnit"));
-                    let endpoint_kind: NetworkResult<i64> =
-                      network_result(network_profile_endpoint_kind("NetworkUnit"));
-                    let send_window: NetworkResult<i64> =
-                      network_result(network_profile_send_window("NetworkUnit"));
-                    let value: i64 =
-                      network_value(bind_core)
-                      + network_value(endpoint_kind)
-                      + network_value(send_window);
-                    data_profile_bind_core("FabricPlane");
-                    let handles: HandleTable<FabricPlaneBindings> =
-                      data_profile_handle_table("FabricPlane");
-                    let uplink: Window<i64> =
-                      data_profile_send_uplink("FabricPlane", value);
-                    let downlink: Window<Window<i64>> =
-                      data_profile_send_downlink("FabricPlane", uplink);
-                    print(handles);
-                    print(downlink);
-                    return value;
-                  }
-                }
-                "#,
-            ));
-            modules
-        },
+    let project = forward_network_data_bridge_project_with_link(
+        reverse_network_data_bridge_module(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: Some("data.FabricPlane".to_owned()),
-    }];
 
     let mut yir = YirModule::new("0.1");
     apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
@@ -1094,61 +1765,11 @@ fn rejects_network_project_links_against_yir_when_data_to_network_xfer_is_missin
 
 #[test]
 fn validates_reverse_network_project_links_against_nir_via_data_bridge() {
-    let project = network_data_project_with_entry(
-        r#"
-        use cpu NetworkDataBridge;
-        use network NetworkUnit;
-        use data FabricPlane;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            return NetworkDataBridge.probe_roundtrip();
-          }
-        }
-        "#,
-        {
-            let mut modules = network_data_support_modules();
-            modules.push((
-                "network_data_bridge.ns",
-                r#"
-                use network NetworkUnit;
-                use data FabricPlane;
-
-                mod cpu NetworkDataBridge {
-                  pub fn probe_roundtrip() -> i64 {
-                    let bind_core: NetworkResult<i64> =
-                      network_result(network_profile_bind_core("NetworkUnit"));
-                    let endpoint_kind: NetworkResult<i64> =
-                      network_result(network_profile_endpoint_kind("NetworkUnit"));
-                    let send_window: NetworkResult<i64> =
-                      network_result(network_profile_send_window("NetworkUnit"));
-                    let value: i64 =
-                      network_value(bind_core)
-                      + network_value(endpoint_kind)
-                      + network_value(send_window);
-                    data_profile_bind_core("FabricPlane");
-                    let handles: HandleTable<FabricPlaneBindings> =
-                      data_profile_handle_table("FabricPlane");
-                    let uplink: Window<i64> =
-                      data_profile_send_uplink("FabricPlane", value);
-                    let downlink: Window<Window<i64>> =
-                      data_profile_send_downlink("FabricPlane", uplink);
-                    print(handles);
-                    print(downlink);
-                    return value;
-                  }
-                }
-                "#,
-            ));
-            modules
-        },
+    let project = reverse_network_data_bridge_project_with_link(
+        reverse_network_data_bridge_module(),
+        "network.NetworkUnit",
+        "cpu.Main",
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "network.NetworkUnit".to_owned(),
-        to: "cpu.Main".to_owned(),
-        via: Some("data.FabricPlane".to_owned()),
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -1215,61 +1836,11 @@ fn rejects_reverse_network_project_links_missing_endpoint_kind_usage() {
 
 #[test]
 fn validates_reverse_network_project_links_against_yir_via_data_bridge() {
-    let project = network_data_project_with_entry(
-        r#"
-        use cpu NetworkDataBridge;
-        use network NetworkUnit;
-        use data FabricPlane;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            return NetworkDataBridge.probe_roundtrip();
-          }
-        }
-        "#,
-        {
-            let mut modules = network_data_support_modules();
-            modules.push((
-                "network_data_bridge.ns",
-                r#"
-                use network NetworkUnit;
-                use data FabricPlane;
-
-                mod cpu NetworkDataBridge {
-                  pub fn probe_roundtrip() -> i64 {
-                    let bind_core: NetworkResult<i64> =
-                      network_result(network_profile_bind_core("NetworkUnit"));
-                    let endpoint_kind: NetworkResult<i64> =
-                      network_result(network_profile_endpoint_kind("NetworkUnit"));
-                    let send_window: NetworkResult<i64> =
-                      network_result(network_profile_send_window("NetworkUnit"));
-                    let value: i64 =
-                      network_value(bind_core)
-                      + network_value(endpoint_kind)
-                      + network_value(send_window);
-                    data_profile_bind_core("FabricPlane");
-                    let handles: HandleTable<FabricPlaneBindings> =
-                      data_profile_handle_table("FabricPlane");
-                    let uplink: Window<i64> =
-                      data_profile_send_uplink("FabricPlane", value);
-                    let downlink: Window<Window<i64>> =
-                      data_profile_send_downlink("FabricPlane", uplink);
-                    print(handles);
-                    print(downlink);
-                    return value;
-                  }
-                }
-                "#,
-            ));
-            modules
-        },
+    let project = reverse_network_data_bridge_project_with_link(
+        reverse_network_data_bridge_module(),
+        "network.NetworkUnit",
+        "cpu.Main",
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "network.NetworkUnit".to_owned(),
-        to: "cpu.Main".to_owned(),
-        via: Some("data.FabricPlane".to_owned()),
-    }];
 
     let mut yir = YirModule::new("0.1");
     apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
@@ -1279,61 +1850,11 @@ fn validates_reverse_network_project_links_against_yir_via_data_bridge() {
 
 #[test]
 fn rejects_reverse_network_project_links_against_yir_when_network_to_data_xfer_is_missing() {
-    let project = network_data_project_with_entry(
-        r#"
-        use cpu NetworkDataBridge;
-        use network NetworkUnit;
-        use data FabricPlane;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            return NetworkDataBridge.probe_roundtrip();
-          }
-        }
-        "#,
-        {
-            let mut modules = network_data_support_modules();
-            modules.push((
-                "network_data_bridge.ns",
-                r#"
-                use network NetworkUnit;
-                use data FabricPlane;
-
-                mod cpu NetworkDataBridge {
-                  pub fn probe_roundtrip() -> i64 {
-                    let bind_core: NetworkResult<i64> =
-                      network_result(network_profile_bind_core("NetworkUnit"));
-                    let endpoint_kind: NetworkResult<i64> =
-                      network_result(network_profile_endpoint_kind("NetworkUnit"));
-                    let send_window: NetworkResult<i64> =
-                      network_result(network_profile_send_window("NetworkUnit"));
-                    let value: i64 =
-                      network_value(bind_core)
-                      + network_value(endpoint_kind)
-                      + network_value(send_window);
-                    data_profile_bind_core("FabricPlane");
-                    let handles: HandleTable<FabricPlaneBindings> =
-                      data_profile_handle_table("FabricPlane");
-                    let uplink: Window<i64> =
-                      data_profile_send_uplink("FabricPlane", value);
-                    let downlink: Window<Window<i64>> =
-                      data_profile_send_downlink("FabricPlane", uplink);
-                    print(handles);
-                    print(downlink);
-                    return value;
-                  }
-                }
-                "#,
-            ));
-            modules
-        },
+    let project = reverse_network_data_bridge_project_with_link(
+        reverse_network_data_bridge_module(),
+        "network.NetworkUnit",
+        "cpu.Main",
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "network.NetworkUnit".to_owned(),
-        to: "cpu.Main".to_owned(),
-        via: Some("data.FabricPlane".to_owned()),
-    }];
 
     let mut yir = YirModule::new("0.1");
     apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
@@ -1368,31 +1889,10 @@ fn rejects_reverse_network_project_links_against_yir_when_network_to_data_xfer_i
     assert!(err.contains("requires a `network` -> `data` xfer segment"));
 }
 
+// Direct network profile and transport/ownership validation matrix.
 #[test]
 fn rejects_network_project_links_missing_endpoint_kind_usage() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            if network_config_ready(bind_core) {
-              return network_value(bind_core);
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
-    );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
+    let project = direct_network_default_project_with_link(direct_network_bind_core_entry());
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -1401,57 +1901,10 @@ fn rejects_network_project_links_missing_endpoint_kind_usage() {
 
 #[test]
 fn validates_network_project_links_for_transport_and_protocol_profile_usage() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use cpu NetworkTaskAsyncShapes;
-        use network NetworkUnit;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            return NetworkTaskAsyncShapes.transport_probe();
-          }
-        }
-        "#,
-        {
-            let mut modules = multidomain_support_modules();
-            modules.push((
-                "network_task_async_shapes.ns",
-                r#"
-                use network NetworkUnit;
-
-                mod cpu NetworkTaskAsyncShapes {
-                  pub fn transport_probe() -> i64 {
-                    let bind_core: NetworkResult<i64> =
-                      network_result(network_profile_bind_core("NetworkUnit"));
-                    let endpoint_kind: NetworkResult<i64> =
-                      network_result(network_profile_endpoint_kind("NetworkUnit"));
-                    let transport_family: NetworkResult<i64> =
-                      network_result(network_profile_transport_family("NetworkUnit"));
-                    let protocol_kind: NetworkResult<i64> =
-                      network_result(network_profile_protocol_kind("NetworkUnit"));
-                    let protocol_version: NetworkResult<i64> =
-                      network_result(network_profile_protocol_version("NetworkUnit"));
-                    if network_config_ready(bind_core) {
-                      return network_value(bind_core)
-                        + network_value(endpoint_kind)
-                        + network_value(transport_family)
-                        + network_value(protocol_kind)
-                        + network_value(protocol_version);
-                    }
-                    return 0;
-                  }
-                }
-                "#,
-            ));
-            modules
-        },
+    let project = network_task_async_project_with_link(
+        network_task_async_transport_entry(),
+        network_task_async_transport_module(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -1459,55 +1912,10 @@ fn validates_network_project_links_for_transport_and_protocol_profile_usage() {
 
 #[test]
 fn rejects_network_project_links_when_protocol_profile_const_is_missing() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let protocol_kind: NetworkResult<i64> =
-              network_result(network_profile_protocol_kind("NetworkUnit"));
-            if network_config_ready(bind_core) {
-              return network_value(bind_core)
-                + network_value(endpoint_kind)
-                + network_value(protocol_kind);
-            }
-            return 0;
-          }
-        }
-        "#,
-        vec![(
-            "network_unit.ns",
-            r#"
-            mod network NetworkUnit {
-              fn profile() {
-                const bind_core: i64 = 2;
-                const endpoint_kind: i64 = 1;
-                const transport_family: i64 = 6;
-                const local_port: i64 = 9000;
-                const remote_port: i64 = 443;
-                const connect_timeout_ms: i64 = 250;
-                const read_timeout_ms: i64 = 125;
-                const write_timeout_ms: i64 = 150;
-                const retry_budget: i64 = 3;
-                const stream_window: i64 = 64;
-                const recv_window: i64 = 32;
-                const send_window: i64 = 32;
-              }
-            }
-            "#,
-        )],
+    let project = direct_network_project_with_link(
+        direct_network_protocol_kind_entry(),
+        network_support_modules_without_protocol_kind(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -1516,60 +1924,7 @@ fn rejects_network_project_links_when_protocol_profile_const_is_missing() {
 
 #[test]
 fn validates_network_project_links_for_host_transport_calls() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_send_probe(
-            stream_window: i64,
-            send_window: i64,
-            remote_port: i64
-          ) -> i64;
-          extern "c" fn host_network_recv_probe(
-            stream_window: i64,
-            recv_window: i64,
-            local_port: i64
-          ) -> i64;
-          extern "c" fn host_network_close(handle: i64) -> i64;
-
-          fn main() -> i64 {
-            let local_port: i64 = network_profile_local_port("NetworkUnit");
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
-            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
-            let send_window: i64 = network_profile_send_window("NetworkUnit");
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let send_result: NetworkResult<i64> = network_result(
-              host_network_send_probe(stream_window, send_window, remote_port)
-            );
-            let recv_result: NetworkResult<i64> = network_result(
-              host_network_recv_probe(stream_window, recv_window, local_port)
-            );
-            let close_result: NetworkResult<i64> =
-              network_result(host_network_close(local_port));
-            if network_config_ready(bind_core) {
-              return network_value(bind_core)
-                + network_value(endpoint_kind)
-                + network_value(send_result)
-                + network_value(recv_result)
-                + network_value(close_result);
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
-    );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
+    let project = direct_network_default_project_with_link(network_host_transport_entry());
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -1577,41 +1932,8 @@ fn validates_network_project_links_for_host_transport_calls() {
 
 #[test]
 fn rejects_network_host_transport_calls_without_profile_routing() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_send_probe(
-            stream_window: i64,
-            send_window: i64,
-            remote_port: i64
-          ) -> i64;
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let send_result: NetworkResult<i64> =
-              network_result(host_network_send_probe(64, 32, 443));
-            if network_config_ready(bind_core) {
-              return network_value(bind_core)
-                + network_value(endpoint_kind)
-                + network_value(send_result);
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
-    );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
+    let project =
+        direct_network_default_project_with_link(network_host_transport_missing_routing_entry());
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -1621,53 +1943,7 @@ fn rejects_network_host_transport_calls_without_profile_routing() {
 
 #[test]
 fn validates_network_project_links_for_owned_udp_open_calls() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_udp_datagram(
-            local_port: i64,
-            remote_port: i64
-          ) -> i64;
-          extern "c" fn host_network_send_owned(
-            handle: i64,
-            stream_window: i64,
-            send_window: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          fn main() -> i64 {
-            let local_port: i64 = network_profile_local_port("NetworkUnit");
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
-            let send_window: i64 = network_profile_send_window("NetworkUnit");
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let handle: i64 = host_network_open_udp_datagram(local_port, remote_port);
-            let send_result: NetworkResult<i64> =
-              network_result(host_network_send_owned(handle, stream_window, send_window));
-            let close_value: i64 = host_network_close_owned(handle);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core)
-                + network_value(endpoint_kind)
-                + network_value(send_result)
-                + close_value;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
-    );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
+    let project = direct_network_default_project_with_link(network_owned_udp_open_entry());
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -1675,39 +1951,8 @@ fn validates_network_project_links_for_owned_udp_open_calls() {
 
 #[test]
 fn rejects_owned_udp_open_calls_without_profile_routing() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_udp_datagram(
-            local_port: i64,
-            remote_port: i64
-          ) -> i64;
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let handle: i64 = host_network_open_udp_datagram(9000, 443);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core)
-                + network_value(endpoint_kind)
-                + handle;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
-    );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
+    let project =
+        direct_network_default_project_with_link(network_owned_udp_open_missing_routing_entry());
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -1717,44 +1962,8 @@ fn rejects_owned_udp_open_calls_without_profile_routing() {
 
 #[test]
 fn rejects_accept_owned_without_listener_source() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_accept_owned(
-            listener_handle: i64,
-            read_timeout_ms: i64,
-            write_timeout_ms: i64
-          ) -> i64;
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
-            let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
-            let accept_result: NetworkResult<i64> = network_result(
-              host_network_accept_owned(7, read_timeout_ms, write_timeout_ms)
-            );
-            if network_config_ready(bind_core) {
-              return network_value(bind_core)
-                + network_value(endpoint_kind)
-                + network_value(accept_result);
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
-    );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
+    let project =
+        direct_network_default_project_with_link(network_accept_owned_without_listener_source_entry());
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -1764,36 +1973,9 @@ fn rejects_accept_owned_without_listener_source() {
 
 #[test]
 fn rejects_close_owned_without_owned_handle_source() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let close_value: i64 = host_network_close_owned(9);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core)
-                + network_value(endpoint_kind)
-                + close_value;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
+    let project = direct_network_default_project_with_link(
+        network_close_owned_without_owned_handle_source_entry(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -1803,42 +1985,8 @@ fn rejects_close_owned_without_owned_handle_source() {
 
 #[test]
 fn rejects_close_owned_after_shadowing_handle_with_plain_value() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_tcp_stream(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
-            let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
-            let handle: i64 = 7;
-            let close_value: i64 = host_network_close_owned(handle);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
-    );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
+    let project =
+        direct_network_default_project_with_link(network_close_owned_after_shadowing_handle_entry());
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -1851,45 +1999,9 @@ fn rejects_close_owned_after_shadowing_handle_with_plain_value() {
 
 #[test]
 fn rejects_close_owned_after_while_shadowing_handle_with_plain_value() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_tcp_stream(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
-            let keep_running: bool = false;
-            let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
-            while keep_running {
-              let handle: i64 = 7;
-            }
-            let close_value: i64 = host_network_close_owned(handle);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
+    let project = direct_network_default_project_with_link(
+        network_close_owned_after_while_shadowing_handle_entry(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -1902,45 +2014,8 @@ fn rejects_close_owned_after_while_shadowing_handle_with_plain_value() {
 
 #[test]
 fn validates_close_owned_through_helper_parameter() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_tcp_stream(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          fn close_handle(handle: i64) -> i64 {
-            return host_network_close_owned(handle);
-          }
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
-            let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
-            let close_value: i64 = close_handle(handle);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
-    );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
+    let project =
+        direct_network_default_project_with_link(network_close_owned_through_helper_parameter_entry());
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -1948,50 +2023,9 @@ fn validates_close_owned_through_helper_parameter() {
 
 #[test]
 fn validates_close_owned_through_spawned_helper_parameter() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_tcp_stream(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          async fn close_handle(handle: i64) -> i64 {
-            return host_network_close_owned(handle);
-          }
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
-            let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
-            let close_task: Task<i64> = spawn(close_handle(handle));
-            let close_joined: TaskResult<i64> = join_result(close_task);
-            if network_config_ready(bind_core) {
-              if task_completed(close_joined) {
-                return network_value(bind_core)
-                  + network_value(endpoint_kind)
-                  + task_value(close_joined);
-              }
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
+    let project = direct_network_default_project_with_link(
+        network_close_owned_through_spawned_helper_parameter_entry(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -2061,45 +2095,9 @@ fn validates_network_result_timeout_and_cancel_async_policy_workflow() {
 
 #[test]
 fn validates_close_owned_through_helper_returned_handle() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_tcp_stream(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          fn open_handle(remote_port: i64, connect_timeout_ms: i64) -> i64 {
-            return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
-          }
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
-            let handle: i64 = open_handle(remote_port, connect_timeout_ms);
-            let close_value: i64 = host_network_close_owned(handle);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
+    let project = direct_network_default_project_with_link(
+        network_close_owned_through_helper_returned_handle_entry(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -2107,50 +2105,9 @@ fn validates_close_owned_through_helper_returned_handle() {
 
 #[test]
 fn validates_close_owned_through_timed_and_cancelled_spawned_helper_parameter() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_tcp_stream(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          async fn close_handle(handle: i64) -> i64 {
-            return host_network_close_owned(handle);
-          }
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
-            let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
-            let timed_close: TaskResult<i64> =
-              join_result(timeout(spawn(close_handle(handle)), connect_timeout_ms));
-            let cancelled_close: TaskResult<i64> =
-              join_result(cancel(spawn(close_handle(handle))));
-            if network_config_ready(bind_core)
-              && task_timed_out(timed_close)
-              && task_cancelled(cancelled_close) {
-              return network_value(bind_core) + network_value(endpoint_kind);
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
+    let project = direct_network_default_project_with_link(
+        network_close_owned_through_timed_and_cancelled_spawned_helper_parameter_entry(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -2158,49 +2115,9 @@ fn validates_close_owned_through_timed_and_cancelled_spawned_helper_parameter() 
 
 #[test]
 fn validates_close_owned_through_nested_helper_returned_handle() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_tcp_stream(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          fn open_handle(remote_port: i64, connect_timeout_ms: i64) -> i64 {
-            return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
-          }
-
-          fn forward_open(remote_port: i64, connect_timeout_ms: i64) -> i64 {
-            return open_handle(remote_port, connect_timeout_ms);
-          }
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
-            let handle: i64 = forward_open(remote_port, connect_timeout_ms);
-            let close_value: i64 = host_network_close_owned(handle);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
+    let project = direct_network_default_project_with_link(
+        network_close_owned_through_nested_helper_returned_handle_entry(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -2208,49 +2125,9 @@ fn validates_close_owned_through_nested_helper_returned_handle() {
 
 #[test]
 fn validates_close_owned_through_network_result_helper_returned_handle() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_tcp_stream(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          fn open_handle_result(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> NetworkResult<i64> {
-            return network_result(host_network_open_tcp_stream(remote_port, connect_timeout_ms));
-          }
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
-            let opened: NetworkResult<i64> = open_handle_result(remote_port, connect_timeout_ms);
-            let handle: i64 = network_value(opened);
-            let close_value: i64 = host_network_close_owned(handle);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
+    let project = direct_network_default_project_with_link(
+        network_close_owned_through_network_result_helper_returned_handle_entry(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -2258,48 +2135,9 @@ fn validates_close_owned_through_network_result_helper_returned_handle() {
 
 #[test]
 fn validates_close_owned_through_recursive_helper_returned_handle() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_tcp_stream(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          fn open_handle_recursive(step: i64, remote_port: i64, connect_timeout_ms: i64) -> i64 {
-            if step < 1 {
-              return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
-            }
-            return open_handle_recursive(0, remote_port, connect_timeout_ms);
-          }
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
-            let handle: i64 = open_handle_recursive(1, remote_port, connect_timeout_ms);
-            let close_value: i64 = host_network_close_owned(handle);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
+    let project = direct_network_default_project_with_link(
+        network_close_owned_through_recursive_helper_returned_handle_entry(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -2307,50 +2145,15 @@ fn validates_close_owned_through_recursive_helper_returned_handle() {
 
 #[test]
 fn validates_close_owned_through_datagram_helper_returned_handle() {
-    let project = multidomain_project_with_entry(
-        r#"
-        use network NetworkUnit;
-
-        mod cpu Main {
-          extern "c" fn host_network_open_udp_datagram(
-            local_port: i64,
-            remote_port: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          fn open_handle(local_port: i64, remote_port: i64) -> i64 {
-            return host_network_open_udp_datagram(local_port, remote_port);
-          }
-
-          fn main() -> i64 {
-            let bind_core: NetworkResult<i64> =
-              network_result(network_profile_bind_core("NetworkUnit"));
-            let endpoint_kind: NetworkResult<i64> =
-              network_result(network_profile_endpoint_kind("NetworkUnit"));
-            let local_port: i64 = network_profile_local_port("NetworkUnit");
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let handle: i64 = open_handle(local_port, remote_port);
-            let close_value: i64 = host_network_close_owned(handle);
-            if network_config_ready(bind_core) {
-              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
-            }
-            return 0;
-          }
-        }
-        "#,
-        multidomain_support_modules(),
+    let project = direct_network_default_project_with_link(
+        network_close_owned_through_datagram_helper_returned_handle_entry(),
     );
-    let mut project = project;
-    project.manifest.links = vec![ProjectLink {
-        from: "cpu.Main".to_owned(),
-        to: "network.NetworkUnit".to_owned(),
-        via: None,
-    }];
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
 }
 
+// Network ownership misuse regressions and HTTP/session workflow coverage.
 #[test]
 fn rejects_http_status_recv_through_datagram_helper_returned_handle() {
     let project = multidomain_project_with_entry(
@@ -3494,6 +3297,7 @@ fn validates_async_loop_owned_network_session_step_workflow() {
     validate_project_links_against_nir(&project, &nir).unwrap();
 }
 
+// End-to-end async control-flow compile coverage.
 #[test]
 fn compiles_async_loop_owned_network_http_session_project() {
     let root = write_temp_project(

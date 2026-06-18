@@ -448,6 +448,8 @@ mod tests {
     mod planning_kernel;
     #[path = "shader_nova_contracts.rs"]
     mod shader_nova_contracts;
+    #[path = "test_support.rs"]
+    mod test_support;
 
     fn project_with_modules(modules: Vec<(&str, &str)>) -> LoadedProject {
         LoadedProject {
