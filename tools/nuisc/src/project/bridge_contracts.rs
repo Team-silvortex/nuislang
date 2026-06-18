@@ -104,11 +104,13 @@ pub(super) fn required_project_link_stage_contract(
             | ("shader", "cpu")
             | ("cpu", "kernel")
             | ("kernel", "cpu")
+            | ("cpu", "network")
+            | ("network", "cpu")
             | ("cpu", "cpu")
     );
     if !cpu_edge || !hetero_peer {
         return Err(format!(
-            "current staged bridges only support cpu<->cpu, cpu<->shader, and cpu<->kernel over `data.*`"
+            "current staged bridges only support cpu<->cpu, cpu<->shader, cpu<->kernel, and cpu<->network over `data.*`"
         ));
     }
 

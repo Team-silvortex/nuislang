@@ -186,8 +186,8 @@ pub fn validate_project_links_against_yir(
         validate_shader_profile_for_link(project, module, &link.to)?;
         validate_kernel_profile_for_link(project, module, &link.from)?;
         validate_kernel_profile_for_link(project, module, &link.to)?;
-        validate_network_profile_for_link(project, &link.from)?;
-        validate_network_profile_for_link(project, &link.to)?;
+        validate_network_profile_for_link(project, module, &link.from)?;
+        validate_network_profile_for_link(project, module, &link.to)?;
     }
     Ok(())
 }
@@ -218,88 +218,161 @@ pub fn validate_project_abi_against_yir(
     Ok(())
 }
 
+pub fn prune_project_topology_for_codegen(
+    project: &LoadedProject,
+    module: &mut YirModule,
+) -> Result<(), String> {
+    let _ = project;
+    let resource_families = module
+        .resources
+        .iter()
+        .map(|resource| (resource.name.clone(), resource.kind.family().to_owned()))
+        .collect::<BTreeMap<_, _>>();
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.clone(), node))
+        .collect::<BTreeMap<_, _>>();
+    let node_families = module
+        .nodes
+        .iter()
+        .map(|node| {
+            let family = resource_families
+                .get(&node.resource)
+                .cloned()
+                .unwrap_or_else(|| node.op.module.clone());
+            (node.name.clone(), family)
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    module.edges.retain(|edge| {
+        if edge.kind != EdgeKind::CrossDomainExchange {
+            return true;
+        }
+        let from_family = node_families.get(&edge.from).map(String::as_str);
+        let to_family = node_families.get(&edge.to).map(String::as_str);
+        let touches_data = from_family == Some("data") || to_family == Some("data");
+        if !touches_data {
+            return true;
+        }
+        let Some(target) = nodes.get(&edge.to) else {
+            return true;
+        };
+        target.op.args.iter().any(|arg| {
+            arg == &edge.from
+                || arg
+                    .split_once('=')
+                    .map(|(_, value)| value == edge.from)
+                    .unwrap_or(false)
+        })
+    });
+    let removable = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "text"
+                && node.name.starts_with("project_")
+        })
+        .map(|node| node.name.clone())
+        .collect::<BTreeSet<_>>();
+    if !removable.is_empty() {
+        module.nodes.retain(|node| !removable.contains(&node.name));
+        module.edges.retain(|edge| {
+            !removable.contains(&edge.from) && !removable.contains(&edge.to)
+        });
+    }
+    Ok(())
+}
+
 pub fn validate_project_links_against_nir(
     project: &LoadedProject,
     module: &NirModule,
 ) -> Result<(), String> {
     let mut support_surface_cache = BTreeMap::<String, BTreeSet<String>>::new();
     for link in &project.manifest.links {
-        let (from_domain, _from_unit) = split_domain_unit(&link.from)?;
+        let (from_domain, from_unit) = split_domain_unit(&link.from)?;
         let (to_domain, to_unit) = split_domain_unit(&link.to)?;
-        if from_domain == "cpu" && to_domain == "shader" {
-            let shader_support = support_surface_for_domain(&mut support_surface_cache, "shader")?;
+        if let Some(via) = &link.via {
+            let (via_domain, via_unit) = split_domain_unit(via)?;
+            if via_domain == "data" {
+                let cpu_endpoint = if from_domain == "cpu" {
+                    Some(link.from.as_str())
+                } else if to_domain == "cpu" {
+                    Some(link.to.as_str())
+                } else {
+                    None
+                };
+                if let Some(cpu_endpoint) = cpu_endpoint {
+                    validate_data_profile_nir_usage(
+                        module,
+                        &mut support_surface_cache,
+                        cpu_endpoint,
+                        via,
+                        &via_unit,
+                    )?;
+                }
+            }
+        }
+        if let Some(network_unit) = cpu_network_link_unit(&from_domain, &link.from, &to_domain, &link.to)? {
+            let network_support =
+                support_surface_for_domain(&mut support_surface_cache, "network")?;
             require_declared_support_surface(
-                &shader_support,
-                "shader",
-                &to_unit,
-                "shader.profile.packet.v1",
+                &network_support,
+                "network",
+                &network_unit,
+                "network.profile.bind-core.v1",
             )?;
-            if !nir_uses_shader_profile_packet(module, &to_unit) {
+            if !nir_uses_network_profile_bind_core(module, &network_unit) {
                 return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_packet(\"{}\", ...) at NIR level",
-                    link.from, link.to, to_unit
-                ));
-            }
-            let uses_shader_render = nir_uses_shader_profile_render(module, &to_unit);
-            let uses_shader_draw = nir_uses_shader_profile_draw_instanced(module, &to_unit);
-            if uses_shader_render {
-                require_declared_support_surface(
-                    &shader_support,
-                    "shader",
-                    &to_unit,
-                    "shader.profile.render.v1",
-                )?;
-            }
-            if uses_shader_draw {
-                require_declared_support_surface(
-                    &shader_support,
-                    "shader",
-                    &to_unit,
-                    "shader.profile.draw.v1",
-                )?;
-            }
-            if !uses_shader_render && !uses_shader_draw {
-                return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_render(\"{}\", ...) or shader_profile_draw_instanced(\"{}\", ...) at NIR level",
-                    link.from, link.to, to_unit, to_unit
+                    "project link `{}` -> `{}` requires CPU entry to use network_profile_bind_core(\"{}\") at NIR level",
+                    link.from, link.to, network_unit
                 ));
             }
             require_declared_support_surface(
-                &shader_support,
-                "shader",
-                &to_unit,
-                "shader.profile.seed.color.v1",
+                &network_support,
+                "network",
+                &network_unit,
+                "network.profile.endpoint-kind.v1",
             )?;
-            if !nir_uses_shader_profile_color_seed(module, &to_unit) {
+            if !nir_uses_network_profile_endpoint_kind(module, &network_unit) {
                 return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_color_seed(\"{}\", ...) at NIR level",
-                    link.from, link.to, to_unit
+                    "project link `{}` -> `{}` requires CPU entry to use network_profile_endpoint_kind(\"{}\") at NIR level",
+                    link.from, link.to, network_unit
                 ));
             }
-            require_declared_support_surface(
-                &shader_support,
-                "shader",
-                &to_unit,
-                "shader.profile.seed.speed.v1",
+            validate_network_profile_slot_requirements(
+                project,
+                module,
+                &network_support,
+                &link.from,
+                &link.to,
+                &network_unit,
             )?;
-            if !nir_uses_shader_profile_speed_seed(module, &to_unit) {
-                return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_speed_seed(\"{}\", ...) at NIR level",
-                    link.from, link.to, to_unit
-                ));
-            }
-            require_declared_support_surface(
-                &shader_support,
-                "shader",
-                &to_unit,
-                "shader.profile.seed.radius.v1",
+            validate_network_host_call_requirements(
+                project,
+                module,
+                &network_support,
+                &link.from,
+                &link.to,
+                &network_unit,
             )?;
-            if !nir_uses_shader_profile_radius_seed(module, &to_unit) {
-                return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_radius_seed(\"{}\", ...) at NIR level",
-                    link.from, link.to, to_unit
-                ));
-            }
+        }
+        let shader_unit = if from_domain == "shader" && to_domain == "cpu" {
+            Some(from_unit.as_str())
+        } else if from_domain == "cpu" && to_domain == "shader" {
+            Some(to_unit.as_str())
+        } else {
+            None
+        };
+        if let Some(shader_unit) = shader_unit {
+            validate_shader_profile_nir_usage(
+                module,
+                &mut support_surface_cache,
+                &link.from,
+                &link.to,
+                shader_unit,
+            )?;
         }
         if from_domain == "cpu" && to_domain == "kernel" {
             let kernel_support = support_surface_for_domain(&mut support_surface_cache, "kernel")?;
@@ -340,89 +413,154 @@ pub fn validate_project_links_against_nir(
                 ));
             }
         }
-        if from_domain == "cpu" && to_domain == "network" {
-            let network_support =
-                support_surface_for_domain(&mut support_surface_cache, "network")?;
-            require_declared_support_surface(
-                &network_support,
-                "network",
-                &to_unit,
-                "network.profile.bind-core.v1",
-            )?;
-            if !nir_uses_network_profile_bind_core(module, &to_unit) {
-                return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use network_profile_bind_core(\"{}\") at NIR level",
-                    link.from, link.to, to_unit
-                ));
-            }
-            require_declared_support_surface(
-                &network_support,
-                "network",
-                &to_unit,
-                "network.profile.endpoint-kind.v1",
-            )?;
-            if !nir_uses_network_profile_endpoint_kind(module, &to_unit) {
-                return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use network_profile_endpoint_kind(\"{}\") at NIR level",
-                    link.from, link.to, to_unit
-                ));
-            }
-            validate_network_profile_slot_requirements(
-                project,
-                module,
-                &network_support,
-                &link.from,
-                &link.to,
-                &to_unit,
-            )?;
-            validate_network_host_call_requirements(
-                project,
-                module,
-                &network_support,
-                &link.from,
-                &link.to,
-                &to_unit,
-            )?;
-        }
         if from_domain == "cpu" && to_domain == "data" {
-            let data_support = support_surface_for_domain(&mut support_surface_cache, "data")?;
-            require_declared_support_surface(
-                &data_support,
-                "data",
+            validate_data_profile_nir_usage(
+                module,
+                &mut support_surface_cache,
+                &link.from,
+                &link.to,
                 &to_unit,
-                "data.profile.handle-table.v1",
             )?;
-            if !nir_uses_data_profile_handle_table(module, &to_unit) {
-                return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use data_handle_table(\"{}\", ...) at NIR level",
-                    link.from, link.to, to_unit
-                ));
-            }
-            require_declared_support_surface(
-                &data_support,
-                "data",
-                &to_unit,
-                "data.profile.send-uplink.v1",
-            )?;
-            if !nir_uses_data_profile_send_uplink(module, &to_unit) {
-                return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use data_send_uplink(\"{}\", ...) at NIR level",
-                    link.from, link.to, to_unit
-                ));
-            }
-            require_declared_support_surface(
-                &data_support,
-                "data",
-                &to_unit,
-                "data.profile.send-downlink.v1",
-            )?;
-            if !nir_uses_data_profile_send_downlink(module, &to_unit) {
-                return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use data_send_downlink(\"{}\", ...) at NIR level",
-                    link.from, link.to, to_unit
-                ));
-            }
         }
+    }
+    Ok(())
+}
+
+fn cpu_network_link_unit(
+    from_domain: &str,
+    from: &str,
+    to_domain: &str,
+    to: &str,
+) -> Result<Option<String>, String> {
+    if from_domain == "cpu" && to_domain == "network" {
+        return split_domain_unit(to).map(|(_, unit)| Some(unit));
+    }
+    if from_domain == "network" && to_domain == "cpu" {
+        return split_domain_unit(from).map(|(_, unit)| Some(unit));
+    }
+    Ok(None)
+}
+
+fn validate_data_profile_nir_usage(
+    module: &NirModule,
+    support_surface_cache: &mut BTreeMap<String, BTreeSet<String>>,
+    from: &str,
+    data_endpoint: &str,
+    unit: &str,
+) -> Result<(), String> {
+    let data_support = support_surface_for_domain(support_surface_cache, "data")?;
+    require_declared_support_surface(
+        &data_support,
+        "data",
+        unit,
+        "data.profile.handle-table.v1",
+    )?;
+    if !nir_uses_data_profile_handle_table(module, unit) {
+        return Err(format!(
+            "project link `{from}` -> `{data_endpoint}` requires CPU entry to use data_handle_table(\"{unit}\", ...) at NIR level"
+        ));
+    }
+    require_declared_support_surface(
+        &data_support,
+        "data",
+        unit,
+        "data.profile.send.uplink.v1",
+    )?;
+    if !nir_uses_data_profile_send_uplink(module, unit) {
+        return Err(format!(
+            "project link `{from}` -> `{data_endpoint}` requires CPU entry to use data_send_uplink(\"{unit}\", ...) at NIR level"
+        ));
+    }
+    require_declared_support_surface(
+        &data_support,
+        "data",
+        unit,
+        "data.profile.send.downlink.v1",
+    )?;
+    if !nir_uses_data_profile_send_downlink(module, unit) {
+        return Err(format!(
+            "project link `{from}` -> `{data_endpoint}` requires CPU entry to use data_send_downlink(\"{unit}\", ...) at NIR level"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_shader_profile_nir_usage(
+    module: &NirModule,
+    support_surface_cache: &mut BTreeMap<String, BTreeSet<String>>,
+    from: &str,
+    to: &str,
+    shader_unit: &str,
+) -> Result<(), String> {
+    let shader_support = support_surface_for_domain(support_surface_cache, "shader")?;
+    require_declared_support_surface(
+        &shader_support,
+        "shader",
+        shader_unit,
+        "shader.profile.packet.v1",
+    )?;
+    if !nir_uses_shader_profile_packet(module, shader_unit) {
+        return Err(format!(
+            "project link `{from}` -> `{to}` requires CPU entry to use shader_profile_packet(\"{shader_unit}\", ...) at NIR level"
+        ));
+    }
+
+    let uses_shader_render = nir_uses_shader_profile_render(module, shader_unit);
+    let uses_shader_draw = nir_uses_shader_profile_draw_instanced(module, shader_unit);
+    if uses_shader_render {
+        require_declared_support_surface(
+            &shader_support,
+            "shader",
+            shader_unit,
+            "shader.profile.render.v1",
+        )?;
+    }
+    if uses_shader_draw {
+        require_declared_support_surface(
+            &shader_support,
+            "shader",
+            shader_unit,
+            "shader.profile.draw.v1",
+        )?;
+    }
+    if !uses_shader_render && !uses_shader_draw {
+        return Err(format!(
+            "project link `{from}` -> `{to}` requires CPU entry to use shader_profile_render(\"{shader_unit}\", ...) or shader_profile_draw_instanced(\"{shader_unit}\", ...) at NIR level"
+        ));
+    }
+
+    require_declared_support_surface(
+        &shader_support,
+        "shader",
+        shader_unit,
+        "shader.profile.seed.color.v1",
+    )?;
+    if !nir_uses_shader_profile_color_seed(module, shader_unit) {
+        return Err(format!(
+            "project link `{from}` -> `{to}` requires CPU entry to use shader_profile_color_seed(\"{shader_unit}\", ...) at NIR level"
+        ));
+    }
+    require_declared_support_surface(
+        &shader_support,
+        "shader",
+        shader_unit,
+        "shader.profile.seed.speed.v1",
+    )?;
+    if !nir_uses_shader_profile_speed_seed(module, shader_unit) {
+        return Err(format!(
+            "project link `{from}` -> `{to}` requires CPU entry to use shader_profile_speed_seed(\"{shader_unit}\", ...) at NIR level"
+        ));
+    }
+    require_declared_support_surface(
+        &shader_support,
+        "shader",
+        shader_unit,
+        "shader.profile.seed.radius.v1",
+    )?;
+    if !nir_uses_shader_profile_radius_seed(module, shader_unit) {
+        return Err(format!(
+            "project link `{from}` -> `{to}` requires CPU entry to use shader_profile_radius_seed(\"{shader_unit}\", ...) at NIR level"
+        ));
     }
     Ok(())
 }

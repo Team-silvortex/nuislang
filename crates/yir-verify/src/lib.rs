@@ -2926,7 +2926,7 @@ fn is_resolved_kernel_profile_slot(node: &Node) -> bool {
 
 fn is_resolved_network_profile_slot(node: &Node) -> bool {
     node.name.starts_with("project_profile_network_")
-        && node.op.module == "cpu"
+        && node.op.module == "network"
         && node.op.instruction == "const_i64"
 }
 

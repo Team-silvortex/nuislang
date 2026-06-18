@@ -304,6 +304,82 @@ pub struct NustarDomainRegistration {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NustarRegistryIssueKind {
+    IndexEmpty,
+    DuplicatePackageId,
+    DuplicateDomainFamily,
+    PackageIdentityMismatch,
+    DomainFamilyMismatch,
+    ManifestSchemaMismatch,
+    LoaderContractMismatch,
+    ResourceFamilyContractMismatch,
+    OpContractMismatch,
+    LaneContractMismatch,
+    PackagingContractMismatch,
+    DomainContractMismatch,
+}
+
+impl NustarRegistryIssueKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::IndexEmpty => "index_empty",
+            Self::DuplicatePackageId => "duplicate_package_id",
+            Self::DuplicateDomainFamily => "duplicate_domain_family",
+            Self::PackageIdentityMismatch => "package_identity_mismatch",
+            Self::DomainFamilyMismatch => "domain_family_mismatch",
+            Self::ManifestSchemaMismatch => "manifest_schema_mismatch",
+            Self::LoaderContractMismatch => "loader_contract_mismatch",
+            Self::ResourceFamilyContractMismatch => "resource_family_contract_mismatch",
+            Self::OpContractMismatch => "op_contract_mismatch",
+            Self::LaneContractMismatch => "lane_contract_mismatch",
+            Self::PackagingContractMismatch => "packaging_contract_mismatch",
+            Self::DomainContractMismatch => "domain_contract_mismatch",
+        }
+    }
+
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::IndexEmpty => "NRV001",
+            Self::DuplicatePackageId => "NRV002",
+            Self::DuplicateDomainFamily => "NRV003",
+            Self::PackageIdentityMismatch => "NRV004",
+            Self::DomainFamilyMismatch => "NRV005",
+            Self::ManifestSchemaMismatch => "NRV006",
+            Self::LoaderContractMismatch => "NRV007",
+            Self::ResourceFamilyContractMismatch => "NRV008",
+            Self::OpContractMismatch => "NRV009",
+            Self::LaneContractMismatch => "NRV010",
+            Self::PackagingContractMismatch => "NRV011",
+            Self::DomainContractMismatch => "NRV012",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarRegistryIssue {
+    pub kind: NustarRegistryIssueKind,
+    pub package: Option<String>,
+    pub domain: Option<String>,
+    pub manifest_path: Option<String>,
+    pub message: String,
+}
+
+impl NustarRegistryIssue {
+    pub fn summary(&self) -> String {
+        let package = self.package.as_deref().unwrap_or("<none>");
+        let domain = self.domain.as_deref().unwrap_or("<none>");
+        format!(
+            "{} {} package={} domain={}: {}",
+            self.kind.code(),
+            self.kind.as_str(),
+            package,
+            domain,
+            self.message
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProjectDomainRegistryIssueKind {
     DomainNotRegistered,
     ContractSchemaMismatch,
@@ -515,7 +591,7 @@ pub fn domain_registration(
     })
 }
 
-pub fn load_registered_domains(root: &Path) -> Result<Vec<NustarDomainRegistration>, String> {
+fn load_registered_domains_unvalidated(root: &Path) -> Result<Vec<NustarDomainRegistration>, String> {
     let root = resolve_registry_root(root);
     let mut registrations = load_index(&root)?
         .into_iter()
@@ -523,6 +599,486 @@ pub fn load_registered_domains(root: &Path) -> Result<Vec<NustarDomainRegistrati
         .collect::<Result<Vec<_>, _>>()?;
     registrations.sort_by(|lhs, rhs| lhs.package_id.cmp(&rhs.package_id));
     Ok(registrations)
+}
+
+fn lane_target_from_entry(entry: &str) -> Option<&str> {
+    let (target, _) = entry.split_once('=')?;
+    let target = target.trim();
+    if target.is_empty() {
+        None
+    } else {
+        Some(target)
+    }
+}
+
+fn lane_target_is_declared(manifest: &NustarPackageManifest, target: &str) -> bool {
+    if manifest.ops.iter().any(|op| op == target) {
+        return true;
+    }
+    let prefix = format!("{}.", manifest.domain_family);
+    let Some(slot) = target.strip_prefix(&prefix) else {
+        return false;
+    };
+    manifest
+        .support_profile_slots
+        .iter()
+        .any(|candidate| candidate == slot)
+}
+
+fn parse_backend_family_from_abi_target(raw: &str) -> Option<String> {
+    let (_, fields) = raw.split_once(':')?;
+    for field in fields.split('|').map(str::trim).filter(|field| !field.is_empty()) {
+        let (key, value) = field.split_once('=')?;
+        if key.trim() == "backend" {
+            return Some(value.trim().to_owned());
+        }
+    }
+    None
+}
+
+fn validate_shader_domain_contract(
+    manifest: &NustarPackageManifest,
+    manifest_path: &Path,
+) -> Vec<NustarRegistryIssue> {
+    let mut issues = Vec::new();
+    let lowering = manifest
+        .lowering_targets
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let backend_families = manifest
+        .abi_targets
+        .iter()
+        .filter_map(|raw| parse_backend_family_from_abi_target(raw))
+        .collect::<BTreeSet<_>>();
+    let missing_lowering = backend_families
+        .iter()
+        .filter(|backend| !lowering.contains(*backend))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing_lowering.is_empty() {
+        issues.push(NustarRegistryIssue {
+            kind: NustarRegistryIssueKind::DomainContractMismatch,
+            package: Some(manifest.package_id.clone()),
+            domain: Some(manifest.domain_family.clone()),
+            manifest_path: Some(manifest_path.display().to_string()),
+            message: format!(
+                "shader ABI backends must be represented in lowering_targets; missing: {}",
+                missing_lowering.join(", ")
+            ),
+        });
+    }
+    if lowering.contains("metal")
+        && !manifest
+            .support_surface
+            .iter()
+            .any(|surface| surface == "shader.inline.wgsl.v1")
+    {
+        issues.push(NustarRegistryIssue {
+            kind: NustarRegistryIssueKind::DomainContractMismatch,
+            package: Some(manifest.package_id.clone()),
+            domain: Some(manifest.domain_family.clone()),
+            manifest_path: Some(manifest_path.display().to_string()),
+            message:
+                "shader lowering_targets containing `metal` must expose `shader.inline.wgsl.v1`"
+                    .to_owned(),
+        });
+    }
+    if !manifest
+        .support_profile_slots
+        .iter()
+        .any(|slot| slot == "target")
+        || !manifest
+            .support_profile_slots
+            .iter()
+            .any(|slot| slot == "viewport")
+        || !manifest
+            .support_profile_slots
+            .iter()
+            .any(|slot| slot == "pipeline")
+    {
+        issues.push(NustarRegistryIssue {
+            kind: NustarRegistryIssueKind::DomainContractMismatch,
+            package: Some(manifest.package_id.clone()),
+            domain: Some(manifest.domain_family.clone()),
+            manifest_path: Some(manifest_path.display().to_string()),
+            message:
+                "shader domain must expose target/viewport/pipeline support_profile_slots"
+                    .to_owned(),
+        });
+    }
+    issues
+}
+
+fn validate_kernel_domain_contract(
+    manifest: &NustarPackageManifest,
+    manifest_path: &Path,
+) -> Vec<NustarRegistryIssue> {
+    let mut issues = Vec::new();
+    let lowering = manifest
+        .lowering_targets
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let backend_families = manifest
+        .abi_targets
+        .iter()
+        .filter_map(|raw| parse_backend_family_from_abi_target(raw))
+        .collect::<BTreeSet<_>>();
+    let missing_lowering = backend_families
+        .iter()
+        .filter(|backend| !lowering.contains(*backend))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing_lowering.is_empty() {
+        issues.push(NustarRegistryIssue {
+            kind: NustarRegistryIssueKind::DomainContractMismatch,
+            package: Some(manifest.package_id.clone()),
+            domain: Some(manifest.domain_family.clone()),
+            manifest_path: Some(manifest_path.display().to_string()),
+            message: format!(
+                "kernel ABI backends must be represented in lowering_targets; missing: {}",
+                missing_lowering.join(", ")
+            ),
+        });
+    }
+    for required_slot in ["bind_core", "queue_depth", "batch_lanes", "entry"] {
+        if !manifest
+            .support_profile_slots
+            .iter()
+            .any(|slot| slot == required_slot)
+        {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "kernel domain must expose `{}` in support_profile_slots",
+                    required_slot
+                ),
+            });
+        }
+    }
+    if lowering.contains("coreml") || lowering.contains("ane") {
+        let has_apple_resource = manifest
+            .resource_families
+            .iter()
+            .any(|family| family.starts_with("kernel.apple") || family.starts_with("npu.apple"));
+        if !has_apple_resource {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message:
+                    "kernel lowering_targets containing `coreml` or `ane` must expose apple/npu resource families"
+                        .to_owned(),
+            });
+        }
+    }
+    issues
+}
+
+fn validate_network_domain_contract(
+    manifest: &NustarPackageManifest,
+    manifest_path: &Path,
+) -> Vec<NustarRegistryIssue> {
+    let mut issues = Vec::new();
+    let lowering = manifest
+        .lowering_targets
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for required_target in ["socket-abi", "urlsession", "winsock"] {
+        if !lowering.contains(required_target) {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "network domain must keep `{}` in lowering_targets",
+                    required_target
+                ),
+            });
+        }
+    }
+    for required_surface in [
+        "network.profile.connect.v1",
+        "network.profile.accept.v1",
+        "network.profile.send.v1",
+        "network.profile.recv.v1",
+        "network.profile.close.v1",
+        "network.profile.protocol.v1",
+    ] {
+        if !manifest
+            .support_surface
+            .iter()
+            .any(|surface| surface == required_surface)
+        {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "network domain must expose `{}` in support_surface",
+                    required_surface
+                ),
+            });
+        }
+    }
+    for required_slot in [
+        "endpoint_kind",
+        "transport_family",
+        "protocol_kind",
+        "protocol_version",
+        "protocol_header_bytes",
+    ] {
+        if !manifest
+            .support_profile_slots
+            .iter()
+            .any(|slot| slot == required_slot)
+        {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "network domain must expose `{}` in support_profile_slots",
+                    required_slot
+                ),
+            });
+        }
+    }
+    for required_op in [
+        "network.connect",
+        "network.accept",
+        "network.send",
+        "network.recv",
+        "network.close",
+        "network.poll",
+    ] {
+        if !manifest.ops.iter().any(|op| op == required_op) {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!("network domain must expose `{}` in ops", required_op),
+            });
+        }
+    }
+    issues
+}
+
+fn validate_domain_specific_contracts(
+    manifest: &NustarPackageManifest,
+    manifest_path: &Path,
+) -> Vec<NustarRegistryIssue> {
+    match manifest.domain_family.as_str() {
+        "shader" => validate_shader_domain_contract(manifest, manifest_path),
+        "kernel" => validate_kernel_domain_contract(manifest, manifest_path),
+        "network" => validate_network_domain_contract(manifest, manifest_path),
+        _ => Vec::new(),
+    }
+}
+
+pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssue>, String> {
+    let root = resolve_registry_root(root);
+    let index = load_index(&root)?;
+    if index.is_empty() {
+        return Ok(vec![NustarRegistryIssue {
+            kind: NustarRegistryIssueKind::IndexEmpty,
+            package: None,
+            domain: None,
+            manifest_path: Some(root.join(INDEX_FILE).display().to_string()),
+            message: format!("no nustar packages are indexed in `{}`", root.join(INDEX_FILE).display()),
+        }]);
+    }
+
+    let mut issues = Vec::new();
+    let mut seen_packages = BTreeSet::new();
+    let mut seen_domains = BTreeSet::new();
+
+    for entry in &index {
+        let manifest_path = manifest_path(&root, entry);
+        if !seen_packages.insert(entry.package_id.clone()) {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DuplicatePackageId,
+                package: Some(entry.package_id.clone()),
+                domain: Some(entry.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "package `{}` appears more than once in `{}`",
+                    entry.package_id,
+                    root.join(INDEX_FILE).display()
+                ),
+            });
+        }
+        if !seen_domains.insert(entry.domain_family.clone()) {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DuplicateDomainFamily,
+                package: Some(entry.package_id.clone()),
+                domain: Some(entry.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "domain `{}` appears more than once in `{}`",
+                    entry.domain_family,
+                    root.join(INDEX_FILE).display()
+                ),
+            });
+        }
+
+        let source = fs::read_to_string(&manifest_path)
+            .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
+        let manifest = parse_manifest(&source, &manifest_path)?;
+
+        if manifest.package_id != entry.package_id {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::PackageIdentityMismatch,
+                package: Some(entry.package_id.clone()),
+                domain: Some(entry.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "index package `{}` does not match manifest package `{}`",
+                    entry.package_id, manifest.package_id
+                ),
+            });
+        }
+        if manifest.domain_family != entry.domain_family {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainFamilyMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(entry.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "index domain `{}` does not match manifest domain `{}`",
+                    entry.domain_family, manifest.domain_family
+                ),
+            });
+        }
+        if manifest.manifest_schema != "nustar-manifest-v1" {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::ManifestSchemaMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "manifest schema `{}` is not supported; expected `nustar-manifest-v1`",
+                    manifest.manifest_schema
+                ),
+            });
+        }
+        if manifest.loader_abi != "nustar-loader-v1" || manifest.loader_entry != "nustar.bootstrap.v1"
+        {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::LoaderContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "loader contract must be `nustar-loader-v1` + `nustar.bootstrap.v1`, got abi=`{}` entry=`{}`",
+                    manifest.loader_abi, manifest.loader_entry
+                ),
+            });
+        }
+        if !manifest
+            .resource_families
+            .iter()
+            .any(|family| family == &manifest.domain_family)
+        {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::ResourceFamilyContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "resource_families must include the owning domain `{}`",
+                    manifest.domain_family
+                ),
+            });
+        }
+        let op_prefix = format!("{}.", manifest.domain_family);
+        let invalid_ops = manifest
+            .ops
+            .iter()
+            .filter(|op| !op.starts_with(&op_prefix))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !invalid_ops.is_empty() {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::OpContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "ops must stay inside domain prefix `{}`; invalid ops: {}",
+                    op_prefix,
+                    invalid_ops.join(", ")
+                ),
+            });
+        }
+        let invalid_lane_targets = manifest
+            .default_lanes
+            .iter()
+            .filter_map(|entry| {
+                let target = lane_target_from_entry(entry)?;
+                if lane_target_is_declared(&manifest, target) {
+                    None
+                } else {
+                    Some(target.to_owned())
+                }
+            })
+            .collect::<Vec<_>>();
+        if !invalid_lane_targets.is_empty() {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::LaneContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "default_lanes reference undeclared ops: {}",
+                    invalid_lane_targets.join(", ")
+                ),
+            });
+        }
+        if let Err(error) = crate::nustar_binary::validate_manifest_for_packaging(&manifest) {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::PackagingContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: error,
+            });
+        }
+        issues.extend(validate_domain_specific_contracts(&manifest, &manifest_path));
+    }
+
+    Ok(issues)
+}
+
+pub fn ensure_registered_domains_valid(root: &Path) -> Result<(), String> {
+    let issues = validate_registered_domains(root)?;
+    if issues.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "nustar registry validation failed:\n{}",
+            issues
+                .iter()
+                .map(NustarRegistryIssue::summary)
+                .collect::<Vec<_>>()
+                .join("\n")
+        ))
+    }
+}
+
+pub fn load_registered_domains(root: &Path) -> Result<Vec<NustarDomainRegistration>, String> {
+    ensure_registered_domains_valid(root)?;
+    load_registered_domains_unvalidated(root)
 }
 
 pub fn load_domain_registration_for_domain(
@@ -2495,6 +3051,8 @@ mod tests {
         ProjectExchangeOrganization, ProjectOrganization, ProjectOutputIntent,
         ProjectSyntheticInput,
     };
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn test_project_plan(domain: &str, abi: &str) -> ProjectCompilationPlan {
         ProjectCompilationPlan {
@@ -2631,6 +3189,128 @@ mod cpu Main {
             unit_types: vec!["Main".to_owned()],
             lowering_targets: vec!["llvm".to_owned()],
             ops: vec!["cpu.const".to_owned()],
+        }
+    }
+
+    fn render_manifest_text(manifest: &NustarPackageManifest) -> String {
+        fn render_array(values: &[String]) -> String {
+            format!(
+                "[{}]",
+                values
+                    .iter()
+                    .map(|value| format!("\"{value}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+
+        format!(
+            concat!(
+                "manifest_schema = \"{}\"\n",
+                "package_id = \"{}\"\n",
+                "domain_family = \"{}\"\n",
+                "frontend = \"{}\"\n",
+                "entry_crate = \"{}\"\n",
+                "ast_entry = \"{}\"\n",
+                "nir_entry = \"{}\"\n",
+                "yir_lowering_entry = \"{}\"\n",
+                "part_verify_entry = \"{}\"\n",
+                "ast_surface = {}\n",
+                "nir_surface = {}\n",
+                "yir_lowering = {}\n",
+                "part_verify = {}\n",
+                "binary_extension = \"{}\"\n",
+                "package_layout = \"{}\"\n",
+                "machine_abi_policy = \"{}\"\n",
+                "abi_profiles = {}\n",
+                "abi_capabilities = {}\n",
+                "abi_targets = {}\n",
+                "implementation_kinds = {}\n",
+                "loader_entry = \"{}\"\n",
+                "loader_abi = \"{}\"\n",
+                "host_ffi_surface = {}\n",
+                "host_ffi_abis = {}\n",
+                "host_ffi_bridge = \"{}\"\n",
+                "support_surface = {}\n",
+                "support_profile_slots = {}\n",
+                "default_lanes = {}\n",
+                "clock_domain_id = \"{}\"\n",
+                "clock_kind = \"{}\"\n",
+                "clock_epoch_kind = \"{}\"\n",
+                "clock_resolution = \"{}\"\n",
+                "clock_bridge_default = \"{}\"\n",
+                "profiles = {}\n",
+                "resource_families = {}\n",
+                "unit_types = {}\n",
+                "lowering_targets = {}\n",
+                "ops = {}\n"
+            ),
+            manifest.manifest_schema,
+            manifest.package_id,
+            manifest.domain_family,
+            manifest.frontend,
+            manifest.entry_crate,
+            manifest.ast_entry,
+            manifest.nir_entry,
+            manifest.yir_lowering_entry,
+            manifest.part_verify_entry,
+            render_array(&manifest.ast_surface),
+            render_array(&manifest.nir_surface),
+            render_array(&manifest.yir_lowering),
+            render_array(&manifest.part_verify),
+            manifest.binary_extension,
+            manifest.package_layout,
+            manifest.machine_abi_policy,
+            render_array(&manifest.abi_profiles),
+            render_array(&manifest.abi_capabilities),
+            render_array(&manifest.abi_targets),
+            render_array(&manifest.implementation_kinds),
+            manifest.loader_entry,
+            manifest.loader_abi,
+            render_array(&manifest.host_ffi_surface),
+            render_array(&manifest.host_ffi_abis),
+            manifest.host_ffi_bridge,
+            render_array(&manifest.support_surface),
+            render_array(&manifest.support_profile_slots),
+            render_array(&manifest.default_lanes),
+            manifest.clock_domain_id,
+            manifest.clock_kind,
+            manifest.clock_epoch_kind,
+            manifest.clock_resolution,
+            manifest.clock_bridge_default,
+            render_array(&manifest.profiles),
+            render_array(&manifest.resource_families),
+            render_array(&manifest.unit_types),
+            render_array(&manifest.lowering_targets),
+            render_array(&manifest.ops),
+        )
+    }
+
+    fn temp_registry_root(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("nuisc-{label}-{nanos}"));
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    fn write_registry_fixture(
+        root: &Path,
+        entries: &[NustarPackageIndexEntry],
+        manifests: &[NustarPackageManifest],
+    ) {
+        let mut index_text = String::new();
+        for entry in entries {
+            index_text.push_str("[[package]]\n");
+            index_text.push_str(&format!("package_id = \"{}\"\n", entry.package_id));
+            index_text.push_str(&format!("manifest = \"{}\"\n", entry.manifest));
+            index_text.push_str(&format!("domain_family = \"{}\"\n\n", entry.domain_family));
+        }
+        fs::write(root.join(INDEX_FILE), index_text).unwrap();
+        for (entry, manifest) in entries.iter().zip(manifests.iter()) {
+            fs::write(root.join(&entry.manifest), render_manifest_text(manifest)).unwrap();
         }
     }
 
@@ -2882,6 +3562,131 @@ mod cpu Main {
             .extension_groups
             .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET.to_owned()));
         assert!(!network.ops.is_empty());
+    }
+
+    #[test]
+    fn validate_registered_domains_accepts_current_mainline_registry() {
+        let issues = validate_registered_domains(Path::new("nustar-packages")).unwrap();
+        assert!(issues.is_empty(), "unexpected registry issues: {issues:?}");
+        ensure_registered_domains_valid(Path::new("nustar-packages")).unwrap();
+    }
+
+    #[test]
+    fn validate_registered_domains_rejects_duplicate_domain_and_bad_lane_target() {
+        let root = temp_registry_root("registry-duplicate-domain");
+        let cpu = cpu_manifest_with_host_target();
+        let mut network = load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
+        network.default_lanes.push("network.ghost=rx".to_owned());
+        let entries = vec![
+            NustarPackageIndexEntry {
+                package_id: cpu.package_id.clone(),
+                manifest: "cpu.toml".to_owned(),
+                domain_family: cpu.domain_family.clone(),
+            },
+            NustarPackageIndexEntry {
+                package_id: network.package_id.clone(),
+                manifest: "network.toml".to_owned(),
+                domain_family: cpu.domain_family.clone(),
+            },
+        ];
+        write_registry_fixture(&root, &entries, &[cpu, network]);
+
+        let issues = validate_registered_domains(&root).unwrap();
+        assert!(issues
+            .iter()
+            .any(|issue| issue.kind == NustarRegistryIssueKind::DuplicateDomainFamily));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.kind == NustarRegistryIssueKind::DomainFamilyMismatch));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.kind == NustarRegistryIssueKind::LaneContractMismatch));
+        let error = ensure_registered_domains_valid(&root).unwrap_err();
+        assert!(error.contains("NRV003"));
+        assert!(error.contains("NRV005"));
+        assert!(error.contains("NRV010"));
+    }
+
+    #[test]
+    fn validate_registered_domains_rejects_loader_and_op_contract_mismatch() {
+        let root = temp_registry_root("registry-loader-op");
+        let mut cpu = cpu_manifest_with_host_target();
+        cpu.loader_abi = "wrong-loader".to_owned();
+        cpu.ops.push("shader.draw".to_owned());
+        let entries = vec![NustarPackageIndexEntry {
+            package_id: cpu.package_id.clone(),
+            manifest: "cpu.toml".to_owned(),
+            domain_family: cpu.domain_family.clone(),
+        }];
+        write_registry_fixture(&root, &entries, &[cpu]);
+
+        let issues = validate_registered_domains(&root).unwrap();
+        assert!(issues
+            .iter()
+            .any(|issue| issue.kind == NustarRegistryIssueKind::LoaderContractMismatch));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.kind == NustarRegistryIssueKind::OpContractMismatch));
+    }
+
+    #[test]
+    fn validate_registered_domains_rejects_shader_backend_without_lowering_target() {
+        let root = temp_registry_root("registry-shader-backend");
+        let mut shader = load_manifest_for_domain(Path::new("nustar-packages"), "shader").unwrap();
+        shader.lowering_targets.retain(|target| target != "cpu-fallback");
+        let entries = vec![NustarPackageIndexEntry {
+            package_id: shader.package_id.clone(),
+            manifest: "shader.toml".to_owned(),
+            domain_family: shader.domain_family.clone(),
+        }];
+        write_registry_fixture(&root, &entries, &[shader]);
+
+        let issues = validate_registered_domains(&root).unwrap();
+        assert!(issues.iter().any(|issue| {
+            issue.kind == NustarRegistryIssueKind::DomainContractMismatch
+                && issue.message.contains("cpu-fallback")
+        }));
+    }
+
+    #[test]
+    fn validate_registered_domains_rejects_kernel_missing_profile_slot() {
+        let root = temp_registry_root("registry-kernel-slot");
+        let mut kernel = load_manifest_for_domain(Path::new("nustar-packages"), "kernel").unwrap();
+        kernel
+            .support_profile_slots
+            .retain(|slot| slot != "batch_lanes");
+        let entries = vec![NustarPackageIndexEntry {
+            package_id: kernel.package_id.clone(),
+            manifest: "kernel.toml".to_owned(),
+            domain_family: kernel.domain_family.clone(),
+        }];
+        write_registry_fixture(&root, &entries, &[kernel]);
+
+        let issues = validate_registered_domains(&root).unwrap();
+        assert!(issues.iter().any(|issue| {
+            issue.kind == NustarRegistryIssueKind::DomainContractMismatch
+                && issue.message.contains("batch_lanes")
+        }));
+    }
+
+    #[test]
+    fn validate_registered_domains_rejects_network_missing_socket_lowering_target() {
+        let root = temp_registry_root("registry-network-lowering");
+        let mut network =
+            load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
+        network.lowering_targets.retain(|target| target != "socket-abi");
+        let entries = vec![NustarPackageIndexEntry {
+            package_id: network.package_id.clone(),
+            manifest: "network.toml".to_owned(),
+            domain_family: network.domain_family.clone(),
+        }];
+        write_registry_fixture(&root, &entries, &[network]);
+
+        let issues = validate_registered_domains(&root).unwrap();
+        assert!(issues.iter().any(|issue| {
+            issue.kind == NustarRegistryIssueKind::DomainContractMismatch
+                && issue.message.contains("socket-abi")
+        }));
     }
 
     #[test]

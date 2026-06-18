@@ -100,6 +100,8 @@ pub(super) fn network_support_surface_contract() -> &'static [&'static str] {
 pub(super) fn data_support_surface_contract() -> &'static [&'static str] {
     &[
         "data.profile.bind-core.v1",
+        "data.profile.send.uplink.v1",
+        "data.profile.send.downlink.v1",
         "data.profile.handle-table.v1",
         "data.profile.window-layout.v1",
         "data.profile.sync-markers.v1",
@@ -371,6 +373,8 @@ pub(super) fn data_profile_required_slots_for_link(
         ("shader", "cpu") => slots.push("marker:shader_to_cpu"),
         ("cpu", "kernel") => slots.push("marker:cpu_to_kernel"),
         ("kernel", "cpu") => slots.push("marker:kernel_to_cpu"),
+        ("cpu", "network") => slots.push("marker:cpu_to_network"),
+        ("network", "cpu") => slots.push("marker:network_to_cpu"),
         _ => {}
     }
     slots

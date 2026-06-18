@@ -480,9 +480,9 @@ fn apply_network_profile_stmt(
         push_profile_node(
             module,
             name,
-            "cpu0",
+            "network0",
             Operation {
-                module: "cpu".to_owned(),
+                module: "network".to_owned(),
                 instruction: "const_i64".to_owned(),
                 args: vec![value.to_string()],
             },
@@ -590,11 +590,8 @@ fn expect_profile_value_input_name(
 }
 
 pub(super) fn ensure_project_resource(module: &mut YirModule, name: &str, kind: &str) {
-    if module
-        .resources
-        .iter()
-        .any(|resource| resource.name == name)
-    {
+    if let Some(resource) = module.resources.iter_mut().find(|resource| resource.name == name) {
+        resource.kind = ResourceKind::parse(kind);
         return;
     }
     module.resources.push(Resource {

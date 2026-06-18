@@ -123,6 +123,7 @@ pub fn compile_project_plan_with_options(
     crate::project::apply_project_links_to_yir(project, &mut artifacts.yir)?;
     crate::project::validate_project_links_against_yir(project, &artifacts.yir)?;
     crate::project::validate_project_abi_against_yir(project, &artifacts.yir)?;
+    crate::project::prune_project_topology_for_codegen(project, &mut artifacts.yir)?;
     artifacts.llvm_ir = yir_lower_llvm::emit_module(&artifacts.yir)?;
     refresh_loaded_nustar(&mut artifacts)?;
     Ok(artifacts)

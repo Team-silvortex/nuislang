@@ -1,15 +1,20 @@
 use std::collections::BTreeMap;
 
+use yir_core::YirModule;
+
+use super::profile_apply::{resolve_registered_abi_target, target_config_tokens_for_domain};
 use super::support_contracts::{
     network_profile_slot_targets, network_support_surface_contract,
     require_declared_support_surface, support_profile_slots_for_domain, support_surface_for_domain,
 };
 use super::{
-    collect_profile_int_bindings, require_declared_profile_slot, split_domain_unit, LoadedProject,
+    collect_profile_int_bindings, resolve_project_abi, require_declared_profile_slot,
+    split_domain_unit, LoadedProject,
 };
 
 pub(super) fn validate_network_profile_for_link(
     project: &LoadedProject,
+    module: &YirModule,
     endpoint: &str,
 ) -> Result<(), String> {
     let (domain, unit) = split_domain_unit(endpoint)?;
@@ -39,6 +44,7 @@ pub(super) fn validate_network_profile_for_link(
             "send_window",
         ],
     )?;
+    validate_network_target_projection(project, module, &unit)?;
     Ok(())
 }
 
@@ -108,4 +114,61 @@ fn validate_network_profile_slot_value(unit: &str, slot: &str, value: i64) -> Re
         "project network unit `network.{}` requires `{}` {}",
         unit, slot, relation
     ))
+}
+
+pub(super) fn validate_network_target_projection(
+    project: &LoadedProject,
+    module: &YirModule,
+    unit: &str,
+) -> Result<(), String> {
+    let resolution = resolve_project_abi(project)?;
+    let Some(target) = resolve_registered_abi_target("network", Some(&resolution))? else {
+        return Ok(());
+    };
+    let expected_resource_kind = match target.machine_os.as_str() {
+        "darwin" => "network.urlsession",
+        "windows" => "network.winsock",
+        _ => "network.socket",
+    };
+    let resource = module
+        .resources
+        .iter()
+        .find(|resource| resource.name == "network0")
+        .ok_or_else(|| {
+            format!(
+                "project network unit `network.{}` requires `network0` resource in YIR",
+                unit
+            )
+        })?;
+    if resource.kind.raw != expected_resource_kind {
+        return Err(format!(
+            "project network unit `network.{}` requires `network0` resource kind `{}` to match selected ABI `{}`",
+            unit, expected_resource_kind, target.abi
+        ));
+    }
+
+    let expected_name = format!("project_profile_network_{}_network_target_config_auto", unit);
+    let node = module
+        .nodes
+        .iter()
+        .find(|node| node.name == expected_name)
+        .ok_or_else(|| {
+            format!(
+                "project network unit `network.{}` requires `{}` node in YIR",
+                unit, expected_name
+            )
+        })?;
+    let (expected_arch, expected_runtime, expected_lane) =
+        target_config_tokens_for_domain("network", &target);
+    if node.op.module != "network"
+        || node.op.instruction != "target_config"
+        || node.op.args
+            != vec![expected_arch.clone(), expected_runtime.clone(), expected_lane.clone()]
+    {
+        return Err(format!(
+            "project network unit `network.{}` requires `{}` to materialize network.target_config({}, {}, {}) for selected ABI `{}`",
+            unit, expected_name, expected_arch, expected_runtime, expected_lane, target.abi
+        ));
+    }
+    Ok(())
 }

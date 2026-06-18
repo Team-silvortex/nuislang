@@ -304,6 +304,89 @@ fn accepts_typed_data_profile_tokens_for_project_link() {
 }
 
 #[test]
+fn data_profile_required_slots_include_network_bridge_markers() {
+    let cpu_to_network = data_profile_required_slots_for_link("cpu", "network");
+    assert!(cpu_to_network.contains(&"marker:cpu_to_network"));
+
+    let network_to_cpu = data_profile_required_slots_for_link("network", "cpu");
+    assert!(network_to_cpu.contains(&"marker:network_to_cpu"));
+}
+
+#[test]
+fn accepts_typed_data_profile_tokens_for_cpu_network_project_link() {
+    let project = project_with_modules(vec![
+        (
+            "main.ns",
+            r#"
+            mod cpu Main {
+              fn main() {
+                let value: i64 = 7;
+                let uplink: Window<i64> =
+                  data_profile_send_uplink("FabricPlane", value);
+                let downlink: Window<Window<i64>> =
+                  data_profile_send_downlink("FabricPlane", uplink);
+                print(downlink);
+              }
+            }
+            "#,
+        ),
+        (
+            "network_unit.ns",
+            r#"
+            mod network NetworkUnit {
+              fn profile() {
+                const bind_core: i64 = 0;
+                const endpoint_kind: i64 = 1;
+                const local_port: i64 = 8080;
+                const remote_port: i64 = 443;
+                const connect_timeout_ms: i64 = 1000;
+                const retry_budget: i64 = 3;
+                const stream_window: i64 = 8;
+                const recv_window: i64 = 8;
+                const send_window: i64 = 8;
+              }
+            }
+            "#,
+        ),
+        (
+            "fabric_plane.ns",
+            r#"
+            mod data FabricPlane {
+              fn profile() {
+                let profile_handles: HandleTable<FabricBindings> =
+                  data_handle_table("host=cpu0", "network=network0");
+                let cpu_to_network: Marker<CpuToNetwork> = data_marker("cpu_to_network");
+                let network_to_cpu: Marker<NetworkToCpu> = data_marker("network_to_cpu");
+                let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
+                let uplink_payload_shape: Marker<PayloadShapeWindowi64> =
+                  data_marker("uplink_payload_shape");
+                let downlink_payload_shape: Marker<PayloadShapeWindowWindowi64> =
+                  data_marker("downlink_payload_shape");
+                let uplink_window_policy: Marker<UplinkWindowPolicy> =
+                  data_marker("uplink_window_policy");
+                let downlink_window_policy: Marker<DownlinkWindowPolicy> =
+                  data_marker("downlink_window_policy");
+              }
+            }
+            "#,
+        ),
+    ]);
+
+    validate_data_profile_token_types(
+        &project,
+        "cpu.Main",
+        "network.NetworkUnit",
+        "data.FabricPlane",
+    )
+    .unwrap();
+}
+
+#[test]
 fn validates_data_profile_token_types_through_local_type_aliases() {
     let project = project_with_modules(vec![
         (

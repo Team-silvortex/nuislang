@@ -20,6 +20,25 @@ fn project_link_stage_contract_accepts_cpu_to_shader_over_data() {
 }
 
 #[test]
+fn project_link_stage_contract_accepts_cpu_to_network_over_data() {
+    let contract = required_project_link_stage_contract(
+        "cpu.Main",
+        "network.NetworkUnit",
+        "data.FabricPlane",
+    )
+    .unwrap();
+
+    assert_eq!(
+        contract.uplink,
+        NirResultStage::Data(NirDataFlowState::Windowed)
+    );
+    assert_eq!(
+        contract.downlink,
+        NirResultStage::Data(NirDataFlowState::Windowed)
+    );
+}
+
+#[test]
 fn materializes_shader_and_network_resources_from_project_abi_targets() {
     let mut project = project_with_modules(vec![
         (
@@ -403,6 +422,287 @@ fn project_lowering_selections_expose_registered_targets_and_selected_backend() 
 }
 
 #[test]
+fn project_lowering_selections_resolve_shader_kernel_and_network_targets() {
+    let mut project = project_with_modules(vec![
+        (
+            "surface_shader.ns",
+            r#"
+            mod shader SurfaceShader {
+              fn profile() {
+                let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+              }
+            }
+            "#,
+        ),
+        (
+            "kernel_unit.ns",
+            r#"
+            mod kernel KernelUnit {
+              fn profile() {
+                let batch_lanes: i64 = 4;
+                let profile_entry: Unit = kernel_target_config("apple_ane", "coreml", batch_lanes);
+              }
+            }
+            "#,
+        ),
+        (
+            "network_unit.ns",
+            r#"
+            mod network NetworkUnit {
+              fn profile() {}
+            }
+            "#,
+        ),
+    ]);
+    project.manifest.abi_requirements = vec![
+        ProjectAbiRequirement {
+            domain: "shader".to_owned(),
+            abi: "shader.metal.msl2_4".to_owned(),
+        },
+        ProjectAbiRequirement {
+            domain: "kernel".to_owned(),
+            abi: "kernel.apple_ane.coreml.v1".to_owned(),
+        },
+        ProjectAbiRequirement {
+            domain: "network".to_owned(),
+            abi: "network.socket.macos.arm64.v1".to_owned(),
+        },
+    ];
+
+    let resolution = resolve_project_abi(&project).unwrap();
+    let lowering = validate_project_lowering_selections(&resolution);
+
+    let shader = lowering.iter().find(|item| item.domain == "shader").unwrap();
+    let kernel = lowering.iter().find(|item| item.domain == "kernel").unwrap();
+    let network = lowering.iter().find(|item| item.domain == "network").unwrap();
+
+    assert_eq!(shader.selected_lowering_target.as_deref(), Some("metal"));
+    assert!(shader
+        .registered_lowering_targets
+        .iter()
+        .any(|target| target == "metal"));
+    assert_eq!(kernel.selected_lowering_target.as_deref(), Some("coreml"));
+    assert!(kernel
+        .registered_lowering_targets
+        .iter()
+        .any(|target| target == "coreml"));
+    assert_eq!(network.selected_lowering_target.as_deref(), Some("urlsession"));
+    assert!(network
+        .registered_lowering_targets
+        .iter()
+        .any(|target| target == "urlsession"));
+}
+
+#[test]
+fn validates_network_target_projection_against_selected_abi() {
+    let mut project = project_with_modules(vec![(
+        "network_unit.ns",
+        r#"
+        mod network NetworkUnit {
+          fn profile() {
+            const bind_core: i64 = 0;
+            const endpoint_kind: i64 = 1;
+            const local_port: i64 = 8080;
+            const remote_port: i64 = 443;
+            const connect_timeout_ms: i64 = 1000;
+            const retry_budget: i64 = 3;
+            const stream_window: i64 = 8;
+            const recv_window: i64 = 8;
+            const send_window: i64 = 8;
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "network".to_owned(),
+        abi: "network.socket.macos.arm64.v1".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+    validate_network_target_projection(&project, &yir, "NetworkUnit").unwrap();
+}
+
+#[test]
+fn rejects_network_target_projection_that_disagrees_with_selected_abi() {
+    let mut project = project_with_modules(vec![(
+        "network_unit.ns",
+        r#"
+        mod network NetworkUnit {
+          fn profile() {
+            const bind_core: i64 = 0;
+            const endpoint_kind: i64 = 1;
+            const local_port: i64 = 8080;
+            const remote_port: i64 = 443;
+            const connect_timeout_ms: i64 = 1000;
+            const retry_budget: i64 = 3;
+            const stream_window: i64 = 8;
+            const recv_window: i64 = 8;
+            const send_window: i64 = 8;
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "network".to_owned(),
+        abi: "network.socket.macos.arm64.v1".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+    let resource = yir
+        .resources
+        .iter_mut()
+        .find(|resource| resource.name == "network0")
+        .unwrap();
+    resource.kind = yir_core::ResourceKind::parse("network.winsock");
+
+    let error = validate_network_target_projection(&project, &yir, "NetworkUnit").unwrap_err();
+    assert!(error.contains("network.urlsession"));
+    assert!(error.contains("network.socket.macos.arm64.v1"));
+}
+
+#[test]
+fn validates_shader_target_projection_against_selected_abi() {
+    let mut project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            const vertex_count: i64 = 3;
+            const instance_count: i64 = 1;
+            const packet_field_count: i64 = 3;
+            const pass_kind: i64 = 1;
+            const packet_color_slot: i64 = 0;
+            const packet_speed_slot: i64 = 1;
+            const packet_radius_slot: i64 = 2;
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+            let profile_view: Viewport = shader_viewport(160, 120);
+            let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, }; @vertex fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut { var out: VsOut; out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0); out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0); return out; } @fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32> { return in.color; }");
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "shader".to_owned(),
+        abi: "shader.metal.msl2_4".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+    validate_shader_target_projection(&project, &yir, "SurfaceShader").unwrap();
+}
+
+#[test]
+fn rejects_shader_target_projection_that_disagrees_with_selected_abi() {
+    let mut project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            const vertex_count: i64 = 3;
+            const instance_count: i64 = 1;
+            const packet_field_count: i64 = 3;
+            const pass_kind: i64 = 1;
+            const packet_color_slot: i64 = 0;
+            const packet_speed_slot: i64 = 1;
+            const packet_radius_slot: i64 = 2;
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+            let profile_view: Viewport = shader_viewport(160, 120);
+            let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, }; @vertex fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut { var out: VsOut; out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0); out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0); return out; } @fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32> { return in.color; }");
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "shader".to_owned(),
+        abi: "shader.metal.msl2_4".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+    let resource = yir
+        .resources
+        .iter_mut()
+        .find(|resource| resource.name == "shader0")
+        .unwrap();
+    resource.kind = yir_core::ResourceKind::parse("shader.directx");
+
+    let error = validate_shader_target_projection(&project, &yir, "SurfaceShader").unwrap_err();
+    assert!(error.contains("shader.metal"));
+    assert!(error.contains("shader.metal.msl2_4"));
+}
+
+#[test]
+fn rejects_shader_target_projection_without_inline_wgsl_for_metal_abi() {
+    let mut project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            const vertex_count: i64 = 3;
+            const instance_count: i64 = 1;
+            const packet_field_count: i64 = 3;
+            const pass_kind: i64 = 1;
+            const packet_color_slot: i64 = 0;
+            const packet_speed_slot: i64 = 1;
+            const packet_radius_slot: i64 = 2;
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+            let profile_view: Viewport = shader_viewport(160, 120);
+            let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "shader".to_owned(),
+        abi: "shader.metal.msl2_4".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+    let error = validate_shader_target_projection(&project, &yir, "SurfaceShader").unwrap_err();
+    assert!(error.contains("requires shader_inline_wgsl"));
+    assert!(error.contains("shader.metal.msl2_4"));
+}
+
+#[test]
+fn rejects_shader_inline_wgsl_for_cpu_fallback_abi() {
+    let mut project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            const vertex_count: i64 = 3;
+            const instance_count: i64 = 1;
+            const packet_field_count: i64 = 3;
+            const pass_kind: i64 = 1;
+            const packet_color_slot: i64 = 0;
+            const packet_speed_slot: i64 = 1;
+            const packet_radius_slot: i64 = 2;
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+            let profile_view: Viewport = shader_viewport(160, 120);
+            let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, }; @vertex fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut { var out: VsOut; out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0); out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0); return out; } @fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32> { return in.color; }");
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "shader".to_owned(),
+        abi: "shader.render.cpu-fallback.v1".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+    let error = validate_shader_target_projection(&project, &yir, "SurfaceShader").unwrap_err();
+    assert!(error.contains("does not declare inline WGSL capability"));
+    assert!(error.contains("shader.render.cpu-fallback.v1"));
+}
+
+#[test]
 fn project_link_stage_contract_rejects_shader_to_kernel_for_now() {
     let error = required_project_link_stage_contract(
         "shader.SurfaceShader",
@@ -414,6 +714,7 @@ fn project_link_stage_contract_rejects_shader_to_kernel_for_now() {
     assert!(error.contains("cpu<->cpu"));
     assert!(error.contains("cpu<->shader"));
     assert!(error.contains("cpu<->kernel"));
+    assert!(error.contains("cpu<->network"));
 }
 
 #[test]

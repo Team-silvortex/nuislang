@@ -44,7 +44,11 @@ use data_contract_types::{
 #[cfg(test)]
 use data_validation::validate_data_profile_token_types;
 #[cfg(test)]
-use kernel_validation::validate_kernel_profile_slot_contract;
+use kernel_validation::{
+    validate_kernel_profile_slot_contract, validate_kernel_target_config_contract,
+};
+#[cfg(test)]
+use network_validation::validate_network_target_projection;
 use manifest::{parse_project_manifest, sanitize_ident};
 pub use packet::render_project_packet_index;
 pub use planning::{
@@ -72,13 +76,15 @@ use rendering::{
 };
 pub use runtime_validation::{
     apply_project_links_to_yir, apply_project_support_modules_to_yir,
+    prune_project_topology_for_codegen,
     validate_project_abi_against_yir, validate_project_links_against_nir,
     validate_project_links_against_yir,
 };
 use shader_validation::{has_edge_to, infer_shader_packet_contract};
 #[cfg(test)]
 use shader_validation::{
-    shader_packet_support_surface_contract, validate_shader_packet_contract, ShaderPacketContract,
+    shader_packet_support_surface_contract, validate_shader_packet_contract,
+    validate_shader_target_projection, ShaderPacketContract,
 };
 use support_contracts::{
     data_profile_required_slots_for_link, data_support_surface_contract,

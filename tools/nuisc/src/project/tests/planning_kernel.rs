@@ -303,6 +303,56 @@ fn rejects_kernel_profile_without_batch_lanes_wiring() {
 }
 
 #[test]
+fn validates_kernel_target_config_against_selected_abi() {
+    let mut project = project_with_modules(vec![(
+        "kernel_unit.ns",
+        r#"
+        mod kernel KernelUnit {
+          fn profile() {
+            const bind_core: i64 = 2;
+            const queue_depth: i64 = 8;
+            const batch_lanes: i64 = 16;
+            let profile_entry: Unit =
+              kernel_target_config("apple_ane", "coreml", batch_lanes);
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "kernel".to_owned(),
+        abi: "kernel.apple_ane.coreml.v1".to_owned(),
+    }];
+
+    validate_kernel_target_config_contract(&project, "KernelUnit").unwrap();
+}
+
+#[test]
+fn rejects_kernel_target_config_that_disagrees_with_selected_abi() {
+    let mut project = project_with_modules(vec![(
+        "kernel_unit.ns",
+        r#"
+        mod kernel KernelUnit {
+          fn profile() {
+            const bind_core: i64 = 2;
+            const queue_depth: i64 = 8;
+            const batch_lanes: i64 = 16;
+            let profile_entry: Unit =
+              kernel_target_config("x86_64", "cpu-fallback", batch_lanes);
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "kernel".to_owned(),
+        abi: "kernel.apple_ane.coreml.v1".to_owned(),
+    }];
+
+    let error = validate_kernel_target_config_contract(&project, "KernelUnit").unwrap_err();
+    assert!(error.contains("kernel_target_config(\"apple_ane\", \"coreml\", ...)"));
+    assert!(error.contains("kernel.apple_ane.coreml.v1"));
+}
+
+#[test]
 fn materializes_kernel_slot_contract_node_into_yir() {
     let project = project_with_modules(vec![(
         "kernel_unit.ns",

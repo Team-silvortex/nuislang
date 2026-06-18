@@ -14,6 +14,21 @@ impl RegisteredMod for NetworkMod {
         require_network_resource(node, resource)?;
 
         match node.op.instruction.as_str() {
+            "const_i64" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `network.const_i64 <name> <resource> <value>`",
+                        node.name
+                    ));
+                }
+                node.op.args[0].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid i64 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
             "target_config" => {
                 if node.op.args.len() != 3 {
                     return Err(format!(
@@ -97,6 +112,12 @@ impl RegisteredMod for NetworkMod {
         require_network_resource(node, resource)?;
 
         match node.op.instruction.as_str() {
+            "const_i64" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(|_| {
+                format!(
+                    "node `{}` has invalid i64 literal `{}`",
+                    node.name, node.op.args[0]
+                )
+            })?)),
             "target_config" => Ok(Value::Tuple(vec![
                 Value::Symbol(node.op.args[0].clone()),
                 Value::Symbol(node.op.args[1].clone()),
@@ -227,6 +248,21 @@ mod tests {
             name: "network0".to_owned(),
             kind: ResourceKind::parse("network.io"),
         }
+    }
+
+    #[test]
+    fn executes_network_const_i64() {
+        let resource = network_resource();
+        let mut state = ExecutionState::default();
+        let network = NetworkMod;
+        let node = Node {
+            name: "network_const".to_owned(),
+            resource: "network0".to_owned(),
+            op: Operation::parse("network.const_i64", vec!["42".to_owned()]).unwrap(),
+        };
+
+        let value = network.execute(&node, &resource, &mut state).unwrap();
+        assert_eq!(value, Value::Int(42));
     }
 
     #[test]

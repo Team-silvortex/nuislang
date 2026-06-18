@@ -3,12 +3,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use nuis_semantics::model::{NirExpr, NirStmt};
 use yir_core::{SemanticOp, YirModule};
 
+use super::profile_apply::{resolve_registered_abi_target, target_config_tokens_for_domain};
 use super::support_contracts::{
     require_declared_support_surface, shader_profile_slot_targets, shader_support_surface_contract,
     support_profile_slots_for_domain, support_surface_for_domain,
 };
 use super::{
-    collect_profile_int_bindings, require_declared_profile_slot,
+    collect_profile_int_bindings, require_declared_profile_slot, resolve_project_abi,
     resolve_project_profile_target_name, LoadedProject,
 };
 
@@ -43,6 +44,7 @@ pub(super) fn validate_shader_profile_for_link(
 
     validate_shader_profile_flow(module, &unit)?;
     validate_shader_packet_contract(project, &unit)?;
+    validate_shader_target_projection(project, module, &unit)?;
 
     Ok(())
 }
@@ -314,12 +316,6 @@ pub(super) fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Re
         .filter(|node| node.op.is_shader_semantic_op(SemanticOp::ShaderInlineWgsl))
         .map(|node| (node.name.as_str(), node.op.args.clone()))
         .collect::<Vec<_>>();
-    if inline_entries.is_empty() {
-        return Err(format!(
-            "project shader unit `shader.{}` requires at least one shader_inline_wgsl(\"entry\", wgsl {{ ... }}) profile node",
-            unit
-        ));
-    }
     let mut matched_pipeline_entry = false;
     for (node_name, args) in inline_entries {
         let Some(entry) = args.first() else {
@@ -366,4 +362,82 @@ pub(super) fn has_edge_to(module: &YirModule, from: &str, to: &str) -> bool {
         .edges
         .iter()
         .any(|edge| edge.from == from && edge.to == to)
+}
+
+pub(super) fn validate_shader_target_projection(
+    project: &LoadedProject,
+    module: &YirModule,
+    unit: &str,
+) -> Result<(), String> {
+    let resolution = resolve_project_abi(project)?;
+    let Some(target) = resolve_registered_abi_target("shader", Some(&resolution))? else {
+        return Ok(());
+    };
+    let expected_backend = target
+        .backend_family
+        .clone()
+        .unwrap_or_else(|| "render".to_owned());
+    let expected_resource_kind = format!("shader.{}", expected_backend.replace('-', "_"));
+    let resource = module
+        .resources
+        .iter()
+        .find(|resource| resource.name == "shader0")
+        .ok_or_else(|| {
+            format!(
+                "project shader unit `shader.{}` requires `shader0` resource in YIR",
+                unit
+            )
+        })?;
+    if resource.kind.raw != expected_resource_kind {
+        return Err(format!(
+            "project shader unit `shader.{}` requires `shader0` resource kind `{}` to match selected ABI `{}`",
+            unit, expected_resource_kind, target.abi
+        ));
+    }
+
+    let expected_name = format!("project_profile_shader_{}_shader_target_config_auto", unit);
+    let node = module
+        .nodes
+        .iter()
+        .find(|node| node.name == expected_name)
+        .ok_or_else(|| {
+            format!(
+                "project shader unit `shader.{}` requires `{}` node in YIR",
+                unit, expected_name
+            )
+        })?;
+    let (expected_arch, expected_runtime, expected_lane) =
+        target_config_tokens_for_domain("shader", &target);
+    if node.op.module != "shader"
+        || node.op.instruction != "target_config"
+        || node.op.args
+            != vec![expected_arch.clone(), expected_runtime.clone(), expected_lane.clone()]
+    {
+        return Err(format!(
+            "project shader unit `shader.{}` requires `{}` to materialize shader.target_config({}, {}, {}) for selected ABI `{}`",
+            unit, expected_name, expected_arch, expected_runtime, expected_lane, target.abi
+        ));
+    }
+
+    let uses_inline_wgsl = module
+        .nodes
+        .iter()
+        .any(|node| node.op.is_shader_semantic_op(SemanticOp::ShaderInlineWgsl));
+    let abi_allows_inline_wgsl = matches!(
+        expected_backend.as_str(),
+        "metal" | "vulkan" | "directx"
+    );
+    if uses_inline_wgsl && !abi_allows_inline_wgsl {
+        return Err(format!(
+            "project shader unit `shader.{}` uses shader_inline_wgsl, but selected ABI `{}` does not declare inline WGSL capability for backend `{}`",
+            unit, target.abi, expected_backend
+        ));
+    }
+    if !uses_inline_wgsl && abi_allows_inline_wgsl {
+        return Err(format!(
+            "project shader unit `shader.{}` requires shader_inline_wgsl for selected ABI `{}` backend `{}`",
+            unit, target.abi, expected_backend
+        ));
+    }
+    Ok(())
 }

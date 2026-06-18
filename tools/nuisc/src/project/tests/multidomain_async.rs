@@ -1,9 +1,11 @@
 use super::*;
 use std::{
+    collections::BTreeMap,
     fs,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use yir_core::EdgeKind;
 
 fn multidomain_project_with_entry(
     entry_source: &str,
@@ -54,6 +56,8 @@ fn multidomain_support_modules() -> Vec<(&'static str, &'static str)> {
         (
             "network_unit.ns",
             r#"
+            use data FabricPlane;
+
             mod network NetworkUnit {
               fn profile() {
                 const bind_core: i64 = 2;
@@ -148,6 +152,76 @@ fn kernel_data_support_modules() -> Vec<(&'static str, &'static str)> {
     ]
 }
 
+fn network_data_support_modules() -> Vec<(&'static str, &'static str)> {
+    vec![
+        (
+            "network_unit.ns",
+            r#"
+            use data FabricPlane;
+
+            mod network NetworkUnit {
+              fn profile() {
+                const bind_core: i64 = 2;
+                const endpoint_kind: i64 = 1;
+                const transport_family: i64 = 6;
+                const local_port: i64 = 9000;
+                const remote_port: i64 = 443;
+                const connect_timeout_ms: i64 = 250;
+                const read_timeout_ms: i64 = 125;
+                const write_timeout_ms: i64 = 150;
+                const retry_budget: i64 = 3;
+                const stream_window: i64 = 64;
+                const recv_window: i64 = 32;
+                const send_window: i64 = 32;
+                const protocol_kind: i64 = 101;
+                const protocol_version: i64 = 2;
+                const protocol_header_bytes: i64 = 24;
+              }
+            }
+            "#,
+        ),
+        (
+            "fabric_plane.ns",
+            r#"
+            mod data FabricPlane {
+              fn profile() {
+                const window_offset: i64 = 0;
+                const uplink_len: i64 = 1;
+                const downlink_len: i64 = 1;
+
+                data_bind_core(1);
+                let profile_handles: HandleTable<FabricPlaneBindings> =
+                  data_handle_table("host=cpu0", "network=network0");
+                let cpu_to_network: Marker<CpuToNetwork> = data_marker("cpu_to_network");
+                let network_to_cpu: Marker<NetworkToCpu> = data_marker("network_to_cpu");
+                let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                let downlink_payload_class: Marker<PayloadClassWindow> =
+                  data_marker("downlink_payload_class");
+                let uplink_payload_shape: Marker<PayloadShapeWindowi64> =
+                  data_marker("uplink_payload_shape");
+                let downlink_payload_shape: Marker<PayloadShapeWindowWindowi64> =
+                  data_marker("downlink_payload_shape");
+                let uplink_window_policy: Marker<UplinkWindowPolicy> =
+                  data_marker("uplink_window_policy");
+                let downlink_window_policy: Marker<DownlinkWindowPolicy> =
+                  data_marker("downlink_window_policy");
+                let uplink_window_mut: WindowMut<i64> =
+                  data_copy_window(window_offset, window_offset, uplink_len);
+                let uplink_window: Window<i64> = data_freeze_window(uplink_window_mut);
+                let downlink_window_mut: WindowMut<i64> =
+                  data_copy_window(window_offset, window_offset, downlink_len);
+                let downlink_window: Window<i64> = data_freeze_window(downlink_window_mut);
+              }
+            }
+            "#,
+        ),
+    ]
+}
+
 fn kernel_data_project_with_entry(
     entry_source: &str,
     extra_modules: Vec<(&str, &str)>,
@@ -192,6 +266,50 @@ fn kernel_data_project_with_entry(
     }
 }
 
+fn network_data_project_with_entry(
+    entry_source: &str,
+    extra_modules: Vec<(&str, &str)>,
+) -> LoadedProject {
+    let mut modules = vec![("main.ns", entry_source)];
+    modules.extend(extra_modules);
+
+    LoadedProject {
+        root: PathBuf::from("."),
+        manifest_path: PathBuf::from("nuis.toml"),
+        manifest: NuisProjectManifest {
+            name: "network_data_test".to_owned(),
+            entry: "main.ns".to_owned(),
+            modules: modules.iter().map(|(path, _)| (*path).to_owned()).collect(),
+            tests: vec![],
+            links: vec![],
+            abi_requirements: vec![
+                ProjectAbiRequirement {
+                    domain: "cpu".to_owned(),
+                    abi: "cpu.arm64.apple_aapcs64".to_owned(),
+                },
+                ProjectAbiRequirement {
+                    domain: "network".to_owned(),
+                    abi: "network.socket.macos.arm64.v1".to_owned(),
+                },
+                ProjectAbiRequirement {
+                    domain: "data".to_owned(),
+                    abi: "data.fabric.macos.arm64.v1".to_owned(),
+                },
+            ],
+            galaxy_dependencies: vec![],
+        },
+        entry_path: PathBuf::from("main.ns"),
+        entry_source: entry_source.to_owned(),
+        modules: modules
+            .into_iter()
+            .map(|(path, source)| ProjectModule {
+                path: PathBuf::from(path),
+                ast: crate::frontend::parse_nuis_ast(source).unwrap(),
+            })
+            .collect(),
+    }
+}
+
 fn write_temp_project(name: &str, entry_source: &str, extra_modules: Vec<(&str, &str)>) -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -215,6 +333,50 @@ abi = [
         .trim_start(),
     )
     .unwrap();
+    fs::write(root.join("main.ns"), entry_source).unwrap();
+    for (path, source) in extra_modules {
+        fs::write(root.join(path), source).unwrap();
+    }
+    root
+}
+
+fn write_temp_network_data_project(
+    name: &str,
+    entry_source: &str,
+    extra_modules: Vec<(&str, &str)>,
+    links: &[&str],
+) -> PathBuf {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("nuisc_{name}_{nonce}"));
+    fs::create_dir_all(&root).unwrap();
+
+    let mut manifest = r#"
+name = "network_data_test"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "network_unit.ns", "fabric_plane.ns", "network_data_bridge.ns"]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "network=network.socket.macos.arm64.v1",
+  "data=data.fabric.macos.arm64.v1",
+]
+"#
+    .trim_start()
+    .to_owned();
+    if !links.is_empty() {
+        manifest.push_str("links = [\n");
+        for link in links {
+            manifest.push_str("  \"");
+            manifest.push_str(link);
+            manifest.push_str("\",\n");
+        }
+        manifest.push_str("]\n");
+    }
+
+    fs::write(root.join("nuis.toml"), manifest).unwrap();
     fs::write(root.join("main.ns"), entry_source).unwrap();
     for (path, source) in extra_modules {
         fs::write(root.join(path), source).unwrap();
@@ -394,6 +556,77 @@ fn compiles_multidomain_data_orchestration_project_after_cycle_fix() {
         .nodes
         .iter()
         .any(|node| node.op.module == "data" && node.op.instruction == "observe"));
+}
+
+#[test]
+fn compiles_reverse_network_project_via_data_bridge() {
+    let root = write_temp_network_data_project(
+        "reverse_network_via_data_bridge",
+        r#"
+        use cpu NetworkDataBridge;
+        use network NetworkUnit;
+        use data FabricPlane;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return NetworkDataBridge.probe_roundtrip();
+          }
+        }
+        "#,
+        {
+            let mut modules = network_data_support_modules();
+            modules.push((
+                "network_data_bridge.ns",
+                r#"
+                use network NetworkUnit;
+                use data FabricPlane;
+
+                mod cpu NetworkDataBridge {
+                  pub fn probe_roundtrip() -> i64 {
+                    let bind_core: NetworkResult<i64> =
+                      network_result(network_profile_bind_core("NetworkUnit"));
+                    let endpoint_kind: NetworkResult<i64> =
+                      network_result(network_profile_endpoint_kind("NetworkUnit"));
+                    let send_window: NetworkResult<i64> =
+                      network_result(network_profile_send_window("NetworkUnit"));
+                    let value: i64 =
+                      network_value(bind_core)
+                      + network_value(endpoint_kind)
+                      + network_value(send_window);
+                    data_profile_bind_core("FabricPlane");
+                    let handles: HandleTable<FabricPlaneBindings> =
+                      data_profile_handle_table("FabricPlane");
+                    let uplink: Window<i64> =
+                      data_profile_send_uplink("FabricPlane", value);
+                    let downlink: Window<Window<i64>> =
+                      data_profile_send_downlink("FabricPlane", uplink);
+                    print(handles);
+                    print(downlink);
+                    return value;
+                  }
+                }
+                "#,
+            ));
+            modules
+        },
+        &["network.NetworkUnit -> cpu.Main via data.FabricPlane"],
+    );
+    let artifacts = crate::pipeline::compile_source_path(&root).unwrap();
+    let _ = fs::remove_dir_all(&root);
+
+    assert!(artifacts
+        .loaded_nustar
+        .iter()
+        .any(|package| package == "official.network"));
+    assert!(artifacts
+        .loaded_nustar
+        .iter()
+        .any(|package| package == "official.data"));
+    assert!(artifacts
+        .yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "observe"));
 }
 
 #[test]
@@ -579,6 +812,560 @@ fn validates_network_project_links_against_nir_with_shared_cpu_helper_indirectio
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn validates_network_project_links_against_nir_via_data_bridge() {
+    let project = network_data_project_with_entry(
+        r#"
+        use cpu NetworkDataBridge;
+        use network NetworkUnit;
+        use data FabricPlane;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return NetworkDataBridge.probe_roundtrip();
+          }
+        }
+        "#,
+        {
+            let mut modules = network_data_support_modules();
+            modules.push((
+                "network_data_bridge.ns",
+                r#"
+                use network NetworkUnit;
+                use data FabricPlane;
+
+                mod cpu NetworkDataBridge {
+                  pub fn probe_roundtrip() -> i64 {
+                    let bind_core: NetworkResult<i64> =
+                      network_result(network_profile_bind_core("NetworkUnit"));
+                    let endpoint_kind: NetworkResult<i64> =
+                      network_result(network_profile_endpoint_kind("NetworkUnit"));
+                    let send_window: NetworkResult<i64> =
+                      network_result(network_profile_send_window("NetworkUnit"));
+                    let value: i64 =
+                      network_value(bind_core)
+                      + network_value(endpoint_kind)
+                      + network_value(send_window);
+                    data_profile_bind_core("FabricPlane");
+                    let handles: HandleTable<FabricPlaneBindings> =
+                      data_profile_handle_table("FabricPlane");
+                    let uplink: Window<i64> =
+                      data_profile_send_uplink("FabricPlane", value);
+                    let downlink: Window<Window<i64>> =
+                      data_profile_send_downlink("FabricPlane", uplink);
+                    print(handles);
+                    print(downlink);
+                    return value;
+                  }
+                }
+                "#,
+            ));
+            modules
+        },
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn rejects_network_project_links_via_data_bridge_missing_downlink_usage() {
+    let project = network_data_project_with_entry(
+        r#"
+        use cpu NetworkDataBridge;
+        use network NetworkUnit;
+        use data FabricPlane;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return NetworkDataBridge.probe_roundtrip();
+          }
+        }
+        "#,
+        {
+            let mut modules = network_data_support_modules();
+            modules.push((
+                "network_data_bridge.ns",
+                r#"
+                use network NetworkUnit;
+                use data FabricPlane;
+
+                mod cpu NetworkDataBridge {
+                  pub fn probe_roundtrip() -> i64 {
+                    let bind_core: NetworkResult<i64> =
+                      network_result(network_profile_bind_core("NetworkUnit"));
+                    let endpoint_kind: NetworkResult<i64> =
+                      network_result(network_profile_endpoint_kind("NetworkUnit"));
+                    let send_window: NetworkResult<i64> =
+                      network_result(network_profile_send_window("NetworkUnit"));
+                    let value: i64 =
+                      network_value(bind_core)
+                      + network_value(endpoint_kind)
+                      + network_value(send_window);
+                    data_profile_bind_core("FabricPlane");
+                    let handles: HandleTable<FabricPlaneBindings> =
+                      data_profile_handle_table("FabricPlane");
+                    let uplink: Window<i64> =
+                      data_profile_send_uplink("FabricPlane", value);
+                    print(handles);
+                    print(uplink);
+                    return value;
+                  }
+                }
+                "#,
+            ));
+            modules
+        },
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("data_send_downlink(\"FabricPlane\""));
+}
+
+#[test]
+fn validates_network_project_links_against_yir_via_data_bridge() {
+    let project = network_data_project_with_entry(
+        r#"
+        use cpu NetworkDataBridge;
+        use network NetworkUnit;
+        use data FabricPlane;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return NetworkDataBridge.probe_roundtrip();
+          }
+        }
+        "#,
+        {
+            let mut modules = network_data_support_modules();
+            modules.push((
+                "network_data_bridge.ns",
+                r#"
+                use network NetworkUnit;
+                use data FabricPlane;
+
+                mod cpu NetworkDataBridge {
+                  pub fn probe_roundtrip() -> i64 {
+                    let bind_core: NetworkResult<i64> =
+                      network_result(network_profile_bind_core("NetworkUnit"));
+                    let endpoint_kind: NetworkResult<i64> =
+                      network_result(network_profile_endpoint_kind("NetworkUnit"));
+                    let send_window: NetworkResult<i64> =
+                      network_result(network_profile_send_window("NetworkUnit"));
+                    let value: i64 =
+                      network_value(bind_core)
+                      + network_value(endpoint_kind)
+                      + network_value(send_window);
+                    data_profile_bind_core("FabricPlane");
+                    let handles: HandleTable<FabricPlaneBindings> =
+                      data_profile_handle_table("FabricPlane");
+                    let uplink: Window<i64> =
+                      data_profile_send_uplink("FabricPlane", value);
+                    let downlink: Window<Window<i64>> =
+                      data_profile_send_downlink("FabricPlane", uplink);
+                    print(handles);
+                    print(downlink);
+                    return value;
+                  }
+                }
+                "#,
+            ));
+            modules
+        },
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+    apply_project_links_to_yir(&project, &mut yir).unwrap();
+    validate_project_links_against_yir(&project, &yir).unwrap();
+}
+
+#[test]
+fn rejects_network_project_links_against_yir_when_data_to_network_xfer_is_missing() {
+    let project = network_data_project_with_entry(
+        r#"
+        use cpu NetworkDataBridge;
+        use network NetworkUnit;
+        use data FabricPlane;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return NetworkDataBridge.probe_roundtrip();
+          }
+        }
+        "#,
+        {
+            let mut modules = network_data_support_modules();
+            modules.push((
+                "network_data_bridge.ns",
+                r#"
+                use network NetworkUnit;
+                use data FabricPlane;
+
+                mod cpu NetworkDataBridge {
+                  pub fn probe_roundtrip() -> i64 {
+                    let bind_core: NetworkResult<i64> =
+                      network_result(network_profile_bind_core("NetworkUnit"));
+                    let endpoint_kind: NetworkResult<i64> =
+                      network_result(network_profile_endpoint_kind("NetworkUnit"));
+                    let send_window: NetworkResult<i64> =
+                      network_result(network_profile_send_window("NetworkUnit"));
+                    let value: i64 =
+                      network_value(bind_core)
+                      + network_value(endpoint_kind)
+                      + network_value(send_window);
+                    data_profile_bind_core("FabricPlane");
+                    let handles: HandleTable<FabricPlaneBindings> =
+                      data_profile_handle_table("FabricPlane");
+                    let uplink: Window<i64> =
+                      data_profile_send_uplink("FabricPlane", value);
+                    let downlink: Window<Window<i64>> =
+                      data_profile_send_downlink("FabricPlane", uplink);
+                    print(handles);
+                    print(downlink);
+                    return value;
+                  }
+                }
+                "#,
+            ));
+            modules
+        },
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+    apply_project_links_to_yir(&project, &mut yir).unwrap();
+
+    let resource_families = yir
+        .resources
+        .iter()
+        .map(|resource| (resource.name.clone(), resource.kind.family().to_owned()))
+        .collect::<BTreeMap<_, _>>();
+    let node_resources = yir
+        .nodes
+        .iter()
+        .map(|node| (node.name.clone(), node.resource.clone()))
+        .collect::<BTreeMap<_, _>>();
+    yir.edges.retain(|edge| {
+        if edge.kind != EdgeKind::CrossDomainExchange {
+            return true;
+        }
+        let from_family = node_resources
+            .get(&edge.from)
+            .and_then(|resource| resource_families.get(resource))
+            .map(String::as_str);
+        let to_family = node_resources
+            .get(&edge.to)
+            .and_then(|resource| resource_families.get(resource))
+            .map(String::as_str);
+        !(from_family == Some("data") && to_family == Some("network"))
+    });
+
+    let err = validate_project_links_against_yir(&project, &yir).unwrap_err();
+    assert!(err.contains("requires a `data` -> `network` xfer segment"));
+}
+
+#[test]
+fn validates_reverse_network_project_links_against_nir_via_data_bridge() {
+    let project = network_data_project_with_entry(
+        r#"
+        use cpu NetworkDataBridge;
+        use network NetworkUnit;
+        use data FabricPlane;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return NetworkDataBridge.probe_roundtrip();
+          }
+        }
+        "#,
+        {
+            let mut modules = network_data_support_modules();
+            modules.push((
+                "network_data_bridge.ns",
+                r#"
+                use network NetworkUnit;
+                use data FabricPlane;
+
+                mod cpu NetworkDataBridge {
+                  pub fn probe_roundtrip() -> i64 {
+                    let bind_core: NetworkResult<i64> =
+                      network_result(network_profile_bind_core("NetworkUnit"));
+                    let endpoint_kind: NetworkResult<i64> =
+                      network_result(network_profile_endpoint_kind("NetworkUnit"));
+                    let send_window: NetworkResult<i64> =
+                      network_result(network_profile_send_window("NetworkUnit"));
+                    let value: i64 =
+                      network_value(bind_core)
+                      + network_value(endpoint_kind)
+                      + network_value(send_window);
+                    data_profile_bind_core("FabricPlane");
+                    let handles: HandleTable<FabricPlaneBindings> =
+                      data_profile_handle_table("FabricPlane");
+                    let uplink: Window<i64> =
+                      data_profile_send_uplink("FabricPlane", value);
+                    let downlink: Window<Window<i64>> =
+                      data_profile_send_downlink("FabricPlane", uplink);
+                    print(handles);
+                    print(downlink);
+                    return value;
+                  }
+                }
+                "#,
+            ));
+            modules
+        },
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "network.NetworkUnit".to_owned(),
+        to: "cpu.Main".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn rejects_reverse_network_project_links_missing_endpoint_kind_usage() {
+    let project = network_data_project_with_entry(
+        r#"
+        use cpu NetworkDataBridge;
+        use network NetworkUnit;
+        use data FabricPlane;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return NetworkDataBridge.probe_roundtrip();
+          }
+        }
+        "#,
+        {
+            let mut modules = network_data_support_modules();
+            modules.push((
+                "network_data_bridge.ns",
+                r#"
+                use network NetworkUnit;
+                use data FabricPlane;
+
+                mod cpu NetworkDataBridge {
+                  pub fn probe_roundtrip() -> i64 {
+                    let bind_core: NetworkResult<i64> =
+                      network_result(network_profile_bind_core("NetworkUnit"));
+                    let send_window: NetworkResult<i64> =
+                      network_result(network_profile_send_window("NetworkUnit"));
+                    let value: i64 =
+                      network_value(bind_core) + network_value(send_window);
+                    data_profile_bind_core("FabricPlane");
+                    let handles: HandleTable<FabricPlaneBindings> =
+                      data_profile_handle_table("FabricPlane");
+                    let uplink: Window<i64> =
+                      data_profile_send_uplink("FabricPlane", value);
+                    let downlink: Window<Window<i64>> =
+                      data_profile_send_downlink("FabricPlane", uplink);
+                    print(handles);
+                    print(downlink);
+                    return value;
+                  }
+                }
+                "#,
+            ));
+            modules
+        },
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "network.NetworkUnit".to_owned(),
+        to: "cpu.Main".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("network_profile_endpoint_kind(\"NetworkUnit\")"));
+}
+
+#[test]
+fn validates_reverse_network_project_links_against_yir_via_data_bridge() {
+    let project = network_data_project_with_entry(
+        r#"
+        use cpu NetworkDataBridge;
+        use network NetworkUnit;
+        use data FabricPlane;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return NetworkDataBridge.probe_roundtrip();
+          }
+        }
+        "#,
+        {
+            let mut modules = network_data_support_modules();
+            modules.push((
+                "network_data_bridge.ns",
+                r#"
+                use network NetworkUnit;
+                use data FabricPlane;
+
+                mod cpu NetworkDataBridge {
+                  pub fn probe_roundtrip() -> i64 {
+                    let bind_core: NetworkResult<i64> =
+                      network_result(network_profile_bind_core("NetworkUnit"));
+                    let endpoint_kind: NetworkResult<i64> =
+                      network_result(network_profile_endpoint_kind("NetworkUnit"));
+                    let send_window: NetworkResult<i64> =
+                      network_result(network_profile_send_window("NetworkUnit"));
+                    let value: i64 =
+                      network_value(bind_core)
+                      + network_value(endpoint_kind)
+                      + network_value(send_window);
+                    data_profile_bind_core("FabricPlane");
+                    let handles: HandleTable<FabricPlaneBindings> =
+                      data_profile_handle_table("FabricPlane");
+                    let uplink: Window<i64> =
+                      data_profile_send_uplink("FabricPlane", value);
+                    let downlink: Window<Window<i64>> =
+                      data_profile_send_downlink("FabricPlane", uplink);
+                    print(handles);
+                    print(downlink);
+                    return value;
+                  }
+                }
+                "#,
+            ));
+            modules
+        },
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "network.NetworkUnit".to_owned(),
+        to: "cpu.Main".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+    apply_project_links_to_yir(&project, &mut yir).unwrap();
+    validate_project_links_against_yir(&project, &yir).unwrap();
+}
+
+#[test]
+fn rejects_reverse_network_project_links_against_yir_when_network_to_data_xfer_is_missing() {
+    let project = network_data_project_with_entry(
+        r#"
+        use cpu NetworkDataBridge;
+        use network NetworkUnit;
+        use data FabricPlane;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return NetworkDataBridge.probe_roundtrip();
+          }
+        }
+        "#,
+        {
+            let mut modules = network_data_support_modules();
+            modules.push((
+                "network_data_bridge.ns",
+                r#"
+                use network NetworkUnit;
+                use data FabricPlane;
+
+                mod cpu NetworkDataBridge {
+                  pub fn probe_roundtrip() -> i64 {
+                    let bind_core: NetworkResult<i64> =
+                      network_result(network_profile_bind_core("NetworkUnit"));
+                    let endpoint_kind: NetworkResult<i64> =
+                      network_result(network_profile_endpoint_kind("NetworkUnit"));
+                    let send_window: NetworkResult<i64> =
+                      network_result(network_profile_send_window("NetworkUnit"));
+                    let value: i64 =
+                      network_value(bind_core)
+                      + network_value(endpoint_kind)
+                      + network_value(send_window);
+                    data_profile_bind_core("FabricPlane");
+                    let handles: HandleTable<FabricPlaneBindings> =
+                      data_profile_handle_table("FabricPlane");
+                    let uplink: Window<i64> =
+                      data_profile_send_uplink("FabricPlane", value);
+                    let downlink: Window<Window<i64>> =
+                      data_profile_send_downlink("FabricPlane", uplink);
+                    print(handles);
+                    print(downlink);
+                    return value;
+                  }
+                }
+                "#,
+            ));
+            modules
+        },
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "network.NetworkUnit".to_owned(),
+        to: "cpu.Main".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+    apply_project_links_to_yir(&project, &mut yir).unwrap();
+
+    let resource_families = yir
+        .resources
+        .iter()
+        .map(|resource| (resource.name.clone(), resource.kind.family().to_owned()))
+        .collect::<BTreeMap<_, _>>();
+    let node_resources = yir
+        .nodes
+        .iter()
+        .map(|node| (node.name.clone(), node.resource.clone()))
+        .collect::<BTreeMap<_, _>>();
+    yir.edges.retain(|edge| {
+        if edge.kind != EdgeKind::CrossDomainExchange {
+            return true;
+        }
+        let from_family = node_resources
+            .get(&edge.from)
+            .and_then(|resource| resource_families.get(resource))
+            .map(String::as_str);
+        let to_family = node_resources
+            .get(&edge.to)
+            .and_then(|resource| resource_families.get(resource))
+            .map(String::as_str);
+        !(from_family == Some("network") && to_family == Some("data"))
+    });
+
+    let err = validate_project_links_against_yir(&project, &yir).unwrap_err();
+    assert!(err.contains("requires a `network` -> `data` xfer segment"));
 }
 
 #[test]

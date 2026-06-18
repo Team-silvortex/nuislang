@@ -3,14 +3,15 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::{NirExpr, NirModule, NirStmt};
 use yir_core::{OperationDomainFamily, YirModule};
 
+use super::profile_apply::{resolve_registered_abi_target, target_config_tokens_for_domain};
 use super::profile_usage::{expr_walk_any, stmt_uses_expr_predicate};
 use super::support_contracts::{
     kernel_support_surface_contract, require_declared_support_surface, support_surface_for_domain,
 };
 use super::{
     collect_profile_int_bindings, extract_profile_call, kernel_profile_slot_targets,
-    require_declared_profile_slot, split_domain_unit, support_profile_slots_for_domain,
-    LoadedProject,
+    require_declared_profile_slot, resolve_project_abi, split_domain_unit,
+    support_profile_slots_for_domain, AstExpr, LoadedProject, ProjectAbiResolution,
 };
 
 pub(super) fn validate_kernel_profile_for_link(
@@ -51,6 +52,7 @@ pub(super) fn validate_kernel_profile_for_link(
     }
 
     validate_kernel_profile_slot_contract(project, &unit)?;
+    validate_kernel_target_config_contract(project, &unit)?;
 
     Ok(())
 }
@@ -157,6 +159,76 @@ pub(super) fn validate_kernel_profile_slot_contract(
     }
 
     Ok(())
+}
+
+pub(super) fn validate_kernel_target_config_contract(
+    project: &LoadedProject,
+    unit: &str,
+) -> Result<(), String> {
+    let resolution = resolve_project_abi(project)?;
+    let Some(target) = resolve_registered_abi_target("kernel", Some(&resolution))? else {
+        return Ok(());
+    };
+    let profile_module = project
+        .modules
+        .iter()
+        .find(|module| module.ast.domain == "kernel" && module.ast.unit == unit)
+        .ok_or_else(|| format!("project is missing support module `kernel.{unit}`"))?;
+    let profile_fn = profile_module
+        .ast
+        .functions
+        .iter()
+        .find(|function| function.name == "profile")
+        .ok_or_else(|| {
+            format!(
+                "project kernel unit `kernel.{}` requires a `profile()` function",
+                unit
+            )
+        })?;
+
+    let expected = expected_kernel_target_config_literals(&resolution, &target)?;
+    for stmt in &profile_fn.body {
+        let Some((_name, "kernel_target_config", args)) = extract_profile_call(stmt) else {
+            continue;
+        };
+        let actual_arch = expect_kernel_target_config_text(args, 0, "kernel_target_config")?;
+        let actual_runtime = expect_kernel_target_config_text(args, 1, "kernel_target_config")?;
+        if actual_arch != expected.0 || actual_runtime != expected.1 {
+            return Err(format!(
+                "project kernel unit `kernel.{}` requires kernel_target_config(\"{}\", \"{}\", ...) to match selected ABI `{}`",
+                unit, expected.0, expected.1, target.abi
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn expected_kernel_target_config_literals(
+    resolution: &ProjectAbiResolution,
+    target: &crate::registry::RegisteredAbiTarget,
+) -> Result<(String, String), String> {
+    resolution
+        .requirements
+        .iter()
+        .find(|item| item.domain == "kernel")
+        .ok_or_else(|| "missing kernel ABI requirement while validating kernel profile".to_owned())?;
+    let (arch, runtime, _) = target_config_tokens_for_domain("kernel", target);
+    Ok((arch, runtime))
+}
+
+fn expect_kernel_target_config_text(
+    args: &[AstExpr],
+    index: usize,
+    callee: &str,
+) -> Result<String, String> {
+    match args.get(index) {
+        Some(AstExpr::Text(value)) => Ok(value.clone()),
+        _ => Err(format!(
+            "{callee}(...) expects string literal arg {}",
+            index + 1
+        )),
+    }
 }
 
 fn stmt_uses_kernel_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {

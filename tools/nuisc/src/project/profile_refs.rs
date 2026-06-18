@@ -177,6 +177,12 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         .filter(|node| node.op.is_data_marker_tag("cpu_to_kernel"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
+    let cpu_to_network_markers = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.is_data_marker_tag("cpu_to_network"))
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
     let uplink_pipe_markers = module
         .nodes
         .iter()
@@ -243,16 +249,40 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         .filter(|node| node.op.is_data_marker_tag("shader_to_cpu"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
+    let shader_nodes = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.is_domain_family(OperationDomainFamily::Shader))
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
     let kernel_to_cpu_markers = module
         .nodes
         .iter()
         .filter(|node| node.op.is_data_marker_tag("kernel_to_cpu"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
+    let network_to_cpu_markers = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.is_data_marker_tag("network_to_cpu"))
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
     let kernel_nodes = module
         .nodes
         .iter()
         .filter(|node| node.op.is_domain_family(OperationDomainFamily::Kernel))
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let cpu_nodes = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.is_domain_family(OperationDomainFamily::Cpu))
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let network_nodes = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.is_domain_family(OperationDomainFamily::Network))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let data_pipe_nodes = module
@@ -311,7 +341,17 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
             push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
         }
     }
+    if let Some(marker) = cpu_to_network_markers.first() {
+        for pipe in data_pipe_nodes.iter().take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
     if let Some(marker) = kernel_to_cpu_markers.first() {
+        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
+    if let Some(marker) = network_to_cpu_markers.first() {
         for pipe in data_pipe_nodes.iter().skip(2).take(2) {
             push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
         }
@@ -496,6 +536,70 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
                     &node_resources,
                     kernel_node,
                     pipe,
+                );
+            }
+        }
+    }
+    if !shader_nodes.is_empty() && !shader_to_cpu_markers.is_empty() {
+        for sink in uplink_windows.iter().chain(data_pipe_nodes.iter().take(2)) {
+            for shader_node in &shader_nodes {
+                push_project_dependency_edge_if_missing(
+                    module,
+                    &resource_families,
+                    &node_resources,
+                    shader_node,
+                    sink,
+                );
+            }
+        }
+    }
+    if !network_nodes.is_empty() && !cpu_to_network_markers.is_empty() {
+        for source in downlink_windows
+            .iter()
+            .chain(data_pipe_nodes.iter().skip(2).take(2))
+        {
+            for network_node in &network_nodes {
+                push_project_dependency_edge_if_missing(
+                    module,
+                    &resource_families,
+                    &node_resources,
+                    source,
+                    network_node,
+                );
+            }
+        }
+    }
+    if !network_nodes.is_empty() && !network_to_cpu_markers.is_empty() {
+        for sink in uplink_windows
+            .iter()
+            .chain(data_pipe_nodes.iter().take(2))
+        {
+            for network_node in &network_nodes {
+                push_project_dependency_edge_if_missing(
+                    module,
+                    &resource_families,
+                    &node_resources,
+                    network_node,
+                    sink,
+                );
+            }
+        }
+    }
+    let has_to_cpu_bridge = !shader_to_cpu_markers.is_empty()
+        || !kernel_to_cpu_markers.is_empty()
+        || !network_to_cpu_markers.is_empty();
+    if has_to_cpu_bridge && !cpu_nodes.is_empty() {
+        for source in downlink_windows
+            .iter()
+            .chain(data_pipe_nodes.iter().skip(2).take(2))
+        {
+            for cpu_node in &cpu_nodes {
+                push_project_dependency_edge_if_missing(
+                    module,
+                    &resource_families,
+                    &node_resources,
+                    source,
+                    cpu_node,
                 );
             }
         }

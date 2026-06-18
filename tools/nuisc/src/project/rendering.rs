@@ -26,6 +26,45 @@ fn json_escape(value: &str) -> String {
     out
 }
 
+fn selected_lowering_target_for_domain(
+    domain: &str,
+    abi: &str,
+) -> Result<Option<String>, String> {
+    match domain {
+        "cpu" => {
+            crate::aot::resolve_cpu_build_target_from_abi(Path::new("nustar-packages"), abi)?;
+            Ok(Some("llvm".to_owned()))
+        }
+        "shader" | "kernel" => Ok(resolve_registered_abi_target(
+            domain,
+            Some(&ProjectAbiResolution {
+                requirements: vec![super::ProjectAbiRequirement {
+                    domain: domain.to_owned(),
+                    abi: abi.to_owned(),
+                }],
+                explicit: true,
+            }),
+        )?
+        .and_then(|target| target.backend_family)),
+        "network" => Ok(resolve_registered_abi_target(
+            domain,
+            Some(&ProjectAbiResolution {
+                requirements: vec![super::ProjectAbiRequirement {
+                    domain: domain.to_owned(),
+                    abi: abi.to_owned(),
+                }],
+                explicit: true,
+            }),
+        )?
+        .map(|target| match target.machine_os.as_str() {
+            "darwin" => "urlsession".to_owned(),
+            "windows" => "winsock".to_owned(),
+            _ => "socket-abi".to_owned(),
+        })),
+        _ => Ok(None),
+    }
+}
+
 pub fn project_abi_selection_views(
     resolution: &ProjectAbiResolution,
 ) -> Vec<ProjectAbiSelectionView> {
@@ -150,19 +189,14 @@ pub fn validate_project_lowering_selections(
                             ),
                         });
                     }
-                    if item.domain == "cpu" {
-                        match crate::aot::resolve_cpu_build_target_from_abi(
-                            Path::new("nustar-packages"),
-                            &item.abi,
-                        ) {
-                            Ok(_) => {
-                                selected_lowering_target = Some("llvm".to_owned());
-                            }
-                            Err(error) => issues.push(ProjectLoweringIssue {
-                                kind: ProjectLoweringIssueKind::AbiTargetResolutionFailed,
-                                message: error,
-                            }),
+                    match selected_lowering_target_for_domain(&item.domain, &item.abi) {
+                        Ok(selected) => {
+                            selected_lowering_target = selected;
                         }
+                        Err(error) => issues.push(ProjectLoweringIssue {
+                            kind: ProjectLoweringIssueKind::AbiTargetResolutionFailed,
+                            message: error,
+                        }),
                     }
                     if let Some(selected) = selected_lowering_target.as_deref() {
                         if !registered_lowering_targets
