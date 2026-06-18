@@ -68,6 +68,10 @@ pub fn project_compile_workflow_brief() -> &'static str {
     "health -> structure -> scheduler -> abi_lock -> check -> test -> build -> release_check"
 }
 
+pub fn nuisc_compile_pipeline_brief() -> &'static str {
+    "resolve_input -> resolve_cpu_target -> compile_plan -> nir_verify -> project_link_validate -> yir_lower -> project_link_apply -> project_abi_validate -> codegen_prune -> llvm_emit -> aot_link -> project_metadata -> build_manifest -> compiled_artifact"
+}
+
 pub fn project_compile_samples_brief() -> &'static str {
     "health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; compile=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir> -> nuis release-check <project-dir> <output-dir>"
 }
@@ -1916,6 +1920,28 @@ pub fn run(command: CommandKind) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    fn temp_dir(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("nuisc_{label}_{nonce}"));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write_temp_project_fixture(name: &str, manifest: &str, entry_source: &str) -> PathBuf {
+        let root = temp_dir(name);
+        fs::write(root.join("nuis.toml"), manifest).unwrap();
+        fs::write(root.join("main.ns"), entry_source).unwrap();
+        root
+    }
 
     #[test]
     fn domain_contract_json_exposes_grouped_contract_sections() {
@@ -1957,5 +1983,92 @@ mod tests {
         assert!(json.contains("\"ast_surface\":["));
         assert!(json.contains("\"nir_surface\":["));
         assert!(json.contains("\"ops\":["));
+    }
+
+    #[test]
+    fn compile_command_writes_end_to_end_project_outputs() {
+        let project_name = "compile_command_smoke";
+        let project_root = write_temp_project_fixture(
+            project_name,
+            r#"
+name = "compile_command_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        );
+        let output_dir = temp_dir("compile_command_outputs");
+        let output_stem = project_name.to_owned();
+
+        run(CommandKind::Compile {
+            input: project_root.clone(),
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        for path in [
+            output_dir.join(format!("{output_stem}.ast.txt")),
+            output_dir.join(format!("{output_stem}.nir.txt")),
+            output_dir.join(format!("{output_stem}.yir")),
+            output_dir.join(format!("{output_stem}.ll")),
+            output_dir.join(&output_stem),
+            output_dir.join("nuis.build.manifest.toml"),
+            output_dir.join("nuis.executable.envelope.toml"),
+            output_dir.join("nuis.compiled.artifact"),
+            output_dir.join("nuis.project.toml"),
+            output_dir.join("nuis.project.plan.txt"),
+            output_dir.join("nuis.project.organization.txt"),
+            output_dir.join("nuis.project.exchange.txt"),
+            output_dir.join("nuis.project.modules.txt"),
+            output_dir.join("nuis.project.links.txt"),
+            output_dir.join("nuis.project.packet.txt"),
+            output_dir.join("nuis.project.host_ffi.txt"),
+            output_dir.join("nuis.project.abi.txt"),
+        ] {
+            assert!(path.exists(), "expected output `{}`", path.display());
+        }
+
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let manifest_text = fs::read_to_string(&manifest_path).unwrap();
+        assert!(manifest_text.contains("manifest_schema = \"nuis-build-manifest-v1\""));
+        assert!(manifest_text.contains("packaging_mode = \"native-cpu-llvm\""));
+        assert!(manifest_text.contains("loaded_nustar = [\"official.cpu\"]"));
+        assert!(manifest_text.contains(&format!("name = \"{project_name}\"")));
+        assert!(manifest_text.contains("manifest_copy = "));
+        assert!(manifest_text.contains("plan_index = "));
+        assert!(manifest_text.contains("organization_index = "));
+        assert!(manifest_text.contains("exchange_index = "));
+        assert!(manifest_text.contains("modules_index = "));
+        assert!(manifest_text.contains("links_index = "));
+        assert!(manifest_text.contains("packet_index = "));
+        assert!(manifest_text.contains("host_ffi_index = "));
+        assert!(manifest_text.contains("abi_index = "));
+
+        let manifest_report = aot::verify_build_manifest(&manifest_path).unwrap();
+        assert_eq!(manifest_report.envelope_schema, "nuis-executable-envelope-v1");
+        assert_eq!(manifest_report.artifact_schema, "nuis-compiled-artifact-v1");
+        assert_eq!(manifest_report.artifact_binary_name, output_stem);
+        assert!(Path::new(&manifest_report.envelope_path).exists());
+        assert!(Path::new(&manifest_report.artifact_path).exists());
+        assert!(manifest_report.project_metadata_checked >= 2);
+
+        let artifact_report =
+            aot::verify_nuis_compiled_artifact(output_dir.join("nuis.compiled.artifact").as_path())
+                .unwrap();
+        assert_eq!(artifact_report.binary_name, output_stem);
+        assert_eq!(artifact_report.packaging_mode, "native-cpu-llvm");
+        assert!(artifact_report.lifecycle_contract_consistent);
+        assert!(artifact_report.artifact_roundtrip_verified);
     }
 }

@@ -438,6 +438,8 @@ pub(super) fn lower_project_module_to_nir(
 mod tests {
     use super::*;
 
+    // Shared filesystem/in-memory test builders live in `test_support`; feature-specific
+    // helpers stay in each test file until they prove reusable across files.
     #[path = "abi_recommendation.rs"]
     mod abi_recommendation;
     #[path = "multidomain_async.rs"]

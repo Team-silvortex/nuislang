@@ -73,7 +73,10 @@ fn run() -> Result<(), String> {
             nuisc::run(nuisc::CommandKind::LoaderContract { package_id })?;
         }
         cli::CommandKind::VerifyBuildManifest { manifest } => {
-            nuisc::run(nuisc::CommandKind::VerifyBuildManifest { manifest })?;
+            nuisc::run(nuisc::CommandKind::VerifyBuildManifest {
+                manifest,
+                json: false,
+            })?;
         }
         cli::CommandKind::CacheStatus {
             input,
@@ -210,6 +213,7 @@ fn handle_release_check(
     let manifest = output_dir.join("nuis.build.manifest.toml");
     nuisc::run(nuisc::CommandKind::VerifyBuildManifest {
         manifest: manifest.clone(),
+        json: false,
     })?;
     println!("release-check: ok");
     println!("  output_dir: {}", output_dir.display());
@@ -927,6 +931,51 @@ fn workflow_frontdoor_json_fields(surface: &WorkflowFrontdoorSurface) -> Vec<Str
     ]
 }
 
+fn workflow_contract_json_fields(
+    frontdoor: &WorkflowFrontdoorSurface,
+    include_project_compile: bool,
+    include_project_test: bool,
+    include_project_galaxy: bool,
+    include_debug: bool,
+) -> Vec<String> {
+    let mut fields = vec![
+        json_object_field("frontdoor", &workflow_frontdoor_json_fields(frontdoor)),
+        json_field("workflow_kind", frontdoor.workflow_kind),
+        json_field("workflow_brief", frontdoor.workflow_brief),
+        json_field("workflow_samples", frontdoor.workflow_samples),
+        json_field("recommended_next_step", frontdoor.recommended_next_step),
+        json_field("recommended_command", frontdoor.recommended_command),
+        json_field("recommended_reason", frontdoor.recommended_reason),
+    ];
+    if include_project_compile {
+        fields.push(json_field(
+            "project_compile_workflow",
+            frontdoor.workflow_brief,
+        ));
+        fields.push(json_field(
+            "project_compile_samples",
+            frontdoor.workflow_samples,
+        ));
+    }
+    if include_project_test {
+        fields.push(json_field(
+            "project_test_workflow",
+            nuisc::project_test_workflow_brief(),
+        ));
+    }
+    if include_project_galaxy {
+        fields.push(json_field(
+            "project_galaxy_workflow",
+            nuisc::project_galaxy_workflow_brief(),
+        ));
+    }
+    if include_debug {
+        fields.push(json_field("debug_workflow", debug_workflow_brief()));
+        fields.push(json_field("debug_samples", debug_workflow_samples_brief()));
+    }
+    fields
+}
+
 fn print_workflow_frontdoor_surface(surface: &WorkflowFrontdoorSurface) {
     println!("  frontdoor.source_kind: {}", surface.source_kind);
     println!("  frontdoor.workflow_kind: {}", surface.workflow_kind);
@@ -1155,21 +1204,6 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
                 json_field("project", &project.manifest.name),
                 json_field("root", &project.root.display().to_string()),
                 json_field("entry", &project.manifest.entry),
-                json_object_field("frontdoor", &workflow_frontdoor_json_fields(&frontdoor)),
-                json_field("workflow_kind", frontdoor.workflow_kind),
-                json_field("workflow_brief", frontdoor.workflow_brief),
-                json_field("workflow_samples", frontdoor.workflow_samples),
-                json_field("project_compile_workflow", frontdoor.workflow_brief),
-                json_field("project_compile_samples", frontdoor.workflow_samples),
-                json_field(
-                    "project_test_workflow",
-                    nuisc::project_test_workflow_brief(),
-                ),
-                json_field("recommended_next_step", frontdoor.recommended_next_step),
-                json_field("recommended_command", frontdoor.recommended_command),
-                json_field("recommended_reason", frontdoor.recommended_reason),
-                json_field("debug_workflow", debug_workflow_brief()),
-                json_field("debug_samples", debug_workflow_samples_brief()),
                 json_field(
                     "default_release_output_dir",
                     &default_release_check_output_dir(&input)
@@ -1177,12 +1211,13 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
                         .to_string(),
                 ),
             ];
-            if include_galaxy_flow {
-                fields.push(json_field(
-                    "project_galaxy_workflow",
-                    nuisc::project_galaxy_workflow_brief(),
-                ));
-            }
+            fields.extend(workflow_contract_json_fields(
+                &frontdoor,
+                true,
+                true,
+                include_galaxy_flow,
+                true,
+            ));
             println!("{{{}}}", fields.join(","));
             return Ok(());
         }
@@ -1218,20 +1253,11 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
                 reason: "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
             },
         );
-        let fields = vec![
+        let mut fields = vec![
             json_field("source_kind", frontdoor.source_kind),
             json_field("input", &input.display().to_string()),
-            json_object_field("frontdoor", &workflow_frontdoor_json_fields(&frontdoor)),
-            json_field("workflow_kind", frontdoor.workflow_kind),
-            json_field("workflow_brief", frontdoor.workflow_brief),
-            json_field("workflow_samples", frontdoor.workflow_samples),
             json_field("single_source_compile_workflow", frontdoor.workflow_brief),
             json_field("single_source_compile_samples", frontdoor.workflow_samples),
-            json_field("recommended_next_step", frontdoor.recommended_next_step),
-            json_field("recommended_command", frontdoor.recommended_command),
-            json_field("recommended_reason", frontdoor.recommended_reason),
-            json_field("debug_workflow", debug_workflow_brief()),
-            json_field("debug_samples", debug_workflow_samples_brief()),
             json_field(
                 "default_build_output_dir",
                 &default_build_output_dir(&input).display().to_string(),
@@ -1243,6 +1269,13 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
                     .to_string(),
             ),
         ];
+        fields.extend(workflow_contract_json_fields(
+            &frontdoor,
+            false,
+            false,
+            false,
+            true,
+        ));
         println!("{{{}}}", fields.join(","));
         return Ok(());
     }
@@ -1584,6 +1617,35 @@ fn public_surface_json(records: &[PublicSurfaceModuleRecord]) -> Vec<String> {
         .collect()
 }
 
+fn public_surface_summary_json_fields(records: &[PublicSurfaceModuleRecord]) -> Vec<String> {
+    let public_extern_count = records.iter().map(|record| record.externs.len()).sum::<usize>();
+    let public_extern_interface_count = records
+        .iter()
+        .map(|record| record.extern_interfaces.len())
+        .sum::<usize>();
+    let public_const_count = records.iter().map(|record| record.consts.len()).sum::<usize>();
+    let public_function_count = records
+        .iter()
+        .map(|record| record.functions.len())
+        .sum::<usize>();
+    let public_type_alias_count = records
+        .iter()
+        .map(|record| record.type_aliases.len())
+        .sum::<usize>();
+    let public_struct_count = records.iter().map(|record| record.structs.len()).sum::<usize>();
+    let public_trait_count = records.iter().map(|record| record.traits.len()).sum::<usize>();
+    vec![
+        json_usize_field("public_surface_modules", records.len()),
+        json_usize_field("public_externs", public_extern_count),
+        json_usize_field("public_extern_interfaces", public_extern_interface_count),
+        json_usize_field("public_consts", public_const_count),
+        json_usize_field("public_type_aliases", public_type_alias_count),
+        json_usize_field("public_functions", public_function_count),
+        json_usize_field("public_structs", public_struct_count),
+        json_usize_field("public_traits", public_trait_count),
+    ]
+}
+
 fn project_plan_json_fields(plan: &nuisc::project::ProjectCompilationPlan) -> Vec<String> {
     vec![
         json_field(
@@ -1618,6 +1680,70 @@ fn project_plan_json_fields(plan: &nuisc::project::ProjectCompilationPlan) -> Ve
     ]
 }
 
+fn project_check_summary_json_fields(
+    abi_checks: &[nuisc::project::ProjectAbiSelectionCheck],
+    registry_checks: &[nuisc::registry::ProjectDomainRegistryCheck],
+    lowering_checks: &[nuisc::project::ProjectLoweringSelectionView],
+) -> Vec<String> {
+    vec![
+        json_usize_field("abi_checks_count", abi_checks.len()),
+        json_bool_field("abi_checks_ok", abi_checks.iter().all(|check| check.ok)),
+        json_usize_field("registry_checks_count", registry_checks.len()),
+        json_bool_field(
+            "registry_checks_ok",
+            registry_checks.iter().all(|check| check.ok),
+        ),
+        json_usize_field("lowering_checks_count", lowering_checks.len()),
+        json_bool_field(
+            "lowering_checks_ok",
+            lowering_checks.iter().all(|check| check.ok),
+        ),
+    ]
+}
+
+fn galaxy_lock_json_fields(
+    status: Result<galaxy::VerifiedGalaxyLock, String>,
+    lock_path: &Path,
+    declared_dependencies: &[String],
+) -> Vec<String> {
+    match status {
+        Ok(lock) => {
+            let locked = lock
+                .entries
+                .iter()
+                .map(|item| format!("{}={}", item.name, item.version))
+                .collect::<BTreeSet<_>>();
+            let declared = declared_dependencies
+                .iter()
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            vec![
+                json_field("galaxy_lock_status", "ok"),
+                json_field("galaxy_lock_path", &lock.path.display().to_string()),
+                json_usize_field("galaxy_lock_dependencies", lock.entries.len()),
+                json_bool_field("galaxy_lock_matches_manifest", declared == locked),
+                json_string_array_field(
+                    "galaxy_lock_entries",
+                    &lock
+                        .entries
+                        .iter()
+                        .map(|item| format!("{}={} {}", item.name, item.version, item.bundle_fnv1a64))
+                        .collect::<Vec<_>>(),
+                ),
+            ]
+        }
+        Err(error) if lock_path.exists() => vec![
+            json_field("galaxy_lock_status", "invalid"),
+            json_field("galaxy_lock_path", &lock_path.display().to_string()),
+            json_field("galaxy_lock_error", &error),
+        ],
+        Err(_) => vec![
+            json_field("galaxy_lock_status", "missing"),
+            json_field("galaxy_lock_path", &lock_path.display().to_string()),
+        ],
+    }
+}
+
 fn project_plan_domains_json(
     plan: &nuisc::project::ProjectCompilationPlan,
 ) -> Result<String, String> {
@@ -1640,28 +1766,7 @@ fn project_workflow_json_fields(
     frontdoor: &WorkflowFrontdoorSurface,
     include_galaxy_flow: bool,
 ) -> Vec<String> {
-    let mut fields = vec![
-        json_object_field("frontdoor", &workflow_frontdoor_json_fields(frontdoor)),
-        json_field("workflow_kind", frontdoor.workflow_kind),
-        json_field("workflow_brief", frontdoor.workflow_brief),
-        json_field("workflow_samples", frontdoor.workflow_samples),
-        json_field("project_compile_workflow", frontdoor.workflow_brief),
-        json_field("project_compile_samples", frontdoor.workflow_samples),
-        json_field(
-            "project_test_workflow",
-            nuisc::project_test_workflow_brief(),
-        ),
-        json_field("recommended_next_step", frontdoor.recommended_next_step),
-        json_field("recommended_command", frontdoor.recommended_command),
-        json_field("recommended_reason", frontdoor.recommended_reason),
-    ];
-    if include_galaxy_flow {
-        fields.push(json_field(
-            "project_galaxy_workflow",
-            nuisc::project_galaxy_workflow_brief(),
-        ));
-    }
-    fields
+    workflow_contract_json_fields(frontdoor, true, true, include_galaxy_flow, false)
 }
 
 fn scheduler_view_domain_record(
@@ -1817,6 +1922,11 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
 }
 
 fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
+    println!("{}", render_scheduler_view_json(&input)?);
+    Ok(())
+}
+
+fn render_scheduler_view_json(input: &Path) -> Result<String, String> {
     if nuisc::project::is_project_input(&input) {
         let project = nuisc::project::load_project(&input)?;
         let plan = nuisc::project::build_project_compilation_plan(&project)?;
@@ -1859,17 +1969,10 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
             .map(scheduler_view_domain_record_json)
             .collect::<Vec<_>>()
             .join(",");
-        let fields = vec![
+        let mut fields = vec![
             json_field("source_kind", "project"),
             json_field("input", &input.display().to_string()),
             json_field("project", &project.manifest.name),
-            json_object_field("frontdoor", &workflow_frontdoor_json_fields(&frontdoor)),
-            json_field("workflow_kind", frontdoor.workflow_kind),
-            json_field("workflow_brief", frontdoor.workflow_brief),
-            json_field("workflow_samples", frontdoor.workflow_samples),
-            json_field("recommended_next_step", frontdoor.recommended_next_step),
-            json_field("recommended_command", frontdoor.recommended_command),
-            json_field("recommended_reason", frontdoor.recommended_reason),
             json_field(
                 "abi_mode",
                 if plan.abi_resolution.explicit {
@@ -1878,36 +1981,16 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
                     "auto-recommended"
                 },
             ),
-            json_field(
-                "project_plan",
-                &nuisc::project::describe_project_compilation_plan(&plan),
-            ),
-            json_field(
-                "project_plan_dependency_categories",
-                &nuisc::project::describe_project_dependency_categories(&plan),
-            ),
-            json_usize_field("project_plan_dependency_count", plan.dependencies.len()),
-            json_field(
-                "project_plan_synthetic_input_kind",
-                &plan.synthetic_input.kind,
-            ),
-            json_field(
-                "project_plan_synthetic_input",
-                &plan.synthetic_input.path.display().to_string(),
-            ),
-            json_field(
-                "project_plan_output_categories",
-                &nuisc::project::describe_project_output_intent_categories(&plan),
-            ),
-            json_usize_field("project_plan_output_count", plan.output_intents.len()),
-            json_field(
-                "project_exchange_route_classes",
-                &nuisc::project::describe_project_exchange_route_classes(&plan),
-            ),
-            json_usize_field("project_exchange_route_count", plan.exchanges.routes.len()),
         ];
-        println!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json);
-        return Ok(());
+        fields.extend(workflow_contract_json_fields(
+            &frontdoor,
+            false,
+            false,
+            false,
+            false,
+        ));
+        fields.extend(project_plan_json_fields(&plan));
+        return Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json));
     }
 
     let artifacts = nuisc::pipeline::compile_source_path(&input)?;
@@ -1942,8 +2025,7 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
         json_field("recommended_command", frontdoor.recommended_command),
         json_field("recommended_reason", frontdoor.recommended_reason),
     ];
-    println!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json);
-    Ok(())
+    Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json))
 }
 
 fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), String> {
@@ -2118,6 +2200,11 @@ fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), St
 }
 
 fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
+    println!("{}", render_project_status_json(&input)?);
+    Ok(())
+}
+
+fn render_project_status_json(input: &Path) -> Result<String, String> {
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let public_surface = public_surface_records(&project);
@@ -2162,34 +2249,6 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
         .collect::<Vec<_>>();
     let domain_json = project_plan_domains_json(&plan)?;
     let public_surface_json = public_surface_json(&public_surface);
-    let public_extern_count = public_surface
-        .iter()
-        .map(|record| record.externs.len())
-        .sum::<usize>();
-    let public_extern_interface_count = public_surface
-        .iter()
-        .map(|record| record.extern_interfaces.len())
-        .sum::<usize>();
-    let public_const_count = public_surface
-        .iter()
-        .map(|record| record.consts.len())
-        .sum::<usize>();
-    let public_function_count = public_surface
-        .iter()
-        .map(|record| record.functions.len())
-        .sum::<usize>();
-    let public_type_alias_count = public_surface
-        .iter()
-        .map(|record| record.type_aliases.len())
-        .sum::<usize>();
-    let public_struct_count = public_surface
-        .iter()
-        .map(|record| record.structs.len())
-        .sum::<usize>();
-    let public_trait_count = public_surface
-        .iter()
-        .map(|record| record.traits.len())
-        .sum::<usize>();
     let mut fields = vec![
         json_field("source_kind", "project"),
         json_field("input", &input.display().to_string()),
@@ -2198,16 +2257,9 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
         json_field("manifest", &project.manifest_path.display().to_string()),
         json_field("entry", &project.manifest.entry),
         json_usize_field("modules", project.modules.len()),
-        json_usize_field("public_surface_modules", public_surface.len()),
-        json_usize_field("public_externs", public_extern_count),
-        json_usize_field("public_extern_interfaces", public_extern_interface_count),
-        json_usize_field("public_consts", public_const_count),
-        json_usize_field("public_type_aliases", public_type_alias_count),
-        json_usize_field("public_functions", public_function_count),
-        json_usize_field("public_structs", public_struct_count),
-        json_usize_field("public_traits", public_trait_count),
         json_usize_field("links", project.manifest.links.len()),
     ];
+    fields.extend(public_surface_summary_json_fields(&public_surface));
     fields.extend(project_plan_json_fields(&plan));
     fields.push(json_usize_field("tests_declared", declared_tests.len()));
     fields.extend(project_workflow_json_fields(
@@ -2232,64 +2284,23 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
             .collect::<Vec<_>>(),
     ));
     let lock_path = project.root.join("nuis.galaxy.lock");
-    match galaxy_lock_status {
-        Ok(lock) => {
-            let declared = project
-                .manifest
-                .galaxy_dependencies
-                .iter()
-                .map(|item| format!("{}={}", item.name, item.version))
-                .collect::<BTreeSet<_>>();
-            let locked = lock
-                .entries
-                .iter()
-                .map(|item| format!("{}={}", item.name, item.version))
-                .collect::<BTreeSet<_>>();
-            fields.push(json_field("galaxy_lock_status", "ok"));
-            fields.push(json_field(
-                "galaxy_lock_path",
-                &lock.path.display().to_string(),
-            ));
-            fields.push(json_usize_field(
-                "galaxy_lock_dependencies",
-                lock.entries.len(),
-            ));
-            fields.push(json_bool_field(
-                "galaxy_lock_matches_manifest",
-                declared == locked,
-            ));
-            fields.push(json_string_array_field(
-                "galaxy_lock_entries",
-                &lock
-                    .entries
-                    .iter()
-                    .map(|item| format!("{}={} {}", item.name, item.version, item.bundle_fnv1a64))
-                    .collect::<Vec<_>>(),
-            ));
-        }
-        Err(error) if lock_path.exists() => {
-            fields.push(json_field("galaxy_lock_status", "invalid"));
-            fields.push(json_field(
-                "galaxy_lock_path",
-                &lock_path.display().to_string(),
-            ));
-            fields.push(json_field("galaxy_lock_error", &error));
-        }
-        Err(_) => {
-            fields.push(json_field("galaxy_lock_status", "missing"));
-            fields.push(json_field(
-                "galaxy_lock_path",
-                &lock_path.display().to_string(),
-            ));
-        }
-    }
+    let declared_galaxy_dependencies = project
+        .manifest
+        .galaxy_dependencies
+        .iter()
+        .map(|item| format!("{}={}", item.name, item.version))
+        .collect::<Vec<_>>();
+    fields.extend(galaxy_lock_json_fields(
+        galaxy_lock_status,
+        &lock_path,
+        &declared_galaxy_dependencies,
+    ));
     fields.push(json_object_array_field("tests", &test_json));
     fields.push(json_object_array_field(
         "public_surface_records",
         &public_surface_json,
     ));
-    println!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json);
-    Ok(())
+    Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json))
 }
 
 fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), String> {
@@ -2685,6 +2696,11 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
 }
 
 fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
+    println!("{}", render_project_doctor_json(&input)?);
+    Ok(())
+}
+
+fn render_project_doctor_json(input: &Path) -> Result<String, String> {
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let public_surface = public_surface_records(&project);
@@ -2859,34 +2875,6 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
     }
     let domain_json = project_plan_domains_json(&plan)?;
     let public_surface_json = public_surface_json(&public_surface);
-    let public_extern_count = public_surface
-        .iter()
-        .map(|record| record.externs.len())
-        .sum::<usize>();
-    let public_extern_interface_count = public_surface
-        .iter()
-        .map(|record| record.extern_interfaces.len())
-        .sum::<usize>();
-    let public_const_count = public_surface
-        .iter()
-        .map(|record| record.consts.len())
-        .sum::<usize>();
-    let public_function_count = public_surface
-        .iter()
-        .map(|record| record.functions.len())
-        .sum::<usize>();
-    let public_type_alias_count = public_surface
-        .iter()
-        .map(|record| record.type_aliases.len())
-        .sum::<usize>();
-    let public_struct_count = public_surface
-        .iter()
-        .map(|record| record.structs.len())
-        .sum::<usize>();
-    let public_trait_count = public_surface
-        .iter()
-        .map(|record| record.traits.len())
-        .sum::<usize>();
     let tests_json = declared_tests
         .iter()
         .map(|path| {
@@ -2924,16 +2912,9 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
         json_field("manifest", &project.manifest_path.display().to_string()),
         json_field("entry", &project.manifest.entry),
         json_usize_field("modules", project.modules.len()),
-        json_usize_field("public_surface_modules", public_surface.len()),
-        json_usize_field("public_externs", public_extern_count),
-        json_usize_field("public_extern_interfaces", public_extern_interface_count),
-        json_usize_field("public_consts", public_const_count),
-        json_usize_field("public_type_aliases", public_type_alias_count),
-        json_usize_field("public_functions", public_function_count),
-        json_usize_field("public_structs", public_struct_count),
-        json_usize_field("public_traits", public_trait_count),
         json_usize_field("links", project.manifest.links.len()),
     ];
+    fields.extend(public_surface_summary_json_fields(&public_surface));
     fields.extend(project_plan_json_fields(&plan));
     fields.push(json_usize_field("tests_declared", declared_tests.len()));
     fields.push(json_usize_field("tests_missing", missing_tests.len()));
@@ -2949,26 +2930,10 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
             "auto-recommended"
         },
     ));
-    fields.push(json_usize_field("abi_checks_count", abi_checks.len()));
-    fields.push(json_bool_field(
-        "abi_checks_ok",
-        abi_checks.iter().all(|check| check.ok),
-    ));
-    fields.push(json_usize_field(
-        "registry_checks_count",
-        registry_checks.len(),
-    ));
-    fields.push(json_bool_field(
-        "registry_checks_ok",
-        registry_checks.iter().all(|check| check.ok),
-    ));
-    fields.push(json_usize_field(
-        "lowering_checks_count",
-        lowering_checks.len(),
-    ));
-    fields.push(json_bool_field(
-        "lowering_checks_ok",
-        lowering_checks.iter().all(|check| check.ok),
+    fields.extend(project_check_summary_json_fields(
+        &abi_checks,
+        &registry_checks,
+        &lowering_checks,
     ));
     fields.push(json_field("galaxy_manifest", &galaxy_manifest_display));
     match galaxy_check {
@@ -3054,8 +3019,7 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
         "galaxy_dependencies",
         &dependency_json,
     ));
-    println!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json);
-    Ok(())
+    Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json))
 }
 
 fn print_domain_contract_group(contract: &nuisc::registry::NustarDomainContract, group: &str) {
@@ -3719,18 +3683,26 @@ fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
 
 #[cfg(test)]
 mod tests {
+    use crate::galaxy;
     use super::{
-        build_workflow_frontdoor_surface, handle_check, handle_test, project_abi_checks_json,
-        project_compile_workflow_source_profile, project_domain_registry_checks_json,
-        resolve_runner_clock_domain, run_language_tests_for_source_file,
-        scheduler_view_domain_record, scheduler_view_domain_record_json,
-        single_source_workflow_source_profile, wait_for_test_child, RawTestOutcome,
-        WorkflowRecommendation,
+        build_workflow_frontdoor_surface, handle_build, handle_check, handle_release_check,
+        handle_test, project_abi_checks_json, project_compile_workflow_source_profile,
+        project_domain_registry_checks_json, project_workflow_json_fields,
+        recommend_project_workflow_step, render_project_doctor_json,
+        render_project_status_json, render_scheduler_view_json,
+        resolve_runner_clock_domain,
+        run_language_tests_for_source_file, scheduler_view_domain_record,
+        scheduler_view_domain_record_json, single_source_workflow_source_profile,
+        wait_for_test_child, RawTestOutcome, WorkflowRecommendation,
+        workflow_contract_json_fields, galaxy_lock_json_fields,
+        public_surface_summary_json_fields, project_check_summary_json_fields,
+        PublicSurfaceModuleRecord,
     };
     use std::{
         env, fs,
         path::{Path, PathBuf},
         process::Command,
+        sync::{Mutex, OnceLock},
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -3804,6 +3776,38 @@ mod tests {
         let dir = env::temp_dir().join(format!("nuis_{label}_{}_{}", std::process::id(), nanos));
         fs::create_dir_all(&dir).expect("create temp dir");
         dir
+    }
+
+    fn write_temp_project_fixture(name: &str, manifest: &str, entry_source: &str) -> PathBuf {
+        let root = temp_dir(name);
+        fs::write(root.join("nuis.toml"), manifest).expect("write manifest");
+        fs::write(root.join("main.ns"), entry_source).expect("write entry");
+        root
+    }
+
+    fn with_repo_root_cwd<T>(f: impl FnOnce() -> T) -> T {
+        static CWD_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        let lock = CWD_LOCK.get_or_init(|| Mutex::new(()));
+        let _guard = lock.lock().expect("lock cwd guard");
+        let original = env::current_dir().expect("current dir");
+        let root = repo_root();
+        env::set_current_dir(&root).expect("set repo root cwd");
+        let result = f();
+        env::set_current_dir(original).expect("restore cwd");
+        result
+    }
+
+    fn empty_galaxy_doctor(project_root: &Path) -> galaxy::GalaxyDoctorReport {
+        galaxy::GalaxyDoctorReport {
+            project_root: project_root.to_path_buf(),
+            project_plan_summary: "<none>".to_owned(),
+            deps_root: project_root.join(".nuis").join("deps"),
+            local_registry_root: project_root.join(".nuis").join("registry"),
+            lock_path: project_root.join("nuis.galaxy.lock"),
+            lock_status: "missing".to_owned(),
+            lock_error: None,
+            dependencies: vec![],
+        }
     }
 
     #[test]
@@ -3891,6 +3895,507 @@ mod cpu Main {
         )
         .expect("write smoke");
         handle_test(manifest, false, false, false, false, None).expect("project tests pass");
+    }
+
+    #[test]
+    fn build_command_writes_project_compile_outputs() {
+        let project_root = write_temp_project_fixture(
+            "build_command_smoke",
+            r#"
+name = "build_command_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 7;
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("build_command_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+
+        for path in [
+            output_dir.join("build_command_smoke.ast.txt"),
+            output_dir.join("build_command_smoke.nir.txt"),
+            output_dir.join("build_command_smoke.yir"),
+            output_dir.join("build_command_smoke.ll"),
+            output_dir.join("build_command_smoke"),
+            output_dir.join("nuis.build.manifest.toml"),
+            output_dir.join("nuis.executable.envelope.toml"),
+            output_dir.join("nuis.compiled.artifact"),
+        ] {
+            assert!(path.exists(), "expected build output `{}`", path.display());
+        }
+
+        let manifest_report =
+            nuisc::aot::verify_build_manifest(output_dir.join("nuis.build.manifest.toml").as_path())
+                .expect("manifest verifies");
+        assert_eq!(manifest_report.artifact_schema, "nuis-compiled-artifact-v1");
+        assert_eq!(manifest_report.artifact_binary_name, "build_command_smoke");
+    }
+
+    #[test]
+    fn release_check_runs_project_compile_chain_end_to_end() {
+        let project_root = write_temp_project_fixture(
+            "release_check_smoke",
+            r#"
+name = "release_check_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 9;
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("release_check_outputs");
+
+        handle_release_check(project_root, output_dir.clone(), None, None)
+            .expect("release-check passes");
+
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        assert!(manifest_path.exists(), "expected manifest output");
+        let manifest_report =
+            nuisc::aot::verify_build_manifest(manifest_path.as_path()).expect("manifest verifies");
+        assert_eq!(manifest_report.packaging_mode, "native-cpu-llvm");
+        assert_eq!(manifest_report.artifact_binary_name, "release_check_smoke");
+
+        let artifact_report = nuisc::aot::verify_nuis_compiled_artifact(
+            output_dir.join("nuis.compiled.artifact").as_path(),
+        )
+        .expect("artifact verifies");
+        assert!(artifact_report.lifecycle_contract_consistent);
+        assert!(artifact_report.artifact_roundtrip_verified);
+    }
+
+    #[test]
+    fn project_workflow_recommendation_prefers_lock_abi_for_auto_projects() {
+        let project_root = write_temp_project_fixture(
+            "workflow_auto_abi",
+            r#"
+name = "workflow_auto_abi"
+entry = "main.ns"
+modules = ["main.ns"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        );
+        let project = nuisc::project::load_project(&project_root).expect("load project");
+        let plan =
+            nuisc::project::build_project_compilation_plan(&project).expect("build project plan");
+        let doctor = empty_galaxy_doctor(&project.root);
+
+        let recommendation =
+            recommend_project_workflow_step(&plan, &[], &[], &doctor, false);
+
+        assert_eq!(recommendation.label, "project_lock_abi");
+        assert_eq!(
+            recommendation.command,
+            "nuis project-lock-abi <project-dir|nuis.toml>"
+        );
+    }
+
+    #[test]
+    fn project_workflow_recommendation_prefers_project_status_for_missing_tests() {
+        let project_root = write_temp_project_fixture(
+            "workflow_missing_tests",
+            r#"
+name = "workflow_missing_tests"
+entry = "main.ns"
+modules = ["main.ns"]
+tests = ["tests/smoke.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        );
+        let project = nuisc::project::load_project(&project_root).expect("load project");
+        let plan =
+            nuisc::project::build_project_compilation_plan(&project).expect("build project plan");
+        let doctor = empty_galaxy_doctor(&project.root);
+        let missing_tests = vec![project.root.join("tests/smoke.ns")];
+
+        let recommendation =
+            recommend_project_workflow_step(&plan, &missing_tests, &missing_tests, &doctor, false);
+
+        assert_eq!(recommendation.label, "project_status");
+        assert_eq!(
+            recommendation.command,
+            "nuis project-status <project-dir|nuis.toml>"
+        );
+    }
+
+    #[test]
+    fn project_workflow_recommendation_defaults_to_check_once_shape_is_stable() {
+        let project_root = write_temp_project_fixture(
+            "workflow_ready",
+            r#"
+name = "workflow_ready"
+entry = "main.ns"
+modules = ["main.ns"]
+tests = ["tests/smoke.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        );
+        let tests_dir = project_root.join("tests");
+        fs::create_dir_all(&tests_dir).expect("create tests dir");
+        fs::write(
+            tests_dir.join("smoke.ns"),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 2;
+  }
+}
+"#,
+        )
+        .expect("write smoke test");
+        let project = nuisc::project::load_project(&project_root).expect("load project");
+        let plan =
+            nuisc::project::build_project_compilation_plan(&project).expect("build project plan");
+        let doctor = empty_galaxy_doctor(&project.root);
+        let declared_tests = vec![project.root.join("tests/smoke.ns")];
+
+        let recommendation =
+            recommend_project_workflow_step(&plan, &declared_tests, &[], &doctor, false);
+
+        assert_eq!(recommendation.label, "check");
+        assert_eq!(recommendation.command, "nuis check <project-dir|nuis.toml>");
+    }
+
+    #[test]
+    fn project_workflow_json_fields_track_compile_and_galaxy_briefs() {
+        let frontdoor = build_workflow_frontdoor_surface(
+            project_compile_workflow_source_profile(),
+            WorkflowRecommendation {
+                label: "check",
+                command: "nuis check <project-dir|nuis.toml>",
+                reason: "compile truth should remain the default once the project shape is stable",
+            },
+        );
+
+        let without_galaxy = project_workflow_json_fields(&frontdoor, false);
+        assert!(without_galaxy.iter().any(|field| {
+            field == &format!(
+                "\"project_compile_workflow\":\"{}\"",
+                nuisc::project_compile_workflow_brief()
+            )
+        }));
+        assert!(without_galaxy.iter().any(|field| {
+            field == &format!(
+                "\"project_test_workflow\":\"{}\"",
+                nuisc::project_test_workflow_brief()
+            )
+        }));
+        assert!(!without_galaxy
+            .iter()
+            .any(|field| field.contains("\"project_galaxy_workflow\"")));
+
+        let with_galaxy = project_workflow_json_fields(&frontdoor, true);
+        assert!(with_galaxy.iter().any(|field| {
+            field == &format!(
+                "\"project_galaxy_workflow\":\"{}\"",
+                nuisc::project_galaxy_workflow_brief()
+            )
+        }));
+    }
+
+    #[test]
+    fn workflow_contract_json_fields_expose_shared_frontdoor_keys() {
+        let frontdoor = build_workflow_frontdoor_surface(
+            project_compile_workflow_source_profile(),
+            WorkflowRecommendation {
+                label: "check",
+                command: "nuis check <project-dir|nuis.toml>",
+                reason: "shared workflow contract should always carry the frontdoor routing fields",
+            },
+        );
+
+        let fields = workflow_contract_json_fields(&frontdoor, true, true, true, true);
+
+        for key in [
+            "\"frontdoor\":{",
+            "\"workflow_kind\":\"project_compile_workflow\"",
+            "\"workflow_brief\":\"",
+            "\"workflow_samples\":\"",
+            "\"recommended_next_step\":\"check\"",
+            "\"recommended_command\":\"nuis check <project-dir|nuis.toml>\"",
+            "\"recommended_reason\":\"shared workflow contract should always carry the frontdoor routing fields\"",
+            "\"project_compile_workflow\":\"",
+            "\"project_compile_samples\":\"",
+            "\"project_test_workflow\":\"",
+            "\"project_galaxy_workflow\":\"",
+            "\"debug_workflow\":\"",
+            "\"debug_samples\":\"",
+        ] {
+            assert!(
+                fields.iter().any(|field| field.contains(key)),
+                "missing shared workflow contract key {key}"
+            );
+        }
+    }
+
+    #[test]
+    fn galaxy_lock_json_fields_report_missing_lock_surface() {
+        let dir = temp_dir("galaxy_lock_fields_missing");
+        let lock_path = dir.join("nuis.galaxy.lock");
+
+        let fields = galaxy_lock_json_fields(Err("missing".to_owned()), &lock_path, &[]);
+
+        assert!(fields
+            .iter()
+            .any(|field| field == "\"galaxy_lock_status\":\"missing\""));
+        assert!(fields
+            .iter()
+            .any(|field| field.contains("\"galaxy_lock_path\":\"")));
+        assert!(!fields
+            .iter()
+            .any(|field| field.contains("\"galaxy_lock_error\"")));
+    }
+
+    #[test]
+    fn public_surface_summary_json_fields_count_public_members() {
+        let records = vec![PublicSurfaceModuleRecord {
+            module: "cpu::Main".to_owned(),
+            externs: vec!["ffi_print".to_owned()],
+            extern_interfaces: vec!["ClockBridge".to_owned()],
+            consts: vec!["DEFAULT_PORT".to_owned()],
+            type_aliases: vec!["ResultCode".to_owned()],
+            functions: vec!["run".to_owned(), "tick".to_owned()],
+            structs: vec!["State(fields=1)".to_owned()],
+            traits: vec!["Runnable".to_owned()],
+        }];
+
+        let fields = public_surface_summary_json_fields(&records);
+
+        assert!(fields
+            .iter()
+            .any(|field| field == "\"public_surface_modules\":1"));
+        assert!(fields.iter().any(|field| field == "\"public_externs\":1"));
+        assert!(fields
+            .iter()
+            .any(|field| field == "\"public_extern_interfaces\":1"));
+        assert!(fields.iter().any(|field| field == "\"public_consts\":1"));
+        assert!(fields
+            .iter()
+            .any(|field| field == "\"public_type_aliases\":1"));
+        assert!(fields.iter().any(|field| field == "\"public_functions\":2"));
+        assert!(fields.iter().any(|field| field == "\"public_structs\":1"));
+        assert!(fields.iter().any(|field| field == "\"public_traits\":1"));
+    }
+
+    #[test]
+    fn project_check_summary_json_fields_report_all_green() {
+        let project = nuisc::project::load_project(
+            &repo_root().join("examples/projects/domains/net_session_recipe_demo"),
+        )
+        .expect("load project");
+        let plan = nuisc::project::build_project_compilation_plan(&project).expect("build plan");
+        let abi_checks =
+            nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)
+                .expect("abi checks");
+        let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
+        let lowering_checks =
+            nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
+
+        let fields =
+            project_check_summary_json_fields(&abi_checks, &registry_checks, &lowering_checks);
+
+        assert!(fields.iter().any(|field| field == "\"abi_checks_ok\":true"));
+        assert!(fields
+            .iter()
+            .any(|field| field == "\"registry_checks_ok\":true"));
+        assert!(fields
+            .iter()
+            .any(|field| field == "\"lowering_checks_ok\":true"));
+        assert!(fields
+            .iter()
+            .any(|field| field.starts_with("\"abi_checks_count\":")));
+        assert!(fields
+            .iter()
+            .any(|field| field.starts_with("\"registry_checks_count\":")));
+        assert!(fields
+            .iter()
+            .any(|field| field.starts_with("\"lowering_checks_count\":")));
+    }
+
+    #[test]
+    fn project_status_json_reports_frontdoor_and_surface_fields() {
+        let project_root = write_temp_project_fixture(
+            "status_json_smoke",
+            r#"
+name = "status_json_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+tests = ["tests/smoke.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  pub fn exported() -> i64 {
+    return 3;
+  }
+
+  fn main() -> i64 {
+    return exported();
+  }
+}
+"#,
+        );
+        let tests_dir = project_root.join("tests");
+        fs::create_dir_all(&tests_dir).expect("create tests dir");
+        fs::write(
+            tests_dir.join("smoke.ns"),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write smoke test");
+
+        let json = render_project_status_json(&project_root).expect("render status json");
+
+        assert!(json.contains("\"source_kind\":\"project\""));
+        assert!(json.contains("\"project\":\"status_json_smoke\""));
+        assert!(json.contains("\"workflow_kind\":\"project_compile_workflow\""));
+        assert!(json.contains(&format!(
+            "\"project_compile_workflow\":\"{}\"",
+            nuisc::project_compile_workflow_brief()
+        )));
+        assert!(json.contains("\"recommended_next_step\":\"check\""));
+        assert!(json.contains("\"tests_declared\":1"));
+        assert!(json.contains("\"public_surface_modules\":1"));
+        assert!(json.contains("\"public_functions\":1"));
+        assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
+        assert!(json.contains("\"tests\":[{"));
+        assert!(json.contains("\"exists\":true"));
+        assert!(json.contains("\"domains\":["));
+    }
+
+    #[test]
+    fn project_doctor_json_reports_missing_test_and_health_checks() {
+        let project_root = write_temp_project_fixture(
+            "doctor_json_smoke",
+            r#"
+name = "doctor_json_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+tests = ["tests/missing.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 4;
+  }
+}
+"#,
+        );
+
+        let json = render_project_doctor_json(&project_root).expect("render doctor json");
+
+        assert!(json.contains("\"source_kind\":\"project\""));
+        assert!(json.contains("\"project\":\"doctor_json_smoke\""));
+        assert!(json.contains("\"workflow_kind\":\"project_compile_workflow\""));
+        assert!(json.contains("\"tests_declared\":1"));
+        assert!(json.contains("\"tests_missing\":1"));
+        assert!(json.contains("\"abi_checks_ok\":true"));
+        assert!(json.contains("\"registry_checks_ok\":true"));
+        assert!(json.contains("\"lowering_checks_ok\":true"));
+        assert!(json.contains("\"galaxy_check_status\":\"skipped\""));
+        assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
+        assert!(json.contains("\"next_steps\":["));
+        assert!(json.contains("some declared project tests are missing on disk"));
+        assert!(json.contains("\"tests\":[{"));
+        assert!(json.contains("\"exists\":false"));
+        assert!(json.contains("\"domains\":["));
+    }
+
+    #[test]
+    fn scheduler_view_json_reports_project_domains_and_frontdoor() {
+        let project_root = write_temp_project_fixture(
+            "scheduler_project_smoke",
+            r#"
+name = "scheduler_project_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 5;
+  }
+}
+"#,
+        );
+
+        let json = render_scheduler_view_json(&project_root).expect("render scheduler project json");
+
+        assert!(json.contains("\"source_kind\":\"project\""));
+        assert!(json.contains("\"project\":\"scheduler_project_smoke\""));
+        assert!(json.contains("\"workflow_kind\":\"project_compile_workflow\""));
+        assert!(json.contains("\"abi_mode\":\"explicit\""));
+        assert!(json.contains("\"project_plan\":\""));
+        assert!(json.contains("\"project_plan_output_count\":"));
+        assert!(json.contains("\"domains\":["));
+        assert!(json.contains("\"abi_selection\":{"));
+        assert!(json.contains("\"domain\":\"cpu\""));
+        assert!(json.contains("\"abi\":\"cpu.arm64.apple_aapcs64\""));
+    }
+
+    #[test]
+    fn scheduler_view_json_reports_single_file_domain_surface() {
+        let input = repo_root().join("stdlib/core/basic_scalars.ns");
+        let json = with_repo_root_cwd(|| {
+            render_scheduler_view_json(&input).expect("render scheduler single-file json")
+        });
+
+        assert!(json.contains("\"source_kind\":\"single-file\""));
+        assert!(json.contains("\"ast_domain\":\"cpu\""));
+        assert!(json.contains("\"ast_unit\":\"Main\""));
+        assert!(json.contains("\"workflow_kind\":\"compile_workflow\""));
+        assert!(json.contains("\"recommended_next_step\":\"check\""));
+        assert!(json.contains("\"domains\":["));
+        assert!(json.contains("\"registration\":{"));
+        assert!(json.contains("\"abi_selection\":null"));
     }
 
     #[test]

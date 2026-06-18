@@ -5,6 +5,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+// Test-builder guidance:
+// - Use `project_with_modules(...)` for small AST/contract unit tests that only need parsed modules.
+// - Use `loaded_project_fixture(...)` when a test needs a full in-memory `LoadedProject` with ABI/link metadata.
+// - Use `write_temp_project_fixture(...)` when a test must go through filesystem-backed compile/pipeline entrypoints.
+
 pub(super) fn write_temp_project_fixture(
     name: &str,
     manifest: &str,
