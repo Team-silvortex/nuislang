@@ -7,26 +7,35 @@ Use this folder when you want the small single-file mirror story.
 Use [README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md)
 when you want the canonical multi-file project route.
 
-## Start Here
+Current role rule:
+
+* this subtree is mirror-only by default
+* it is useful for reading compact source-shaped domain stories
+* it should not be read as the canonical validation route for `shader`,
+  `kernel`, or future network lanes when the project-form route already exists
+
+## Current Frontdoor Mirrors
+
+If you only want the shortest current single-file mirror route, use:
 
 * showcase mirror:
   [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
-* shader spine:
-  [shader_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_profile_demo.ns) ->
-  surface branch ->
-  packet branch ->
-  bridge branch
-* kernel spine:
-  [kernel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_profile_demo.ns) ->
-  async base ->
-  async tensor ->
-  tensor lane
+* shader mirror anchor:
+  [shader_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_profile_demo.ns)
+* kernel mirror anchor:
+  [kernel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_profile_demo.ns)
 * network note:
   the older single-file `net_*` / `network_*` mirrors have been retired from
   this folder; use
   [README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md)
   and the `examples/projects/domains/*` project routes for the current network
   path
+
+Practical rule:
+
+* stop at these anchors if you only need the compact mirror story
+* continue into the longer shader/kernel branches only when you are already
+  working inside that domain lane
 
 ## Shader Mirrors
 

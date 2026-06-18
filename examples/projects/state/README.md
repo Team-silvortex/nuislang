@@ -11,6 +11,15 @@ This folder is the project-form companion area for:
 
 Use this README as a router, not as a full inventory.
 
+Alpha closeout rule:
+
+* this subtree is still `active` in the
+  [examples freshness audit](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+  and should be read as a guided ladder, not as a flat shelf
+* during `alpha-0.0.1` closeout, the goal here is to keep one short control
+  flow route, one short recursion route, and one short generic/control-flow
+  route obvious before the remaining micro-demos are reconsidered
+
 ## Start Here
 
 If you want the shortest current route, read:
@@ -18,25 +27,74 @@ If you want the shortest current route, read:
 * [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
 * [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 
-Then use the focused clusters below.
+Then use the frontdoor ladders below.
 
-## Focused Clusters
+## Current Frontdoor Ladders
 
-Generic method-bound route:
+If you only want the shortest current state/control-flow route, use these three
+ladders first.
+
+Sync control-flow ladder:
+
+* [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo)
+* [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo)
+* [flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo)
+* [post_flow_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo)
+* [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+
+This is the shortest current user-facing route for:
+
+* ordinary `while` lowering
+* `match`-driven branch shaping inside loops
+* `continue` flow shaping
+* post-flow shared-suffix lowering
+* post-flow branching with both `break` and `continue`
+
+Recursion and higher-order ladder:
+
+* [tail_recursive_sum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_sum_demo)
+* [ordinary_recursive_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_call_graph_demo)
+* [ordinary_recursive_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_higher_order_call_graph_demo)
+* [generic_callable_forwarding_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo)
+
+This is the shortest current route for:
+
+* plain tail recursion
+* ordinary recursive call-graph lowering
+* recursion that survives higher-order helper lanes
+* generic callable forwarding through lifted helper surfaces
+
+Generic/control-flow ladder:
 
 * [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo)
-* [generic_shared_suffix_if_method_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_shared_suffix_if_method_demo)
 * [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo)
 * [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
-* [generic_method_bound_payload_alias_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_payload_alias_demo)
+* [generic_shared_suffix_if_method_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_shared_suffix_if_method_demo)
 
 This is the shortest user-facing path for:
 
-* alias-wrapped generic receivers
 * `T: Addable` method calls
 * binding visibility through `if`
 * binding visibility through nested `match`
 * guard-preserving nested `match`
+* shared-suffix shaping around generic method-bound branches
+
+## Companion Clusters
+
+Everything below is still current-useful, but it should mostly be read after
+the frontdoor ladders above.
+
+Generic method-bound companions:
+
+* [generic_method_bound_payload_alias_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_payload_alias_demo)
+* [generic_lambda_method_bound_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_lambda_method_bound_hof_demo)
+* [generic_lambda_method_bound_fn3_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_lambda_method_bound_fn3_hof_demo)
+
+These are best treated as companion coverage for:
+
+* alias-wrapped generic receivers
+* generic lambda-lifted method-bound helper routes
+* `Fn3`-shaped higher-order specialization
 
 Pattern / destructuring route:
 
@@ -54,7 +112,7 @@ Pattern / destructuring route:
 * [match_struct_binding_shorthand_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_struct_binding_shorthand_guard_state_demo)
 * [match_unit_struct_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_unit_struct_guard_state_demo)
 
-Recursion / higher-order route:
+Recursion / higher-order long-tail:
 
 * [ordinary_mutual_recursive_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_mutual_recursive_demo)
 * [ordinary_recursive_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_call_graph_demo)
@@ -72,7 +130,6 @@ Recursion / higher-order route:
 * [ordinary_recursive_mixed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_mixed_call_graph_demo)
 * [ordinary_recursive_generic_composed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_composed_call_graph_demo)
 * [ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo)
-* [tail_recursive_sum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_sum_demo)
 * [tail_recursive_factorial_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_demo)
 * [tail_recursive_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_cross_carry_demo)
 * [tail_recursive_branching_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_demo)
@@ -80,12 +137,9 @@ Recursion / higher-order route:
 * [tail_recursive_carry_condition_multi_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_carry_condition_multi_carry_demo)
 * [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
 * [tail_recursive_branching_multi_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_multi_carry_demo)
-* [generic_callable_forwarding_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo)
 * [lambda_alias_fn3_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_alias_fn3_demo)
 * [generic_payload_alias_higher_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_higher_order_demo)
 * [generic_payload_alias_method_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo)
-* [generic_lambda_method_bound_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_lambda_method_bound_hof_demo)
-* [generic_lambda_method_bound_fn3_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_lambda_method_bound_fn3_hof_demo)
 
 This route now also carries:
 
@@ -107,30 +161,25 @@ This route now also carries:
 * project-backed multi-carry and cross-carry tail recursion truth
 * project-backed branching multi-carry tail recursion truth
 
-Loop / lowering route:
+Loop / lowering long-tail:
 
 * [counted_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_demo)
 * [accumulating_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/accumulating_while_demo)
-* [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo)
 * [bounded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/bounded_while_demo)
 * [equality_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/equality_while_demo)
 * [inequality_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/inequality_while_demo)
 * [guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/guarded_while_demo)
 * [match_guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guarded_while_demo)
 * [branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/branching_while_demo)
-* [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo)
 * [match_expr_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_expr_branching_while_demo)
 * [bool_match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/bool_match_branching_while_demo)
 * [lambda_match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_branching_while_demo)
 * [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
 * [equality_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/equality_branching_while_demo)
-* [flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo)
 * [lambda_match_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_flow_continuing_while_demo)
 * [lambda_match_or_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_or_flow_continuing_while_demo)
 * [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
 * [post_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_continuing_while_demo)
-* [post_flow_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo)
-* [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
 * [carried_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/carried_breaking_while_demo)
 * [double_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/double_branching_while_demo)
 * [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
@@ -187,6 +236,7 @@ Runtime location/config route:
 
 If you are exploring broadly:
 
-* use the clusters above first
+* use the frontdoor ladders first
+* use the companion clusters after you know which lane you care about
 * use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md) for repo-level shortest paths
 * browse the folder directly for wider sibling probes once you already know the cluster you care about

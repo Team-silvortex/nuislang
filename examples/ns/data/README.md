@@ -6,7 +6,16 @@ This folder contains front-end examples focused on `data` interaction and unit u
 * `hello_data_window.ns`
 * `hello_instantiate.ns`
 
-Recommended reading order:
+Current role rule:
+
+* this subtree is a narrow source-side `data` anchor set
+* it is useful for compact frontend reading
+* it should not compete with the richer project-form `data` routes already
+  carried by the current showcase projects
+
+## Current Frontdoor Ladder
+
+Use this order first:
 
 * `hello_data.ns`
   smallest data-oriented frontend route
@@ -14,6 +23,12 @@ Recommended reading order:
   immutable `Window<T>` plus local mutable `WindowMut<T>` framing
 * `hello_instantiate.ns`
   CPU-side unit instantiation and cross-domain use
+
+Practical rule:
+
+* stop here if you only need the compact single-file `data` story
+* jump to project-form routes once the question becomes domain composition,
+  richer UI flow, or kernel/data interplay
 
 Useful commands:
 
@@ -26,6 +41,13 @@ Project-scale `data_profile_*` flows currently live in:
 
 * `/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo/main.ns`
 * `/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo/main.ns`
+
+Reading rule:
+
+* use this README for the shortest single-file `data` route
+* use [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+  for the canonical multi-file project route
+* treat project-scale `data` paths as the stronger current validation story
 
 Current note:
 

@@ -7,6 +7,12 @@ Most entries here are small surface probes, not showcase programs.
 Older low-level shell, line-input, automation, and report probes have been
 retired from the checked-in examples tree.
 
+Current role rule:
+
+* this subtree is mostly companion-only by design
+* only the shortest CLI/command/workflow trio should be treated as frontdoor
+* most other routes are narrow surface probes for one runtime/tooling contract
+
 ## Start Here
 
 If you only want the shortest tooling route, start with:
@@ -55,5 +61,7 @@ If you only want the shortest tooling route, start with:
 * use one representative route per surface
 * do not read this folder top-to-bottom unless you are auditing runtime
   coverage
+* treat most entries outside the CLI/command/workflow trio as companion-only
+  probes, not as equal-entry onboarding material
 * for repo-level routing, prefer
   [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)

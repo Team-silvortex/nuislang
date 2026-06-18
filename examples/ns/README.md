@@ -11,6 +11,9 @@ Canonical short map:
 
 * [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
   Use that file first when you want the shortest current route.
+* [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+  Use that file when the question is whether a source route is current
+  frontdoor, companion-only, or still an active closeout lane.
 
 Current source-style rule:
 
@@ -18,6 +21,16 @@ Current source-style rule:
   and `buffer[index]`
 * if you need the lowering/builtin explanation behind that surface, use
   [docs/reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
+
+Alpha closeout rule:
+
+* this tree is still `active` in the
+  [examples freshness audit](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+* its best role before `alpha-0.0.1` is narrow semantic anchoring, not
+  competing with multi-file project onboarding
+* the current goal is to keep one short basic-language ladder, one short
+  ownership/task ladder, and one short host-facade ladder obvious before the
+  longer single-file tail is reclassified further
 
 Subdirectories:
 
@@ -28,31 +41,57 @@ Subdirectories:
 * [memory](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/README.md)
 * [demos](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/README.md)
 
-## First Anchors
+## Current Frontdoor Ladders
 
-Start here:
+If you only want the shortest current `.ns` route, start with these ladders.
+
+Basic language ladder:
 
 * [hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_world.ns)
-  smallest front-end baseline
+* [hello_if.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_if.ns)
 * [hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns)
-  smallest ownership-sensitive aggregate example
-* [hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
-  smallest `data` link surface
+
+This is the shortest source-facing route for:
+
+* smallest `mod cpu Main` entry
+* ordinary conditional shape
+* smallest ownership-sensitive aggregate example
+
+Ownership and task ladder:
+
+* [hello_borrow_end.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns)
 * [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
-  narrow task-value source anchor
+* [hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns)
+
+This is the shortest source-facing route for:
+
+* explicit local borrow closure
+* narrow task completed-value observation
+* single-file `await` / `?` / control-flow composition
+
+Host facade ladder:
+
+* [hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_ffi.ns)
 * [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
-  narrow host/runtime source anchor
+* [hello_path_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns)
+
+This is the shortest source-facing route for:
+
+* plain host symbol facade reading
+* input/runtime facade mirroring
+* path/runtime facade mirroring
+
+## Companion Detail
 
 ## Short Source Map
 
 * basic language
-  - [hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_world.ns)
-  - [hello_if.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_if.ns)
+  - [hello_expr.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_expr.ns)
+  - [hello_let_expr.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_let_expr.ns)
+  - [hello_call.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_call.ns)
+  - [hello_method.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_method.ns)
 * types and ownership
-  - [hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns)
-  - [hello_borrow_end.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns)
   - [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
-  - [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
   - [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
   - [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
 * data path
@@ -70,10 +109,13 @@ Start here:
   - [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
   - [shader_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_profile_demo.ns)
   - [kernel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_profile_demo.ns)
+  - read these as compact mirrors, not as the canonical project-validation
+    route for domain-heavy lanes
 
 ## Reading Rule
 
-* use this README for the shortest `.ns`-side anchor set
+* use the frontdoor ladders first
+* use the companion detail map after you know which source lane you care about
 * use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
   for the shortest repo-level route
 * use local subdirectory READMEs for area detail

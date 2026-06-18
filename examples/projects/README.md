@@ -15,6 +15,9 @@ The important reading rule now is:
   [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 * if you want the current cleanup/status board for project routes, use
   [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+* if you want the repo-level alpha closeout status that explains why some
+  examples are frontdoor while others are only companions, use
+  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
 
 Current source-style rule:
 
@@ -88,6 +91,9 @@ reading an entire subtree.
   [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo),
   [tail_recursive_sum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_sum_demo),
   [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo)
+  Practical rule:
+  start with one sync control-flow ladder, then one recursion anchor, then one
+  generic/control-flow ladder, instead of browsing the whole subtree
 * async tasks / task-result control:
   [task](/Users/Shared/chroot/dev/nuislang/examples/projects/task)
   Start with:
@@ -169,6 +175,8 @@ Practical consequence:
 * keep old-but-still-useful companions when they still carry regression value
 * keep probe routes when they still support runtime validation or design docs
 * stop treating long directory inventories as the first reading route
+* during the `alpha-0.0.1` closeout pass, prefer demotion and rerouting before
+  deletion
 
 ## Artifact Bundles
 

@@ -25,6 +25,12 @@ That model is increasingly enforced through `YIR` contracts, project validation,
 
 Current versioning entrypoints:
 
+* current mainline router:
+  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* current alpha closeout board:
+  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+* current alpha closeout checklist:
+  [docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
 * current snapshot:
   [docs/versioning/nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
 * current workflow:
@@ -124,6 +130,17 @@ Timed tests already support `timeout_ms`, `clock_domain`, and
 metadata at run time. For the current contract and bridge semantics, read
 [docs/reference/cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md).
 
+Current workflow reading rule:
+
+* use `nuis workflow` when you want the CLI to restate the shortest route for
+  a specific input
+* use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  when you want the repo-wide current route
+* use
+  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+  when the question is whether a lane is already current, still active, or only
+  an intentional alpha boundary
+
 Useful inspection commands:
 
 ```bash
@@ -202,8 +219,11 @@ If you want the shortest path by goal:
 
 * consolidated current mainline map
   - [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* current alpha closeout execution board
+  - [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
 * current user-facing project path
   - [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+  - [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
   - [docs/reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
 * current source-level language and host examples
   - [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)

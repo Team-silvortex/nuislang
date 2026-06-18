@@ -12,25 +12,39 @@ Canonical short map:
 
 * [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
   Use that file first when you want the shortest current route.
+* [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+  Use that file when the question is whether a facade example is still a
+  frontdoor anchor or only companion detail.
 
-## First Anchors
+Current role rule:
 
-Start here:
+* this subtree is a narrow source-side facade mirror layer
+* it should not compete with project-form tooling/filesystem/task onboarding
+* before `alpha-0.0.1`, the goal is to keep one short host bridge ladder, one
+  short task/runtime ladder, and one short path/runtime ladder obvious
+
+## Current Frontdoor Ladders
+
+If you only want the shortest current FFI-side route, start with these ladders.
+
+Host bridge ladder:
 
 * [hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_ffi.ns)
-  current `extern "nurs"` host bridge
 * [hello_c_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_ffi.ns)
-  lower-level `extern "c"` baseline
-* [hello_cli_host_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cli_host_facades.ns)
-  wider CLI/reporting host facade bundle
-* [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
-  task-facing host facade anchor
-* [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
-  host input/runtime anchor
-* [hello_path_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns)
-  path/filesystem naming anchor
 
-## Short Facade Map
+Task/runtime ladder:
+
+* [hello_task_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_runtime_facades.ns)
+* [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
+* [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
+
+Path/runtime ladder:
+
+* [hello_path_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns)
+* [hello_file_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_file_runtime_facades.ns)
+* [hello_directory_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_runtime_facades.ns)
+
+## Companion Detail Map
 
 Use these as the shortest current `recipe -> facade` mirrors.
 
@@ -94,7 +108,8 @@ Use these as the shortest current `recipe -> facade` mirrors.
 
 ## Reading Rule
 
-* use this README for the shortest FFI-side anchor set
+* use the frontdoor ladders first
+* use the companion detail map after you know which facade lane you care about
 * use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
   for the shortest repo-level route
 * use [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)

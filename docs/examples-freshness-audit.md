@@ -13,6 +13,7 @@ to list everything that exists, but to decide:
 Companion current-state matrix:
 
 * [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
+* [versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
 
 Current policy:
 
@@ -20,6 +21,14 @@ Current policy:
 * do demote examples that no longer deserve homepage or subtree-README space
 * do not archive or delete examples that still carry active doc, workflow, or
   regression value until those references are intentionally moved
+
+Alpha closeout rule:
+
+* this file is the example-tree execution companion for the repo-level alpha
+  closeout board
+* use it to decide which example routes stay frontdoor, which only stay as
+  companions, and which should be demoted before alpha wording gets harder
+  elsewhere
 
 ## Buckets
 
@@ -84,8 +93,9 @@ Completed in this pass:
 
 Next likely work:
 
-* review whether some of the many `path_*` micro-probes deserve a grouped
-  subrouter or a future legacy bucket once the path layer stabilizes further
+* keep the new frontdoor-versus-micro-probe split stable before deciding
+  whether the dense `path_*` family deserves a grouped subrouter or a future
+  legacy/probe bucket
 
 ### Domains
 
@@ -107,8 +117,9 @@ Completed in this pass:
 
 Next likely work:
 
-* decide whether network runtime validation probes should eventually move under
-  a dedicated validation subtree once their doc usage becomes easier to isolate
+* keep the new `frontdoor -> companion -> validation-only -> exploration-only`
+  split stable across docs before deciding whether runtime probes should move
+  under a dedicated validation subtree
 
 ### Task
 
@@ -131,7 +142,58 @@ Next likely work:
   behind a narrower probe/archive router once the GLM and hot-sync reference
   docs are easier to retarget
 
+### State
+
+Status:
+
+* `active`
+
+Current assessment:
+
+* the control-flow route is strong and still belongs in current docs
+* the subtree is dense enough that several narrow branch/inference micro-demos
+  should probably stay companion-only instead of reading like equal-entry
+  routes
+* generics/control-flow crossover examples are current, but they should keep
+  reading as a guided ladder instead of a flat inventory
+
+Next likely work:
+
+* narrow the README-first state route more aggressively around one sync ladder,
+  one recursion anchor, and one generic/control-flow ladder
+* identify any micro-demos that no longer carry distinct regression or doc
+  value
+* keep the long-tail state demos as companion coverage unless they become the
+  strongest evidence for a current contract claim
+
+### Source `.ns`
+
+Status:
+
+* `active`
+
+Current assessment:
+
+* the `.ns` tree still works well as a source-surface anchor set
+* its best current role is narrow semantic anchoring, not competing with
+  project-route onboarding
+* the core/type/memory/ffi frontdoor is already recognizable, but the audit
+  should eventually classify more of the long tail as companion-only
+
+Next likely work:
+
+* continue narrowing the source `.ns` first-stop route around one
+  basic-language ladder, one ownership/task ladder, and one host-facade ladder
+* demote any single-file demo that now exists mainly to mirror a stronger
+  project-route example
+
 ## First-Pass Result
+
+Operational note:
+
+* this is not yet a full archive plan for every subtree
+* for alpha closeout, the important thing is that frontdoor routes are narrow
+  and consistent before the remaining long tail is fully reclassified
 
 ### Keep Frontdoor
 
@@ -291,25 +353,70 @@ Current control-flow reading rule:
 These are the strongest candidates for future demotion, archive moves, or
 wording cleanup, but they should not be deleted blindly yet.
 
-* [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo)
-  still referenced by task/GLM and hot-sync design docs; more of a future probe
-  than a current front-door example
-* [network_host_handle_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_probe_demo)
-  runtime-host validation probe, not a broad reading route
-* [network_loopback_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_loopback_runtime_demo)
-  still used in runtime-host validation docs; likely stays companion/probe
-* [net_tcp_send_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_send_runtime_probe_demo)
-  explicit runtime-host validation probe; should stay out of front-door routing
-* [net_tcp_socket_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_runtime_probe_demo)
-  same role as `net_tcp_send_runtime_probe_demo`, but for the combined socket path
-* [net_http_status_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_status_runtime_probe_demo)
-  targeted HTTP status validation probe, useful for host verification rather
-  than general onboarding
-* [net_http_client_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_runtime_probe_demo)
-  broader HTTP client validation probe; keep as runtime-host material, not a
-  current front-door example
-* [net_protocol_experiment_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_experiment_recipe_demo)
-  the name itself already marks it as a non-frontdoor exploratory example
+Next-batch candidate board:
+
+* `task probe candidate`
+  path:
+  [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo)
+  current role:
+  probe-only
+  suggested next action:
+  keep in tree, but eventually move behind a narrower task probe/archive route
+  once GLM and hot-sync docs stop depending on the current path
+  blocker:
+  still referenced by forward-looking task/GLM material
+* `network validation probe cluster`
+  paths:
+  [network_host_handle_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_probe_demo),
+  [network_loopback_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_loopback_runtime_demo),
+  [net_tcp_send_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_send_runtime_probe_demo),
+  [net_tcp_socket_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_runtime_probe_demo),
+  [net_http_status_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_status_runtime_probe_demo),
+  [net_http_client_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_runtime_probe_demo)
+  current role:
+  validation-only
+  suggested next action:
+  keep as a visible cluster for now, then consider moving under a dedicated
+  `validation/` or `probes/` route once doc references are easier to isolate
+  blocker:
+  still used by runtime-host verification and network validation discussion
+* `network experiment candidate`
+  path:
+  [net_protocol_experiment_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_experiment_recipe_demo)
+  current role:
+  exploration-only
+  suggested next action:
+  keep named as experiment, and eventually move beside other explicitly
+  exploratory material instead of the ordinary domain ladders
+  blocker:
+  still useful as a living design-space marker while protocol layering remains
+  active
+* `filesystem path micro-probe family`
+  paths:
+  `examples/projects/filesystem/path_*_demo`
+  current role:
+  companion-only micro-probes
+  suggested next action:
+  keep the frontdoor trio where it is, but consider grouping the remaining
+  `path_*` family under a narrower subrouter or future probe/archive route
+  blocker:
+  the family is dense, but not yet cleanly separable by doc usage
+* `single-file mirror-heavy ns demos`
+  paths:
+  [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns),
+  [shader_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_profile_demo.ns),
+  [kernel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_profile_demo.ns)
+  current role:
+  mirror-only
+  suggested next action:
+  keep as compact source mirrors, but avoid promoting their deeper siblings as
+  equal-entry routes; later consider a stronger `mirror-only` local grouping if
+  the subtree keeps growing
+  blocker:
+  still useful as compact source-shaped mirrors of the main project routes
+
+The candidate board above is now the authoritative detailed list for this
+bucket.
 
 ### Archived
 
@@ -352,15 +459,17 @@ The next cleanup pass should focus on one subtree at a time.
 Recommended order:
 
 1. `examples/projects/domains/`
-   decide whether network runtime validation probes should eventually move
-   under a dedicated validation subtree once their reference-doc usage is more
-   isolated
+   execute the network validation/exploration split from the candidate board
+   once their reference-doc usage is more isolated
 2. `examples/projects/filesystem/`
-   review whether the dense `path_*` micro-probe family should keep living as a
-   flat set of companions or eventually gain a narrower grouped subrouter
+   decide whether the dense `path_*` micro-probe family should keep living as a
+   flat set of companions or gain a narrower grouped subrouter
 3. `examples/projects/task/`
-   revisit only when GLM/hot-sync documentation is ready for a narrower
-   dedicated probe/archive route for `task_join_nonconsuming_probe_demo`
+   revisit when GLM/hot-sync documentation is ready for a narrower dedicated
+   probe/archive route for `task_join_nonconsuming_probe_demo`
 4. `examples/projects/tooling/`
    revisit only if more probe-style or historical routes accumulate and the
    current `legacy/tooling` split stops being sufficient
+5. `examples/ns/demos/`
+   revisit if the mirror-only subtree grows further and needs a stronger local
+   mirror/archive split

@@ -6,6 +6,14 @@ This folder contains narrow project-form companions for the current task-facing
 These are not all equal-entry examples. Many are intentionally narrow compile
 or regression anchors.
 
+Current role rule:
+
+* this subtree is companion-first, not showcase-first
+* only a short frontdoor slice should be treated as current onboarding
+* most branch/payload/session variants below are best read as
+  companion-only coverage unless they are the strongest current proof for a
+  specific task contract
+
 ## Start Here
 
 If you only want the current task mainline, start with:
@@ -83,7 +91,7 @@ If you only want the current task mainline, start with:
   explicit project smoke test is checked in and now runs through the staged
   AOT thread/lock lowering path, including generic helper-style
   `mutex_snapshot<T>` / `join_thread_*<T>` wrappers
-* future/probe route:
+* probe-only route:
   [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo)
 
 ## Reading Rule
@@ -92,6 +100,8 @@ Use this folder like a companion matrix, not like a linear tutorial.
 
 * pick one representative example for the feature you care about
 * do not start by reading every neighboring branch demo
+* treat most `*_branch_*`, `*_batch_*`, and `*_session_*` variants as
+  companion-only unless you are actively working on that contract family
 * treat `task_join_nonconsuming_probe_demo` as forward-looking probe material,
   not as current front-door reading
 * if you want the repo-level shortest route, prefer
