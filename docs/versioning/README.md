@@ -7,6 +7,7 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-alpha-0.0.1-preflight-report.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-preflight-report.md)
 * [nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
 * [nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
 * [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
@@ -43,6 +44,8 @@ Use that set when the question is:
   instead of being treated as one flat bucket
 * which specific `0.20.*` compile-chain gaps are still being actively closed
 * how `0.20.*` is supposed to hand off into `alpha-0.0.1`
+* whether the next commit should still be closeout-only or is trying to reopen
+  the surface
 * which alpha closeout lanes are still active versus already documented
   boundaries
 * which project/frontend/workflow matrices should still be treated as live
