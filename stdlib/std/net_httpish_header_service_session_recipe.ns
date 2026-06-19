@@ -68,6 +68,7 @@ mod cpu Main {
     body_code: i64,
     retry_code: i64,
     staged_total: i64,
+    packet_value: i64,
     close_value: i64,
     session_value: i64,
     tick_ns: i64
@@ -315,7 +316,7 @@ mod cpu Main {
     response_bytes: i64,
     listener_handle: i64,
     accepted_handle: i64,
-    packet: NetHttpishHeaderServicePacket,
+    packet_value: i64,
     close_value: i64
   ) -> i64 {
     return argv_count
@@ -330,7 +331,7 @@ mod cpu Main {
       + response_bytes
       + listener_handle
       + accepted_handle
-      + compute_packet_value(packet)
+      + packet_value
       + close_value;
   }
 
@@ -387,6 +388,7 @@ mod cpu Main {
       select_body_code(recv_result, send_result, retry_budget),
       select_retry_code(accept_plan, recv_result, send_result)
     );
+    let packet_value: i64 = compute_packet_value(packet);
     let close_value: i64 = close_transport(accepted_handle);
 
     return NetHttpishHeaderServiceSummary {
@@ -411,6 +413,7 @@ mod cpu Main {
       body_code: packet.body_code,
       retry_code: packet.retry_code,
       staged_total: packet.staged_total,
+      packet_value: packet_value,
       close_value: close_value,
       session_value: compute_session_value(
         argv_count,
@@ -425,7 +428,7 @@ mod cpu Main {
         response_bytes,
         listener_handle,
         accepted_handle,
-        packet,
+        packet_value,
         close_value
       ),
       tick_ns: tick_ns
@@ -456,6 +459,7 @@ mod cpu Main {
       + summary.body_code
       + summary.retry_code
       + summary.staged_total
+      + summary.packet_value
       + summary.close_value
       + summary.session_value
       + summary.tick_ns;

@@ -64,6 +64,7 @@ mod cpu Main {
     body_code: i64,
     retry_code: i64,
     staged_total: i64,
+    packet_value: i64,
     session_value: i64,
     tick_ns: i64
   }
@@ -167,57 +168,36 @@ mod cpu Main {
     return protocol_header_bytes + recv_window + headers.trace_code;
   }
 
-  fn select_request_header_code(
+  fn compute_request_header_code(
     headers: NetHttpishRequestHeaders,
-    send_result: NetworkResult<i64>,
-    status_result: NetworkResult<i64>
+    send_ready: i64,
+    status_ready: i64
   ) -> i64 {
-    if network_send_ready(send_result) {
-      return headers.auth_code;
-    }
-    if network_recv_ready(status_result) {
-      return headers.trace_code;
-    }
-    return headers.auth_code + headers.trace_code;
+    return headers.auth_code + headers.trace_code + send_ready + status_ready;
   }
 
-  fn select_response_header_code(
+  fn compute_response_header_code(
     plan: NetHttpishRequestPlan,
     recv_window: i64,
-    status_result: NetworkResult<i64>
+    status_ready: i64
   ) -> i64 {
-    if network_recv_ready(status_result) {
-      return plan.path_code + recv_window;
-    }
-    return plan.method_code + recv_window;
+    return plan.path_code + recv_window + status_ready;
   }
 
-  fn select_body_code(
-    recv_result: NetworkResult<i64>,
-    send_result: NetworkResult<i64>,
+  fn compute_body_code(
+    recv_value: i64,
+    send_value: i64,
     retry_budget: i64
   ) -> i64 {
-    if network_recv_ready(recv_result) {
-      return encode_value(recv_result);
-    }
-    if network_send_ready(send_result) {
-      return encode_value(send_result) + retry_budget;
-    }
-    return retry_budget;
+    return recv_value + send_value + retry_budget;
   }
 
-  fn select_retry_code(
-    plan: NetHttpishRequestPlan,
-    send_result: NetworkResult<i64>,
-    recv_result: NetworkResult<i64>
+  fn compute_retry_code(
+    retry_budget: i64,
+    send_ready: i64,
+    body_ready: i64
   ) -> i64 {
-    if network_recv_ready(recv_result) {
-      return 0;
-    }
-    if network_send_ready(send_result) {
-      return plan.retry_budget;
-    }
-    return plan.retry_budget + 1;
+    return retry_budget + send_ready + body_ready;
   }
 
   fn stage_header_session_packet(
@@ -278,7 +258,7 @@ mod cpu Main {
     request_bytes: i64,
     response_bytes: i64,
     open_handle: i64,
-    packet: NetHttpishHeaderSessionPacket,
+    packet_value: i64,
     close_value: i64
   ) -> i64 {
     return argv_count
@@ -289,7 +269,7 @@ mod cpu Main {
       + request_bytes
       + response_bytes
       + open_handle
-      + compute_packet_value(packet)
+      + packet_value
       + close_value;
   }
 
@@ -332,13 +312,19 @@ mod cpu Main {
       recv_session_status(open_handle, stream_window, recv_window);
     let recv_result: NetworkResult<i64> =
       recv_session_body(open_handle, stream_window, recv_window);
+    let send_ready: i64 = encode_send_ready(send_result);
+    let status_ready: i64 = encode_recv_ready(status_result);
+    let body_ready: i64 = encode_recv_ready(recv_result);
+    let send_value: i64 = encode_value(send_result);
     let status_code: i64 = encode_value(status_result);
+    let recv_value: i64 = encode_value(recv_result);
     let request_header_code: i64 =
-      select_request_header_code(request_headers, send_result, status_result);
+      compute_request_header_code(request_headers, send_ready, status_ready);
     let response_header_code: i64 =
-      select_response_header_code(request_plan, recv_window, status_result);
-    let body_code: i64 = select_body_code(recv_result, send_result, retry_budget);
-    let retry_code: i64 = select_retry_code(request_plan, send_result, recv_result);
+      compute_response_header_code(request_plan, recv_window, status_ready);
+    let body_code: i64 = compute_body_code(recv_value, send_value, retry_budget);
+    let retry_code: i64 =
+      compute_retry_code(request_plan.retry_budget, send_ready, body_ready);
     let packet: NetHttpishHeaderSessionPacket = stage_header_session_packet(
       request_headers,
       status_code,
@@ -347,6 +333,7 @@ mod cpu Main {
       body_code,
       retry_code
     );
+    let packet_value: i64 = compute_packet_value(packet);
     let close_value: i64 = close_session_handle(open_handle);
     let tick_ns: i64 = host_monotonic_time_ns();
 
@@ -361,14 +348,15 @@ mod cpu Main {
       request_bytes: request_bytes,
       response_bytes: response_bytes,
       open_handle: open_handle,
-      send_ready: encode_send_ready(send_result),
-      recv_ready: encode_recv_ready(status_result),
+      send_ready: send_ready,
+      recv_ready: status_ready,
       status_code: packet.status_code,
       request_header_code: packet.request_header_code,
       response_header_code: packet.response_header_code,
       body_code: packet.body_code,
       retry_code: packet.retry_code,
       staged_total: packet.staged_total,
+      packet_value: packet_value,
       session_value: compute_session_value(
         argv_count,
         transport_family,
@@ -378,7 +366,7 @@ mod cpu Main {
         request_bytes,
         response_bytes,
         open_handle,
-        packet,
+        packet_value,
         close_value
       ),
       tick_ns: tick_ns
@@ -406,6 +394,7 @@ mod cpu Main {
       + summary.body_code
       + summary.retry_code
       + summary.staged_total
+      + summary.packet_value
       + summary.session_value
       + summary.tick_ns;
   }

@@ -1,13 +1,12 @@
 use std::path::{Path, PathBuf};
 
-#[cfg(test)]
-use nuis_semantics::model::NirDataFlowState;
-use nuis_semantics::model::{AstExpr, AstModule, NirResultStage, NirTypeRef};
+use nuis_semantics::model::{AstExpr, AstModule, NirDataFlowState, NirResultStage, NirTypeRef};
 #[cfg(test)]
 use yir_core::YirModule;
 
 mod abi;
 mod bridge_contracts;
+mod data_bridge_directions;
 mod data_contract_types;
 mod data_validation;
 mod kernel_validation;
@@ -410,11 +409,42 @@ pub(super) struct ProjectLinkStageContract {
     downlink: NirResultStage,
 }
 
+impl ProjectLinkStageContract {
+    pub(super) fn windowed_data_bridge() -> Self {
+        Self {
+            uplink: NirResultStage::Data(NirDataFlowState::Windowed),
+            downlink: NirResultStage::Data(NirDataFlowState::Windowed),
+        }
+    }
+
+    pub(super) fn is_windowed_data_bridge(&self) -> bool {
+        self.uplink == NirResultStage::Data(NirDataFlowState::Windowed)
+            && self.downlink == NirResultStage::Data(NirDataFlowState::Windowed)
+    }
+
+    pub(super) fn directions(self) -> [(&'static str, NirResultStage); 2] {
+        [("uplink", self.uplink), ("downlink", self.downlink)]
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ProjectLinkBridgeContract {
     stages: ProjectLinkStageContract,
-    uplink_payload: Option<NirTypeRef>,
-    downlink_payload: Option<NirTypeRef>,
+    payloads: [Option<NirTypeRef>; 2],
+}
+
+impl ProjectLinkBridgeContract {
+    pub(super) fn payload(&self, is_uplink: bool) -> Option<&NirTypeRef> {
+        self.payloads[bridge_direction_index(is_uplink)].as_ref()
+    }
+
+    pub(super) fn into_payload(self, is_uplink: bool) -> Option<NirTypeRef> {
+        self.payloads[bridge_direction_index(is_uplink)].clone()
+    }
+}
+
+fn bridge_direction_index(is_uplink: bool) -> usize {
+    if is_uplink { 0 } else { 1 }
 }
 
 pub fn is_project_input(path: &Path) -> bool {

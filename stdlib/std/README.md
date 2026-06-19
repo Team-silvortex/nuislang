@@ -85,6 +85,10 @@ Use these as the primary cluster names when placing new work:
     [network/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/network/README.md)
   - contract:
     [docs/reference/std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
+  - current HTTP/session frontdoor:
+    `net_http_client_session_recipe -> net_httpish_header_session_recipe -> net_http_client_lane_recipe`
+  - current service mirror:
+    `net_httpish_service_session_packet_recipe -> net_httpish_header_service_session_recipe -> net_http_service_lane_recipe`
 
 ## Current Status
 
@@ -195,6 +199,8 @@ Recipe modules:
     [stdlib/std/network/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/network/README.md)
   - contract:
     [std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
+  - current narrow frontdoor:
+    `net_http_client_session_recipe -> net_httpish_header_session_recipe -> net_http_client_lane_recipe`
   - shortest route:
     [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
   - cross-lane companions:

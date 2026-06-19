@@ -35,9 +35,11 @@ mod cpu Main {
     method_code: i64,
     authority_bytes: i64,
     path_bytes: i64,
-    header_bytes: i64,
-    body_bytes: i64,
+    request_header_bytes: i64,
+    request_body_bytes: i64,
     request_bytes: i64,
+    response_header_bytes: i64,
+    response_body_bytes: i64,
     response_bytes: i64,
     status_code: i64,
     open_handle: i64,
@@ -65,6 +67,72 @@ mod cpu Main {
     return network_value(result);
   }
 
+  fn build_method_code(protocol_kind: i64, protocol_version: i64) -> i64 {
+    return 64 + protocol_kind + protocol_version;
+  }
+
+  fn estimate_authority_bytes(
+    protocol_header_bytes: i64,
+    transport_family: i64
+  ) -> i64 {
+    return protocol_header_bytes + 8 + transport_family;
+  }
+
+  fn estimate_path_bytes(protocol_version: i64, send_window: i64) -> i64 {
+    return protocol_version + send_window + 12;
+  }
+
+  fn estimate_request_header_bytes(
+    protocol_header_bytes: i64,
+    send_window: i64,
+    retry_budget: i64
+  ) -> i64 {
+    return protocol_header_bytes + send_window + retry_budget;
+  }
+
+  fn estimate_request_body_bytes(
+    stream_window: i64,
+    protocol_version: i64,
+    timeout_budget: i64
+  ) -> i64 {
+    return stream_window + protocol_version + timeout_budget;
+  }
+
+  fn estimate_response_header_bytes(protocol_header_bytes: i64) -> i64 {
+    return protocol_header_bytes + 12;
+  }
+
+  fn estimate_response_body_bytes(
+    protocol_header_bytes: i64,
+    recv_window: i64
+  ) -> i64 {
+    return protocol_header_bytes + recv_window;
+  }
+
+  fn compute_lane_value(
+    transport_family: i64,
+    retry_budget: i64,
+    method_code: i64,
+    request_bytes: i64,
+    response_bytes: i64,
+    status_code: i64,
+    open_handle: i64,
+    send_value: i64,
+    recv_value: i64,
+    close_value: i64
+  ) -> i64 {
+    return transport_family
+      + retry_budget
+      + method_code
+      + request_bytes
+      + response_bytes
+      + status_code
+      + open_handle
+      + send_value
+      + recv_value
+      + close_value;
+  }
+
   fn capture_net_http_client_lane_summary() -> NetHttpClientLaneSummary {
     let argv_count: i64 = host_argv_count();
     let transport_family: i64 = network_profile_transport_family("NetworkUnit");
@@ -79,15 +147,30 @@ mod cpu Main {
     let recv_window: i64 = network_profile_recv_window("NetworkUnit");
     let send_window: i64 = network_profile_send_window("NetworkUnit");
     let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-    let method_code: i64 = 64 + protocol_kind + protocol_version;
-    let authority_bytes: i64 = protocol_header_bytes + 8 + transport_family;
-    let path_bytes: i64 = protocol_version + send_window + 12;
-    let header_bytes: i64 = protocol_header_bytes + send_window + retry_budget;
-    let body_bytes: i64 = stream_window + protocol_version + timeout_budget;
+    let method_code: i64 = build_method_code(protocol_kind, protocol_version);
+    let authority_bytes: i64 =
+      estimate_authority_bytes(protocol_header_bytes, transport_family);
+    let path_bytes: i64 = estimate_path_bytes(protocol_version, send_window);
+    let request_header_bytes: i64 =
+      estimate_request_header_bytes(
+        protocol_header_bytes,
+        send_window,
+        retry_budget
+      );
+    let request_body_bytes: i64 =
+      estimate_request_body_bytes(
+        stream_window,
+        protocol_version,
+        timeout_budget
+      );
     let request_bytes: i64 =
-      authority_bytes + path_bytes + header_bytes + body_bytes;
+      authority_bytes + path_bytes + request_header_bytes + request_body_bytes;
+    let response_header_bytes: i64 =
+      estimate_response_header_bytes(protocol_header_bytes);
+    let response_body_bytes: i64 =
+      estimate_response_body_bytes(protocol_header_bytes, recv_window);
     let response_bytes: i64 =
-      protocol_header_bytes + 12 + protocol_header_bytes + recv_window;
+      response_header_bytes + response_body_bytes;
     let open_handle: i64 = host_network_open_tcp_stream(
       remote_port,
       connect_timeout_ms
@@ -118,24 +201,28 @@ mod cpu Main {
       method_code: method_code,
       authority_bytes: authority_bytes,
       path_bytes: path_bytes,
-      header_bytes: header_bytes,
-      body_bytes: body_bytes,
+      request_header_bytes: request_header_bytes,
+      request_body_bytes: request_body_bytes,
       request_bytes: request_bytes,
+      response_header_bytes: response_header_bytes,
+      response_body_bytes: response_body_bytes,
       response_bytes: response_bytes,
       status_code: status_code,
       open_handle: open_handle,
       send_ready: encode_send_ready(send_result),
       recv_ready: encode_recv_ready(status_result),
-      lane_value: transport_family
-        + retry_budget
-        + method_code
-        + request_bytes
-        + response_bytes
-        + status_code
-        + open_handle
-        + send_value
-        + recv_value
-        + close_value,
+      lane_value: compute_lane_value(
+        transport_family,
+        retry_budget,
+        method_code,
+        request_bytes,
+        response_bytes,
+        status_code,
+        open_handle,
+        send_value,
+        recv_value,
+        close_value
+      ),
       tick_ns: tick_ns
     };
   }
@@ -152,9 +239,11 @@ mod cpu Main {
       + summary.method_code
       + summary.authority_bytes
       + summary.path_bytes
-      + summary.header_bytes
-      + summary.body_bytes
+      + summary.request_header_bytes
+      + summary.request_body_bytes
       + summary.request_bytes
+      + summary.response_header_bytes
+      + summary.response_body_bytes
       + summary.response_bytes
       + summary.status_code
       + summary.open_handle

@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::data_markers::{directional_bridge_marker_tag, DATA_BRIDGE_HETERO_DOMAINS};
 use yir_core::{EdgeKind, OperationDomainFamily, SemanticOp, YirModule};
 
+use super::data_bridge_directions::{data_bridge_directions, DataBridgeDirection};
 use super::profile_targets::resolve_project_profile_target_name;
 
 pub(super) fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(), String> {
@@ -166,66 +167,6 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         .filter(|node| node.op.semantic_op() == SemanticOp::DataHandleTable)
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let uplink_pipe_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("uplink_pipe"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let uplink_pipe_class_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("uplink_pipe_class"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let uplink_payload_class_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("uplink_payload_class"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let uplink_payload_shape_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("uplink_payload_shape"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let downlink_pipe_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("downlink_pipe"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let downlink_payload_class_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("downlink_payload_class"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let downlink_payload_shape_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("downlink_payload_shape"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let downlink_pipe_class_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("downlink_pipe_class"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let uplink_window_policy_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("uplink_window_policy"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let downlink_window_policy_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("downlink_window_policy"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
     let directional_markers = DATA_BRIDGE_HETERO_DOMAINS
         .iter()
         .filter_map(|domain| {
@@ -277,180 +218,97 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         .iter()
         .find(|node| node.name.contains("_downlink_len"))
         .map(|node| node.name.clone());
+    let plane_directions = [
+        DataPlaneDirectionContext {
+            direction: data_bridge_directions()[0],
+            pipe_targets: data_pipe_nodes.iter().take(2).cloned().collect::<Vec<_>>(),
+            windows: uplink_windows.clone(),
+            len: uplink_len.clone(),
+        },
+        DataPlaneDirectionContext {
+            direction: data_bridge_directions()[1],
+            pipe_targets: data_pipe_nodes.iter().skip(2).take(2).cloned().collect::<Vec<_>>(),
+            windows: downlink_windows.clone(),
+            len: downlink_len.clone(),
+        },
+    ];
 
     for handle in &handle_tables {
         for pipe in &data_pipe_nodes {
             push_edge_if_missing(module, EdgeKind::Dep, handle, pipe);
         }
     }
-    for (_domain, uplink_markers, downlink_markers) in &directional_markers {
-        if let Some(marker) = uplink_markers.first() {
-            for pipe in data_pipe_nodes.iter().take(2) {
-                push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-            }
-        }
-        if let Some(marker) = downlink_markers.first() {
-            for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-                push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-            }
-        }
+    for (index, (_domain, uplink_markers, downlink_markers)) in directional_markers.iter().enumerate() {
+        let _ = index;
+        push_effect_edges_from_first_marker(module, uplink_markers, &plane_directions[0].pipe_targets);
+        push_effect_edges_from_first_marker(module, downlink_markers, &plane_directions[1].pipe_targets);
     }
-    if let Some(marker) = uplink_pipe_markers.first() {
-        for pipe in data_pipe_nodes.iter().take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+    for context in &plane_directions {
+        let pipe_markers = collect_data_marker_nodes(module, context.direction.pipe_marker);
+        let pipe_class_markers =
+            collect_data_marker_nodes(module, context.direction.pipe_class_marker);
+        let payload_class_markers =
+            collect_data_marker_nodes(module, context.direction.payload_class_marker.trim_start_matches("marker:"));
+        let payload_shape_markers =
+            collect_data_marker_nodes(module, context.direction.payload_shape_marker.trim_start_matches("marker:"));
+        let window_policy_markers =
+            collect_data_marker_nodes(module, context.direction.window_policy_marker.trim_start_matches("marker:"));
+        push_effect_edges_from_first_marker(module, &pipe_markers, &context.pipe_targets);
+        push_effect_edges_from_first_marker(module, &pipe_class_markers, &context.pipe_targets);
+        push_effect_edges_from_first_marker(module, &payload_class_markers, &context.pipe_targets);
+        if let Some(marker) = payload_shape_markers.first() {
+            push_effect_edges(module, marker, &context.pipe_targets);
+            push_effect_edges(module, marker, &context.windows);
         }
+        stitch_window_binding_edges(
+            module,
+            &resource_families,
+            &node_resources,
+            &context.windows,
+            &context.pipe_targets,
+            window_policy_markers.first(),
+            window_offset.as_deref(),
+            context.len.as_deref(),
+        );
     }
-    if let Some(marker) = uplink_pipe_class_markers.first() {
-        for pipe in data_pipe_nodes.iter().take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-    }
-    if let Some(marker) = uplink_payload_class_markers.first() {
-        for pipe in data_pipe_nodes.iter().take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-    }
-    if let Some(marker) = uplink_payload_shape_markers.first() {
-        for pipe in data_pipe_nodes.iter().take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-        for window in &uplink_windows {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, window);
-        }
-    }
-    if let Some(marker) = downlink_pipe_markers.first() {
-        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-    }
-    if let Some(marker) = downlink_pipe_class_markers.first() {
-        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-    }
-    if let Some(marker) = downlink_payload_class_markers.first() {
-        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-    }
-    if let Some(marker) = downlink_payload_shape_markers.first() {
-        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-        for window in &downlink_windows {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, window);
-        }
-    }
-    for window in &uplink_windows {
-        if let Some(marker) = uplink_window_policy_markers.first() {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, window);
-        }
-        for pipe in data_pipe_nodes.iter().take(2) {
-            push_project_dependency_edge_if_missing(
-                module,
-                &resource_families,
-                &node_resources,
-                window,
-                pipe,
-            );
-        }
+    if plane_directions[0].windows.is_empty() {
         if let Some(offset) = &window_offset {
-            push_project_dependency_edge_if_missing(
+            push_project_dependency_edges_from_each(
                 module,
                 &resource_families,
                 &node_resources,
-                offset,
-                window,
+                std::slice::from_ref(offset),
+                &plane_directions[0].pipe_targets,
             );
         }
-        if let Some(len) = &uplink_len {
-            push_project_dependency_edge_if_missing(
+        if let Some(len) = &plane_directions[0].len {
+            push_project_dependency_edges_from_each(
                 module,
                 &resource_families,
                 &node_resources,
-                len,
-                window,
-            );
-        }
-    }
-    for window in &downlink_windows {
-        if let Some(marker) = downlink_window_policy_markers.first() {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, window);
-        }
-        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-            push_project_dependency_edge_if_missing(
-                module,
-                &resource_families,
-                &node_resources,
-                window,
-                pipe,
-            );
-        }
-        if let Some(offset) = &window_offset {
-            push_project_dependency_edge_if_missing(
-                module,
-                &resource_families,
-                &node_resources,
-                offset,
-                window,
-            );
-        }
-        if let Some(len) = &downlink_len {
-            push_project_dependency_edge_if_missing(
-                module,
-                &resource_families,
-                &node_resources,
-                len,
-                window,
+                std::slice::from_ref(len),
+                &plane_directions[0].pipe_targets,
             );
         }
     }
-    if uplink_windows.is_empty() {
+    if plane_directions[1].windows.is_empty() {
         if let Some(offset) = &window_offset {
-            for pipe in data_pipe_nodes.iter().take(2) {
-                push_project_dependency_edge_if_missing(
-                    module,
-                    &resource_families,
-                    &node_resources,
-                    offset,
-                    pipe,
-                );
-            }
+            push_project_dependency_edges_from_each(
+                module,
+                &resource_families,
+                &node_resources,
+                std::slice::from_ref(offset),
+                &plane_directions[1].pipe_targets,
+            );
         }
-        if let Some(len) = &uplink_len {
-            for pipe in data_pipe_nodes.iter().take(2) {
-                push_project_dependency_edge_if_missing(
-                    module,
-                    &resource_families,
-                    &node_resources,
-                    len,
-                    pipe,
-                );
-            }
-        }
-    }
-    if downlink_windows.is_empty() {
-        if let Some(offset) = &window_offset {
-            for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-                push_project_dependency_edge_if_missing(
-                    module,
-                    &resource_families,
-                    &node_resources,
-                    offset,
-                    pipe,
-                );
-            }
-        }
-        if let Some(len) = &downlink_len {
-            for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-                push_project_dependency_edge_if_missing(
-                    module,
-                    &resource_families,
-                    &node_resources,
-                    len,
-                    pipe,
-                );
-            }
+        if let Some(len) = &plane_directions[1].len {
+            push_project_dependency_edges_from_each(
+                module,
+                &resource_families,
+                &node_resources,
+                std::slice::from_ref(len),
+                &plane_directions[1].pipe_targets,
+            );
         }
     }
     for (domain, uplink_markers, downlink_markers) in &directional_markers {
@@ -462,9 +320,10 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
             continue;
         }
         if !uplink_markers.is_empty() {
-            for source in downlink_windows
+            for source in plane_directions[1]
+                .windows
                 .iter()
-                .chain(data_pipe_nodes.iter().skip(2).take(2))
+                .chain(plane_directions[1].pipe_targets.iter())
             {
                 for domain_node in &domain_nodes {
                     push_project_dependency_edge_if_missing(
@@ -478,7 +337,11 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
             }
         }
         if !downlink_markers.is_empty() {
-            for sink in uplink_windows.iter().chain(data_pipe_nodes.iter().take(2)) {
+            for sink in plane_directions[0]
+                .windows
+                .iter()
+                .chain(plane_directions[0].pipe_targets.iter())
+            {
                 for domain_node in &domain_nodes {
                     push_project_dependency_edge_if_missing(
                         module,
@@ -495,9 +358,10 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         .iter()
         .any(|(_, _, downlink_markers)| !downlink_markers.is_empty());
     if has_to_cpu_bridge && !cpu_nodes.is_empty() {
-        for source in downlink_windows
+        for source in plane_directions[1]
+            .windows
             .iter()
-            .chain(data_pipe_nodes.iter().skip(2).take(2))
+            .chain(plane_directions[1].pipe_targets.iter())
         {
             for cpu_node in &cpu_nodes {
                 push_project_dependency_edge_if_missing(
@@ -509,6 +373,108 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
                 );
             }
         }
+    }
+}
+
+#[derive(Clone)]
+struct DataPlaneDirectionContext {
+    direction: DataBridgeDirection,
+    pipe_targets: Vec<String>,
+    windows: Vec<String>,
+    len: Option<String>,
+}
+
+fn push_effect_edges_from_first_marker(
+    module: &mut YirModule,
+    markers: &[String],
+    targets: &[String],
+) {
+    if let Some(marker) = markers.first() {
+        push_effect_edges(module, marker, targets);
+    }
+}
+
+fn push_effect_edges(module: &mut YirModule, marker: &str, targets: &[String]) {
+    for target in targets {
+        push_edge_if_missing(module, EdgeKind::Effect, marker, target);
+    }
+}
+
+fn stitch_window_binding_edges(
+    module: &mut YirModule,
+    resource_families: &BTreeMap<String, String>,
+    node_resources: &BTreeMap<String, String>,
+    windows: &[String],
+    pipes: &[String],
+    policy_marker: Option<&String>,
+    window_offset: Option<&str>,
+    window_len: Option<&str>,
+) {
+    if let Some(marker) = policy_marker {
+        push_effect_edges(module, marker, windows);
+    }
+    push_project_dependency_edges_from_each(
+        module,
+        resource_families,
+        node_resources,
+        windows,
+        pipes,
+    );
+    if let Some(offset) = window_offset {
+        push_project_dependency_edges_to_each(
+            module,
+            resource_families,
+            node_resources,
+            offset,
+            windows,
+        );
+    }
+    if let Some(len) = window_len {
+        push_project_dependency_edges_to_each(
+            module,
+            resource_families,
+            node_resources,
+            len,
+            windows,
+        );
+    }
+}
+
+fn push_project_dependency_edges_from_each(
+    module: &mut YirModule,
+    resource_families: &BTreeMap<String, String>,
+    node_resources: &BTreeMap<String, String>,
+    from_nodes: &[String],
+    to_nodes: &[String],
+) {
+    for from in from_nodes {
+        for to in to_nodes {
+            push_project_dependency_edge_if_missing(
+                module,
+                resource_families,
+                node_resources,
+                from,
+                to,
+            );
+        }
+    }
+}
+
+fn push_project_dependency_edges_to_each(
+    module: &mut YirModule,
+    resource_families: &BTreeMap<String, String>,
+    node_resources: &BTreeMap<String, String>,
+    from_node: &str,
+    to_nodes: &[String],
+) {
+    for to in to_nodes {
+        push_project_dependency_edge_if_missing(
+            module,
+            resource_families,
+            node_resources,
+            from_node,
+            to,
+        );
     }
 }
 

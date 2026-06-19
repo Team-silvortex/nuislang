@@ -43,10 +43,12 @@ mod cpu Main {
     accept_ready: i64,
     recv_ready: i64,
     send_ready: i64,
-    request_head_bytes: i64,
+    request_header_bytes: i64,
     request_body_bytes: i64,
-    response_head_bytes: i64,
+    request_bytes: i64,
+    response_header_bytes: i64,
     response_body_bytes: i64,
+    response_bytes: i64,
     service_value: i64,
     tick_ns: i64
   }
@@ -74,6 +76,61 @@ mod cpu Main {
 
   fn encode_value(result: NetworkResult<i64>) -> i64 {
     return network_value(result);
+  }
+
+  fn estimate_listener_request_head_bytes(
+    protocol_header_bytes: i64,
+    protocol_version: i64
+  ) -> i64 {
+    return protocol_header_bytes + protocol_version + 16;
+  }
+
+  fn estimate_listener_request_body_bytes(
+    stream_window: i64,
+    recv_window: i64,
+    retry_budget: i64
+  ) -> i64 {
+    return stream_window + recv_window + retry_budget;
+  }
+
+  fn estimate_listener_response_head_bytes(protocol_header_bytes: i64) -> i64 {
+    return protocol_header_bytes + 12;
+  }
+
+  fn estimate_listener_response_body_bytes(
+    stream_window: i64,
+    send_window: i64,
+    protocol_kind: i64
+  ) -> i64 {
+    return stream_window + send_window + protocol_kind;
+  }
+
+  fn compute_service_value(
+    transport_family: i64,
+    endpoint_kind: i64,
+    retry_budget: i64,
+    protocol_kind: i64,
+    local_port: i64,
+    listener_handle: i64,
+    request_bytes: i64,
+    response_bytes: i64,
+    recv_value: i64,
+    send_value: i64,
+    accepted_close_value: i64,
+    listener_close_value: i64
+  ) -> i64 {
+    return transport_family
+      + endpoint_kind
+      + retry_budget
+      + protocol_kind
+      + local_port
+      + listener_handle
+      + request_bytes
+      + response_bytes
+      + recv_value
+      + send_value
+      + accepted_close_value
+      + listener_close_value;
   }
 
   fn open_listener(
@@ -122,11 +179,14 @@ mod cpu Main {
     return host_network_close_owned(listener_handle);
   }
 
-  fn estimate_request_head_bytes(
+  fn estimate_request_header_bytes(
     protocol_header_bytes: i64,
     protocol_version: i64
   ) -> i64 {
-    return protocol_header_bytes + protocol_version + 16;
+    return estimate_listener_request_head_bytes(
+      protocol_header_bytes,
+      protocol_version
+    );
   }
 
   fn estimate_request_body_bytes(
@@ -134,11 +194,15 @@ mod cpu Main {
     recv_window: i64,
     retry_budget: i64
   ) -> i64 {
-    return stream_window + recv_window + retry_budget;
+    return estimate_listener_request_body_bytes(
+      stream_window,
+      recv_window,
+      retry_budget
+    );
   }
 
-  fn estimate_response_head_bytes(protocol_header_bytes: i64) -> i64 {
-    return protocol_header_bytes + 12;
+  fn estimate_response_header_bytes(protocol_header_bytes: i64) -> i64 {
+    return estimate_listener_response_head_bytes(protocol_header_bytes);
   }
 
   fn estimate_response_body_bytes(
@@ -146,7 +210,11 @@ mod cpu Main {
     send_window: i64,
     protocol_kind: i64
   ) -> i64 {
-    return stream_window + send_window + protocol_kind;
+    return estimate_listener_response_body_bytes(
+      stream_window,
+      send_window,
+      protocol_kind
+    );
   }
 
   fn capture_net_http_service_lane_summary() -> NetHttpServiceLaneSummary {
@@ -175,14 +243,16 @@ mod cpu Main {
       send_response(accepted_handle, stream_window, send_window);
     let recv_value: i64 = encode_value(recv_result);
     let send_value: i64 = encode_value(send_result);
-    let request_head_bytes: i64 =
-      estimate_request_head_bytes(protocol_header_bytes, protocol_version);
+    let request_header_bytes: i64 =
+      estimate_request_header_bytes(protocol_header_bytes, protocol_version);
     let request_body_bytes: i64 =
       estimate_request_body_bytes(stream_window, recv_window, retry_budget);
-    let response_head_bytes: i64 =
-      estimate_response_head_bytes(protocol_header_bytes);
+    let request_bytes: i64 = request_header_bytes + request_body_bytes;
+    let response_header_bytes: i64 =
+      estimate_response_header_bytes(protocol_header_bytes);
     let response_body_bytes: i64 =
       estimate_response_body_bytes(stream_window, send_window, protocol_kind);
+    let response_bytes: i64 = response_header_bytes + response_body_bytes;
     let accepted_close_value: i64 = close_transport(accepted_handle);
     let listener_close_value: i64 = close_listener(listener_handle);
     let tick_ns: i64 = host_monotonic_time_ns();
@@ -205,24 +275,26 @@ mod cpu Main {
       accept_ready: encode_accept_ready(accept_result),
       recv_ready: encode_recv_ready(recv_result),
       send_ready: encode_send_ready(send_result),
-      request_head_bytes: request_head_bytes,
+      request_header_bytes: request_header_bytes,
       request_body_bytes: request_body_bytes,
-      response_head_bytes: response_head_bytes,
+      request_bytes: request_bytes,
+      response_header_bytes: response_header_bytes,
       response_body_bytes: response_body_bytes,
-      service_value: transport_family
-        + endpoint_kind
-        + retry_budget
-        + protocol_kind
-        + local_port
-        + listener_handle
-        + request_head_bytes
-        + request_body_bytes
-        + response_head_bytes
-        + response_body_bytes
-        + recv_value
-        + send_value
-        + accepted_close_value
-        + listener_close_value,
+      response_bytes: response_bytes,
+      service_value: compute_service_value(
+        transport_family,
+        endpoint_kind,
+        retry_budget,
+        protocol_kind,
+        local_port,
+        listener_handle,
+        request_bytes,
+        response_bytes,
+        recv_value,
+        send_value,
+        accepted_close_value,
+        listener_close_value
+      ),
       tick_ns: tick_ns
     };
   }
@@ -247,10 +319,12 @@ mod cpu Main {
       + summary.accept_ready
       + summary.recv_ready
       + summary.send_ready
-      + summary.request_head_bytes
+      + summary.request_header_bytes
       + summary.request_body_bytes
-      + summary.response_head_bytes
+      + summary.request_bytes
+      + summary.response_header_bytes
       + summary.response_body_bytes
+      + summary.response_bytes
       + summary.service_value
       + summary.tick_ns;
   }

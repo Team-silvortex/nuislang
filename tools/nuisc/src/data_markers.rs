@@ -31,6 +31,16 @@ pub fn directional_bridge_marker_slot(from_domain: &str, to_domain: &str) -> Opt
     directional_bridge_marker_tag(from_domain, to_domain).map(|tag| format!("marker:{tag}"))
 }
 
+pub fn supports_staged_data_bridge_pair(from_domain: &str, to_domain: &str) -> bool {
+    (from_domain == "cpu" || to_domain == "cpu")
+        && (is_supported_staged_data_bridge_peer(from_domain)
+            && is_supported_staged_data_bridge_peer(to_domain))
+}
+
+pub fn is_supported_staged_data_bridge_peer(domain: &str) -> bool {
+    domain == "cpu" || DATA_BRIDGE_HETERO_DOMAINS.contains(&domain)
+}
+
 pub fn all_uplink_directional_marker_slots() -> Vec<String> {
     DATA_BRIDGE_HETERO_DOMAINS
         .iter()
@@ -70,6 +80,7 @@ mod tests {
     use super::{
         all_downlink_directional_marker_slots, all_sync_marker_slots,
         all_uplink_directional_marker_slots, data_marker_surface, directional_bridge_marker_slot,
+        is_supported_staged_data_bridge_peer, supports_staged_data_bridge_pair,
     };
 
     #[test]
@@ -120,5 +131,15 @@ mod tests {
             data_marker_surface("uplink_payload_shape"),
             "data.profile.payload-shape.v1"
         );
+    }
+
+    #[test]
+    fn staged_bridge_support_is_cpu_centered_but_extensible() {
+        assert!(supports_staged_data_bridge_pair("cpu", "network"));
+        assert!(supports_staged_data_bridge_pair("network", "cpu"));
+        assert!(supports_staged_data_bridge_pair("cpu", "cpu"));
+        assert!(!supports_staged_data_bridge_pair("shader", "kernel"));
+        assert!(is_supported_staged_data_bridge_peer("shader"));
+        assert!(!is_supported_staged_data_bridge_peer("storage"));
     }
 }

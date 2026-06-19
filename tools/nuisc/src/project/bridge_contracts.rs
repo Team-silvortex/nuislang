@@ -1,5 +1,7 @@
-use nuis_semantics::model::{NirDataFlowState, NirResultStage, NirTypeRef};
+use nuis_semantics::model::{NirResultStage, NirTypeRef};
 use yir_core::YirModule;
+
+use crate::data_markers::supports_staged_data_bridge_pair;
 
 use super::type_contracts::{connect_project_contract_node, push_profile_text_node};
 use super::{
@@ -22,63 +24,41 @@ pub(super) fn materialize_project_bridge_contract_nodes(
         let bridge = build_project_link_bridge_contract(project, &link.from, &link.to, via)?;
         let id = project_link_contract_id(&link.from, &link.to, via);
         let stage_node = format!("project_link_{id}_bridge_stage_type");
-        let uplink_payload_node = format!("project_link_{id}_uplink_bridge_payload_type");
-        let downlink_payload_node = format!("project_link_{id}_downlink_bridge_payload_type");
         push_profile_text_node(
             module,
             stage_node.clone(),
-            format!(
-                "uplink={};downlink={}",
-                bridge.stages.uplink.render(),
-                bridge.stages.downlink.render()
-            ),
-        );
-        push_profile_text_node(
-            module,
-            uplink_payload_node.clone(),
             bridge
-                .uplink_payload
-                .as_ref()
-                .map(NirTypeRef::render)
-                .unwrap_or_else(|| "unknown".to_owned()),
+                .stages
+                .directions()
+                .into_iter()
+                .map(|(direction, stage)| format!("{direction}={}", stage.render()))
+                .collect::<Vec<_>>()
+                .join(";"),
         );
-        push_profile_text_node(
-            module,
-            downlink_payload_node.clone(),
-            bridge
-                .downlink_payload
-                .as_ref()
-                .map(NirTypeRef::render)
-                .unwrap_or_else(|| "unknown".to_owned()),
-        );
-        connect_project_contract_node(
-            module,
-            &stage_node,
-            &resolve_project_profile_target_name("data", &via_unit, "marker:uplink_window_policy"),
-        );
-        connect_project_contract_node(
-            module,
-            &stage_node,
-            &resolve_project_profile_target_name(
-                "data",
-                &via_unit,
-                "marker:downlink_window_policy",
-            ),
-        );
-        connect_project_contract_node(
-            module,
-            &uplink_payload_node,
-            &resolve_project_profile_target_name("data", &via_unit, "marker:uplink_payload_shape"),
-        );
-        connect_project_contract_node(
-            module,
-            &downlink_payload_node,
-            &resolve_project_profile_target_name(
-                "data",
-                &via_unit,
-                "marker:downlink_payload_shape",
-            ),
-        );
+        for direction in bridge_directions() {
+            let payload_node = format!(
+                "project_link_{id}_{}_bridge_payload_type",
+                direction.name
+            );
+            push_profile_text_node(
+                module,
+                payload_node.clone(),
+                direction
+                    .payload(&bridge)
+                    .map(NirTypeRef::render)
+                    .unwrap_or_else(|| "unknown".to_owned()),
+            );
+            connect_project_contract_node(
+                module,
+                &stage_node,
+                &resolve_project_profile_target_name("data", &via_unit, direction.window_policy_marker),
+            );
+            connect_project_contract_node(
+                module,
+                &payload_node,
+                &resolve_project_profile_target_name("data", &via_unit, direction.payload_shape_marker),
+            );
+        }
     }
     Ok(())
 }
@@ -97,27 +77,13 @@ pub(super) fn required_project_link_stage_contract(
         ));
     }
 
-    let cpu_edge = from_domain == "cpu" || to_domain == "cpu";
-    let hetero_peer = matches!(
-        (from_domain.as_str(), to_domain.as_str()),
-        ("cpu", "shader")
-            | ("shader", "cpu")
-            | ("cpu", "kernel")
-            | ("kernel", "cpu")
-            | ("cpu", "network")
-            | ("network", "cpu")
-            | ("cpu", "cpu")
-    );
-    if !cpu_edge || !hetero_peer {
+    if !supports_staged_data_bridge_pair(&from_domain, &to_domain) {
         return Err(format!(
             "current staged bridges only support cpu<->cpu, cpu<->shader, cpu<->kernel, and cpu<->network over `data.*`"
         ));
     }
 
-    Ok(ProjectLinkStageContract {
-        uplink: NirResultStage::Data(NirDataFlowState::Windowed),
-        downlink: NirResultStage::Data(NirDataFlowState::Windowed),
-    })
+    Ok(ProjectLinkStageContract::windowed_data_bridge())
 }
 
 pub(super) fn validate_project_link_stage_contract(
@@ -126,9 +92,7 @@ pub(super) fn validate_project_link_stage_contract(
     via: &str,
     contract: ProjectLinkStageContract,
 ) -> Result<(), String> {
-    if contract.uplink != NirResultStage::Data(NirDataFlowState::Windowed)
-        || contract.downlink != NirResultStage::Data(NirDataFlowState::Windowed)
-    {
+    if !contract.is_windowed_data_bridge() {
         return Err(format!(
             "project link `{from}` -> `{to}` via `{via}` requires staged fabric bridge `uplink={}` `downlink={}`",
             contract.uplink.render(),
@@ -145,36 +109,62 @@ pub(super) fn build_project_link_bridge_contract(
     via: &str,
 ) -> Result<ProjectLinkBridgeContract, String> {
     let (_, data_unit) = split_domain_unit(via)?;
-    let uplink_source = resolve_bridge_payload_source(from, to, true)?;
-    let downlink_source = resolve_bridge_payload_source(from, to, false)?;
     let stages = required_project_link_stage_contract(from, to, via)?;
-    let uplink_payload =
-        infer_project_route_payload_type(project, &uplink_source, &data_unit, true)?;
-    let downlink_payload =
-        infer_project_route_payload_type(project, &downlink_source, &data_unit, false)?;
+    let mut payloads = [None, None];
+    for direction in bridge_directions() {
+        let source = resolve_bridge_payload_source(from, to, direction.is_uplink)?;
+        let payload = infer_project_route_payload_type(project, &source, &data_unit, direction.is_uplink)?;
+        validate_bridge_stage_payload(
+            direction.name,
+            from,
+            to,
+            via,
+            direction.stage(stages),
+            payload.as_ref(),
+        )?;
+        payloads[if direction.is_uplink { 0 } else { 1 }] = payload;
+    }
 
-    validate_bridge_stage_payload(
-        "uplink",
-        from,
-        to,
-        via,
-        stages.uplink,
-        uplink_payload.as_ref(),
-    )?;
-    validate_bridge_stage_payload(
-        "downlink",
-        from,
-        to,
-        via,
-        stages.downlink,
-        downlink_payload.as_ref(),
-    )?;
+    Ok(ProjectLinkBridgeContract { stages, payloads })
+}
 
-    Ok(ProjectLinkBridgeContract {
-        stages,
-        uplink_payload,
-        downlink_payload,
-    })
+#[derive(Clone, Copy)]
+struct BridgeDirection {
+    name: &'static str,
+    is_uplink: bool,
+    payload_shape_marker: &'static str,
+    window_policy_marker: &'static str,
+}
+
+impl BridgeDirection {
+    fn stage(self, contract: ProjectLinkStageContract) -> NirResultStage {
+        if self.is_uplink {
+            contract.uplink
+        } else {
+            contract.downlink
+        }
+    }
+
+    fn payload<'a>(self, contract: &'a ProjectLinkBridgeContract) -> Option<&'a NirTypeRef> {
+        contract.payload(self.is_uplink)
+    }
+}
+
+fn bridge_directions() -> [BridgeDirection; 2] {
+    [
+        BridgeDirection {
+            name: "uplink",
+            is_uplink: true,
+            payload_shape_marker: "marker:uplink_payload_shape",
+            window_policy_marker: "marker:uplink_window_policy",
+        },
+        BridgeDirection {
+            name: "downlink",
+            is_uplink: false,
+            payload_shape_marker: "marker:downlink_payload_shape",
+            window_policy_marker: "marker:downlink_window_policy",
+        },
+    ]
 }
 
 fn project_link_contract_id(from: &str, to: &str, via: &str) -> String {

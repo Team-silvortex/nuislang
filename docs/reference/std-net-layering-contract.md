@@ -85,6 +85,34 @@ At the current repository stage, the important split is the grouped one:
   composes control, transport, protocol, result, and task summaries into wider
   reusable routes
 
+For the current HTTP/session frontdoor, the narrower split is:
+
+* `net_http_client_session_recipe`
+  owns the smallest host-transport lifecycle summary:
+  open/send/status/body/close plus request/response byte estimates
+* `net_httpish_header_session_recipe`
+  owns packet-plus-session aggregation:
+  request-header / response-header / body / retry staging on top of the
+  smaller client-session shape
+* `net_http_client_lane_recipe`
+  owns the widest checked-in client lane summary:
+  authority/path plus request/response header/body byte grouping on top of the
+  lower transport shape
+* `net_http_service_lane_recipe`
+  is the current listener-side mirror:
+  request/response header/body byte grouping on top of the lower service
+  packet/session shape
+
+The practical rule is:
+
+* session is the transport lifecycle floor
+* header-session is the current packet/session bridge
+* lane is the current highest readable frontdoor layer, where client keeps the
+  extra `authority/path` split and service keeps the listener-oriented mirror
+* client/service lane summaries should prefer the shared names
+  `request_header_bytes`, `request_body_bytes`, `request_bytes`,
+  `response_header_bytes`, `response_body_bytes`, and `response_bytes`
+
 ## Current Reading Rule
 
 If you want the shortest pass:

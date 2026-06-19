@@ -69,6 +69,34 @@ Current anchor files for this convention:
   - [net_http_client_session_async_loop_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_async_loop_recipe.ns)
   - [net_http_service_lane_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_service_lane_recipe.ns)
 
+Current narrow frontdoor for the HTTP/session cluster:
+
+```text
+net_http_client_session_recipe
+-> net_httpish_header_session_recipe
+-> net_http_client_lane_recipe
+```
+
+Service-side mirror:
+
+```text
+net_httpish_service_session_packet_recipe
+-> net_httpish_header_service_session_recipe
+-> net_http_service_lane_recipe
+```
+
+Current frontdoor cheat sheet:
+
+* client chain
+  `net_http_client_session_recipe -> net_httpish_header_session_recipe -> net_http_client_lane_recipe`
+* service chain
+  `net_httpish_service_session_packet_recipe -> net_httpish_header_service_session_recipe -> net_http_service_lane_recipe`
+* shared lane summary names
+  `request_header_bytes`, `request_body_bytes`, `request_bytes`,
+  `response_header_bytes`, `response_body_bytes`, `response_bytes`
+* client-only extra split
+  `authority_bytes`, `path_bytes`
+
 ## Source Router
 
 ### Profile Core
@@ -172,6 +200,7 @@ Current anchor files for this convention:
 * [net_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_pipeline_recipe.ns)
 * [net_owned_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_dnsish_pipeline_recipe.ns)
 * [net_httpish_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_session_recipe.ns)
+* [net_httpish_header_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_session_recipe.ns)
 * [net_httpish_header_service_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_service_session_recipe.ns)
 * [net_httpish_client_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_client_session_packet_recipe.ns)
 * [net_httpish_service_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_service_session_packet_recipe.ns)
@@ -203,6 +232,8 @@ Shortest grouped route:
   - [net_httpish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_protocol_recipe_demo)
   - [net_httpish_client_session_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_client_session_packet_recipe_demo)
   - [net_httpish_service_session_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_service_session_packet_recipe_demo)
+  - [net_httpish_header_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_session_recipe_demo)
+  - [net_httpish_header_service_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_service_session_recipe_demo)
   - [net_http_client_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_recipe_demo)
   - [net_http_client_exchange_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_exchange_recipe_demo)
   - [net_http_client_lane_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_lane_recipe_demo)
@@ -219,7 +250,11 @@ If you only want one pass:
 
 1. start with [net_endpoint_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_endpoint_recipe.ns)
 2. follow the grouped lane above until `session`
-3. jump into the matching `examples/projects/domains/*_demo`
-4. return to
+3. if your target is the current HTTP/session frontdoor, prefer
+   `net_http_client_session_recipe -> net_httpish_header_session_recipe -> net_http_client_lane_recipe`
+4. use the service mirror when validating listener-side shape:
+   `net_httpish_service_session_packet_recipe -> net_httpish_header_service_session_recipe -> net_http_service_lane_recipe`
+5. jump into the matching `examples/projects/domains/*_demo`
+6. return to
    [std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
    when you want the contract language instead of the raw source list

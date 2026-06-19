@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::NirTypeRef;
 use yir_core::{Operation, YirModule};
 
+use super::data_bridge_directions::data_bridge_directions;
 use super::ProjectAbiResolution;
 use super::{
     build_project_link_bridge_contract, collect_profile_int_bindings, ensure_project_resource,
@@ -193,8 +194,7 @@ fn materialize_data_type_contract_nodes(
     unit: &str,
     module: &mut YirModule,
 ) -> Result<(), String> {
-    let mut uplink_payload: Option<NirTypeRef> = None;
-    let mut downlink_payload: Option<NirTypeRef> = None;
+    let mut payloads = [None, None];
     for link in &project.manifest.links {
         let Some(via) = &link.via else {
             continue;
@@ -204,69 +204,45 @@ fn materialize_data_type_contract_nodes(
             continue;
         }
         let bridge = build_project_link_bridge_contract(project, &link.from, &link.to, via)?;
-        if let Some(ty) = bridge.uplink_payload {
-            uplink_payload = Some(merge_project_payload_contract(
-                uplink_payload.take(),
-                ty,
-                "data",
-                unit,
-                "uplink",
-            )?);
-        }
-        if let Some(ty) = bridge.downlink_payload {
-            downlink_payload = Some(merge_project_payload_contract(
-                downlink_payload.take(),
-                ty,
-                "data",
-                unit,
-                "downlink",
-            )?);
+        for direction in data_bridge_directions() {
+            if let Some(ty) = bridge.clone().into_payload(direction.is_uplink) {
+                let slot = &mut payloads[direction.index];
+                *slot = Some(merge_project_payload_contract(
+                    slot.take(),
+                    ty,
+                    "data",
+                    unit,
+                    direction.name,
+                )?);
+            }
         }
     }
 
-    if let Some(ty) = uplink_payload.as_ref() {
-        let class_node = format!(
-            "project_profile_data_{}_uplink_payload_class_type",
-            sanitize_ident(unit)
-        );
-        let shape_node = format!(
-            "project_profile_data_{}_uplink_payload_shape_type",
-            sanitize_ident(unit)
-        );
-        push_profile_text_node(module, class_node.clone(), payload_class_marker_name(ty));
-        push_profile_text_node(module, shape_node.clone(), payload_shape_marker_name(ty));
-        connect_project_contract_node(
-            module,
-            &class_node,
-            &resolve_project_profile_target_name("data", unit, "marker:uplink_payload_class"),
-        );
-        connect_project_contract_node(
-            module,
-            &shape_node,
-            &resolve_project_profile_target_name("data", unit, "marker:uplink_payload_shape"),
-        );
-    }
-    if let Some(ty) = downlink_payload.as_ref() {
-        let class_node = format!(
-            "project_profile_data_{}_downlink_payload_class_type",
-            sanitize_ident(unit)
-        );
-        let shape_node = format!(
-            "project_profile_data_{}_downlink_payload_shape_type",
-            sanitize_ident(unit)
-        );
-        push_profile_text_node(module, class_node.clone(), payload_class_marker_name(ty));
-        push_profile_text_node(module, shape_node.clone(), payload_shape_marker_name(ty));
-        connect_project_contract_node(
-            module,
-            &class_node,
-            &resolve_project_profile_target_name("data", unit, "marker:downlink_payload_class"),
-        );
-        connect_project_contract_node(
-            module,
-            &shape_node,
-            &resolve_project_profile_target_name("data", unit, "marker:downlink_payload_shape"),
-        );
+    for direction in data_bridge_directions() {
+        if let Some(ty) = payloads[direction.index].as_ref() {
+            let class_node = format!(
+                "project_profile_data_{}_{}_payload_class_type",
+                sanitize_ident(unit),
+                direction.name,
+            );
+            let shape_node = format!(
+                "project_profile_data_{}_{}_payload_shape_type",
+                sanitize_ident(unit),
+                direction.name,
+            );
+            push_profile_text_node(module, class_node.clone(), payload_class_marker_name(ty));
+            push_profile_text_node(module, shape_node.clone(), payload_shape_marker_name(ty));
+            connect_project_contract_node(
+                module,
+                &class_node,
+                &resolve_project_profile_target_name("data", unit, direction.payload_class_marker),
+            );
+            connect_project_contract_node(
+                module,
+                &shape_node,
+                &resolve_project_profile_target_name("data", unit, direction.payload_shape_marker),
+            );
+        }
     }
 
     if let Some(schema) = infer_data_handle_table_schema(project, unit)? {

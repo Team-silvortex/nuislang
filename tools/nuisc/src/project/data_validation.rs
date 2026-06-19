@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::{NirDataFlowState, NirResultStage};
 use yir_core::YirModule;
 
+use super::data_bridge_directions::data_bridge_directions;
 use super::support_contracts::{require_declared_support_surface, support_surface_for_domain};
 use super::{
     build_project_link_bridge_contract, data_profile_required_slots_for_link,
@@ -65,18 +66,6 @@ pub(super) fn validate_data_profile_for_link(
         .take(2)
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let uplink_payload =
-        resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_class");
-    let downlink_payload =
-        resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_class");
-    let uplink_shape =
-        resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_shape");
-    let downlink_shape =
-        resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_shape");
-    let uplink_window_policy =
-        resolve_project_profile_target_name("data", &unit, "marker:uplink_window_policy");
-    let downlink_window_policy =
-        resolve_project_profile_target_name("data", &unit, "marker:downlink_window_policy");
     let uplink_windows = module
         .nodes
         .iter()
@@ -91,106 +80,45 @@ pub(super) fn validate_data_profile_for_link(
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-
-    if !uplink_nodes
-        .iter()
-        .all(|pipe| has_edge_to(module, &uplink_payload, pipe))
-    {
-        return Err(format!(
-            "project data unit `data.{}` requires uplink payload class to feed all uplink pipe nodes",
-            unit
-        ));
-    }
-    if !uplink_nodes
-        .iter()
-        .all(|pipe| has_edge_to(module, &uplink_shape, pipe))
-    {
-        return Err(format!(
-            "project data unit `data.{}` requires uplink payload shape to feed all uplink pipe nodes",
-            unit
-        ));
-    }
-    if !uplink_windows
-        .iter()
-        .all(|window| has_edge_to(module, &uplink_shape, window))
-    {
-        return Err(format!(
-            "project data unit `data.{}` requires uplink payload shape to feed all uplink window nodes",
-            unit
-        ));
-    }
-    if !downlink_nodes
-        .iter()
-        .all(|pipe| has_edge_to(module, &downlink_payload, pipe))
-    {
-        return Err(format!(
-            "project data unit `data.{}` requires downlink payload class to feed all downlink pipe nodes",
-            unit
-        ));
-    }
-    if !downlink_nodes
-        .iter()
-        .all(|pipe| has_edge_to(module, &downlink_shape, pipe))
-    {
-        return Err(format!(
-            "project data unit `data.{}` requires downlink payload shape to feed all downlink pipe nodes",
-            unit
-        ));
-    }
-    if !downlink_windows
-        .iter()
-        .all(|window| has_edge_to(module, &downlink_shape, window))
-    {
-        return Err(format!(
-            "project data unit `data.{}` requires downlink payload shape to feed all downlink window nodes",
-            unit
-        ));
-    }
-    if contract.uplink == NirResultStage::Data(NirDataFlowState::Windowed) {
-        if !module
-            .nodes
-            .iter()
-            .any(|node| node.name == uplink_window_policy)
-        {
-            return Err(format!(
-                "project data unit `data.{}` requires `uplink_window_policy` marker node for bridge stage `{}`",
-                unit,
-                contract.uplink.render()
-            ));
-        }
-        if !uplink_windows
-            .iter()
-            .all(|window| has_edge_to(module, &uplink_window_policy, window))
-        {
-            return Err(format!(
-                "project data unit `data.{}` requires uplink window policy to feed all uplink window nodes for bridge stage `{}`",
-                unit,
-                contract.uplink.render()
-            ));
-        }
-    }
-    if contract.downlink == NirResultStage::Data(NirDataFlowState::Windowed) {
-        if !module
-            .nodes
-            .iter()
-            .any(|node| node.name == downlink_window_policy)
-        {
-            return Err(format!(
-                "project data unit `data.{}` requires `downlink_window_policy` marker node for bridge stage `{}`",
-                unit,
-                contract.downlink.render()
-            ));
-        }
-        if !downlink_windows
-            .iter()
-            .all(|window| has_edge_to(module, &downlink_window_policy, window))
-        {
-            return Err(format!(
-                "project data unit `data.{}` requires downlink window policy to feed all downlink window nodes for bridge stage `{}`",
-                unit,
-                contract.downlink.render()
-            ));
-        }
+    for direction in data_bridge_directions() {
+        let payload_marker =
+            resolve_project_profile_target_name("data", &unit, direction.payload_class_marker);
+        let shape_marker =
+            resolve_project_profile_target_name("data", &unit, direction.payload_shape_marker);
+        let window_policy_marker =
+            resolve_project_profile_target_name("data", &unit, direction.window_policy_marker);
+        let pipe_nodes = if direction.is_uplink {
+            &uplink_nodes
+        } else {
+            &downlink_nodes
+        };
+        let window_nodes = if direction.is_uplink {
+            &uplink_windows
+        } else {
+            &downlink_windows
+        };
+        let stage = if direction.is_uplink {
+            contract.uplink
+        } else {
+            contract.downlink
+        };
+        validate_bridge_payload_marker_edges(
+            module,
+            &unit,
+            direction.name,
+            &payload_marker,
+            &shape_marker,
+            pipe_nodes,
+            window_nodes,
+        )?;
+        validate_window_policy_marker_edges(
+            module,
+            &unit,
+            direction.name,
+            stage,
+            &window_policy_marker,
+            window_nodes,
+        )?;
     }
 
     Ok(())
@@ -258,7 +186,176 @@ pub(super) fn validate_data_profile_token_types(
         require_profile_semantic_type(&marker_ty, "Marker", true, &unit, tag)?;
     }
 
-    for tag in [
+    for tag in data_bridge_core_marker_tags() {
+        let marker_ty = find_profile_call_declared_type(
+            &profile_fn.body,
+            &profile_module.ast.type_aliases,
+            "data_marker",
+            Some(&tag),
+        )
+        .ok_or_else(|| {
+            format!(
+                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
+                unit, tag
+            )
+        })?;
+        require_profile_semantic_type(&marker_ty, "Marker", true, &unit, &tag)?;
+    }
+    for direction in data_bridge_directions() {
+        let stage = if direction.is_uplink {
+            contract.uplink
+        } else {
+            contract.downlink
+        };
+        if stage_requires_window_policy(stage) {
+            let marker_ty = find_profile_call_declared_type(
+                &profile_fn.body,
+                &profile_module.ast.type_aliases,
+                "data_marker",
+                Some(direction.window_policy_marker.trim_start_matches("marker:")),
+            )
+            .ok_or_else(|| {
+                format!(
+                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}` because {} bridge stage is `{}`",
+                    unit,
+                    direction.window_policy_marker.trim_start_matches("marker:"),
+                    direction.name,
+                    stage.render()
+                )
+            })?;
+            require_marker_semantic_payload_name(
+                &marker_ty,
+                direction.window_policy_payload,
+                &unit,
+                direction.window_policy_marker.trim_start_matches("marker:"),
+            )?;
+        }
+
+        if let Some(payload_ty) = bridge.payload(direction.is_uplink) {
+            let class_tag = direction.payload_class_marker.trim_start_matches("marker:");
+            let marker_ty = find_profile_call_declared_type(
+                &profile_fn.body,
+                &profile_module.ast.type_aliases,
+                "data_marker",
+                Some(class_tag),
+            )
+            .ok_or_else(|| {
+                format!(
+                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
+                    unit, class_tag
+                )
+            })?;
+            require_marker_semantic_payload_name(
+                &marker_ty,
+                &payload_class_marker_name(payload_ty),
+                &unit,
+                class_tag,
+            )?;
+
+            let shape_tag = direction.payload_shape_marker.trim_start_matches("marker:");
+            let marker_ty = find_profile_call_declared_type(
+                &profile_fn.body,
+                &profile_module.ast.type_aliases,
+                "data_marker",
+                Some(shape_tag),
+            )
+            .ok_or_else(|| {
+                format!(
+                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
+                    unit, shape_tag
+                )
+            })?;
+            require_marker_semantic_payload_name(
+                &marker_ty,
+                &payload_shape_marker_name(payload_ty),
+                &unit,
+                shape_tag,
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn stage_requires_window_policy(stage: NirResultStage) -> bool {
+    stage == NirResultStage::Data(NirDataFlowState::Windowed)
+}
+
+fn validate_bridge_payload_marker_edges(
+    module: &YirModule,
+    unit: &str,
+    direction: &str,
+    payload_marker: &str,
+    shape_marker: &str,
+    pipe_nodes: &[String],
+    window_nodes: &[String],
+) -> Result<(), String> {
+    if !pipe_nodes
+        .iter()
+        .all(|pipe| has_edge_to(module, payload_marker, pipe))
+    {
+        return Err(format!(
+            "project data unit `data.{}` requires {} payload class to feed all {} pipe nodes",
+            unit, direction, direction
+        ));
+    }
+    if !pipe_nodes
+        .iter()
+        .all(|pipe| has_edge_to(module, shape_marker, pipe))
+    {
+        return Err(format!(
+            "project data unit `data.{}` requires {} payload shape to feed all {} pipe nodes",
+            unit, direction, direction
+        ));
+    }
+    if !window_nodes
+        .iter()
+        .all(|window| has_edge_to(module, shape_marker, window))
+    {
+        return Err(format!(
+            "project data unit `data.{}` requires {} payload shape to feed all {} window nodes",
+            unit, direction, direction
+        ));
+    }
+    Ok(())
+}
+
+fn validate_window_policy_marker_edges(
+    module: &YirModule,
+    unit: &str,
+    direction: &str,
+    stage: NirResultStage,
+    policy_marker: &str,
+    window_nodes: &[String],
+) -> Result<(), String> {
+    if !stage_requires_window_policy(stage) {
+        return Ok(());
+    }
+    if !module.nodes.iter().any(|node| node.name == policy_marker) {
+        return Err(format!(
+            "project data unit `data.{}` requires `{}_window_policy` marker node for bridge stage `{}`",
+            unit,
+            direction,
+            stage.render()
+        ));
+    }
+    if !window_nodes
+        .iter()
+        .all(|window| has_edge_to(module, policy_marker, window))
+    {
+        return Err(format!(
+            "project data unit `data.{}` requires {} window policy to feed all {} window nodes for bridge stage `{}`",
+            unit,
+            direction,
+            direction,
+            stage.render()
+        ));
+    }
+    Ok(())
+}
+
+fn data_bridge_core_marker_tags() -> Vec<String> {
+    [
         "uplink_pipe",
         "downlink_pipe",
         "uplink_pipe_class",
@@ -267,143 +364,8 @@ pub(super) fn validate_data_profile_token_types(
         "downlink_payload_class",
         "uplink_payload_shape",
         "downlink_payload_shape",
-    ] {
-        let marker_ty = find_profile_call_declared_type(
-            &profile_fn.body,
-            &profile_module.ast.type_aliases,
-            "data_marker",
-            Some(tag),
-        )
-        .ok_or_else(|| {
-            format!(
-                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
-                unit, tag
-            )
-        })?;
-        require_profile_semantic_type(&marker_ty, "Marker", true, &unit, tag)?;
-    }
-    if contract.uplink == NirResultStage::Data(NirDataFlowState::Windowed) {
-        let marker_ty = find_profile_call_declared_type(
-            &profile_fn.body,
-            &profile_module.ast.type_aliases,
-            "data_marker",
-            Some("uplink_window_policy"),
-        )
-        .ok_or_else(|| {
-            format!(
-                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `uplink_window_policy` because uplink bridge stage is `{}`",
-                unit,
-                contract.uplink.render()
-            )
-        })?;
-        require_marker_semantic_payload_name(
-            &marker_ty,
-            "UplinkWindowPolicy",
-            &unit,
-            "uplink_window_policy",
-        )?;
-    }
-    if contract.downlink == NirResultStage::Data(NirDataFlowState::Windowed) {
-        let marker_ty = find_profile_call_declared_type(
-            &profile_fn.body,
-            &profile_module.ast.type_aliases,
-            "data_marker",
-            Some("downlink_window_policy"),
-        )
-        .ok_or_else(|| {
-            format!(
-                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `downlink_window_policy` because downlink bridge stage is `{}`",
-                unit,
-                contract.downlink.render()
-            )
-        })?;
-        require_marker_semantic_payload_name(
-            &marker_ty,
-            "DownlinkWindowPolicy",
-            &unit,
-            "downlink_window_policy",
-        )?;
-    }
-
-    if let Some(uplink_ty) = bridge.uplink_payload.as_ref() {
-        let marker_ty = find_profile_call_declared_type(
-            &profile_fn.body,
-            &profile_module.ast.type_aliases,
-            "data_marker",
-            Some("uplink_payload_class"),
-        )
-        .ok_or_else(|| {
-            format!(
-                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `uplink_payload_class`",
-                unit
-            )
-        })?;
-        require_marker_semantic_payload_name(
-            &marker_ty,
-            &payload_class_marker_name(uplink_ty),
-            &unit,
-            "uplink_payload_class",
-        )?;
-
-        let marker_ty = find_profile_call_declared_type(
-            &profile_fn.body,
-            &profile_module.ast.type_aliases,
-            "data_marker",
-            Some("uplink_payload_shape"),
-        )
-        .ok_or_else(|| {
-            format!(
-                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `uplink_payload_shape`",
-                unit
-            )
-        })?;
-        require_marker_semantic_payload_name(
-            &marker_ty,
-            &payload_shape_marker_name(uplink_ty),
-            &unit,
-            "uplink_payload_shape",
-        )?;
-    }
-
-    if let Some(downlink_ty) = bridge.downlink_payload.as_ref() {
-        let marker_ty = find_profile_call_declared_type(
-            &profile_fn.body,
-            &profile_module.ast.type_aliases,
-            "data_marker",
-            Some("downlink_payload_class"),
-        )
-        .ok_or_else(|| {
-            format!(
-                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `downlink_payload_class`",
-                unit
-            )
-        })?;
-        require_marker_semantic_payload_name(
-            &marker_ty,
-            &payload_class_marker_name(downlink_ty),
-            &unit,
-            "downlink_payload_class",
-        )?;
-
-        let marker_ty = find_profile_call_declared_type(
-            &profile_fn.body,
-            &profile_module.ast.type_aliases,
-            "data_marker",
-            Some("downlink_payload_shape"),
-        )
-        .ok_or_else(|| {
-            format!(
-                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `downlink_payload_shape`",
-                unit
-            )
-        })?;
-        require_marker_semantic_payload_name(
-            &marker_ty,
-            &payload_shape_marker_name(downlink_ty),
-            &unit,
-            "downlink_payload_shape",
-        )?;
-    }
-
-    Ok(())
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect()
 }
