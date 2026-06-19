@@ -20,6 +20,15 @@ pub(crate) fn parse_required_toml_usize(
         .ok_or_else(|| ArtifactError::new(format!("`{}` is missing required key `{key}`", path.display())))
 }
 
+pub(crate) fn parse_required_toml_bool(
+    source: &str,
+    key: &str,
+    path: &Path,
+) -> Result<bool, ArtifactError> {
+    parse_optional_toml_bool(source, key)
+        .ok_or_else(|| ArtifactError::new(format!("`{}` is missing required key `{key}`", path.display())))
+}
+
 pub(crate) fn parse_required_toml_string_array(
     source: &str,
     key: &str,
@@ -50,6 +59,21 @@ pub(crate) fn parse_optional_toml_usize(source: &str, key: &str) -> Option<usize
         let line = raw.trim();
         if let Some(rest) = line.strip_prefix(&prefix) {
             return rest.trim().parse::<usize>().ok();
+        }
+    }
+    None
+}
+
+pub(crate) fn parse_optional_toml_bool(source: &str, key: &str) -> Option<bool> {
+    let prefix = format!("{key} = ");
+    for raw in source.lines() {
+        let line = raw.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            return match rest.trim() {
+                "true" => Some(true),
+                "false" => Some(false),
+                _ => None,
+            };
         }
     }
     None

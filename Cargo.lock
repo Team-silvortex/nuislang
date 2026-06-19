@@ -21,6 +21,9 @@ version = "0.1.0"
 [[package]]
 name = "nuis-runtime"
 version = "0.1.0"
+dependencies = [
+ "nuis-artifact",
+]
 
 [[package]]
 name = "nuis-semantics"

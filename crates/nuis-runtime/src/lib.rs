@@ -4,7 +4,14 @@
 //! artifacts. It does not define execution topology, and it is not the
 //! external `yalivia` project.
 
+pub mod error;
+pub mod loader;
 pub mod executor;
+pub mod session;
+
+pub use error::RuntimeError;
+pub use loader::RuntimeLoader;
+pub use session::LoadedExecutable;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeRole {

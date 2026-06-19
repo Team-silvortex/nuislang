@@ -10,3 +10,6 @@ description = "AOT-side execution and contract scaffolding for the Nuis toolchai
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+nuis-artifact = { path = "../nuis-artifact" }
