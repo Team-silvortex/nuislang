@@ -2828,6 +2828,12 @@ pub struct BuildManifestVerifyReport {
     pub domain_build_unit_count: usize,
     pub heterogeneous_domain_count: usize,
     pub domain_payload_blobs_checked: usize,
+    pub domain_payload_blob_sections_checked: usize,
+    pub domain_payload_contract_sections_checked: usize,
+    pub domain_payload_lowering_plans_checked: usize,
+    pub domain_payload_backend_stubs_checked: usize,
+    pub domain_payload_bridge_plans_checked: usize,
+    pub domain_bridge_stubs_checked: usize,
     pub domain_build_units: Vec<BuildManifestDomainBuildUnit>,
     pub cpu_target_abi: String,
     pub cpu_target_machine_arch: String,
@@ -2844,9 +2850,11 @@ pub struct BuildManifestVerifyReport {
     pub bridge_registry_path: Option<String>,
     pub bridge_registry_units: usize,
     pub bridge_registry_checked: usize,
+    pub bridge_registry_entries_checked: usize,
     pub host_bridge_plan_index_path: Option<String>,
     pub host_bridge_plan_units: usize,
     pub host_bridge_plan_checked: usize,
+    pub host_bridge_plan_entries_checked: usize,
     pub artifacts_checked: usize,
     pub project_metadata_checked: usize,
 }
@@ -3038,6 +3046,12 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         .filter(|unit| unit.domain_family != "cpu")
         .count();
     let mut domain_payload_blobs_checked = 0usize;
+    let mut domain_payload_blob_sections_checked = 0usize;
+    let mut domain_payload_contract_sections_checked = 0usize;
+    let mut domain_payload_lowering_plans_checked = 0usize;
+    let mut domain_payload_backend_stubs_checked = 0usize;
+    let mut domain_payload_bridge_plans_checked = 0usize;
+    let mut domain_bridge_stubs_checked = 0usize;
     let parsed_envelope = parse_nuis_executable_envelope(Path::new(&envelope_path))?;
     if parsed_envelope.schema != envelope_schema {
         return Err(format!(
@@ -3315,6 +3329,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 payload_path
             ));
         }
+        domain_payload_contract_sections_checked += 1;
         let lowering_section = &decoded_blob.sections[1];
         if lowering_section.name != "lowering_plan" {
             return Err(format!(
@@ -3331,6 +3346,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 unit.domain_family
             ));
         }
+        domain_payload_lowering_plans_checked += 1;
         let backend_section = &decoded_blob.sections[2];
         if backend_section.name != "backend_stub" {
             return Err(format!(
@@ -3347,6 +3363,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 unit.domain_family
             ));
         }
+        domain_payload_backend_stubs_checked += 1;
         let bridge_section = &decoded_blob.sections[3];
         if bridge_section.name != "bridge_plan" {
             return Err(format!(
@@ -3363,6 +3380,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 unit.domain_family
             ));
         }
+        domain_payload_bridge_plans_checked += 1;
         let expected_bridge_stub = render_domain_build_unit_host_bridge_stub(unit);
         if bridge_stub != expected_bridge_stub {
             return Err(format!(
@@ -3371,10 +3389,13 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 unit.domain_family
             ));
         }
+        domain_bridge_stubs_checked += 1;
+        domain_payload_blob_sections_checked += decoded_blob.sections.len();
         domain_payload_blobs_checked += 1;
     }
 
     let mut bridge_registry_checked = 0usize;
+    let mut bridge_registry_entries_checked = 0usize;
     if let Some(bridge_registry_path) = &bridge_registry_path {
         if bridge_registry_schema.as_deref() != Some("nuis-bridge-registry-v1") {
             return Err(format!(
@@ -3441,6 +3462,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                     bridge_registry_path, unit.domain_family
                 ));
             }
+            bridge_registry_entries_checked += 1;
         }
         bridge_registry_checked = 1;
     } else if heterogeneous_domain_count > 0 {
@@ -3451,6 +3473,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     }
 
     let mut host_bridge_plan_checked = 0usize;
+    let mut host_bridge_plan_entries_checked = 0usize;
     if let Some(host_bridge_plan_index_path) = &host_bridge_plan_index_path {
         if host_bridge_plan_index_schema.as_deref()
             != Some("nuis-host-bridge-plan-index-v1")
@@ -3519,6 +3542,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                     host_bridge_plan_index_path, unit.domain_family
                 ));
             }
+            host_bridge_plan_entries_checked += 1;
         }
         host_bridge_plan_checked = 1;
     } else if heterogeneous_domain_count > 0 {
@@ -3585,6 +3609,12 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         domain_build_unit_count: domain_build_units.len(),
         heterogeneous_domain_count,
         domain_payload_blobs_checked,
+        domain_payload_blob_sections_checked,
+        domain_payload_contract_sections_checked,
+        domain_payload_lowering_plans_checked,
+        domain_payload_backend_stubs_checked,
+        domain_payload_bridge_plans_checked,
+        domain_bridge_stubs_checked,
         domain_build_units,
         cpu_target_abi,
         cpu_target_machine_arch,
@@ -3601,9 +3631,11 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         bridge_registry_path,
         bridge_registry_units,
         bridge_registry_checked,
+        bridge_registry_entries_checked,
         host_bridge_plan_index_path,
         host_bridge_plan_units,
         host_bridge_plan_checked,
+        host_bridge_plan_entries_checked,
         artifacts_checked: artifacts.len(),
         project_metadata_checked,
     })
@@ -7634,10 +7666,18 @@ mod tests {
         assert_eq!(report.domain_build_unit_count, 3);
         assert_eq!(report.heterogeneous_domain_count, 2);
         assert_eq!(report.domain_payload_blobs_checked, 2);
+        assert_eq!(report.domain_payload_blob_sections_checked, 8);
+        assert_eq!(report.domain_payload_contract_sections_checked, 2);
+        assert_eq!(report.domain_payload_lowering_plans_checked, 2);
+        assert_eq!(report.domain_payload_backend_stubs_checked, 2);
+        assert_eq!(report.domain_payload_bridge_plans_checked, 2);
+        assert_eq!(report.domain_bridge_stubs_checked, 2);
         assert_eq!(report.bridge_registry_units, 2);
         assert_eq!(report.bridge_registry_checked, 1);
+        assert_eq!(report.bridge_registry_entries_checked, 2);
         assert_eq!(report.host_bridge_plan_units, 2);
         assert_eq!(report.host_bridge_plan_checked, 1);
+        assert_eq!(report.host_bridge_plan_entries_checked, 2);
         let kernel_payload = dir.join("nuis.domain.kernel.payload.toml");
         let kernel_bridge_stub = dir.join("nuis.domain.kernel.bridge.stub.txt");
         let kernel_payload_blob = dir.join("nuis.domain.kernel.payload.bin");
