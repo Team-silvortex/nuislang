@@ -95,6 +95,105 @@ fn json_optional_string_field(name: &str, value: Option<&str>) -> String {
     }
 }
 
+fn domain_build_contract_summary_json(
+    summary: &registry::NustarDomainBuildContractSummary,
+) -> String {
+    let lowering_fields = vec![
+        json_string_field("lane_policy", &summary.lowering.lane_policy),
+        json_string_field("bridge_surface", &summary.lowering.bridge_surface),
+        json_string_field("emission_kind", &summary.lowering.emission_kind),
+    ];
+    let backend_fields = vec![
+        json_string_field("stub_kind", &summary.backend.stub_kind),
+        json_string_field("bridge_entry", &summary.backend.bridge_entry),
+        json_string_field("submission_mode", &summary.backend.submission_mode),
+        json_string_field("wake_policy", &summary.backend.wake_policy),
+        json_string_field("scheduler_binding", &summary.backend.scheduler_binding),
+        json_optional_string_field("phase_bind", summary.backend.phase_bind.as_deref()),
+        json_optional_string_field("phase_submit", summary.backend.phase_submit.as_deref()),
+        json_optional_string_field("phase_wait", summary.backend.phase_wait.as_deref()),
+        json_optional_string_field("phase_finalize", summary.backend.phase_finalize.as_deref()),
+        json_optional_string_field(
+            "transport_model",
+            summary.backend.transport_model.as_deref(),
+        ),
+        json_optional_string_field("request_shape", summary.backend.request_shape.as_deref()),
+        json_optional_string_field("response_shape", summary.backend.response_shape.as_deref()),
+        json_optional_string_field("dispatch_shape", summary.backend.dispatch_shape.as_deref()),
+        json_optional_string_field("memory_binding", summary.backend.memory_binding.as_deref()),
+        json_optional_string_field(
+            "resource_binding",
+            summary.backend.resource_binding.as_deref(),
+        ),
+        json_optional_string_field(
+            "completion_model",
+            summary.backend.completion_model.as_deref(),
+        ),
+    ];
+    let bridge_fields = vec![
+        json_string_field("bridge_surface", &summary.bridge.bridge_surface),
+        json_string_field("bridge_entry", &summary.bridge.bridge_entry),
+        json_string_field("scheduler_binding", &summary.bridge.scheduler_binding),
+        json_string_field("phase_bind", &summary.bridge.phase_bind),
+        json_string_field("phase_submit", &summary.bridge.phase_submit),
+        json_string_field("phase_wait", &summary.bridge.phase_wait),
+        json_string_field("phase_finalize", &summary.bridge.phase_finalize),
+        json_string_field("bridge_kind", &summary.bridge.bridge_kind),
+    ];
+    let host_bridge_fields = vec![
+        json_string_field("host_ffi_surface", &summary.host_bridge.host_ffi_surface),
+        json_string_field("handle_family", &summary.host_bridge.handle_family),
+        json_string_array_field("phase_order", &summary.host_bridge.phase_order),
+        json_string_array_field("phase_bind_inputs", &summary.host_bridge.phase_bind_inputs),
+        json_string_array_field("phase_bind_outputs", &summary.host_bridge.phase_bind_outputs),
+        json_string_array_field(
+            "phase_submit_inputs",
+            &summary.host_bridge.phase_submit_inputs,
+        ),
+        json_string_array_field(
+            "phase_submit_outputs",
+            &summary.host_bridge.phase_submit_outputs,
+        ),
+        json_string_array_field("phase_wait_inputs", &summary.host_bridge.phase_wait_inputs),
+        json_string_array_field("phase_wait_outputs", &summary.host_bridge.phase_wait_outputs),
+        json_string_array_field(
+            "phase_finalize_inputs",
+            &summary.host_bridge.phase_finalize_inputs,
+        ),
+        json_string_array_field(
+            "phase_finalize_outputs",
+            &summary.host_bridge.phase_finalize_outputs,
+        ),
+        json_string_field("phase_bind_wake", &summary.host_bridge.phase_bind_wake),
+        json_string_field("phase_submit_wake", &summary.host_bridge.phase_submit_wake),
+        json_string_field("phase_wait_wake", &summary.host_bridge.phase_wait_wake),
+        json_string_field("phase_finalize_wake", &summary.host_bridge.phase_finalize_wake),
+        json_bool_field("bridge_plan_begin", summary.host_bridge.bridge_plan_begin),
+        json_bool_field("bridge_plan_end", summary.host_bridge.bridge_plan_end),
+    ];
+    format!(
+        "{{\"lowering\":{{{}}},\"backend\":{{{}}},\"bridge\":{{{}}},\"host_bridge\":{{{}}}}}",
+        lowering_fields.join(","),
+        backend_fields.join(","),
+        bridge_fields.join(","),
+        host_bridge_fields.join(","),
+    )
+}
+
+fn domain_registry_json(
+    registration: &registry::NustarDomainRegistration,
+    manifest: &registry::NustarPackageManifest,
+) -> String {
+    let mut fields = registry::domain_registration_json(registration);
+    fields.pop();
+    fields.push_str(&format!(
+        ",\"build_contract\":{}",
+        domain_build_contract_summary_json(&registry::domain_build_contract_summary(manifest))
+    ));
+    fields.push('}');
+    fields
+}
+
 fn domain_build_unit_json(unit: &aot::BuildManifestDomainBuildUnit) -> String {
     let fields = vec![
         json_string_field("package_id", &unit.package_id),
@@ -132,6 +231,38 @@ fn domain_build_unit_json(unit: &aot::BuildManifestDomainBuildUnit) -> String {
         json_string_field("packaging_role", &unit.packaging_role),
     ];
     format!("{{{}}}", fields.join(","))
+}
+
+fn domain_build_unit_effective_contract_summary(
+    unit: &aot::BuildManifestDomainBuildUnit,
+) -> registry::NustarDomainBuildContractSummary {
+    registry::load_manifest(Path::new(NUSTAR_REGISTRY_ROOT), &unit.package_id)
+        .map(|manifest| registry::domain_build_contract_summary(&manifest))
+        .unwrap_or_else(|_| registry::domain_build_contract_summary_for_domain(&unit.domain_family))
+}
+
+fn domain_build_unit_contract_json(unit: &aot::BuildManifestDomainBuildUnit) -> String {
+    let fields = vec![
+        json_string_field("package_id", &unit.package_id),
+        json_string_field("domain_family", &unit.domain_family),
+        json_optional_string_field("abi", unit.abi.as_deref()),
+        json_optional_string_field(
+            "selected_lowering_target",
+            unit.selected_lowering_target.as_deref(),
+        ),
+        format!(
+            "\"build_contract\":{}",
+            domain_build_contract_summary_json(&domain_build_unit_effective_contract_summary(unit))
+        ),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn domain_build_unit_contracts_json(units: &[aot::BuildManifestDomainBuildUnit]) -> String {
+    units.iter()
+        .map(domain_build_unit_contract_json)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn collect_benchmark_inventory(
@@ -267,8 +398,12 @@ fn load_nuis_compiled_artifact(input: &Path) -> Result<aot::NuisCompiledArtifact
     }
 }
 
-fn inspect_artifact_json(input: &Path, artifact: &aot::NuisCompiledArtifact) -> String {
-    let fields = vec![
+fn inspect_artifact_json(
+    input: &Path,
+    artifact: &aot::NuisCompiledArtifact,
+    manifest_verify: Option<&aot::BuildManifestVerifyReport>,
+) -> String {
+    let mut fields = vec![
         json_string_field("kind", "nuis_artifact_inspect"),
         json_string_field("input", &input.display().to_string()),
         json_string_field("schema", &artifact.schema),
@@ -318,6 +453,25 @@ fn inspect_artifact_json(input: &Path, artifact: &aot::NuisCompiledArtifact) -> 
             &artifact.lifecycle.runtime_capability_flags,
         ),
     ];
+    if let Some(report) = manifest_verify {
+        fields.push(json_usize_field(
+            "domain_build_unit_count",
+            report.domain_build_unit_count,
+        ));
+        fields.push(format!(
+            "\"domain_build_units\":[{}]",
+            report
+                .domain_build_units
+                .iter()
+                .map(domain_build_unit_json)
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+        fields.push(format!(
+            "\"domain_build_contracts\":[{}]",
+            domain_build_unit_contracts_json(&report.domain_build_units)
+        ));
+    }
     format!("{{{}}}", fields.join(","))
 }
 
@@ -383,6 +537,7 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
         .map(domain_build_unit_json)
         .collect::<Vec<_>>()
         .join(",");
+    let domain_build_contracts = domain_build_unit_contracts_json(&report.domain_build_units);
     let fields = vec![
         json_string_field("kind", "nuis_build_manifest_verify"),
         json_string_field("input", &input.display().to_string()),
@@ -427,6 +582,7 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
             report.domain_payload_blobs_checked,
         ),
         format!("\"domain_build_units\":[{}]", domain_build_units),
+        format!("\"domain_build_contracts\":[{}]", domain_build_contracts),
         json_optional_string_field(
             "bridge_registry_path",
             report.bridge_registry_path.as_deref(),
@@ -517,7 +673,7 @@ fn artifact_report_json(
         ),
         format!(
             "\"artifact_inspect\":{}",
-            inspect_artifact_json(input, artifact)
+            inspect_artifact_json(input, artifact, Some(manifest_verify))
         ),
         format!(
             "\"artifact_verify\":{}",
@@ -586,8 +742,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             if json {
                 let contracts = registrations
                     .iter()
-                    .map(registry::domain_registration_json)
-                    .collect::<Vec<_>>();
+                    .map(|registration| {
+                        let manifest = registry::load_manifest_for_domain(
+                            Path::new("nustar-packages"),
+                            &registration.domain_family,
+                        )?;
+                        Ok(domain_registry_json(registration, &manifest))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
                 println!(
                     "{{{},{},{}}}",
                     format!(
@@ -607,6 +769,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 let capability = registry::capability_summary(&manifest);
                 let execution = registry::execution_summary(&manifest);
                 let scheduler = registry::scheduler_summary(&manifest);
+                let build_contract = registry::domain_build_contract_summary(&manifest);
                 println!("package: {}", manifest.package_id);
                 println!("  schema: {}", manifest.manifest_schema);
                 println!("  domain: {}", manifest.domain_family);
@@ -699,6 +862,169 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!(
                     "  scheduler_observer_classes: {}",
                     scheduler.observer_classes
+                );
+                println!(
+                    "  build_lowering_lane_policy: {}",
+                    build_contract.lowering.lane_policy
+                );
+                println!(
+                    "  build_lowering_bridge_surface: {}",
+                    build_contract.lowering.bridge_surface
+                );
+                println!(
+                    "  build_lowering_emission_kind: {}",
+                    build_contract.lowering.emission_kind
+                );
+                println!(
+                    "  build_backend_stub_kind: {}",
+                    build_contract.backend.stub_kind
+                );
+                println!(
+                    "  build_backend_bridge_entry: {}",
+                    build_contract.backend.bridge_entry
+                );
+                println!(
+                    "  build_backend_submission_mode: {}",
+                    build_contract.backend.submission_mode
+                );
+                println!(
+                    "  build_backend_wake_policy: {}",
+                    build_contract.backend.wake_policy
+                );
+                println!(
+                    "  build_backend_scheduler_binding: {}",
+                    build_contract.backend.scheduler_binding
+                );
+                if let Some(phase_bind) = build_contract.backend.phase_bind.as_deref() {
+                    println!("  build_backend_phase_bind: {}", phase_bind);
+                }
+                if let Some(phase_submit) = build_contract.backend.phase_submit.as_deref() {
+                    println!("  build_backend_phase_submit: {}", phase_submit);
+                }
+                if let Some(phase_wait) = build_contract.backend.phase_wait.as_deref() {
+                    println!("  build_backend_phase_wait: {}", phase_wait);
+                }
+                if let Some(phase_finalize) = build_contract.backend.phase_finalize.as_deref() {
+                    println!("  build_backend_phase_finalize: {}", phase_finalize);
+                }
+                if let Some(transport_model) = build_contract.backend.transport_model.as_deref() {
+                    println!("  build_backend_transport_model: {}", transport_model);
+                }
+                if let Some(request_shape) = build_contract.backend.request_shape.as_deref() {
+                    println!("  build_backend_request_shape: {}", request_shape);
+                }
+                if let Some(response_shape) = build_contract.backend.response_shape.as_deref() {
+                    println!("  build_backend_response_shape: {}", response_shape);
+                }
+                if let Some(dispatch_shape) = build_contract.backend.dispatch_shape.as_deref() {
+                    println!("  build_backend_dispatch_shape: {}", dispatch_shape);
+                }
+                if let Some(memory_binding) = build_contract.backend.memory_binding.as_deref() {
+                    println!("  build_backend_memory_binding: {}", memory_binding);
+                }
+                if let Some(resource_binding) = build_contract.backend.resource_binding.as_deref() {
+                    println!("  build_backend_resource_binding: {}", resource_binding);
+                }
+                if let Some(completion_model) = build_contract.backend.completion_model.as_deref()
+                {
+                    println!("  build_backend_completion_model: {}", completion_model);
+                }
+                println!(
+                    "  build_bridge_surface: {}",
+                    build_contract.bridge.bridge_surface
+                );
+                println!(
+                    "  build_bridge_entry: {}",
+                    build_contract.bridge.bridge_entry
+                );
+                println!(
+                    "  build_bridge_scheduler_binding: {}",
+                    build_contract.bridge.scheduler_binding
+                );
+                println!(
+                    "  build_bridge_phase_bind: {}",
+                    build_contract.bridge.phase_bind
+                );
+                println!(
+                    "  build_bridge_phase_submit: {}",
+                    build_contract.bridge.phase_submit
+                );
+                println!(
+                    "  build_bridge_phase_wait: {}",
+                    build_contract.bridge.phase_wait
+                );
+                println!(
+                    "  build_bridge_phase_finalize: {}",
+                    build_contract.bridge.phase_finalize
+                );
+                println!("  build_bridge_kind: {}", build_contract.bridge.bridge_kind);
+                println!(
+                    "  host_bridge_host_ffi_surface: {}",
+                    build_contract.host_bridge.host_ffi_surface
+                );
+                println!(
+                    "  host_bridge_handle_family: {}",
+                    build_contract.host_bridge.handle_family
+                );
+                println!(
+                    "  host_bridge_phase_order: {}",
+                    build_contract.host_bridge.phase_order.join(", ")
+                );
+                println!(
+                    "  host_bridge_phase_bind_inputs: {}",
+                    build_contract.host_bridge.phase_bind_inputs.join(", ")
+                );
+                println!(
+                    "  host_bridge_phase_bind_outputs: {}",
+                    build_contract.host_bridge.phase_bind_outputs.join(", ")
+                );
+                println!(
+                    "  host_bridge_phase_submit_inputs: {}",
+                    build_contract.host_bridge.phase_submit_inputs.join(", ")
+                );
+                println!(
+                    "  host_bridge_phase_submit_outputs: {}",
+                    build_contract.host_bridge.phase_submit_outputs.join(", ")
+                );
+                println!(
+                    "  host_bridge_phase_wait_inputs: {}",
+                    build_contract.host_bridge.phase_wait_inputs.join(", ")
+                );
+                println!(
+                    "  host_bridge_phase_wait_outputs: {}",
+                    build_contract.host_bridge.phase_wait_outputs.join(", ")
+                );
+                println!(
+                    "  host_bridge_phase_finalize_inputs: {}",
+                    build_contract.host_bridge.phase_finalize_inputs.join(", ")
+                );
+                println!(
+                    "  host_bridge_phase_finalize_outputs: {}",
+                    build_contract.host_bridge.phase_finalize_outputs.join(", ")
+                );
+                println!(
+                    "  host_bridge_phase_bind_wake: {}",
+                    build_contract.host_bridge.phase_bind_wake
+                );
+                println!(
+                    "  host_bridge_phase_submit_wake: {}",
+                    build_contract.host_bridge.phase_submit_wake
+                );
+                println!(
+                    "  host_bridge_phase_wait_wake: {}",
+                    build_contract.host_bridge.phase_wait_wake
+                );
+                println!(
+                    "  host_bridge_phase_finalize_wake: {}",
+                    build_contract.host_bridge.phase_finalize_wake
+                );
+                println!(
+                    "  host_bridge_plan_begin: {}",
+                    build_contract.host_bridge.bridge_plan_begin
+                );
+                println!(
+                    "  host_bridge_plan_end: {}",
+                    build_contract.host_bridge.bridge_plan_end
                 );
                 println!("  profiles: {}", manifest.profiles.join(", "));
                 println!(
@@ -1156,8 +1482,21 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         }
         CommandKind::InspectArtifact { input, json } => {
             let artifact = load_nuis_compiled_artifact(&input)?;
+            let is_manifest_input = input
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name == "nuis.build.manifest.toml")
+                .unwrap_or(false);
+            let manifest_verify = if is_manifest_input {
+                Some(aot::verify_build_manifest(&input)?)
+            } else {
+                Some(reconstruct_manifest_report_from_artifact(&input, &artifact)?.1)
+            };
             if json {
-                println!("{}", inspect_artifact_json(&input, &artifact));
+                println!(
+                    "{}",
+                    inspect_artifact_json(&input, &artifact, manifest_verify.as_ref())
+                );
                 return Ok(());
             }
             println!("nuis artifact: {}", input.display());
@@ -1221,6 +1560,63 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 "  lifecycle_runtime_capability_flags: {}",
                 artifact.lifecycle.runtime_capability_flags.join(", ")
             );
+            if let Some(report) = &manifest_verify {
+                println!("  domain_build_unit_count: {}", report.domain_build_unit_count);
+                println!(
+                    "  heterogeneous_domain_count: {}",
+                    report.heterogeneous_domain_count
+                );
+                for unit in &report.domain_build_units {
+                    let build_contract = domain_build_unit_effective_contract_summary(unit);
+                    println!(
+                        "  domain_build_contract: {} [{}]",
+                        unit.package_id, unit.domain_family
+                    );
+                    if let Some(abi) = unit.abi.as_deref() {
+                        println!("    abi: {}", abi);
+                    }
+                    if let Some(target) = unit.selected_lowering_target.as_deref() {
+                        println!("    selected_lowering_target: {}", target);
+                    }
+                    println!(
+                        "    lowering: lane_policy={}, bridge_surface={}, emission_kind={}",
+                        build_contract.lowering.lane_policy,
+                        build_contract.lowering.bridge_surface,
+                        build_contract.lowering.emission_kind
+                    );
+                    println!(
+                        "    backend: stub_kind={}, bridge_entry={}, submission_mode={}, wake_policy={}, scheduler_binding={}",
+                        build_contract.backend.stub_kind,
+                        build_contract.backend.bridge_entry,
+                        build_contract.backend.submission_mode,
+                        build_contract.backend.wake_policy,
+                        build_contract.backend.scheduler_binding
+                    );
+                    println!(
+                        "    bridge: bridge_surface={}, bridge_entry={}, scheduler_binding={}, phase_bind={}, phase_submit={}, phase_wait={}, phase_finalize={}, bridge_kind={}",
+                        build_contract.bridge.bridge_surface,
+                        build_contract.bridge.bridge_entry,
+                        build_contract.bridge.scheduler_binding,
+                        build_contract.bridge.phase_bind,
+                        build_contract.bridge.phase_submit,
+                        build_contract.bridge.phase_wait,
+                        build_contract.bridge.phase_finalize,
+                        build_contract.bridge.bridge_kind
+                    );
+                    println!(
+                        "    host_bridge: host_ffi_surface={}, handle_family={}, phase_order={}, phase_bind_wake={}, phase_submit_wake={}, phase_wait_wake={}, phase_finalize_wake={}, bridge_plan_begin={}, bridge_plan_end={}",
+                        build_contract.host_bridge.host_ffi_surface,
+                        build_contract.host_bridge.handle_family,
+                        build_contract.host_bridge.phase_order.join(", "),
+                        build_contract.host_bridge.phase_bind_wake,
+                        build_contract.host_bridge.phase_submit_wake,
+                        build_contract.host_bridge.phase_wait_wake,
+                        build_contract.host_bridge.phase_finalize_wake,
+                        build_contract.host_bridge.bridge_plan_begin,
+                        build_contract.host_bridge.bridge_plan_end
+                    );
+                }
+            }
         }
         CommandKind::ArtifactReport { input, json } => {
             let is_manifest_input = input
@@ -1495,6 +1891,53 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 "  domain_payload_blobs_checked: {}",
                 report.domain_payload_blobs_checked
             );
+            for unit in &report.domain_build_units {
+                let build_contract = domain_build_unit_effective_contract_summary(unit);
+                println!("  domain_build_contract: {} [{}]", unit.package_id, unit.domain_family);
+                if let Some(abi) = unit.abi.as_deref() {
+                    println!("    abi: {}", abi);
+                }
+                if let Some(target) = unit.selected_lowering_target.as_deref() {
+                    println!("    selected_lowering_target: {}", target);
+                }
+                println!(
+                    "    lowering: lane_policy={}, bridge_surface={}, emission_kind={}",
+                    build_contract.lowering.lane_policy,
+                    build_contract.lowering.bridge_surface,
+                    build_contract.lowering.emission_kind
+                );
+                println!(
+                    "    backend: stub_kind={}, bridge_entry={}, submission_mode={}, wake_policy={}, scheduler_binding={}",
+                    build_contract.backend.stub_kind,
+                    build_contract.backend.bridge_entry,
+                    build_contract.backend.submission_mode,
+                    build_contract.backend.wake_policy,
+                    build_contract.backend.scheduler_binding
+                );
+                println!(
+                    "    bridge: bridge_surface={}, bridge_entry={}, scheduler_binding={}, phase_bind={}, phase_submit={}, phase_wait={}, phase_finalize={}, bridge_kind={}",
+                    build_contract.bridge.bridge_surface,
+                    build_contract.bridge.bridge_entry,
+                    build_contract.bridge.scheduler_binding,
+                    build_contract.bridge.phase_bind,
+                    build_contract.bridge.phase_submit,
+                    build_contract.bridge.phase_wait,
+                    build_contract.bridge.phase_finalize,
+                    build_contract.bridge.bridge_kind
+                );
+                println!(
+                    "    host_bridge: host_ffi_surface={}, handle_family={}, phase_order={}, phase_bind_wake={}, phase_submit_wake={}, phase_wait_wake={}, phase_finalize_wake={}, bridge_plan_begin={}, bridge_plan_end={}",
+                    build_contract.host_bridge.host_ffi_surface,
+                    build_contract.host_bridge.handle_family,
+                    build_contract.host_bridge.phase_order.join(", "),
+                    build_contract.host_bridge.phase_bind_wake,
+                    build_contract.host_bridge.phase_submit_wake,
+                    build_contract.host_bridge.phase_wait_wake,
+                    build_contract.host_bridge.phase_finalize_wake,
+                    build_contract.host_bridge.bridge_plan_begin,
+                    build_contract.host_bridge.bridge_plan_end
+                );
+            }
             if let Some(path) = &report.bridge_registry_path {
                 println!("  bridge_registry_path: {}", path);
             }
@@ -2250,6 +2693,156 @@ mod tests {
         assert!(json.contains("\"ast_surface\":["));
         assert!(json.contains("\"nir_surface\":["));
         assert!(json.contains("\"ops\":["));
+    }
+
+    #[test]
+    fn domain_build_contract_summary_json_exposes_grouped_sections() {
+        let manifest = registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), "network")
+            .expect("expected network manifest");
+        let json = domain_build_contract_summary_json(&registry::domain_build_contract_summary(
+            &manifest,
+        ));
+
+        assert!(json.contains("\"lowering\":{"));
+        assert!(json.contains("\"backend\":{"));
+        assert!(json.contains("\"bridge\":{"));
+        assert!(json.contains("\"host_bridge\":{"));
+        assert!(json.contains("\"lane_policy\":\"dispatch-lanes.io-bound\""));
+        assert!(json.contains("\"bridge_entry\":\"nuis.network.bridge.dispatch.v1\""));
+        assert!(json.contains("\"transport_model\":\"client-session\""));
+        assert!(json.contains("\"phase_order\":[\"bind\",\"submit\",\"wait\",\"finalize\"]"));
+        assert!(json.contains("\"bridge_plan_begin\":true"));
+        assert!(json.contains("\"bridge_plan_end\":true"));
+    }
+
+    #[test]
+    fn domain_registry_json_includes_effective_build_contract() {
+        let registration = registry::load_registered_domains(Path::new(NUSTAR_REGISTRY_ROOT))
+            .expect("expected registered domains")
+            .into_iter()
+            .find(|item| item.domain_family == "network")
+            .expect("expected network registration");
+        let manifest = registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), "network")
+            .expect("expected network manifest");
+        let json = domain_registry_json(&registration, &manifest);
+
+        assert!(json.contains("\"registration\":{"));
+        assert!(json.contains("\"build_contract\":{"));
+        assert!(json.contains("\"backend\":{"));
+        assert!(json.contains("\"host_bridge\":{"));
+        assert!(json.contains("\"scheduler_binding\":\"network-poll-bridge\""));
+        assert!(json.contains("\"host_ffi_surface\":\"socket,urlsession\""));
+    }
+
+    #[test]
+    fn domain_build_unit_contract_json_includes_effective_build_contract() {
+        let unit = aot::BuildManifestDomainBuildUnit {
+            package_id: "official.network".to_owned(),
+            domain_family: "network".to_owned(),
+            abi: Some("network.socket.macos.arm64.v1".to_owned()),
+            machine_arch: Some("arm64".to_owned()),
+            machine_os: Some("darwin".to_owned()),
+            backend_family: Some("urlsession".to_owned()),
+            selected_lowering_target: Some("urlsession".to_owned()),
+            artifact_stub_path: None,
+            artifact_payload_path: None,
+            artifact_bridge_stub_path: None,
+            artifact_payload_blob_path: None,
+            artifact_payload_blob_bytes: None,
+            artifact_payload_format: None,
+            contract_family: "nustar.network".to_owned(),
+            packaging_role: "domain-sidecar".to_owned(),
+        };
+        let json = domain_build_unit_contract_json(&unit);
+
+        assert!(json.contains("\"package_id\":\"official.network\""));
+        assert!(json.contains("\"domain_family\":\"network\""));
+        assert!(json.contains("\"build_contract\":{"));
+        assert!(json.contains("\"lane_policy\":\"dispatch-lanes.io-bound\""));
+        assert!(json.contains("\"bridge_entry\":\"nuis.network.bridge.dispatch.v1\""));
+    }
+
+    #[test]
+    fn verify_build_manifest_json_includes_domain_build_contracts() {
+        let project_name = "verify_build_manifest_contract_json";
+        let project_root = write_temp_project_fixture(
+            project_name,
+            r#"
+name = "verify_build_manifest_contract_json"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        );
+        let output_dir = temp_dir("verify_build_manifest_contract_json_outputs");
+
+        run(CommandKind::Compile {
+            input: project_root,
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let report = aot::verify_build_manifest(&manifest_path).unwrap();
+        let json = verify_build_manifest_json(&manifest_path, &report);
+
+        assert!(json.contains("\"domain_build_units\":["));
+        assert!(json.contains("\"domain_build_contracts\":["));
+        assert!(json.contains("\"package_id\":\"official.cpu\""));
+        assert!(json.contains("\"build_contract\":{"));
+    }
+
+    #[test]
+    fn inspect_artifact_json_includes_domain_build_contracts_when_manifest_is_available() {
+        let project_name = "inspect_artifact_contract_json";
+        let project_root = write_temp_project_fixture(
+            project_name,
+            r#"
+name = "inspect_artifact_contract_json"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        );
+        let output_dir = temp_dir("inspect_artifact_contract_json_outputs");
+
+        run(CommandKind::Compile {
+            input: project_root,
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let artifact = load_nuis_compiled_artifact(&manifest_path).unwrap();
+        let report = aot::verify_build_manifest(&manifest_path).unwrap();
+        let json = inspect_artifact_json(&manifest_path, &artifact, Some(&report));
+
+        assert!(json.contains("\"domain_build_unit_count\":"));
+        assert!(json.contains("\"domain_build_units\":["));
+        assert!(json.contains("\"domain_build_contracts\":["));
+        assert!(json.contains("\"package_id\":\"official.cpu\""));
     }
 
     #[test]

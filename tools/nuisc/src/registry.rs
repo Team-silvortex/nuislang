@@ -109,6 +109,43 @@ pub struct NustarPackageManifest {
     pub host_ffi_surface: Vec<String>,
     pub host_ffi_abis: Vec<String>,
     pub host_ffi_bridge: String,
+    pub bridge_lane_policy: Option<String>,
+    pub bridge_surface: Option<String>,
+    pub bridge_emission_kind: Option<String>,
+    pub bridge_entry: Option<String>,
+    pub bridge_kind: Option<String>,
+    pub bridge_scheduler_binding: Option<String>,
+    pub backend_stub_kind: Option<String>,
+    pub backend_submission_mode: Option<String>,
+    pub backend_wake_policy: Option<String>,
+    pub backend_transport_model: Option<String>,
+    pub backend_request_shape: Option<String>,
+    pub backend_response_shape: Option<String>,
+    pub backend_dispatch_shape: Option<String>,
+    pub backend_memory_binding: Option<String>,
+    pub backend_resource_binding: Option<String>,
+    pub backend_completion_model: Option<String>,
+    pub phase_bind: Option<String>,
+    pub phase_submit: Option<String>,
+    pub phase_wait: Option<String>,
+    pub phase_finalize: Option<String>,
+    pub host_bridge_host_ffi_surface: Option<Vec<String>>,
+    pub host_bridge_handle_family: Option<Vec<String>>,
+    pub host_bridge_phase_order: Option<Vec<String>>,
+    pub host_bridge_phase_bind_inputs: Option<Vec<String>>,
+    pub host_bridge_phase_bind_outputs: Option<Vec<String>>,
+    pub host_bridge_phase_submit_inputs: Option<Vec<String>>,
+    pub host_bridge_phase_submit_outputs: Option<Vec<String>>,
+    pub host_bridge_phase_wait_inputs: Option<Vec<String>>,
+    pub host_bridge_phase_wait_outputs: Option<Vec<String>>,
+    pub host_bridge_phase_finalize_inputs: Option<Vec<String>>,
+    pub host_bridge_phase_finalize_outputs: Option<Vec<String>>,
+    pub host_bridge_phase_bind_wake: Option<String>,
+    pub host_bridge_phase_submit_wake: Option<String>,
+    pub host_bridge_phase_wait_wake: Option<String>,
+    pub host_bridge_phase_finalize_wake: Option<String>,
+    pub host_bridge_plan_begin: Option<bool>,
+    pub host_bridge_plan_end: Option<bool>,
     pub support_surface: Vec<String>,
     pub support_profile_slots: Vec<String>,
     pub default_lanes: Vec<String>,
@@ -273,6 +310,141 @@ pub struct NustarDomainBuildContractSummary {
     pub host_bridge: NustarHostBridgeSpecSummary,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FallbackDomainBuildPreset {
+    lane_policy: &'static str,
+    bridge_surface: &'static str,
+    emission_kind: &'static str,
+    bridge_entry: &'static str,
+    bridge_kind: &'static str,
+    stub_kind: &'static str,
+    submission_mode: &'static str,
+    wake_policy: &'static str,
+    scheduler_binding: &'static str,
+    phase_bind: &'static str,
+    phase_submit: &'static str,
+    phase_wait: &'static str,
+    phase_finalize: &'static str,
+    transport_model: Option<&'static str>,
+    request_shape: Option<&'static str>,
+    response_shape: Option<&'static str>,
+    dispatch_shape: Option<&'static str>,
+    memory_binding: Option<&'static str>,
+    resource_binding: Option<&'static str>,
+    completion_model: Option<&'static str>,
+    host_ffi_surface: &'static [&'static str],
+    handle_family: &'static [&'static str],
+    phase_bind_inputs: &'static [&'static str],
+    phase_bind_outputs: &'static [&'static str],
+    phase_submit_inputs: &'static [&'static str],
+    phase_submit_outputs: &'static [&'static str],
+    phase_wait_inputs: &'static [&'static str],
+    phase_wait_outputs: &'static [&'static str],
+    phase_finalize_inputs: &'static [&'static str],
+    phase_finalize_outputs: &'static [&'static str],
+    phase_bind_wake: &'static str,
+    phase_submit_wake: &'static str,
+    phase_wait_wake: &'static str,
+    phase_finalize_wake: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FallbackBackendFacet {
+    stub_kind: &'static str,
+    submission_mode: &'static str,
+    wake_policy: &'static str,
+    transport_model: Option<&'static str>,
+    request_shape: Option<&'static str>,
+    response_shape: Option<&'static str>,
+    dispatch_shape: Option<&'static str>,
+    memory_binding: Option<&'static str>,
+    resource_binding: Option<&'static str>,
+    completion_model: Option<&'static str>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FallbackBridgeFlowFacet {
+    lane_policy: &'static str,
+    bridge_surface: &'static str,
+    bridge_entry: &'static str,
+    scheduler_binding: &'static str,
+    phase_bind: &'static str,
+    phase_submit: &'static str,
+    phase_wait: &'static str,
+    phase_finalize: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FallbackHostBridgeFacet {
+    host_ffi_surface: &'static [&'static str],
+    handle_family: &'static [&'static str],
+    phase_bind_inputs: &'static [&'static str],
+    phase_bind_outputs: &'static [&'static str],
+    phase_submit_inputs: &'static [&'static str],
+    phase_submit_outputs: &'static [&'static str],
+    phase_wait_inputs: &'static [&'static str],
+    phase_wait_outputs: &'static [&'static str],
+    phase_finalize_inputs: &'static [&'static str],
+    phase_finalize_outputs: &'static [&'static str],
+    phase_bind_wake: &'static str,
+    phase_submit_wake: &'static str,
+    phase_wait_wake: &'static str,
+    phase_finalize_wake: &'static str,
+}
+
+const DEFAULT_BRIDGE_PHASE_ORDER: [&str; 4] = ["bind", "submit", "wait", "finalize"];
+
+fn preset_vec(values: &[&str]) -> Vec<String> {
+    values.iter().map(|v| (*v).to_owned()).collect()
+}
+
+fn preset_csv(values: &[&str]) -> String {
+    values.join(",")
+}
+
+fn fallback_preset(
+    flow: FallbackBridgeFlowFacet,
+    backend: FallbackBackendFacet,
+    host_bridge: FallbackHostBridgeFacet,
+) -> FallbackDomainBuildPreset {
+    FallbackDomainBuildPreset {
+        lane_policy: flow.lane_policy,
+        bridge_surface: flow.bridge_surface,
+        emission_kind: "sidecar-plan",
+        bridge_entry: flow.bridge_entry,
+        bridge_kind: "managed-lifecycle-bridge",
+        stub_kind: backend.stub_kind,
+        submission_mode: backend.submission_mode,
+        wake_policy: backend.wake_policy,
+        scheduler_binding: flow.scheduler_binding,
+        phase_bind: flow.phase_bind,
+        phase_submit: flow.phase_submit,
+        phase_wait: flow.phase_wait,
+        phase_finalize: flow.phase_finalize,
+        transport_model: backend.transport_model,
+        request_shape: backend.request_shape,
+        response_shape: backend.response_shape,
+        dispatch_shape: backend.dispatch_shape,
+        memory_binding: backend.memory_binding,
+        resource_binding: backend.resource_binding,
+        completion_model: backend.completion_model,
+        host_ffi_surface: host_bridge.host_ffi_surface,
+        handle_family: host_bridge.handle_family,
+        phase_bind_inputs: host_bridge.phase_bind_inputs,
+        phase_bind_outputs: host_bridge.phase_bind_outputs,
+        phase_submit_inputs: host_bridge.phase_submit_inputs,
+        phase_submit_outputs: host_bridge.phase_submit_outputs,
+        phase_wait_inputs: host_bridge.phase_wait_inputs,
+        phase_wait_outputs: host_bridge.phase_wait_outputs,
+        phase_finalize_inputs: host_bridge.phase_finalize_inputs,
+        phase_finalize_outputs: host_bridge.phase_finalize_outputs,
+        phase_bind_wake: host_bridge.phase_bind_wake,
+        phase_submit_wake: host_bridge.phase_submit_wake,
+        phase_wait_wake: host_bridge.phase_wait_wake,
+        phase_finalize_wake: host_bridge.phase_finalize_wake,
+    }
+}
+
 impl NustarClockSummary {
     pub fn brief(&self) -> String {
         format!(
@@ -312,275 +484,392 @@ pub fn execution_summary(manifest: &NustarPackageManifest) -> NustarExecutionSum
 pub fn domain_build_contract_summary(
     manifest: &NustarPackageManifest,
 ) -> NustarDomainBuildContractSummary {
-    domain_build_contract_summary_for_domain(&manifest.domain_family)
+    let fallback = domain_build_contract_summary_for_domain(&manifest.domain_family);
+    let host_bridge_host_ffi_surface = manifest
+        .host_bridge_host_ffi_surface
+        .clone()
+        .map(|values| values.join(","))
+        .unwrap_or(fallback.host_bridge.host_ffi_surface);
+    let host_bridge_handle_family = manifest
+        .host_bridge_handle_family
+        .clone()
+        .map(|values| values.join(","))
+        .unwrap_or(fallback.host_bridge.handle_family);
+    NustarDomainBuildContractSummary {
+        lowering: NustarDomainLoweringPlanSummary {
+            lane_policy: manifest
+                .bridge_lane_policy
+                .clone()
+                .unwrap_or(fallback.lowering.lane_policy),
+            bridge_surface: manifest
+                .bridge_surface
+                .clone()
+                .unwrap_or(fallback.lowering.bridge_surface),
+            emission_kind: manifest
+                .bridge_emission_kind
+                .clone()
+                .unwrap_or(fallback.lowering.emission_kind),
+        },
+        backend: NustarDomainBackendStubSummary {
+            stub_kind: manifest
+                .backend_stub_kind
+                .clone()
+                .unwrap_or(fallback.backend.stub_kind),
+            bridge_entry: manifest
+                .bridge_entry
+                .clone()
+                .unwrap_or(fallback.backend.bridge_entry),
+            submission_mode: manifest
+                .backend_submission_mode
+                .clone()
+                .unwrap_or(fallback.backend.submission_mode),
+            wake_policy: manifest
+                .backend_wake_policy
+                .clone()
+                .unwrap_or(fallback.backend.wake_policy),
+            scheduler_binding: manifest
+                .bridge_scheduler_binding
+                .clone()
+                .unwrap_or(fallback.backend.scheduler_binding),
+            phase_bind: manifest.phase_bind.clone().or(fallback.backend.phase_bind),
+            phase_submit: manifest.phase_submit.clone().or(fallback.backend.phase_submit),
+            phase_wait: manifest.phase_wait.clone().or(fallback.backend.phase_wait),
+            phase_finalize: manifest
+                .phase_finalize
+                .clone()
+                .or(fallback.backend.phase_finalize),
+            transport_model: manifest
+                .backend_transport_model
+                .clone()
+                .or(fallback.backend.transport_model),
+            request_shape: manifest
+                .backend_request_shape
+                .clone()
+                .or(fallback.backend.request_shape),
+            response_shape: manifest
+                .backend_response_shape
+                .clone()
+                .or(fallback.backend.response_shape),
+            dispatch_shape: manifest
+                .backend_dispatch_shape
+                .clone()
+                .or(fallback.backend.dispatch_shape),
+            memory_binding: manifest
+                .backend_memory_binding
+                .clone()
+                .or(fallback.backend.memory_binding),
+            resource_binding: manifest
+                .backend_resource_binding
+                .clone()
+                .or(fallback.backend.resource_binding),
+            completion_model: manifest
+                .backend_completion_model
+                .clone()
+                .or(fallback.backend.completion_model),
+        },
+        bridge: NustarDomainBridgePlanSummary {
+            bridge_surface: manifest
+                .bridge_surface
+                .clone()
+                .unwrap_or(fallback.bridge.bridge_surface),
+            bridge_entry: manifest
+                .bridge_entry
+                .clone()
+                .unwrap_or(fallback.bridge.bridge_entry),
+            scheduler_binding: manifest
+                .bridge_scheduler_binding
+                .clone()
+                .unwrap_or(fallback.bridge.scheduler_binding),
+            phase_bind: manifest
+                .phase_bind
+                .clone()
+                .unwrap_or(fallback.bridge.phase_bind),
+            phase_submit: manifest
+                .phase_submit
+                .clone()
+                .unwrap_or(fallback.bridge.phase_submit),
+            phase_wait: manifest
+                .phase_wait
+                .clone()
+                .unwrap_or(fallback.bridge.phase_wait),
+            phase_finalize: manifest
+                .phase_finalize
+                .clone()
+                .unwrap_or(fallback.bridge.phase_finalize),
+            bridge_kind: manifest
+                .bridge_kind
+                .clone()
+                .unwrap_or(fallback.bridge.bridge_kind),
+        },
+        host_bridge: NustarHostBridgeSpecSummary {
+            host_ffi_surface: host_bridge_host_ffi_surface,
+            handle_family: host_bridge_handle_family,
+            phase_order: manifest
+                .host_bridge_phase_order
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_order),
+            phase_bind_inputs: manifest
+                .host_bridge_phase_bind_inputs
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_bind_inputs),
+            phase_bind_outputs: manifest
+                .host_bridge_phase_bind_outputs
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_bind_outputs),
+            phase_submit_inputs: manifest
+                .host_bridge_phase_submit_inputs
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_submit_inputs),
+            phase_submit_outputs: manifest
+                .host_bridge_phase_submit_outputs
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_submit_outputs),
+            phase_wait_inputs: manifest
+                .host_bridge_phase_wait_inputs
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_wait_inputs),
+            phase_wait_outputs: manifest
+                .host_bridge_phase_wait_outputs
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_wait_outputs),
+            phase_finalize_inputs: manifest
+                .host_bridge_phase_finalize_inputs
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_finalize_inputs),
+            phase_finalize_outputs: manifest
+                .host_bridge_phase_finalize_outputs
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_finalize_outputs),
+            phase_bind_wake: manifest
+                .host_bridge_phase_bind_wake
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_bind_wake),
+            phase_submit_wake: manifest
+                .host_bridge_phase_submit_wake
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_submit_wake),
+            phase_wait_wake: manifest
+                .host_bridge_phase_wait_wake
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_wait_wake),
+            phase_finalize_wake: manifest
+                .host_bridge_phase_finalize_wake
+                .clone()
+                .unwrap_or(fallback.host_bridge.phase_finalize_wake),
+            bridge_plan_begin: manifest
+                .host_bridge_plan_begin
+                .unwrap_or(fallback.host_bridge.bridge_plan_begin),
+            bridge_plan_end: manifest
+                .host_bridge_plan_end
+                .unwrap_or(fallback.host_bridge.bridge_plan_end),
+        },
+    }
 }
 
 pub fn domain_build_contract_summary_for_domain(
     domain_family: &str,
 ) -> NustarDomainBuildContractSummary {
+    fallback_domain_build_preset(domain_family)
+        .unwrap_or_else(|| fallback_domain_build_preset("host").expect("host preset must exist"))
+        .into_summary()
+}
+
+impl FallbackDomainBuildPreset {
+    fn into_summary(self) -> NustarDomainBuildContractSummary {
+        NustarDomainBuildContractSummary {
+            lowering: NustarDomainLoweringPlanSummary {
+                lane_policy: self.lane_policy.to_owned(),
+                bridge_surface: self.bridge_surface.to_owned(),
+                emission_kind: self.emission_kind.to_owned(),
+            },
+            backend: NustarDomainBackendStubSummary {
+                stub_kind: self.stub_kind.to_owned(),
+                bridge_entry: self.bridge_entry.to_owned(),
+                submission_mode: self.submission_mode.to_owned(),
+                wake_policy: self.wake_policy.to_owned(),
+                scheduler_binding: self.scheduler_binding.to_owned(),
+                phase_bind: Some(self.phase_bind.to_owned()),
+                phase_submit: Some(self.phase_submit.to_owned()),
+                phase_wait: Some(self.phase_wait.to_owned()),
+                phase_finalize: Some(self.phase_finalize.to_owned()),
+                transport_model: self.transport_model.map(str::to_owned),
+                request_shape: self.request_shape.map(str::to_owned),
+                response_shape: self.response_shape.map(str::to_owned),
+                dispatch_shape: self.dispatch_shape.map(str::to_owned),
+                memory_binding: self.memory_binding.map(str::to_owned),
+                resource_binding: self.resource_binding.map(str::to_owned),
+                completion_model: self.completion_model.map(str::to_owned),
+            },
+            bridge: NustarDomainBridgePlanSummary {
+                bridge_surface: self.bridge_surface.to_owned(),
+                bridge_entry: self.bridge_entry.to_owned(),
+                scheduler_binding: self.scheduler_binding.to_owned(),
+                phase_bind: self.phase_bind.to_owned(),
+                phase_submit: self.phase_submit.to_owned(),
+                phase_wait: self.phase_wait.to_owned(),
+                phase_finalize: self.phase_finalize.to_owned(),
+                bridge_kind: self.bridge_kind.to_owned(),
+            },
+            host_bridge: NustarHostBridgeSpecSummary {
+                host_ffi_surface: preset_csv(self.host_ffi_surface),
+                handle_family: preset_csv(self.handle_family),
+                phase_order: preset_vec(&DEFAULT_BRIDGE_PHASE_ORDER),
+                phase_bind_inputs: preset_vec(self.phase_bind_inputs),
+                phase_bind_outputs: preset_vec(self.phase_bind_outputs),
+                phase_submit_inputs: preset_vec(self.phase_submit_inputs),
+                phase_submit_outputs: preset_vec(self.phase_submit_outputs),
+                phase_wait_inputs: preset_vec(self.phase_wait_inputs),
+                phase_wait_outputs: preset_vec(self.phase_wait_outputs),
+                phase_finalize_inputs: preset_vec(self.phase_finalize_inputs),
+                phase_finalize_outputs: preset_vec(self.phase_finalize_outputs),
+                phase_bind_wake: self.phase_bind_wake.to_owned(),
+                phase_submit_wake: self.phase_submit_wake.to_owned(),
+                phase_wait_wake: self.phase_wait_wake.to_owned(),
+                phase_finalize_wake: self.phase_finalize_wake.to_owned(),
+                bridge_plan_begin: true,
+                bridge_plan_end: true,
+            },
+        }
+    }
+}
+
+fn fallback_domain_build_preset(domain_family: &str) -> Option<FallbackDomainBuildPreset> {
     match domain_family {
-        "network" => NustarDomainBuildContractSummary {
-            lowering: NustarDomainLoweringPlanSummary {
-                lane_policy: "dispatch-lanes.io-bound".to_owned(),
-                bridge_surface: "host-ffi.bridge.network".to_owned(),
-                emission_kind: "sidecar-plan".to_owned(),
+        "network" => Some(fallback_preset(
+            FallbackBridgeFlowFacet {
+                lane_policy: "dispatch-lanes.io-bound",
+                bridge_surface: "host-ffi.bridge.network",
+                bridge_entry: "nuis.network.bridge.dispatch.v1",
+                scheduler_binding: "network-poll-bridge",
+                phase_bind: "socket-bind-or-session-open",
+                phase_submit: "packet-write-dispatch",
+                phase_wait: "callback-or-read-ready",
+                phase_finalize: "response-commit-and-wake",
             },
-            backend: NustarDomainBackendStubSummary {
-                stub_kind: "network-host-bridge".to_owned(),
-                bridge_entry: "nuis.network.bridge.dispatch.v1".to_owned(),
-                submission_mode: "request-response".to_owned(),
-                wake_policy: "io-ready".to_owned(),
-                scheduler_binding: "network-poll-bridge".to_owned(),
-                phase_bind: Some("socket-bind-or-session-open".to_owned()),
-                phase_submit: Some("packet-write-dispatch".to_owned()),
-                phase_wait: Some("callback-or-read-ready".to_owned()),
-                phase_finalize: Some("response-commit-and-wake".to_owned()),
-                transport_model: Some("client-session".to_owned()),
-                request_shape: Some("packetized-exchange".to_owned()),
-                response_shape: Some("completion-callback".to_owned()),
+            FallbackBackendFacet {
+                stub_kind: "network-host-bridge",
+                submission_mode: "request-response",
+                wake_policy: "io-ready",
+                transport_model: Some("client-session"),
+                request_shape: Some("packetized-exchange"),
+                response_shape: Some("completion-callback"),
                 dispatch_shape: None,
                 memory_binding: None,
                 resource_binding: None,
                 completion_model: None,
             },
-            bridge: NustarDomainBridgePlanSummary {
-                bridge_surface: "host-ffi.bridge.network".to_owned(),
-                bridge_entry: "nuis.network.bridge.dispatch.v1".to_owned(),
-                scheduler_binding: "network-poll-bridge".to_owned(),
-                phase_bind: "socket-bind-or-session-open".to_owned(),
-                phase_submit: "packet-write-dispatch".to_owned(),
-                phase_wait: "callback-or-read-ready".to_owned(),
-                phase_finalize: "response-commit-and-wake".to_owned(),
-                bridge_kind: "managed-lifecycle-bridge".to_owned(),
+            FallbackHostBridgeFacet {
+                host_ffi_surface: &["socket", "urlsession"],
+                handle_family: &["network.request", "network.response"],
+                phase_bind_inputs: &["request.packet", "bridge.config", "host.session"],
+                phase_bind_outputs: &["session.handle", "request.handle"],
+                phase_submit_inputs: &["session.handle", "request.handle", "request.packet"],
+                phase_submit_outputs: &["inflight.request", "poll.token"],
+                phase_wait_inputs: &["poll.token", "callback.slot"],
+                phase_wait_outputs: &["response.packet", "completion.signal"],
+                phase_finalize_inputs: &["response.packet", "completion.signal"],
+                phase_finalize_outputs: &["result.value", "scheduler.wake"],
+                phase_bind_wake: "bind-ready",
+                phase_submit_wake: "submit-ready",
+                phase_wait_wake: "io-ready",
+                phase_finalize_wake: "result-commit",
             },
-            host_bridge: NustarHostBridgeSpecSummary {
-                host_ffi_surface: "socket,urlsession".to_owned(),
-                handle_family: "network.request,network.response".to_owned(),
-                phase_order: vec![
-                    "bind".to_owned(),
-                    "submit".to_owned(),
-                    "wait".to_owned(),
-                    "finalize".to_owned(),
-                ],
-                phase_bind_inputs: vec![
-                    "request.packet".to_owned(),
-                    "bridge.config".to_owned(),
-                    "host.session".to_owned(),
-                ],
-                phase_bind_outputs: vec![
-                    "session.handle".to_owned(),
-                    "request.handle".to_owned(),
-                ],
-                phase_submit_inputs: vec![
-                    "session.handle".to_owned(),
-                    "request.handle".to_owned(),
-                    "request.packet".to_owned(),
-                ],
-                phase_submit_outputs: vec![
-                    "inflight.request".to_owned(),
-                    "poll.token".to_owned(),
-                ],
-                phase_wait_inputs: vec!["poll.token".to_owned(), "callback.slot".to_owned()],
-                phase_wait_outputs: vec![
-                    "response.packet".to_owned(),
-                    "completion.signal".to_owned(),
-                ],
-                phase_finalize_inputs: vec![
-                    "response.packet".to_owned(),
-                    "completion.signal".to_owned(),
-                ],
-                phase_finalize_outputs: vec![
-                    "result.value".to_owned(),
-                    "scheduler.wake".to_owned(),
-                ],
-                phase_bind_wake: "bind-ready".to_owned(),
-                phase_submit_wake: "submit-ready".to_owned(),
-                phase_wait_wake: "io-ready".to_owned(),
-                phase_finalize_wake: "result-commit".to_owned(),
-                bridge_plan_begin: true,
-                bridge_plan_end: true,
+        )),
+        "kernel" => Some(fallback_preset(
+            FallbackBridgeFlowFacet {
+                lane_policy: "dispatch-lanes.accelerator-bound",
+                bridge_surface: "host-ffi.bridge.hetero",
+                bridge_entry: "nuis.kernel.bridge.dispatch.v1",
+                scheduler_binding: "hetero-submit-bridge",
+                phase_bind: "buffer-and-argument-bind",
+                phase_submit: "queue-dispatch-submit",
+                phase_wait: "fence-await-or-poll",
+                phase_finalize: "result-commit-and-release",
             },
-        },
-        "kernel" => NustarDomainBuildContractSummary {
-            lowering: NustarDomainLoweringPlanSummary {
-                lane_policy: "dispatch-lanes.accelerator-bound".to_owned(),
-                bridge_surface: "host-ffi.bridge.hetero".to_owned(),
-                emission_kind: "sidecar-plan".to_owned(),
-            },
-            backend: NustarDomainBackendStubSummary {
-                stub_kind: "kernel-dispatch".to_owned(),
-                bridge_entry: "nuis.kernel.bridge.dispatch.v1".to_owned(),
-                submission_mode: "accelerator-dispatch".to_owned(),
-                wake_policy: "completion-fence".to_owned(),
-                scheduler_binding: "hetero-submit-bridge".to_owned(),
-                phase_bind: Some("buffer-and-argument-bind".to_owned()),
-                phase_submit: Some("queue-dispatch-submit".to_owned()),
-                phase_wait: Some("fence-await-or-poll".to_owned()),
-                phase_finalize: Some("result-commit-and-release".to_owned()),
+            FallbackBackendFacet {
+                stub_kind: "kernel-dispatch",
+                submission_mode: "accelerator-dispatch",
+                wake_policy: "completion-fence",
                 transport_model: None,
                 request_shape: None,
                 response_shape: None,
-                dispatch_shape: Some("grid-launch".to_owned()),
-                memory_binding: Some("buffer-table".to_owned()),
+                dispatch_shape: Some("grid-launch"),
+                memory_binding: Some("buffer-table"),
                 resource_binding: None,
-                completion_model: Some("device-fence".to_owned()),
+                completion_model: Some("device-fence"),
             },
-            bridge: NustarDomainBridgePlanSummary {
-                bridge_surface: "host-ffi.bridge.hetero".to_owned(),
-                bridge_entry: "nuis.kernel.bridge.dispatch.v1".to_owned(),
-                scheduler_binding: "hetero-submit-bridge".to_owned(),
-                phase_bind: "buffer-and-argument-bind".to_owned(),
-                phase_submit: "queue-dispatch-submit".to_owned(),
-                phase_wait: "fence-await-or-poll".to_owned(),
-                phase_finalize: "result-commit-and-release".to_owned(),
-                bridge_kind: "managed-lifecycle-bridge".to_owned(),
+            FallbackHostBridgeFacet {
+                host_ffi_surface: &["buffer", "queue", "fence"],
+                handle_family: &["kernel.buffer", "kernel.dispatch"],
+                phase_bind_inputs: &["kernel.args", "buffer.table", "dispatch.config"],
+                phase_bind_outputs: &["bound.buffer.table", "dispatch.handle"],
+                phase_submit_inputs: &["dispatch.handle", "bound.buffer.table", "queue.slot"],
+                phase_submit_outputs: &["inflight.dispatch", "fence.handle"],
+                phase_wait_inputs: &["fence.handle", "poll.token"],
+                phase_wait_outputs: &["completion.state", "result.buffer"],
+                phase_finalize_inputs: &["completion.state", "result.buffer"],
+                phase_finalize_outputs: &["result.value", "resource.release"],
+                phase_bind_wake: "bind-ready",
+                phase_submit_wake: "submit-ready",
+                phase_wait_wake: "completion-fence",
+                phase_finalize_wake: "result-commit",
             },
-            host_bridge: NustarHostBridgeSpecSummary {
-                host_ffi_surface: "buffer,queue,fence".to_owned(),
-                handle_family: "kernel.buffer,kernel.dispatch".to_owned(),
-                phase_order: vec![
-                    "bind".to_owned(),
-                    "submit".to_owned(),
-                    "wait".to_owned(),
-                    "finalize".to_owned(),
-                ],
-                phase_bind_inputs: vec![
-                    "kernel.args".to_owned(),
-                    "buffer.table".to_owned(),
-                    "dispatch.config".to_owned(),
-                ],
-                phase_bind_outputs: vec![
-                    "bound.buffer.table".to_owned(),
-                    "dispatch.handle".to_owned(),
-                ],
-                phase_submit_inputs: vec![
-                    "dispatch.handle".to_owned(),
-                    "bound.buffer.table".to_owned(),
-                    "queue.slot".to_owned(),
-                ],
-                phase_submit_outputs: vec![
-                    "inflight.dispatch".to_owned(),
-                    "fence.handle".to_owned(),
-                ],
-                phase_wait_inputs: vec!["fence.handle".to_owned(), "poll.token".to_owned()],
-                phase_wait_outputs: vec![
-                    "completion.state".to_owned(),
-                    "result.buffer".to_owned(),
-                ],
-                phase_finalize_inputs: vec![
-                    "completion.state".to_owned(),
-                    "result.buffer".to_owned(),
-                ],
-                phase_finalize_outputs: vec![
-                    "result.value".to_owned(),
-                    "resource.release".to_owned(),
-                ],
-                phase_bind_wake: "bind-ready".to_owned(),
-                phase_submit_wake: "submit-ready".to_owned(),
-                phase_wait_wake: "completion-fence".to_owned(),
-                phase_finalize_wake: "result-commit".to_owned(),
-                bridge_plan_begin: true,
-                bridge_plan_end: true,
+        )),
+        "shader" => Some(fallback_preset(
+            FallbackBridgeFlowFacet {
+                lane_policy: "dispatch-lanes.render-bound",
+                bridge_surface: "host-ffi.bridge.hetero",
+                bridge_entry: "nuis.shader.bridge.dispatch.v1",
+                scheduler_binding: "render-submit-bridge",
+                phase_bind: "pipeline-and-resource-bind",
+                phase_submit: "draw-or-dispatch-encode",
+                phase_wait: "frame-fence-await",
+                phase_finalize: "present-or-signal",
             },
-        },
-        "shader" => NustarDomainBuildContractSummary {
-            lowering: NustarDomainLoweringPlanSummary {
-                lane_policy: "dispatch-lanes.render-bound".to_owned(),
-                bridge_surface: "host-ffi.bridge.hetero".to_owned(),
-                emission_kind: "sidecar-plan".to_owned(),
-            },
-            backend: NustarDomainBackendStubSummary {
-                stub_kind: "shader-dispatch".to_owned(),
-                bridge_entry: "nuis.shader.bridge.dispatch.v1".to_owned(),
-                submission_mode: "frame-graph-dispatch".to_owned(),
-                wake_policy: "frame-present".to_owned(),
-                scheduler_binding: "render-submit-bridge".to_owned(),
-                phase_bind: Some("pipeline-and-resource-bind".to_owned()),
-                phase_submit: Some("draw-or-dispatch-encode".to_owned()),
-                phase_wait: Some("frame-fence-await".to_owned()),
-                phase_finalize: Some("present-or-signal".to_owned()),
+            FallbackBackendFacet {
+                stub_kind: "shader-dispatch",
+                submission_mode: "frame-graph-dispatch",
+                wake_policy: "frame-present",
                 transport_model: None,
                 request_shape: None,
                 response_shape: None,
-                dispatch_shape: Some("render-pass".to_owned()),
+                dispatch_shape: Some("render-pass"),
                 memory_binding: None,
-                resource_binding: Some("pipeline-layout".to_owned()),
-                completion_model: Some("frame-fence".to_owned()),
+                resource_binding: Some("pipeline-layout"),
+                completion_model: Some("frame-fence"),
             },
-            bridge: NustarDomainBridgePlanSummary {
-                bridge_surface: "host-ffi.bridge.hetero".to_owned(),
-                bridge_entry: "nuis.shader.bridge.dispatch.v1".to_owned(),
-                scheduler_binding: "render-submit-bridge".to_owned(),
-                phase_bind: "pipeline-and-resource-bind".to_owned(),
-                phase_submit: "draw-or-dispatch-encode".to_owned(),
-                phase_wait: "frame-fence-await".to_owned(),
-                phase_finalize: "present-or-signal".to_owned(),
-                bridge_kind: "managed-lifecycle-bridge".to_owned(),
+            FallbackHostBridgeFacet {
+                host_ffi_surface: &["pipeline", "resource", "fence"],
+                handle_family: &["shader.pipeline", "shader.dispatch"],
+                phase_bind_inputs: &["pipeline.layout", "resource.table", "frame.config"],
+                phase_bind_outputs: &["bound.pipeline", "dispatch.handle"],
+                phase_submit_inputs: &["dispatch.handle", "bound.pipeline", "encoder.slot"],
+                phase_submit_outputs: &["inflight.frame", "frame.fence"],
+                phase_wait_inputs: &["frame.fence", "present.slot"],
+                phase_wait_outputs: &["frame.state", "present.signal"],
+                phase_finalize_inputs: &["frame.state", "present.signal"],
+                phase_finalize_outputs: &["present.result", "scheduler.wake"],
+                phase_bind_wake: "bind-ready",
+                phase_submit_wake: "submit-ready",
+                phase_wait_wake: "frame-present",
+                phase_finalize_wake: "present-commit",
             },
-            host_bridge: NustarHostBridgeSpecSummary {
-                host_ffi_surface: "pipeline,resource,fence".to_owned(),
-                handle_family: "shader.pipeline,shader.dispatch".to_owned(),
-                phase_order: vec![
-                    "bind".to_owned(),
-                    "submit".to_owned(),
-                    "wait".to_owned(),
-                    "finalize".to_owned(),
-                ],
-                phase_bind_inputs: vec![
-                    "pipeline.layout".to_owned(),
-                    "resource.table".to_owned(),
-                    "frame.config".to_owned(),
-                ],
-                phase_bind_outputs: vec![
-                    "bound.pipeline".to_owned(),
-                    "dispatch.handle".to_owned(),
-                ],
-                phase_submit_inputs: vec![
-                    "dispatch.handle".to_owned(),
-                    "bound.pipeline".to_owned(),
-                    "encoder.slot".to_owned(),
-                ],
-                phase_submit_outputs: vec![
-                    "inflight.frame".to_owned(),
-                    "frame.fence".to_owned(),
-                ],
-                phase_wait_inputs: vec!["frame.fence".to_owned(), "present.slot".to_owned()],
-                phase_wait_outputs: vec![
-                    "frame.state".to_owned(),
-                    "present.signal".to_owned(),
-                ],
-                phase_finalize_inputs: vec![
-                    "frame.state".to_owned(),
-                    "present.signal".to_owned(),
-                ],
-                phase_finalize_outputs: vec![
-                    "present.result".to_owned(),
-                    "scheduler.wake".to_owned(),
-                ],
-                phase_bind_wake: "bind-ready".to_owned(),
-                phase_submit_wake: "submit-ready".to_owned(),
-                phase_wait_wake: "frame-present".to_owned(),
-                phase_finalize_wake: "present-commit".to_owned(),
-                bridge_plan_begin: true,
-                bridge_plan_end: true,
+        )),
+        "host" | "cpu" => Some(fallback_preset(
+            FallbackBridgeFlowFacet {
+                lane_policy: "dispatch-lanes.host-bound",
+                bridge_surface: "host-ffi.bridge.none",
+                bridge_entry: "nuis.host.bridge.dispatch.v1",
+                scheduler_binding: "host-inline",
+                phase_bind: "direct-bind",
+                phase_submit: "direct-call",
+                phase_wait: "immediate",
+                phase_finalize: "return-and-finish",
             },
-        },
-        _ => NustarDomainBuildContractSummary {
-            lowering: NustarDomainLoweringPlanSummary {
-                lane_policy: "dispatch-lanes.host-bound".to_owned(),
-                bridge_surface: "host-ffi.bridge.none".to_owned(),
-                emission_kind: "sidecar-plan".to_owned(),
-            },
-            backend: NustarDomainBackendStubSummary {
-                stub_kind: "host-fallback".to_owned(),
-                bridge_entry: "nuis.host.bridge.dispatch.v1".to_owned(),
-                submission_mode: "direct-call".to_owned(),
-                wake_policy: "immediate".to_owned(),
-                scheduler_binding: "host-inline".to_owned(),
-                phase_bind: None,
-                phase_submit: None,
-                phase_wait: None,
-                phase_finalize: None,
+            FallbackBackendFacet {
+                stub_kind: "host-fallback",
+                submission_mode: "direct-call",
+                wake_policy: "immediate",
                 transport_model: None,
                 request_shape: None,
                 response_shape: None,
@@ -589,41 +878,24 @@ pub fn domain_build_contract_summary_for_domain(
                 resource_binding: None,
                 completion_model: None,
             },
-            bridge: NustarDomainBridgePlanSummary {
-                bridge_surface: "host-ffi.bridge.none".to_owned(),
-                bridge_entry: "nuis.host.bridge.dispatch.v1".to_owned(),
-                scheduler_binding: "host-inline".to_owned(),
-                phase_bind: "direct-bind".to_owned(),
-                phase_submit: "direct-call".to_owned(),
-                phase_wait: "immediate".to_owned(),
-                phase_finalize: "return-and-finish".to_owned(),
-                bridge_kind: "managed-lifecycle-bridge".to_owned(),
+            FallbackHostBridgeFacet {
+                host_ffi_surface: &["host-inline"],
+                handle_family: &["host.inline"],
+                phase_bind_inputs: &["call.args"],
+                phase_bind_outputs: &["bound.call"],
+                phase_submit_inputs: &["bound.call"],
+                phase_submit_outputs: &["inflight.call"],
+                phase_wait_inputs: &["inflight.call"],
+                phase_wait_outputs: &["call.result"],
+                phase_finalize_inputs: &["call.result"],
+                phase_finalize_outputs: &["result.value"],
+                phase_bind_wake: "bind-ready",
+                phase_submit_wake: "submit-ready",
+                phase_wait_wake: "immediate",
+                phase_finalize_wake: "return",
             },
-            host_bridge: NustarHostBridgeSpecSummary {
-                host_ffi_surface: "host-inline".to_owned(),
-                handle_family: "host.inline".to_owned(),
-                phase_order: vec![
-                    "bind".to_owned(),
-                    "submit".to_owned(),
-                    "wait".to_owned(),
-                    "finalize".to_owned(),
-                ],
-                phase_bind_inputs: vec!["call.args".to_owned()],
-                phase_bind_outputs: vec!["bound.call".to_owned()],
-                phase_submit_inputs: vec!["bound.call".to_owned()],
-                phase_submit_outputs: vec!["inflight.call".to_owned()],
-                phase_wait_inputs: vec!["inflight.call".to_owned()],
-                phase_wait_outputs: vec!["call.result".to_owned()],
-                phase_finalize_inputs: vec!["call.result".to_owned()],
-                phase_finalize_outputs: vec!["result.value".to_owned()],
-                phase_bind_wake: "bind-ready".to_owned(),
-                phase_submit_wake: "submit-ready".to_owned(),
-                phase_wait_wake: "immediate".to_owned(),
-                phase_finalize_wake: "return".to_owned(),
-                bridge_plan_begin: true,
-                bridge_plan_end: true,
-            },
-        },
+        )),
+        _ => None,
     }
 }
 
@@ -1260,6 +1532,229 @@ fn validate_network_domain_contract(
     issues
 }
 
+fn validate_build_contract_fields(
+    manifest: &NustarPackageManifest,
+    manifest_path: &Path,
+) -> Vec<NustarRegistryIssue> {
+    let mut issues = Vec::new();
+    let has_bridge_contract = manifest.bridge_lane_policy.is_some()
+        || manifest.bridge_surface.is_some()
+        || manifest.bridge_emission_kind.is_some()
+        || manifest.bridge_entry.is_some()
+        || manifest.bridge_kind.is_some()
+        || manifest.bridge_scheduler_binding.is_some()
+        || manifest.backend_stub_kind.is_some()
+        || manifest.backend_submission_mode.is_some()
+        || manifest.backend_wake_policy.is_some()
+        || manifest.backend_transport_model.is_some()
+        || manifest.backend_request_shape.is_some()
+        || manifest.backend_response_shape.is_some()
+        || manifest.backend_dispatch_shape.is_some()
+        || manifest.backend_memory_binding.is_some()
+        || manifest.backend_resource_binding.is_some()
+        || manifest.backend_completion_model.is_some()
+        || manifest.phase_bind.is_some()
+        || manifest.phase_submit.is_some()
+        || manifest.phase_wait.is_some()
+        || manifest.phase_finalize.is_some();
+    if has_bridge_contract {
+        let mut missing = Vec::new();
+        for (name, value) in [
+            ("bridge_lane_policy", manifest.bridge_lane_policy.as_deref()),
+            ("bridge_surface", manifest.bridge_surface.as_deref()),
+            (
+                "bridge_emission_kind",
+                manifest.bridge_emission_kind.as_deref(),
+            ),
+            ("bridge_entry", manifest.bridge_entry.as_deref()),
+            ("bridge_kind", manifest.bridge_kind.as_deref()),
+            (
+                "bridge_scheduler_binding",
+                manifest.bridge_scheduler_binding.as_deref(),
+            ),
+            ("backend_stub_kind", manifest.backend_stub_kind.as_deref()),
+            (
+                "backend_submission_mode",
+                manifest.backend_submission_mode.as_deref(),
+            ),
+            ("backend_wake_policy", manifest.backend_wake_policy.as_deref()),
+            ("phase_bind", manifest.phase_bind.as_deref()),
+            ("phase_submit", manifest.phase_submit.as_deref()),
+            ("phase_wait", manifest.phase_wait.as_deref()),
+            ("phase_finalize", manifest.phase_finalize.as_deref()),
+        ] {
+            if value.is_none() {
+                missing.push(name.to_owned());
+            }
+        }
+        if !missing.is_empty() {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "bridge/build contract must declare a complete minimum skeleton; missing: {}",
+                    missing.join(", ")
+                ),
+            });
+        }
+    }
+
+    let has_host_bridge_contract = manifest.host_bridge_host_ffi_surface.is_some()
+        || manifest.host_bridge_handle_family.is_some()
+        || manifest.host_bridge_phase_order.is_some()
+        || manifest.host_bridge_phase_bind_inputs.is_some()
+        || manifest.host_bridge_phase_bind_outputs.is_some()
+        || manifest.host_bridge_phase_submit_inputs.is_some()
+        || manifest.host_bridge_phase_submit_outputs.is_some()
+        || manifest.host_bridge_phase_wait_inputs.is_some()
+        || manifest.host_bridge_phase_wait_outputs.is_some()
+        || manifest.host_bridge_phase_finalize_inputs.is_some()
+        || manifest.host_bridge_phase_finalize_outputs.is_some()
+        || manifest.host_bridge_phase_bind_wake.is_some()
+        || manifest.host_bridge_phase_submit_wake.is_some()
+        || manifest.host_bridge_phase_wait_wake.is_some()
+        || manifest.host_bridge_phase_finalize_wake.is_some()
+        || manifest.host_bridge_plan_begin.is_some()
+        || manifest.host_bridge_plan_end.is_some();
+    if has_host_bridge_contract {
+        let mut missing = Vec::new();
+        for (name, present) in [
+            (
+                "host_bridge_host_ffi_surface",
+                manifest.host_bridge_host_ffi_surface.is_some(),
+            ),
+            (
+                "host_bridge_handle_family",
+                manifest.host_bridge_handle_family.is_some(),
+            ),
+            (
+                "host_bridge_phase_order",
+                manifest.host_bridge_phase_order.is_some(),
+            ),
+            (
+                "host_bridge_phase_bind_inputs",
+                manifest.host_bridge_phase_bind_inputs.is_some(),
+            ),
+            (
+                "host_bridge_phase_bind_outputs",
+                manifest.host_bridge_phase_bind_outputs.is_some(),
+            ),
+            (
+                "host_bridge_phase_submit_inputs",
+                manifest.host_bridge_phase_submit_inputs.is_some(),
+            ),
+            (
+                "host_bridge_phase_submit_outputs",
+                manifest.host_bridge_phase_submit_outputs.is_some(),
+            ),
+            (
+                "host_bridge_phase_wait_inputs",
+                manifest.host_bridge_phase_wait_inputs.is_some(),
+            ),
+            (
+                "host_bridge_phase_wait_outputs",
+                manifest.host_bridge_phase_wait_outputs.is_some(),
+            ),
+            (
+                "host_bridge_phase_finalize_inputs",
+                manifest.host_bridge_phase_finalize_inputs.is_some(),
+            ),
+            (
+                "host_bridge_phase_finalize_outputs",
+                manifest.host_bridge_phase_finalize_outputs.is_some(),
+            ),
+            (
+                "host_bridge_phase_bind_wake",
+                manifest.host_bridge_phase_bind_wake.is_some(),
+            ),
+            (
+                "host_bridge_phase_submit_wake",
+                manifest.host_bridge_phase_submit_wake.is_some(),
+            ),
+            (
+                "host_bridge_phase_wait_wake",
+                manifest.host_bridge_phase_wait_wake.is_some(),
+            ),
+            (
+                "host_bridge_phase_finalize_wake",
+                manifest.host_bridge_phase_finalize_wake.is_some(),
+            ),
+            (
+                "host_bridge_plan_begin",
+                manifest.host_bridge_plan_begin.is_some(),
+            ),
+            ("host_bridge_plan_end", manifest.host_bridge_plan_end.is_some()),
+        ] {
+            if !present {
+                missing.push(name.to_owned());
+            }
+        }
+        if !missing.is_empty() {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "host bridge contract must declare every phase field; missing: {}",
+                    missing.join(", ")
+                ),
+            });
+        } else {
+            if manifest
+                .host_bridge_host_ffi_surface
+                .as_ref()
+                .is_some_and(Vec::is_empty)
+            {
+                issues.push(NustarRegistryIssue {
+                    kind: NustarRegistryIssueKind::DomainContractMismatch,
+                    package: Some(manifest.package_id.clone()),
+                    domain: Some(manifest.domain_family.clone()),
+                    manifest_path: Some(manifest_path.display().to_string()),
+                    message: "host bridge contract must expose at least one host_ffi surface"
+                        .to_owned(),
+                });
+            }
+            if manifest
+                .host_bridge_handle_family
+                .as_ref()
+                .is_some_and(Vec::is_empty)
+            {
+                issues.push(NustarRegistryIssue {
+                    kind: NustarRegistryIssueKind::DomainContractMismatch,
+                    package: Some(manifest.package_id.clone()),
+                    domain: Some(manifest.domain_family.clone()),
+                    manifest_path: Some(manifest_path.display().to_string()),
+                    message: "host bridge contract must expose at least one handle family"
+                        .to_owned(),
+                });
+            }
+            if manifest.host_bridge_phase_order.as_deref()
+                != Some(&[
+                    "bind".to_owned(),
+                    "submit".to_owned(),
+                    "wait".to_owned(),
+                    "finalize".to_owned(),
+                ][..])
+            {
+                issues.push(NustarRegistryIssue {
+                    kind: NustarRegistryIssueKind::DomainContractMismatch,
+                    package: Some(manifest.package_id.clone()),
+                    domain: Some(manifest.domain_family.clone()),
+                    manifest_path: Some(manifest_path.display().to_string()),
+                    message:
+                        "host bridge phase_order must be [\"bind\", \"submit\", \"wait\", \"finalize\"]"
+                            .to_owned(),
+                });
+            }
+        }
+    }
+
+    issues
+}
+
 fn validate_domain_specific_contracts(
     manifest: &NustarPackageManifest,
     manifest_path: &Path,
@@ -1440,6 +1935,7 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
                 message: error,
             });
         }
+        issues.extend(validate_build_contract_fields(&manifest, &manifest_path));
         issues.extend(validate_domain_specific_contracts(&manifest, &manifest_path));
     }
 
@@ -3094,6 +3590,58 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
     let host_ffi_abis = parse_optional_string_array(source, "host_ffi_abis").unwrap_or_default();
     let host_ffi_bridge =
         parse_optional_string(source, "host_ffi_bridge").unwrap_or_else(|| "none".to_owned());
+    let bridge_lane_policy = parse_optional_string(source, "bridge_lane_policy");
+    let bridge_surface = parse_optional_string(source, "bridge_surface");
+    let bridge_emission_kind = parse_optional_string(source, "bridge_emission_kind");
+    let bridge_entry = parse_optional_string(source, "bridge_entry");
+    let bridge_kind = parse_optional_string(source, "bridge_kind");
+    let bridge_scheduler_binding = parse_optional_string(source, "bridge_scheduler_binding");
+    let backend_stub_kind = parse_optional_string(source, "backend_stub_kind");
+    let backend_submission_mode = parse_optional_string(source, "backend_submission_mode");
+    let backend_wake_policy = parse_optional_string(source, "backend_wake_policy");
+    let backend_transport_model = parse_optional_string(source, "backend_transport_model");
+    let backend_request_shape = parse_optional_string(source, "backend_request_shape");
+    let backend_response_shape = parse_optional_string(source, "backend_response_shape");
+    let backend_dispatch_shape = parse_optional_string(source, "backend_dispatch_shape");
+    let backend_memory_binding = parse_optional_string(source, "backend_memory_binding");
+    let backend_resource_binding = parse_optional_string(source, "backend_resource_binding");
+    let backend_completion_model = parse_optional_string(source, "backend_completion_model");
+    let phase_bind = parse_optional_string(source, "phase_bind");
+    let phase_submit = parse_optional_string(source, "phase_submit");
+    let phase_wait = parse_optional_string(source, "phase_wait");
+    let phase_finalize = parse_optional_string(source, "phase_finalize");
+    let host_bridge_host_ffi_surface =
+        parse_optional_string_array(source, "host_bridge_host_ffi_surface");
+    let host_bridge_handle_family =
+        parse_optional_string_array(source, "host_bridge_handle_family");
+    let host_bridge_phase_order =
+        parse_optional_string_array(source, "host_bridge_phase_order");
+    let host_bridge_phase_bind_inputs =
+        parse_optional_string_array(source, "host_bridge_phase_bind_inputs");
+    let host_bridge_phase_bind_outputs =
+        parse_optional_string_array(source, "host_bridge_phase_bind_outputs");
+    let host_bridge_phase_submit_inputs =
+        parse_optional_string_array(source, "host_bridge_phase_submit_inputs");
+    let host_bridge_phase_submit_outputs =
+        parse_optional_string_array(source, "host_bridge_phase_submit_outputs");
+    let host_bridge_phase_wait_inputs =
+        parse_optional_string_array(source, "host_bridge_phase_wait_inputs");
+    let host_bridge_phase_wait_outputs =
+        parse_optional_string_array(source, "host_bridge_phase_wait_outputs");
+    let host_bridge_phase_finalize_inputs =
+        parse_optional_string_array(source, "host_bridge_phase_finalize_inputs");
+    let host_bridge_phase_finalize_outputs =
+        parse_optional_string_array(source, "host_bridge_phase_finalize_outputs");
+    let host_bridge_phase_bind_wake =
+        parse_optional_string(source, "host_bridge_phase_bind_wake");
+    let host_bridge_phase_submit_wake =
+        parse_optional_string(source, "host_bridge_phase_submit_wake");
+    let host_bridge_phase_wait_wake =
+        parse_optional_string(source, "host_bridge_phase_wait_wake");
+    let host_bridge_phase_finalize_wake =
+        parse_optional_string(source, "host_bridge_phase_finalize_wake");
+    let host_bridge_plan_begin = parse_optional_bool(source, "host_bridge_plan_begin");
+    let host_bridge_plan_end = parse_optional_bool(source, "host_bridge_plan_end");
     let support_surface =
         parse_optional_string_array(source, "support_surface").unwrap_or_default();
     let support_profile_slots =
@@ -3141,6 +3689,43 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         host_ffi_surface,
         host_ffi_abis,
         host_ffi_bridge,
+        bridge_lane_policy,
+        bridge_surface,
+        bridge_emission_kind,
+        bridge_entry,
+        bridge_kind,
+        bridge_scheduler_binding,
+        backend_stub_kind,
+        backend_submission_mode,
+        backend_wake_policy,
+        backend_transport_model,
+        backend_request_shape,
+        backend_response_shape,
+        backend_dispatch_shape,
+        backend_memory_binding,
+        backend_resource_binding,
+        backend_completion_model,
+        phase_bind,
+        phase_submit,
+        phase_wait,
+        phase_finalize,
+        host_bridge_host_ffi_surface,
+        host_bridge_handle_family,
+        host_bridge_phase_order,
+        host_bridge_phase_bind_inputs,
+        host_bridge_phase_bind_outputs,
+        host_bridge_phase_submit_inputs,
+        host_bridge_phase_submit_outputs,
+        host_bridge_phase_wait_inputs,
+        host_bridge_phase_wait_outputs,
+        host_bridge_phase_finalize_inputs,
+        host_bridge_phase_finalize_outputs,
+        host_bridge_phase_bind_wake,
+        host_bridge_phase_submit_wake,
+        host_bridge_phase_wait_wake,
+        host_bridge_phase_finalize_wake,
+        host_bridge_plan_begin,
+        host_bridge_plan_end,
         support_surface,
         support_profile_slots,
         default_lanes,
@@ -3346,6 +3931,21 @@ fn parse_optional_string(source: &str, key: &str) -> Option<String> {
         let line = raw_line.trim();
         if let Some(rest) = line.strip_prefix(&prefix) {
             return parse_quoted(rest);
+        }
+    }
+    None
+}
+
+fn parse_optional_bool(source: &str, key: &str) -> Option<bool> {
+    let prefix = format!("{key} = ");
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            return match rest.trim() {
+                "true" => Some(true),
+                "false" => Some(false),
+                _ => None,
+            };
         }
     }
     None
@@ -3562,6 +4162,43 @@ mod cpu Main {
             host_ffi_surface: Vec::new(),
             host_ffi_abis: Vec::new(),
             host_ffi_bridge: "none".to_owned(),
+            bridge_lane_policy: None,
+            bridge_surface: None,
+            bridge_emission_kind: None,
+            bridge_entry: None,
+            bridge_kind: None,
+            bridge_scheduler_binding: None,
+            backend_stub_kind: None,
+            backend_submission_mode: None,
+            backend_wake_policy: None,
+            backend_transport_model: None,
+            backend_request_shape: None,
+            backend_response_shape: None,
+            backend_dispatch_shape: None,
+            backend_memory_binding: None,
+            backend_resource_binding: None,
+            backend_completion_model: None,
+            phase_bind: None,
+            phase_submit: None,
+            phase_wait: None,
+            phase_finalize: None,
+            host_bridge_host_ffi_surface: None,
+            host_bridge_handle_family: None,
+            host_bridge_phase_order: None,
+            host_bridge_phase_bind_inputs: None,
+            host_bridge_phase_bind_outputs: None,
+            host_bridge_phase_submit_inputs: None,
+            host_bridge_phase_submit_outputs: None,
+            host_bridge_phase_wait_inputs: None,
+            host_bridge_phase_wait_outputs: None,
+            host_bridge_phase_finalize_inputs: None,
+            host_bridge_phase_finalize_outputs: None,
+            host_bridge_phase_bind_wake: None,
+            host_bridge_phase_submit_wake: None,
+            host_bridge_phase_wait_wake: None,
+            host_bridge_phase_finalize_wake: None,
+            host_bridge_plan_begin: None,
+            host_bridge_plan_end: None,
             support_surface: Vec::new(),
             support_profile_slots: Vec::new(),
             default_lanes: Vec::new(),
@@ -3588,6 +4225,28 @@ mod cpu Main {
                     .collect::<Vec<_>>()
                     .join(", ")
             )
+        }
+
+        fn render_optional_string(value: Option<&str>) -> String {
+            match value {
+                Some(value) => format!("\"{value}\""),
+                None => "null".to_owned(),
+            }
+        }
+
+        fn render_optional_array(value: Option<&[String]>) -> String {
+            match value {
+                Some(values) => render_array(values),
+                None => "null".to_owned(),
+            }
+        }
+
+        fn render_optional_bool(value: Option<bool>) -> String {
+            match value {
+                Some(true) => "true".to_owned(),
+                Some(false) => "false".to_owned(),
+                None => "null".to_owned(),
+            }
         }
 
         format!(
@@ -3617,6 +4276,43 @@ mod cpu Main {
                 "host_ffi_surface = {}\n",
                 "host_ffi_abis = {}\n",
                 "host_ffi_bridge = \"{}\"\n",
+                "bridge_lane_policy = {}\n",
+                "bridge_surface = {}\n",
+                "bridge_emission_kind = {}\n",
+                "bridge_entry = {}\n",
+                "bridge_kind = {}\n",
+                "bridge_scheduler_binding = {}\n",
+                "backend_stub_kind = {}\n",
+                "backend_submission_mode = {}\n",
+                "backend_wake_policy = {}\n",
+                "backend_transport_model = {}\n",
+                "backend_request_shape = {}\n",
+                "backend_response_shape = {}\n",
+                "backend_dispatch_shape = {}\n",
+                "backend_memory_binding = {}\n",
+                "backend_resource_binding = {}\n",
+                "backend_completion_model = {}\n",
+                "phase_bind = {}\n",
+                "phase_submit = {}\n",
+                "phase_wait = {}\n",
+                "phase_finalize = {}\n",
+                "host_bridge_host_ffi_surface = {}\n",
+                "host_bridge_handle_family = {}\n",
+                "host_bridge_phase_order = {}\n",
+                "host_bridge_phase_bind_inputs = {}\n",
+                "host_bridge_phase_bind_outputs = {}\n",
+                "host_bridge_phase_submit_inputs = {}\n",
+                "host_bridge_phase_submit_outputs = {}\n",
+                "host_bridge_phase_wait_inputs = {}\n",
+                "host_bridge_phase_wait_outputs = {}\n",
+                "host_bridge_phase_finalize_inputs = {}\n",
+                "host_bridge_phase_finalize_outputs = {}\n",
+                "host_bridge_phase_bind_wake = {}\n",
+                "host_bridge_phase_submit_wake = {}\n",
+                "host_bridge_phase_wait_wake = {}\n",
+                "host_bridge_phase_finalize_wake = {}\n",
+                "host_bridge_plan_begin = {}\n",
+                "host_bridge_plan_end = {}\n",
                 "support_surface = {}\n",
                 "support_profile_slots = {}\n",
                 "default_lanes = {}\n",
@@ -3656,6 +4352,43 @@ mod cpu Main {
             render_array(&manifest.host_ffi_surface),
             render_array(&manifest.host_ffi_abis),
             manifest.host_ffi_bridge,
+            render_optional_string(manifest.bridge_lane_policy.as_deref()),
+            render_optional_string(manifest.bridge_surface.as_deref()),
+            render_optional_string(manifest.bridge_emission_kind.as_deref()),
+            render_optional_string(manifest.bridge_entry.as_deref()),
+            render_optional_string(manifest.bridge_kind.as_deref()),
+            render_optional_string(manifest.bridge_scheduler_binding.as_deref()),
+            render_optional_string(manifest.backend_stub_kind.as_deref()),
+            render_optional_string(manifest.backend_submission_mode.as_deref()),
+            render_optional_string(manifest.backend_wake_policy.as_deref()),
+            render_optional_string(manifest.backend_transport_model.as_deref()),
+            render_optional_string(manifest.backend_request_shape.as_deref()),
+            render_optional_string(manifest.backend_response_shape.as_deref()),
+            render_optional_string(manifest.backend_dispatch_shape.as_deref()),
+            render_optional_string(manifest.backend_memory_binding.as_deref()),
+            render_optional_string(manifest.backend_resource_binding.as_deref()),
+            render_optional_string(manifest.backend_completion_model.as_deref()),
+            render_optional_string(manifest.phase_bind.as_deref()),
+            render_optional_string(manifest.phase_submit.as_deref()),
+            render_optional_string(manifest.phase_wait.as_deref()),
+            render_optional_string(manifest.phase_finalize.as_deref()),
+            render_optional_array(manifest.host_bridge_host_ffi_surface.as_deref()),
+            render_optional_array(manifest.host_bridge_handle_family.as_deref()),
+            render_optional_array(manifest.host_bridge_phase_order.as_deref()),
+            render_optional_array(manifest.host_bridge_phase_bind_inputs.as_deref()),
+            render_optional_array(manifest.host_bridge_phase_bind_outputs.as_deref()),
+            render_optional_array(manifest.host_bridge_phase_submit_inputs.as_deref()),
+            render_optional_array(manifest.host_bridge_phase_submit_outputs.as_deref()),
+            render_optional_array(manifest.host_bridge_phase_wait_inputs.as_deref()),
+            render_optional_array(manifest.host_bridge_phase_wait_outputs.as_deref()),
+            render_optional_array(manifest.host_bridge_phase_finalize_inputs.as_deref()),
+            render_optional_array(manifest.host_bridge_phase_finalize_outputs.as_deref()),
+            render_optional_string(manifest.host_bridge_phase_bind_wake.as_deref()),
+            render_optional_string(manifest.host_bridge_phase_submit_wake.as_deref()),
+            render_optional_string(manifest.host_bridge_phase_wait_wake.as_deref()),
+            render_optional_string(manifest.host_bridge_phase_finalize_wake.as_deref()),
+            render_optional_bool(manifest.host_bridge_plan_begin),
+            render_optional_bool(manifest.host_bridge_plan_end),
             render_array(&manifest.support_surface),
             render_array(&manifest.support_profile_slots),
             render_array(&manifest.default_lanes),
@@ -3853,6 +4586,73 @@ mod cpu Main {
         assert_eq!(summary.default_time_mode, "logical");
         assert_eq!(summary.contract_family, "nustar.kernel");
         assert!(summary.lowering_targets.contains(&"coreml".to_owned()));
+    }
+
+    #[test]
+    fn domain_build_contract_summary_prefers_manifest_registered_bridge_fields() {
+        let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
+        assert_eq!(
+            manifest.bridge_lane_policy.as_deref(),
+            Some("dispatch-lanes.io-bound")
+        );
+        assert_eq!(
+            manifest.bridge_surface.as_deref(),
+            Some("host-ffi.bridge.network")
+        );
+        assert_eq!(
+            manifest.bridge_entry.as_deref(),
+            Some("nuis.network.bridge.dispatch.v1")
+        );
+        assert_eq!(
+            manifest.bridge_scheduler_binding.as_deref(),
+            Some("network-poll-bridge")
+        );
+        assert_eq!(
+            manifest.bridge_emission_kind.as_deref(),
+            Some("sidecar-plan")
+        );
+        assert_eq!(
+            manifest.bridge_kind.as_deref(),
+            Some("managed-lifecycle-bridge")
+        );
+        let summary = domain_build_contract_summary(&manifest);
+        assert_eq!(summary.lowering.lane_policy, "dispatch-lanes.io-bound");
+        assert_eq!(summary.lowering.bridge_surface, "host-ffi.bridge.network");
+        assert_eq!(summary.lowering.emission_kind, "sidecar-plan");
+        assert_eq!(summary.backend.stub_kind, "network-host-bridge");
+        assert_eq!(summary.backend.submission_mode, "request-response");
+        assert_eq!(summary.backend.wake_policy, "io-ready");
+        assert_eq!(
+            summary.backend.transport_model.as_deref(),
+            Some("client-session")
+        );
+        assert_eq!(
+            summary.bridge.scheduler_binding,
+            "network-poll-bridge"
+        );
+        assert_eq!(summary.bridge.phase_submit, "packet-write-dispatch");
+        assert_eq!(summary.bridge.phase_wait, "callback-or-read-ready");
+        assert_eq!(summary.bridge.bridge_kind, "managed-lifecycle-bridge");
+        assert_eq!(summary.host_bridge.host_ffi_surface, "socket,urlsession");
+        assert_eq!(
+            summary.host_bridge.handle_family,
+            "network.request,network.response"
+        );
+        assert_eq!(
+            summary.host_bridge.phase_bind_inputs,
+            vec![
+                "request.packet".to_owned(),
+                "bridge.config".to_owned(),
+                "host.session".to_owned()
+            ]
+        );
+        assert_eq!(
+            summary.host_bridge.phase_submit_outputs,
+            vec!["inflight.request".to_owned(), "poll.token".to_owned()]
+        );
+        assert_eq!(summary.host_bridge.phase_wait_wake, "io-ready");
+        assert!(summary.host_bridge.bridge_plan_begin);
+        assert!(summary.host_bridge.bridge_plan_end);
     }
 
     #[test]
@@ -4072,6 +4872,50 @@ mod cpu Main {
         assert!(issues.iter().any(|issue| {
             issue.kind == NustarRegistryIssueKind::DomainContractMismatch
                 && issue.message.contains("socket-abi")
+        }));
+    }
+
+    #[test]
+    fn validate_registered_domains_rejects_incomplete_host_bridge_contract() {
+        let root = temp_registry_root("registry-host-bridge-missing");
+        let mut network =
+            load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
+        network.host_bridge_phase_wait_wake = None;
+        let entries = vec![NustarPackageIndexEntry {
+            package_id: network.package_id.clone(),
+            manifest: "network.toml".to_owned(),
+            domain_family: network.domain_family.clone(),
+        }];
+        write_registry_fixture(&root, &entries, &[network]);
+
+        let issues = validate_registered_domains(&root).unwrap();
+        assert!(issues.iter().any(|issue| {
+            issue.kind == NustarRegistryIssueKind::DomainContractMismatch
+                && issue.message.contains("host_bridge_phase_wait_wake")
+        }));
+    }
+
+    #[test]
+    fn validate_registered_domains_rejects_invalid_host_bridge_phase_order() {
+        let root = temp_registry_root("registry-host-bridge-order");
+        let mut kernel = load_manifest_for_domain(Path::new("nustar-packages"), "kernel").unwrap();
+        kernel.host_bridge_phase_order = Some(vec![
+            "bind".to_owned(),
+            "wait".to_owned(),
+            "submit".to_owned(),
+            "finalize".to_owned(),
+        ]);
+        let entries = vec![NustarPackageIndexEntry {
+            package_id: kernel.package_id.clone(),
+            manifest: "kernel.toml".to_owned(),
+            domain_family: kernel.domain_family.clone(),
+        }];
+        write_registry_fixture(&root, &entries, &[kernel]);
+
+        let issues = validate_registered_domains(&root).unwrap();
+        assert!(issues.iter().any(|issue| {
+            issue.kind == NustarRegistryIssueKind::DomainContractMismatch
+                && issue.message.contains("phase_order")
         }));
     }
 

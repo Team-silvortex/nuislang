@@ -721,6 +721,43 @@ fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifes
         host_ffi_surface: parse_string_array(source, "host_ffi_surface", path)?,
         host_ffi_abis: parse_string_array(source, "host_ffi_abis", path)?,
         host_ffi_bridge: parse_required_string(source, "host_ffi_bridge", path)?,
+        bridge_lane_policy: parse_optional_string(source, "bridge_lane_policy"),
+        bridge_surface: parse_optional_string(source, "bridge_surface"),
+        bridge_emission_kind: parse_optional_string(source, "bridge_emission_kind"),
+        bridge_entry: parse_optional_string(source, "bridge_entry"),
+        bridge_kind: parse_optional_string(source, "bridge_kind"),
+        bridge_scheduler_binding: parse_optional_string(source, "bridge_scheduler_binding"),
+        backend_stub_kind: parse_optional_string(source, "backend_stub_kind"),
+        backend_submission_mode: parse_optional_string(source, "backend_submission_mode"),
+        backend_wake_policy: parse_optional_string(source, "backend_wake_policy"),
+        backend_transport_model: parse_optional_string(source, "backend_transport_model"),
+        backend_request_shape: parse_optional_string(source, "backend_request_shape"),
+        backend_response_shape: parse_optional_string(source, "backend_response_shape"),
+        backend_dispatch_shape: parse_optional_string(source, "backend_dispatch_shape"),
+        backend_memory_binding: parse_optional_string(source, "backend_memory_binding"),
+        backend_resource_binding: parse_optional_string(source, "backend_resource_binding"),
+        backend_completion_model: parse_optional_string(source, "backend_completion_model"),
+        phase_bind: parse_optional_string(source, "phase_bind"),
+        phase_submit: parse_optional_string(source, "phase_submit"),
+        phase_wait: parse_optional_string(source, "phase_wait"),
+        phase_finalize: parse_optional_string(source, "phase_finalize"),
+        host_bridge_host_ffi_surface: None,
+        host_bridge_handle_family: None,
+        host_bridge_phase_order: None,
+        host_bridge_phase_bind_inputs: None,
+        host_bridge_phase_bind_outputs: None,
+        host_bridge_phase_submit_inputs: None,
+        host_bridge_phase_submit_outputs: None,
+        host_bridge_phase_wait_inputs: None,
+        host_bridge_phase_wait_outputs: None,
+        host_bridge_phase_finalize_inputs: None,
+        host_bridge_phase_finalize_outputs: None,
+        host_bridge_phase_bind_wake: None,
+        host_bridge_phase_submit_wake: None,
+        host_bridge_phase_wait_wake: None,
+        host_bridge_phase_finalize_wake: None,
+        host_bridge_plan_begin: None,
+        host_bridge_plan_end: None,
         support_surface: parse_optional_string_array(source, "support_surface").unwrap_or_default(),
         support_profile_slots: parse_optional_string_array(source, "support_profile_slots")
             .unwrap_or_default(),
@@ -822,6 +859,21 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
     None
 }
 
+fn parse_optional_string(source: &str, key: &str) -> Option<String> {
+    let prefix = format!("{key} = ");
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            let value = rest.trim();
+            if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
+                return Some(value[1..value.len() - 1].to_owned());
+            }
+            return None;
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -872,6 +924,43 @@ mod tests {
             host_ffi_surface: Vec::new(),
             host_ffi_abis: Vec::new(),
             host_ffi_bridge: "none".to_owned(),
+            bridge_lane_policy: None,
+            bridge_surface: None,
+            bridge_emission_kind: None,
+            bridge_entry: None,
+            bridge_kind: None,
+            bridge_scheduler_binding: None,
+            backend_stub_kind: None,
+            backend_submission_mode: None,
+            backend_wake_policy: None,
+            backend_transport_model: None,
+            backend_request_shape: None,
+            backend_response_shape: None,
+            backend_dispatch_shape: None,
+            backend_memory_binding: None,
+            backend_resource_binding: None,
+            backend_completion_model: None,
+            phase_bind: None,
+            phase_submit: None,
+            phase_wait: None,
+            phase_finalize: None,
+            host_bridge_host_ffi_surface: None,
+            host_bridge_handle_family: None,
+            host_bridge_phase_order: None,
+            host_bridge_phase_bind_inputs: None,
+            host_bridge_phase_bind_outputs: None,
+            host_bridge_phase_submit_inputs: None,
+            host_bridge_phase_submit_outputs: None,
+            host_bridge_phase_wait_inputs: None,
+            host_bridge_phase_wait_outputs: None,
+            host_bridge_phase_finalize_inputs: None,
+            host_bridge_phase_finalize_outputs: None,
+            host_bridge_phase_bind_wake: None,
+            host_bridge_phase_submit_wake: None,
+            host_bridge_phase_wait_wake: None,
+            host_bridge_phase_finalize_wake: None,
+            host_bridge_plan_begin: None,
+            host_bridge_plan_end: None,
             support_surface: Vec::new(),
             support_profile_slots: Vec::new(),
             default_lanes: Vec::new(),
