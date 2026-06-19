@@ -5,9 +5,7 @@ use yir_core::{OperationDomainFamily, YirModule};
 
 use super::profile_apply::{resolve_registered_abi_target, target_config_tokens_for_domain};
 use super::profile_usage::{expr_walk_any, stmt_uses_expr_predicate};
-use super::support_contracts::{
-    kernel_support_surface_contract, require_declared_support_surface, support_surface_for_domain,
-};
+use super::support_contracts::support_surface_for_domain;
 use super::{
     collect_profile_int_bindings, extract_profile_call, kernel_profile_slot_targets,
     require_declared_profile_slot, resolve_project_abi, split_domain_unit,
@@ -25,8 +23,11 @@ pub(super) fn validate_kernel_profile_for_link(
     }
     let declared_support = support_surface_for_domain(&mut BTreeMap::new(), "kernel")?;
     let declared_slots = support_profile_slots_for_domain("kernel")?;
-    for required_surface in kernel_support_surface_contract() {
-        require_declared_support_surface(&declared_support, "kernel", &unit, required_surface)?;
+    if declared_support.is_empty() {
+        return Err(format!(
+            "project kernel unit `kernel.{}` requires nustar to declare at least one support surface",
+            unit
+        ));
     }
 
     for (slot, node_name) in kernel_profile_slot_targets(&unit) {

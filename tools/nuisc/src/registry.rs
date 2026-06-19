@@ -4,6 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::data_markers::{
+    all_downlink_directional_marker_slots, all_sync_marker_slots,
+    all_uplink_directional_marker_slots, data_common_marker_slots, data_marker_surface,
+};
 use nuis_semantics::model::{NirExpr, NirModule, NirStmt};
 use yir_core::YirModule;
 
@@ -2679,8 +2683,8 @@ fn covered_profile_slots(
     covered.into_iter().collect::<Vec<_>>()
 }
 
-fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'static str] {
-    match (domain_family, surface) {
+fn implied_slots_for_surface(domain_family: &str, surface: &str) -> Vec<String> {
+    let slots: &[&str] = match (domain_family, surface) {
         ("shader", "shader.profile.render.v1") => &[
             "target",
             "viewport",
@@ -2741,33 +2745,27 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'
         ("shader", "shader.profile.pass-kind.v1") => &["pass_kind"],
         ("shader", "shader.profile.packet-field-count.v1") => &["packet_field_count"],
         ("data", "data.profile.bind-core.v1") => &["bind_core"],
-        ("data", "data.profile.send.uplink.v1") => &[
-            "window_offset",
-            "uplink_len",
-            "marker:cpu_to_shader",
-            "marker:uplink_pipe",
-            "marker:uplink_pipe_class",
-            "marker:uplink_payload_class",
-            "marker:uplink_payload_shape",
-            "marker:uplink_window_policy",
-        ],
-        ("data", "data.profile.send.downlink.v1") => &[
-            "window_offset",
-            "downlink_len",
-            "marker:shader_to_cpu",
-            "marker:downlink_pipe",
-            "marker:downlink_pipe_class",
-            "marker:downlink_payload_class",
-            "marker:downlink_payload_shape",
-            "marker:downlink_window_policy",
-        ],
+        ("data", "data.profile.send.uplink.v1") => {
+            let mut slots = vec!["window_offset".to_owned(), "uplink_len".to_owned()];
+            slots.extend(all_uplink_directional_marker_slots());
+            slots.extend(data_common_marker_slots().iter().filter_map(|slot| {
+                slot.starts_with("marker:uplink_").then_some((*slot).to_owned())
+            }));
+            return slots;
+        }
+        ("data", "data.profile.send.downlink.v1") => {
+            let mut slots = vec!["window_offset".to_owned(), "downlink_len".to_owned()];
+            slots.extend(all_downlink_directional_marker_slots());
+            slots.extend(data_common_marker_slots().iter().filter_map(|slot| {
+                slot.starts_with("marker:downlink_").then_some((*slot).to_owned())
+            }));
+            return slots;
+        }
         ("data", "data.profile.handle-table.v1") => &["handle_table"],
         ("data", "data.profile.window-layout.v1") => {
             &["window_offset", "uplink_len", "downlink_len"]
         }
-        ("data", "data.profile.sync-markers.v1") => {
-            &["marker:cpu_to_shader", "marker:shader_to_cpu"]
-        }
+        ("data", "data.profile.sync-markers.v1") => return all_sync_marker_slots(),
         ("data", "data.profile.pipe-markers.v1") => &["marker:uplink_pipe", "marker:downlink_pipe"],
         ("data", "data.profile.pipe-class.v1") => {
             &["marker:uplink_pipe_class", "marker:downlink_pipe_class"]
@@ -2813,7 +2811,8 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'
             &["protocol_kind", "protocol_version", "protocol_header_bytes"]
         }
         _ => &[],
-    }
+    };
+    slots.iter().map(|slot| (*slot).to_owned()).collect()
 }
 
 fn detect_matched_support_usage(
@@ -2970,29 +2969,8 @@ fn collect_support_usage_expr(
             slots.insert("handle_table".to_owned());
         }
         NirExpr::DataProfileMarkerRef { tag, .. } if domain_family == "data" => {
-            let (surface, slot) = match tag.as_str() {
-                "cpu_to_shader" | "shader_to_cpu" => {
-                    ("data.profile.sync-markers.v1", format!("marker:{tag}"))
-                }
-                "uplink_pipe" | "downlink_pipe" => {
-                    ("data.profile.pipe-markers.v1", format!("marker:{tag}"))
-                }
-                "uplink_pipe_class" | "downlink_pipe_class" => {
-                    ("data.profile.pipe-class.v1", format!("marker:{tag}"))
-                }
-                "uplink_payload_class" | "downlink_payload_class" => {
-                    ("data.profile.payload-class.v1", format!("marker:{tag}"))
-                }
-                "uplink_payload_shape" | "downlink_payload_shape" => {
-                    ("data.profile.payload-shape.v1", format!("marker:{tag}"))
-                }
-                "uplink_window_policy" | "downlink_window_policy" => {
-                    ("data.profile.window-policy.v1", format!("marker:{tag}"))
-                }
-                _ => ("data.profile.sync-markers.v1", format!("marker:{tag}")),
-            };
-            surfaces.insert(surface.to_owned());
-            slots.insert(slot);
+            surfaces.insert(data_marker_surface(tag).to_owned());
+            slots.insert(format!("marker:{tag}"));
         }
         NirExpr::NetworkProfileBindCoreRef { .. } if domain_family == "network" => {
             surfaces.insert("network.profile.bind-core.v1".to_owned());

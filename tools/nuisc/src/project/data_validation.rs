@@ -6,7 +6,7 @@ use yir_core::YirModule;
 use super::support_contracts::{require_declared_support_surface, support_surface_for_domain};
 use super::{
     build_project_link_bridge_contract, data_profile_required_slots_for_link,
-    data_support_surface_contract, find_profile_call_declared_type, has_edge_to,
+    find_profile_call_declared_type, has_edge_to,
     payload_class_marker_name, payload_shape_marker_name, require_declared_profile_slot,
     require_marker_semantic_payload_name, require_profile_semantic_type,
     required_project_link_stage_contract, resolve_project_profile_target_name, split_domain_unit,
@@ -28,13 +28,19 @@ pub(super) fn validate_data_profile_for_link(
     let (to_domain, _) = split_domain_unit(to_endpoint)?;
     let declared_support = support_surface_for_domain(&mut BTreeMap::new(), "data")?;
     let declared_slots = support_profile_slots_for_domain("data")?;
-    for required_surface in data_support_surface_contract() {
+    for required_surface in [
+        "data.profile.send.uplink.v1",
+        "data.profile.send.downlink.v1",
+        "data.profile.payload-class.v1",
+        "data.profile.payload-shape.v1",
+        "data.profile.window-policy.v1",
+    ] {
         require_declared_support_surface(&declared_support, "data", &unit, required_surface)?;
     }
 
     for slot in data_profile_required_slots_for_link(&from_domain, &to_domain) {
-        require_declared_profile_slot(&declared_slots, "data", &unit, slot)?;
-        let node_name = resolve_project_profile_target_name("data", &unit, slot);
+        require_declared_profile_slot(&declared_slots, "data", &unit, &slot)?;
+        let node_name = resolve_project_profile_target_name("data", &unit, &slot);
         let exists = module.nodes.iter().any(|node| node.name == node_name);
         if !exists {
             return Err(format!(

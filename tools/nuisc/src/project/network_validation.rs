@@ -4,8 +4,7 @@ use yir_core::YirModule;
 
 use super::profile_apply::{resolve_registered_abi_target, target_config_tokens_for_domain};
 use super::support_contracts::{
-    network_profile_slot_targets, network_support_surface_contract,
-    require_declared_support_surface, support_profile_slots_for_domain, support_surface_for_domain,
+    network_profile_slot_targets, support_profile_slots_for_domain, support_surface_for_domain,
 };
 use super::{
     collect_profile_int_bindings, resolve_project_abi, require_declared_profile_slot,
@@ -23,8 +22,11 @@ pub(super) fn validate_network_profile_for_link(
     }
     let declared_support = support_surface_for_domain(&mut BTreeMap::new(), "network")?;
     let declared_slots = support_profile_slots_for_domain("network")?;
-    for required_surface in network_support_surface_contract() {
-        require_declared_support_surface(&declared_support, "network", &unit, required_surface)?;
+    if declared_support.is_empty() {
+        return Err(format!(
+            "project network unit `network.{}` requires nustar to declare at least one support surface",
+            unit
+        ));
     }
     for (slot, _node_name) in network_profile_slot_targets(&unit) {
         require_declared_profile_slot(&declared_slots, "network", &unit, slot)?;

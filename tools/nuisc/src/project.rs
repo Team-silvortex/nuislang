@@ -87,8 +87,8 @@ use shader_validation::{
     validate_shader_target_projection, ShaderPacketContract,
 };
 use support_contracts::{
-    data_profile_required_slots_for_link, data_support_surface_contract,
-    kernel_profile_slot_targets, require_declared_profile_slot, support_profile_slots_for_domain,
+    data_profile_required_slots_for_link, kernel_profile_slot_targets,
+    require_declared_profile_slot, support_profile_slots_for_domain,
 };
 use type_contracts::materialize_project_type_contract_nodes;
 use validation_core::{

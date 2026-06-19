@@ -2,6 +2,7 @@ pub mod aot;
 pub mod cache;
 pub mod cli;
 pub mod codegen_wasm;
+pub mod data_markers;
 pub mod engine;
 pub mod errors;
 pub mod fmt;

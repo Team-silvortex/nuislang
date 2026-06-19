@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::data_markers::{directional_bridge_marker_tag, DATA_BRIDGE_HETERO_DOMAINS};
 use yir_core::{EdgeKind, OperationDomainFamily, SemanticOp, YirModule};
 
 use super::profile_targets::resolve_project_profile_target_name;
@@ -165,24 +166,6 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         .filter(|node| node.op.semantic_op() == SemanticOp::DataHandleTable)
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let cpu_to_shader_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("cpu_to_shader"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let cpu_to_kernel_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("cpu_to_kernel"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let cpu_to_network_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("cpu_to_network"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
     let uplink_pipe_markers = module
         .nodes
         .iter()
@@ -243,46 +226,20 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         .filter(|node| node.op.is_data_marker_tag("downlink_window_policy"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let shader_to_cpu_markers = module
-        .nodes
+    let directional_markers = DATA_BRIDGE_HETERO_DOMAINS
         .iter()
-        .filter(|node| node.op.is_data_marker_tag("shader_to_cpu"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let shader_nodes = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_domain_family(OperationDomainFamily::Shader))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let kernel_to_cpu_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("kernel_to_cpu"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let network_to_cpu_markers = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_marker_tag("network_to_cpu"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let kernel_nodes = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_domain_family(OperationDomainFamily::Kernel))
-        .map(|node| node.name.clone())
+        .filter_map(|domain| {
+            let uplink_tag = directional_bridge_marker_tag("cpu", domain)?;
+            let downlink_tag = directional_bridge_marker_tag(domain, "cpu")?;
+            let uplink_markers = collect_data_marker_nodes(module, &uplink_tag);
+            let downlink_markers = collect_data_marker_nodes(module, &downlink_tag);
+            Some(((*domain).to_owned(), uplink_markers, downlink_markers))
+        })
         .collect::<Vec<_>>();
     let cpu_nodes = module
         .nodes
         .iter()
         .filter(|node| node.op.is_domain_family(OperationDomainFamily::Cpu))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let network_nodes = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_domain_family(OperationDomainFamily::Network))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let data_pipe_nodes = module
@@ -326,34 +283,16 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
             push_edge_if_missing(module, EdgeKind::Dep, handle, pipe);
         }
     }
-    if let Some(marker) = cpu_to_shader_markers.first() {
-        for pipe in data_pipe_nodes.iter().take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+    for (_domain, uplink_markers, downlink_markers) in &directional_markers {
+        if let Some(marker) = uplink_markers.first() {
+            for pipe in data_pipe_nodes.iter().take(2) {
+                push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+            }
         }
-    }
-    if let Some(marker) = shader_to_cpu_markers.first() {
-        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-    }
-    if let Some(marker) = cpu_to_kernel_markers.first() {
-        for pipe in data_pipe_nodes.iter().take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-    }
-    if let Some(marker) = cpu_to_network_markers.first() {
-        for pipe in data_pipe_nodes.iter().take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-    }
-    if let Some(marker) = kernel_to_cpu_markers.first() {
-        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
-        }
-    }
-    if let Some(marker) = network_to_cpu_markers.first() {
-        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        if let Some(marker) = downlink_markers.first() {
+            for pipe in data_pipe_nodes.iter().skip(2).take(2) {
+                push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+            }
         }
     }
     if let Some(marker) = uplink_pipe_markers.first() {
@@ -514,80 +453,47 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
             }
         }
     }
-    if !kernel_nodes.is_empty() && !cpu_to_kernel_markers.is_empty() {
-        for pipe in data_pipe_nodes.iter().take(2) {
-            for kernel_node in &kernel_nodes {
-                push_project_dependency_edge_if_missing(
-                    module,
-                    &resource_families,
-                    &node_resources,
-                    pipe,
-                    kernel_node,
-                );
+    for (domain, uplink_markers, downlink_markers) in &directional_markers {
+        let Some(family) = operation_domain_family_for_name(domain) else {
+            continue;
+        };
+        let domain_nodes = collect_domain_nodes(module, family);
+        if domain_nodes.is_empty() {
+            continue;
+        }
+        if !uplink_markers.is_empty() {
+            for source in downlink_windows
+                .iter()
+                .chain(data_pipe_nodes.iter().skip(2).take(2))
+            {
+                for domain_node in &domain_nodes {
+                    push_project_dependency_edge_if_missing(
+                        module,
+                        &resource_families,
+                        &node_resources,
+                        source,
+                        domain_node,
+                    );
+                }
+            }
+        }
+        if !downlink_markers.is_empty() {
+            for sink in uplink_windows.iter().chain(data_pipe_nodes.iter().take(2)) {
+                for domain_node in &domain_nodes {
+                    push_project_dependency_edge_if_missing(
+                        module,
+                        &resource_families,
+                        &node_resources,
+                        domain_node,
+                        sink,
+                    );
+                }
             }
         }
     }
-    if !kernel_nodes.is_empty() && !kernel_to_cpu_markers.is_empty() {
-        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
-            for kernel_node in &kernel_nodes {
-                push_project_dependency_edge_if_missing(
-                    module,
-                    &resource_families,
-                    &node_resources,
-                    kernel_node,
-                    pipe,
-                );
-            }
-        }
-    }
-    if !shader_nodes.is_empty() && !shader_to_cpu_markers.is_empty() {
-        for sink in uplink_windows.iter().chain(data_pipe_nodes.iter().take(2)) {
-            for shader_node in &shader_nodes {
-                push_project_dependency_edge_if_missing(
-                    module,
-                    &resource_families,
-                    &node_resources,
-                    shader_node,
-                    sink,
-                );
-            }
-        }
-    }
-    if !network_nodes.is_empty() && !cpu_to_network_markers.is_empty() {
-        for source in downlink_windows
-            .iter()
-            .chain(data_pipe_nodes.iter().skip(2).take(2))
-        {
-            for network_node in &network_nodes {
-                push_project_dependency_edge_if_missing(
-                    module,
-                    &resource_families,
-                    &node_resources,
-                    source,
-                    network_node,
-                );
-            }
-        }
-    }
-    if !network_nodes.is_empty() && !network_to_cpu_markers.is_empty() {
-        for sink in uplink_windows
-            .iter()
-            .chain(data_pipe_nodes.iter().take(2))
-        {
-            for network_node in &network_nodes {
-                push_project_dependency_edge_if_missing(
-                    module,
-                    &resource_families,
-                    &node_resources,
-                    network_node,
-                    sink,
-                );
-            }
-        }
-    }
-    let has_to_cpu_bridge = !shader_to_cpu_markers.is_empty()
-        || !kernel_to_cpu_markers.is_empty()
-        || !network_to_cpu_markers.is_empty();
+    let has_to_cpu_bridge = directional_markers
+        .iter()
+        .any(|(_, _, downlink_markers)| !downlink_markers.is_empty());
     if has_to_cpu_bridge && !cpu_nodes.is_empty() {
         for source in downlink_windows
             .iter()
@@ -603,6 +509,33 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
                 );
             }
         }
+    }
+}
+
+fn collect_data_marker_nodes(module: &YirModule, tag: &str) -> Vec<String> {
+    module
+        .nodes
+        .iter()
+        .filter(|node| node.op.is_data_marker_tag(tag))
+        .map(|node| node.name.clone())
+        .collect()
+}
+
+fn collect_domain_nodes(module: &YirModule, family: OperationDomainFamily) -> Vec<String> {
+    module
+        .nodes
+        .iter()
+        .filter(|node| node.op.is_domain_family(family))
+        .map(|node| node.name.clone())
+        .collect()
+}
+
+fn operation_domain_family_for_name(domain: &str) -> Option<OperationDomainFamily> {
+    match domain {
+        "shader" => Some(OperationDomainFamily::Shader),
+        "kernel" => Some(OperationDomainFamily::Kernel),
+        "network" => Some(OperationDomainFamily::Network),
+        _ => None,
     }
 }
 

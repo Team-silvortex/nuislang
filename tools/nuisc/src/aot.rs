@@ -1297,6 +1297,7 @@ fn render_host_bridge_plan_index(units: &[&BuildManifestDomainBuildUnit]) -> Str
         .collect::<Vec<_>>();
     out.push_str(&format!("domains = {}\n", render_string_array(&domains)));
     for unit in units {
+        let contract = domain_build_contract_summary_for_unit(unit);
         out.push('\n');
         out.push_str("[[plan]]\n");
         out.push_str(&format!(
@@ -1317,22 +1318,16 @@ fn render_host_bridge_plan_index(units: &[&BuildManifestDomainBuildUnit]) -> Str
         ));
         out.push_str(&format!(
             "bridge_surface = \"{}\"\n",
-            escape_toml_string(match unit.domain_family.as_str() {
-                "network" => "host-ffi.bridge.network",
-                "kernel" | "shader" => "host-ffi.bridge.hetero",
-                _ => "host-ffi.bridge.none",
-            })
+            escape_toml_string(&contract.bridge.bridge_surface)
         ));
         out.push_str(&format!(
             "scheduler_binding = \"{}\"\n",
-            escape_toml_string(match unit.domain_family.as_str() {
-                "network" => "network-poll-bridge",
-                "kernel" => "hetero-submit-bridge",
-                "shader" => "render-submit-bridge",
-                _ => "host-inline",
-            })
+            escape_toml_string(&contract.bridge.scheduler_binding)
         ));
-        out.push_str("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]\n");
+        out.push_str(&format!(
+            "phase_order = {}\n",
+            render_string_array(&contract.host_bridge.phase_order)
+        ));
         out.push_str(&format!(
             "plan_inline = \"{}\"\n",
             escape_toml_string(&render_domain_build_unit_bridge_plan(unit).replace('\n', "\\n"))
@@ -1789,8 +1784,7 @@ fn decode_domain_build_unit_payload_blob(
 fn domain_build_contract_summary_for_unit(
     unit: &BuildManifestDomainBuildUnit,
 ) -> crate::registry::NustarDomainBuildContractSummary {
-    match crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &unit.domain_family)
-    {
+    match crate::registry::load_manifest(Path::new("nustar-packages"), &unit.package_id) {
         Ok(manifest) => crate::registry::domain_build_contract_summary(&manifest),
         Err(_) => crate::registry::domain_build_contract_summary_for_domain(&unit.domain_family),
     }

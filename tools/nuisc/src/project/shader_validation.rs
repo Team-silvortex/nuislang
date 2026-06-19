@@ -5,8 +5,8 @@ use yir_core::{SemanticOp, YirModule};
 
 use super::profile_apply::{resolve_registered_abi_target, target_config_tokens_for_domain};
 use super::support_contracts::{
-    require_declared_support_surface, shader_profile_slot_targets, shader_support_surface_contract,
-    support_profile_slots_for_domain, support_surface_for_domain,
+    require_declared_support_surface, shader_profile_slot_targets, support_profile_slots_for_domain,
+    support_surface_for_domain,
 };
 use super::{
     collect_profile_int_bindings, require_declared_profile_slot, resolve_project_abi,
@@ -24,8 +24,11 @@ pub(super) fn validate_shader_profile_for_link(
     }
     let declared_support = support_surface_for_domain(&mut BTreeMap::new(), "shader")?;
     let declared_slots = support_profile_slots_for_domain("shader")?;
-    for required_surface in shader_support_surface_contract() {
-        require_declared_support_surface(&declared_support, "shader", &unit, required_surface)?;
+    if declared_support.is_empty() {
+        return Err(format!(
+            "project shader unit `shader.{}` requires nustar to declare at least one support surface",
+            unit
+        ));
     }
     let packet_contract = infer_shader_packet_contract(project, &unit)?;
     for (slot, node_name) in shader_profile_slot_targets(

@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use crate::data_markers::{data_common_marker_slots, directional_bridge_marker_slot};
+
 pub(super) fn support_surface_for_domain(
     cache: &mut BTreeMap<String, BTreeSet<String>>,
     domain: &str,
@@ -53,64 +55,6 @@ pub(super) fn require_declared_profile_slot(
         "project {} unit `{}.{}` requires nustar to declare profile slot `{}`",
         domain, domain, unit, required_slot
     ))
-}
-
-pub(super) fn shader_support_surface_contract() -> &'static [&'static str] {
-    &[
-        "shader.profile.packet.v1",
-        "shader.inline.wgsl.v1",
-        "shader.profile.target.v1",
-        "shader.profile.viewport.v1",
-        "shader.profile.pipeline.v1",
-        "shader.profile.draw-budget.v1",
-        "shader.profile.packet-slots.v1",
-        "shader.profile.packet-tag.v1",
-        "shader.profile.material-mode.v1",
-        "shader.profile.pass-kind.v1",
-        "shader.profile.packet-field-count.v1",
-    ]
-}
-
-pub(super) fn kernel_support_surface_contract() -> &'static [&'static str] {
-    &[
-        "kernel.profile.bind-core.v1",
-        "kernel.profile.queue-depth.v1",
-        "kernel.profile.batch-lanes.v1",
-        "kernel.profile.entry.v1",
-    ]
-}
-
-pub(super) fn network_support_surface_contract() -> &'static [&'static str] {
-    &[
-        "network.profile.bind-core.v1",
-        "network.profile.connect.v1",
-        "network.profile.accept.v1",
-        "network.profile.send.v1",
-        "network.profile.recv.v1",
-        "network.profile.close.v1",
-        "network.profile.timeout.v1",
-        "network.profile.retry.v1",
-        "network.profile.endpoint-kind.v1",
-        "network.profile.stream-window.v1",
-        "network.profile.transport.v1",
-        "network.profile.protocol.v1",
-    ]
-}
-
-pub(super) fn data_support_surface_contract() -> &'static [&'static str] {
-    &[
-        "data.profile.bind-core.v1",
-        "data.profile.send.uplink.v1",
-        "data.profile.send.downlink.v1",
-        "data.profile.handle-table.v1",
-        "data.profile.window-layout.v1",
-        "data.profile.sync-markers.v1",
-        "data.profile.pipe-markers.v1",
-        "data.profile.pipe-class.v1",
-        "data.profile.payload-class.v1",
-        "data.profile.payload-shape.v1",
-        "data.profile.window-policy.v1",
-    ]
 }
 
 pub(super) fn shader_profile_slot_targets(
@@ -350,32 +294,21 @@ pub(super) fn network_profile_slot_targets(unit: &str) -> Vec<(&'static str, Str
 pub(super) fn data_profile_required_slots_for_link(
     from_domain: &str,
     to_domain: &str,
-) -> Vec<&'static str> {
+) -> Vec<String> {
     let mut slots = vec![
-        "bind_core",
-        "window_offset",
-        "uplink_len",
-        "downlink_len",
-        "handle_table",
-        "marker:uplink_pipe",
-        "marker:downlink_pipe",
-        "marker:uplink_pipe_class",
-        "marker:downlink_pipe_class",
-        "marker:uplink_payload_class",
-        "marker:downlink_payload_class",
-        "marker:uplink_payload_shape",
-        "marker:downlink_payload_shape",
-        "marker:uplink_window_policy",
-        "marker:downlink_window_policy",
+        "bind_core".to_owned(),
+        "window_offset".to_owned(),
+        "uplink_len".to_owned(),
+        "downlink_len".to_owned(),
+        "handle_table".to_owned(),
     ];
-    match (from_domain, to_domain) {
-        ("cpu", "shader") => slots.push("marker:cpu_to_shader"),
-        ("shader", "cpu") => slots.push("marker:shader_to_cpu"),
-        ("cpu", "kernel") => slots.push("marker:cpu_to_kernel"),
-        ("kernel", "cpu") => slots.push("marker:kernel_to_cpu"),
-        ("cpu", "network") => slots.push("marker:cpu_to_network"),
-        ("network", "cpu") => slots.push("marker:network_to_cpu"),
-        _ => {}
+    slots.extend(
+        data_common_marker_slots()
+            .iter()
+            .map(|slot| (*slot).to_owned()),
+    );
+    if let Some(slot) = directional_bridge_marker_slot(from_domain, to_domain) {
+        slots.push(slot);
     }
     slots
 }

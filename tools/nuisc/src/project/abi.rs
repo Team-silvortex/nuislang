@@ -1,10 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use super::support_contracts::{
-    data_support_surface_contract, kernel_support_surface_contract,
-    network_support_surface_contract, shader_support_surface_contract,
-};
+use super::support_contracts::support_surface_for_domain;
 use super::validation_core::collect_project_domains;
 use super::{
     split_domain_unit, LoadedProject, ProjectAbiIssue, ProjectAbiIssueKind, ProjectAbiRequirement,
@@ -364,6 +361,7 @@ pub(super) fn required_abi_surfaces_for_domain(
     domain: &str,
 ) -> Result<Vec<String>, String> {
     let mut surfaces = BTreeSet::new();
+    let mut support_surface_cache = std::collections::BTreeMap::new();
     for link in &project.manifest.links {
         let (from_domain, _) = split_domain_unit(&link.from)?;
         let (to_domain, _) = split_domain_unit(&link.to)?;
@@ -377,30 +375,8 @@ pub(super) fn required_abi_surfaces_for_domain(
         if !domain_is_in_link {
             continue;
         }
-        match domain {
-            "shader" => {
-                for surface in shader_support_surface_contract() {
-                    surfaces.insert((*surface).to_owned());
-                }
-            }
-            "kernel" => {
-                for surface in kernel_support_surface_contract() {
-                    surfaces.insert((*surface).to_owned());
-                }
-            }
-            "network" => {
-                for surface in network_support_surface_contract() {
-                    surfaces.insert((*surface).to_owned());
-                }
-            }
-            "data" => {
-                for surface in data_support_surface_contract() {
-                    surfaces.insert((*surface).to_owned());
-                }
-                surfaces.insert("data.profile.send.uplink.v1".to_owned());
-                surfaces.insert("data.profile.send.downlink.v1".to_owned());
-            }
-            _ => {}
+        for surface in support_surface_for_domain(&mut support_surface_cache, domain)? {
+            surfaces.insert(surface);
         }
     }
     Ok(surfaces.into_iter().collect())
