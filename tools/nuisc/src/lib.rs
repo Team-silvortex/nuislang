@@ -95,6 +95,45 @@ fn json_optional_string_field(name: &str, value: Option<&str>) -> String {
     }
 }
 
+fn domain_build_unit_json(unit: &aot::BuildManifestDomainBuildUnit) -> String {
+    let fields = vec![
+        json_string_field("package_id", &unit.package_id),
+        json_string_field("domain_family", &unit.domain_family),
+        json_optional_string_field("abi", unit.abi.as_deref()),
+        json_optional_string_field("machine_arch", unit.machine_arch.as_deref()),
+        json_optional_string_field("machine_os", unit.machine_os.as_deref()),
+        json_optional_string_field("backend_family", unit.backend_family.as_deref()),
+        json_optional_string_field(
+            "selected_lowering_target",
+            unit.selected_lowering_target.as_deref(),
+        ),
+        json_optional_string_field("artifact_stub_path", unit.artifact_stub_path.as_deref()),
+        json_optional_string_field(
+            "artifact_payload_path",
+            unit.artifact_payload_path.as_deref(),
+        ),
+        json_optional_string_field(
+            "artifact_bridge_stub_path",
+            unit.artifact_bridge_stub_path.as_deref(),
+        ),
+        json_optional_string_field(
+            "artifact_payload_blob_path",
+            unit.artifact_payload_blob_path.as_deref(),
+        ),
+        match unit.artifact_payload_blob_bytes {
+            Some(value) => json_usize_field("artifact_payload_blob_bytes", value),
+            None => "\"artifact_payload_blob_bytes\":null".to_owned(),
+        },
+        json_optional_string_field(
+            "artifact_payload_format",
+            unit.artifact_payload_format.as_deref(),
+        ),
+        json_string_field("contract_family", &unit.contract_family),
+        json_string_field("packaging_role", &unit.packaging_role),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
 fn collect_benchmark_inventory(
     artifacts: &pipeline::PipelineArtifacts,
 ) -> Vec<BenchmarkInventoryEntry> {
@@ -338,6 +377,12 @@ fn verify_artifact_json(input: &Path, report: &aot::NuisCompiledArtifactVerifyRe
 }
 
 fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyReport) -> String {
+    let domain_build_units = report
+        .domain_build_units
+        .iter()
+        .map(domain_build_unit_json)
+        .collect::<Vec<_>>()
+        .join(",");
     let fields = vec![
         json_string_field("kind", "nuis_build_manifest_verify"),
         json_string_field("input", &input.display().to_string()),
@@ -375,6 +420,25 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
             "execution_contracts_checked",
             report.execution_contracts_checked,
         ),
+        json_usize_field("domain_build_unit_count", report.domain_build_unit_count),
+        json_usize_field("heterogeneous_domain_count", report.heterogeneous_domain_count),
+        json_usize_field(
+            "domain_payload_blobs_checked",
+            report.domain_payload_blobs_checked,
+        ),
+        format!("\"domain_build_units\":[{}]", domain_build_units),
+        json_optional_string_field(
+            "bridge_registry_path",
+            report.bridge_registry_path.as_deref(),
+        ),
+        json_usize_field("bridge_registry_units", report.bridge_registry_units),
+        json_usize_field("bridge_registry_checked", report.bridge_registry_checked),
+        json_optional_string_field(
+            "host_bridge_plan_index_path",
+            report.host_bridge_plan_index_path.as_deref(),
+        ),
+        json_usize_field("host_bridge_plan_units", report.host_bridge_plan_units),
+        json_usize_field("host_bridge_plan_checked", report.host_bridge_plan_checked),
         json_string_field("cpu_target_abi", &report.cpu_target_abi),
         json_string_field("cpu_target_machine_arch", &report.cpu_target_machine_arch),
         json_string_field("cpu_target_machine_os", &report.cpu_target_machine_os),
@@ -1422,6 +1486,52 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 "  execution_contracts_checked: {}",
                 report.execution_contracts_checked
             );
+            println!("  domain_build_unit_count: {}", report.domain_build_unit_count);
+            println!(
+                "  heterogeneous_domain_count: {}",
+                report.heterogeneous_domain_count
+            );
+            println!(
+                "  domain_payload_blobs_checked: {}",
+                report.domain_payload_blobs_checked
+            );
+            if let Some(path) = &report.bridge_registry_path {
+                println!("  bridge_registry_path: {}", path);
+            }
+            println!("  bridge_registry_units: {}", report.bridge_registry_units);
+            println!(
+                "  bridge_registry_checked: {}",
+                report.bridge_registry_checked
+            );
+            if let Some(path) = &report.host_bridge_plan_index_path {
+                println!("  host_bridge_plan_index_path: {}", path);
+            }
+            println!("  host_bridge_plan_units: {}", report.host_bridge_plan_units);
+            println!(
+                "  host_bridge_plan_checked: {}",
+                report.host_bridge_plan_checked
+            );
+            for unit in &report.domain_build_units {
+                let payload_blob_bytes = unit
+                    .artifact_payload_blob_bytes
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "<none>".to_owned());
+                println!(
+                    "  domain_build_unit: {} package={} abi={} lowering={} backend={} role={} stub={} payload={} bridge_stub={} payload_blob={} payload_blob_bytes={} payload_format={}",
+                    unit.domain_family,
+                    unit.package_id,
+                    unit.abi.as_deref().unwrap_or("<none>"),
+                    unit.selected_lowering_target.as_deref().unwrap_or("<none>"),
+                    unit.backend_family.as_deref().unwrap_or("<none>"),
+                    unit.packaging_role,
+                    unit.artifact_stub_path.as_deref().unwrap_or("<none>"),
+                    unit.artifact_payload_path.as_deref().unwrap_or("<none>"),
+                    unit.artifact_bridge_stub_path.as_deref().unwrap_or("<none>"),
+                    unit.artifact_payload_blob_path.as_deref().unwrap_or("<none>"),
+                    payload_blob_bytes,
+                    unit.artifact_payload_format.as_deref().unwrap_or("<none>")
+                );
+            }
             println!("  cpu_target_abi: {}", report.cpu_target_abi);
             println!(
                 "  cpu_target_machine: {}-{}",
@@ -2201,6 +2311,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(manifest_text.contains("manifest_schema = \"nuis-build-manifest-v1\""));
         assert!(manifest_text.contains("packaging_mode = \"native-cpu-llvm\""));
         assert!(manifest_text.contains("loaded_nustar = [\"official.cpu\"]"));
+        assert!(manifest_text.contains("[[domain_build_unit]]"));
         assert!(manifest_text.contains(&format!("name = \"{project_name}\"")));
         assert!(manifest_text.contains("manifest_copy = "));
         assert!(manifest_text.contains("plan_index = "));

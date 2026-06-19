@@ -205,6 +205,74 @@ pub struct NustarExecutionSummary {
     pub lowering_targets: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarDomainLoweringPlanSummary {
+    pub lane_policy: String,
+    pub bridge_surface: String,
+    pub emission_kind: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarDomainBackendStubSummary {
+    pub stub_kind: String,
+    pub bridge_entry: String,
+    pub submission_mode: String,
+    pub wake_policy: String,
+    pub scheduler_binding: String,
+    pub phase_bind: Option<String>,
+    pub phase_submit: Option<String>,
+    pub phase_wait: Option<String>,
+    pub phase_finalize: Option<String>,
+    pub transport_model: Option<String>,
+    pub request_shape: Option<String>,
+    pub response_shape: Option<String>,
+    pub dispatch_shape: Option<String>,
+    pub memory_binding: Option<String>,
+    pub resource_binding: Option<String>,
+    pub completion_model: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarDomainBridgePlanSummary {
+    pub bridge_surface: String,
+    pub bridge_entry: String,
+    pub scheduler_binding: String,
+    pub phase_bind: String,
+    pub phase_submit: String,
+    pub phase_wait: String,
+    pub phase_finalize: String,
+    pub bridge_kind: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarHostBridgeSpecSummary {
+    pub host_ffi_surface: String,
+    pub handle_family: String,
+    pub phase_order: Vec<String>,
+    pub phase_bind_inputs: Vec<String>,
+    pub phase_bind_outputs: Vec<String>,
+    pub phase_submit_inputs: Vec<String>,
+    pub phase_submit_outputs: Vec<String>,
+    pub phase_wait_inputs: Vec<String>,
+    pub phase_wait_outputs: Vec<String>,
+    pub phase_finalize_inputs: Vec<String>,
+    pub phase_finalize_outputs: Vec<String>,
+    pub phase_bind_wake: String,
+    pub phase_submit_wake: String,
+    pub phase_wait_wake: String,
+    pub phase_finalize_wake: String,
+    pub bridge_plan_begin: bool,
+    pub bridge_plan_end: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarDomainBuildContractSummary {
+    pub lowering: NustarDomainLoweringPlanSummary,
+    pub backend: NustarDomainBackendStubSummary,
+    pub bridge: NustarDomainBridgePlanSummary,
+    pub host_bridge: NustarHostBridgeSpecSummary,
+}
+
 impl NustarClockSummary {
     pub fn brief(&self) -> String {
         format!(
@@ -238,6 +306,324 @@ pub fn execution_summary(manifest: &NustarPackageManifest) -> NustarExecutionSum
         default_time_mode: "logical".to_owned(),
         contract_family: format!("nustar.{}", manifest.domain_family),
         lowering_targets: manifest.lowering_targets.clone(),
+    }
+}
+
+pub fn domain_build_contract_summary(
+    manifest: &NustarPackageManifest,
+) -> NustarDomainBuildContractSummary {
+    domain_build_contract_summary_for_domain(&manifest.domain_family)
+}
+
+pub fn domain_build_contract_summary_for_domain(
+    domain_family: &str,
+) -> NustarDomainBuildContractSummary {
+    match domain_family {
+        "network" => NustarDomainBuildContractSummary {
+            lowering: NustarDomainLoweringPlanSummary {
+                lane_policy: "dispatch-lanes.io-bound".to_owned(),
+                bridge_surface: "host-ffi.bridge.network".to_owned(),
+                emission_kind: "sidecar-plan".to_owned(),
+            },
+            backend: NustarDomainBackendStubSummary {
+                stub_kind: "network-host-bridge".to_owned(),
+                bridge_entry: "nuis.network.bridge.dispatch.v1".to_owned(),
+                submission_mode: "request-response".to_owned(),
+                wake_policy: "io-ready".to_owned(),
+                scheduler_binding: "network-poll-bridge".to_owned(),
+                phase_bind: Some("socket-bind-or-session-open".to_owned()),
+                phase_submit: Some("packet-write-dispatch".to_owned()),
+                phase_wait: Some("callback-or-read-ready".to_owned()),
+                phase_finalize: Some("response-commit-and-wake".to_owned()),
+                transport_model: Some("client-session".to_owned()),
+                request_shape: Some("packetized-exchange".to_owned()),
+                response_shape: Some("completion-callback".to_owned()),
+                dispatch_shape: None,
+                memory_binding: None,
+                resource_binding: None,
+                completion_model: None,
+            },
+            bridge: NustarDomainBridgePlanSummary {
+                bridge_surface: "host-ffi.bridge.network".to_owned(),
+                bridge_entry: "nuis.network.bridge.dispatch.v1".to_owned(),
+                scheduler_binding: "network-poll-bridge".to_owned(),
+                phase_bind: "socket-bind-or-session-open".to_owned(),
+                phase_submit: "packet-write-dispatch".to_owned(),
+                phase_wait: "callback-or-read-ready".to_owned(),
+                phase_finalize: "response-commit-and-wake".to_owned(),
+                bridge_kind: "managed-lifecycle-bridge".to_owned(),
+            },
+            host_bridge: NustarHostBridgeSpecSummary {
+                host_ffi_surface: "socket,urlsession".to_owned(),
+                handle_family: "network.request,network.response".to_owned(),
+                phase_order: vec![
+                    "bind".to_owned(),
+                    "submit".to_owned(),
+                    "wait".to_owned(),
+                    "finalize".to_owned(),
+                ],
+                phase_bind_inputs: vec![
+                    "request.packet".to_owned(),
+                    "bridge.config".to_owned(),
+                    "host.session".to_owned(),
+                ],
+                phase_bind_outputs: vec![
+                    "session.handle".to_owned(),
+                    "request.handle".to_owned(),
+                ],
+                phase_submit_inputs: vec![
+                    "session.handle".to_owned(),
+                    "request.handle".to_owned(),
+                    "request.packet".to_owned(),
+                ],
+                phase_submit_outputs: vec![
+                    "inflight.request".to_owned(),
+                    "poll.token".to_owned(),
+                ],
+                phase_wait_inputs: vec!["poll.token".to_owned(), "callback.slot".to_owned()],
+                phase_wait_outputs: vec![
+                    "response.packet".to_owned(),
+                    "completion.signal".to_owned(),
+                ],
+                phase_finalize_inputs: vec![
+                    "response.packet".to_owned(),
+                    "completion.signal".to_owned(),
+                ],
+                phase_finalize_outputs: vec![
+                    "result.value".to_owned(),
+                    "scheduler.wake".to_owned(),
+                ],
+                phase_bind_wake: "bind-ready".to_owned(),
+                phase_submit_wake: "submit-ready".to_owned(),
+                phase_wait_wake: "io-ready".to_owned(),
+                phase_finalize_wake: "result-commit".to_owned(),
+                bridge_plan_begin: true,
+                bridge_plan_end: true,
+            },
+        },
+        "kernel" => NustarDomainBuildContractSummary {
+            lowering: NustarDomainLoweringPlanSummary {
+                lane_policy: "dispatch-lanes.accelerator-bound".to_owned(),
+                bridge_surface: "host-ffi.bridge.hetero".to_owned(),
+                emission_kind: "sidecar-plan".to_owned(),
+            },
+            backend: NustarDomainBackendStubSummary {
+                stub_kind: "kernel-dispatch".to_owned(),
+                bridge_entry: "nuis.kernel.bridge.dispatch.v1".to_owned(),
+                submission_mode: "accelerator-dispatch".to_owned(),
+                wake_policy: "completion-fence".to_owned(),
+                scheduler_binding: "hetero-submit-bridge".to_owned(),
+                phase_bind: Some("buffer-and-argument-bind".to_owned()),
+                phase_submit: Some("queue-dispatch-submit".to_owned()),
+                phase_wait: Some("fence-await-or-poll".to_owned()),
+                phase_finalize: Some("result-commit-and-release".to_owned()),
+                transport_model: None,
+                request_shape: None,
+                response_shape: None,
+                dispatch_shape: Some("grid-launch".to_owned()),
+                memory_binding: Some("buffer-table".to_owned()),
+                resource_binding: None,
+                completion_model: Some("device-fence".to_owned()),
+            },
+            bridge: NustarDomainBridgePlanSummary {
+                bridge_surface: "host-ffi.bridge.hetero".to_owned(),
+                bridge_entry: "nuis.kernel.bridge.dispatch.v1".to_owned(),
+                scheduler_binding: "hetero-submit-bridge".to_owned(),
+                phase_bind: "buffer-and-argument-bind".to_owned(),
+                phase_submit: "queue-dispatch-submit".to_owned(),
+                phase_wait: "fence-await-or-poll".to_owned(),
+                phase_finalize: "result-commit-and-release".to_owned(),
+                bridge_kind: "managed-lifecycle-bridge".to_owned(),
+            },
+            host_bridge: NustarHostBridgeSpecSummary {
+                host_ffi_surface: "buffer,queue,fence".to_owned(),
+                handle_family: "kernel.buffer,kernel.dispatch".to_owned(),
+                phase_order: vec![
+                    "bind".to_owned(),
+                    "submit".to_owned(),
+                    "wait".to_owned(),
+                    "finalize".to_owned(),
+                ],
+                phase_bind_inputs: vec![
+                    "kernel.args".to_owned(),
+                    "buffer.table".to_owned(),
+                    "dispatch.config".to_owned(),
+                ],
+                phase_bind_outputs: vec![
+                    "bound.buffer.table".to_owned(),
+                    "dispatch.handle".to_owned(),
+                ],
+                phase_submit_inputs: vec![
+                    "dispatch.handle".to_owned(),
+                    "bound.buffer.table".to_owned(),
+                    "queue.slot".to_owned(),
+                ],
+                phase_submit_outputs: vec![
+                    "inflight.dispatch".to_owned(),
+                    "fence.handle".to_owned(),
+                ],
+                phase_wait_inputs: vec!["fence.handle".to_owned(), "poll.token".to_owned()],
+                phase_wait_outputs: vec![
+                    "completion.state".to_owned(),
+                    "result.buffer".to_owned(),
+                ],
+                phase_finalize_inputs: vec![
+                    "completion.state".to_owned(),
+                    "result.buffer".to_owned(),
+                ],
+                phase_finalize_outputs: vec![
+                    "result.value".to_owned(),
+                    "resource.release".to_owned(),
+                ],
+                phase_bind_wake: "bind-ready".to_owned(),
+                phase_submit_wake: "submit-ready".to_owned(),
+                phase_wait_wake: "completion-fence".to_owned(),
+                phase_finalize_wake: "result-commit".to_owned(),
+                bridge_plan_begin: true,
+                bridge_plan_end: true,
+            },
+        },
+        "shader" => NustarDomainBuildContractSummary {
+            lowering: NustarDomainLoweringPlanSummary {
+                lane_policy: "dispatch-lanes.render-bound".to_owned(),
+                bridge_surface: "host-ffi.bridge.hetero".to_owned(),
+                emission_kind: "sidecar-plan".to_owned(),
+            },
+            backend: NustarDomainBackendStubSummary {
+                stub_kind: "shader-dispatch".to_owned(),
+                bridge_entry: "nuis.shader.bridge.dispatch.v1".to_owned(),
+                submission_mode: "frame-graph-dispatch".to_owned(),
+                wake_policy: "frame-present".to_owned(),
+                scheduler_binding: "render-submit-bridge".to_owned(),
+                phase_bind: Some("pipeline-and-resource-bind".to_owned()),
+                phase_submit: Some("draw-or-dispatch-encode".to_owned()),
+                phase_wait: Some("frame-fence-await".to_owned()),
+                phase_finalize: Some("present-or-signal".to_owned()),
+                transport_model: None,
+                request_shape: None,
+                response_shape: None,
+                dispatch_shape: Some("render-pass".to_owned()),
+                memory_binding: None,
+                resource_binding: Some("pipeline-layout".to_owned()),
+                completion_model: Some("frame-fence".to_owned()),
+            },
+            bridge: NustarDomainBridgePlanSummary {
+                bridge_surface: "host-ffi.bridge.hetero".to_owned(),
+                bridge_entry: "nuis.shader.bridge.dispatch.v1".to_owned(),
+                scheduler_binding: "render-submit-bridge".to_owned(),
+                phase_bind: "pipeline-and-resource-bind".to_owned(),
+                phase_submit: "draw-or-dispatch-encode".to_owned(),
+                phase_wait: "frame-fence-await".to_owned(),
+                phase_finalize: "present-or-signal".to_owned(),
+                bridge_kind: "managed-lifecycle-bridge".to_owned(),
+            },
+            host_bridge: NustarHostBridgeSpecSummary {
+                host_ffi_surface: "pipeline,resource,fence".to_owned(),
+                handle_family: "shader.pipeline,shader.dispatch".to_owned(),
+                phase_order: vec![
+                    "bind".to_owned(),
+                    "submit".to_owned(),
+                    "wait".to_owned(),
+                    "finalize".to_owned(),
+                ],
+                phase_bind_inputs: vec![
+                    "pipeline.layout".to_owned(),
+                    "resource.table".to_owned(),
+                    "frame.config".to_owned(),
+                ],
+                phase_bind_outputs: vec![
+                    "bound.pipeline".to_owned(),
+                    "dispatch.handle".to_owned(),
+                ],
+                phase_submit_inputs: vec![
+                    "dispatch.handle".to_owned(),
+                    "bound.pipeline".to_owned(),
+                    "encoder.slot".to_owned(),
+                ],
+                phase_submit_outputs: vec![
+                    "inflight.frame".to_owned(),
+                    "frame.fence".to_owned(),
+                ],
+                phase_wait_inputs: vec!["frame.fence".to_owned(), "present.slot".to_owned()],
+                phase_wait_outputs: vec![
+                    "frame.state".to_owned(),
+                    "present.signal".to_owned(),
+                ],
+                phase_finalize_inputs: vec![
+                    "frame.state".to_owned(),
+                    "present.signal".to_owned(),
+                ],
+                phase_finalize_outputs: vec![
+                    "present.result".to_owned(),
+                    "scheduler.wake".to_owned(),
+                ],
+                phase_bind_wake: "bind-ready".to_owned(),
+                phase_submit_wake: "submit-ready".to_owned(),
+                phase_wait_wake: "frame-present".to_owned(),
+                phase_finalize_wake: "present-commit".to_owned(),
+                bridge_plan_begin: true,
+                bridge_plan_end: true,
+            },
+        },
+        _ => NustarDomainBuildContractSummary {
+            lowering: NustarDomainLoweringPlanSummary {
+                lane_policy: "dispatch-lanes.host-bound".to_owned(),
+                bridge_surface: "host-ffi.bridge.none".to_owned(),
+                emission_kind: "sidecar-plan".to_owned(),
+            },
+            backend: NustarDomainBackendStubSummary {
+                stub_kind: "host-fallback".to_owned(),
+                bridge_entry: "nuis.host.bridge.dispatch.v1".to_owned(),
+                submission_mode: "direct-call".to_owned(),
+                wake_policy: "immediate".to_owned(),
+                scheduler_binding: "host-inline".to_owned(),
+                phase_bind: None,
+                phase_submit: None,
+                phase_wait: None,
+                phase_finalize: None,
+                transport_model: None,
+                request_shape: None,
+                response_shape: None,
+                dispatch_shape: None,
+                memory_binding: None,
+                resource_binding: None,
+                completion_model: None,
+            },
+            bridge: NustarDomainBridgePlanSummary {
+                bridge_surface: "host-ffi.bridge.none".to_owned(),
+                bridge_entry: "nuis.host.bridge.dispatch.v1".to_owned(),
+                scheduler_binding: "host-inline".to_owned(),
+                phase_bind: "direct-bind".to_owned(),
+                phase_submit: "direct-call".to_owned(),
+                phase_wait: "immediate".to_owned(),
+                phase_finalize: "return-and-finish".to_owned(),
+                bridge_kind: "managed-lifecycle-bridge".to_owned(),
+            },
+            host_bridge: NustarHostBridgeSpecSummary {
+                host_ffi_surface: "host-inline".to_owned(),
+                handle_family: "host.inline".to_owned(),
+                phase_order: vec![
+                    "bind".to_owned(),
+                    "submit".to_owned(),
+                    "wait".to_owned(),
+                    "finalize".to_owned(),
+                ],
+                phase_bind_inputs: vec!["call.args".to_owned()],
+                phase_bind_outputs: vec!["bound.call".to_owned()],
+                phase_submit_inputs: vec!["bound.call".to_owned()],
+                phase_submit_outputs: vec!["inflight.call".to_owned()],
+                phase_wait_inputs: vec!["inflight.call".to_owned()],
+                phase_wait_outputs: vec!["call.result".to_owned()],
+                phase_finalize_inputs: vec!["call.result".to_owned()],
+                phase_finalize_outputs: vec!["result.value".to_owned()],
+                phase_bind_wake: "bind-ready".to_owned(),
+                phase_submit_wake: "submit-ready".to_owned(),
+                phase_wait_wake: "immediate".to_owned(),
+                phase_finalize_wake: "return".to_owned(),
+                bridge_plan_begin: true,
+                bridge_plan_end: true,
+            },
+        },
     }
 }
 
