@@ -505,6 +505,57 @@ fn contains_unresolved_template_generic(
             .any(|arg| contains_unresolved_template_generic(arg, generic_names))
 }
 
+fn is_builtin_concrete_type_name(name: &str) -> bool {
+    matches!(
+        name,
+        "bool"
+            | "String"
+            | "str"
+            | "char"
+            | "i8"
+            | "i16"
+            | "i32"
+            | "i64"
+            | "i128"
+            | "isize"
+            | "u8"
+            | "u16"
+            | "u32"
+            | "u64"
+            | "u128"
+            | "usize"
+            | "f32"
+            | "f64"
+            | "Task"
+            | "Option"
+            | "Result"
+    )
+}
+
+fn type_ref_looks_unresolved_placeholder(ty: &AstTypeRef) -> bool {
+    if ty.is_optional || ty.is_ref {
+        return false;
+    }
+    if !ty.generic_args.is_empty() {
+        return ty
+            .generic_args
+            .iter()
+            .any(type_ref_looks_unresolved_placeholder);
+    }
+    !is_builtin_concrete_type_name(&ty.name)
+        && !ty.name.contains('.')
+        && ty.name.len() <= 2
+        && ty.name.chars().all(|ch| ch.is_ascii_uppercase())
+}
+
+fn type_ref_contains_unresolved_placeholder(ty: &AstTypeRef) -> bool {
+    type_ref_looks_unresolved_placeholder(ty)
+        || ty
+            .generic_args
+            .iter()
+            .any(type_ref_contains_unresolved_placeholder)
+}
+
 fn infer_block_result_type(
     body: &[AstStmt],
     local_types: &BTreeMap<String, AstTypeRef>,
@@ -558,6 +609,7 @@ fn expected_await_operand_type(expected_payload: Option<&AstTypeRef>) -> Option<
 
 fn infer_higher_order_substitutions(
     template: &AstFunction,
+    explicit_substitutions: &BTreeMap<String, AstTypeRef>,
     args: &[AstExpr],
     expected: Option<&AstTypeRef>,
     local_types: &BTreeMap<String, AstTypeRef>,
@@ -574,7 +626,7 @@ fn infer_higher_order_substitutions(
     if generic_names.is_empty() {
         return Ok(BTreeMap::new());
     }
-    let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+    let mut substitutions = explicit_substitutions.clone();
     if let (Some(return_pattern), Some(expected_ty)) = (template.return_type.as_ref(), expected) {
         let resolved_return_pattern =
             resolve_ast_type_ref_aliases(return_pattern, visible_type_aliases)?;
@@ -622,6 +674,15 @@ fn infer_higher_order_substitutions(
             &function_return_types,
         )
         .or_else(|| infer_local_binding_type(arg, local_types, function_table, module_impls));
+        let arg_ty = match arg_ty {
+            Some(arg_ty)
+                if type_ref_looks_unresolved_placeholder(&arg_ty)
+                    && !contains_unresolved_template_generic(&specialized_param_ty, &generic_names) =>
+            {
+                Some(specialized_param_ty.clone())
+            }
+            other => other,
+        };
         let Some(arg_ty) = arg_ty else {
             continue;
         };
@@ -644,6 +705,7 @@ fn infer_higher_order_substitutions(
 pub(crate) struct BoundCallable {
     pub(crate) symbol: String,
     pub(crate) capture_args: Vec<AstExpr>,
+    pub(crate) capture_params: Vec<AstParam>,
 }
 
 fn parse_bound_callable_expr(
@@ -658,6 +720,7 @@ fn parse_bound_callable_expr(
                 .unwrap_or_else(|| BoundCallable {
                     symbol: name.clone(),
                     capture_args: Vec::new(),
+                    capture_params: Vec::new(),
                 }),
         ),
         AstExpr::Call {
@@ -668,6 +731,7 @@ fn parse_bound_callable_expr(
             Some(BoundCallable {
                 symbol: callee[LAMBDA_BIND_PREFIX.len()..].to_owned(),
                 capture_args: args.to_vec(),
+                capture_params: Vec::new(),
             })
         }
         _ => None,
@@ -1167,7 +1231,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         )?),
         AstStmt::Return(Some(value)) => AstStmt::Return(Some(rewrite_higher_order_calls_in_expr(
             value,
-            current_return_type,
+            tail_expected.or(current_return_type),
             current_return_type,
             local_types,
             templates,
@@ -1764,6 +1828,10 @@ pub(crate) fn specialize_higher_order_call(
                 BoundCallable {
                     symbol: callable_name.clone(),
                     capture_args: helper_capture_args,
+                    capture_params: capture_param_defs
+                        .iter()
+                        .map(|param| (*param).clone())
+                        .collect(),
                 },
             );
             callable_fragments.push(sanitize_symbol_fragment(&callable_name));
@@ -1787,6 +1855,7 @@ pub(crate) fn specialize_higher_order_call(
 
     let inferred_substitutions = infer_higher_order_substitutions(
         template,
+        &explicit_substitutions,
         args,
         expected,
         local_types,
@@ -1809,6 +1878,9 @@ pub(crate) fn specialize_higher_order_call(
             .iter()
             .map(|(name, ty)| (name.clone(), ast_type_from_nir(ty)))
             .collect::<BTreeMap<_, _>>();
+        let inferred_contains_placeholder = inferred_ast_substitutions
+            .values()
+            .any(type_ref_looks_unresolved_placeholder);
         for param in &template.params {
             let Some(binding) = callable_bindings.get_mut(&param.name) else {
                 continue;
@@ -1827,20 +1899,47 @@ pub(crate) fn specialize_higher_order_call(
                 )?;
             let mut callable_specialization = inferred_ast_substitutions.clone();
             callable_specialization.extend(callable_specific_substitutions);
-            let specialized_callable_name =
-                format!("{}__{}", binding.symbol, type_fragments.join("__"));
-            if specialized_cache.insert(specialized_callable_name.clone()) {
-                let specialized_callable = specialize_function_template(
-                    callable,
-                    &specialized_callable_name,
-                    &callable_specialization
+            let callable_contains_placeholder = callable_specialization
+                .values()
+                .any(type_ref_looks_unresolved_placeholder);
+            let callable_needs_specialization = !callable.generic_params.is_empty()
+                || callable
+                    .params
+                    .iter()
+                    .any(|param| type_ref_contains_unresolved_placeholder(&param.ty))
+                || callable
+                    .return_type
+                    .as_ref()
+                    .is_some_and(type_ref_contains_unresolved_placeholder);
+            if callable_needs_specialization
+                && !inferred_contains_placeholder
+                && !callable_contains_placeholder
+            {
+                let specialized_callable_name =
+                    format!("{}__{}", binding.symbol, type_fragments.join("__"));
+                if specialized_cache.insert(specialized_callable_name.clone()) {
+                    let lowered_callable_specialization = callable_specialization
+                        .clone()
                         .into_iter()
                         .map(|(name, ty)| (name, lower_type_ref(&ty)))
-                        .collect(),
-                )?;
-                specialized_functions.push(specialized_callable);
+                        .collect();
+                    let specialized_callable = specialize_function_template(
+                        callable,
+                        &specialized_callable_name,
+                        &lowered_callable_specialization,
+                    )?;
+                    specialized_functions.push(specialized_callable);
+                }
+                binding.symbol = specialized_callable_name;
+                binding.capture_params = binding
+                    .capture_params
+                    .iter()
+                    .map(|param| AstParam {
+                        name: param.name.clone(),
+                        ty: specialize_type_with_substitutions(&param.ty, &callable_specialization),
+                    })
+                    .collect();
             }
-            binding.symbol = specialized_callable_name;
         }
     }
 
@@ -1870,7 +1969,14 @@ pub(crate) fn specialize_higher_order_call(
             specialized_cache,
             specialized_functions,
         )?;
-        let specialized = if inferred_substitutions.is_empty() {
+        let inferred_ast_substitutions = inferred_substitutions
+            .iter()
+            .map(|(name, ty)| (name.clone(), ast_type_from_nir(ty)))
+            .collect::<BTreeMap<_, _>>();
+        let inferred_contains_placeholder = inferred_ast_substitutions
+            .values()
+            .any(type_ref_looks_unresolved_placeholder);
+        let specialized = if inferred_substitutions.is_empty() || inferred_contains_placeholder {
             specialized
         } else {
             specialize_function_template(&specialized, &specialized_name, &inferred_substitutions)?

@@ -4,7 +4,6 @@ use nuis_semantics::model::{
     AstExpr, AstFunction, AstMatchArm, AstParam, AstStmt, AstTypeAlias, AstVisibility,
 };
 
-use super::super::resolve_ast_type_ref_aliases;
 use super::callables::is_callable_type_with_aliases;
 use super::expansion::{specialize_higher_order_call, BoundCallable};
 
@@ -37,22 +36,9 @@ pub(crate) fn specialize_higher_order_template(
             let Some(bound) = callable_bindings.get(&param.name) else {
                 return Vec::<AstParam>::new();
             };
-            let Ok(resolved_callable_ty) =
-                resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)
-            else {
-                return Vec::<AstParam>::new();
-            };
-            let Some(callable_arity) = super::callables::callable_type_arity(&resolved_callable_ty)
-            else {
-                return Vec::<AstParam>::new();
-            };
-            let Some(callable_function) = function_table.get(&bound.symbol) else {
-                return Vec::<AstParam>::new();
-            };
-            callable_function
-                .params
+            bound
+                .capture_params
                 .iter()
-                .skip(callable_arity)
                 .zip(bound.capture_args.iter())
                 .filter_map(|(capture_param, capture_arg)| match capture_arg {
                     AstExpr::Var(name) => Some(AstParam {
@@ -342,6 +328,7 @@ pub(crate) fn rewrite_higher_order_template_expr(
                 .unwrap_or_else(|| BoundCallable {
                     symbol: name.clone(),
                     capture_args: Vec::new(),
+                    capture_params: Vec::new(),
                 });
             if bound.capture_args.is_empty() {
                 AstExpr::Var(bound.symbol)
@@ -451,6 +438,7 @@ pub(crate) fn rewrite_higher_order_template_expr(
                 .unwrap_or_else(|| BoundCallable {
                     symbol: callee.clone(),
                     capture_args: Vec::new(),
+                    capture_params: Vec::new(),
                 });
             rewritten_args.extend(bound.capture_args);
             AstExpr::Call {
