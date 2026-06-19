@@ -52,6 +52,7 @@ struct DomainBuildContractDriftCheck {
 struct DomainBuildUnitVerificationVerdict {
     package_id: String,
     domain_family: String,
+    kind: String,
     payload_blob_ok: bool,
     lowering_plan_ok: bool,
     backend_stub_ok: bool,
@@ -60,7 +61,18 @@ struct DomainBuildUnitVerificationVerdict {
     bridge_registry_ok: bool,
     host_bridge_plan_ok: bool,
     registry_alignment_ok: bool,
+    failure_reasons: Vec<String>,
     consistent: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DomainBuildVerificationSummary {
+    all_units_consistent: bool,
+    total_units: usize,
+    host_units_checked: usize,
+    hetero_units_checked: usize,
+    registry_drift_units: usize,
+    failing_units: Vec<String>,
 }
 
 fn json_escape(value: &str) -> String {
@@ -385,43 +397,69 @@ fn domain_build_unit_verification_verdict(
     report: &aot::BuildManifestVerifyReport,
 ) -> DomainBuildUnitVerificationVerdict {
     let is_heterogeneous = unit.domain_family != "cpu";
+    let kind = if is_heterogeneous { "hetero" } else { "host" }.to_owned();
     let drift = evaluate_domain_build_contract_drift(unit);
+    let mut failure_reasons = Vec::new();
     let payload_blob_ok = if is_heterogeneous {
         unit.artifact_payload_blob_path.is_some() && report.domain_payload_blobs_checked > 0
     } else {
         true
     };
+    if is_heterogeneous && !payload_blob_ok {
+        failure_reasons.push("payload_blob_missing_or_unverified".to_owned());
+    }
     let lowering_plan_ok = if is_heterogeneous {
         unit.artifact_payload_blob_path.is_some() && report.domain_payload_lowering_plans_checked > 0
     } else {
         true
     };
+    if is_heterogeneous && !lowering_plan_ok {
+        failure_reasons.push("lowering_plan_missing_or_unverified".to_owned());
+    }
     let backend_stub_ok = if is_heterogeneous {
         unit.artifact_payload_blob_path.is_some() && report.domain_payload_backend_stubs_checked > 0
     } else {
         true
     };
+    if is_heterogeneous && !backend_stub_ok {
+        failure_reasons.push("backend_stub_missing_or_unverified".to_owned());
+    }
     let bridge_plan_ok = if is_heterogeneous {
         unit.artifact_payload_blob_path.is_some() && report.domain_payload_bridge_plans_checked > 0
     } else {
         true
     };
+    if is_heterogeneous && !bridge_plan_ok {
+        failure_reasons.push("bridge_plan_missing_or_unverified".to_owned());
+    }
     let bridge_stub_ok = if is_heterogeneous {
         unit.artifact_bridge_stub_path.is_some() && report.domain_bridge_stubs_checked > 0
     } else {
         true
     };
+    if is_heterogeneous && !bridge_stub_ok {
+        failure_reasons.push("bridge_stub_missing_or_unverified".to_owned());
+    }
     let bridge_registry_ok = if is_heterogeneous {
         report.bridge_registry_checked > 0 && report.bridge_registry_entries_checked > 0
     } else {
         true
     };
+    if is_heterogeneous && !bridge_registry_ok {
+        failure_reasons.push("bridge_registry_missing_or_unverified".to_owned());
+    }
     let host_bridge_plan_ok = if is_heterogeneous {
         report.host_bridge_plan_checked > 0 && report.host_bridge_plan_entries_checked > 0
     } else {
         true
     };
+    if is_heterogeneous && !host_bridge_plan_ok {
+        failure_reasons.push("host_bridge_plan_missing_or_unverified".to_owned());
+    }
     let registry_alignment_ok = drift.consistent;
+    if !registry_alignment_ok {
+        failure_reasons.push("registry_alignment_drift".to_owned());
+    }
     let consistent = payload_blob_ok
         && lowering_plan_ok
         && backend_stub_ok
@@ -433,6 +471,7 @@ fn domain_build_unit_verification_verdict(
     DomainBuildUnitVerificationVerdict {
         package_id: unit.package_id.clone(),
         domain_family: unit.domain_family.clone(),
+        kind,
         payload_blob_ok,
         lowering_plan_ok,
         backend_stub_ok,
@@ -441,6 +480,7 @@ fn domain_build_unit_verification_verdict(
         bridge_registry_ok,
         host_bridge_plan_ok,
         registry_alignment_ok,
+        failure_reasons,
         consistent,
     }
 }
@@ -451,6 +491,7 @@ fn domain_build_unit_verification_verdict_json(
     let fields = vec![
         json_string_field("package_id", &verdict.package_id),
         json_string_field("domain_family", &verdict.domain_family),
+        json_string_field("kind", &verdict.kind),
         json_bool_field("payload_blob_ok", verdict.payload_blob_ok),
         json_bool_field("lowering_plan_ok", verdict.lowering_plan_ok),
         json_bool_field("backend_stub_ok", verdict.backend_stub_ok),
@@ -459,24 +500,122 @@ fn domain_build_unit_verification_verdict_json(
         json_bool_field("bridge_registry_ok", verdict.bridge_registry_ok),
         json_bool_field("host_bridge_plan_ok", verdict.host_bridge_plan_ok),
         json_bool_field("registry_alignment_ok", verdict.registry_alignment_ok),
+        json_string_array_field("failure_reasons", &verdict.failure_reasons),
         json_bool_field("consistent", verdict.consistent),
     ];
     format!("{{{}}}", fields.join(","))
 }
 
-fn domain_build_unit_verification_verdicts_json(
+fn collect_domain_build_unit_verdicts(
     report: &aot::BuildManifestVerifyReport,
-) -> String {
+) -> Vec<DomainBuildUnitVerificationVerdict> {
     report
         .domain_build_units
         .iter()
-        .map(|unit| {
-            domain_build_unit_verification_verdict_json(
-                &domain_build_unit_verification_verdict(unit, report),
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(",")
+        .map(|unit| domain_build_unit_verification_verdict(unit, report))
+        .collect()
+}
+
+fn summarize_domain_build_verification(
+    verdicts: &[DomainBuildUnitVerificationVerdict],
+) -> DomainBuildVerificationSummary {
+    let total_units = verdicts.len();
+    let host_units_checked = verdicts.iter().filter(|verdict| verdict.kind == "host").count();
+    let hetero_units_checked = verdicts
+        .iter()
+        .filter(|verdict| verdict.kind == "hetero")
+        .count();
+    let registry_drift_units = verdicts
+        .iter()
+        .filter(|verdict| !verdict.registry_alignment_ok)
+        .count();
+    let failing_units = verdicts
+        .iter()
+        .filter(|verdict| !verdict.consistent)
+        .map(|verdict| format!("{}[{}]", verdict.package_id, verdict.domain_family))
+        .collect::<Vec<_>>();
+    DomainBuildVerificationSummary {
+        all_units_consistent: failing_units.is_empty(),
+        total_units,
+        host_units_checked,
+        hetero_units_checked,
+        registry_drift_units,
+        failing_units,
+    }
+}
+
+fn domain_build_verification_summary_json(summary: &DomainBuildVerificationSummary) -> String {
+    let fields = vec![
+        json_bool_field("all_units_consistent", summary.all_units_consistent),
+        json_usize_field("total_units", summary.total_units),
+        json_usize_field("host_units_checked", summary.host_units_checked),
+        json_usize_field("hetero_units_checked", summary.hetero_units_checked),
+        json_usize_field("registry_drift_units", summary.registry_drift_units),
+        json_string_array_field("failing_units", &summary.failing_units),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn artifact_report_summary_lines(
+    artifact_verify: &aot::NuisCompiledArtifactVerifyReport,
+    verification_summary: &DomainBuildVerificationSummary,
+    manifest_verify_reconstructed: bool,
+) -> Vec<String> {
+    vec![
+        format!(
+            "summary: artifact_roundtrip={} lifecycle={} runtime_flags={} all_units_consistent={}",
+            if artifact_verify.artifact_roundtrip_verified {
+                "ok"
+            } else {
+                "failed"
+            },
+            if artifact_verify.lifecycle_contract_consistent {
+                "ok"
+            } else {
+                "failed"
+            },
+            if artifact_verify.lifecycle_runtime_capability_flags_consistent {
+                "ok"
+            } else {
+                "failed"
+            },
+            if verification_summary.all_units_consistent {
+                "true"
+            } else {
+                "false"
+            }
+        ),
+        format!(
+            "summary_units: total={} host={} hetero={} drift={} failing={}",
+            verification_summary.total_units,
+            verification_summary.host_units_checked,
+            verification_summary.hetero_units_checked,
+            verification_summary.registry_drift_units,
+            if verification_summary.failing_units.is_empty() {
+                "<none>".to_owned()
+            } else {
+                verification_summary.failing_units.join(", ")
+            }
+        ),
+        format!(
+            "summary_manifest: reconstructed={}",
+            if manifest_verify_reconstructed {
+                "true"
+            } else {
+                "false"
+            }
+        ),
+    ]
+}
+
+fn verdict_status(ok: bool, hetero_expected: bool) -> &'static str {
+    if !hetero_expected {
+        "skipped"
+    } else if ok {
+        "ok"
+    } else {
+        "missing"
+    }
 }
 
 fn collect_benchmark_inventory(
@@ -671,6 +810,8 @@ fn inspect_artifact_json(
         let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
         let drift_check_count = drift_checks.len();
         let drift_mismatch_count = drift_checks.iter().filter(|check| !check.consistent).count();
+        let verdicts = collect_domain_build_unit_verdicts(report);
+        let summary = summarize_domain_build_verification(&verdicts);
         fields.push(json_usize_field(
             "domain_build_unit_count",
             report.domain_build_unit_count,
@@ -737,8 +878,16 @@ fn inspect_artifact_json(
             report.host_bridge_plan_entries_checked,
         ));
         fields.push(format!(
+            "\"domain_build_verification_summary\":{}",
+            domain_build_verification_summary_json(&summary)
+        ));
+        fields.push(format!(
             "\"domain_build_unit_verdicts\":[{}]",
-            domain_build_unit_verification_verdicts_json(report)
+            verdicts
+                .iter()
+                .map(domain_build_unit_verification_verdict_json)
+                .collect::<Vec<_>>()
+                .join(",")
         ));
         fields.push(format!(
             "\"domain_build_contract_drift\":[{}]",
@@ -817,6 +966,8 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
     let domain_build_contracts = domain_build_unit_contracts_json(&report.domain_build_units);
     let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
     let drift_mismatch_count = drift_checks.iter().filter(|check| !check.consistent).count();
+    let verdicts = collect_domain_build_unit_verdicts(report);
+    let summary = summarize_domain_build_verification(&verdicts);
     let fields = vec![
         json_string_field("kind", "nuis_build_manifest_verify"),
         json_string_field("input", &input.display().to_string()),
@@ -899,6 +1050,10 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
             drift_mismatch_count == 0,
         ),
         format!(
+            "\"domain_build_verification_summary\":{}",
+            domain_build_verification_summary_json(&summary)
+        ),
+        format!(
             "\"domain_build_contract_drift\":[{}]",
             drift_checks
                 .iter()
@@ -928,7 +1083,11 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
         ),
         format!(
             "\"domain_build_unit_verdicts\":[{}]",
-            domain_build_unit_verification_verdicts_json(report)
+            verdicts
+                .iter()
+                .map(domain_build_unit_verification_verdict_json)
+                .collect::<Vec<_>>()
+                .join(",")
         ),
         json_string_field("cpu_target_abi", &report.cpu_target_abi),
         json_string_field("cpu_target_machine_arch", &report.cpu_target_machine_arch),
@@ -999,12 +1158,18 @@ fn artifact_report_json(
     manifest_verify: &aot::BuildManifestVerifyReport,
     manifest_verify_reconstructed: bool,
 ) -> String {
+    let verdicts = collect_domain_build_unit_verdicts(manifest_verify);
+    let summary = summarize_domain_build_verification(&verdicts);
     let fields = vec![
         json_string_field("kind", "nuis_artifact_report"),
         json_string_field("input", &input.display().to_string()),
         json_bool_field(
             "manifest_verify_reconstructed",
             manifest_verify_reconstructed,
+        ),
+        format!(
+            "\"domain_build_verification_summary\":{}",
+            domain_build_verification_summary_json(&summary)
         ),
         format!(
             "\"artifact_inspect\":{}",
@@ -2012,24 +2177,35 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                         if drift.consistent { "ok" } else { "drift" }
                     );
                     println!(
-                        "    verification_verdict: payload_blob={} lowering_plan={} backend_stub={} bridge_plan={} bridge_stub={} bridge_registry={} host_bridge_plan={} registry_alignment={} consistent={}",
-                        if verdict.payload_blob_ok { "ok" } else { "missing" },
-                        if verdict.lowering_plan_ok { "ok" } else { "missing" },
-                        if verdict.backend_stub_ok { "ok" } else { "missing" },
-                        if verdict.bridge_plan_ok { "ok" } else { "missing" },
-                        if verdict.bridge_stub_ok { "ok" } else { "missing" },
-                        if verdict.bridge_registry_ok { "ok" } else { "missing" },
-                        if verdict.host_bridge_plan_ok { "ok" } else { "missing" },
+                        "    verification_verdict: kind={} payload_blob={} lowering_plan={} backend_stub={} bridge_plan={} bridge_stub={} bridge_registry={} host_bridge_plan={} registry_alignment={} consistent={}",
+                        verdict.kind,
+                        verdict_status(verdict.payload_blob_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.lowering_plan_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.backend_stub_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.bridge_plan_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.bridge_stub_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.bridge_registry_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.host_bridge_plan_ok, verdict.kind == "hetero"),
                         if verdict.registry_alignment_ok { "ok" } else { "drift" },
                         if verdict.consistent { "true" } else { "false" }
                     );
+                    if !verdict.failure_reasons.is_empty() {
+                        println!(
+                            "      failure_reasons: {}",
+                            verdict.failure_reasons.join(", ")
+                        );
+                    }
                     for issue in drift.issues {
                         println!("      issue: {}", issue);
                     }
                 }
             }
         }
-        CommandKind::ArtifactReport { input, json } => {
+        CommandKind::ArtifactReport {
+            input,
+            json,
+            summary,
+        } => {
             let is_manifest_input = input
                 .file_name()
                 .and_then(|name| name.to_str())
@@ -2065,6 +2241,19 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                         manifest_verify_reconstructed,
                     )
                 );
+                return Ok(());
+            }
+            let verdicts = collect_domain_build_unit_verdicts(&manifest_verify);
+            let summary_view = summarize_domain_build_verification(&verdicts);
+            if summary {
+                println!("nuis artifact report summary: {}", input.display());
+                for line in artifact_report_summary_lines(
+                    &artifact_verify,
+                    &summary_view,
+                    manifest_verify_reconstructed,
+                ) {
+                    println!("  {}", line);
+                }
                 return Ok(());
             }
             println!("nuis artifact report: {}", input.display());
@@ -2112,6 +2301,34 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!(
                 "  execution_contracts_checked: {}",
                 manifest_verify.execution_contracts_checked
+            );
+            let summary = summary_view;
+            for line in artifact_report_summary_lines(
+                &artifact_verify,
+                &summary,
+                manifest_verify_reconstructed,
+            ) {
+                println!("  {}", line);
+            }
+            println!(
+                "  all_units_consistent: {}",
+                if summary.all_units_consistent {
+                    "true"
+                } else {
+                    "false"
+                }
+            );
+            println!("  total_units: {}", summary.total_units);
+            println!("  host_units_checked: {}", summary.host_units_checked);
+            println!("  hetero_units_checked: {}", summary.hetero_units_checked);
+            println!("  registry_drift_units: {}", summary.registry_drift_units);
+            println!(
+                "  failing_units: {}",
+                if summary.failing_units.is_empty() {
+                    "<none>".to_owned()
+                } else {
+                    summary.failing_units.join(", ")
+                }
             );
             println!(
                 "  domain_payload_blobs_checked: {}",
@@ -2429,17 +2646,24 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     if drift.consistent { "ok" } else { "drift" }
                 );
                 println!(
-                    "    verification_verdict: payload_blob={} lowering_plan={} backend_stub={} bridge_plan={} bridge_stub={} bridge_registry={} host_bridge_plan={} registry_alignment={} consistent={}",
-                    if verdict.payload_blob_ok { "ok" } else { "missing" },
-                    if verdict.lowering_plan_ok { "ok" } else { "missing" },
-                    if verdict.backend_stub_ok { "ok" } else { "missing" },
-                    if verdict.bridge_plan_ok { "ok" } else { "missing" },
-                    if verdict.bridge_stub_ok { "ok" } else { "missing" },
-                    if verdict.bridge_registry_ok { "ok" } else { "missing" },
-                    if verdict.host_bridge_plan_ok { "ok" } else { "missing" },
+                    "    verification_verdict: kind={} payload_blob={} lowering_plan={} backend_stub={} bridge_plan={} bridge_stub={} bridge_registry={} host_bridge_plan={} registry_alignment={} consistent={}",
+                    verdict.kind,
+                    verdict_status(verdict.payload_blob_ok, verdict.kind == "hetero"),
+                    verdict_status(verdict.lowering_plan_ok, verdict.kind == "hetero"),
+                    verdict_status(verdict.backend_stub_ok, verdict.kind == "hetero"),
+                    verdict_status(verdict.bridge_plan_ok, verdict.kind == "hetero"),
+                    verdict_status(verdict.bridge_stub_ok, verdict.kind == "hetero"),
+                    verdict_status(verdict.bridge_registry_ok, verdict.kind == "hetero"),
+                    verdict_status(verdict.host_bridge_plan_ok, verdict.kind == "hetero"),
                     if verdict.registry_alignment_ok { "ok" } else { "drift" },
                     if verdict.consistent { "true" } else { "false" }
                 );
+                if !verdict.failure_reasons.is_empty() {
+                    println!(
+                        "      failure_reasons: {}",
+                        verdict.failure_reasons.join(", ")
+                    );
+                }
                 for issue in drift.issues {
                     println!("      issue: {}", issue);
                 }
@@ -3414,10 +3638,12 @@ mod tests {
         };
         let verdict = domain_build_unit_verification_verdict(&unit, &report);
 
+        assert_eq!(verdict.kind, "host");
         assert!(verdict.payload_blob_ok);
         assert!(verdict.bridge_registry_ok);
         assert!(verdict.host_bridge_plan_ok);
         assert!(verdict.registry_alignment_ok);
+        assert!(verdict.failure_reasons.is_empty());
         assert!(verdict.consistent);
     }
 
@@ -3471,6 +3697,11 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"domain_build_contracts_consistent\":true"));
         assert!(json.contains("\"domain_build_contract_drift\":["));
         assert!(json.contains("\"domain_build_unit_verdicts\":["));
+        assert!(json.contains("\"domain_build_verification_summary\":{"));
+        assert!(json.contains("\"all_units_consistent\":true"));
+        assert!(json.contains("\"failing_units\":[]"));
+        assert!(json.contains("\"kind\":\"host\""));
+        assert!(json.contains("\"failure_reasons\":[]"));
         assert!(json.contains("\"registry_alignment_ok\":true"));
         assert!(json.contains("\"consistent\":true"));
         assert!(json.contains("\"package_id\":\"official.cpu\""));
@@ -3529,9 +3760,121 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"domain_build_contracts_consistent\":true"));
         assert!(json.contains("\"domain_build_contract_drift\":["));
         assert!(json.contains("\"domain_build_unit_verdicts\":["));
+        assert!(json.contains("\"domain_build_verification_summary\":{"));
+        assert!(json.contains("\"all_units_consistent\":true"));
+        assert!(json.contains("\"failing_units\":[]"));
+        assert!(json.contains("\"kind\":\"host\""));
+        assert!(json.contains("\"failure_reasons\":[]"));
         assert!(json.contains("\"registry_alignment_ok\":true"));
         assert!(json.contains("\"consistent\":true"));
         assert!(json.contains("\"package_id\":\"official.cpu\""));
+    }
+
+    #[test]
+    fn artifact_report_json_includes_top_level_verification_summary() {
+        let project_name = "artifact_report_contract_summary_json";
+        let project_root = write_temp_project_fixture(
+            project_name,
+            r#"
+name = "artifact_report_contract_summary_json"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        );
+        let output_dir = temp_dir("artifact_report_contract_summary_json_outputs");
+
+        run(CommandKind::Compile {
+            input: project_root,
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let artifact = load_nuis_compiled_artifact(&manifest_path).unwrap();
+        let artifact_verify =
+            aot::verify_nuis_compiled_artifact(output_dir.join("nuis.compiled.artifact").as_path())
+                .unwrap();
+        let manifest_verify = aot::verify_build_manifest(&manifest_path).unwrap();
+        let json = artifact_report_json(
+            &manifest_path,
+            &artifact,
+            output_dir.join("nuis.compiled.artifact").as_path(),
+            &artifact_verify,
+            &manifest_path,
+            &manifest_verify,
+            false,
+        );
+
+        assert!(json.contains("\"domain_build_verification_summary\":{"));
+        assert!(json.contains("\"all_units_consistent\":true"));
+        assert!(json.contains("\"host_units_checked\":1"));
+        assert!(json.contains("\"hetero_units_checked\":0"));
+        assert!(json.contains("\"failing_units\":[]"));
+    }
+
+    #[test]
+    fn artifact_report_summary_lines_expose_compact_overview() {
+        let artifact_verify = aot::NuisCompiledArtifactVerifyReport {
+            schema: "nuis-compiled-artifact-v1".to_owned(),
+            packaging_mode: "native-cpu-llvm".to_owned(),
+            binary_name: "demo".to_owned(),
+            binary_bytes: 1,
+            build_manifest_bytes: 1,
+            envelope_schema: "nuis-executable-envelope-v1".to_owned(),
+            envelope_package_count: 1,
+            lifecycle_schema: "nuis-lifecycle-contract-v1".to_owned(),
+            lifecycle_bootstrap_entry: "main".to_owned(),
+            lifecycle_tick_policy: "poll".to_owned(),
+            lifecycle_shutdown_policy: "flush".to_owned(),
+            lifecycle_yalivia_rpc: "disabled".to_owned(),
+            lifecycle_hook_count: 0,
+            lifecycle_hook_surface: Vec::new(),
+            lifecycle_export_count: 0,
+            lifecycle_export_surface: Vec::new(),
+            lifecycle_runtime_capability_flags: Vec::new(),
+            lifecycle_contract_consistent: true,
+            lifecycle_runtime_capability_flags_consistent: true,
+            execution_contracts_checked: 1,
+            cpu_target_abi: "cpu.arm64.apple_aapcs64".to_owned(),
+            cpu_target_machine_arch: "arm64".to_owned(),
+            cpu_target_machine_os: "darwin".to_owned(),
+            cpu_target_object_format: "mach-o".to_owned(),
+            cpu_target_calling_abi: "aapcs64-darwin".to_owned(),
+            artifact_roundtrip_verified: true,
+        };
+        let summary = DomainBuildVerificationSummary {
+            all_units_consistent: true,
+            total_units: 1,
+            host_units_checked: 1,
+            hetero_units_checked: 0,
+            registry_drift_units: 0,
+            failing_units: Vec::new(),
+        };
+        let lines = artifact_report_summary_lines(&artifact_verify, &summary, false);
+
+        assert_eq!(lines.len(), 3);
+        assert!(lines[0].contains("artifact_roundtrip=ok"));
+        assert!(lines[0].contains("lifecycle=ok"));
+        assert!(lines[0].contains("runtime_flags=ok"));
+        assert!(lines[0].contains("all_units_consistent=true"));
+        assert!(lines[1].contains("total=1"));
+        assert!(lines[1].contains("host=1"));
+        assert!(lines[1].contains("hetero=0"));
+        assert!(lines[1].contains("drift=0"));
+        assert!(lines[1].contains("failing=<none>"));
+        assert_eq!(lines[2], "summary_manifest: reconstructed=false");
     }
 
     #[test]

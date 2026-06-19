@@ -40,6 +40,7 @@ pub enum CommandKind {
     ArtifactReport {
         input: PathBuf,
         json: bool,
+        summary: bool,
     },
     VerifyArtifact {
         input: PathBuf,
@@ -191,25 +192,35 @@ where
         }
         "artifact-report" => {
             let mut json = false;
+            let mut summary = false;
             let mut input = None;
             for arg in args.by_ref() {
                 if arg == "--json" {
                     json = true;
+                } else if arg == "--summary" {
+                    summary = true;
                 } else if input.is_none() {
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuisc artifact-report [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        "usage: nuisc artifact-report [--json|--summary] <nuis.compiled.artifact|nuis.build.manifest.toml>"
                             .to_owned(),
                     );
                 }
             }
+            if json && summary {
+                return Err(
+                    "usage: nuisc artifact-report [--json|--summary] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        .to_owned(),
+                );
+            }
             Ok(CommandKind::ArtifactReport {
                 input: input.ok_or_else(|| {
-                    "usage: nuisc artifact-report [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                    "usage: nuisc artifact-report [--json|--summary] <nuis.compiled.artifact|nuis.build.manifest.toml>"
                         .to_owned()
                 })?,
                 json,
+                summary,
             })
         }
         "verify-artifact" => {
@@ -561,6 +572,28 @@ mod tests {
             CommandKind::ArtifactReport {
                 input: PathBuf::from("nuis.compiled.artifact"),
                 json: true,
+                summary: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_artifact_report_summary_command() {
+        let command = parse_args(
+            vec![
+                "artifact-report".to_owned(),
+                "--summary".to_owned(),
+                "nuis.compiled.artifact".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::ArtifactReport {
+                input: PathBuf::from("nuis.compiled.artifact"),
+                json: false,
+                summary: true,
             }
         );
     }
