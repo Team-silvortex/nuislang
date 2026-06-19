@@ -1,0 +1,129 @@
+mod cpu Main {
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_format_i64(pattern_handle: i64, value: i64) -> i64;
+  extern "c" fn host_text_format_pair(pattern_handle: i64, lhs: i64, rhs: i64) -> i64;
+  extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_json_array_len(item_count: i64) -> i64;
+  extern "c" fn host_json_object_len(field_count: i64) -> i64;
+
+  struct TextPipelineSeed {
+    lhs_handle: i64,
+    rhs_handle: i64,
+    tail_handle: i64,
+    primary_pattern_handle: i64,
+    secondary_pattern_handle: i64,
+    key_handle: i64,
+    item_count: i64,
+    field_count: i64
+  }
+
+  struct TextPipelineSummary {
+    lhs_len: i64,
+    rhs_len: i64,
+    merged_handle: i64,
+    merged_len: i64,
+    chained_handle: i64,
+    primary_single_handle: i64,
+    primary_pair_handle: i64,
+    primary_pair_len: i64,
+    pipeline_handle: i64,
+    pipeline_len: i64,
+    pair_len: i64,
+    array_len: i64,
+    object_len: i64
+  }
+
+  fn build_text_pipeline_seed(
+    lhs_handle: i64,
+    rhs_handle: i64,
+    tail_handle: i64,
+    primary_pattern_handle: i64,
+    secondary_pattern_handle: i64,
+    key_handle: i64,
+    item_count: i64,
+    field_count: i64
+  ) -> TextPipelineSeed {
+    return TextPipelineSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle,
+      tail_handle: tail_handle,
+      primary_pattern_handle: primary_pattern_handle,
+      secondary_pattern_handle: secondary_pattern_handle,
+      key_handle: key_handle,
+      item_count: item_count,
+      field_count: field_count
+    };
+  }
+
+  fn capture_text_pipeline(seed: TextPipelineSeed) -> TextPipelineSummary {
+    let lhs_len: i64 = host_text_len(seed.lhs_handle);
+    let rhs_len: i64 = host_text_len(seed.rhs_handle);
+    let merged_handle: i64 = host_text_concat(seed.lhs_handle, seed.rhs_handle);
+    let merged_len: i64 = host_text_concat_len(seed.lhs_handle, seed.rhs_handle);
+    let chained_handle: i64 = host_text_concat(merged_handle, seed.tail_handle);
+    let primary_single_handle: i64 =
+      host_text_format_i64(seed.primary_pattern_handle, merged_len);
+    let primary_pair_handle: i64 =
+      host_text_format_pair(seed.secondary_pattern_handle, lhs_len, rhs_len);
+    let primary_pair_len: i64 = host_text_measure(primary_pair_handle);
+    let pipeline_handle: i64 = host_text_concat(chained_handle, primary_single_handle);
+    return TextPipelineSummary {
+      lhs_len: lhs_len,
+      rhs_len: rhs_len,
+      merged_handle: merged_handle,
+      merged_len: merged_len,
+      chained_handle: chained_handle,
+      primary_single_handle: primary_single_handle,
+      primary_pair_handle: primary_pair_handle,
+      primary_pair_len: primary_pair_len,
+      pipeline_handle: pipeline_handle,
+      pipeline_len: host_text_measure(pipeline_handle),
+      pair_len: host_json_pair_len(seed.key_handle, primary_single_handle),
+      array_len: host_json_array_len(seed.item_count),
+      object_len: host_json_object_len(seed.field_count)
+    };
+  }
+
+  fn summarize_text_pipeline_recipe(
+    lhs_handle: i64,
+    rhs_handle: i64,
+    tail_handle: i64,
+    primary_pattern_handle: i64,
+    secondary_pattern_handle: i64,
+    key_handle: i64,
+    item_count: i64,
+    field_count: i64
+  ) -> i64 {
+    let seed: TextPipelineSeed = build_text_pipeline_seed(
+      lhs_handle,
+      rhs_handle,
+      tail_handle,
+      primary_pattern_handle,
+      secondary_pattern_handle,
+      key_handle,
+      item_count,
+      field_count
+    );
+    let summary: TextPipelineSummary = capture_text_pipeline(seed);
+    return summary.lhs_len
+      + summary.rhs_len
+      + summary.merged_handle
+      + summary.merged_len
+      + summary.chained_handle
+      + summary.primary_single_handle
+      + summary.primary_pair_handle
+      + summary.primary_pair_len
+      + summary.pipeline_handle
+      + summary.pipeline_len
+      + summary.pair_len
+      + summary.array_len
+      + summary.object_len;
+  }
+
+  fn main() {
+    print(summarize_text_pipeline_recipe(11, 19, 23, 811, 907, 601, 3, 2));
+  }
+}

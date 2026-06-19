@@ -1,0 +1,66 @@
+mod cpu Main {
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+
+  struct TextReportBuilderProjectSummary {
+    title_line_handle: i64,
+    title_line_len: i64,
+    kv_line_handle: i64,
+    kv_line_len: i64,
+    status_line_handle: i64,
+    status_line_len: i64,
+    report_handle: i64,
+    report_len: i64
+  }
+
+  fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
+    let with_colon: i64 = host_text_concat(label_handle, colon_handle);
+    return host_text_concat(with_colon, space_handle);
+  }
+
+  fn build_kv_line(
+    key_handle: i64,
+    value_handle: i64,
+    colon_handle: i64,
+    space_handle: i64
+  ) -> i64 {
+    let prefix: i64 = build_line_prefix(key_handle, colon_handle, space_handle);
+    return host_text_concat(prefix, value_handle);
+  }
+
+  fn append_line(block_handle: i64, line_handle: i64, newline_handle: i64) -> i64 {
+    let with_line: i64 = host_text_concat(block_handle, line_handle);
+    return host_text_concat(with_line, newline_handle);
+  }
+
+  fn capture_text_report_builder_project() -> TextReportBuilderProjectSummary {
+    let title_line_handle: i64 = 1501;
+    let kv_line_handle: i64 = build_kv_line(1601, 1602, 58, 32);
+    let status_line_handle: i64 = build_kv_line(1701, 1702, 58, 32);
+    let first_block: i64 = append_line(title_line_handle, kv_line_handle, 10);
+    let second_block: i64 = append_line(first_block, status_line_handle, 10);
+    let report_handle: i64 = host_text_concat(second_block, 1801);
+    return TextReportBuilderProjectSummary {
+      title_line_handle: title_line_handle,
+      title_line_len: host_text_measure(title_line_handle),
+      kv_line_handle: kv_line_handle,
+      kv_line_len: host_text_measure(kv_line_handle),
+      status_line_handle: status_line_handle,
+      status_line_len: host_text_measure(status_line_handle),
+      report_handle: report_handle,
+      report_len: host_text_measure(report_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: TextReportBuilderProjectSummary = capture_text_report_builder_project();
+    return summary.title_line_handle
+      + summary.title_line_len
+      + summary.kv_line_handle
+      + summary.kv_line_len
+      + summary.status_line_handle
+      + summary.status_line_len
+      + summary.report_handle
+      + summary.report_len;
+  }
+}

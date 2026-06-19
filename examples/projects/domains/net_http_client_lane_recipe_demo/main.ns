@@ -35,9 +35,11 @@ mod cpu Main {
     method_code: i64,
     authority_bytes: i64,
     path_bytes: i64,
-    header_bytes: i64,
-    body_bytes: i64,
+    request_header_bytes: i64,
+    request_body_bytes: i64,
     request_bytes: i64,
+    response_header_bytes: i64,
+    response_body_bytes: i64,
     response_bytes: i64,
     status_code: i64,
     open_handle: i64,
@@ -82,12 +84,15 @@ mod cpu Main {
     let method_code: i64 = 64 + protocol_kind + protocol_version;
     let authority_bytes: i64 = protocol_header_bytes + 8 + transport_family;
     let path_bytes: i64 = protocol_version + send_window + 12;
-    let header_bytes: i64 = protocol_header_bytes + send_window + retry_budget;
-    let body_bytes: i64 = stream_window + protocol_version + timeout_budget;
+    let request_header_bytes: i64 =
+      protocol_header_bytes + send_window + retry_budget;
+    let request_body_bytes: i64 =
+      stream_window + protocol_version + timeout_budget;
     let request_bytes: i64 =
-      authority_bytes + path_bytes + header_bytes + body_bytes;
-    let response_bytes: i64 =
-      protocol_header_bytes + 12 + protocol_header_bytes + recv_window;
+      authority_bytes + path_bytes + request_header_bytes + request_body_bytes;
+    let response_header_bytes: i64 = protocol_header_bytes + 12;
+    let response_body_bytes: i64 = protocol_header_bytes + recv_window;
+    let response_bytes: i64 = response_header_bytes + response_body_bytes;
     let open_handle: i64 = host_network_open_tcp_stream(
       remote_port,
       connect_timeout_ms
@@ -118,9 +123,11 @@ mod cpu Main {
       method_code: method_code,
       authority_bytes: authority_bytes,
       path_bytes: path_bytes,
-      header_bytes: header_bytes,
-      body_bytes: body_bytes,
+      request_header_bytes: request_header_bytes,
+      request_body_bytes: request_body_bytes,
       request_bytes: request_bytes,
+      response_header_bytes: response_header_bytes,
+      response_body_bytes: response_body_bytes,
       response_bytes: response_bytes,
       status_code: status_code,
       open_handle: open_handle,
@@ -152,9 +159,11 @@ mod cpu Main {
       + summary.method_code
       + summary.authority_bytes
       + summary.path_bytes
-      + summary.header_bytes
-      + summary.body_bytes
+      + summary.request_header_bytes
+      + summary.request_body_bytes
       + summary.request_bytes
+      + summary.response_header_bytes
+      + summary.response_body_bytes
       + summary.response_bytes
       + summary.status_code
       + summary.open_handle

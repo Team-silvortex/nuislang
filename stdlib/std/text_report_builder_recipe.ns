@@ -1,0 +1,139 @@
+mod cpu Main {
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+
+  struct TextReportBuilderSeed {
+    title_handle: i64,
+    key_handle: i64,
+    value_handle: i64,
+    status_handle: i64,
+    status_value_handle: i64,
+    footer_handle: i64,
+    colon_handle: i64,
+    space_handle: i64,
+    newline_handle: i64
+  }
+
+  struct TextReportBuilderSummary {
+    title_line_handle: i64,
+    title_line_len: i64,
+    kv_line_handle: i64,
+    kv_line_len: i64,
+    status_line_handle: i64,
+    status_line_len: i64,
+    report_handle: i64,
+    report_len: i64
+  }
+
+  fn build_text_report_builder_seed(
+    title_handle: i64,
+    key_handle: i64,
+    value_handle: i64,
+    status_handle: i64,
+    status_value_handle: i64,
+    footer_handle: i64,
+    colon_handle: i64,
+    space_handle: i64,
+    newline_handle: i64
+  ) -> TextReportBuilderSeed {
+    return TextReportBuilderSeed {
+      title_handle: title_handle,
+      key_handle: key_handle,
+      value_handle: value_handle,
+      status_handle: status_handle,
+      status_value_handle: status_value_handle,
+      footer_handle: footer_handle,
+      colon_handle: colon_handle,
+      space_handle: space_handle,
+      newline_handle: newline_handle
+    };
+  }
+
+  fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
+    let with_colon: i64 = host_text_concat(label_handle, colon_handle);
+    return host_text_concat(with_colon, space_handle);
+  }
+
+  fn build_kv_line(
+    key_handle: i64,
+    value_handle: i64,
+    colon_handle: i64,
+    space_handle: i64
+  ) -> i64 {
+    let prefix: i64 = build_line_prefix(key_handle, colon_handle, space_handle);
+    return host_text_concat(prefix, value_handle);
+  }
+
+  fn append_line(block_handle: i64, line_handle: i64, newline_handle: i64) -> i64 {
+    let with_line: i64 = host_text_concat(block_handle, line_handle);
+    return host_text_concat(with_line, newline_handle);
+  }
+
+  fn capture_text_report_builder(seed: TextReportBuilderSeed) -> TextReportBuilderSummary {
+    let title_line_handle: i64 = seed.title_handle;
+    let kv_line_handle: i64 = build_kv_line(
+      seed.key_handle,
+      seed.value_handle,
+      seed.colon_handle,
+      seed.space_handle
+    );
+    let status_line_handle: i64 = build_kv_line(
+      seed.status_handle,
+      seed.status_value_handle,
+      seed.colon_handle,
+      seed.space_handle
+    );
+    let first_block: i64 = append_line(title_line_handle, kv_line_handle, seed.newline_handle);
+    let second_block: i64 = append_line(first_block, status_line_handle, seed.newline_handle);
+    let report_handle: i64 = host_text_concat(second_block, seed.footer_handle);
+    return TextReportBuilderSummary {
+      title_line_handle: title_line_handle,
+      title_line_len: host_text_measure(title_line_handle),
+      kv_line_handle: kv_line_handle,
+      kv_line_len: host_text_measure(kv_line_handle),
+      status_line_handle: status_line_handle,
+      status_line_len: host_text_measure(status_line_handle),
+      report_handle: report_handle,
+      report_len: host_text_measure(report_handle)
+    };
+  }
+
+  fn summarize_text_report_builder_recipe(
+    title_handle: i64,
+    key_handle: i64,
+    value_handle: i64,
+    status_handle: i64,
+    status_value_handle: i64,
+    footer_handle: i64,
+    colon_handle: i64,
+    space_handle: i64,
+    newline_handle: i64
+  ) -> i64 {
+    let seed: TextReportBuilderSeed = build_text_report_builder_seed(
+      title_handle,
+      key_handle,
+      value_handle,
+      status_handle,
+      status_value_handle,
+      footer_handle,
+      colon_handle,
+      space_handle,
+      newline_handle
+    );
+    let summary: TextReportBuilderSummary = capture_text_report_builder(seed);
+    return summary.title_line_handle
+      + summary.title_line_len
+      + summary.kv_line_handle
+      + summary.kv_line_len
+      + summary.status_line_handle
+      + summary.status_line_len
+      + summary.report_handle
+      + summary.report_len;
+  }
+
+  fn main() {
+    print(
+      summarize_text_report_builder_recipe(1501, 1601, 1602, 1701, 1702, 1801, 58, 32, 10)
+    );
+  }
+}

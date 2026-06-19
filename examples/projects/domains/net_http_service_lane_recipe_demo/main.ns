@@ -43,10 +43,12 @@ mod cpu Main {
     accept_ready: i64,
     recv_ready: i64,
     send_ready: i64,
-    request_head_bytes: i64,
+    request_header_bytes: i64,
     request_body_bytes: i64,
-    response_head_bytes: i64,
+    request_bytes: i64,
+    response_header_bytes: i64,
     response_body_bytes: i64,
+    response_bytes: i64,
     service_value: i64,
     tick_ns: i64
   }
@@ -108,10 +110,13 @@ mod cpu Main {
     );
     let recv_value: i64 = encode_value(recv_result);
     let send_value: i64 = encode_value(send_result);
-    let request_head_bytes: i64 = protocol_header_bytes + protocol_version + 16;
+    let request_header_bytes: i64 =
+      protocol_header_bytes + protocol_version + 16;
     let request_body_bytes: i64 = stream_window + recv_window + retry_budget;
-    let response_head_bytes: i64 = protocol_header_bytes + 12;
+    let request_bytes: i64 = request_header_bytes + request_body_bytes;
+    let response_header_bytes: i64 = protocol_header_bytes + 12;
     let response_body_bytes: i64 = stream_window + send_window + protocol_kind;
+    let response_bytes: i64 = response_header_bytes + response_body_bytes;
     let accepted_close_value: i64 = host_network_close_owned(accepted_handle);
     let listener_close_value: i64 = host_network_close_owned(listener_handle);
     let tick_ns: i64 = host_monotonic_time_ns();
@@ -134,20 +139,20 @@ mod cpu Main {
       accept_ready: encode_accept_ready(accept_result),
       recv_ready: encode_recv_ready(recv_result),
       send_ready: encode_send_ready(send_result),
-      request_head_bytes: request_head_bytes,
+      request_header_bytes: request_header_bytes,
       request_body_bytes: request_body_bytes,
-      response_head_bytes: response_head_bytes,
+      request_bytes: request_bytes,
+      response_header_bytes: response_header_bytes,
       response_body_bytes: response_body_bytes,
+      response_bytes: response_bytes,
       service_value: transport_family
         + endpoint_kind
         + retry_budget
         + protocol_kind
         + local_port
         + listener_handle
-        + request_head_bytes
-        + request_body_bytes
-        + response_head_bytes
-        + response_body_bytes
+        + request_bytes
+        + response_bytes
         + recv_value
         + send_value
         + accepted_close_value
@@ -176,10 +181,12 @@ mod cpu Main {
       + summary.accept_ready
       + summary.recv_ready
       + summary.send_ready
-      + summary.request_head_bytes
+      + summary.request_header_bytes
       + summary.request_body_bytes
-      + summary.response_head_bytes
+      + summary.request_bytes
+      + summary.response_header_bytes
       + summary.response_body_bytes
+      + summary.response_bytes
       + summary.service_value
       + summary.tick_ns;
   }

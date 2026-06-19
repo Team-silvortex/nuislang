@@ -1,0 +1,109 @@
+mod cpu Main {
+  extern "c" fn host_path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_path_basename(path_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+  extern "c" fn host_fs_kind(path_handle: i64) -> i64;
+  extern "c" fn host_fs_size(path_handle: i64) -> i64;
+  extern "c" fn host_dir_open(path_handle: i64) -> i64;
+  extern "c" fn host_dir_entry_count(dir_handle: i64) -> i64;
+  extern "c" fn host_dir_close(dir_handle: i64) -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+
+  struct FilesystemReportProjectSummary {
+    joined_len: i64,
+    basename_handle: i64,
+    exists_code: i64,
+    kind_code: i64,
+    size_code: i64,
+    dir_handle: i64,
+    dir_entry_count: i64,
+    dir_close_code: i64,
+    file_handle: i64,
+    read_bytes: i64,
+    file_close_code: i64,
+    joined_line_handle: i64,
+    joined_line_len: i64,
+    file_line_handle: i64,
+    file_line_len: i64,
+    report_handle: i64,
+    report_len: i64
+  }
+
+  fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
+    let with_colon: i64 = host_text_concat(label_handle, colon_handle);
+    return host_text_concat(with_colon, space_handle);
+  }
+
+  fn build_kv_line(
+    key_handle: i64,
+    value_handle: i64,
+    colon_handle: i64,
+    space_handle: i64
+  ) -> i64 {
+    let prefix: i64 = build_line_prefix(key_handle, colon_handle, space_handle);
+    return host_text_concat(prefix, value_handle);
+  }
+
+  fn append_line(block_handle: i64, line_handle: i64, newline_handle: i64) -> i64 {
+    let with_line: i64 = host_text_concat(block_handle, line_handle);
+    return host_text_concat(with_line, newline_handle);
+  }
+
+  fn capture_filesystem_report_project() -> FilesystemReportProjectSummary {
+    let joined_len: i64 = host_path_join_len(2001, 37);
+    let basename_handle: i64 = host_path_basename(2103);
+    let dir_handle: i64 = host_dir_open(2001);
+    let file_handle: i64 = host_file_open(2103, 1);
+    let backing: ref Buffer = alloc_buffer(8, 0);
+    let read_bytes: i64 = host_file_read(file_handle, host_buffer_handle(backing), 8);
+    let joined_line_handle: i64 = build_kv_line(1601, basename_handle, 58, 32);
+    let file_line_handle: i64 = build_kv_line(1602, 2103, 58, 32);
+    let first_block: i64 = append_line(1501, joined_line_handle, 10);
+    let second_block: i64 = append_line(first_block, file_line_handle, 10);
+    let report_handle: i64 = host_text_concat(second_block, 1801);
+    return FilesystemReportProjectSummary {
+      joined_len: joined_len,
+      basename_handle: basename_handle,
+      exists_code: host_fs_exists(2103),
+      kind_code: host_fs_kind(2103),
+      size_code: host_fs_size(2103),
+      dir_handle: dir_handle,
+      dir_entry_count: host_dir_entry_count(dir_handle),
+      dir_close_code: host_dir_close(dir_handle),
+      file_handle: file_handle,
+      read_bytes: read_bytes,
+      file_close_code: host_file_close(file_handle),
+      joined_line_handle: joined_line_handle,
+      joined_line_len: host_text_measure(joined_line_handle),
+      file_line_handle: file_line_handle,
+      file_line_len: host_text_measure(file_line_handle),
+      report_handle: report_handle,
+      report_len: host_text_measure(report_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: FilesystemReportProjectSummary = capture_filesystem_report_project();
+    return summary.joined_len
+      + summary.basename_handle
+      + summary.exists_code
+      + summary.kind_code
+      + summary.size_code
+      + summary.dir_handle
+      + summary.dir_entry_count
+      + summary.dir_close_code
+      + summary.file_handle
+      + summary.read_bytes
+      + summary.file_close_code
+      + summary.joined_line_handle
+      + summary.joined_line_len
+      + summary.file_line_handle
+      + summary.file_line_len
+      + summary.report_handle
+      + summary.report_len;
+  }
+}

@@ -32,6 +32,8 @@ If you only want the shortest tooling route, start with:
   [subprocess_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo)
 * text, json, diagnostics:
   [host_text_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/host_text_runtime_demo),
+  [text_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_pipeline_demo),
+  [text_report_builder_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_report_builder_demo),
   [json_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/json_runtime_demo),
   [text_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_json_demo),
   [text_format_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_format_runtime_demo),
