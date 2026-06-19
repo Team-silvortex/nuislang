@@ -13,6 +13,28 @@ use super::{
     resolve_ast_type_ref_aliases, substitute_ast_type_alias_target,
 };
 
+fn inferred_match_value_type(
+    value: &AstExpr,
+    local_type_env: &BTreeMap<String, AstTypeRef>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    visible_structs: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+) -> Option<AstTypeRef> {
+    simple_match_value_type(value, local_type_env).or_else(|| {
+        infer_ast_expr_type(
+            value,
+            local_type_env,
+            impl_lookup,
+            visible_structs,
+            function_return_types,
+        )
+    })
+}
+
+fn normalize_method_bound_context(context: &str) -> String {
+    context.replace(" match-arm", "")
+}
+
 fn parent_enum_ast_type(receiver_ty: &AstTypeRef) -> Option<AstTypeRef> {
     let (parent, _variant) = receiver_ty.name.rsplit_once('.')?;
     Some(AstTypeRef {
@@ -101,6 +123,8 @@ pub(super) fn validate_expr_generic_method_bounds(
     local_type_env: &BTreeMap<String, AstTypeRef>,
     context: &str,
 ) -> Result<(), String> {
+    let normalized_context = normalize_method_bound_context(context);
+    let context = normalized_context.as_str();
     match expr {
         AstExpr::Bool(_)
         | AstExpr::Text(_)
@@ -164,7 +188,13 @@ pub(super) fn validate_expr_generic_method_bounds(
                 local_type_env,
                 context,
             )?;
-            let match_value_ty = simple_match_value_type(value, local_type_env);
+            let match_value_ty = inferred_match_value_type(
+                value,
+                local_type_env,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
+            );
             for arm in arms {
                 let mut arm_env = local_type_env.clone();
                 if let Some(match_value_ty) = match_value_ty.as_ref() {
@@ -200,7 +230,7 @@ pub(super) fn validate_expr_generic_method_bounds(
                     generic_param_names,
                     generic_bounds,
                     &mut arm_env,
-                    &format!("{context} match-arm"),
+                    context,
                 )?;
             }
         }
@@ -552,6 +582,8 @@ fn validate_stmt_generic_method_bounds(
     local_type_env: &mut BTreeMap<String, AstTypeRef>,
     context: &str,
 ) -> Result<(), String> {
+    let normalized_context = normalize_method_bound_context(context);
+    let context = normalized_context.as_str();
     match stmt {
         AstStmt::Let {
             name, ty, value, ..
@@ -693,7 +725,13 @@ fn validate_stmt_generic_method_bounds(
                 local_type_env,
                 context,
             )?;
-            let match_value_ty = simple_match_value_type(value, local_type_env);
+            let match_value_ty = inferred_match_value_type(
+                value,
+                local_type_env,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
+            );
             for AstMatchArm {
                 pattern,
                 guard,

@@ -5,10 +5,54 @@ use nuis_semantics::model::{
     AstStructDef, AstTypeAlias, AstTypeRef, NirTypeRef,
 };
 
-use super::types::{ast_type_from_nir, infer_ast_expr_type};
+use super::types::{ast_type_from_nir, infer_ast_expr_type, infer_ast_expr_type_for_pattern};
 use super::validation_binding_env::instantiate_ast_struct_field_type;
 use super::validation_trait_bounds::validate_generic_parameter_use_site_bound_with_context;
 use super::{lower_type_ref, resolve_ast_type_ref_aliases};
+
+fn is_builtin_concrete_type_name(name: &str) -> bool {
+    matches!(
+        name,
+        "bool"
+            | "String"
+            | "str"
+            | "char"
+            | "i8"
+            | "i16"
+            | "i32"
+            | "i64"
+            | "i128"
+            | "isize"
+            | "u8"
+            | "u16"
+            | "u32"
+            | "u64"
+            | "u128"
+            | "usize"
+            | "f32"
+            | "f64"
+            | "Task"
+            | "Option"
+            | "Result"
+            | "Pipe"
+    )
+}
+
+fn type_ref_looks_unresolved_placeholder(ty: &AstTypeRef) -> bool {
+    if ty.is_optional || ty.is_ref {
+        return false;
+    }
+    if !ty.generic_args.is_empty() {
+        return ty
+            .generic_args
+            .iter()
+            .any(type_ref_looks_unresolved_placeholder);
+    }
+    !is_builtin_concrete_type_name(&ty.name)
+        && !ty.name.contains('.')
+        && ty.name.len() <= 2
+        && ty.name.chars().all(|ch| ch.is_ascii_uppercase())
+}
 
 pub(crate) fn infer_generic_substitutions(
     template: &AstFunction,
@@ -58,18 +102,41 @@ pub(crate) fn infer_generic_substitutions(
         ) {
             continue;
         }
-        let Some(arg_ty) = infer_alias_aware_ast_expr_type(
+        let pattern_arg_ty = infer_ast_expr_type_for_pattern(
             arg,
+            &resolved_param_ty,
+            &generic_names,
             env,
-            visible_type_aliases,
             impl_lookup,
             struct_table,
             function_return_types,
-        ) else {
+        );
+        let arg_ty = pattern_arg_ty.or_else(|| {
+            infer_alias_aware_ast_expr_type(
+                arg,
+                env,
+                visible_type_aliases,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+            )
+        });
+        let Some(arg_ty) = arg_ty else {
             return Err(format!(
                 "cannot infer concrete type for generic arg `{}` in call to `{}`",
                 param.name, template.name
             ));
+        };
+        let arg_ty = if type_ref_looks_unresolved_placeholder(&arg_ty)
+            && !contains_unresolved_generic_placeholders(
+                &resolved_param_ty,
+                &generic_names,
+                &substitutions,
+            )
+        {
+            resolved_param_ty.clone()
+        } else {
+            arg_ty
         };
         let resolved_arg_ty = resolve_ast_type_ref_aliases(&arg_ty, visible_type_aliases)?;
         unify_generic_type_pattern(
@@ -217,6 +284,14 @@ pub(crate) fn unify_generic_type_pattern(
     function_name: &str,
 ) -> Result<(), String> {
     if generic_names.contains(&pattern.name) && pattern.generic_args.is_empty() {
+        if generic_names.contains(&concrete.name)
+            && concrete.generic_args.is_empty()
+            && !concrete.is_optional
+            && !concrete.is_ref
+            && pattern.name == concrete.name
+        {
+            return Ok(());
+        }
         if let Some(existing) = substitutions.get(&pattern.name) {
             if lower_type_ref(existing).render() != lower_type_ref(concrete).render() {
                 return Err(format!(
@@ -279,6 +354,12 @@ pub(crate) fn specialize_function_template(
         test_timeout_ms: None,
         test_clock_domain: None,
         test_clock_policy: None,
+        benchmark_name: None,
+        benchmark_warmup_iters: None,
+        benchmark_measure_iters: None,
+        benchmark_timeout_ms: None,
+        benchmark_clock_domain: None,
+        benchmark_clock_policy: None,
         is_async: template.is_async,
         generic_params: vec![],
         where_bounds: vec![],

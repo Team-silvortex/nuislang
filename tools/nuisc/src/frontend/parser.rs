@@ -609,6 +609,12 @@ impl Parser {
             test_timeout_ms,
             test_clock_domain,
             test_clock_policy,
+            declared_benchmark_name,
+            benchmark_warmup_iters,
+            benchmark_measure_iters,
+            benchmark_timeout_ms,
+            benchmark_clock_domain,
+            benchmark_clock_policy,
         ) = if self.peek_word("test") {
             self.expect_word("test")?;
             if !self.peek_symbol('(') {
@@ -617,9 +623,77 @@ impl Parser {
                         .to_owned(),
                 );
             }
-            self.parse_test_decl_call_syntax()?
+            let (
+                declared_test_name,
+                test_ignored,
+                test_should_fail,
+                test_reason,
+                test_timeout_ms,
+                test_clock_domain,
+                test_clock_policy,
+            ) = self.parse_test_decl_call_syntax()?;
+            (
+                declared_test_name,
+                test_ignored,
+                test_should_fail,
+                test_reason,
+                test_timeout_ms,
+                test_clock_domain,
+                test_clock_policy,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+        } else if self.peek_word("benchmark") {
+            self.expect_word("benchmark")?;
+            if !self.peek_symbol('(') {
+                return Err(
+                    "benchmark declarations now require `benchmark(...) fn ...`; the older bare-prefix `benchmark ... fn ...` syntax has been retired"
+                        .to_owned(),
+                );
+            }
+            let (
+                declared_benchmark_name,
+                benchmark_warmup_iters,
+                benchmark_measure_iters,
+                benchmark_timeout_ms,
+                benchmark_clock_domain,
+                benchmark_clock_policy,
+            ) = self.parse_benchmark_decl_call_syntax()?;
+            (
+                None,
+                false,
+                false,
+                None,
+                None,
+                None,
+                None,
+                declared_benchmark_name,
+                benchmark_warmup_iters,
+                benchmark_measure_iters,
+                benchmark_timeout_ms,
+                benchmark_clock_domain,
+                benchmark_clock_policy,
+            )
         } else {
-            (None, false, false, None, None, None, None)
+            (
+                None,
+                false,
+                false,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
         };
         let is_async = if self.peek_word("async") {
             self.expect_word("async")?;
@@ -627,6 +701,18 @@ impl Parser {
         } else {
             false
         };
+        if declared_test_name.is_some() && self.peek_word("benchmark") {
+            return Err(
+                "function cannot be both a test and a benchmark in the current MVP"
+                    .to_owned(),
+            );
+        }
+        if declared_benchmark_name.is_some() && self.peek_word("test") {
+            return Err(
+                "function cannot be both a test and a benchmark in the current MVP"
+                    .to_owned(),
+            );
+        }
         self.expect_word("fn")?;
         let name = self.expect_ident()?;
         let generic_params = if self.peek_symbol('<') {
@@ -639,9 +725,26 @@ impl Parser {
             .find(|attribute| attribute.name == "test")
             .map(|attribute| self.parse_test_attribute_metadata(&attribute.args))
             .transpose()?;
+        let benchmark_from_attribute = attributes
+            .iter()
+            .find(|attribute| attribute.name == "benchmark")
+            .map(|attribute| self.parse_benchmark_attribute_metadata(&attribute.args))
+            .transpose()?;
         if declared_test_name.is_some() && test_from_attribute.is_some() {
             return Err(format!(
                 "function `{name}` cannot use both `test(...)` and `@test(...)`; choose one test declaration style"
+            ));
+        }
+        if declared_benchmark_name.is_some() && benchmark_from_attribute.is_some() {
+            return Err(format!(
+                "function `{name}` cannot use both `benchmark(...)` and `@benchmark(...)`; choose one benchmark declaration style"
+            ));
+        }
+        if (declared_test_name.is_some() || test_from_attribute.is_some())
+            && (declared_benchmark_name.is_some() || benchmark_from_attribute.is_some())
+        {
+            return Err(format!(
+                "function `{name}` cannot be both a test and a benchmark in the current MVP"
             ));
         }
         if declared_test_name.is_some() {
@@ -653,6 +756,16 @@ impl Parser {
                 test_timeout_ms,
                 test_clock_domain,
                 test_clock_policy,
+            ));
+        }
+        if declared_benchmark_name.is_some() {
+            attributes.push(self.build_benchmark_attribute(
+                declared_benchmark_name.clone(),
+                benchmark_warmup_iters,
+                benchmark_measure_iters,
+                benchmark_timeout_ms,
+                benchmark_clock_domain,
+                benchmark_clock_policy,
             ));
         }
         let (
@@ -676,6 +789,31 @@ impl Parser {
             ),
         };
         let test_name = raw_test_name.map(|label| {
+            if label.is_empty() {
+                name.clone()
+            } else {
+                label
+            }
+        });
+        let (
+            raw_benchmark_name,
+            benchmark_warmup_iters,
+            benchmark_measure_iters,
+            benchmark_timeout_ms,
+            benchmark_clock_domain,
+            benchmark_clock_policy,
+        ) = match benchmark_from_attribute {
+            Some(values) => values,
+            None => (
+                declared_benchmark_name,
+                benchmark_warmup_iters,
+                benchmark_measure_iters,
+                benchmark_timeout_ms,
+                benchmark_clock_domain,
+                benchmark_clock_policy,
+            ),
+        };
+        let benchmark_name = raw_benchmark_name.map(|label| {
             if label.is_empty() {
                 name.clone()
             } else {
@@ -708,6 +846,12 @@ impl Parser {
             test_timeout_ms,
             test_clock_domain,
             test_clock_policy,
+            benchmark_name,
+            benchmark_warmup_iters,
+            benchmark_measure_iters,
+            benchmark_timeout_ms,
+            benchmark_clock_domain,
+            benchmark_clock_policy,
             is_async,
             generic_params,
             where_bounds,
@@ -874,6 +1018,151 @@ impl Parser {
             ignored,
             should_fail,
             reason,
+            timeout_ms,
+            clock_domain,
+            clock_policy,
+        ))
+    }
+
+    fn build_benchmark_attribute(
+        &self,
+        label: Option<String>,
+        warmup_iters: Option<i64>,
+        measure_iters: Option<i64>,
+        timeout_ms: Option<i64>,
+        clock_domain: Option<TestClockDomain>,
+        clock_policy: Option<TestClockPolicy>,
+    ) -> AstAttribute {
+        let mut args = Vec::new();
+        if let Some(label) = label {
+            if !label.is_empty() {
+                args.push(AstAttributeArg {
+                    name: None,
+                    value: AstAttributeValue::String(label),
+                });
+            }
+        }
+        if let Some(warmup_iters) = warmup_iters {
+            args.push(AstAttributeArg {
+                name: Some("warmup_iters".to_owned()),
+                value: AstAttributeValue::Int(warmup_iters),
+            });
+        }
+        if let Some(measure_iters) = measure_iters {
+            args.push(AstAttributeArg {
+                name: Some("measure_iters".to_owned()),
+                value: AstAttributeValue::Int(measure_iters),
+            });
+        }
+        if let Some(timeout_ms) = timeout_ms {
+            args.push(AstAttributeArg {
+                name: Some("timeout_ms".to_owned()),
+                value: AstAttributeValue::Int(timeout_ms),
+            });
+        }
+        if let Some(clock_domain) = clock_domain {
+            args.push(AstAttributeArg {
+                name: Some("clock_domain".to_owned()),
+                value: AstAttributeValue::String(clock_domain.as_str().to_owned()),
+            });
+        }
+        if let Some(clock_policy) = clock_policy {
+            args.push(AstAttributeArg {
+                name: Some("clock_policy".to_owned()),
+                value: AstAttributeValue::String(clock_policy.as_str().to_owned()),
+            });
+        }
+        AstAttribute {
+            name: "benchmark".to_owned(),
+            args,
+        }
+    }
+
+    fn parse_benchmark_attribute_metadata(
+        &self,
+        args: &[AstAttributeArg],
+    ) -> Result<
+        (
+            Option<String>,
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+            Option<TestClockDomain>,
+            Option<TestClockPolicy>,
+        ),
+        String,
+    > {
+        let mut label = Some(String::new());
+        let mut warmup_iters = None;
+        let mut measure_iters = None;
+        let mut timeout_ms = None;
+        let mut clock_domain = None;
+        let mut clock_policy = None;
+
+        for arg in args {
+            match (&arg.name, &arg.value) {
+                (None, AstAttributeValue::String(value)) => {
+                    if label.is_some() && label.as_ref().is_some_and(|item| item.is_empty()) {
+                        label = Some(value.clone());
+                    } else {
+                        return Err(
+                            "`@benchmark(...)` accepts at most one positional string label"
+                                .to_owned(),
+                        );
+                    }
+                }
+                (Some(name), AstAttributeValue::String(value)) => match name.as_str() {
+                    "name" => label = Some(value.clone()),
+                    "clock_domain" => {
+                        clock_domain = Some(TestClockDomain::parse(value).ok_or_else(|| {
+                            format!(
+                                "unsupported `clock_domain=\"{}\"`; expected `monotonic`, `wall`, or `global`",
+                                value
+                            )
+                        })?)
+                    }
+                    "clock_policy" => {
+                        clock_policy = Some(TestClockPolicy::parse(value).ok_or_else(|| {
+                            format!(
+                                "unsupported `clock_policy=\"{}\"`; expected `bridge`",
+                                value
+                            )
+                        })?)
+                    }
+                    other => {
+                        return Err(format!(
+                            "unknown benchmark metadata key `{other}` in `@benchmark(...)`"
+                        ));
+                    }
+                },
+                (Some(name), AstAttributeValue::Int(value)) => match name.as_str() {
+                    "warmup_iters" => warmup_iters = Some(*value),
+                    "measure_iters" => measure_iters = Some(*value),
+                    "timeout_ms" => timeout_ms = Some(*value),
+                    other => {
+                        return Err(format!(
+                            "unknown benchmark metadata key `{other}` in `@benchmark(...)`"
+                        ));
+                    }
+                },
+                (Some(name), _) => {
+                    return Err(format!(
+                        "benchmark metadata key `{name}` has unsupported value shape in `@benchmark(...)`"
+                    ));
+                }
+                (None, _) => {
+                    return Err(
+                        "expected string label in `@benchmark(...)` positional arguments"
+                            .to_owned(),
+                    );
+                }
+            }
+        }
+
+        Ok((
+            label,
+            warmup_iters,
+            measure_iters,
             timeout_ms,
             clock_domain,
             clock_policy,
@@ -1119,6 +1408,82 @@ impl Parser {
         ))
     }
 
+    fn parse_benchmark_decl_call_syntax(
+        &mut self,
+    ) -> Result<
+        (
+            Option<String>,
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+            Option<TestClockDomain>,
+            Option<TestClockPolicy>,
+        ),
+        String,
+    > {
+        self.expect_symbol('(')?;
+        let mut label = Some(String::new());
+        let mut warmup_iters = None;
+        let mut measure_iters = None;
+        let mut timeout_ms = None;
+        let mut clock_domain = None;
+        let mut clock_policy = None;
+        while !self.peek_symbol(')') {
+            match self.next() {
+                Some(Token::String(value)) => {
+                    label = Some(value);
+                }
+                Some(Token::Word(word)) => {
+                    if self.peek_symbol('=') {
+                        self.expect_symbol('=')?;
+                        match word.as_str() {
+                            "name" => label = Some(self.parse_test_meta_string()?),
+                            "warmup_iters" => warmup_iters = Some(self.parse_test_meta_int()?),
+                            "measure_iters" => measure_iters = Some(self.parse_test_meta_int()?),
+                            "timeout_ms" => timeout_ms = Some(self.parse_test_meta_int()?),
+                            "clock_domain" => {
+                                clock_domain = Some(self.parse_test_clock_domain()?)
+                            }
+                            "clock_policy" => {
+                                clock_policy = Some(self.parse_test_clock_policy()?)
+                            }
+                            _ => {
+                                return Err(format!(
+                                    "unknown benchmark metadata key `{word}` in `benchmark(...)`"
+                                ))
+                            }
+                        }
+                    } else {
+                        return Err(format!(
+                            "unknown benchmark metadata flag `{word}` in `benchmark(...)`"
+                        ));
+                    }
+                }
+                Some(other) => {
+                    return Err(format!(
+                        "expected string label or benchmark metadata in `benchmark(...)`, found {}",
+                        describe_token(&other)
+                    ))
+                }
+                None => return Err("unterminated `benchmark(...)` declaration".to_owned()),
+            }
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+            } else {
+                break;
+            }
+        }
+        self.expect_symbol(')')?;
+        Ok((
+            label,
+            warmup_iters,
+            measure_iters,
+            timeout_ms,
+            clock_domain,
+            clock_policy,
+        ))
+    }
+
     fn parse_test_meta_bool(&mut self) -> Result<bool, String> {
         match self.next() {
             Some(Token::Word(word)) if word == "true" => Ok(true),
@@ -1145,6 +1510,19 @@ impl Parser {
     }
 
     fn parse_test_meta_int(&mut self) -> Result<i64, String> {
+        if self.peek_symbol('-') {
+            self.expect_symbol('-')?;
+            return match self.next() {
+                Some(Token::Integer(value)) => Ok(-value),
+                Some(other) => Err(format!(
+                    "expected integer literal in test metadata, found {}",
+                    describe_token(&other)
+                )),
+                None => Err(
+                    "expected integer literal in test metadata, found end of input".to_owned(),
+                ),
+            };
+        }
         match self.next() {
             Some(Token::Integer(value)) => Ok(value),
             Some(other) => Err(format!(

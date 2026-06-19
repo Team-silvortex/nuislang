@@ -4,7 +4,7 @@ use nuis_semantics::model::{NirExternFunction, NirModule, NirStmt, NirStructDef,
 
 use super::{
     async_boundary_violation_detail, async_parameter_violation_detail,
-    validate_test_function_signature, validate_type_ref,
+    validate_benchmark_function_signature, validate_test_function_signature, validate_type_ref,
 };
 
 pub(super) fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
@@ -37,6 +37,9 @@ pub(super) fn validate_declared_nir_types(module: &NirModule) -> Result<(), Stri
     for function in &module.functions {
         if function.test_name.is_some() {
             validate_test_function_signature(module, function)?;
+        }
+        if function.benchmark_name.is_some() {
+            validate_benchmark_function_signature(module, function)?;
         }
         if function.is_async && module.domain != "cpu" {
             return Err(format!(

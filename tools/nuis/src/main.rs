@@ -125,6 +125,13 @@ fn run() -> Result<(), String> {
             exact,
             filter,
         } => handle_test(input, list, ignored_only, include_ignored, exact, filter)?,
+        cli::CommandKind::Bench {
+            input,
+            list,
+            json,
+            exact,
+            filter,
+        } => handle_bench(input, list, json, exact, filter)?,
         cli::CommandKind::Build {
             input,
             output_dir,
@@ -320,11 +327,251 @@ fn handle_test(
     }
 }
 
+fn handle_bench(
+    input: std::path::PathBuf,
+    list: bool,
+    json: bool,
+    exact: bool,
+    filter: Option<String>,
+) -> Result<(), String> {
+    if json {
+        let source_kind = if nuisc::project::is_project_input(&input) {
+            "project"
+        } else {
+            "single-file"
+        };
+        let report =
+            collect_language_benchmark_run_report(&input, filter.as_deref(), list, exact)?;
+        println!("{}", benchmark_run_report_json(&input, source_kind, list, exact, filter.as_deref(), &report));
+        if !list && (report.failed > 0 || report.timed_out > 0) {
+            return Err(format!(
+                "benchmark run failed: {} failed, {} timed out",
+                report.failed, report.timed_out
+            ));
+        }
+        return Ok(());
+    }
+    if nuisc::project::is_project_input(&input) {
+        let project = nuisc::project::load_project(&input)?;
+        println!("bench: checking project {}", project.manifest.name);
+        handle_check(input.clone())?;
+        let paths = project
+            .modules
+            .iter()
+            .map(|module| module.path.clone())
+            .collect::<BTreeSet<_>>();
+        let mut collected = 0usize;
+        let mut completed = 0usize;
+        let mut failed = 0usize;
+        let mut timed_out = 0usize;
+        for path in paths {
+            let report = run_language_benchmarks_for_source_file(
+                &path,
+                filter.as_deref(),
+                list,
+                exact,
+            )?;
+            collected += report.collected;
+            completed += report.completed;
+            failed += report.failed;
+            timed_out += report.timed_out;
+        }
+        println!("  collected language benchmarks: {}", collected);
+        if list {
+            println!("  listed language benchmarks: {}", collected);
+            return Ok(());
+        }
+        println!("  executed language benchmarks: {}", completed + failed + timed_out);
+        println!("  completed: {}", completed);
+        println!("  failed: {}", failed);
+        println!("  timed_out: {}", timed_out);
+        if failed > 0 || timed_out > 0 {
+            return Err(format!(
+                "project benchmark run failed: {failed} failed, {timed_out} timed out"
+            ));
+        }
+        if collected == 0 {
+            println!("  result: project check passed");
+        } else {
+            println!("  result: all discovered language benchmarks completed");
+        }
+        Ok(())
+    } else {
+        println!("bench: {}", input.display());
+        let report = run_language_benchmarks_for_source_file(&input, filter.as_deref(), list, exact)?;
+        if report.collected == 0 {
+            handle_check(input.clone())?;
+        }
+        if list {
+            println!("  listed language benchmarks: {}", report.collected);
+            return Ok(());
+        }
+        if report.failed > 0 || report.timed_out > 0 {
+            return Err(format!(
+                "benchmark run failed: {} failed, {} timed out",
+                report.failed, report.timed_out
+            ));
+        }
+        println!("  result: passed");
+        Ok(())
+    }
+}
+
+fn collect_language_benchmark_run_report(
+    input: &Path,
+    filter: Option<&str>,
+    list_only: bool,
+    exact: bool,
+) -> Result<LanguageBenchmarkRunReport, String> {
+    if nuisc::project::is_project_input(input) {
+        let project = nuisc::project::load_project(input)?;
+        // Keep `bench --json` behavior aligned with the text path without printing a check summary.
+        let resolved = nuisc::pipeline::resolve_compile_input(input)?;
+        let _ = resolved.compile()?;
+        let paths = project
+            .modules
+            .iter()
+            .map(|module| module.path.clone())
+            .collect::<BTreeSet<_>>();
+        let mut collected = 0usize;
+        let mut completed = 0usize;
+        let mut failed = 0usize;
+        let mut timed_out = 0usize;
+        let mut records = Vec::new();
+        for path in paths {
+            let report =
+                collect_language_benchmarks_for_source_file(&path, filter, list_only, exact)?;
+            collected += report.collected;
+            completed += report.completed;
+            failed += report.failed;
+            timed_out += report.timed_out;
+            records.extend(report.records);
+        }
+        Ok(LanguageBenchmarkRunReport {
+            collected,
+            completed,
+            failed,
+            timed_out,
+            records,
+        })
+    } else {
+        let report = collect_language_benchmarks_for_source_file(input, filter, list_only, exact)?;
+        if report.collected == 0 {
+            let resolved = nuisc::pipeline::resolve_compile_input(input)?;
+            let _ = resolved.compile()?;
+        }
+        Ok(report)
+    }
+}
+
 struct LanguageTestRunReport {
     collected: usize,
     passed: usize,
     failed: usize,
     skipped: usize,
+}
+
+struct LanguageBenchmarkRunReport {
+    collected: usize,
+    completed: usize,
+    failed: usize,
+    timed_out: usize,
+    records: Vec<BenchmarkRunRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BenchmarkRunRecord {
+    source: String,
+    function_name: String,
+    label: String,
+    status: &'static str,
+    warmup_iters: usize,
+    measure_iters: usize,
+    note: Option<String>,
+    measurement: Option<BenchmarkMeasurement>,
+    clock_policy: Option<&'static str>,
+    resolved_clock_bridge: Option<&'static str>,
+    resolved_clock_surface: Option<&'static str>,
+    declared_clock_domain: Option<&'static str>,
+    declared_clock_domain_code: Option<i64>,
+    resolved_clock_domain: Option<&'static str>,
+    resolved_clock_domain_code: Option<i64>,
+    resolved_clock_source: Option<&'static str>,
+}
+
+fn benchmark_run_report_json(
+    input: &Path,
+    source_kind: &str,
+    list_only: bool,
+    exact: bool,
+    filter: Option<&str>,
+    report: &LanguageBenchmarkRunReport,
+) -> String {
+    let record_json = report
+        .records
+        .iter()
+        .map(benchmark_run_record_json)
+        .collect::<Vec<_>>();
+    let mut fields = vec![
+        json_field("kind", "nuis_benchmark_run"),
+        json_field("source_kind", source_kind),
+        json_field("input", &input.display().to_string()),
+        json_bool_field("list_only", list_only),
+        json_bool_field("exact", exact),
+        json_optional_string_field("filter", filter),
+        json_usize_field("collected", report.collected),
+        json_usize_field("completed", report.completed),
+        json_usize_field("failed", report.failed),
+        json_usize_field("timed_out", report.timed_out),
+        json_object_array_field("benchmarks", &record_json),
+    ];
+    fields.push(json_field(
+        "result",
+        if list_only {
+            "listed"
+        } else if report.failed > 0 || report.timed_out > 0 {
+            "failed"
+        } else {
+            "passed"
+        },
+    ));
+    format!("{{{}}}", fields.join(","))
+}
+
+fn benchmark_run_record_json(record: &BenchmarkRunRecord) -> String {
+    let mut fields = vec![
+        json_field("source", &record.source),
+        json_field("function", &record.function_name),
+        json_field("label", &record.label),
+        json_field("status", record.status),
+        json_usize_field("warmup_iters", record.warmup_iters),
+        json_usize_field("measure_iters", record.measure_iters),
+        json_optional_string_field("note", record.note.as_deref()),
+        json_optional_string_field("clock_policy", record.clock_policy),
+        json_optional_string_field("resolved_clock_bridge", record.resolved_clock_bridge),
+        json_optional_string_field("resolved_clock_surface", record.resolved_clock_surface),
+        json_optional_string_field("declared_clock_domain", record.declared_clock_domain),
+        json_optional_i64_field("declared_clock_domain_code", record.declared_clock_domain_code),
+        json_optional_string_field("resolved_clock_domain", record.resolved_clock_domain),
+        json_optional_i64_field("resolved_clock_domain_code", record.resolved_clock_domain_code),
+        json_optional_string_field("resolved_clock_source", record.resolved_clock_source),
+    ];
+    if let Some(measurement) = record.measurement {
+        fields.push(json_field("run_mode", measurement.run_mode));
+        fields.push(json_usize_field("sample_count", measurement.sample_count));
+        fields.push(json_optional_u128_field("min_ns", measurement.min_ns));
+        fields.push(json_u128_field("avg_ns", measurement.avg_ns));
+        fields.push(json_optional_u128_field("max_ns", measurement.max_ns));
+        fields.push(json_u128_field("total_ns", measurement.total_ns));
+    } else {
+        fields.push("\"run_mode\":null".to_owned());
+        fields.push("\"sample_count\":null".to_owned());
+        fields.push("\"min_ns\":null".to_owned());
+        fields.push("\"avg_ns\":null".to_owned());
+        fields.push("\"max_ns\":null".to_owned());
+        fields.push("\"total_ns\":null".to_owned());
+    }
+    format!("{{{}}}", fields.join(","))
 }
 
 struct TestVerdict {
@@ -339,6 +586,32 @@ struct TestVerdict {
     resolved_clock_domain: Option<&'static str>,
     resolved_clock_domain_code: Option<i64>,
     resolved_clock_source: Option<&'static str>,
+}
+
+struct BenchmarkVerdict {
+    status: &'static str,
+    note: Option<String>,
+    warmup_iters: usize,
+    measure_iters: usize,
+    measurement: Option<BenchmarkMeasurement>,
+    clock_policy: Option<&'static str>,
+    resolved_clock_bridge: Option<&'static str>,
+    resolved_clock_surface: Option<&'static str>,
+    declared_clock_domain: Option<&'static str>,
+    declared_clock_domain_code: Option<i64>,
+    resolved_clock_domain: Option<&'static str>,
+    resolved_clock_domain_code: Option<i64>,
+    resolved_clock_source: Option<&'static str>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BenchmarkMeasurement {
+    run_mode: &'static str,
+    sample_count: usize,
+    min_ns: Option<u128>,
+    max_ns: Option<u128>,
+    avg_ns: u128,
+    total_ns: u128,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -501,6 +774,223 @@ fn run_language_tests_for_source_file(
     })
 }
 
+fn run_language_benchmarks_for_source_file(
+    path: &Path,
+    filter: Option<&str>,
+    list_only: bool,
+    exact: bool,
+) -> Result<LanguageBenchmarkRunReport, String> {
+    let report = collect_language_benchmarks_for_source_file(path, filter, list_only, exact)?;
+    if !report.records.is_empty() {
+        println!("  source: {}", path.display());
+    }
+    println!("  collected language benchmarks: {}", report.collected);
+    for record in &report.records {
+        let mut line = format!("  bench_fn: {} ({})", record.function_name, record.label);
+        if record.warmup_iters > 0 {
+            line.push_str(&format!(" [warmup_iters: {}]", record.warmup_iters));
+        }
+        line.push_str(&format!(" [measure_iters: {}]", record.measure_iters));
+        if let Some(note) = &record.note {
+            if record.status == "DISCOVERED" {
+                line.push_str(&format!(" [note: {}]", note));
+            }
+        }
+        if let Some(clock_domain) = record.declared_clock_domain {
+            line.push_str(&format!(" [clock_domain: {}]", clock_domain));
+        }
+        if let Some(clock_policy) = record.clock_policy {
+            line.push_str(&format!(" [clock_policy: {}]", clock_policy));
+        }
+        println!("{line}");
+    }
+    if list_only {
+        return Ok(report);
+    }
+    for record in &report.records {
+        println!("  {} {}", record.status, record.label);
+        println!("    warmup_iters: {}", record.warmup_iters);
+        println!("    measure_iters: {}", record.measure_iters);
+        if let Some(clock_policy) = record.clock_policy {
+            println!("    clock_policy: {}", clock_policy);
+        }
+        if let Some(clock_bridge) = record.resolved_clock_bridge {
+            println!("    resolved_clock_bridge: {}", clock_bridge);
+        }
+        if let Some(clock_surface) = record.resolved_clock_surface {
+            println!("    resolved_clock_surface: {}", clock_surface);
+        }
+        if let Some(clock_domain) = record.declared_clock_domain {
+            let code = record
+                .declared_clock_domain_code
+                .map(|code| format!(" ({code})"))
+                .unwrap_or_default();
+            println!("    declared_clock_domain: {}{}", clock_domain, code);
+        }
+        if let Some(clock_domain) = record.resolved_clock_domain {
+            let code = record
+                .resolved_clock_domain_code
+                .map(|code| format!(" ({code})"))
+                .unwrap_or_default();
+            println!("    resolved_clock_domain: {}{}", clock_domain, code);
+        }
+        if let Some(source) = record.resolved_clock_source {
+            println!("    resolved_clock_source: {}", source);
+        }
+        if let Some(measurement) = record.measurement {
+            println!("    run_mode: {}", measurement.run_mode);
+            println!("    sample_count: {}", measurement.sample_count);
+            if let Some(min_ns) = measurement.min_ns {
+                println!("    min_ns: {}", min_ns);
+            }
+            println!("    avg_ns: {}", measurement.avg_ns);
+            if let Some(max_ns) = measurement.max_ns {
+                println!("    max_ns: {}", max_ns);
+            }
+            println!("    total_ns: {}", measurement.total_ns);
+        }
+        if let Some(note) = &record.note {
+            println!("    note: {}", note);
+        }
+    }
+    println!(
+        "  executed language benchmarks: {}",
+        report.completed + report.failed + report.timed_out
+    );
+    println!("  completed: {}", report.completed);
+    println!("  failed: {}", report.failed);
+    println!("  timed_out: {}", report.timed_out);
+    Ok(report)
+}
+
+fn collect_language_benchmarks_for_source_file(
+    path: &Path,
+    filter: Option<&str>,
+    list_only: bool,
+    exact: bool,
+) -> Result<LanguageBenchmarkRunReport, String> {
+    let source = std::fs::read_to_string(path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    let ast = nuisc::frontend::parse_nuis_ast(&source)?;
+    let nir = nuisc::frontend::lower_ast_to_nir(&ast)?;
+    let benchmarks = nuisc::frontend::collect_nir_benchmarks(&nir);
+    let matched = ast
+        .functions
+        .iter()
+        .filter(|function| function.benchmark_name.is_some())
+        .filter(|function| {
+            test_matches_filter(
+                function.name.as_str(),
+                function.benchmark_name.as_deref(),
+                filter,
+                exact,
+            )
+        })
+        .collect::<Vec<_>>();
+    let discovered = benchmarks
+        .iter()
+        .filter(|function| {
+            test_matches_filter(
+                function.name.as_str(),
+                function.benchmark_name.as_deref(),
+                filter,
+                exact,
+            )
+        })
+        .map(|function| BenchmarkRunRecord {
+            source: path.display().to_string(),
+            function_name: function.name.clone(),
+            label: function
+                .benchmark_name
+                .clone()
+                .unwrap_or_else(|| function.name.clone()),
+            status: "DISCOVERED",
+            warmup_iters: function
+                .benchmark_warmup_iters
+                .unwrap_or(0)
+                .try_into()
+                .unwrap_or(0),
+            measure_iters: function
+                .benchmark_measure_iters
+                .unwrap_or(1)
+                .try_into()
+                .unwrap_or(1),
+            note: function
+                .benchmark_timeout_ms
+                .map(|timeout_ms| format!("timeout_ms={timeout_ms}")),
+            measurement: None,
+            clock_policy: function.benchmark_clock_policy.map(|policy| policy.as_str()),
+            resolved_clock_bridge: None,
+            resolved_clock_surface: None,
+            declared_clock_domain: function.benchmark_clock_domain.map(|domain| domain.as_str()),
+            declared_clock_domain_code: function.benchmark_clock_domain.map(|domain| domain.code()),
+            resolved_clock_domain: None,
+            resolved_clock_domain_code: None,
+            resolved_clock_source: None,
+        })
+        .collect::<Vec<_>>();
+    if list_only {
+        return Ok(LanguageBenchmarkRunReport {
+            collected: matched.len(),
+            completed: 0,
+            failed: 0,
+            timed_out: 0,
+            records: discovered,
+        });
+    }
+    let mut completed = 0usize;
+    let mut failed = 0usize;
+    let mut timed_out = 0usize;
+    let mut records = Vec::with_capacity(matched.len());
+    for function in matched {
+        let verdict = execute_language_benchmark(path, &ast, function)?;
+        let label = function
+            .benchmark_name
+            .clone()
+            .unwrap_or_else(|| function.name.clone());
+        match verdict.status {
+            "OK" => completed += 1,
+            "TIMEOUT" => timed_out += 1,
+            _ => failed += 1,
+        }
+        records.push(BenchmarkRunRecord {
+            source: path.display().to_string(),
+            function_name: function.name.clone(),
+            label,
+            status: verdict.status,
+            warmup_iters: verdict.warmup_iters,
+            measure_iters: verdict.measure_iters,
+            note: verdict.note.clone(),
+            measurement: verdict.measurement,
+            clock_policy: verdict.clock_policy,
+            resolved_clock_bridge: verdict.resolved_clock_bridge,
+            resolved_clock_surface: verdict.resolved_clock_surface,
+            declared_clock_domain: verdict.declared_clock_domain,
+            declared_clock_domain_code: verdict.declared_clock_domain_code,
+            resolved_clock_domain: verdict.resolved_clock_domain,
+            resolved_clock_domain_code: verdict.resolved_clock_domain_code,
+            resolved_clock_source: verdict.resolved_clock_source,
+        });
+    }
+    Ok(LanguageBenchmarkRunReport {
+        collected: benchmarks
+            .iter()
+            .filter(|function| {
+                test_matches_filter(
+                    function.name.as_str(),
+                    function.benchmark_name.as_deref(),
+                    filter,
+                    exact,
+                )
+            })
+            .count(),
+        completed,
+        failed,
+        timed_out,
+        records,
+    })
+}
+
 fn test_matches_ignored_mode(
     test_ignored: bool,
     ignored_only: bool,
@@ -619,9 +1109,238 @@ fn execute_language_test(
     })
 }
 
+fn execute_language_benchmark(
+    input_path: &Path,
+    ast: &AstModule,
+    benchmark_function: &AstFunction,
+) -> Result<BenchmarkVerdict, String> {
+    let warmup_iters = benchmark_function
+        .benchmark_warmup_iters
+        .unwrap_or(0)
+        .try_into()
+        .map_err(|_| "benchmark warmup iters overflowed usize".to_owned())?;
+    let measure_iters = benchmark_function
+        .benchmark_measure_iters
+        .unwrap_or(1)
+        .try_into()
+        .map_err(|_| "benchmark measure iters overflowed usize".to_owned())?;
+    let declared_clock_domain = benchmark_function.benchmark_clock_domain;
+    let resolved_clock = benchmark_function
+        .benchmark_timeout_ms
+        .map(|_| resolve_runner_clock_domain(declared_clock_domain));
+    let benchmark_label = benchmark_function
+        .benchmark_name
+        .as_deref()
+        .unwrap_or(&benchmark_function.name);
+    if warmup_iters > 0 {
+        let warmup_written = compile_benchmark_harness_binary(
+            input_path,
+            ast,
+            benchmark_function,
+            warmup_iters as i64,
+            &format!("{benchmark_label}-warmup"),
+        )?;
+        let warmup_outcome = run_benchmark_process(
+            &warmup_written.binary_path,
+            benchmark_function.benchmark_timeout_ms,
+            resolved_clock.map(|clock| clock.domain),
+        )?;
+        match warmup_outcome {
+            RawBenchmarkOutcome::Completed { status, .. } => {
+                if status.code().is_none() {
+                    return Ok(BenchmarkVerdict {
+                        status: "FAIL",
+                        note: Some(
+                            "benchmark process terminated without an exit code during warmup loop"
+                                .to_owned(),
+                        ),
+                        warmup_iters,
+                        measure_iters,
+                        measurement: None,
+                        clock_policy: benchmark_function
+                            .benchmark_clock_policy
+                            .map(|policy| policy.as_str()),
+                        resolved_clock_bridge: resolved_clock.map(|clock| clock.bridge.as_str()),
+                        resolved_clock_surface: resolved_clock
+                            .map(|clock| clock.bridge.host_surface().as_str()),
+                        declared_clock_domain: declared_clock_domain.map(|domain| domain.as_str()),
+                        declared_clock_domain_code: declared_clock_domain.map(|domain| domain.code()),
+                        resolved_clock_domain: resolved_clock.map(|clock| clock.domain.as_str()),
+                        resolved_clock_domain_code: resolved_clock.map(|clock| clock.domain.code()),
+                        resolved_clock_source: resolved_clock.map(|clock| clock.source),
+                    });
+                }
+            }
+            RawBenchmarkOutcome::TimedOut { timeout_ms } => {
+                return Ok(BenchmarkVerdict {
+                    status: "TIMEOUT",
+                    note: Some(format!(
+                        "timed out during warmup loop after {} ms",
+                        timeout_ms
+                    )),
+                    warmup_iters,
+                    measure_iters,
+                    measurement: None,
+                    clock_policy: benchmark_function
+                        .benchmark_clock_policy
+                        .map(|policy| policy.as_str()),
+                    resolved_clock_bridge: resolved_clock.map(|clock| clock.bridge.as_str()),
+                    resolved_clock_surface: resolved_clock
+                        .map(|clock| clock.bridge.host_surface().as_str()),
+                    declared_clock_domain: declared_clock_domain.map(|domain| domain.as_str()),
+                    declared_clock_domain_code: declared_clock_domain.map(|domain| domain.code()),
+                    resolved_clock_domain: resolved_clock.map(|clock| clock.domain.as_str()),
+                    resolved_clock_domain_code: resolved_clock.map(|clock| clock.domain.code()),
+                    resolved_clock_source: resolved_clock.map(|clock| clock.source),
+                });
+            }
+        }
+    }
+    let measured_written = compile_benchmark_harness_binary(
+        input_path,
+        ast,
+        benchmark_function,
+        measure_iters as i64,
+        benchmark_label,
+    )?;
+    let outcome = run_benchmark_process(
+        &measured_written.binary_path,
+        benchmark_function.benchmark_timeout_ms,
+        resolved_clock.map(|clock| clock.domain),
+    )?;
+    let measurement = match outcome {
+        RawBenchmarkOutcome::Completed { elapsed_ns, status } => {
+            if status.code().is_none() {
+                return Ok(BenchmarkVerdict {
+                    status: "FAIL",
+                    note: Some(
+                        "benchmark process terminated without an exit code during single-process loop"
+                            .to_owned(),
+                    ),
+                    warmup_iters,
+                    measure_iters,
+                    measurement: None,
+                    clock_policy: benchmark_function
+                        .benchmark_clock_policy
+                        .map(|policy| policy.as_str()),
+                    resolved_clock_bridge: resolved_clock.map(|clock| clock.bridge.as_str()),
+                    resolved_clock_surface: resolved_clock
+                        .map(|clock| clock.bridge.host_surface().as_str()),
+                    declared_clock_domain: declared_clock_domain.map(|domain| domain.as_str()),
+                    declared_clock_domain_code: declared_clock_domain.map(|domain| domain.code()),
+                    resolved_clock_domain: resolved_clock.map(|clock| clock.domain.as_str()),
+                    resolved_clock_domain_code: resolved_clock.map(|clock| clock.domain.code()),
+                    resolved_clock_source: resolved_clock.map(|clock| clock.source),
+                });
+            }
+            Some(BenchmarkMeasurement {
+                run_mode: if warmup_iters > 0 {
+                    "dual-process-loop"
+                } else {
+                    "single-process-loop"
+                },
+                sample_count: measure_iters,
+                min_ns: None,
+                max_ns: None,
+                avg_ns: elapsed_ns / measure_iters as u128,
+                total_ns: elapsed_ns,
+            })
+        }
+        RawBenchmarkOutcome::TimedOut { timeout_ms } => {
+            return Ok(BenchmarkVerdict {
+                status: "TIMEOUT",
+                note: Some(format!(
+                    "timed out during measured loop after {} ms",
+                    timeout_ms
+                )),
+                warmup_iters,
+                measure_iters,
+                measurement: None,
+                clock_policy: benchmark_function
+                    .benchmark_clock_policy
+                    .map(|policy| policy.as_str()),
+                resolved_clock_bridge: resolved_clock.map(|clock| clock.bridge.as_str()),
+                resolved_clock_surface: resolved_clock
+                    .map(|clock| clock.bridge.host_surface().as_str()),
+                declared_clock_domain: declared_clock_domain.map(|domain| domain.as_str()),
+                declared_clock_domain_code: declared_clock_domain.map(|domain| domain.code()),
+                resolved_clock_domain: resolved_clock.map(|clock| clock.domain.as_str()),
+                resolved_clock_domain_code: resolved_clock.map(|clock| clock.domain.code()),
+                resolved_clock_source: resolved_clock.map(|clock| clock.source),
+            });
+        }
+    };
+
+    Ok(BenchmarkVerdict {
+        status: "OK",
+        note: None,
+        warmup_iters,
+        measure_iters,
+        measurement,
+        clock_policy: benchmark_function
+            .benchmark_clock_policy
+            .map(|policy| policy.as_str()),
+        resolved_clock_bridge: resolved_clock.map(|clock| clock.bridge.as_str()),
+        resolved_clock_surface: resolved_clock.map(|clock| clock.bridge.host_surface().as_str()),
+        declared_clock_domain: declared_clock_domain.map(|domain| domain.as_str()),
+        declared_clock_domain_code: declared_clock_domain.map(|domain| domain.code()),
+        resolved_clock_domain: resolved_clock.map(|clock| clock.domain.as_str()),
+        resolved_clock_domain_code: resolved_clock.map(|clock| clock.domain.code()),
+        resolved_clock_source: resolved_clock.map(|clock| clock.source),
+    })
+}
+
 enum RawTestOutcome {
     Completed(ExitStatus),
     TimedOut(i64),
+}
+
+enum RawBenchmarkOutcome {
+    Completed { elapsed_ns: u128, status: ExitStatus },
+    TimedOut { timeout_ms: i64 },
+}
+
+fn compile_benchmark_harness_binary(
+    input_path: &Path,
+    ast: &AstModule,
+    benchmark_function: &AstFunction,
+    iterations: i64,
+    label: &str,
+) -> Result<nuisc::aot::CompileArtifacts, String> {
+    let harness_ast = build_benchmark_harness_module(ast, benchmark_function, iterations)?;
+    let artifacts = nuisc::pipeline::compile_ast(harness_ast)?;
+    let output_dir = temp_test_output_dir(label);
+    let cpu_target =
+        nuisc::aot::resolve_cpu_build_target(Path::new("nustar-packages"), None, None, None)?;
+    nuisc::aot::write_and_link(
+        input_path,
+        &output_dir,
+        &artifacts.ast,
+        &artifacts.nir,
+        &artifacts.yir,
+        &artifacts.llvm_ir,
+        &cpu_target,
+    )
+}
+
+fn run_benchmark_process(
+    binary_path: &str,
+    timeout_ms: Option<i64>,
+    clock_domain: Option<nuis_semantics::model::TestClockDomain>,
+) -> Result<RawBenchmarkOutcome, String> {
+    let mut child = Command::new(binary_path)
+        .spawn()
+        .map_err(|error| format!("failed to run `{binary_path}`: {error}"))?;
+    let started = Instant::now();
+    match wait_for_test_child(&mut child, timeout_ms, clock_domain)? {
+        RawTestOutcome::Completed(status) => Ok(RawBenchmarkOutcome::Completed {
+            elapsed_ns: started.elapsed().as_nanos(),
+            status,
+        }),
+        RawTestOutcome::TimedOut(timeout_ms) => Ok(RawBenchmarkOutcome::TimedOut {
+            timeout_ms,
+        }),
+    }
 }
 
 fn wait_for_test_child(
@@ -699,6 +1418,22 @@ fn build_test_harness_module(ast: &AstModule, test_function: &AstFunction) -> As
     harness
 }
 
+fn build_benchmark_harness_module(
+    ast: &AstModule,
+    benchmark_function: &AstFunction,
+    iterations: i64,
+) -> Result<AstModule, String> {
+    let mut harness = ast.clone();
+    harness.functions.retain(|function| function.name != "main");
+    harness
+        .functions
+        .push(build_benchmark_loop_function(benchmark_function));
+    harness
+        .functions
+        .push(build_benchmark_main_function(benchmark_function, iterations));
+    Ok(harness)
+}
+
 fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
     #[rustfmt::skip]
     let test_call = AstExpr::Call {
@@ -753,6 +1488,12 @@ fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
         test_timeout_ms: None,
         test_clock_domain: None,
         test_clock_policy: None,
+        benchmark_name: None,
+        benchmark_warmup_iters: None,
+        benchmark_measure_iters: None,
+        benchmark_timeout_ms: None,
+        benchmark_clock_domain: None,
+        benchmark_clock_policy: None,
         is_async: test_function.is_async,
         generic_params: vec![],
         where_bounds: vec![],
@@ -760,6 +1501,127 @@ fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
         return_type: Some(i64_type_ref()),
         body,
     }
+}
+
+fn build_benchmark_loop_function(benchmark_function: &AstFunction) -> AstFunction {
+    let helper_name = benchmark_loop_function_name();
+    let side_effect_name = "benchmark_side_effect".to_owned();
+    let remaining_name = "benchmark_remaining".to_owned();
+    let benchmark_return_type = benchmark_function
+        .return_type
+        .clone()
+        .unwrap_or_else(i64_type_ref);
+    let recursive_call = AstExpr::Call {
+        callee: helper_name.clone(),
+        generic_args: vec![],
+        args: vec![AstExpr::Binary {
+            op: nuis_semantics::model::AstBinaryOp::Sub,
+            lhs: Box::new(AstExpr::Var(remaining_name.clone())),
+            rhs: Box::new(AstExpr::Int(1)),
+        }],
+    };
+    let recurse_expr = if benchmark_function.is_async {
+        AstExpr::Await(Box::new(recursive_call))
+    } else {
+        recursive_call
+    };
+    AstFunction {
+        name: helper_name,
+        visibility: AstVisibility::Private,
+        attributes: vec![],
+        test_name: None,
+        test_ignored: false,
+        test_should_fail: false,
+        test_reason: None,
+        test_timeout_ms: None,
+        test_clock_domain: None,
+        test_clock_policy: None,
+        benchmark_name: None,
+        benchmark_warmup_iters: None,
+        benchmark_measure_iters: None,
+        benchmark_timeout_ms: None,
+        benchmark_clock_domain: None,
+        benchmark_clock_policy: None,
+        is_async: benchmark_function.is_async,
+        generic_params: vec![],
+        where_bounds: vec![],
+        params: vec![nuis_semantics::model::AstParam {
+            name: remaining_name.clone(),
+            ty: i64_type_ref(),
+        }],
+        return_type: Some(i64_type_ref()),
+        body: vec![
+            AstStmt::If {
+                condition: AstExpr::Binary {
+                    op: nuis_semantics::model::AstBinaryOp::Le,
+                    lhs: Box::new(AstExpr::Var(remaining_name.clone())),
+                    rhs: Box::new(AstExpr::Int(0)),
+                },
+                then_body: vec![AstStmt::Return(Some(AstExpr::Int(0)))],
+                else_body: vec![],
+            },
+            AstStmt::Let {
+                mutable: false,
+                name: side_effect_name,
+                ty: Some(benchmark_return_type),
+                value: benchmark_call_expr(benchmark_function),
+            },
+            AstStmt::Return(Some(recurse_expr)),
+        ],
+    }
+}
+
+fn build_benchmark_main_function(benchmark_function: &AstFunction, iterations: i64) -> AstFunction {
+    let helper_call = AstExpr::Call {
+        callee: benchmark_loop_function_name(),
+        generic_args: vec![],
+        args: vec![AstExpr::Int(iterations)],
+    };
+    let return_expr = if benchmark_function.is_async {
+        AstExpr::Await(Box::new(helper_call))
+    } else {
+        helper_call
+    };
+    AstFunction {
+        name: "main".to_owned(),
+        visibility: AstVisibility::Private,
+        attributes: vec![],
+        test_name: None,
+        test_ignored: false,
+        test_should_fail: false,
+        test_reason: None,
+        test_timeout_ms: None,
+        test_clock_domain: None,
+        test_clock_policy: None,
+        benchmark_name: None,
+        benchmark_warmup_iters: None,
+        benchmark_measure_iters: None,
+        benchmark_timeout_ms: None,
+        benchmark_clock_domain: None,
+        benchmark_clock_policy: None,
+        is_async: benchmark_function.is_async,
+        generic_params: vec![],
+        where_bounds: vec![],
+        params: vec![],
+        return_type: Some(i64_type_ref()),
+        body: vec![AstStmt::Return(Some(return_expr))],
+    }
+}
+
+fn benchmark_call_expr(benchmark_function: &AstFunction) -> AstExpr {
+    #[rustfmt::skip]
+    let benchmark_call = AstExpr::Call {
+        callee: benchmark_function.name.clone(), generic_args: vec![], args: vec![],
+    };
+    if benchmark_function.is_async {
+        AstExpr::Await(Box::new(benchmark_call))
+    } else {
+        benchmark_call
+    }
+}
+
+fn benchmark_loop_function_name() -> String {
+    "__nuis_benchmark_loop".to_owned()
 }
 
 fn i64_type_ref() -> AstTypeRef {
@@ -1312,6 +2174,24 @@ pub(crate) fn json_bool_field(name: &str, value: bool) -> String {
 
 pub(crate) fn json_usize_field(name: &str, value: usize) -> String {
     format!("\"{}\":{}", name, value)
+}
+
+fn json_u128_field(name: &str, value: u128) -> String {
+    format!("\"{}\":{}", name, value)
+}
+
+fn json_optional_u128_field(name: &str, value: Option<u128>) -> String {
+    match value {
+        Some(value) => json_u128_field(name, value),
+        None => format!("\"{}\":null", name),
+    }
+}
+
+fn json_optional_i64_field(name: &str, value: Option<i64>) -> String {
+    match value {
+        Some(value) => format!("\"{}\":{}", name, value),
+        None => format!("\"{}\":null", name),
+    }
 }
 
 pub(crate) fn json_string_array_field(name: &str, values: &[String]) -> String {
@@ -2390,6 +3270,9 @@ fn print_help() {
         "    nuis test [--list] [--ignored|--include-ignored] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
     );
     println!(
+        "    nuis bench [--list] [--json] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
+    );
+    println!(
         "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
     );
     println!(
@@ -2569,7 +3452,8 @@ mod tests {
         project_domain_registry_checks_json, project_workflow_json_fields,
         recommend_project_workflow_step, render_project_doctor_json,
         render_project_status_json, render_scheduler_view_json,
-        resolve_runner_clock_domain,
+        benchmark_run_report_json, resolve_runner_clock_domain,
+        run_language_benchmarks_for_source_file,
         run_language_tests_for_source_file, scheduler_view_domain_record,
         scheduler_view_domain_record_json, single_source_workflow_source_profile,
         wait_for_test_child, RawTestOutcome, WorkflowRecommendation,
@@ -3459,6 +4343,141 @@ mod cpu Main {
         assert_eq!(report.passed, 1);
         assert_eq!(report.failed, 0);
         assert_eq!(report.skipped, 0);
+    }
+
+    #[test]
+    fn language_benchmark_runner_executes_sync_benchmark() {
+        let dir = temp_dir("language_benchmark_sync");
+        let input = dir.join("bench_sync.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  benchmark("sum_loop", warmup_iters=1, measure_iters=2) fn sum_loop() -> i64 {
+    return 7;
+  }
+}
+"#,
+        )
+        .expect("write benchmark file");
+
+        let report = run_language_benchmarks_for_source_file(&input, None, false, false)
+            .expect("language benchmarks should run");
+        assert_eq!(report.collected, 1);
+        assert_eq!(report.completed, 1);
+        assert_eq!(report.failed, 0);
+        assert_eq!(report.timed_out, 0);
+    }
+
+    #[test]
+    fn language_benchmark_runner_supports_bool_return() {
+        let dir = temp_dir("language_benchmark_bool");
+        let input = dir.join("bench_bool.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  benchmark("bool_case", measure_iters=1) fn bool_case() -> bool {
+    return true;
+  }
+}
+"#,
+        )
+        .expect("write bool benchmark file");
+
+        let report = run_language_benchmarks_for_source_file(&input, None, false, false)
+            .expect("bool benchmark should run");
+        assert_eq!(report.collected, 1);
+        assert_eq!(report.completed, 1);
+        assert_eq!(report.failed, 0);
+        assert_eq!(report.timed_out, 0);
+    }
+
+    #[test]
+    fn language_benchmark_runner_can_filter_exactly() {
+        let dir = temp_dir("language_benchmark_exact");
+        let input = dir.join("bench_exact.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  benchmark("sum_loop", measure_iters=1) fn sum_loop_impl() -> i64 {
+    return 1;
+  }
+
+  benchmark(measure_iters=1) fn sum_loop_extra() -> i64 {
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write benchmark file");
+
+        let report =
+            run_language_benchmarks_for_source_file(&input, Some("sum_loop"), false, true)
+                .expect("exact benchmark filter should run");
+        assert_eq!(report.collected, 1);
+        assert_eq!(report.completed, 1);
+        assert_eq!(report.failed, 0);
+        assert_eq!(report.timed_out, 0);
+    }
+
+    #[test]
+    fn language_benchmark_runner_times_out_end_to_end() {
+        let dir = temp_dir("language_benchmark_timeout");
+        let input = dir.join("bench_timeout.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  extern "c" fn usleep(usec: i64) -> i32;
+
+  benchmark("slow_async", measure_iters=1, timeout_ms=25) async fn slow_async() -> i64 {
+    let _slept: i32 = usleep(100000);
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write timeout benchmark file");
+
+        let report = run_language_benchmarks_for_source_file(&input, None, false, false)
+            .expect("timeout benchmark should run");
+        assert_eq!(report.collected, 1);
+        assert_eq!(report.completed, 0);
+        assert_eq!(report.failed, 0);
+        assert_eq!(report.timed_out, 1);
+    }
+
+    #[test]
+    fn benchmark_report_json_includes_machine_readable_measurements() {
+        let dir = temp_dir("language_benchmark_json");
+        let input = dir.join("bench_json.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  benchmark("sum_loop", warmup_iters=1, measure_iters=1) fn sum_loop() -> i64 {
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write benchmark file");
+
+        let report = super::collect_language_benchmark_run_report(&input, None, false, false)
+            .expect("json benchmark report should collect");
+        let json = benchmark_run_report_json(&input, "single-file", false, false, None, &report);
+
+        assert!(json.contains("\"kind\":\"nuis_benchmark_run\""));
+        assert!(json.contains("\"source_kind\":\"single-file\""));
+        assert!(json.contains("\"result\":\"passed\""));
+        assert!(json.contains("\"label\":\"sum_loop\""));
+        assert!(json.contains("\"status\":\"OK\""));
+        assert!(json.contains("\"min_ns\":"));
+        assert!(json.contains("\"avg_ns\":"));
+        assert!(json.contains("\"max_ns\":"));
+        assert!(json.contains("\"total_ns\":"));
     }
 
     #[test]

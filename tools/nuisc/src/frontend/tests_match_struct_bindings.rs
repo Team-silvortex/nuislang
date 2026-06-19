@@ -1,6 +1,16 @@
 use super::{parse_nuis_ast, parse_nuis_module};
 use nuis_semantics::model::{AstMatchPattern, NirBinaryOp, NirExpr, NirStmt};
 
+fn match_arms_from_stmt(stmt: &nuis_semantics::model::AstStmt) -> &[nuis_semantics::model::AstMatchArm] {
+    match stmt {
+        nuis_semantics::model::AstStmt::Match { arms, .. } => arms,
+        nuis_semantics::model::AstStmt::Return(Some(nuis_semantics::model::AstExpr::Match {
+            arms, ..
+        })) => arms,
+        other => panic!("expected match statement, found {other:?}"),
+    }
+}
+
 #[test]
 fn parses_struct_match_field_binding_into_ast() {
     let ast = parse_nuis_ast(
@@ -27,23 +37,20 @@ fn parses_struct_match_field_binding_into_ast() {
     )
     .unwrap();
 
-    match &ast.functions[0].body[1] {
-        nuis_semantics::model::AstStmt::Match { arms, .. } => match &arms[0].pattern {
-            AstMatchPattern::StructFields { fields, .. } => {
-                assert!(matches!(
-                    &fields[0],
-                    (field, AstMatchPattern::Bind(name))
-                        if field == "kind" && name == "packet_kind"
-                ));
-                assert!(matches!(
-                    &fields[1],
-                    (field, AstMatchPattern::Bool(true))
-                        if field == "ready"
-                ));
-            }
-            other => panic!("expected struct match pattern, found {other:?}"),
-        },
-        other => panic!("expected match statement, found {other:?}"),
+    match &match_arms_from_stmt(&ast.functions[0].body[1])[0].pattern {
+        AstMatchPattern::StructFields { fields, .. } => {
+            assert!(matches!(
+                &fields[0],
+                (field, AstMatchPattern::Bind(name))
+                    if field == "kind" && name == "packet_kind"
+            ));
+            assert!(matches!(
+                &fields[1],
+                (field, AstMatchPattern::Bool(true))
+                    if field == "ready"
+            ));
+        }
+        other => panic!("expected struct match pattern, found {other:?}"),
     }
 }
 
@@ -81,28 +88,25 @@ fn parses_nested_struct_match_field_binding_shorthand_into_ast() {
     )
     .unwrap();
 
-    match &ast.functions[0].body[1] {
-        nuis_semantics::model::AstStmt::Match { arms, .. } => match &arms[0].pattern {
-            AstMatchPattern::StructFields { fields, .. } => {
-                assert!(matches!(
-                    &fields[0],
-                    (
-                        field,
-                        AstMatchPattern::StructFields {
-                            type_ref: None,
-                            fields: nested_fields
-                        }
-                    ) if field == "header"
-                        && matches!(
-                            &nested_fields[0],
-                            (nested_field, AstMatchPattern::Bind(name))
-                                if nested_field == "kind" && name == "packet_kind"
-                        )
-                ));
-            }
-            other => panic!("expected struct match pattern, found {other:?}"),
-        },
-        other => panic!("expected match statement, found {other:?}"),
+    match &match_arms_from_stmt(&ast.functions[0].body[1])[0].pattern {
+        AstMatchPattern::StructFields { fields, .. } => {
+            assert!(matches!(
+                &fields[0],
+                (
+                    field,
+                    AstMatchPattern::StructFields {
+                        type_ref: None,
+                        fields: nested_fields
+                    }
+                ) if field == "header"
+                    && matches!(
+                        &nested_fields[0],
+                        (nested_field, AstMatchPattern::Bind(name))
+                            if nested_field == "kind" && name == "packet_kind"
+                    )
+            ));
+        }
+        other => panic!("expected struct match pattern, found {other:?}"),
     }
 }
 

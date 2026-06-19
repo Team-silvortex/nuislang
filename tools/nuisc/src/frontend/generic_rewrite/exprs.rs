@@ -809,7 +809,19 @@ fn resolved_struct_constructor_alias(
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
 ) -> Result<Option<(String, Vec<AstTypeRef>)>, String> {
-    if generic_args.is_empty() {
+    let alias_placeholder_names = visible_type_aliases
+        .get(callee)
+        .map(|alias| {
+            alias
+                .generic_params
+                .iter()
+                .map(|param| param.name.clone())
+                .collect::<BTreeSet<_>>()
+        })
+        .unwrap_or_default();
+    let has_placeholder_generic_args =
+        ast_type_args_are_placeholder_generics(generic_args, &alias_placeholder_names);
+    if has_placeholder_generic_args {
         if let Some(from_expected) = infer_alias_struct_target_from_expected(
             callee,
             expected,
@@ -817,6 +829,17 @@ fn resolved_struct_constructor_alias(
             struct_table,
         )? {
             return Ok(Some(from_expected));
+        }
+        if let Some(inferred) = infer_alias_struct_constructor_type_from_args(
+            callee,
+            args,
+            env,
+            visible_type_aliases,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+        )? {
+            return Ok(Some(inferred));
         }
     }
     let type_ref = AstTypeRef {
@@ -828,7 +851,7 @@ fn resolved_struct_constructor_alias(
     let resolved = match resolve_ast_type_ref_aliases(&type_ref, visible_type_aliases) {
         Ok(resolved) => resolved,
         Err(error) => {
-            if generic_args.is_empty() {
+            if has_placeholder_generic_args {
                 if let Some(inferred) = infer_alias_struct_constructor_type_from_args(
                     callee,
                     args,
@@ -863,7 +886,19 @@ fn resolved_struct_literal_alias(
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
 ) -> Result<Option<(String, Vec<AstTypeRef>)>, String> {
-    if type_args.is_empty() {
+    let alias_placeholder_names = visible_type_aliases
+        .get(type_name)
+        .map(|alias| {
+            alias
+                .generic_params
+                .iter()
+                .map(|param| param.name.clone())
+                .collect::<BTreeSet<_>>()
+        })
+        .unwrap_or_default();
+    let has_placeholder_type_args =
+        ast_type_args_are_placeholder_generics(type_args, &alias_placeholder_names);
+    if has_placeholder_type_args {
         if let Some(from_expected) = infer_alias_struct_target_from_expected(
             type_name,
             expected,
@@ -871,6 +906,18 @@ fn resolved_struct_literal_alias(
             struct_table,
         )? {
             return Ok(Some(from_expected));
+        }
+        if let Some(inferred) = infer_alias_struct_literal_type_from_fields(
+            type_name,
+            fields,
+            expected,
+            env,
+            visible_type_aliases,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+        )? {
+            return Ok(Some(inferred));
         }
     }
     let type_ref = AstTypeRef {
@@ -882,18 +929,7 @@ fn resolved_struct_literal_alias(
     let resolved = match resolve_ast_type_ref_aliases(&type_ref, visible_type_aliases) {
         Ok(resolved) => resolved,
         Err(error) => {
-            if type_args.is_empty() {
-                if let Some(inferred) = infer_alias_struct_literal_type_from_fields(
-                    type_name,
-                    fields,
-                    env,
-                    visible_type_aliases,
-                    impl_lookup,
-                    struct_table,
-                    function_return_types,
-                )? {
-                    return Ok(Some(inferred));
-                }
+            if has_placeholder_type_args {
             }
             if visible_type_aliases.contains_key(type_name) {
                 return Err(error);
@@ -1035,6 +1071,7 @@ fn infer_alias_struct_constructor_type_from_args(
 fn infer_alias_struct_literal_type_from_fields(
     alias_name: &str,
     fields: &[(String, AstExpr)],
+    expected: Option<&AstTypeRef>,
     env: &BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
@@ -1076,6 +1113,14 @@ fn infer_alias_struct_literal_type_from_fields(
         .iter()
         .map(|param| param.name.clone())
         .collect::<BTreeSet<_>>();
+    let seed = seed_alias_generic_substitutions_from_expected_pattern(
+        alias_name,
+        alias_definition,
+        &resolved_target_pattern,
+        expected,
+        visible_type_aliases,
+        &generic_names,
+    )?;
     infer_alias_struct_target_from_usage_seeded(
         alias_name,
         alias_definition,
@@ -1090,7 +1135,7 @@ fn infer_alias_struct_literal_type_from_fields(
         struct_table,
         function_return_types,
         &generic_names,
-        BTreeMap::new(),
+        seed,
     )
 }
 
@@ -1119,15 +1164,26 @@ fn infer_alias_struct_target_from_usage_seeded(
         for (pattern, concrete_expr) in pending {
             let expected_pattern =
                 specialize_ast_type_pattern_with_known_substitutions(pattern, &substitutions);
-            let concrete = infer_ast_expr_type_for_pattern(
+            let concrete = infer_alias_aware_ast_expr_type_for_pattern(
                 concrete_expr,
                 &expected_pattern,
-                generic_names,
                 env,
+                visible_type_aliases,
                 impl_lookup,
                 struct_table,
                 function_return_types,
             )
+            .or_else(|| {
+                infer_ast_expr_type_for_pattern(
+                    concrete_expr,
+                    &expected_pattern,
+                    generic_names,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                )
+            })
             .or_else(|| {
                 infer_alias_aware_ast_expr_type(
                     concrete_expr,
@@ -1195,6 +1251,74 @@ fn infer_alias_struct_target_from_usage_seeded(
     Ok(struct_table
         .contains_key(&resolved.name)
         .then_some((resolved.name, resolved.generic_args)))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn infer_alias_aware_ast_expr_type_for_pattern(
+    expr: &AstExpr,
+    expected_pattern: &AstTypeRef,
+    env: &BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+) -> Option<AstTypeRef> {
+    match expr {
+        AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => {
+            if visible_type_aliases.contains_key(type_name) {
+                if let Ok(Some((resolved_name, resolved_args))) = resolved_struct_literal_alias(
+                    type_name,
+                    type_args,
+                    Some(expected_pattern),
+                    fields,
+                    env,
+                    visible_type_aliases,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                ) {
+                    return Some(AstTypeRef {
+                        name: resolved_name,
+                        generic_args: resolved_args,
+                        is_optional: false,
+                        is_ref: false,
+                    });
+                }
+            }
+        }
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } => {
+            if visible_type_aliases.contains_key(callee) {
+                if let Ok(Some((resolved_name, resolved_args))) = resolved_struct_constructor_alias(
+                    callee,
+                    generic_args,
+                    Some(expected_pattern),
+                    args,
+                    env,
+                    visible_type_aliases,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                ) {
+                    return Some(AstTypeRef {
+                        name: resolved_name,
+                        generic_args: resolved_args,
+                        is_optional: false,
+                        is_ref: false,
+                    });
+                }
+            }
+        }
+        _ => {}
+    }
+    None
 }
 
 fn specialize_ast_type_pattern_with_known_substitutions(
@@ -1301,6 +1425,52 @@ fn contains_ast_placeholder_generic_name(
             .generic_args
             .iter()
             .any(|arg| contains_ast_placeholder_generic_name(arg, placeholder_names))
+}
+
+fn ast_type_args_are_placeholder_generics(
+    type_args: &[AstTypeRef],
+    placeholder_names: &BTreeSet<String>,
+) -> bool {
+    type_args.is_empty()
+        || type_args
+            .iter()
+            .all(|arg| contains_ast_placeholder_generic_name(arg, placeholder_names))
+}
+
+fn seed_alias_generic_substitutions_from_expected_pattern(
+    alias_name: &str,
+    alias_definition: &AstTypeAlias,
+    resolved_target_pattern: &AstTypeRef,
+    expected: Option<&AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    generic_names: &BTreeSet<String>,
+) -> Result<BTreeMap<String, AstTypeRef>, String> {
+    let Some(expected) = expected else {
+        return Ok(BTreeMap::new());
+    };
+    let resolved_expected = resolve_ast_type_ref_aliases(expected, visible_type_aliases)?;
+    let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+    if unify_generic_type_pattern(
+        resolved_target_pattern,
+        &resolved_expected,
+        generic_names,
+        &mut substitutions,
+        alias_name,
+    )
+    .is_err()
+    {
+        return Ok(BTreeMap::new());
+    }
+    Ok(alias_definition
+        .generic_params
+        .iter()
+        .filter_map(|param| {
+            substitutions.get(&param.name).and_then(|arg| {
+                (!contains_ast_placeholder_generic_name(arg, generic_names))
+                    .then_some((param.name.clone(), arg.clone()))
+            })
+        })
+        .collect())
 }
 
 pub(super) fn ensure_generic_specialization(

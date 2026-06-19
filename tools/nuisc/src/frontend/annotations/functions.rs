@@ -12,6 +12,7 @@ pub(crate) fn validate_function_annotations(function: &AstFunction) -> Result<()
     for attribute in &function.attributes {
         match attribute.name.as_str() {
             "test" => {}
+            "benchmark" => {}
             "inline" => {
                 validate_zero_arg_function_annotation(function, "inline", &attribute.args)?;
                 has_inline = true;

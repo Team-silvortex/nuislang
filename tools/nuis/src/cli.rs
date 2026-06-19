@@ -60,6 +60,13 @@ pub enum CommandKind {
         exact: bool,
         filter: Option<String>,
     },
+    Bench {
+        input: PathBuf,
+        list: bool,
+        json: bool,
+        exact: bool,
+        filter: Option<String>,
+    },
     Build {
         input: PathBuf,
         output_dir: PathBuf,
@@ -396,6 +403,36 @@ where
                 filter: positional.get(1).cloned(),
             })
         }
+        "bench" => {
+            let mut list = false;
+            let mut json = false;
+            let mut exact = false;
+            let mut positional = Vec::new();
+            while let Some(arg) = args.next() {
+                if arg == "--list" {
+                    list = true;
+                } else if arg == "--json" {
+                    json = true;
+                } else if arg == "--exact" {
+                    exact = true;
+                } else {
+                    positional.push(arg);
+                }
+            }
+            if positional.len() > 2 {
+                return Err(
+                    "usage: nuis bench [--list] [--json] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
+                        .to_owned(),
+                );
+            }
+            Ok(CommandKind::Bench {
+                input: PathBuf::from(positional.first().cloned().unwrap_or_else(|| ".".to_owned())),
+                list,
+                json,
+                exact,
+                filter: positional.get(1).cloned(),
+            })
+        }
         "build" => {
             let mut verbose_cache = false;
             let mut cpu_abi = None;
@@ -686,6 +723,47 @@ mod tests {
             CommandKind::Workflow {
                 input: PathBuf::from("examples/demo.ns"),
                 json: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_bench_with_default_input() {
+        let command = parse_args(["bench".to_owned()].into_iter()).expect("bench parses");
+        assert_eq!(
+            command,
+            CommandKind::Bench {
+                input: PathBuf::from("."),
+                list: false,
+                json: false,
+                exact: false,
+                filter: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_bench_with_list_exact_and_filter() {
+        let command = parse_args(
+            [
+                "bench".to_owned(),
+                "--list".to_owned(),
+                "--json".to_owned(),
+                "--exact".to_owned(),
+                "examples/demo.ns".to_owned(),
+                "sum_loop".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .expect("bench with filter parses");
+        assert_eq!(
+            command,
+            CommandKind::Bench {
+                input: PathBuf::from("examples/demo.ns"),
+                list: true,
+                json: true,
+                exact: true,
+                filter: Some("sum_loop".to_owned()),
             }
         );
     }

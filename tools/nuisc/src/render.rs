@@ -1545,15 +1545,39 @@ fn render_ast_function_header(function: &AstFunction) -> String {
             format!("test({}) ", parts.join(", "))
         })
         .unwrap_or_default();
+    let benchmark_prefix = function
+        .benchmark_name
+        .as_ref()
+        .map(|name| {
+            let mut parts = vec![format!("\"{}\"", name)];
+            if let Some(warmup_iters) = function.benchmark_warmup_iters {
+                parts.push(format!("warmup_iters={warmup_iters}"));
+            }
+            if let Some(measure_iters) = function.benchmark_measure_iters {
+                parts.push(format!("measure_iters={measure_iters}"));
+            }
+            if let Some(timeout_ms) = function.benchmark_timeout_ms {
+                parts.push(format!("timeout_ms={timeout_ms}"));
+            }
+            if let Some(clock_domain) = &function.benchmark_clock_domain {
+                parts.push(format!("clock_domain=\"{}\"", clock_domain.as_str()));
+            }
+            if let Some(clock_policy) = &function.benchmark_clock_policy {
+                parts.push(format!("clock_policy=\"{}\"", clock_policy.as_str()));
+            }
+            format!("benchmark({}) ", parts.join(", "))
+        })
+        .unwrap_or_default();
     let async_prefix = if function.is_async { "async " } else { "" };
     let attribute_prefix = render_ast_attributes(&function.attributes);
     let visibility_prefix = render_ast_visibility(function.visibility);
     let where_suffix = render_ast_where_clause(&function.where_bounds);
     format!(
-        "  {}{}{}{}fn {}{}({}){}{}\n",
+        "  {}{}{}{}{}fn {}{}({}){}{}\n",
         attribute_prefix,
         visibility_prefix,
         test_prefix,
+        benchmark_prefix,
         async_prefix,
         function.name,
         render_ast_generic_params(&function.generic_params),
@@ -1601,15 +1625,39 @@ fn render_nir_function_header(function: &NirFunction) -> String {
             format!("test({}) ", parts.join(", "))
         })
         .unwrap_or_default();
+    let benchmark_prefix = function
+        .benchmark_name
+        .as_ref()
+        .map(|name| {
+            let mut parts = vec![format!("\"{}\"", name)];
+            if let Some(warmup_iters) = function.benchmark_warmup_iters {
+                parts.push(format!("warmup_iters={warmup_iters}"));
+            }
+            if let Some(measure_iters) = function.benchmark_measure_iters {
+                parts.push(format!("measure_iters={measure_iters}"));
+            }
+            if let Some(timeout_ms) = function.benchmark_timeout_ms {
+                parts.push(format!("timeout_ms={timeout_ms}"));
+            }
+            if let Some(clock_domain) = &function.benchmark_clock_domain {
+                parts.push(format!("clock_domain=\"{}\"", clock_domain.as_str()));
+            }
+            if let Some(clock_policy) = &function.benchmark_clock_policy {
+                parts.push(format!("clock_policy=\"{}\"", clock_policy.as_str()));
+            }
+            format!("benchmark({}) ", parts.join(", "))
+        })
+        .unwrap_or_default();
     let async_prefix = if function.is_async { "async " } else { "" };
     let annotation_prefix = render_nir_annotations(&function.annotations);
     let visibility_prefix = render_nir_visibility(function.visibility);
     let where_suffix = render_nir_where_clause(&function.where_bounds);
     format!(
-        "  {}{}{}{}fn {}{}({}){}{}\n",
+        "  {}{}{}{}{}fn {}{}({}){}{}\n",
         annotation_prefix,
         visibility_prefix,
         test_prefix,
+        benchmark_prefix,
         async_prefix,
         function.name,
         render_nir_generic_params(&function.generic_params),
@@ -1952,6 +2000,12 @@ mod tests {
                 test_timeout_ms: None,
                 test_clock_domain: None,
                 test_clock_policy: None,
+                benchmark_name: None,
+                benchmark_warmup_iters: None,
+                benchmark_measure_iters: None,
+                benchmark_timeout_ms: None,
+                benchmark_clock_domain: None,
+                benchmark_clock_policy: None,
                 is_async: false,
                 generic_params: vec![],
                 where_bounds: vec![],

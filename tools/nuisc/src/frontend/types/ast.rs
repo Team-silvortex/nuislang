@@ -186,7 +186,13 @@ pub(crate) fn infer_ast_expr_type_inner(
                 .get(callee)
                 .is_some_and(|definition| definition.fields.len() == 1 && args.len() == 1) =>
             {
-                if generic_args.is_empty() {
+                let definition = struct_table.get(callee)?;
+                let placeholder_names = definition
+                    .generic_params
+                    .iter()
+                    .map(|param| param.name.clone())
+                    .collect::<BTreeSet<_>>();
+                if type_args_are_pattern_placeholders(generic_args, &placeholder_names) {
                     infer_payload_constructor_ast_type(
                         callee,
                         args,
@@ -1054,9 +1060,16 @@ pub(crate) fn infer_ast_expr_type_inner(
             fields,
         } => {
             let definition = struct_table.get(type_name)?;
+            let placeholder_names = definition
+                .generic_params
+                .iter()
+                .map(|param| param.name.clone())
+                .collect::<BTreeSet<_>>();
             if definition.generic_params.is_empty() {
                 Some(ast_named_type(type_name))
-            } else if type_args.len() == definition.generic_params.len() {
+            } else if type_args.len() == definition.generic_params.len()
+                && !type_args_are_pattern_placeholders(type_args, &placeholder_names)
+            {
                 Some(ast_generic_named_type(type_name, type_args.clone()))
             } else {
                 infer_struct_literal_ast_type(
@@ -1331,6 +1344,16 @@ pub(crate) fn infer_ast_expr_type_for_pattern(
     )
 }
 
+fn type_args_are_pattern_placeholders(
+    type_args: &[AstTypeRef],
+    placeholder_names: &BTreeSet<String>,
+) -> bool {
+    type_args.is_empty()
+        || type_args
+            .iter()
+            .all(|arg| contains_ast_placeholder_generic_name(arg, placeholder_names))
+}
+
 fn infer_ast_expr_type_for_pattern_inner(
     expr: &AstExpr,
     expected_pattern: &AstTypeRef,
@@ -1346,8 +1369,18 @@ fn infer_ast_expr_type_for_pattern_inner(
             type_name,
             type_args,
             fields,
-        } if type_args.is_empty() && expected_pattern.name == *type_name => {
+        } if expected_pattern.name == *type_name => {
             let definition = struct_table.get(type_name)?;
+            if !type_args_are_pattern_placeholders(type_args, placeholder_names) {
+                return infer_ast_expr_type_inner(
+                    expr,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                );
+            }
             let generic_names = definition
                 .generic_params
                 .iter()
@@ -1375,8 +1408,18 @@ fn infer_ast_expr_type_for_pattern_inner(
             callee,
             generic_args,
             args,
-        } if generic_args.is_empty() && expected_pattern.name == *callee => {
+        } if expected_pattern.name == *callee => {
             let definition = struct_table.get(callee)?;
+            if !type_args_are_pattern_placeholders(generic_args, placeholder_names) {
+                return infer_ast_expr_type_inner(
+                    expr,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                );
+            }
             if definition.fields.len() != 1 || args.len() != 1 {
                 return None;
             }
@@ -1464,8 +1507,13 @@ fn infer_struct_literal_ast_type_seeded(
     let generic_args = definition
         .generic_params
         .iter()
-        .map(|param| substitutions.get(&param.name).cloned())
-        .collect::<Option<Vec<_>>>()?;
+        .map(|param| {
+            substitutions
+                .get(&param.name)
+                .cloned()
+                .unwrap_or_else(|| ast_named_type(&param.name))
+        })
+        .collect::<Vec<_>>();
     Some(ast_generic_named_type(type_name, generic_args))
 }
 
@@ -1506,8 +1554,13 @@ fn infer_payload_constructor_ast_type_seeded(
     let generic_args = definition
         .generic_params
         .iter()
-        .map(|param| substitutions.get(&param.name).cloned())
-        .collect::<Option<Vec<_>>>()?;
+        .map(|param| {
+            substitutions
+                .get(&param.name)
+                .cloned()
+                .unwrap_or_else(|| ast_named_type(&param.name))
+        })
+        .collect::<Vec<_>>();
     Some(ast_generic_named_type(callee, generic_args))
 }
 
@@ -1579,6 +1632,13 @@ fn unify_ast_generic_type_pattern(
     substitutions: &mut BTreeMap<String, AstTypeRef>,
 ) -> Result<(), ()> {
     if generic_names.contains(&pattern.name) && pattern.generic_args.is_empty() {
+        if generic_names.contains(&concrete.name)
+            && concrete.generic_args.is_empty()
+            && !concrete.is_optional
+            && !concrete.is_ref
+        {
+            return Ok(());
+        }
         if let Some(existing) = substitutions.get(&pattern.name) {
             if lower_type_ref(existing).render() != lower_type_ref(concrete).render() {
                 return Err(());

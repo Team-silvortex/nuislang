@@ -53,6 +53,10 @@ pub enum CommandKind {
         manifest: PathBuf,
         json: bool,
     },
+    InspectBenchmarks {
+        input: PathBuf,
+        json: bool,
+    },
     CacheStatus {
         input: Option<PathBuf>,
         all: bool,
@@ -262,6 +266,29 @@ where
                 json,
             })
         }
+        "inspect-benchmarks" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc inspect-benchmarks [--json] <input.ns|project-dir|nuis.toml>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::InspectBenchmarks {
+                input: input.ok_or_else(|| {
+                    "usage: nuisc inspect-benchmarks [--json] <input.ns|project-dir|nuis.toml>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
         "cache-status" => {
             let mut verbose_cache = false;
             let mut all = false;
@@ -430,7 +457,7 @@ where
             })
         }
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
         )),
     }
 }
@@ -593,6 +620,41 @@ mod tests {
             command,
             CommandKind::VerifyBuildManifest {
                 manifest: PathBuf::from("nuis.build.manifest.toml"),
+                json: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_benchmarks_command() {
+        let command = parse_args(
+            vec!["inspect-benchmarks".to_owned(), "main.ns".to_owned()].into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectBenchmarks {
+                input: PathBuf::from("main.ns"),
+                json: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_benchmarks_json_command() {
+        let command = parse_args(
+            vec![
+                "inspect-benchmarks".to_owned(),
+                "--json".to_owned(),
+                "main.ns".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectBenchmarks {
+                input: PathBuf::from("main.ns"),
                 json: true,
             }
         );

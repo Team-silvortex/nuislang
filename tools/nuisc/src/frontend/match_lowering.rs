@@ -40,17 +40,23 @@ pub(super) fn lower_match_stmt_with_async(
         None,
         false,
     )?;
-    match nir_expr_effect_class(&lowered_value) {
-        NirExprEffectClass::Pure | NirExprEffectClass::LocalReadOnly => {}
-        _ => {
-            return Err(
-                "minimal `match` currently requires a pure or local-read-only scrutinee".to_owned(),
-            )
-        }
-    }
     let Some(value_ty) = infer_nir_expr_type(&lowered_value, bindings, signatures, struct_table)
     else {
         return Err("could not infer scrutinee type for `match`".to_owned());
+    };
+    let (match_value, hoisted_scrutinee) = match nir_expr_effect_class(&lowered_value) {
+        NirExprEffectClass::Pure | NirExprEffectClass::LocalReadOnly => (lowered_value.clone(), None),
+        _ => {
+            let temp_name = "__nuis_match_scrutinee".to_owned();
+            (
+                NirExpr::Var(temp_name.clone()),
+                Some(NirStmt::Let {
+                    name: temp_name,
+                    ty: Some(value_ty.clone()),
+                    value: lowered_value.clone(),
+                }),
+            )
+        }
     };
     let wildcard_index = arms
         .iter()
@@ -88,7 +94,7 @@ pub(super) fn lower_match_stmt_with_async(
     for arm in arms_to_lower.iter().rev() {
         let (mut condition, pattern_bindings) = lower_match_pattern_condition_and_bindings(
             &arm.pattern,
-            &lowered_value,
+            &match_value,
             &value_ty,
             type_aliases,
             struct_table,
@@ -153,10 +159,19 @@ pub(super) fn lower_match_stmt_with_async(
         }];
     }
 
-    else_body
+    let lowered_match = else_body
         .into_iter()
         .next()
-        .ok_or_else(|| "internal error: lowered empty `match` body".to_owned())
+        .ok_or_else(|| "internal error: lowered empty `match` body".to_owned())?;
+    if let Some(hoisted_scrutinee) = hoisted_scrutinee {
+        Ok(NirStmt::If {
+            condition: NirExpr::Bool(true),
+            then_body: vec![hoisted_scrutinee, lowered_match],
+            else_body: Vec::new(),
+        })
+    } else {
+        Ok(lowered_match)
+    }
 }
 
 fn is_exhaustive_option_or_result_match(

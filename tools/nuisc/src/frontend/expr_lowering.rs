@@ -477,6 +477,13 @@ pub(super) fn lower_expr_with_async(
             let definition = struct_table
                 .get(type_name)
                 .ok_or_else(|| format!("unknown struct type `{}`", type_name))?;
+            let generic_name_set = definition
+                .generic_params
+                .iter()
+                .map(|param| param.name.clone())
+                .collect::<BTreeSet<_>>();
+            let has_placeholder_type_args =
+                ast_type_args_are_placeholder_generics(type_args, &generic_name_set);
             let literal_ty = if definition.generic_params.is_empty() {
                 if !type_args.is_empty() {
                     return Err(format!(
@@ -485,7 +492,7 @@ pub(super) fn lower_expr_with_async(
                     ));
                 }
                 named_type(type_name)
-            } else if !type_args.is_empty() {
+            } else if !type_args.is_empty() && !has_placeholder_type_args {
                 if type_args.len() != definition.generic_params.len() {
                     return Err(format!(
                         "struct literal `{}<...>` expects {} generic argument(s), found {}",
@@ -840,7 +847,9 @@ fn infer_field_expr_type_for_generic_pattern(
             type_name,
             type_args,
             fields,
-        } if type_args.is_empty() && expected_pattern.name == *type_name => {
+        } if ast_type_args_are_placeholder_generics(type_args, placeholder_names)
+            && expected_pattern.name == *type_name =>
+        {
             let Some(definition) = struct_table.get(type_name) else {
                 return Ok(None);
             };
@@ -886,7 +895,9 @@ fn infer_field_expr_type_for_generic_pattern(
             callee,
             generic_args,
             args,
-        } if generic_args.is_empty() && expected_pattern.name == *callee => {
+        } if ast_type_args_are_placeholder_generics(generic_args, placeholder_names)
+            && expected_pattern.name == *callee =>
+        {
             let Some(definition) = struct_table.get(callee) else {
                 return Ok(None);
             };
@@ -1070,6 +1081,30 @@ fn contains_placeholder_generic_name(
             .generic_args
             .iter()
             .any(|arg| contains_placeholder_generic_name(arg, placeholder_names))
+}
+
+fn ast_type_args_are_placeholder_generics(
+    type_args: &[super::AstTypeRef],
+    placeholder_names: &BTreeSet<String>,
+) -> bool {
+    type_args.is_empty()
+        || type_args
+            .iter()
+            .all(|arg| ast_type_is_placeholder_generic(arg, placeholder_names))
+}
+
+fn ast_type_is_placeholder_generic(
+    ty: &super::AstTypeRef,
+    placeholder_names: &BTreeSet<String>,
+) -> bool {
+    (ty.generic_args.is_empty()
+        && !ty.is_optional
+        && !ty.is_ref
+        && placeholder_names.contains(&ty.name))
+        || ty
+            .generic_args
+            .iter()
+            .all(|arg| ast_type_is_placeholder_generic(arg, placeholder_names))
 }
 
 fn unify_payload_constructor_type_pattern(

@@ -225,6 +225,101 @@ pub(super) fn validate_test_function_signature(
     Ok(())
 }
 
+pub(super) fn validate_benchmark_function_signature(
+    module: &NirModule,
+    function: &NirFunction,
+) -> Result<(), String> {
+    let label = function
+        .benchmark_name
+        .as_deref()
+        .unwrap_or(&function.name);
+    if module.domain != "cpu" {
+        return Err(format!(
+            "benchmark function `{}::{}` ({}) is only supported in `mod cpu` for now",
+            module.unit, function.name, label
+        ));
+    }
+    if !function.params.is_empty() {
+        return Err(format!(
+            "benchmark function `{}` ({}) cannot take parameters in the current MVP runner shape",
+            function.name, label
+        ));
+    }
+    let Some(return_type) = function.return_type.as_ref() else {
+        return Err(format!(
+            "benchmark function `{}` ({}) must return integer or float scalar in the current MVP",
+            function.name, label
+        ));
+    };
+    if !(return_type.is_integer_scalar()
+        || return_type.is_bool_scalar()
+        || return_type.is_float_scalar())
+    {
+        return Err(format!(
+            "benchmark function `{}` ({}) must return integer or float scalar, found `{}`",
+            function.name,
+            label,
+            return_type.render()
+        ));
+    }
+    if let Some(warmup_iters) = function.benchmark_warmup_iters {
+        if warmup_iters < 0 {
+            return Err(format!(
+                "benchmark function `{}` ({}) must use `warmup_iters >= 0`, found `{}`",
+                function.name, label, warmup_iters
+            ));
+        }
+    }
+    if let Some(measure_iters) = function.benchmark_measure_iters {
+        if measure_iters <= 0 {
+            return Err(format!(
+                "benchmark function `{}` ({}) must use `measure_iters > 0`, found `{}`",
+                function.name, label, measure_iters
+            ));
+        }
+    }
+    if let Some(timeout_ms) = function.benchmark_timeout_ms {
+        if timeout_ms <= 0 {
+            return Err(format!(
+                "benchmark function `{}` ({}) must use `timeout_ms` > 0, found `{}`",
+                function.name, label, timeout_ms
+            ));
+        }
+    }
+    if let Some(clock_domain) = function.benchmark_clock_domain {
+        if function.benchmark_timeout_ms.is_none() {
+            return Err(format!(
+                "benchmark function `{}` ({}) can only use `clock_domain=\"...\"` together with `timeout_ms=...` in the current MVP",
+                function.name, label
+            ));
+        }
+        if clock_domain == nuis_semantics::model::TestClockDomain::Wall && function.is_async {
+            return Err(format!(
+                "benchmark function `{}` ({}) cannot use `clock_domain=\"wall\"` on `async fn` in the current MVP; use `monotonic` or `global`",
+                function.name, label
+            ));
+        }
+    }
+    if let Some(clock_policy) = function.benchmark_clock_policy {
+        if function.benchmark_timeout_ms.is_none() {
+            return Err(format!(
+                "benchmark function `{}` ({}) can only use `clock_policy=\"...\"` together with `timeout_ms=...` in the current MVP",
+                function.name, label
+            ));
+        }
+        if function.benchmark_clock_domain != Some(nuis_semantics::model::TestClockDomain::Global)
+        {
+            return Err(format!(
+                "benchmark function `{}` ({}) can only use `clock_policy=\"{}\"` together with `clock_domain=\"global\"` in the current MVP",
+                function.name,
+                label,
+                clock_policy.as_str()
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn validate_type_ref(ty: &NirTypeRef) -> Result<(), String> {
     ty.validate_container_contract()
         .map_err(|error| format!("invalid type `{}`: {error}", ty.render()))

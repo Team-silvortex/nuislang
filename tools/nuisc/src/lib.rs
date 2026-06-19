@@ -27,6 +27,19 @@ struct CompiledCommandInput {
     artifacts: pipeline::PipelineArtifacts,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BenchmarkInventoryEntry {
+    symbol: String,
+    label: String,
+    is_async: bool,
+    return_type: String,
+    warmup_iters: Option<i64>,
+    measure_iters: Option<i64>,
+    timeout_ms: Option<i64>,
+    clock_domain: Option<String>,
+    clock_policy: Option<String>,
+}
+
 fn json_escape(value: &str) -> String {
     let mut out = String::new();
     for ch in value.chars() {
@@ -55,6 +68,10 @@ fn json_usize_field(name: &str, value: usize) -> String {
     format!("\"{}\":{}", name, value)
 }
 
+fn json_i64_field(name: &str, value: i64) -> String {
+    format!("\"{}\":{}", name, value)
+}
+
 fn json_string_array_field(name: &str, values: &[String]) -> String {
     let entries = values
         .iter()
@@ -62,6 +79,84 @@ fn json_string_array_field(name: &str, values: &[String]) -> String {
         .collect::<Vec<_>>()
         .join(",");
     format!("\"{}\":[{}]", name, entries)
+}
+
+fn json_optional_i64_field(name: &str, value: Option<i64>) -> String {
+    match value {
+        Some(value) => json_i64_field(name, value),
+        None => format!("\"{}\":null", name),
+    }
+}
+
+fn json_optional_string_field(name: &str, value: Option<&str>) -> String {
+    match value {
+        Some(value) => json_string_field(name, value),
+        None => format!("\"{}\":null", name),
+    }
+}
+
+fn collect_benchmark_inventory(
+    artifacts: &pipeline::PipelineArtifacts,
+) -> Vec<BenchmarkInventoryEntry> {
+    frontend::collect_nir_benchmarks(&artifacts.nir)
+        .into_iter()
+        .map(|function| BenchmarkInventoryEntry {
+            symbol: format!(
+                "{}::{}::{}",
+                artifacts.nir.domain, artifacts.nir.unit, function.name
+            ),
+            label: function
+                .benchmark_name
+                .clone()
+                .unwrap_or_else(|| function.name.clone()),
+            is_async: function.is_async,
+            return_type: function
+                .return_type
+                .as_ref()
+                .map(|ty| ty.render())
+                .unwrap_or_else(|| "()".to_owned()),
+            warmup_iters: function.benchmark_warmup_iters,
+            measure_iters: function.benchmark_measure_iters,
+            timeout_ms: function.benchmark_timeout_ms,
+            clock_domain: function
+                .benchmark_clock_domain
+                .map(|domain| domain.as_str().to_owned()),
+            clock_policy: function
+                .benchmark_clock_policy
+                .map(|policy| policy.as_str().to_owned()),
+        })
+        .collect()
+}
+
+fn inspect_benchmarks_json(input: &Path, artifacts: &pipeline::PipelineArtifacts) -> String {
+    let benchmarks = collect_benchmark_inventory(artifacts);
+    let entries = benchmarks
+        .iter()
+        .map(|entry| {
+            let fields = vec![
+                json_string_field("symbol", &entry.symbol),
+                json_string_field("label", &entry.label),
+                json_bool_field("async", entry.is_async),
+                json_string_field("return_type", &entry.return_type),
+                json_optional_i64_field("warmup_iters", entry.warmup_iters),
+                json_optional_i64_field("measure_iters", entry.measure_iters),
+                json_optional_i64_field("timeout_ms", entry.timeout_ms),
+                json_optional_string_field("clock_domain", entry.clock_domain.as_deref()),
+                json_optional_string_field("clock_policy", entry.clock_policy.as_deref()),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = vec![
+        json_string_field("kind", "nuis_benchmark_inventory"),
+        json_string_field("input", &input.display().to_string()),
+        json_string_field("domain", &artifacts.nir.domain),
+        json_string_field("unit", &artifacts.nir.unit),
+        json_usize_field("benchmark_count", benchmarks.len()),
+        format!("\"benchmarks\":[{}]", entries),
+    ];
+    format!("{{{}}}", fields.join(","))
 }
 
 pub fn project_compile_workflow_brief() -> &'static str {
@@ -1370,6 +1465,56 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 report.project_metadata_checked
             );
         }
+        CommandKind::InspectBenchmarks { input, json } => {
+            let compiled = compile_command_input(&input)?;
+            let benchmarks = collect_benchmark_inventory(&compiled.artifacts);
+            if json {
+                println!("{}", inspect_benchmarks_json(&input, &compiled.artifacts));
+                return Ok(());
+            }
+            print_project_context(&compiled.resolved);
+            println!("benchmark inventory: {}", input.display());
+            println!(
+                "  domain_unit: {}::{}",
+                compiled.artifacts.nir.domain, compiled.artifacts.nir.unit
+            );
+            println!("  benchmark_count: {}", benchmarks.len());
+            for entry in benchmarks {
+                println!("  benchmark: {}", entry.symbol);
+                println!("    label: {}", entry.label);
+                println!("    async: {}", if entry.is_async { "true" } else { "false" });
+                println!("    return_type: {}", entry.return_type);
+                println!(
+                    "    warmup_iters: {}",
+                    entry
+                        .warmup_iters
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_owned())
+                );
+                println!(
+                    "    measure_iters: {}",
+                    entry
+                        .measure_iters
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_owned())
+                );
+                println!(
+                    "    timeout_ms: {}",
+                    entry
+                        .timeout_ms
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_owned())
+                );
+                println!(
+                    "    clock_domain: {}",
+                    entry.clock_domain.as_deref().unwrap_or("-")
+                );
+                println!(
+                    "    clock_policy: {}",
+                    entry.clock_policy.as_deref().unwrap_or("-")
+                );
+            }
+        }
         CommandKind::CacheStatus {
             input,
             all,
@@ -1681,6 +1826,18 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     .join(", ")
             );
             println!("nir_functions: {}", artifacts.nir.functions.len());
+            let benchmarks = collect_benchmark_inventory(&artifacts);
+            println!("nir_benchmarks: {}", benchmarks.len());
+            if !benchmarks.is_empty() {
+                println!(
+                    "benchmark_symbols: {}",
+                    benchmarks
+                        .iter()
+                        .map(|entry| entry.symbol.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
             println!("yir_nodes: {}", artifacts.yir.nodes.len());
             println!("yir_edges: {}", artifacts.yir.edges.len());
             println!("llvm_ir_bytes: {}", artifacts.llvm_ir.len());
@@ -2070,5 +2227,63 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert_eq!(artifact_report.packaging_mode, "native-cpu-llvm");
         assert!(artifact_report.lifecycle_contract_consistent);
         assert!(artifact_report.artifact_roundtrip_verified);
+    }
+
+    #[test]
+    fn benchmark_inventory_collects_declared_benchmarks() {
+        let artifacts = pipeline::compile_source(
+            r#"
+            mod cpu Main {
+              benchmark("sum_loop", warmup_iters=4, measure_iters=32, timeout_ms=25, clock_domain="global", clock_policy="bridge")
+              async fn sum_loop() -> i64 {
+                return 1;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let entries = collect_benchmark_inventory(&artifacts);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].symbol, "cpu::Main::sum_loop");
+        assert_eq!(entries[0].label, "sum_loop");
+        assert!(entries[0].is_async);
+        assert_eq!(entries[0].return_type, "i64");
+        assert_eq!(entries[0].warmup_iters, Some(4));
+        assert_eq!(entries[0].measure_iters, Some(32));
+        assert_eq!(entries[0].timeout_ms, Some(25));
+        assert_eq!(entries[0].clock_domain.as_deref(), Some("global"));
+        assert_eq!(entries[0].clock_policy.as_deref(), Some("bridge"));
+    }
+
+    #[test]
+    fn inspect_benchmarks_json_exposes_metadata() {
+        let artifacts = pipeline::compile_source(
+            r#"
+            mod cpu Main {
+              benchmark("sum_loop", measure_iters=32)
+              fn sum_loop() -> i64 {
+                return 1;
+              }
+
+              fn main() -> i64 {
+                return sum_loop();
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let json = inspect_benchmarks_json(Path::new("main.ns"), &artifacts);
+        assert!(json.contains("\"kind\":\"nuis_benchmark_inventory\""));
+        assert!(json.contains("\"input\":\"main.ns\""));
+        assert!(json.contains("\"benchmark_count\":1"));
+        assert!(json.contains("\"symbol\":\"cpu::Main::sum_loop\""));
+        assert!(json.contains("\"label\":\"sum_loop\""));
+        assert!(json.contains("\"measure_iters\":32"));
     }
 }

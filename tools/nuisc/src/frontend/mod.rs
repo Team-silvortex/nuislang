@@ -34,6 +34,8 @@ mod specialization_pipeline;
 mod stmt_lowering;
 mod task_builtins;
 #[cfg(test)]
+mod tests_benchmark_functions;
+#[cfg(test)]
 mod tests_consts_aliases;
 #[cfg(test)]
 mod tests_control_flow;
@@ -144,8 +146,9 @@ use self::validation::validate_declared_nir_types;
 use self::validation_assignments::validate_ast_assignments;
 use self::validation_generic_constraints::validate_ast_generic_constraints;
 use self::validation_helpers::{
-    async_boundary_violation_detail, async_parameter_violation_detail, render_type_name,
-    select_expected_semantic_token_type, validate_test_function_signature, validate_type_ref,
+    async_boundary_violation_detail, async_parameter_violation_detail,
+    render_type_name, select_expected_semantic_token_type,
+    validate_benchmark_function_signature, validate_test_function_signature, validate_type_ref,
 };
 use aliases::*;
 use nuis_semantics::model::{
@@ -303,6 +306,14 @@ pub fn collect_nir_tests<'a>(module: &'a NirModule) -> Vec<&'a NirFunction> {
         .functions
         .iter()
         .filter(|function| function.test_name.is_some())
+        .collect()
+}
+
+pub fn collect_nir_benchmarks<'a>(module: &'a NirModule) -> Vec<&'a NirFunction> {
+    module
+        .functions
+        .iter()
+        .filter(|function| function.benchmark_name.is_some())
         .collect()
 }
 
