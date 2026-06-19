@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstFunction, AstImplDef, AstMatchArm, AstStructDef, AstTypeAlias,
-    AstTypeRef, AstUnaryOp,
+    AstBinaryOp, AstExpr, AstFunction, AstImplDef, AstStructDef, AstTypeAlias, AstTypeRef,
+    AstUnaryOp,
 };
 
 use super::super::generics::{
@@ -101,8 +101,8 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 )?,
             }
         }
-        AstExpr::Match { value, arms } => AstExpr::Match {
-            value: Box::new(rewrite_generic_calls_in_expr(
+        AstExpr::Match { value, arms } => {
+            let rewritten_value = rewrite_generic_calls_in_expr(
                 value,
                 context,
                 None,
@@ -119,56 +119,38 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?),
-            arms: arms
-                .iter()
-                .map(|arm| {
-                    let mut arm_env = env.clone();
-                    Ok(AstMatchArm {
-                        pattern: arm.pattern.clone(),
-                        guard: match &arm.guard {
-                            Some(guard) => Some(rewrite_generic_calls_in_expr(
-                                guard,
-                                context,
-                                Some(&super::super::ast_named_type("bool")),
-                                &arm_env,
-                                visible_type_aliases,
-                                generic_templates,
-                                generic_impl_method_templates,
-                                higher_order_templates,
-                                function_table,
-                                signatures,
-                                impl_lookup,
-                                struct_table,
-                                function_return_types,
-                                specialization_cache,
-                                specialized_functions,
-                                specialized_signatures,
-                            )?),
-                            None => None,
-                        },
-                        body: super::blocks::rewrite_generic_calls_in_block(
-                            &arm.body,
-                            &format!("{context} match-arm"),
-                            expected,
-                            &mut arm_env,
-                            visible_type_aliases,
-                            generic_templates,
-                            generic_impl_method_templates,
-                            higher_order_templates,
-                            function_table,
-                            signatures,
-                            impl_lookup,
-                            struct_table,
-                            function_return_types,
-                            specialization_cache,
-                            specialized_functions,
-                            specialized_signatures,
-                        )?,
-                    })
-                })
-                .collect::<Result<Vec<_>, String>>()?,
-        },
+            )?;
+            let scrutinee_type = infer_alias_aware_ast_expr_type(
+                &rewritten_value,
+                env,
+                visible_type_aliases,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+            );
+            AstExpr::Match {
+                value: Box::new(rewritten_value),
+                arms: super::blocks::rewrite_generic_calls_in_match_arms(
+                    arms,
+                    context,
+                    scrutinee_type.as_ref(),
+                    expected,
+                    env,
+                    visible_type_aliases,
+                    generic_templates,
+                    generic_impl_method_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?,
+            }
+        }
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_generic_calls_in_expr(
             value,
             context,

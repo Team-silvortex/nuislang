@@ -1022,6 +1022,54 @@ fn lowers_match_expression_as_struct_field_value_with_try_branches() {
 }
 
 #[test]
+fn lowers_try_over_option_some_struct_literal_payload() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            Missing,
+          }
+
+          enum Option<T> {
+            Some(T),
+            None,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn promote_option(value: Option<i64>) -> Result<i64, CoreError> {
+            match value {
+              Option.Some(payload) => {
+                return Result.Ok(payload);
+              }
+              _ => {
+                return Result.Err(CoreError.Missing);
+              }
+            }
+          }
+
+          fn try_sum(seed: i64) -> Result<i64, CoreError> {
+            let right: i64 = promote_option(Option.Some(seed + 2))?;
+            return Result.Ok(right);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "try_sum")
+        .unwrap();
+    assert!(count_ifs(&function.body) >= 1, "{:?}", function.body);
+    assert!(matches!(function.body.last(), Some(NirStmt::Return(_))));
+}
+
+#[test]
 fn lowers_await_over_if_expression_returning_result_task() {
     let module = parse_nuis_module(
         r#"

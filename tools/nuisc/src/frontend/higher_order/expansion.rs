@@ -5,11 +5,14 @@ use nuis_semantics::model::{
     AstTypeAlias, AstTypeRef,
 };
 
-use super::super::validation_binding_env::instantiate_ast_struct_field_type;
+use super::super::validation_binding_env::{
+    bind_match_pattern_for_type, instantiate_ast_struct_field_type,
+};
 
 use super::super::generics::{
     specialize_ast_type_ref, specialize_function_template, unify_generic_type_pattern,
 };
+use super::super::types::{ast_type_from_nir, infer_ast_expr_type_for_pattern};
 use super::super::{
     build_impl_method_function, impl_method_symbol_name, lower_type_ref,
     lower_type_ref_with_aliases, resolve_ast_type_ref_aliases,
@@ -208,9 +211,18 @@ fn infer_local_binding_type(
             is_optional: false,
             is_ref: false,
         }),
-        AstExpr::Call { callee, .. } => function_table
-            .get(callee)
-            .and_then(|function| function.return_type.clone()),
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } => infer_call_result_type(
+            callee,
+            generic_args,
+            args,
+            local_types,
+            function_table,
+            module_impls,
+        ),
         AstExpr::If {
             then_body,
             else_body,
@@ -291,6 +303,208 @@ fn infer_local_binding_type(
     }
 }
 
+fn infer_call_result_type(
+    callee: &str,
+    explicit_generic_args: &[AstTypeRef],
+    args: &[AstExpr],
+    local_types: &BTreeMap<String, AstTypeRef>,
+    function_table: &BTreeMap<String, AstFunction>,
+    module_impls: &[AstImplDef],
+) -> Option<AstTypeRef> {
+    let function = function_table.get(callee)?;
+    let return_ty = function.return_type.as_ref()?.clone();
+    let mut generic_names = if function.generic_params.is_empty() {
+        if return_ty.generic_args.is_empty() {
+            return Some(return_ty);
+        }
+        collect_generic_type_names(&return_ty)
+    } else {
+        function
+            .generic_params
+            .iter()
+            .map(|param| param.name.clone())
+            .collect::<BTreeSet<_>>()
+    };
+    if generic_names.is_empty() {
+        return Some(return_ty);
+    }
+    let mut substitutions = BTreeMap::new();
+
+    for (param, arg) in function.params.iter().zip(args.iter()) {
+        let arg_ty = infer_local_binding_type(arg, local_types, function_table, module_impls)?;
+        unify_generic_type_pattern(
+            &param.ty,
+            &arg_ty,
+            &generic_names,
+            &mut substitutions,
+            &function.name,
+        )
+        .ok()?;
+    }
+
+    for (name, explicit) in function
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .zip(explicit_generic_args.iter().cloned())
+    {
+        substitutions.insert(name, explicit);
+    }
+
+    generic_names.retain(|name| substitutions.contains_key(name));
+    if generic_names.is_empty() && substitutions.is_empty() {
+        return Some(return_ty);
+    }
+    Some(specialize_type_with_substitutions(&return_ty, &substitutions))
+}
+
+fn infer_callable_binding_substitutions(
+    expected_callable_ty: &AstTypeRef,
+    callable: &AstFunction,
+    generic_names: &BTreeSet<String>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<BTreeMap<String, AstTypeRef>, String> {
+    let Some(arity) = super::callables::callable_type_arity(expected_callable_ty) else {
+        return Ok(BTreeMap::new());
+    };
+    if callable.params.len() < arity {
+        return Ok(BTreeMap::new());
+    }
+    let Some(callable_return_ty) = callable.return_type.as_ref() else {
+        return Ok(BTreeMap::new());
+    };
+    let callable_generic_names = callable
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    let expected_parts = expected_callable_ty.generic_args[..arity]
+        .iter()
+        .chain(std::iter::once(&expected_callable_ty.generic_args[arity]))
+        .collect::<Vec<_>>();
+    let callable_parts = callable
+        .params
+        .iter()
+        .take(arity)
+        .map(|param| resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases))
+        .chain(std::iter::once(resolve_ast_type_ref_aliases(
+            callable_return_ty,
+            visible_type_aliases,
+        )))
+        .collect::<Result<Vec<_>, _>>()?;
+    let callable_part_refs = callable_parts.iter().collect::<Vec<_>>();
+
+    let callable_substitutions = infer_callable_generic_substitutions_from_expected_parts(
+        &expected_parts,
+        &callable_part_refs,
+        &callable_generic_names,
+        generic_names,
+        &callable.name,
+    )?;
+
+    let specialized_callable_parts = callable_part_refs
+        .iter()
+        .map(|part| specialize_type_with_substitutions(part, &callable_substitutions))
+        .collect::<Vec<_>>();
+
+    let mut substitutions = BTreeMap::new();
+    for (expected_part, callable_part) in expected_parts.iter().zip(specialized_callable_parts) {
+        if contains_unresolved_template_generic(&callable_part, &callable_generic_names) {
+            continue;
+        }
+        if contains_unresolved_template_generic(expected_part, generic_names) {
+            unify_generic_type_pattern(
+                expected_part,
+                &callable_part,
+                generic_names,
+                &mut substitutions,
+                &callable.name,
+            )?;
+        }
+    }
+
+    Ok(substitutions)
+}
+
+fn infer_callable_generic_substitutions(
+    expected_callable_ty: &AstTypeRef,
+    callable: &AstFunction,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<BTreeMap<String, AstTypeRef>, String> {
+    let Some(arity) = super::callables::callable_type_arity(expected_callable_ty) else {
+        return Ok(BTreeMap::new());
+    };
+    if callable.params.len() < arity {
+        return Ok(BTreeMap::new());
+    }
+    let Some(callable_return_ty) = callable.return_type.as_ref() else {
+        return Ok(BTreeMap::new());
+    };
+    let callable_generic_names = callable
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    let expected_parts = expected_callable_ty.generic_args[..arity]
+        .iter()
+        .chain(std::iter::once(&expected_callable_ty.generic_args[arity]))
+        .collect::<Vec<_>>();
+    let callable_parts = callable
+        .params
+        .iter()
+        .take(arity)
+        .map(|param| resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases))
+        .chain(std::iter::once(resolve_ast_type_ref_aliases(
+            callable_return_ty,
+            visible_type_aliases,
+        )))
+        .collect::<Result<Vec<_>, _>>()?;
+    let callable_part_refs = callable_parts.iter().collect::<Vec<_>>();
+    infer_callable_generic_substitutions_from_expected_parts(
+        &expected_parts,
+        &callable_part_refs,
+        &callable_generic_names,
+        &BTreeSet::new(),
+        &callable.name,
+    )
+}
+
+fn infer_callable_generic_substitutions_from_expected_parts(
+    expected_parts: &[&AstTypeRef],
+    callable_parts: &[&AstTypeRef],
+    callable_generic_names: &BTreeSet<String>,
+    unresolved_expected_generic_names: &BTreeSet<String>,
+    callable_name: &str,
+) -> Result<BTreeMap<String, AstTypeRef>, String> {
+    let mut callable_substitutions = BTreeMap::new();
+    for (expected_part, callable_part) in expected_parts.iter().zip(callable_parts.iter()) {
+        if contains_unresolved_template_generic(expected_part, unresolved_expected_generic_names) {
+            continue;
+        }
+        if contains_unresolved_template_generic(callable_part, callable_generic_names) {
+            unify_generic_type_pattern(
+                callable_part,
+                expected_part,
+                callable_generic_names,
+                &mut callable_substitutions,
+                callable_name,
+            )?;
+        }
+    }
+    Ok(callable_substitutions)
+}
+
+fn contains_unresolved_template_generic(
+    ty: &AstTypeRef,
+    generic_names: &BTreeSet<String>,
+) -> bool {
+    (ty.generic_args.is_empty() && generic_names.contains(&ty.name))
+        || ty
+            .generic_args
+            .iter()
+            .any(|arg| contains_unresolved_template_generic(arg, generic_names))
+}
+
 fn infer_block_result_type(
     body: &[AstStmt],
     local_types: &BTreeMap<String, AstTypeRef>,
@@ -349,6 +563,7 @@ fn infer_higher_order_substitutions(
     local_types: &BTreeMap<String, AstTypeRef>,
     function_table: &BTreeMap<String, AstFunction>,
     module_impls: &[AstImplDef],
+    visible_structs: &BTreeMap<String, AstStructDef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
 ) -> Result<BTreeMap<String, nuis_semantics::model::NirTypeRef>, String> {
     let generic_names = template
@@ -372,15 +587,44 @@ fn infer_higher_order_substitutions(
             &template.name,
         )?;
     }
+    let function_return_types = function_table
+        .iter()
+        .map(|(name, function)| (name.clone(), function.return_type.clone()))
+        .collect::<BTreeMap<_, _>>();
     for (param, arg) in template.params.iter().zip(args) {
+        let resolved_param_ty = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
+        let specialized_param_ty =
+            specialize_type_with_substitutions(&resolved_param_ty, &substitutions);
         if is_callable_type_with_aliases(&param.ty, visible_type_aliases)? {
+            let Some(bound_callable) = parse_bound_callable_expr(arg, None) else {
+                continue;
+            };
+            let Some(callable) = function_table.get(&bound_callable.symbol) else {
+                continue;
+            };
+            for (name, ty) in infer_callable_binding_substitutions(
+                &specialized_param_ty,
+                callable,
+                &generic_names,
+                visible_type_aliases,
+            )? {
+                substitutions.entry(name).or_insert(ty);
+            }
             continue;
         }
-        let Some(arg_ty) = infer_local_binding_type(arg, local_types, function_table, module_impls)
-        else {
+        let arg_ty = infer_ast_expr_type_for_pattern(
+            arg,
+            &specialized_param_ty,
+            &generic_names,
+            local_types,
+            &BTreeMap::new(),
+            visible_structs,
+            &function_return_types,
+        )
+        .or_else(|| infer_local_binding_type(arg, local_types, function_table, module_impls));
+        let Some(arg_ty) = arg_ty else {
             continue;
         };
-        let resolved_param_ty = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
         let resolved_arg_ty = resolve_ast_type_ref_aliases(&arg_ty, visible_type_aliases)?;
         unify_generic_type_pattern(
             &resolved_param_ty,
@@ -536,6 +780,7 @@ pub(crate) fn rewrite_higher_order_calls_in_function(
     let body = rewrite_higher_order_calls_in_block(
         &function.body,
         function.return_type.as_ref(),
+        function.return_type.as_ref(),
         &local_types,
         templates,
         function_table,
@@ -554,6 +799,7 @@ pub(crate) fn rewrite_higher_order_calls_in_function(
 pub(crate) fn rewrite_higher_order_calls_in_block(
     body: &[AstStmt],
     current_return_type: Option<&AstTypeRef>,
+    tail_expected: Option<&AstTypeRef>,
     local_types: &BTreeMap<String, AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
@@ -570,6 +816,7 @@ pub(crate) fn rewrite_higher_order_calls_in_block(
         let rewritten_stmt = rewrite_higher_order_calls_in_stmt(
             stmt,
             current_return_type,
+            tail_expected,
             &env,
             templates,
             function_table,
@@ -632,6 +879,7 @@ pub(crate) fn rewrite_higher_order_calls_in_block(
 pub(crate) fn rewrite_higher_order_calls_in_stmt(
     stmt: &AstStmt,
     current_return_type: Option<&AstTypeRef>,
+    tail_expected: Option<&AstTypeRef>,
     local_types: &BTreeMap<String, AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
@@ -660,6 +908,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -676,6 +925,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -697,6 +947,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -714,6 +965,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -728,6 +980,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             templates,
             function_table,
             module_impls,
+            visible_structs,
             method_template_lookup,
             visible_type_aliases,
             specialized_cache,
@@ -741,6 +994,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             templates,
             function_table,
             module_impls,
+            visible_structs,
             method_template_lookup,
             visible_type_aliases,
             specialized_cache,
@@ -759,6 +1013,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -766,6 +1021,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             )?,
             then_body: rewrite_higher_order_calls_in_block(
                 then_body,
+                current_return_type,
                 current_return_type,
                 local_types,
                 templates,
@@ -780,6 +1036,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             else_body: rewrite_higher_order_calls_in_block(
                 else_body,
                 current_return_type,
+                current_return_type,
                 local_types,
                 templates,
                 function_table,
@@ -791,8 +1048,8 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 specialized_functions,
             )?,
         },
-        AstStmt::Match { value, arms } => AstStmt::Match {
-            value: rewrite_higher_order_calls_in_expr(
+        AstStmt::Match { value, arms } => {
+            let rewritten_value = rewrite_higher_order_calls_in_expr(
                 value,
                 None,
                 current_return_type,
@@ -800,52 +1057,70 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
                 specialized_functions,
-            )?,
-            arms: arms
-                .iter()
-                .map(|arm| {
-                    Ok(AstMatchArm {
-                        pattern: arm.pattern.clone(),
-                        guard: arm
-                            .guard
-                            .as_ref()
-                            .map(|guard| {
-                                rewrite_higher_order_calls_in_expr(
-                                    guard,
-                                    None,
-                                    current_return_type,
-                                    local_types,
-                                    templates,
-                                    function_table,
-                                    module_impls,
-                                    method_template_lookup,
-                                    visible_type_aliases,
-                                    specialized_cache,
-                                    specialized_functions,
-                                )
-                            })
-                            .transpose()?,
-                        body: rewrite_higher_order_calls_in_block(
-                            &arm.body,
-                            current_return_type,
-                            local_types,
-                            templates,
-                            function_table,
-                            module_impls,
-                            visible_structs,
-                            method_template_lookup,
-                            visible_type_aliases,
-                            specialized_cache,
-                            specialized_functions,
-                        )?,
+            )?;
+            let scrutinee_type =
+                infer_local_binding_type(&rewritten_value, local_types, function_table, module_impls);
+            AstStmt::Match {
+                value: rewritten_value,
+                arms: arms
+                    .iter()
+                    .map(|arm| {
+                        let mut arm_local_types = local_types.clone();
+                        if let Some(scrutinee_type) = scrutinee_type.as_ref() {
+                            bind_match_pattern_for_type(
+                                scrutinee_type,
+                                &arm.pattern,
+                                visible_type_aliases,
+                                visible_structs,
+                                &mut arm_local_types,
+                            )?;
+                        }
+                        Ok(AstMatchArm {
+                            pattern: arm.pattern.clone(),
+                            guard: arm
+                                .guard
+                                .as_ref()
+                                .map(|guard| {
+                                    rewrite_higher_order_calls_in_expr(
+                                        guard,
+                                        None,
+                                        current_return_type,
+                                        &arm_local_types,
+                                        templates,
+                                        function_table,
+                                        module_impls,
+                                        visible_structs,
+                                        method_template_lookup,
+                                        visible_type_aliases,
+                                        specialized_cache,
+                                        specialized_functions,
+                                    )
+                                })
+                                .transpose()?,
+                            body: rewrite_higher_order_calls_in_block(
+                                &arm.body,
+                                current_return_type,
+                                current_return_type,
+                                &arm_local_types,
+                                templates,
+                                function_table,
+                                module_impls,
+                                visible_structs,
+                                method_template_lookup,
+                                visible_type_aliases,
+                                specialized_cache,
+                                specialized_functions,
+                            )?,
+                        })
                     })
-                })
-                .collect::<Result<Vec<_>, String>>()?,
-        },
+                    .collect::<Result<Vec<_>, String>>()?,
+            }
+        }
         AstStmt::While { condition, body } => AstStmt::While {
             condition: rewrite_higher_order_calls_in_expr(
                 condition,
@@ -855,6 +1130,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -862,6 +1138,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             )?,
             body: rewrite_higher_order_calls_in_block(
                 body,
+                current_return_type,
                 current_return_type,
                 local_types,
                 templates,
@@ -876,12 +1153,13 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         },
         AstStmt::Expr(expr) => AstStmt::Expr(rewrite_higher_order_calls_in_expr(
             expr,
-            None,
+            tail_expected,
             current_return_type,
             local_types,
             templates,
             function_table,
             module_impls,
+            visible_structs,
             method_template_lookup,
             visible_type_aliases,
             specialized_cache,
@@ -895,6 +1173,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             templates,
             function_table,
             module_impls,
+            visible_structs,
             method_template_lookup,
             visible_type_aliases,
             specialized_cache,
@@ -914,6 +1193,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     module_impls: &[AstImplDef],
+    visible_structs: &BTreeMap<String, AstStructDef>,
     method_template_lookup: &BTreeMap<(String, String), String>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     specialized_cache: &mut BTreeSet<String>,
@@ -933,6 +1213,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -940,12 +1221,13 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             )?),
             then_body: rewrite_higher_order_calls_in_block(
                 then_body,
+                current_return_type,
                 expected,
                 local_types,
                 templates,
                 function_table,
                 module_impls,
-                &BTreeMap::new(),
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -953,20 +1235,21 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             )?,
             else_body: rewrite_higher_order_calls_in_block(
                 else_body,
+                current_return_type,
                 expected,
                 local_types,
                 templates,
                 function_table,
                 module_impls,
-                &BTreeMap::new(),
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
                 specialized_functions,
             )?,
         },
-        AstExpr::Match { value, arms } => AstExpr::Match {
-            value: Box::new(rewrite_higher_order_calls_in_expr(
+        AstExpr::Match { value, arms } => {
+            let rewritten_value = rewrite_higher_order_calls_in_expr(
                 value,
                 None,
                 current_return_type,
@@ -974,49 +1257,71 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
                 specialized_functions,
-            )?),
-            arms: arms
-                .iter()
-                .map(|arm| {
-                    Ok(AstMatchArm {
-                        pattern: arm.pattern.clone(),
-                        guard: match &arm.guard {
-                            Some(guard) => Some(rewrite_higher_order_calls_in_expr(
-                                guard,
-                                Some(&super::super::ast_named_type("bool")),
+            )?;
+            let scrutinee_type = infer_local_binding_type(
+                &rewritten_value,
+                local_types,
+                function_table,
+                module_impls,
+            );
+            AstExpr::Match {
+                value: Box::new(rewritten_value),
+                arms: arms
+                    .iter()
+                    .map(|arm| {
+                        let mut arm_local_types = local_types.clone();
+                        if let Some(scrutinee_type) = scrutinee_type.as_ref() {
+                            bind_match_pattern_for_type(
+                                scrutinee_type,
+                                &arm.pattern,
+                                visible_type_aliases,
+                                visible_structs,
+                                &mut arm_local_types,
+                            )?;
+                        }
+                        Ok(AstMatchArm {
+                            pattern: arm.pattern.clone(),
+                            guard: match &arm.guard {
+                                Some(guard) => Some(rewrite_higher_order_calls_in_expr(
+                                    guard,
+                                    Some(&super::super::ast_named_type("bool")),
+                                    current_return_type,
+                                    &arm_local_types,
+                                    templates,
+                                    function_table,
+                                    module_impls,
+                                    visible_structs,
+                                    method_template_lookup,
+                                    visible_type_aliases,
+                                    specialized_cache,
+                                    specialized_functions,
+                                )?),
+                                None => None,
+                            },
+                            body: rewrite_higher_order_calls_in_block(
+                                &arm.body,
                                 current_return_type,
-                                local_types,
+                                expected,
+                                &arm_local_types,
                                 templates,
                                 function_table,
                                 module_impls,
+                                visible_structs,
                                 method_template_lookup,
                                 visible_type_aliases,
                                 specialized_cache,
                                 specialized_functions,
-                            )?),
-                            None => None,
-                        },
-                        body: rewrite_higher_order_calls_in_block(
-                            &arm.body,
-                            expected,
-                            local_types,
-                            templates,
-                            function_table,
-                            module_impls,
-                            &BTreeMap::new(),
-                            method_template_lookup,
-                            visible_type_aliases,
-                            specialized_cache,
-                            specialized_functions,
-                        )?,
+                            )?,
+                        })
                     })
-                })
-                .collect::<Result<Vec<_>, String>>()?,
-        },
+                    .collect::<Result<Vec<_>, String>>()?,
+            }
+        }
         AstExpr::Call {
             callee,
             generic_args,
@@ -1031,6 +1336,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             templates,
             function_table,
             module_impls,
+            visible_structs,
             visible_type_aliases,
             specialized_cache,
             specialized_functions,
@@ -1045,6 +1351,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -1061,6 +1368,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -1085,6 +1393,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                         templates,
                         function_table,
                         module_impls,
+                        visible_structs,
                         method_template_lookup,
                         visible_type_aliases,
                         specialized_cache,
@@ -1103,6 +1412,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -1118,6 +1428,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -1134,6 +1445,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                         templates,
                         function_table,
                         module_impls,
+                        visible_structs,
                         method_template_lookup,
                         visible_type_aliases,
                         specialized_cache,
@@ -1167,6 +1479,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                         templates,
                         function_table,
                         module_impls,
+                        visible_structs,
                         visible_type_aliases,
                         specialized_cache,
                         specialized_functions,
@@ -1191,6 +1504,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                         templates,
                         function_table,
                         module_impls,
+                        visible_structs,
                         visible_type_aliases,
                         specialized_cache,
                         specialized_functions,
@@ -1206,6 +1520,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                     templates,
                     function_table,
                     module_impls,
+                    visible_structs,
                     method_template_lookup,
                     visible_type_aliases,
                     specialized_cache,
@@ -1224,6 +1539,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                             templates,
                             function_table,
                             module_impls,
+                            visible_structs,
                             method_template_lookup,
                             visible_type_aliases,
                             specialized_cache,
@@ -1253,6 +1569,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                             templates,
                             function_table,
                             module_impls,
+                            visible_structs,
                             method_template_lookup,
                             visible_type_aliases,
                             specialized_cache,
@@ -1271,6 +1588,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -1288,6 +1606,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -1301,6 +1620,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 templates,
                 function_table,
                 module_impls,
+                visible_structs,
                 method_template_lookup,
                 visible_type_aliases,
                 specialized_cache,
@@ -1321,6 +1641,7 @@ pub(crate) fn specialize_higher_order_call(
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     module_impls: &[AstImplDef],
+    visible_structs: &BTreeMap<String, AstStructDef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     specialized_cache: &mut BTreeSet<String>,
     specialized_functions: &mut Vec<AstFunction>,
@@ -1471,6 +1792,7 @@ pub(crate) fn specialize_higher_order_call(
         local_types,
         function_table,
         module_impls,
+        visible_structs,
         visible_type_aliases,
     )?;
     let type_fragments = template
@@ -1483,17 +1805,38 @@ pub(crate) fn specialize_higher_order_call(
         })
         .collect::<Vec<_>>();
     if !inferred_substitutions.is_empty() {
-        for binding in callable_bindings.values_mut() {
+        let inferred_ast_substitutions = inferred_substitutions
+            .iter()
+            .map(|(name, ty)| (name.clone(), ast_type_from_nir(ty)))
+            .collect::<BTreeMap<_, _>>();
+        for param in &template.params {
+            let Some(binding) = callable_bindings.get_mut(&param.name) else {
+                continue;
+            };
             let Some(callable) = function_table.get(&binding.symbol) else {
                 continue;
             };
+            let resolved_param_ty = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
+            let specialized_param_ty =
+                specialize_type_with_substitutions(&resolved_param_ty, &inferred_ast_substitutions);
+            let callable_specific_substitutions =
+                infer_callable_generic_substitutions(
+                    &specialized_param_ty,
+                    callable,
+                    visible_type_aliases,
+                )?;
+            let mut callable_specialization = inferred_ast_substitutions.clone();
+            callable_specialization.extend(callable_specific_substitutions);
             let specialized_callable_name =
                 format!("{}__{}", binding.symbol, type_fragments.join("__"));
             if specialized_cache.insert(specialized_callable_name.clone()) {
                 let specialized_callable = specialize_function_template(
                     callable,
                     &specialized_callable_name,
-                    &inferred_substitutions,
+                    &callable_specialization
+                        .into_iter()
+                        .map(|(name, ty)| (name, lower_type_ref(&ty)))
+                        .collect(),
                 )?;
                 specialized_functions.push(specialized_callable);
             }
@@ -1571,6 +1914,7 @@ fn rewrite_higher_order_argument_expr(
         templates,
         function_table,
         &[],
+        &BTreeMap::new(),
         &BTreeMap::new(),
         visible_type_aliases,
         specialized_cache,

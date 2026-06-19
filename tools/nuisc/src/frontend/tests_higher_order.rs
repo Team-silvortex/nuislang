@@ -267,6 +267,896 @@ fn lowers_result_map_and_and_then_higher_order_helpers() {
 }
 
 #[test]
+fn lowers_option_map_higher_order_helper_with_direct_payload_constructor() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          fn option_map<T, R>(value: Option<T>, mapper: Fn1<T, R>) -> Option<R> {
+            match value {
+              Option.Some(payload) => {
+                return Option.Some(mapper(payload));
+              }
+              Option.None => {
+                return Option.None;
+              }
+            }
+          }
+
+          fn add5(value: i64) -> i64 {
+            return value + 5;
+          }
+
+          fn main() -> i64 {
+            let mapped: Option<i64> = option_map(Option.Some(7), add5);
+            match mapped {
+              Option.Some(value) => {
+                return value;
+              }
+              Option.None => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name.starts_with("__hof_option_map_")));
+}
+
+#[test]
+fn lowers_result_map_higher_order_helper_with_direct_ok_constructor() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                return Result.Ok(mapper(value));
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn add5(value: i64) -> i64 {
+            return value + 5;
+          }
+
+          fn main() -> i64 {
+            let mapped: Result<i64, CoreError> = result_map(Result.Ok(7), add5);
+            match mapped {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name.starts_with("__hof_result_map_")));
+}
+
+#[test]
+fn lowers_result_and_then_higher_order_helper_with_direct_err_constructor() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn result_and_then<T, R, E>(
+            result: Result<T, E>,
+            mapper: Fn1<T, Result<R, E>>
+          ) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                return mapper(value);
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn map_value(value: i64) -> Result<i64, CoreError> {
+            return Result.Ok(value + 1);
+          }
+
+          fn main() -> i64 {
+            let mapped: Result<i64, CoreError> =
+              result_and_then(Result.Err(CoreError.InvalidInput), map_value);
+            match mapped {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name.starts_with("__hof_result_and_then_")));
+}
+
+#[test]
+fn lowers_result_map_with_direct_ok_constructor_and_generic_named_callable() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn id<T>(value: T) -> T {
+            return value;
+          }
+
+          fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                return Result.Ok(mapper(value));
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let mapped: Result<i64, CoreError> = result_map(Result.Ok(7), id);
+            match mapped {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_result_map_id__i64__i64__CoreError")
+        .expect("expected monomorphized result_map helper for generic named callable");
+    assert!(helper.generic_params.is_empty());
+
+    let id_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "id__i64__i64__CoreError")
+        .expect("expected generic callable specialization");
+    assert!(id_specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_result_and_then_with_direct_ok_constructor_and_generic_named_callable() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn lift_ok<T, E>(value: T) -> Result<T, E> {
+            return Result.Ok(value);
+          }
+
+          fn result_and_then<T, R, E>(
+            result: Result<T, E>,
+            mapper: Fn1<T, Result<R, E>>
+          ) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                return mapper(value);
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let mapped: Result<i64, CoreError> = result_and_then(Result.Ok(7), lift_ok);
+            match mapped {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_result_and_then_lift_ok__i64__i64__CoreError")
+        .expect("expected monomorphized result_and_then helper for generic named callable");
+    assert!(helper.generic_params.is_empty());
+
+    let lift_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "lift_ok__i64__i64__CoreError")
+        .expect("expected generic result callable specialization");
+    assert!(lift_specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_result_zip_with_direct_ok_constructors_and_generic_named_fn2_callable() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn choose_left<T>(lhs: T, rhs: T) -> T {
+            return lhs;
+          }
+
+          fn result_zip_with<T, U, R, E>(
+            lhs: Result<T, E>,
+            rhs: Result<U, E>,
+            mapper: Fn2<T, U, R>
+          ) -> Result<R, E> {
+            match lhs {
+              Result.Ok(lhs_value) => {
+                match rhs {
+                  Result.Ok(rhs_value) => {
+                    return Result.Ok(mapper(lhs_value, rhs_value));
+                  }
+                  Result.Err(error) => {
+                    return Result.Err(error);
+                  }
+                }
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let mapped: Result<i64, CoreError> =
+              result_zip_with(Result.Ok(7), Result.Ok(3), choose_left);
+            match mapped {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name == "__hof_result_zip_with_choose_left__i64__i64__i64__CoreError"
+        })
+        .expect("expected monomorphized result_zip_with helper for generic Fn2 callable");
+    assert!(helper.generic_params.is_empty());
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose_left__i64__i64__i64__CoreError")
+        .expect("expected generic Fn2 callable specialization");
+    assert!(specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_result_zip3_with_direct_ok_constructors_and_generic_named_fn3_callable() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn choose_first<T>(lhs: T, mid: T, rhs: T) -> T {
+            return lhs;
+          }
+
+          fn result_zip3_with<T, U, V, R, E>(
+            first: Result<T, E>,
+            second: Result<U, E>,
+            third: Result<V, E>,
+            mapper: Fn3<T, U, V, R>
+          ) -> Result<R, E> {
+            match first {
+              Result.Ok(first_value) => {
+                match second {
+                  Result.Ok(second_value) => {
+                    match third {
+                      Result.Ok(third_value) => {
+                        return Result.Ok(mapper(first_value, second_value, third_value));
+                      }
+                      Result.Err(error) => {
+                        return Result.Err(error);
+                      }
+                    }
+                  }
+                  Result.Err(error) => {
+                    return Result.Err(error);
+                  }
+                }
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let mapped: Result<i64, CoreError> = result_zip3_with(
+              Result.Ok(7),
+              Result.Ok(3),
+              Result.Ok(1),
+              choose_first
+            );
+            match mapped {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name
+                == "__hof_result_zip3_with_choose_first__i64__i64__i64__i64__CoreError"
+        })
+        .expect("expected monomorphized result_zip3_with helper for generic Fn3 callable");
+    assert!(helper.generic_params.is_empty());
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose_first__i64__i64__i64__i64__CoreError")
+        .expect("expected generic Fn3 callable specialization");
+    assert!(specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_result_zip_with_direct_ok_constructors_and_generic_named_fn2_alias_callable() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          type Mapper2<T, U, R> = Fn2<T, U, R>;
+
+          fn choose_left<T>(lhs: T, rhs: T) -> T {
+            return lhs;
+          }
+
+          fn result_zip_with<T, U, R, E>(
+            lhs: Result<T, E>,
+            rhs: Result<U, E>,
+            mapper: Mapper2<T, U, R>
+          ) -> Result<R, E> {
+            match lhs {
+              Result.Ok(lhs_value) => {
+                match rhs {
+                  Result.Ok(rhs_value) => {
+                    return Result.Ok(mapper(lhs_value, rhs_value));
+                  }
+                  Result.Err(error) => {
+                    return Result.Err(error);
+                  }
+                }
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let mapped: Result<i64, CoreError> =
+              result_zip_with(Result.Ok(7), Result.Ok(3), choose_left);
+            match mapped {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name == "__hof_result_zip_with_choose_left__i64__i64__i64__CoreError"
+        })
+        .expect("expected monomorphized alias result_zip_with helper for generic Fn2 callable");
+    assert!(helper.generic_params.is_empty());
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose_left__i64__i64__i64__CoreError")
+        .expect("expected generic Fn2 alias callable specialization");
+    assert!(specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_result_zip3_with_direct_ok_constructors_and_generic_named_fn3_alias_callable() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          type Reducer<T, U, V, R> = Fn3<T, U, V, R>;
+
+          fn choose_first<T>(lhs: T, mid: T, rhs: T) -> T {
+            return lhs;
+          }
+
+          fn result_zip3_with<T, U, V, R, E>(
+            first: Result<T, E>,
+            second: Result<U, E>,
+            third: Result<V, E>,
+            mapper: Reducer<T, U, V, R>
+          ) -> Result<R, E> {
+            match first {
+              Result.Ok(first_value) => {
+                match second {
+                  Result.Ok(second_value) => {
+                    match third {
+                      Result.Ok(third_value) => {
+                        return Result.Ok(mapper(first_value, second_value, third_value));
+                      }
+                      Result.Err(error) => {
+                        return Result.Err(error);
+                      }
+                    }
+                  }
+                  Result.Err(error) => {
+                    return Result.Err(error);
+                  }
+                }
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let mapped: Result<i64, CoreError> = result_zip3_with(
+              Result.Ok(7),
+              Result.Ok(3),
+              Result.Ok(1),
+              choose_first
+            );
+            match mapped {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name
+                == "__hof_result_zip3_with_choose_first__i64__i64__i64__i64__CoreError"
+        })
+        .expect("expected monomorphized alias result_zip3_with helper for generic Fn3 callable");
+    assert!(helper.generic_params.is_empty());
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose_first__i64__i64__i64__i64__CoreError")
+        .expect("expected generic Fn3 alias callable specialization");
+    assert!(specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_option_map_with_direct_some_constructor_and_generic_named_nested_result_callable() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn wrap_ok<T, E>(value: T) -> Result<T, E> {
+            return Result.Ok(value);
+          }
+
+          fn option_map<T, R>(value: Option<T>, mapper: Fn1<T, R>) -> Option<R> {
+            match value {
+              Option.Some(payload) => {
+                return Option.Some(mapper(payload));
+              }
+              Option.None => {
+                return Option.None;
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let mapped: Option<Result<i64, CoreError>> = option_map(Option.Some(7), wrap_ok);
+            match mapped {
+              Option.Some(Result.Ok(value)) => {
+                return value;
+              }
+              _ => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_option_map_wrap_ok__i64__Result_i64__CoreError_")
+        .expect("expected monomorphized option_map helper for nested result callable");
+    assert!(helper.generic_params.is_empty());
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "wrap_ok__i64__Result_i64__CoreError_")
+        .expect("expected generic nested result callable specialization");
+    assert!(specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_result_and_then_with_direct_ok_constructor_and_generic_named_result_task_callable() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Error {
+            Invalid,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          async fn emit<T>(value: T) -> T {
+            return value;
+          }
+
+          fn spawn_wrap<T, E>(value: T) -> Result<Task<T>, E> {
+            return Result.Ok(spawn(emit(value)));
+          }
+
+          fn result_and_then<T, R, E>(
+            result: Result<T, E>,
+            mapper: Fn1<T, Result<R, E>>
+          ) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                return mapper(value);
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          async fn main() -> Result<i64, Error> {
+            let task: Task<i64> = result_and_then(Result.Ok(7), spawn_wrap)?;
+            let value: i64 = await task;
+            return Result.Ok(value);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name == "__hof_result_and_then_spawn_wrap__i64__Task_i64___Error"
+        })
+        .expect("expected monomorphized result_and_then helper for result-task callable");
+    assert!(helper.generic_params.is_empty());
+    assert!(matches!(
+        helper.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "Result<Task<i64>, Error>"
+    ));
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "spawn_wrap__i64__Task_i64___Error")
+        .expect("expected generic result-task callable specialization");
+    assert!(specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_option_map_with_direct_some_constructor_and_alias_chain_nested_result_callable() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum CoreError {
+            InvalidInput,
+          }
+
+          enum Option<T> {
+            None,
+            Some(T),
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          type AppError = CoreError;
+          type AppResult<T> = Result<T, AppError>;
+
+          fn wrap_app_ok<T>(value: T) -> AppResult<T> {
+            return Result.Ok(value);
+          }
+
+          fn option_map<T, R>(value: Option<T>, mapper: Fn1<T, R>) -> Option<R> {
+            match value {
+              Option.Some(payload) => {
+                return Option.Some(mapper(payload));
+              }
+              Option.None => {
+                return Option.None;
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let mapped: Option<AppResult<i64>> = option_map(Option.Some(7), wrap_app_ok);
+            match mapped {
+              Option.Some(Result.Ok(value)) => {
+                return value;
+              }
+              _ => {
+                return -1;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_option_map_wrap_app_ok__")
+                && matches!(
+                    function.return_type.as_ref().map(|ty| ty.render()),
+                    Some(rendered) if rendered == "Option<Result<i64, CoreError>>"
+                )
+        })
+        .expect("expected monomorphized option_map helper for alias-chain nested result callable");
+    assert!(helper.generic_params.is_empty());
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("wrap_app_ok__")
+                && matches!(
+                    function.return_type.as_ref().map(|ty| ty.render()),
+                    Some(rendered) if rendered == "Result<i64, CoreError>"
+                )
+        })
+        .expect("expected generic alias-chain nested result callable specialization");
+    assert!(specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_result_and_then_with_direct_ok_constructor_and_alias_chain_result_task_callable() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Error {
+            Invalid,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          type AppError = Error;
+          type AsyncResult<T> = Result<Task<T>, AppError>;
+
+          async fn emit<T>(value: T) -> T {
+            return value;
+          }
+
+          fn spawn_wrap_alias<T>(value: T) -> AsyncResult<T> {
+            return Result.Ok(spawn(emit(value)));
+          }
+
+          fn result_and_then<T, R, E>(
+            result: Result<T, E>,
+            mapper: Fn1<T, Result<R, E>>
+          ) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                return mapper(value);
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          async fn main() -> Result<i64, Error> {
+            let task: Task<i64> = result_and_then(Result.Ok(7), spawn_wrap_alias)?;
+            let value: i64 = await task;
+            return Result.Ok(value);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_result_and_then_spawn_wrap_alias__")
+                && matches!(
+                    function.return_type.as_ref().map(|ty| ty.render()),
+                    Some(rendered) if rendered == "Result<Task<i64>, Error>"
+                )
+        })
+        .expect("expected monomorphized result_and_then helper for alias-chain result-task callable");
+    assert!(helper.generic_params.is_empty());
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("spawn_wrap_alias__")
+                && matches!(
+                    function.return_type.as_ref().map(|ty| ty.render()),
+                    Some(rendered) if rendered == "Result<Task<i64>, Error>"
+                )
+        })
+        .expect("expected generic alias-chain result-task callable specialization");
+    assert!(specialized.generic_params.is_empty());
+}
+
+#[test]
 fn lowers_generic_named_function_through_concrete_fn1_parameter() {
     let module = parse_nuis_module(
         r#"

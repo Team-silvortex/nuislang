@@ -1,5 +1,7 @@
 mod cli;
 mod galaxy;
+mod json_surface;
+mod surface_render;
 
 use std::{
     collections::BTreeSet,
@@ -11,6 +13,7 @@ use std::{
 };
 
 use nuis_semantics::model::{AstExpr, AstFunction, AstModule, AstStmt, AstTypeRef, AstVisibility};
+use json_surface::workflow_contract_json_fields;
 
 fn main() {
     let result = thread::Builder::new()
@@ -857,11 +860,11 @@ fn handle_dump_yir(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn debug_workflow_brief() -> &'static str {
+pub(crate) fn debug_workflow_brief() -> &'static str {
     "dump-ast -> dump-nir -> dump-yir -> scheduler-view"
 }
 
-fn debug_workflow_samples_brief() -> &'static str {
+pub(crate) fn debug_workflow_samples_brief() -> &'static str {
     "ast=nuis dump-ast <input>; nir=nuis dump-nir <input>; yir=nuis dump-yir <input>; scheduler=nuis scheduler-view <input>"
 }
 
@@ -894,14 +897,14 @@ struct WorkflowSourceProfile {
     workflow_samples: &'static str,
 }
 
-struct WorkflowFrontdoorSurface {
-    source_kind: &'static str,
-    workflow_kind: &'static str,
-    workflow_brief: &'static str,
-    workflow_samples: &'static str,
-    recommended_next_step: &'static str,
-    recommended_command: &'static str,
-    recommended_reason: &'static str,
+pub(crate) struct WorkflowFrontdoorSurface {
+    pub(crate) source_kind: &'static str,
+    pub(crate) workflow_kind: &'static str,
+    pub(crate) workflow_brief: &'static str,
+    pub(crate) workflow_samples: &'static str,
+    pub(crate) recommended_next_step: &'static str,
+    pub(crate) recommended_command: &'static str,
+    pub(crate) recommended_reason: &'static str,
 }
 
 fn build_workflow_frontdoor_surface(
@@ -919,7 +922,7 @@ fn build_workflow_frontdoor_surface(
     }
 }
 
-fn workflow_frontdoor_json_fields(surface: &WorkflowFrontdoorSurface) -> Vec<String> {
+pub(crate) fn workflow_frontdoor_json_fields(surface: &WorkflowFrontdoorSurface) -> Vec<String> {
     vec![
         json_field("source_kind", surface.source_kind),
         json_field("workflow_kind", surface.workflow_kind),
@@ -929,51 +932,6 @@ fn workflow_frontdoor_json_fields(surface: &WorkflowFrontdoorSurface) -> Vec<Str
         json_field("recommended_command", surface.recommended_command),
         json_field("recommended_reason", surface.recommended_reason),
     ]
-}
-
-fn workflow_contract_json_fields(
-    frontdoor: &WorkflowFrontdoorSurface,
-    include_project_compile: bool,
-    include_project_test: bool,
-    include_project_galaxy: bool,
-    include_debug: bool,
-) -> Vec<String> {
-    let mut fields = vec![
-        json_object_field("frontdoor", &workflow_frontdoor_json_fields(frontdoor)),
-        json_field("workflow_kind", frontdoor.workflow_kind),
-        json_field("workflow_brief", frontdoor.workflow_brief),
-        json_field("workflow_samples", frontdoor.workflow_samples),
-        json_field("recommended_next_step", frontdoor.recommended_next_step),
-        json_field("recommended_command", frontdoor.recommended_command),
-        json_field("recommended_reason", frontdoor.recommended_reason),
-    ];
-    if include_project_compile {
-        fields.push(json_field(
-            "project_compile_workflow",
-            frontdoor.workflow_brief,
-        ));
-        fields.push(json_field(
-            "project_compile_samples",
-            frontdoor.workflow_samples,
-        ));
-    }
-    if include_project_test {
-        fields.push(json_field(
-            "project_test_workflow",
-            nuisc::project_test_workflow_brief(),
-        ));
-    }
-    if include_project_galaxy {
-        fields.push(json_field(
-            "project_galaxy_workflow",
-            nuisc::project_galaxy_workflow_brief(),
-        ));
-    }
-    if include_debug {
-        fields.push(json_field("debug_workflow", debug_workflow_brief()));
-        fields.push(json_field("debug_samples", debug_workflow_samples_brief()));
-    }
-    fields
 }
 
 fn print_workflow_frontdoor_surface(surface: &WorkflowFrontdoorSurface) {
@@ -1013,7 +971,7 @@ fn project_compile_workflow_source_profile() -> WorkflowSourceProfile {
     }
 }
 
-fn project_frontdoor_surface(
+pub(crate) fn project_frontdoor_surface(
     plan: &nuisc::project::ProjectCompilationPlan,
     declared_tests: &[PathBuf],
     missing_tests: &[PathBuf],
@@ -1030,7 +988,7 @@ fn project_frontdoor_surface(
     build_workflow_frontdoor_surface(project_compile_workflow_source_profile(), recommendation)
 }
 
-fn single_source_frontdoor_surface() -> WorkflowFrontdoorSurface {
+pub(crate) fn single_source_frontdoor_surface() -> WorkflowFrontdoorSurface {
     build_workflow_frontdoor_surface(
         single_source_workflow_source_profile(),
         WorkflowRecommendation {
@@ -1337,7 +1295,7 @@ fn json_escape_local(value: &str) -> String {
     out
 }
 
-fn json_field(name: &str, value: &str) -> String {
+pub(crate) fn json_field(name: &str, value: &str) -> String {
     format!("\"{}\":\"{}\"", name, json_escape_local(value))
 }
 
@@ -1348,15 +1306,15 @@ fn json_optional_string_field(name: &str, value: Option<&str>) -> String {
     }
 }
 
-fn json_bool_field(name: &str, value: bool) -> String {
+pub(crate) fn json_bool_field(name: &str, value: bool) -> String {
     format!("\"{}\":{}", name, if value { "true" } else { "false" })
 }
 
-fn json_usize_field(name: &str, value: usize) -> String {
+pub(crate) fn json_usize_field(name: &str, value: usize) -> String {
     format!("\"{}\":{}", name, value)
 }
 
-fn json_string_array_field(name: &str, values: &[String]) -> String {
+pub(crate) fn json_string_array_field(name: &str, values: &[String]) -> String {
     let entries = values
         .iter()
         .map(|value| format!("\"{}\"", json_escape_local(value)))
@@ -1365,7 +1323,7 @@ fn json_string_array_field(name: &str, values: &[String]) -> String {
     format!("\"{}\":[{}]", name, entries)
 }
 
-fn json_object_field(name: &str, fields: &[String]) -> String {
+pub(crate) fn json_object_field(name: &str, fields: &[String]) -> String {
     format!("\"{}\":{{{}}}", name, fields.join(","))
 }
 
@@ -1395,7 +1353,7 @@ fn project_domain_registry_checks_json(
         .collect()
 }
 
-fn project_lowering_checks_json(
+pub(crate) fn project_lowering_checks_json(
     checks: &[nuisc::project::ProjectLoweringSelectionView],
 ) -> Vec<String> {
     checks
@@ -1412,15 +1370,15 @@ fn project_abi_checks_json(checks: &[nuisc::project::ProjectAbiSelectionCheck]) 
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct PublicSurfaceModuleRecord {
-    module: String,
-    externs: Vec<String>,
-    extern_interfaces: Vec<String>,
-    consts: Vec<String>,
-    type_aliases: Vec<String>,
-    functions: Vec<String>,
-    structs: Vec<String>,
-    traits: Vec<String>,
+pub(crate) struct PublicSurfaceModuleRecord {
+    pub(crate) module: String,
+    pub(crate) externs: Vec<String>,
+    pub(crate) extern_interfaces: Vec<String>,
+    pub(crate) consts: Vec<String>,
+    pub(crate) type_aliases: Vec<String>,
+    pub(crate) functions: Vec<String>,
+    pub(crate) structs: Vec<String>,
+    pub(crate) traits: Vec<String>,
 }
 
 impl PublicSurfaceModuleRecord {
@@ -1435,7 +1393,7 @@ impl PublicSurfaceModuleRecord {
     }
 }
 
-fn public_surface_records(
+pub(crate) fn public_surface_records(
     project: &nuisc::project::LoadedProject,
 ) -> Vec<PublicSurfaceModuleRecord> {
     project
@@ -1525,7 +1483,7 @@ fn public_surface_records(
         .collect()
 }
 
-fn describe_public_surface(records: &[PublicSurfaceModuleRecord]) -> String {
+pub(crate) fn describe_public_surface(records: &[PublicSurfaceModuleRecord]) -> String {
     let extern_count = records
         .iter()
         .map(|record| record.externs.len())
@@ -1563,7 +1521,7 @@ fn describe_public_surface(records: &[PublicSurfaceModuleRecord]) -> String {
     )
 }
 
-fn describe_public_surface_modules(records: &[PublicSurfaceModuleRecord]) -> String {
+pub(crate) fn describe_public_surface_modules(records: &[PublicSurfaceModuleRecord]) -> String {
     if records.is_empty() {
         return "<none>".to_owned();
     }
@@ -1598,7 +1556,7 @@ fn describe_public_surface_modules(records: &[PublicSurfaceModuleRecord]) -> Str
         .join("; ")
 }
 
-fn public_surface_json(records: &[PublicSurfaceModuleRecord]) -> Vec<String> {
+pub(crate) fn public_surface_json(records: &[PublicSurfaceModuleRecord]) -> Vec<String> {
     records
         .iter()
         .map(|record| {
@@ -1617,134 +1575,7 @@ fn public_surface_json(records: &[PublicSurfaceModuleRecord]) -> Vec<String> {
         .collect()
 }
 
-fn public_surface_summary_json_fields(records: &[PublicSurfaceModuleRecord]) -> Vec<String> {
-    let public_extern_count = records.iter().map(|record| record.externs.len()).sum::<usize>();
-    let public_extern_interface_count = records
-        .iter()
-        .map(|record| record.extern_interfaces.len())
-        .sum::<usize>();
-    let public_const_count = records.iter().map(|record| record.consts.len()).sum::<usize>();
-    let public_function_count = records
-        .iter()
-        .map(|record| record.functions.len())
-        .sum::<usize>();
-    let public_type_alias_count = records
-        .iter()
-        .map(|record| record.type_aliases.len())
-        .sum::<usize>();
-    let public_struct_count = records.iter().map(|record| record.structs.len()).sum::<usize>();
-    let public_trait_count = records.iter().map(|record| record.traits.len()).sum::<usize>();
-    vec![
-        json_usize_field("public_surface_modules", records.len()),
-        json_usize_field("public_externs", public_extern_count),
-        json_usize_field("public_extern_interfaces", public_extern_interface_count),
-        json_usize_field("public_consts", public_const_count),
-        json_usize_field("public_type_aliases", public_type_alias_count),
-        json_usize_field("public_functions", public_function_count),
-        json_usize_field("public_structs", public_struct_count),
-        json_usize_field("public_traits", public_trait_count),
-    ]
-}
-
-fn project_plan_json_fields(plan: &nuisc::project::ProjectCompilationPlan) -> Vec<String> {
-    vec![
-        json_field(
-            "project_plan",
-            &nuisc::project::describe_project_compilation_plan(plan),
-        ),
-        json_field(
-            "project_plan_dependency_categories",
-            &nuisc::project::describe_project_dependency_categories(plan),
-        ),
-        json_usize_field("project_plan_dependency_count", plan.dependencies.len()),
-        json_field(
-            "project_plan_synthetic_input_kind",
-            &plan.synthetic_input.kind,
-        ),
-        json_field(
-            "project_plan_synthetic_input",
-            &plan.synthetic_input.path.display().to_string(),
-        ),
-        json_field(
-            "project_plan_output_categories",
-            &nuisc::project::describe_project_output_intent_categories(plan),
-        ),
-        json_usize_field("project_plan_output_count", plan.output_intents.len()),
-        json_field("project_organization_entry", &plan.organization.entry),
-        json_field("project_domains", &plan.organization.domains.join(", ")),
-        json_field(
-            "project_exchange_route_classes",
-            &nuisc::project::describe_project_exchange_route_classes(plan),
-        ),
-        json_usize_field("project_exchange_route_count", plan.exchanges.routes.len()),
-    ]
-}
-
-fn project_check_summary_json_fields(
-    abi_checks: &[nuisc::project::ProjectAbiSelectionCheck],
-    registry_checks: &[nuisc::registry::ProjectDomainRegistryCheck],
-    lowering_checks: &[nuisc::project::ProjectLoweringSelectionView],
-) -> Vec<String> {
-    vec![
-        json_usize_field("abi_checks_count", abi_checks.len()),
-        json_bool_field("abi_checks_ok", abi_checks.iter().all(|check| check.ok)),
-        json_usize_field("registry_checks_count", registry_checks.len()),
-        json_bool_field(
-            "registry_checks_ok",
-            registry_checks.iter().all(|check| check.ok),
-        ),
-        json_usize_field("lowering_checks_count", lowering_checks.len()),
-        json_bool_field(
-            "lowering_checks_ok",
-            lowering_checks.iter().all(|check| check.ok),
-        ),
-    ]
-}
-
-fn galaxy_lock_json_fields(
-    status: Result<galaxy::VerifiedGalaxyLock, String>,
-    lock_path: &Path,
-    declared_dependencies: &[String],
-) -> Vec<String> {
-    match status {
-        Ok(lock) => {
-            let locked = lock
-                .entries
-                .iter()
-                .map(|item| format!("{}={}", item.name, item.version))
-                .collect::<BTreeSet<_>>();
-            let declared = declared_dependencies
-                .iter()
-                .cloned()
-                .collect::<BTreeSet<_>>();
-            vec![
-                json_field("galaxy_lock_status", "ok"),
-                json_field("galaxy_lock_path", &lock.path.display().to_string()),
-                json_usize_field("galaxy_lock_dependencies", lock.entries.len()),
-                json_bool_field("galaxy_lock_matches_manifest", declared == locked),
-                json_string_array_field(
-                    "galaxy_lock_entries",
-                    &lock
-                        .entries
-                        .iter()
-                        .map(|item| format!("{}={} {}", item.name, item.version, item.bundle_fnv1a64))
-                        .collect::<Vec<_>>(),
-                ),
-            ]
-        }
-        Err(error) if lock_path.exists() => vec![
-            json_field("galaxy_lock_status", "invalid"),
-            json_field("galaxy_lock_path", &lock_path.display().to_string()),
-            json_field("galaxy_lock_error", &error),
-        ],
-        Err(_) => vec![
-            json_field("galaxy_lock_status", "missing"),
-            json_field("galaxy_lock_path", &lock_path.display().to_string()),
-        ],
-    }
-}
-
-fn project_plan_domains_json(
+pub(crate) fn project_plan_domains_json(
     plan: &nuisc::project::ProjectCompilationPlan,
 ) -> Result<String, String> {
     let mut domains = Vec::new();
@@ -1762,14 +1593,14 @@ fn project_plan_domains_json(
         .join(","))
 }
 
-fn project_workflow_json_fields(
+pub(crate) fn project_workflow_json_fields(
     frontdoor: &WorkflowFrontdoorSurface,
     include_galaxy_flow: bool,
 ) -> Vec<String> {
     workflow_contract_json_fields(frontdoor, true, true, include_galaxy_flow, false)
 }
 
-fn scheduler_view_domain_record(
+pub(crate) fn scheduler_view_domain_record(
     domain: &str,
     _package: Option<String>,
     abi: Option<String>,
@@ -1799,7 +1630,7 @@ fn scheduler_view_domain_record(
     })
 }
 
-fn scheduler_view_domain_record_json(record: &SchedulerViewDomainRecord) -> String {
+pub(crate) fn scheduler_view_domain_record_json(record: &SchedulerViewDomainRecord) -> String {
     let mut fields = Vec::new();
     if let Some(shared_abi_json) = record.shared_abi_json.as_deref() {
         fields.push(format!("\"abi_selection\":{}", shared_abi_json));
@@ -1926,224 +1757,19 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn render_scheduler_view_json(input: &Path) -> Result<String, String> {
-    if nuisc::project::is_project_input(&input) {
-        let project = nuisc::project::load_project(&input)?;
-        let plan = nuisc::project::build_project_compilation_plan(&project)?;
-        let declared_tests = project
-            .manifest
-            .tests
-            .iter()
-            .map(|relative| project.root.join(relative))
-            .collect::<Vec<_>>();
-        let missing_tests = declared_tests
-            .iter()
-            .filter(|path| !path.exists())
-            .cloned()
-            .collect::<Vec<_>>();
-        let galaxy_manifest_path = project.root.join("galaxy.toml");
-        let galaxy_check = if galaxy_manifest_path.exists() {
-            Some(galaxy::check(&project.root))
-        } else {
-            None
-        };
-        let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
-        let galaxy_doctor = galaxy::doctor_project(&project.root)?;
-        let frontdoor = project_frontdoor_surface(
-            &plan,
-            &declared_tests,
-            &missing_tests,
-            &galaxy_doctor,
-            galaxy_check_invalid,
-        );
-        let mut domains = Vec::new();
-        for item in &plan.abi_resolution.requirements {
-            domains.push(scheduler_view_domain_record(
-                &item.domain,
-                None,
-                Some(item.abi.clone()),
-            )?);
-        }
-        let domain_json = domains
-            .iter()
-            .map(scheduler_view_domain_record_json)
-            .collect::<Vec<_>>()
-            .join(",");
-        let mut fields = vec![
-            json_field("source_kind", "project"),
-            json_field("input", &input.display().to_string()),
-            json_field("project", &project.manifest.name),
-            json_field(
-                "abi_mode",
-                if plan.abi_resolution.explicit {
-                    "explicit"
-                } else {
-                    "auto-recommended"
-                },
-            ),
-        ];
-        fields.extend(workflow_contract_json_fields(
-            &frontdoor,
-            false,
-            false,
-            false,
-            false,
-        ));
-        fields.extend(project_plan_json_fields(&plan));
-        return Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json));
-    }
-
-    let artifacts = nuisc::pipeline::compile_source_path(&input)?;
-    let manifests = nuisc::registry::load_required_manifests(
-        std::path::Path::new("nustar-packages"),
-        &artifacts.yir,
-    )?;
-    let frontdoor = single_source_frontdoor_surface();
-    let mut domains = Vec::new();
-    for manifest in manifests {
-        domains.push(scheduler_view_domain_record(
-            &manifest.domain_family,
-            Some(manifest.package_id),
-            None,
-        )?);
-    }
-    let domain_json = domains
-        .iter()
-        .map(scheduler_view_domain_record_json)
-        .collect::<Vec<_>>()
-        .join(",");
-    let fields = vec![
-        json_field("source_kind", "single-file"),
-        json_field("input", &input.display().to_string()),
-        json_field("ast_domain", &artifacts.ast.domain),
-        json_field("ast_unit", &artifacts.ast.unit),
-        json_object_field("frontdoor", &workflow_frontdoor_json_fields(&frontdoor)),
-        json_field("workflow_kind", frontdoor.workflow_kind),
-        json_field("workflow_brief", frontdoor.workflow_brief),
-        json_field("workflow_samples", frontdoor.workflow_samples),
-        json_field("recommended_next_step", frontdoor.recommended_next_step),
-        json_field("recommended_command", frontdoor.recommended_command),
-        json_field("recommended_reason", frontdoor.recommended_reason),
-    ];
-    Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json))
+pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String> {
+    surface_render::render_scheduler_view_json(input)
 }
 
 fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), String> {
     if json {
         return handle_project_status_json(input);
     }
+    for line in surface_render::render_project_status_text_summary(&input)? {
+        println!("{line}");
+    }
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
-    let public_surface = public_surface_records(&project);
-    let galaxy_lock_status = galaxy::verify_project_lock(&input);
-    let galaxy_manifest_path = project.root.join("galaxy.toml");
-    let include_galaxy_flow =
-        galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
-    let declared_tests = project
-        .manifest
-        .tests
-        .iter()
-        .map(|relative| project.root.join(relative))
-        .collect::<Vec<_>>();
-    let missing_tests = declared_tests
-        .iter()
-        .filter(|path| !path.exists())
-        .cloned()
-        .collect::<Vec<_>>();
-    let galaxy_check = if galaxy_manifest_path.exists() {
-        Some(galaxy::check(&project.root))
-    } else {
-        None
-    };
-    let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
-    let galaxy_doctor = galaxy::doctor_project(&project.root)?;
-    let frontdoor = project_frontdoor_surface(
-        &plan,
-        &declared_tests,
-        &missing_tests,
-        &galaxy_doctor,
-        galaxy_check_invalid,
-    );
-    println!("project status: {}", project.manifest.name);
-    println!("  root: {}", project.root.display());
-    println!("  manifest: {}", project.manifest_path.display());
-    println!("  entry: {}", project.manifest.entry);
-    print_workflow_frontdoor_surface(&frontdoor);
-    println!(
-        "  recommended_next_step: {}",
-        frontdoor.recommended_next_step
-    );
-    println!("  recommended_command: {}", frontdoor.recommended_command);
-    println!("  recommended_reason: {}", frontdoor.recommended_reason);
-    println!("  modules: {}", project.modules.len());
-    println!(
-        "  public_surface: {}",
-        describe_public_surface(&public_surface)
-    );
-    print_scheduler_sample_field(
-        "public_surface_modules",
-        &describe_public_surface_modules(&public_surface),
-    );
-    println!("  links: {}", project.manifest.links.len());
-    println!(
-        "  project_plan: {}",
-        nuisc::project::describe_project_compilation_plan(&plan)
-    );
-    println!(
-        "  project_plan_dependencies: {}",
-        if plan.dependencies.is_empty() {
-            "<none>".to_owned()
-        } else {
-            plan.dependencies
-                .iter()
-                .map(|item| {
-                    format!(
-                        "{}:{}={} ({})",
-                        item.category, item.name, item.version, item.source
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(", ")
-        }
-    );
-    println!(
-        "  project_plan_dependency_categories: {}",
-        nuisc::project::describe_project_dependency_categories(&plan)
-    );
-    println!(
-        "  project_plan_synthetic_input: {} ({})",
-        plan.synthetic_input.path.display(),
-        plan.synthetic_input.kind
-    );
-    println!("  project_plan_outputs: {}", plan.output_intents.len());
-    println!(
-        "  project_plan_output_categories: {}",
-        nuisc::project::describe_project_output_intent_categories(&plan)
-    );
-    println!("  project_organization_entry: {}", plan.organization.entry);
-    println!("  project_exchange_routes: {}", plan.exchanges.routes.len());
-    println!(
-        "  project_exchange_route_classes: {}",
-        nuisc::project::describe_project_exchange_route_classes(&plan)
-    );
-    println!("  tests: {}", declared_tests.len());
-    for path in &declared_tests {
-        println!(
-            "  test: {} exists={}",
-            path.display(),
-            yes_no(path.exists())
-        );
-    }
-    print_project_management_hints(include_galaxy_flow);
-    println!("  domains: {}", plan.organization.domains.join(", "));
-    println!(
-        "  abi_mode: {}",
-        if plan.abi_resolution.explicit {
-            "explicit"
-        } else {
-            "auto-recommended"
-        }
-    );
     for item in nuisc::project::project_abi_selection_views(&plan.abi_resolution) {
         let domain = item.domain.clone();
         for line in nuisc::project::render_project_abi_selection_view_lines(&item) {
@@ -2155,47 +1781,6 @@ fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), St
         }
         print_project_scheduler_contract_view(&domain)?;
     }
-    for item in &project.manifest.galaxy_dependencies {
-        println!("  galaxy: {}={}", item.name, item.version);
-    }
-    let lock_path = project.root.join("nuis.galaxy.lock");
-    match galaxy_lock_status {
-        Ok(lock) => {
-            println!("  galaxy_lock: ok");
-            println!("  galaxy_lock_path: {}", lock.path.display());
-            println!("  galaxy_lock_dependencies: {}", lock.entries.len());
-            let declared = project
-                .manifest
-                .galaxy_dependencies
-                .iter()
-                .map(|item| format!("{}={}", item.name, item.version))
-                .collect::<BTreeSet<_>>();
-            let locked = lock
-                .entries
-                .iter()
-                .map(|item| format!("{}={}", item.name, item.version))
-                .collect::<BTreeSet<_>>();
-            println!(
-                "  galaxy_lock_matches_manifest: {}",
-                if declared == locked { "yes" } else { "no" }
-            );
-            for item in lock.entries {
-                println!(
-                    "  galaxy_lock_entry: {}={} {}",
-                    item.name, item.version, item.bundle_fnv1a64
-                );
-            }
-        }
-        Err(error) if lock_path.exists() => {
-            println!("  galaxy_lock: invalid");
-            println!("  galaxy_lock_path: {}", lock_path.display());
-            println!("  galaxy_lock_error: {}", error);
-        }
-        Err(_) => {
-            println!("  galaxy_lock: missing");
-            println!("  galaxy_lock_path: {}", lock_path.display());
-        }
-    }
     Ok(())
 }
 
@@ -2204,220 +1789,35 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn render_project_status_json(input: &Path) -> Result<String, String> {
-    let project = nuisc::project::load_project(&input)?;
-    let plan = nuisc::project::build_project_compilation_plan(&project)?;
-    let public_surface = public_surface_records(&project);
-    let galaxy_lock_status = galaxy::verify_project_lock(&input);
-    let galaxy_manifest_path = project.root.join("galaxy.toml");
-    let include_galaxy_flow =
-        galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
-    let declared_tests = project
-        .manifest
-        .tests
-        .iter()
-        .map(|relative| project.root.join(relative))
-        .collect::<Vec<_>>();
-    let missing_tests = declared_tests
-        .iter()
-        .filter(|path| !path.exists())
-        .cloned()
-        .collect::<Vec<_>>();
-    let galaxy_check = if galaxy_manifest_path.exists() {
-        Some(galaxy::check(&project.root))
-    } else {
-        None
-    };
-    let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
-    let galaxy_doctor = galaxy::doctor_project(&project.root)?;
-    let frontdoor = project_frontdoor_surface(
-        &plan,
-        &declared_tests,
-        &missing_tests,
-        &galaxy_doctor,
-        galaxy_check_invalid,
-    );
-    let test_json = declared_tests
-        .iter()
-        .map(|path| {
-            format!(
-                "{{{},{}}}",
-                json_field("path", &path.display().to_string()),
-                json_bool_field("exists", path.exists())
-            )
-        })
-        .collect::<Vec<_>>();
-    let domain_json = project_plan_domains_json(&plan)?;
-    let public_surface_json = public_surface_json(&public_surface);
-    let mut fields = vec![
-        json_field("source_kind", "project"),
-        json_field("input", &input.display().to_string()),
-        json_field("project", &project.manifest.name),
-        json_field("root", &project.root.display().to_string()),
-        json_field("manifest", &project.manifest_path.display().to_string()),
-        json_field("entry", &project.manifest.entry),
-        json_usize_field("modules", project.modules.len()),
-        json_usize_field("links", project.manifest.links.len()),
-    ];
-    fields.extend(public_surface_summary_json_fields(&public_surface));
-    fields.extend(project_plan_json_fields(&plan));
-    fields.push(json_usize_field("tests_declared", declared_tests.len()));
-    fields.extend(project_workflow_json_fields(
-        &frontdoor,
-        include_galaxy_flow,
-    ));
-    fields.push(json_field(
-        "abi_mode",
-        if plan.abi_resolution.explicit {
-            "explicit"
-        } else {
-            "auto-recommended"
-        },
-    ));
-    fields.push(json_string_array_field(
-        "galaxy_dependencies",
-        &project
-            .manifest
-            .galaxy_dependencies
-            .iter()
-            .map(|item| format!("{}={}", item.name, item.version))
-            .collect::<Vec<_>>(),
-    ));
-    let lock_path = project.root.join("nuis.galaxy.lock");
-    let declared_galaxy_dependencies = project
-        .manifest
-        .galaxy_dependencies
-        .iter()
-        .map(|item| format!("{}={}", item.name, item.version))
-        .collect::<Vec<_>>();
-    fields.extend(galaxy_lock_json_fields(
-        galaxy_lock_status,
-        &lock_path,
-        &declared_galaxy_dependencies,
-    ));
-    fields.push(json_object_array_field("tests", &test_json));
-    fields.push(json_object_array_field(
-        "public_surface_records",
-        &public_surface_json,
-    ));
-    Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json))
+pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String> {
+    surface_render::render_project_status_json(input)
 }
 
 fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), String> {
     if json {
         return handle_project_doctor_json(input);
     }
+    for line in surface_render::render_project_doctor_text_summary(&input)? {
+        println!("{line}");
+    }
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
-    let public_surface = public_surface_records(&project);
-    let declared_tests = project
-        .manifest
-        .tests
-        .iter()
-        .map(|relative| project.root.join(relative))
-        .collect::<Vec<_>>();
-    let missing_tests = declared_tests
-        .iter()
-        .filter(|path| !path.exists())
-        .cloned()
-        .collect::<Vec<_>>();
-    let galaxy_manifest_path = project.root.join("galaxy.toml");
-    let galaxy_manifest_exists = galaxy_manifest_path.exists();
-    let galaxy_check = if galaxy_manifest_exists {
-        Some(galaxy::check(&project.root))
-    } else {
-        None
-    };
-    let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
-    let galaxy_doctor = galaxy::doctor_project(&project.root)?;
     let nova_profile = galaxy::inspect_ns_nova_profile(&project.root)?;
-    let nova_stdlib = galaxy::inspect_ns_nova_stdlib(std::path::Path::new("."))?;
-    let lock_status = galaxy_doctor.lock_status.clone();
-    let lock_error = galaxy_doctor.lock_error.clone();
-    let deps_len = galaxy_doctor.dependencies.len();
-    let include_galaxy_flow =
-        galaxy_manifest_exists || !project.manifest.galaxy_dependencies.is_empty();
-    let any_local_missing = galaxy_doctor
-        .dependencies
-        .iter()
-        .any(|dependency| !dependency.local_available);
-    let any_lock_missing = galaxy_doctor
-        .dependencies
-        .iter()
-        .any(|dependency| !dependency.locked);
-    let any_install_missing = galaxy_doctor
-        .dependencies
-        .iter()
-        .any(|dependency| !dependency.installed);
     let abi_checks =
         nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
     let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
     let lowering_checks =
         nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
-    let frontdoor = project_frontdoor_surface(
-        &plan,
-        &declared_tests,
-        &missing_tests,
-        &galaxy_doctor,
-        galaxy_check_invalid,
-    );
-
-    println!("project doctor: {}", project.manifest.name);
-    println!("  root: {}", project.root.display());
-    println!("  manifest: {}", project.manifest_path.display());
-    println!("  entry: {}", project.manifest.entry);
-    print_workflow_frontdoor_surface(&frontdoor);
-    println!(
-        "  recommended_next_step: {}",
-        frontdoor.recommended_next_step
-    );
-    println!("  recommended_command: {}", frontdoor.recommended_command);
-    println!("  recommended_reason: {}", frontdoor.recommended_reason);
-    println!("  modules: {}", project.modules.len());
-    println!(
-        "  public_surface: {}",
-        describe_public_surface(&public_surface)
-    );
-    print_scheduler_sample_field(
-        "public_surface_modules",
-        &describe_public_surface_modules(&public_surface),
-    );
-    println!("  links: {}", project.manifest.links.len());
-    println!(
-        "  project_plan: {}",
-        nuisc::project::describe_project_compilation_plan(&plan)
-    );
-    println!("  tests_declared: {}", declared_tests.len());
-    println!("  tests_missing: {}", missing_tests.len());
-    for path in &declared_tests {
-        println!(
-            "  test: {} exists={}",
-            path.display(),
-            yes_no(path.exists())
-        );
-    }
-    print_project_management_hints(include_galaxy_flow);
-    println!(
-        "  abi_mode: {}",
-        if plan.abi_resolution.explicit {
-            "explicit"
-        } else {
-            "auto-recommended"
-        }
-    );
-    println!("  abi_checks: {}", abi_checks.len());
     for check in &abi_checks {
         for line in nuisc::project::render_project_abi_selection_check_lines(check) {
             println!("  {}", line);
         }
     }
-    println!("  registry_checks: {}", registry_checks.len());
     for check in &registry_checks {
         for line in nuisc::registry::render_project_domain_registry_check_lines(check) {
             println!("  {}", line);
         }
     }
-    println!("  lowering_checks: {}", lowering_checks.len());
     for check in &lowering_checks {
         for line in nuisc::project::render_project_lowering_selection_lines(check) {
             println!("  {}", line);
@@ -2427,64 +1827,8 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
         println!("  abi: {}={}", item.domain, item.abi);
         print_project_scheduler_contract_view(&item.domain)?;
     }
-
-    println!(
-        "  galaxy_manifest: {}",
-        if galaxy_manifest_exists {
-            galaxy_manifest_path.display().to_string()
-        } else {
-            "<missing>".to_owned()
-        }
-    );
-    match galaxy_check {
-        Some(Ok(checked)) => {
-            println!("  galaxy_check: ok");
-            println!("  galaxy_package_kind: {}", checked.manifest.package_kind);
-            println!(
-                "  galaxy_framework: {}",
-                checked.manifest.framework.as_deref().unwrap_or("<none>")
-            );
-            println!("  galaxy_include_files: {}", checked.include_files.len());
-        }
-        Some(Err(error)) => {
-            println!("  galaxy_check: invalid");
-            println!("  galaxy_error: {}", error);
-        }
-        None => {
-            println!("  galaxy_check: skipped");
-        }
-    }
-
-    println!("  galaxy_lock: {}", galaxy_doctor.lock_status);
-    println!("  galaxy_lock_path: {}", galaxy_doctor.lock_path.display());
-    if let Some(error) = galaxy_doctor.lock_error {
-        println!("  galaxy_lock_error: {}", error);
-    }
-    println!("  galaxy_deps_root: {}", galaxy_doctor.deps_root.display());
-    println!(
-        "  galaxy_local_registry: {}",
-        galaxy_doctor.local_registry_root.display()
-    );
-    println!(
-        "  galaxy_dependencies: {}",
-        galaxy_doctor.dependencies.len()
-    );
-    for dependency in galaxy_doctor.dependencies {
-        println!(
-            "  dep: {}={} local={} lock={} installed={}",
-            dependency.name,
-            dependency.version,
-            yes_no(dependency.local_available),
-            yes_no(dependency.locked),
-            yes_no(dependency.installed)
-        );
-    }
-
     match nova_profile.as_ref() {
         Some(profile) => {
-            println!("  ns_nova_profile: {}", profile.path.display());
-            println!("  ns_nova_framework: {}", profile.framework);
-            println!("  ns_nova_framework_schema: {}", profile.framework_schema);
             println!(
                 "  ns_nova_stdlib_schema: {}",
                 profile.stdlib_schema.as_deref().unwrap_or("<none>")
@@ -2538,158 +1882,7 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
                 }
             );
         }
-        None => {
-            println!("  ns_nova_profile: <missing>");
-        }
-    }
-    match nova_stdlib.as_ref() {
-        Some(summary) => {
-            println!("  ns_nova_stdlib_manifest: {}", summary.path.display());
-            println!("  ns_nova_stdlib_sources: {}", summary.source_modules.len());
-            println!(
-                "  ns_nova_stdlib_missing_sources: {}",
-                summary.missing_modules.len()
-            );
-            for path in &summary.missing_modules {
-                println!("  ns_nova_stdlib_missing: {}", path.display());
-            }
-        }
-        None => {
-            println!("  ns_nova_stdlib_manifest: <missing>");
-        }
-    }
-
-    let mut next_steps = Vec::new();
-    if !galaxy_manifest_exists {
-        next_steps.push(
-            "run `nuis galaxy init <project-dir>` if you want to package or share this project"
-                .to_owned(),
-        );
-    }
-    if let Some(profile) = nova_profile.as_ref() {
-        if !galaxy_manifest_exists {
-            next_steps.push(
-                "run `nuis galaxy init <project-dir> --framework ns-nova` if this project should be packaged as an `ns-nova` framework project".to_owned(),
-            );
-        }
-        if profile.family_schema.as_deref() == Some("ns-nova-family-v1")
-            && profile.family_layers.is_empty()
-        {
-            next_steps.push(
-                "fill `family_layers` in `ns-nova.toml` so the framework contract says whether this project is using `core`, `ui`, or `scene`".to_owned(),
-            );
-        }
-        if profile.render_schema.as_deref() == Some("ns-nova-render-v1")
-            && (profile.render_owner_unit.is_none()
-                || profile.render_bridge_unit.is_none()
-                || profile.render_surface_unit.is_none())
-        {
-            next_steps.push(
-                "fill `render_owner_unit`, `render_bridge_unit`, and `render_surface_unit` in `ns-nova.toml` to complete the render contract".to_owned(),
-            );
-        }
-        if profile.selection_schema.as_deref() == Some("ns-nova-selection-v1")
-            && (profile.selection_owner_unit.is_none()
-                || profile.selection_bridge_unit.is_none()
-                || profile.selection_render_unit.is_none()
-                || profile.selection_controls.is_empty())
-        {
-            next_steps.push(
-                "fill the `selection_*` units and `selection_controls` in `ns-nova.toml` to complete the shared selection contract".to_owned(),
-            );
-        }
-        if profile.stdlib_schema.as_deref() == Some("ns-nova-stdlib-v1")
-            && (profile.stdlib_manifest.is_none() || profile.stdlib_sources.is_empty())
-        {
-            next_steps.push(
-                "fill `stdlib_manifest` and `stdlib_sources` in `ns-nova.toml` so the framework profile points at its canonical stdlib source assets".to_owned(),
-            );
-        }
-    } else if nova_stdlib.is_some() {
-        next_steps.push(
-            "add `ns-nova.toml` if this project should carry explicit `ns-nova` framework metadata alongside the shared stdlib source asset catalog".to_owned(),
-        );
-    }
-    if let Some(summary) = nova_stdlib.as_ref() {
-        if summary.source_modules.is_empty() {
-            next_steps.push(
-                "fill `source_modules` in `stdlib/ns-nova/module.toml` so the framework declares its canonical `ns` source assets".to_owned(),
-            );
-        }
-        if !summary.missing_modules.is_empty() {
-            next_steps.push(
-                "some `ns-nova` source modules declared in `stdlib/ns-nova/module.toml` are missing on disk; add them or remove stale entries from `source_modules`".to_owned(),
-            );
-        }
-        if let Some(profile) = nova_profile.as_ref() {
-            if profile.stdlib_sources.len() != summary.source_modules.len() {
-                next_steps.push(
-                    "refresh `ns-nova.toml` so its `stdlib_sources` count matches `stdlib/ns-nova/module.toml`".to_owned(),
-                );
-            }
-        }
-    }
-    match lock_status.as_str() {
-        "missing" if deps_len > 0 => {
-            next_steps.push(
-                "run `nuis galaxy lock-deps <project-dir>` to create `nuis.galaxy.lock`".to_owned(),
-            );
-        }
-        "invalid" => {
-            next_steps.push(
-                "run `nuis galaxy verify-lock <project-dir>` after fixing the lock or regenerate it with `nuis galaxy lock-deps <project-dir>`".to_owned(),
-            );
-        }
-        _ => {}
-    }
-    if any_lock_missing && deps_len > 0 && lock_status == "ok" {
-        next_steps.push(
-            "run `nuis galaxy lock-deps <project-dir>` to refresh the lock so it matches the manifest".to_owned(),
-        );
-    }
-    if any_install_missing && lock_status == "ok" {
-        next_steps.push(
-            "run `nuis galaxy sync-deps <project-dir>` to materialize locked galaxy dependencies under `.nuis/deps/galaxy`".to_owned(),
-        );
-    }
-    if any_local_missing && deps_len > 0 {
-        next_steps.push(
-            "some galaxy deps are not available locally; use `nuis galaxy list` to inspect the local registry or publish/install the missing packages first".to_owned(),
-        );
-    }
-    if galaxy_check_invalid {
-        next_steps.push(
-            "run `nuis galaxy check <project-dir>` after fixing `galaxy.toml` or framework profile issues".to_owned(),
-        );
-    }
-    if !plan.abi_resolution.explicit {
-        next_steps.push(
-            "run `nuis project-lock-abi <project-dir>` if you want to freeze the current ABI recommendations".to_owned(),
-        );
-    }
-    if declared_tests.is_empty() {
-        next_steps.push(
-            "add `tests = [\"tests/smoke.ns\"]` to `nuis.toml` once you want `nuis test <project-dir>` to run explicit project test inputs".to_owned(),
-        );
-    }
-    if !missing_tests.is_empty() {
-        next_steps.push(
-            "some declared project tests are missing on disk; add those `.ns` files or remove stale entries from `tests = [...]` in `nuis.toml`".to_owned(),
-        );
-    }
-    if next_steps.is_empty() {
-        println!("  next_steps: none");
-    } else {
-        println!("  next_steps: {}", next_steps.len());
-        for step in next_steps {
-            println!("  next: {}", step);
-        }
-    }
-    if let Some(error) = lock_error {
-        println!(
-            "  note: lock verification failed before suggestions were computed: {}",
-            error
-        );
+        None => {}
     }
 
     Ok(())
@@ -2700,326 +1893,8 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn render_project_doctor_json(input: &Path) -> Result<String, String> {
-    let project = nuisc::project::load_project(&input)?;
-    let plan = nuisc::project::build_project_compilation_plan(&project)?;
-    let public_surface = public_surface_records(&project);
-    let declared_tests = project
-        .manifest
-        .tests
-        .iter()
-        .map(|relative| project.root.join(relative))
-        .collect::<Vec<_>>();
-    let missing_tests = declared_tests
-        .iter()
-        .filter(|path| !path.exists())
-        .cloned()
-        .collect::<Vec<_>>();
-    let galaxy_manifest_path = project.root.join("galaxy.toml");
-    let galaxy_manifest_exists = galaxy_manifest_path.exists();
-    let galaxy_check = if galaxy_manifest_exists {
-        Some(galaxy::check(&project.root))
-    } else {
-        None
-    };
-    let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
-    let galaxy_doctor = galaxy::doctor_project(&project.root)?;
-    let nova_profile = galaxy::inspect_ns_nova_profile(&project.root)?;
-    let nova_stdlib = galaxy::inspect_ns_nova_stdlib(std::path::Path::new("."))?;
-    let lock_status = galaxy_doctor.lock_status.clone();
-    let lock_error = galaxy_doctor.lock_error.clone();
-    let deps_len = galaxy_doctor.dependencies.len();
-    let include_galaxy_flow =
-        galaxy_manifest_exists || !project.manifest.galaxy_dependencies.is_empty();
-    let any_local_missing = galaxy_doctor
-        .dependencies
-        .iter()
-        .any(|dependency| !dependency.local_available);
-    let any_lock_missing = galaxy_doctor
-        .dependencies
-        .iter()
-        .any(|dependency| !dependency.locked);
-    let any_install_missing = galaxy_doctor
-        .dependencies
-        .iter()
-        .any(|dependency| !dependency.installed);
-    let abi_checks =
-        nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;
-    let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
-    let lowering_checks =
-        nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
-    let frontdoor = project_frontdoor_surface(
-        &plan,
-        &declared_tests,
-        &missing_tests,
-        &galaxy_doctor,
-        galaxy_check_invalid,
-    );
-    let mut next_steps = Vec::new();
-    if !galaxy_manifest_exists {
-        next_steps.push(
-            "run `nuis galaxy init <project-dir>` if you want to package or share this project"
-                .to_owned(),
-        );
-    }
-    if let Some(profile) = nova_profile.as_ref() {
-        if !galaxy_manifest_exists {
-            next_steps.push(
-                "run `nuis galaxy init <project-dir> --framework ns-nova` if this project should be packaged as an `ns-nova` framework project".to_owned(),
-            );
-        }
-        if profile.family_schema.as_deref() == Some("ns-nova-family-v1")
-            && profile.family_layers.is_empty()
-        {
-            next_steps.push(
-                "fill `family_layers` in `ns-nova.toml` so the framework contract says whether this project is using `core`, `ui`, or `scene`".to_owned(),
-            );
-        }
-        if profile.render_schema.as_deref() == Some("ns-nova-render-v1")
-            && (profile.render_owner_unit.is_none()
-                || profile.render_bridge_unit.is_none()
-                || profile.render_surface_unit.is_none())
-        {
-            next_steps.push(
-                "fill `render_owner_unit`, `render_bridge_unit`, and `render_surface_unit` in `ns-nova.toml` to complete the render contract".to_owned(),
-            );
-        }
-        if profile.selection_schema.as_deref() == Some("ns-nova-selection-v1")
-            && (profile.selection_owner_unit.is_none()
-                || profile.selection_bridge_unit.is_none()
-                || profile.selection_render_unit.is_none()
-                || profile.selection_controls.is_empty())
-        {
-            next_steps.push(
-                "fill the `selection_*` units and `selection_controls` in `ns-nova.toml` to complete the shared selection contract".to_owned(),
-            );
-        }
-        if profile.stdlib_schema.as_deref() == Some("ns-nova-stdlib-v1")
-            && (profile.stdlib_manifest.is_none() || profile.stdlib_sources.is_empty())
-        {
-            next_steps.push(
-                "fill `stdlib_manifest` and `stdlib_sources` in `ns-nova.toml` so the framework profile points at its canonical stdlib source assets".to_owned(),
-            );
-        }
-    } else if nova_stdlib.is_some() {
-        next_steps.push(
-            "add `ns-nova.toml` if this project should carry explicit `ns-nova` framework metadata alongside the shared stdlib source asset catalog".to_owned(),
-        );
-    }
-    if let Some(summary) = nova_stdlib.as_ref() {
-        if summary.source_modules.is_empty() {
-            next_steps.push(
-                "fill `source_modules` in `stdlib/ns-nova/module.toml` so the framework declares its canonical `ns` source assets".to_owned(),
-            );
-        }
-        if !summary.missing_modules.is_empty() {
-            next_steps.push(
-                "some `ns-nova` source modules declared in `stdlib/ns-nova/module.toml` are missing on disk; add them or remove stale entries from `source_modules`".to_owned(),
-            );
-        }
-        if let Some(profile) = nova_profile.as_ref() {
-            if profile.stdlib_sources.len() != summary.source_modules.len() {
-                next_steps.push(
-                    "refresh `ns-nova.toml` so its `stdlib_sources` count matches `stdlib/ns-nova/module.toml`".to_owned(),
-                );
-            }
-        }
-    }
-    match lock_status.as_str() {
-        "missing" if deps_len > 0 => {
-            next_steps.push(
-                "run `nuis galaxy lock-deps <project-dir>` to create `nuis.galaxy.lock`".to_owned(),
-            );
-        }
-        "invalid" => {
-            next_steps.push(
-                "run `nuis galaxy verify-lock <project-dir>` after fixing the lock or regenerate it with `nuis galaxy lock-deps <project-dir>`".to_owned(),
-            );
-        }
-        _ => {}
-    }
-    if any_lock_missing && deps_len > 0 && lock_status == "ok" {
-        next_steps.push(
-            "run `nuis galaxy lock-deps <project-dir>` to refresh the lock so it matches the manifest".to_owned(),
-        );
-    }
-    if any_install_missing && lock_status == "ok" {
-        next_steps.push(
-            "run `nuis galaxy sync-deps <project-dir>` to materialize locked galaxy dependencies under `.nuis/deps/galaxy`".to_owned(),
-        );
-    }
-    if any_local_missing && deps_len > 0 {
-        next_steps.push(
-            "some galaxy deps are not available locally; use `nuis galaxy list` to inspect the local registry or publish/install the missing packages first".to_owned(),
-        );
-    }
-    if galaxy_check_invalid {
-        next_steps.push(
-            "run `nuis galaxy check <project-dir>` after fixing `galaxy.toml` or framework profile issues".to_owned(),
-        );
-    }
-    if !plan.abi_resolution.explicit {
-        next_steps.push(
-            "run `nuis project-lock-abi <project-dir>` if you want to freeze the current ABI recommendations".to_owned(),
-        );
-    }
-    if declared_tests.is_empty() {
-        next_steps.push(
-            "add `tests = [\"tests/smoke.ns\"]` to `nuis.toml` once you want `nuis test <project-dir>` to run explicit project test inputs".to_owned(),
-        );
-    }
-    if !missing_tests.is_empty() {
-        next_steps.push(
-            "some declared project tests are missing on disk; add those `.ns` files or remove stale entries from `tests = [...]` in `nuis.toml`".to_owned(),
-        );
-    }
-    let domain_json = project_plan_domains_json(&plan)?;
-    let public_surface_json = public_surface_json(&public_surface);
-    let tests_json = declared_tests
-        .iter()
-        .map(|path| {
-            format!(
-                "{{{},{}}}",
-                json_field("path", &path.display().to_string()),
-                json_bool_field("exists", path.exists())
-            )
-        })
-        .collect::<Vec<_>>();
-    let dependency_json = galaxy_doctor
-        .dependencies
-        .iter()
-        .map(|dependency| {
-            format!(
-                "{{{},{},{},{},{}}}",
-                json_field("name", &dependency.name),
-                json_field("version", &dependency.version),
-                json_bool_field("local_available", dependency.local_available),
-                json_bool_field("locked", dependency.locked),
-                json_bool_field("installed", dependency.installed),
-            )
-        })
-        .collect::<Vec<_>>();
-    let galaxy_manifest_display = if galaxy_manifest_exists {
-        galaxy_manifest_path.display().to_string()
-    } else {
-        "<missing>".to_owned()
-    };
-    let mut fields = vec![
-        json_field("source_kind", "project"),
-        json_field("input", &input.display().to_string()),
-        json_field("project", &project.manifest.name),
-        json_field("root", &project.root.display().to_string()),
-        json_field("manifest", &project.manifest_path.display().to_string()),
-        json_field("entry", &project.manifest.entry),
-        json_usize_field("modules", project.modules.len()),
-        json_usize_field("links", project.manifest.links.len()),
-    ];
-    fields.extend(public_surface_summary_json_fields(&public_surface));
-    fields.extend(project_plan_json_fields(&plan));
-    fields.push(json_usize_field("tests_declared", declared_tests.len()));
-    fields.push(json_usize_field("tests_missing", missing_tests.len()));
-    fields.extend(project_workflow_json_fields(
-        &frontdoor,
-        include_galaxy_flow,
-    ));
-    fields.push(json_field(
-        "abi_mode",
-        if plan.abi_resolution.explicit {
-            "explicit"
-        } else {
-            "auto-recommended"
-        },
-    ));
-    fields.extend(project_check_summary_json_fields(
-        &abi_checks,
-        &registry_checks,
-        &lowering_checks,
-    ));
-    fields.push(json_field("galaxy_manifest", &galaxy_manifest_display));
-    match galaxy_check {
-        Some(Ok(checked)) => {
-            fields.push(json_field("galaxy_check_status", "ok"));
-            fields.push(json_field(
-                "galaxy_package_kind",
-                &checked.manifest.package_kind,
-            ));
-            fields.push(json_field(
-                "galaxy_framework",
-                checked.manifest.framework.as_deref().unwrap_or("<none>"),
-            ));
-            fields.push(json_usize_field(
-                "galaxy_include_files",
-                checked.include_files.len(),
-            ));
-        }
-        Some(Err(error)) => {
-            fields.push(json_field("galaxy_check_status", "invalid"));
-            fields.push(json_field("galaxy_error", &error));
-        }
-        None => {
-            fields.push(json_field("galaxy_check_status", "skipped"));
-        }
-    }
-    fields.push(json_field("galaxy_lock_status", &galaxy_doctor.lock_status));
-    fields.push(json_field(
-        "galaxy_lock_path",
-        &galaxy_doctor.lock_path.display().to_string(),
-    ));
-    if let Some(error) = galaxy_doctor.lock_error.as_deref() {
-        fields.push(json_field("galaxy_lock_error", error));
-    }
-    fields.push(json_field(
-        "galaxy_deps_root",
-        &galaxy_doctor.deps_root.display().to_string(),
-    ));
-    fields.push(json_field(
-        "galaxy_local_registry",
-        &galaxy_doctor.local_registry_root.display().to_string(),
-    ));
-    fields.push(json_usize_field(
-        "galaxy_dependencies_count",
-        galaxy_doctor.dependencies.len(),
-    ));
-    fields.push(json_optional_string_field(
-        "ns_nova_profile",
-        nova_profile
-            .as_ref()
-            .map(|profile| profile.path.display().to_string())
-            .as_deref(),
-    ));
-    fields.push(json_optional_string_field(
-        "ns_nova_stdlib_manifest",
-        nova_stdlib
-            .as_ref()
-            .map(|summary| summary.path.display().to_string())
-            .as_deref(),
-    ));
-    if let Some(error) = lock_error.as_deref() {
-        fields.push(json_field("note", error));
-    }
-    fields.push(json_string_array_field("next_steps", &next_steps));
-    fields.push(json_object_array_field("tests", &tests_json));
-    fields.push(json_object_array_field(
-        "public_surface_records",
-        &public_surface_json,
-    ));
-    fields.push(json_object_array_field(
-        "abi_checks",
-        &project_abi_checks_json(&abi_checks),
-    ));
-    fields.push(json_object_array_field(
-        "registry_checks",
-        &project_domain_registry_checks_json(&registry_checks),
-    ));
-    fields.push(json_object_array_field(
-        "lowering_checks",
-        &project_lowering_checks_json(&lowering_checks),
-    ));
-    fields.push(json_object_array_field(
-        "galaxy_dependencies",
-        &dependency_json,
-    ));
-    Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json))
+pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String> {
+    surface_render::render_project_doctor_json(input)
 }
 
 fn print_domain_contract_group(contract: &nuisc::registry::NustarDomainContract, group: &str) {
@@ -3609,7 +2484,7 @@ fn run_nuis_rc(args: &[String]) -> Result<(), String> {
     }
 }
 
-fn yes_no(value: bool) -> &'static str {
+pub(crate) fn yes_no(value: bool) -> &'static str {
     if value {
         "yes"
     } else {
@@ -3684,6 +2559,10 @@ fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use crate::galaxy;
+    use crate::json_surface::{
+        galaxy_lock_json_fields, project_check_summary_json_fields,
+        public_surface_summary_json_fields, workflow_contract_json_fields,
+    };
     use super::{
         build_workflow_frontdoor_surface, handle_build, handle_check, handle_release_check,
         handle_test, project_abi_checks_json, project_compile_workflow_source_profile,
@@ -3694,8 +2573,6 @@ mod tests {
         run_language_tests_for_source_file, scheduler_view_domain_record,
         scheduler_view_domain_record_json, single_source_workflow_source_profile,
         wait_for_test_child, RawTestOutcome, WorkflowRecommendation,
-        workflow_contract_json_fields, galaxy_lock_json_fields,
-        public_surface_summary_json_fields, project_check_summary_json_fields,
         PublicSurfaceModuleRecord,
     };
     use std::{

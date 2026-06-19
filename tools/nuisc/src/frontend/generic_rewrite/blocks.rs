@@ -772,7 +772,7 @@ fn expected_type_for_var_from_following_stmts(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn rewrite_generic_calls_in_match_arms(
+pub(super) fn rewrite_generic_calls_in_match_arms(
     arms: &[AstMatchArm],
     context: &str,
     scrutinee_type: Option<&AstTypeRef>,

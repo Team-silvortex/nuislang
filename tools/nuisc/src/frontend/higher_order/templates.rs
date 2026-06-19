@@ -473,6 +473,7 @@ pub(crate) fn rewrite_higher_order_template_expr(
             templates,
             function_table,
             &[],
+            &BTreeMap::new(),
             visible_type_aliases,
             specialized_cache,
             specialized_functions,

@@ -1650,6 +1650,18 @@ fn ast_expr_from_nir(expr: NirExpr) -> super::AstExpr {
             generic_args: Vec::new(),
             args: args.into_iter().map(ast_expr_from_nir).collect(),
         },
+        NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => super::AstExpr::StructLiteral {
+            type_name,
+            type_args: type_args.iter().map(ast_type_from_nir).collect(),
+            fields: fields
+                .into_iter()
+                .map(|(field, value)| (field, ast_expr_from_nir(value)))
+                .collect(),
+        },
         NirExpr::FieldAccess { base, field } => super::AstExpr::FieldAccess {
             base: Box::new(ast_expr_from_nir(*base)),
             field,
