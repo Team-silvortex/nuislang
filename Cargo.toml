@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/nuis-artifact",
     "crates/nuis-runtime",
     "crates/nuis-semantics",
     "crates/strategy-ai",

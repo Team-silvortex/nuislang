@@ -6,15 +6,24 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use nuis_artifact::{
+    decode_nuis_compiled_artifact_binary as shared_decode_nuis_compiled_artifact_binary,
+    decode_nuis_executable_envelope_binary as shared_decode_nuis_executable_envelope_binary,
+    encode_nuis_compiled_artifact_binary as shared_encode_nuis_compiled_artifact_binary,
+    encode_nuis_executable_envelope_binary as shared_encode_nuis_executable_envelope_binary,
+    parse_domain_build_unit_blocks as shared_parse_domain_build_unit_blocks,
+    parse_nuis_compiled_artifact as shared_parse_nuis_compiled_artifact,
+    parse_nuis_executable_envelope as shared_parse_nuis_executable_envelope,
+    parse_nuis_executable_envelope_from_source as shared_parse_nuis_executable_envelope_from_source,
+    render_nuis_executable_envelope as shared_render_nuis_executable_envelope,
+    write_nuis_compiled_artifact as shared_write_nuis_compiled_artifact,
+    write_nuis_executable_envelope as shared_write_nuis_executable_envelope,
+};
 use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef, NirModule};
 use yir_core::YirModule;
 
 use crate::render;
 
-const NUIS_ENVELOPE_BINARY_MAGIC: &[u8; 4] = b"NENV";
-const NUIS_ENVELOPE_BINARY_VERSION: u16 = 1;
-const NUIS_COMPILED_ARTIFACT_MAGIC: &[u8; 4] = b"NART";
-const NUIS_COMPILED_ARTIFACT_VERSION: u16 = 1;
 const NUIS_DOMAIN_PAYLOAD_BLOB_MAGIC: &[u8; 4] = b"NDPB";
 const NUIS_DOMAIN_PAYLOAD_BLOB_VERSION: u16 = 2;
 
@@ -61,71 +70,15 @@ struct BuildManifestExecutionContract {
     execution: crate::registry::NustarExecutionSummary,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NuisExecutableEnvelope {
-    pub schema: String,
-    pub executable_kind: String,
-    pub package_count: usize,
-    pub domain_families: Vec<String>,
-    pub contract_families: Vec<String>,
-    pub function_kind: String,
-    pub graph_kind: String,
-    pub default_time_mode: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NuisLifecycleContract {
-    pub schema: String,
-    pub bootstrap_entry: String,
-    pub tick_policy: String,
-    pub shutdown_policy: String,
-    pub yalivia_rpc: String,
-    pub hook_surface: Vec<String>,
-    pub export_surface: Vec<String>,
-    pub runtime_capability_flags: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NuisCompiledArtifact {
-    pub schema: String,
-    pub packaging_mode: String,
-    pub cpu_target_abi: String,
-    pub cpu_target_machine_arch: String,
-    pub cpu_target_machine_os: String,
-    pub cpu_target_object_format: String,
-    pub cpu_target_calling_abi: String,
-    pub binary_name: String,
-    pub binary_bytes: usize,
-    pub build_manifest_bytes: usize,
-    pub envelope: NuisExecutableEnvelope,
-    pub lifecycle: NuisLifecycleContract,
-    pub build_manifest_source: String,
-    pub binary_blob: Vec<u8>,
-}
+pub use nuis_artifact::{
+    BuildManifestDomainBuildUnit, NuisCompiledArtifact, NuisExecutableEnvelope,
+    NuisLifecycleContract,
+};
 
 pub struct BuildManifestCacheInfo {
     pub status: String,
     pub key: String,
     pub root: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BuildManifestDomainBuildUnit {
-    pub package_id: String,
-    pub domain_family: String,
-    pub abi: Option<String>,
-    pub machine_arch: Option<String>,
-    pub machine_os: Option<String>,
-    pub backend_family: Option<String>,
-    pub selected_lowering_target: Option<String>,
-    pub artifact_stub_path: Option<String>,
-    pub artifact_payload_path: Option<String>,
-    pub artifact_bridge_stub_path: Option<String>,
-    pub artifact_payload_blob_path: Option<String>,
-    pub artifact_payload_blob_bytes: Option<usize>,
-    pub artifact_payload_format: Option<String>,
-    pub contract_family: String,
-    pub packaging_role: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -868,48 +821,13 @@ pub fn write_build_manifest(
 }
 
 pub fn render_nuis_executable_envelope(envelope: &NuisExecutableEnvelope) -> String {
-    let mut out = String::new();
-    out.push_str("envelope_schema = \"nuis-executable-envelope-v1\"\n");
-    out.push_str(&format!(
-        "executable_kind = \"{}\"\n",
-        escape_toml_string(&envelope.executable_kind)
-    ));
-    out.push_str(&format!("package_count = {}\n", envelope.package_count));
-    out.push_str(&format!(
-        "domain_families = {}\n",
-        render_string_array(&envelope.domain_families)
-    ));
-    out.push_str(&format!(
-        "contract_families = {}\n",
-        render_string_array(&envelope.contract_families)
-    ));
-    out.push_str(&format!(
-        "function_kind = \"{}\"\n",
-        escape_toml_string(&envelope.function_kind)
-    ));
-    out.push_str(&format!(
-        "graph_kind = \"{}\"\n",
-        escape_toml_string(&envelope.graph_kind)
-    ));
-    out.push_str(&format!(
-        "default_time_mode = \"{}\"\n",
-        escape_toml_string(&envelope.default_time_mode)
-    ));
-    out
+    shared_render_nuis_executable_envelope(envelope)
 }
 
 pub fn encode_nuis_executable_envelope_binary(
     envelope: &NuisExecutableEnvelope,
 ) -> Result<Vec<u8>, String> {
-    let payload = render_nuis_executable_envelope(envelope).into_bytes();
-    let payload_len = u32::try_from(payload.len())
-        .map_err(|_| "nuis executable envelope payload exceeds 4 GiB".to_owned())?;
-    let mut out = Vec::with_capacity(4 + 2 + 4 + payload.len());
-    out.extend_from_slice(NUIS_ENVELOPE_BINARY_MAGIC);
-    out.extend_from_slice(&NUIS_ENVELOPE_BINARY_VERSION.to_le_bytes());
-    out.extend_from_slice(&payload_len.to_le_bytes());
-    out.extend_from_slice(&payload);
-    Ok(out)
+    shared_encode_nuis_executable_envelope_binary(envelope).map_err(|error| error.to_string())
 }
 
 fn encode_u32_len(len: usize, what: &str) -> Result<[u8; 4], String> {
@@ -921,36 +839,14 @@ fn encode_u32_len(len: usize, what: &str) -> Result<[u8; 4], String> {
 pub fn decode_nuis_executable_envelope_binary(
     bytes: &[u8],
 ) -> Result<NuisExecutableEnvelope, String> {
-    if bytes.len() < 10 {
-        return Err("nuis executable envelope binary is too short".to_owned());
-    }
-    if &bytes[..4] != NUIS_ENVELOPE_BINARY_MAGIC {
-        return Err("nuis executable envelope binary has invalid magic".to_owned());
-    }
-    let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if version != NUIS_ENVELOPE_BINARY_VERSION {
-        return Err(format!(
-            "unsupported nuis executable envelope binary version `{version}`"
-        ));
-    }
-    let payload_len = u32::from_le_bytes([bytes[6], bytes[7], bytes[8], bytes[9]]) as usize;
-    if bytes.len() != 10 + payload_len {
-        return Err(format!(
-            "nuis executable envelope binary length mismatch: header says {payload_len} payload bytes, actual {}",
-            bytes.len().saturating_sub(10)
-        ));
-    }
-    let payload = std::str::from_utf8(&bytes[10..])
-        .map_err(|error| format!("nuis executable envelope payload is not valid UTF-8: {error}"))?;
-    parse_nuis_executable_envelope_from_source(payload, Path::new("<nuis-envelope-binary>"))
+    shared_decode_nuis_executable_envelope_binary(bytes).map_err(|error| error.to_string())
 }
 
 pub fn write_nuis_executable_envelope(
     path: &Path,
     envelope: &NuisExecutableEnvelope,
 ) -> Result<(), String> {
-    let out = render_nuis_executable_envelope(envelope);
-    fs::write(path, out).map_err(|error| format!("failed to write `{}`: {error}", path.display()))
+    shared_write_nuis_executable_envelope(path, envelope).map_err(|error| error.to_string())
 }
 
 fn build_nuis_compiled_artifact(
@@ -992,333 +888,22 @@ fn build_nuis_compiled_artifact(
 pub fn encode_nuis_compiled_artifact_binary(
     artifact: &NuisCompiledArtifact,
 ) -> Result<Vec<u8>, String> {
-    let envelope = encode_nuis_executable_envelope_binary(&artifact.envelope)?;
-    let packaging_mode = artifact.packaging_mode.as_bytes();
-    let cpu_target_abi = artifact.cpu_target_abi.as_bytes();
-    let cpu_target_machine_arch = artifact.cpu_target_machine_arch.as_bytes();
-    let cpu_target_machine_os = artifact.cpu_target_machine_os.as_bytes();
-    let cpu_target_object_format = artifact.cpu_target_object_format.as_bytes();
-    let cpu_target_calling_abi = artifact.cpu_target_calling_abi.as_bytes();
-    let binary_name = artifact.binary_name.as_bytes();
-    let lifecycle_schema = artifact.lifecycle.schema.as_bytes();
-    let lifecycle_bootstrap_entry = artifact.lifecycle.bootstrap_entry.as_bytes();
-    let lifecycle_tick_policy = artifact.lifecycle.tick_policy.as_bytes();
-    let lifecycle_shutdown_policy = artifact.lifecycle.shutdown_policy.as_bytes();
-    let lifecycle_yalivia_rpc = artifact.lifecycle.yalivia_rpc.as_bytes();
-    let lifecycle_hook_surface = render_string_array(&artifact.lifecycle.hook_surface).into_bytes();
-    let lifecycle_export_surface =
-        render_string_array(&artifact.lifecycle.export_surface).into_bytes();
-    let lifecycle_runtime_capability_flags =
-        render_string_array(&artifact.lifecycle.runtime_capability_flags).into_bytes();
-    let build_manifest_source = artifact.build_manifest_source.as_bytes();
-    let binary_blob = &artifact.binary_blob;
-    let mut out = Vec::new();
-    out.extend_from_slice(NUIS_COMPILED_ARTIFACT_MAGIC);
-    out.extend_from_slice(&NUIS_COMPILED_ARTIFACT_VERSION.to_le_bytes());
-    out.extend_from_slice(&encode_u32_len(
-        envelope.len(),
-        "compiled artifact envelope",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        packaging_mode.len(),
-        "compiled artifact packaging_mode",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        cpu_target_abi.len(),
-        "compiled artifact cpu_target_abi",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        cpu_target_machine_arch.len(),
-        "compiled artifact cpu_target_machine_arch",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        cpu_target_machine_os.len(),
-        "compiled artifact cpu_target_machine_os",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        cpu_target_object_format.len(),
-        "compiled artifact cpu_target_object_format",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        cpu_target_calling_abi.len(),
-        "compiled artifact cpu_target_calling_abi",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        binary_name.len(),
-        "compiled artifact binary_name",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        lifecycle_schema.len(),
-        "compiled artifact lifecycle_schema",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        lifecycle_bootstrap_entry.len(),
-        "compiled artifact lifecycle_bootstrap_entry",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        lifecycle_tick_policy.len(),
-        "compiled artifact lifecycle_tick_policy",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        lifecycle_shutdown_policy.len(),
-        "compiled artifact lifecycle_shutdown_policy",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        lifecycle_yalivia_rpc.len(),
-        "compiled artifact lifecycle_yalivia_rpc",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        lifecycle_hook_surface.len(),
-        "compiled artifact lifecycle_hook_surface",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        lifecycle_export_surface.len(),
-        "compiled artifact lifecycle_export_surface",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        lifecycle_runtime_capability_flags.len(),
-        "compiled artifact lifecycle_runtime_capability_flags",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        build_manifest_source.len(),
-        "compiled artifact build_manifest_source",
-    )?);
-    out.extend_from_slice(&encode_u32_len(
-        binary_blob.len(),
-        "compiled artifact binary_blob",
-    )?);
-    out.extend_from_slice(envelope.as_slice());
-    out.extend_from_slice(packaging_mode);
-    out.extend_from_slice(cpu_target_abi);
-    out.extend_from_slice(cpu_target_machine_arch);
-    out.extend_from_slice(cpu_target_machine_os);
-    out.extend_from_slice(cpu_target_object_format);
-    out.extend_from_slice(cpu_target_calling_abi);
-    out.extend_from_slice(binary_name);
-    out.extend_from_slice(lifecycle_schema);
-    out.extend_from_slice(lifecycle_bootstrap_entry);
-    out.extend_from_slice(lifecycle_tick_policy);
-    out.extend_from_slice(lifecycle_shutdown_policy);
-    out.extend_from_slice(lifecycle_yalivia_rpc);
-    out.extend_from_slice(lifecycle_hook_surface.as_slice());
-    out.extend_from_slice(lifecycle_export_surface.as_slice());
-    out.extend_from_slice(lifecycle_runtime_capability_flags.as_slice());
-    out.extend_from_slice(build_manifest_source);
-    out.extend_from_slice(binary_blob);
-    Ok(out)
+    shared_encode_nuis_compiled_artifact_binary(artifact).map_err(|error| error.to_string())
 }
 
 pub fn decode_nuis_compiled_artifact_binary(bytes: &[u8]) -> Result<NuisCompiledArtifact, String> {
-    if bytes.len() < 78 {
-        return Err("nuis compiled artifact binary is too short".to_owned());
-    }
-    if &bytes[..4] != NUIS_COMPILED_ARTIFACT_MAGIC {
-        return Err("nuis compiled artifact binary has invalid magic".to_owned());
-    }
-    let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if version != NUIS_COMPILED_ARTIFACT_VERSION {
-        return Err(format!(
-            "unsupported nuis compiled artifact binary version `{version}`"
-        ));
-    }
-    let mut offset = 6usize;
-    let next_len = |bytes: &[u8], offset: &mut usize| -> Result<usize, String> {
-        if *offset + 4 > bytes.len() {
-            return Err("nuis compiled artifact binary header is truncated".to_owned());
-        }
-        let value = u32::from_le_bytes([
-            bytes[*offset],
-            bytes[*offset + 1],
-            bytes[*offset + 2],
-            bytes[*offset + 3],
-        ]) as usize;
-        *offset += 4;
-        Ok(value)
-    };
-    let envelope_len = next_len(bytes, &mut offset)?;
-    let packaging_mode_len = next_len(bytes, &mut offset)?;
-    let cpu_target_abi_len = next_len(bytes, &mut offset)?;
-    let cpu_target_machine_arch_len = next_len(bytes, &mut offset)?;
-    let cpu_target_machine_os_len = next_len(bytes, &mut offset)?;
-    let cpu_target_object_format_len = next_len(bytes, &mut offset)?;
-    let cpu_target_calling_abi_len = next_len(bytes, &mut offset)?;
-    let binary_name_len = next_len(bytes, &mut offset)?;
-    let lifecycle_schema_len = next_len(bytes, &mut offset)?;
-    let lifecycle_bootstrap_entry_len = next_len(bytes, &mut offset)?;
-    let lifecycle_tick_policy_len = next_len(bytes, &mut offset)?;
-    let lifecycle_shutdown_policy_len = next_len(bytes, &mut offset)?;
-    let lifecycle_yalivia_rpc_len = next_len(bytes, &mut offset)?;
-    let lifecycle_hook_surface_len = next_len(bytes, &mut offset)?;
-    let lifecycle_export_surface_len = next_len(bytes, &mut offset)?;
-    let lifecycle_runtime_capability_flags_len = next_len(bytes, &mut offset)?;
-    let build_manifest_source_len = next_len(bytes, &mut offset)?;
-    let binary_blob_len = next_len(bytes, &mut offset)?;
-    let total_payload_len = envelope_len
-        + packaging_mode_len
-        + cpu_target_abi_len
-        + cpu_target_machine_arch_len
-        + cpu_target_machine_os_len
-        + cpu_target_object_format_len
-        + cpu_target_calling_abi_len
-        + binary_name_len
-        + lifecycle_schema_len
-        + lifecycle_bootstrap_entry_len
-        + lifecycle_tick_policy_len
-        + lifecycle_shutdown_policy_len
-        + lifecycle_yalivia_rpc_len
-        + lifecycle_hook_surface_len
-        + lifecycle_export_surface_len
-        + lifecycle_runtime_capability_flags_len
-        + build_manifest_source_len
-        + binary_blob_len;
-    if bytes.len() != offset + total_payload_len {
-        return Err(format!(
-            "nuis compiled artifact binary length mismatch: header says {total_payload_len} payload bytes, actual {}",
-            bytes.len().saturating_sub(offset)
-        ));
-    }
-    let take_bytes = |bytes: &[u8], offset: &mut usize, len: usize| -> Result<Vec<u8>, String> {
-        if *offset + len > bytes.len() {
-            return Err("nuis compiled artifact binary payload is truncated".to_owned());
-        }
-        let value = bytes[*offset..*offset + len].to_vec();
-        *offset += len;
-        Ok(value)
-    };
-    let envelope =
-        decode_nuis_executable_envelope_binary(&take_bytes(bytes, &mut offset, envelope_len)?)?;
-    let packaging_mode = String::from_utf8(take_bytes(bytes, &mut offset, packaging_mode_len)?)
-        .map_err(|error| format!("compiled artifact packaging_mode is not valid UTF-8: {error}"))?;
-    let cpu_target_abi = String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_abi_len)?)
-        .map_err(|error| format!("compiled artifact cpu_target_abi is not valid UTF-8: {error}"))?;
-    let cpu_target_machine_arch =
-        String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_machine_arch_len)?).map_err(
-            |error| {
-                format!("compiled artifact cpu_target_machine_arch is not valid UTF-8: {error}")
-            },
-        )?;
-    let cpu_target_machine_os =
-        String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_machine_os_len)?).map_err(
-            |error| format!("compiled artifact cpu_target_machine_os is not valid UTF-8: {error}"),
-        )?;
-    let cpu_target_object_format = String::from_utf8(take_bytes(
-        bytes,
-        &mut offset,
-        cpu_target_object_format_len,
-    )?)
-    .map_err(|error| {
-        format!("compiled artifact cpu_target_object_format is not valid UTF-8: {error}")
-    })?;
-    let cpu_target_calling_abi =
-        String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_calling_abi_len)?).map_err(
-            |error| format!("compiled artifact cpu_target_calling_abi is not valid UTF-8: {error}"),
-        )?;
-    let binary_name = String::from_utf8(take_bytes(bytes, &mut offset, binary_name_len)?)
-        .map_err(|error| format!("compiled artifact binary_name is not valid UTF-8: {error}"))?;
-    let lifecycle_schema = String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_schema_len)?)
-        .map_err(|error| {
-            format!("compiled artifact lifecycle_schema is not valid UTF-8: {error}")
-        })?;
-    let lifecycle_bootstrap_entry = String::from_utf8(take_bytes(
-        bytes,
-        &mut offset,
-        lifecycle_bootstrap_entry_len,
-    )?)
-    .map_err(|error| {
-        format!("compiled artifact lifecycle_bootstrap_entry is not valid UTF-8: {error}")
-    })?;
-    let lifecycle_tick_policy =
-        String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_tick_policy_len)?).map_err(
-            |error| format!("compiled artifact lifecycle_tick_policy is not valid UTF-8: {error}"),
-        )?;
-    let lifecycle_shutdown_policy = String::from_utf8(take_bytes(
-        bytes,
-        &mut offset,
-        lifecycle_shutdown_policy_len,
-    )?)
-    .map_err(|error| {
-        format!("compiled artifact lifecycle_shutdown_policy is not valid UTF-8: {error}")
-    })?;
-    let lifecycle_yalivia_rpc =
-        String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_yalivia_rpc_len)?).map_err(
-            |error| format!("compiled artifact lifecycle_yalivia_rpc is not valid UTF-8: {error}"),
-        )?;
-    let lifecycle_hook_surface_source =
-        String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_hook_surface_len)?).map_err(
-            |error| format!("compiled artifact lifecycle_hook_surface is not valid UTF-8: {error}"),
-        )?;
-    let lifecycle_export_surface_source = String::from_utf8(take_bytes(
-        bytes,
-        &mut offset,
-        lifecycle_export_surface_len,
-    )?)
-    .map_err(|error| {
-        format!("compiled artifact lifecycle_export_surface is not valid UTF-8: {error}")
-    })?;
-    let lifecycle_runtime_capability_flags_source = String::from_utf8(take_bytes(
-        bytes,
-        &mut offset,
-        lifecycle_runtime_capability_flags_len,
-    )?)
-    .map_err(|error| {
-        format!("compiled artifact lifecycle_runtime_capability_flags is not valid UTF-8: {error}")
-    })?;
-    let build_manifest_source =
-        String::from_utf8(take_bytes(bytes, &mut offset, build_manifest_source_len)?).map_err(
-            |error| format!("compiled artifact build_manifest_source is not valid UTF-8: {error}"),
-        )?;
-    let binary_blob = take_bytes(bytes, &mut offset, binary_blob_len)?;
-    Ok(NuisCompiledArtifact {
-        schema: "nuis-compiled-artifact-v1".to_owned(),
-        packaging_mode,
-        cpu_target_abi,
-        cpu_target_machine_arch,
-        cpu_target_machine_os,
-        cpu_target_object_format,
-        cpu_target_calling_abi,
-        binary_name,
-        binary_bytes: binary_blob.len(),
-        build_manifest_bytes: build_manifest_source.len(),
-        envelope,
-        lifecycle: NuisLifecycleContract {
-            schema: lifecycle_schema,
-            bootstrap_entry: lifecycle_bootstrap_entry,
-            tick_policy: lifecycle_tick_policy,
-            shutdown_policy: lifecycle_shutdown_policy,
-            yalivia_rpc: lifecycle_yalivia_rpc,
-            hook_surface: parse_optional_toml_string_array(
-                &format!("hook_surface = {lifecycle_hook_surface_source}"),
-                "hook_surface",
-            )
-            .unwrap_or_default(),
-            export_surface: parse_optional_toml_string_array(
-                &format!("export_surface = {lifecycle_export_surface_source}"),
-                "export_surface",
-            )
-            .unwrap_or_default(),
-            runtime_capability_flags: parse_optional_toml_string_array(
-                &format!("runtime_capability_flags = {lifecycle_runtime_capability_flags_source}"),
-                "runtime_capability_flags",
-            )
-            .unwrap_or_default(),
-        },
-        build_manifest_source,
-        binary_blob,
-    })
+    shared_decode_nuis_compiled_artifact_binary(bytes).map_err(|error| error.to_string())
 }
 
 pub fn write_nuis_compiled_artifact(
     path: &Path,
     artifact: &NuisCompiledArtifact,
 ) -> Result<(), String> {
-    let out = encode_nuis_compiled_artifact_binary(artifact)?;
-    fs::write(path, out).map_err(|error| format!("failed to write `{}`: {error}", path.display()))
+    shared_write_nuis_compiled_artifact(path, artifact).map_err(|error| error.to_string())
 }
 
 pub fn parse_nuis_compiled_artifact(path: &Path) -> Result<NuisCompiledArtifact, String> {
-    let bytes =
-        fs::read(path).map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
-    decode_nuis_compiled_artifact_binary(&bytes)
+    shared_parse_nuis_compiled_artifact(path).map_err(|error| error.to_string())
 }
 
 pub fn render_relocated_unpacked_build_manifest(
@@ -3742,46 +3327,15 @@ pub fn verify_nuis_compiled_artifact(
 }
 
 pub fn parse_nuis_executable_envelope(path: &Path) -> Result<NuisExecutableEnvelope, String> {
-    let source = fs::read_to_string(path)
-        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
-    parse_nuis_executable_envelope_from_source(&source, path)
+    shared_parse_nuis_executable_envelope(path).map_err(|error| error.to_string())
 }
 
 pub fn parse_nuis_executable_envelope_from_source(
     source: &str,
     path: &Path,
 ) -> Result<NuisExecutableEnvelope, String> {
-    let schema = parse_optional_toml_string(source, "envelope_schema")
-        .or_else(|| parse_optional_toml_string(source, "schema"))
-        .ok_or_else(|| format!("`{}` is missing required key `schema`", path.display()))?;
-    let executable_kind = parse_required_toml_string(source, "executable_kind", path)?;
-    let package_count = parse_required_toml_usize(source, "package_count", path)?;
-    let domain_families = parse_required_toml_string_array(source, "domain_families", path)?;
-    let contract_families = parse_required_toml_string_array(source, "contract_families", path)?;
-    let function_kind = parse_required_toml_string(source, "function_kind", path)?;
-    let graph_kind = parse_required_toml_string(source, "graph_kind", path)?;
-    let default_time_mode = parse_required_toml_string(source, "default_time_mode", path)?;
-
-    if package_count != domain_families.len() || package_count != contract_families.len() {
-        return Err(format!(
-            "`{}` nuis envelope package_count mismatch: package_count={}, domains={}, contract_families={}",
-            path.display(),
-            package_count,
-            domain_families.len(),
-            contract_families.len()
-        ));
-    }
-
-    Ok(NuisExecutableEnvelope {
-        schema,
-        executable_kind,
-        package_count,
-        domain_families,
-        contract_families,
-        function_kind,
-        graph_kind,
-        default_time_mode,
-    })
+    shared_parse_nuis_executable_envelope_from_source(source, path)
+        .map_err(|error| error.to_string())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -3796,63 +3350,7 @@ fn parse_domain_build_unit_blocks(
     source: &str,
     path: &Path,
 ) -> Result<Vec<BuildManifestDomainBuildUnit>, String> {
-    let mut rows = Vec::new();
-    let mut current = BTreeMap::<String, String>::new();
-    let mut in_block = false;
-    for raw in source.lines() {
-        let line = raw.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        if line == "[[domain_build_unit]]" {
-            if in_block {
-                rows.push(parse_domain_build_unit_row(&current, path)?);
-                current.clear();
-            }
-            in_block = true;
-            continue;
-        }
-        if line.starts_with('[') {
-            if in_block {
-                rows.push(parse_domain_build_unit_row(&current, path)?);
-                current.clear();
-                in_block = false;
-            }
-            continue;
-        }
-        if in_block {
-            if let Some((key, value)) = line.split_once('=') {
-                current.insert(key.trim().to_owned(), value.trim().to_owned());
-            }
-        }
-    }
-    if in_block {
-        rows.push(parse_domain_build_unit_row(&current, path)?);
-    }
-    Ok(rows)
-}
-
-fn parse_domain_build_unit_row(
-    values: &BTreeMap<String, String>,
-    path: &Path,
-) -> Result<BuildManifestDomainBuildUnit, String> {
-    Ok(BuildManifestDomainBuildUnit {
-        package_id: parse_required_map_string_in_block(values, "package_id", path, "domain_build_unit")?,
-        domain_family: parse_required_map_string_in_block(values, "domain_family", path, "domain_build_unit")?,
-        abi: parse_optional_map_string(values, "abi"),
-        machine_arch: parse_optional_map_string(values, "machine_arch"),
-        machine_os: parse_optional_map_string(values, "machine_os"),
-        backend_family: parse_optional_map_string(values, "backend_family"),
-        selected_lowering_target: parse_optional_map_string(values, "selected_lowering_target"),
-        artifact_stub_path: parse_optional_map_string(values, "artifact_stub_path"),
-        artifact_payload_path: parse_optional_map_string(values, "artifact_payload_path"),
-        artifact_bridge_stub_path: parse_optional_map_string(values, "artifact_bridge_stub_path"),
-        artifact_payload_blob_path: parse_optional_map_string(values, "artifact_payload_blob_path"),
-        artifact_payload_blob_bytes: parse_optional_map_usize(values, "artifact_payload_blob_bytes", path, "domain_build_unit")?,
-        artifact_payload_format: parse_optional_map_string(values, "artifact_payload_format"),
-        contract_family: parse_required_map_string_in_block(values, "contract_family", path, "domain_build_unit")?,
-        packaging_role: parse_required_map_string_in_block(values, "packaging_role", path, "domain_build_unit")?,
-    })
+    shared_parse_domain_build_unit_blocks(source, path).map_err(|error| error.to_string())
 }
 
 fn parse_artifact_hash_blocks(source: &str, path: &Path) -> Result<Vec<ArtifactHashRow>, String> {
@@ -4022,32 +3520,6 @@ fn parse_required_map_usize(
     value.parse::<usize>().map_err(|_| {
         format!(
             "`{}` artifact_hash key `{key}` must be an unsigned integer",
-            manifest_path.display()
-        )
-    })
-}
-
-fn parse_optional_map_string(values: &BTreeMap<String, String>, key: &str) -> Option<String> {
-    let value = values.get(key)?;
-    if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
-        Some(value[1..value.len() - 1].to_owned())
-    } else {
-        None
-    }
-}
-
-fn parse_optional_map_usize(
-    values: &BTreeMap<String, String>,
-    key: &str,
-    manifest_path: &Path,
-    block_name: &str,
-) -> Result<Option<usize>, String> {
-    let Some(value) = values.get(key) else {
-        return Ok(None);
-    };
-    value.parse::<usize>().map(Some).map_err(|_| {
-        format!(
-            "`{}` {block_name} key `{key}` must be an unsigned integer",
             manifest_path.display()
         )
     })

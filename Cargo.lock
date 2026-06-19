@@ -11,6 +11,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "nuis-artifact"
+version = "0.1.0"
+
+[[package]]
 name = "nuis-rc"
 version = "0.1.0"
 
@@ -26,6 +30,7 @@ version = "0.1.0"
 name = "nuisc"
 version = "0.1.0"
 dependencies = [
+ "nuis-artifact",
  "nuis-semantics",
  "yir-core",
  "yir-lower-llvm",
