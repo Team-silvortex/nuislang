@@ -1,0 +1,579 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_line_read(prompt_handle: i64) -> i64;
+  extern "c" fn host_line_len(line_handle: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stderr_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_stderr_flush() -> i64;
+  extern "c" fn host_diag_label(message_handle: i64) -> i64;
+  extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
+  extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+  extern "c" fn host_command_spawn_in(
+    program_handle: i64,
+    argv_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct PipelineCliSeed {
+    prompt_handle: i64,
+    ready_text_handle: i64,
+    failed_text_handle: i64,
+    timeout_limit: i64,
+    ready_severity: i64,
+    failed_severity: i64
+  }
+
+  struct PipelineAutomationSeed {
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  }
+
+  struct BuildPipelineSeed {
+    cli: PipelineCliSeed,
+    automation: PipelineAutomationSeed
+  }
+
+  struct PipelineCliSummary {
+    argv_count: i64,
+    line_handle: i64,
+    line_len: i64,
+    completed: bool,
+    timed_out: bool,
+    selected_target_handle: i64,
+    tick_ns: i64
+  }
+
+  struct PipelineAutomationSummary {
+    workspace_handle: i64,
+    artifact_dir_handle: i64,
+    artifact_file_handle: i64,
+    cache_hit_handle: i64,
+    cache_store_code: i64
+  }
+
+  struct BuildPlan {
+    workspace_handle: i64,
+    artifact_dir_handle: i64,
+    artifact_file_handle: i64,
+    selected_target_handle: i64,
+    cache_value_handle: i64,
+    timeout_budget: i64
+  }
+
+  struct CommandContext {
+    cwd_handle: i64,
+    timeout_ms: i64
+  }
+
+  struct CommandRequest {
+    program_handle: i64,
+    argv_handle: i64,
+    context: CommandContext
+  }
+
+  struct CommandResult {
+    handle: i64,
+    status: i64,
+    wait_code: i64,
+    wait_exit: i64,
+    launched: bool,
+    cwd_handle: i64,
+    timeout_ms: i64
+  }
+
+  struct WorkflowStep {
+    name_handle: i64,
+    request: CommandRequest,
+    fail_fast: bool
+  }
+
+  struct BuildPipelineSteps {
+    prepare: WorkflowStep,
+    check: WorkflowStep,
+    compile: WorkflowStep,
+    package: WorkflowStep
+  }
+
+  struct WorkflowStepReport {
+    name_handle: i64,
+    result: CommandResult,
+    executed: bool,
+    blocked_by_failure: bool
+  }
+
+  struct BuildPipelineReport {
+    prepare: WorkflowStepReport,
+    check: WorkflowStepReport,
+    compile: WorkflowStepReport,
+    package: WorkflowStepReport,
+    first_failure_handle: i64,
+    overall_success: bool,
+    executed_steps: i64
+  }
+
+  struct BuildPipelineSummary {
+    cli: PipelineCliSummary,
+    automation: PipelineAutomationSummary,
+    plan: BuildPlan,
+    pipeline: BuildPipelineReport,
+    diag_code: i64,
+    stdout_code: i64,
+    stderr_code: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 17;
+  }
+
+  fn build_seed() -> BuildPipelineSeed {
+    return BuildPipelineSeed {
+      cli: PipelineCliSeed {
+        prompt_handle: 9011,
+        ready_text_handle: 29011,
+        failed_text_handle: 29013,
+        timeout_limit: 0,
+        ready_severity: 1,
+        failed_severity: 2
+      },
+      automation: PipelineAutomationSeed {
+        prefix_handle: 25011,
+        cache_name_handle: 1609,
+        cache_key_handle: 43
+      }
+    };
+  }
+
+  fn capture_pipeline_cli(seed: PipelineCliSeed) -> PipelineCliSummary {
+    let argv_count: i64 = host_argv_count();
+    let line_handle: i64 = host_line_read(seed.prompt_handle);
+    let line_len: i64 = host_line_len(line_handle);
+    let result: TaskResult<i64> =
+      join_result(timeout(spawn(ping(argv_count + line_len)), seed.timeout_limit));
+
+    if task_completed(result) {
+      return PipelineCliSummary {
+        argv_count: argv_count,
+        line_handle: line_handle,
+        line_len: line_len,
+        completed: true,
+        timed_out: false,
+        selected_target_handle: task_value(result),
+        tick_ns: host_monotonic_time_ns()
+      };
+    }
+
+    return PipelineCliSummary {
+      argv_count: argv_count,
+      line_handle: line_handle,
+      line_len: line_len,
+      completed: false,
+      timed_out: true,
+      selected_target_handle: 0,
+      tick_ns: host_monotonic_time_ns()
+    };
+  }
+
+  fn capture_pipeline_automation(
+    seed: PipelineAutomationSeed,
+    cache_value_handle: i64
+  ) -> PipelineAutomationSummary {
+    let cache_handle: i64 = host_cache_open(seed.cache_name_handle);
+    let cache_hit_handle: i64 = host_cache_lookup(cache_handle, seed.cache_key_handle);
+    let artifact_file_handle: i64 = host_temp_file_handle(seed.prefix_handle);
+    let cache_store_code: i64 = host_cache_store(
+      cache_handle,
+      seed.cache_key_handle,
+      cache_value_handle + artifact_file_handle
+    );
+    let cache_close_code: i64 = host_cache_close(cache_handle);
+
+    return PipelineAutomationSummary {
+      workspace_handle: host_cwd_handle(),
+      artifact_dir_handle: host_temp_dir_handle(),
+      artifact_file_handle: artifact_file_handle,
+      cache_hit_handle: cache_hit_handle + cache_close_code,
+      cache_store_code: cache_store_code
+    };
+  }
+
+  fn build_plan(
+    cli: PipelineCliSummary,
+    automation: PipelineAutomationSummary
+  ) -> BuildPlan {
+    return BuildPlan {
+      workspace_handle: automation.workspace_handle,
+      artifact_dir_handle: automation.artifact_dir_handle,
+      artifact_file_handle: automation.artifact_file_handle,
+      selected_target_handle: cli.selected_target_handle,
+      cache_value_handle: automation.cache_hit_handle + automation.cache_store_code,
+      timeout_budget: 1500 + cli.line_len + cli.argv_count
+    };
+  }
+
+  fn build_command_request(
+    program_handle: i64,
+    argv_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> CommandRequest {
+    return CommandRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      context: CommandContext {
+        cwd_handle: cwd_handle,
+        timeout_ms: timeout_ms
+      }
+    };
+  }
+
+  fn build_step(
+    name_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    fail_fast: bool
+  ) -> WorkflowStep {
+    return WorkflowStep {
+      name_handle: name_handle,
+      request: build_command_request(program_handle, argv_handle, cwd_handle, timeout_ms),
+      fail_fast: fail_fast
+    };
+  }
+
+  fn build_pipeline_steps(plan: BuildPlan) -> BuildPipelineSteps {
+    return BuildPipelineSteps {
+      prepare: build_step(5101, 901, 31, plan.workspace_handle, 250, true),
+      check: build_step(5102, 903, 37, plan.workspace_handle, 500, true),
+      compile: build_step(5103, 905, 41, plan.workspace_handle, plan.timeout_budget, true),
+      package: build_step(5104, 907, 43, plan.artifact_dir_handle, 750, true)
+    };
+  }
+
+  fn run_command(request: CommandRequest) -> CommandResult {
+    let handle: i64 = host_command_spawn_in(
+      request.program_handle,
+      request.argv_handle,
+      request.context.cwd_handle,
+      request.context.timeout_ms
+    );
+    return CommandResult {
+      handle: handle,
+      status: host_command_status(handle),
+      wait_code: host_command_wait(handle),
+      wait_exit: host_command_wait_exit(handle),
+      launched: handle != 0,
+      cwd_handle: request.context.cwd_handle,
+      timeout_ms: request.context.timeout_ms
+    };
+  }
+
+  fn build_step_report(
+    name_handle: i64,
+    result: CommandResult,
+    executed: bool,
+    blocked_by_failure: bool
+  ) -> WorkflowStepReport {
+    return WorkflowStepReport {
+      name_handle: name_handle,
+      result: result,
+      executed: executed,
+      blocked_by_failure: blocked_by_failure
+    };
+  }
+
+  fn build_skipped_result(step: WorkflowStep) -> CommandResult {
+    return CommandResult {
+      handle: 0,
+      status: 0,
+      wait_code: 0,
+      wait_exit: 1,
+      launched: false,
+      cwd_handle: step.request.context.cwd_handle,
+      timeout_ms: step.request.context.timeout_ms
+    };
+  }
+
+  fn run_step(step: WorkflowStep) -> WorkflowStepReport {
+    return build_step_report(
+      step.name_handle,
+      run_command(step.request),
+      true,
+      false
+    );
+  }
+
+  fn skipped_step(step: WorkflowStep) -> WorkflowStepReport {
+    return build_step_report(
+      step.name_handle,
+      build_skipped_result(step),
+      false,
+      true
+    );
+  }
+
+  fn step_count_after_first(
+    second: WorkflowStepReport,
+    third: WorkflowStepReport,
+    fourth: WorkflowStepReport
+  ) -> i64 {
+    if second.executed == false {
+      return 1;
+    }
+    if third.executed == false {
+      return 2;
+    }
+    if fourth.executed {
+      return 4;
+    }
+    return 3;
+  }
+
+  fn build_failed_report(
+    prepare: WorkflowStepReport,
+    check: WorkflowStepReport,
+    compile: WorkflowStepReport,
+    package: WorkflowStepReport,
+    first_failure_handle: i64
+  ) -> BuildPipelineReport {
+    return BuildPipelineReport {
+      prepare: prepare,
+      check: check,
+      compile: compile,
+      package: package,
+      first_failure_handle: first_failure_handle,
+      overall_success: false,
+      executed_steps: step_count_after_first(check, compile, package)
+    };
+  }
+
+  fn build_success_report(
+    prepare: WorkflowStepReport,
+    check: WorkflowStepReport,
+    compile: WorkflowStepReport,
+    package: WorkflowStepReport
+  ) -> BuildPipelineReport {
+    return BuildPipelineReport {
+      prepare: prepare,
+      check: check,
+      compile: compile,
+      package: package,
+      first_failure_handle: 0,
+      overall_success: true,
+      executed_steps: 4
+    };
+  }
+
+  fn step_failed(report: WorkflowStepReport) -> bool {
+    if report.executed == false {
+      return false;
+    }
+    return report.result.launched == false;
+  }
+
+  fn should_stop(step: WorkflowStep, report: WorkflowStepReport) -> bool {
+    return step.fail_fast && step_failed(report);
+  }
+
+  fn count_executed_steps(
+    check: WorkflowStepReport,
+    compile: WorkflowStepReport,
+    package: WorkflowStepReport
+  ) -> i64 {
+    return step_count_after_first(check, compile, package);
+  }
+
+  fn build_pipeline_report(
+    prepare: WorkflowStepReport,
+    check: WorkflowStepReport,
+    compile: WorkflowStepReport,
+    package: WorkflowStepReport
+  ) -> BuildPipelineReport {
+    if step_failed(prepare) {
+      return build_failed_report(
+        prepare,
+        check,
+        compile,
+        package,
+        prepare.name_handle
+      );
+    }
+    if step_failed(check) {
+      return build_failed_report(
+        prepare,
+        check,
+        compile,
+        package,
+        check.name_handle
+      );
+    }
+    if step_failed(compile) {
+      return build_failed_report(
+        prepare,
+        check,
+        compile,
+        package,
+        compile.name_handle
+      );
+    }
+    if step_failed(package) {
+      return build_failed_report(
+        prepare,
+        check,
+        compile,
+        package,
+        package.name_handle
+      );
+    }
+    return build_success_report(prepare, check, compile, package);
+  }
+
+  fn capture_pipeline(plan: BuildPlan, cli: PipelineCliSummary) -> BuildPipelineReport {
+    let steps: BuildPipelineSteps = build_pipeline_steps(plan);
+
+    if cli.completed == false {
+      return build_pipeline_report(
+        skipped_step(steps.prepare),
+        skipped_step(steps.check),
+        skipped_step(steps.compile),
+        skipped_step(steps.package)
+      );
+    }
+
+    let prepare_report: WorkflowStepReport = run_step(steps.prepare);
+    if should_stop(steps.prepare, prepare_report) {
+      return build_pipeline_report(
+        prepare_report,
+        skipped_step(steps.check),
+        skipped_step(steps.compile),
+        skipped_step(steps.package)
+      );
+    }
+
+    let check_report: WorkflowStepReport = run_step(steps.check);
+    if should_stop(steps.check, check_report) {
+      return build_pipeline_report(
+        prepare_report,
+        check_report,
+        skipped_step(steps.compile),
+        skipped_step(steps.package)
+      );
+    }
+
+    let compile_report: WorkflowStepReport = run_step(steps.compile);
+    if should_stop(steps.compile, compile_report) {
+      return build_pipeline_report(
+        prepare_report,
+        check_report,
+        compile_report,
+        skipped_step(steps.package)
+      );
+    }
+
+    return build_pipeline_report(
+      prepare_report,
+      check_report,
+      compile_report,
+      run_step(steps.package)
+    );
+  }
+
+  fn emit_diag(
+    cli: PipelineCliSummary,
+    pipeline: BuildPipelineReport,
+    text_handle: i64,
+    severity: i64
+  ) -> i64 {
+    let label_handle: i64 = host_diag_label(text_handle);
+    let span_handle: i64 = host_diag_span(0, cli.line_len + pipeline.executed_steps);
+    return host_diag_emit(label_handle, span_handle, severity);
+  }
+
+  fn build_success_summary(
+    seed: BuildPipelineSeed,
+    cli: PipelineCliSummary,
+    automation: PipelineAutomationSummary,
+    plan: BuildPlan,
+    pipeline: BuildPipelineReport
+  ) -> BuildPipelineSummary {
+    return BuildPipelineSummary {
+      cli: cli,
+      automation: automation,
+      plan: plan,
+      pipeline: pipeline,
+      diag_code: emit_diag(cli, pipeline, seed.cli.ready_text_handle, seed.cli.ready_severity),
+      stdout_code: host_stdout_write(seed.cli.ready_text_handle),
+      stderr_code: 0,
+      stdout_flushed: host_stdout_flush(),
+      stderr_flushed: 0
+    };
+  }
+
+  fn build_failure_summary(
+    seed: BuildPipelineSeed,
+    cli: PipelineCliSummary,
+    automation: PipelineAutomationSummary,
+    plan: BuildPlan,
+    pipeline: BuildPipelineReport
+  ) -> BuildPipelineSummary {
+    return BuildPipelineSummary {
+      cli: cli,
+      automation: automation,
+      plan: plan,
+      pipeline: pipeline,
+      diag_code: emit_diag(cli, pipeline, seed.cli.failed_text_handle, seed.cli.failed_severity),
+      stdout_code: 0,
+      stderr_code: host_stderr_write(seed.cli.failed_text_handle),
+      stdout_flushed: 0,
+      stderr_flushed: host_stderr_flush()
+    };
+  }
+
+  fn summary_exit_code(summary: BuildPipelineSummary) -> i64 {
+    if summary.diag_code > 0 {
+      return 0;
+    }
+    if summary.stdout_code > 0 {
+      return 0;
+    }
+    if summary.stderr_code > 0 {
+      return 0;
+    }
+    return 1;
+  }
+
+  fn capture_summary(seed: BuildPipelineSeed) -> BuildPipelineSummary {
+    let cli: PipelineCliSummary = capture_pipeline_cli(seed.cli);
+    let automation: PipelineAutomationSummary =
+      capture_pipeline_automation(seed.automation, cli.selected_target_handle);
+    let plan: BuildPlan = build_plan(cli, automation);
+    let pipeline: BuildPipelineReport = capture_pipeline(plan, cli);
+
+    if pipeline.overall_success {
+      return build_success_summary(seed, cli, automation, plan, pipeline);
+    }
+
+    return build_failure_summary(seed, cli, automation, plan, pipeline);
+  }
+
+  fn main() -> i64 {
+    let summary: BuildPipelineSummary = capture_summary(build_seed());
+    return summary_exit_code(summary);
+  }
+}

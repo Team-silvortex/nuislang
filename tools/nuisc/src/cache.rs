@@ -6,6 +6,8 @@ use std::{
 
 use crate::project::{LoadedProject, ProjectCompilationPlan};
 
+const COMPILE_CACHE_EPOCH: &str = "2026-06-20-aot-file-read-buffer-v1";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompileCacheKey {
     pub root: PathBuf,
@@ -107,6 +109,10 @@ pub fn compute_compile_cache_key_with_plan(
     records.push((
         "toolchain.nuisc.version".to_owned(),
         env!("CARGO_PKG_VERSION").as_bytes().to_vec(),
+    ));
+    records.push((
+        "toolchain.nuisc.cache_epoch".to_owned(),
+        COMPILE_CACHE_EPOCH.as_bytes().to_vec(),
     ));
     records.push((
         "toolchain.engine.version".to_owned(),

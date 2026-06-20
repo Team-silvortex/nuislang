@@ -25,6 +25,7 @@ Current source anchor:
 
 * [theme_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/theme_surface.ns)
 * [frame_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/frame_runtime.ns)
+* [texture_resource_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/texture_resource_recipe.ns)
 * [window_controls_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/window_controls_runtime_recipe.ns)
 
 This file is intentionally small and compileable on its own. It is the first step toward
@@ -35,6 +36,12 @@ turning `ns-nova-core` from pure framework contract text into real `ns` source a
 * pass / frame / target / frame-graph orchestration
 * queue / semaphore / timeline / fence signaling
 * dispatch / feedback / intent / reaction / commit / snapshot style runtime contracts
+
+`texture_resource_recipe.ns` adds the first texture-resource handoff recipe for `ns-nova-core`:
+
+* a narrow `NovaTextureResource` host-side description
+* lowering into `NovaResourceSetPacket` / `NovaResourceSetState`
+* stable seed derivation for future GUI/render shader-facing texture consumption
 
 `window_controls_runtime_recipe.ns` is the first project-shaped extraction from the
 runtime half of `window_controls_demo`:

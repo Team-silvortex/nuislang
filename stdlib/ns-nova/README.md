@@ -51,7 +51,7 @@ Current source-asset status:
 * this is currently the only `stdlib` layer that already declares a canonical
   checked-in source set through
   [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/module.toml)
-* that manifest currently lists `10` source modules
+* that manifest currently lists `11` source modules
 * `nuis` smoke tests and `project-doctor` now both inspect that asset set
 
 See metadata:
@@ -65,6 +65,7 @@ First source modules:
 
 * [core/theme_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/theme_surface.ns)
 * [core/frame_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/frame_runtime.ns)
+* [core/texture_resource_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/texture_resource_recipe.ns)
 * [core/window_controls_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/window_controls_runtime_recipe.ns)
 * [ui/panel_selection.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/panel_selection.ns)
 * [ui/panel_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/panel_blueprint.ns)
@@ -93,6 +94,7 @@ The current migration split is:
 
 * already extracted into stdlib recipes
   - render/runtime orchestration patterns:
+    [core/texture_resource_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/texture_resource_recipe.ns),
     [core/window_controls_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/window_controls_runtime_recipe.ns)
   - UI/selection/control packing patterns:
     [ui/window_controls_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/window_controls_recipe.ns)

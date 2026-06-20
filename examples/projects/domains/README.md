@@ -40,7 +40,9 @@ If you only want the current front-door examples, start with:
 * shader branch reading order:
   `profile -> surface branch -> packet branch -> bridge branch`
   current narrow branch anchors:
-  [galaxy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/galaxy_profile_demo),
+  [pixelmagic_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_profile_demo),
+  [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo),
+  [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo),
   [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo),
   [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo),
   [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
@@ -89,13 +91,21 @@ Practical shader rule:
   `surface branch` or `packet branch` or `bridge branch`
 * treat the async branch as bridge-branch continuation, not as an independent
   first-stop ladder
-* for future `galaxy`-style image processing work, treat the current host-side
+* for future `PixelMagic` image-processing work, treat the current host-side
   closure as a prep path:
   `filesystem_io_report -> shader profile/render lanes`
-* the first checked-in `galaxy` seed is:
-  [galaxy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/galaxy_profile_demo)
+* the first checked-in `PixelMagic` seed scaffold is:
+  [pixelmagic_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_profile_demo)
+* the first checked-in `PixelMagic` packet consumer scaffold is:
+  [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
+* the first checked-in `PixelMagic` texture-resource handoff scaffold is:
+  [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
+* the first checked-in `PixelMagic` single-binary render scaffold is:
+  [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
 * the current prep sketch for that future lane is:
   [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
+* the current next-step texture handoff note is:
+  [galaxy-texture-handoff-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-texture-handoff-contract.md)
 
 ## Retired In Current Cleanup
 

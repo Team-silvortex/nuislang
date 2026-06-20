@@ -1,0 +1,89 @@
+mod cpu Main {
+  struct NovaTextureResource {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    sampler_filter: i64,
+    address_mode: i64
+  }
+
+  struct NovaTextureShaderSeeds {
+    color_seed: i64,
+    speed_seed: i64,
+    radius_seed: i64
+  }
+
+  fn build_nova_texture_resource(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    sampler_filter: i64,
+    address_mode: i64
+  ) -> NovaTextureResource {
+    return NovaTextureResource {
+      source_handle: source_handle,
+      width: width,
+      height: height,
+      format_kind: format_kind,
+      texel_layout: texel_layout,
+      sampler_filter: sampler_filter,
+      address_mode: address_mode
+    };
+  }
+
+  fn nova_texture_resource_residency(resource: NovaTextureResource) -> i64 {
+    return resource.source_handle +
+      resource.format_kind +
+      resource.texel_layout +
+      resource.sampler_filter +
+      resource.address_mode;
+  }
+
+  fn nova_texture_resource_set(resource: NovaTextureResource) -> NovaResourceSetPacket {
+    return nova_resource_set_packet(
+      resource.texel_layout,
+      1,
+      1,
+      nova_texture_resource_residency(resource)
+    );
+  }
+
+  fn nova_texture_resource_state(resource: NovaTextureResource) -> NovaResourceSetState {
+    return nova_resource_set_state(nova_texture_resource_set(resource));
+  }
+
+  fn nova_texture_shader_seeds(
+    resource: NovaTextureResource,
+    state: NovaResourceSetState
+  ) -> NovaTextureShaderSeeds {
+    return NovaTextureShaderSeeds {
+      color_seed: resource.source_handle + nova_resource_set_state_residency(state),
+      speed_seed: resource.width + nova_resource_set_state_textures(state) + resource.sampler_filter,
+      radius_seed: resource.height + nova_resource_set_state_samplers(state) + resource.address_mode
+    };
+  }
+
+  fn summarize_nova_texture_resource(resource: NovaTextureResource) -> i64 {
+    let state: NovaResourceSetState = nova_texture_resource_state(resource);
+    let seeds: NovaTextureShaderSeeds = nova_texture_shader_seeds(resource, state);
+    return resource.width +
+      resource.height +
+      nova_resource_set_state_buffers(state) +
+      nova_resource_set_state_textures(state) +
+      nova_resource_set_state_samplers(state) +
+      nova_resource_set_state_residency(state) +
+      seeds.color_seed +
+      seeds.speed_seed +
+      seeds.radius_seed;
+  }
+
+  fn main() {
+    let resource: NovaTextureResource =
+      build_nova_texture_resource(4101, 160, 120, 1, 1, 1, 0);
+    print(summarize_nova_texture_resource(resource));
+  }
+}

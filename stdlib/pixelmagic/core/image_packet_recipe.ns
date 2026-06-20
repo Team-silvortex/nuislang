@@ -1,0 +1,73 @@
+mod cpu Main {
+  struct PixelMagicImagePacket {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    amount: i64,
+    flags: i64
+  }
+
+  struct PixelMagicPacketSeeds {
+    color_seed: i64,
+    speed_seed: i64,
+    radius_seed: i64
+  }
+
+  fn build_pixelmagic_image_packet(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    amount: i64,
+    flags: i64
+  ) -> PixelMagicImagePacket {
+    return PixelMagicImagePacket {
+      source_handle: source_handle,
+      width: width,
+      height: height,
+      op_kind: op_kind,
+      amount: amount,
+      flags: flags
+    };
+  }
+
+  fn pixelmagic_packet_color_base(packet: PixelMagicImagePacket) -> i64 {
+    return packet.source_handle + packet.op_kind + packet.flags;
+  }
+
+  fn pixelmagic_packet_speed_base(packet: PixelMagicImagePacket) -> i64 {
+    return packet.width + packet.amount;
+  }
+
+  fn pixelmagic_packet_radius_base(packet: PixelMagicImagePacket) -> i64 {
+    return packet.height + packet.flags + packet.op_kind;
+  }
+
+  fn pixelmagic_packet_seeds(packet: PixelMagicImagePacket) -> PixelMagicPacketSeeds {
+    return PixelMagicPacketSeeds {
+      color_seed: pixelmagic_packet_color_base(packet),
+      speed_seed: pixelmagic_packet_speed_base(packet),
+      radius_seed: pixelmagic_packet_radius_base(packet)
+    };
+  }
+
+  fn summarize_pixelmagic_image_packet(packet: PixelMagicImagePacket) -> i64 {
+    let seeds: PixelMagicPacketSeeds = pixelmagic_packet_seeds(packet);
+    return packet.source_handle +
+      packet.width +
+      packet.height +
+      packet.op_kind +
+      packet.amount +
+      packet.flags +
+      seeds.color_seed +
+      seeds.speed_seed +
+      seeds.radius_seed;
+  }
+
+  fn main() {
+    let packet: PixelMagicImagePacket =
+      build_pixelmagic_image_packet(3101, 160, 120, 2, 24, 1);
+    print(summarize_pixelmagic_image_packet(packet));
+  }
+}

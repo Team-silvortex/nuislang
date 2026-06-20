@@ -1,0 +1,122 @@
+use data FabricPlane;
+use shader PixelMagicTextureShader;
+
+mod cpu Main {
+  type FabricBindings = HandleTable<FabricPlaneBindings>;
+  type ShaderPacketWindow = Window<PixelMagicTextureShaderPacket>;
+  type HostFrameWindow = Window<Frame>;
+  type FrameStatus = ShaderResult<Frame>;
+
+  struct PixelMagicImageResource {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    sampler_filter: i64,
+    address_mode: i64
+  }
+
+  fn build_pixelmagic_resource(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    sampler_filter: i64,
+    address_mode: i64
+  ) -> PixelMagicImageResource {
+    return PixelMagicImageResource {
+      source_handle: source_handle,
+      width: width,
+      height: height,
+      format_kind: format_kind,
+      texel_layout: texel_layout,
+      sampler_filter: sampler_filter,
+      address_mode: address_mode
+    };
+  }
+
+  fn pixelmagic_resource_residency(resource: PixelMagicImageResource) -> i64 {
+    return resource.source_handle +
+      resource.format_kind +
+      resource.texel_layout +
+      resource.sampler_filter +
+      resource.address_mode;
+  }
+
+  fn lower_pixelmagic_resource(resource: PixelMagicImageResource) -> NovaResourceSetPacket {
+    let buffer_count: i64 = resource.texel_layout;
+    let texture_count: i64 = 1;
+    let sampler_count: i64 = 1;
+    let residency: i64 = pixelmagic_resource_residency(resource);
+    return nova_resource_set_packet(
+      buffer_count,
+      texture_count,
+      sampler_count,
+      residency
+    );
+  }
+
+  fn lower_resource_to_shader_packet(
+    resource: PixelMagicImageResource,
+    state: NovaResourceSetState
+  ) -> PixelMagicTextureShaderPacket {
+    let color_seed: i64 = shader_profile_color_seed(
+      "PixelMagicTextureShader",
+      resource.source_handle + nova_resource_set_state_residency(state),
+      0
+    );
+    let speed_seed: i64 = shader_profile_speed_seed(
+      "PixelMagicTextureShader",
+      nova_resource_set_state_textures(state),
+      resource.sampler_filter + 1,
+      resource.width
+    );
+    let radius_seed: i64 = shader_profile_radius_seed(
+      "PixelMagicTextureShader",
+      resource.height + nova_resource_set_state_samplers(state) + resource.address_mode,
+      0
+    );
+    return shader_profile_packet("PixelMagicTextureShader", color_seed, speed_seed, radius_seed);
+  }
+
+  fn main() {
+    cpu_bind_core(0);
+    cpu_window(320, 200, "pixelmagic_texture_resource_demo");
+
+    let image_resource: PixelMagicImageResource =
+      build_pixelmagic_resource(4101, 160, 120, 1, 1, 1, 0);
+    let resource_set: NovaResourceSetPacket = lower_pixelmagic_resource(image_resource);
+    let resource_state: NovaResourceSetState = nova_resource_set_state(resource_set);
+
+    data_profile_bind_core("FabricPlane");
+    let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
+    let lowered: PixelMagicTextureShaderPacket =
+      lower_resource_to_shader_packet(image_resource, resource_state);
+    let gpu_packet: ShaderPacketWindow =
+      data_profile_send_uplink("FabricPlane", lowered);
+    let render_result: FrameStatus =
+      shader_result(shader_profile_render("PixelMagicTextureShader", gpu_packet));
+    let render_ready: bool = shader_frame_ready(render_result);
+    let host_frame: HostFrameWindow =
+      data_profile_send_downlink("FabricPlane", shader_value(render_result));
+
+    print(
+      image_resource.source_handle +
+      image_resource.width +
+      image_resource.height +
+      image_resource.format_kind +
+      image_resource.texel_layout +
+      image_resource.sampler_filter +
+      image_resource.address_mode +
+      nova_resource_set_state_buffers(resource_state) +
+      nova_resource_set_state_textures(resource_state) +
+      nova_resource_set_state_samplers(resource_state) +
+      nova_resource_set_state_residency(resource_state)
+    );
+    print(render_ready);
+
+    cpu_present_frame(host_frame);
+  }
+}

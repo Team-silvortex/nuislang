@@ -1,0 +1,67 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_argv_at(index: i64) -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+
+  fn sample_error_code(buffer: ref Buffer, read_len: i64) -> i64 {
+    if read_len < 18 {
+      return 1;
+    }
+    if buffer[0] != 80 {
+      return 2;
+    }
+    if buffer[1] != 50 {
+      return 3;
+    }
+    if buffer[2] != 10 {
+      return 4;
+    }
+    if buffer[4] != 32 {
+      return 5;
+    }
+    if buffer[6] != 10 {
+      return 6;
+    }
+    if buffer[7] != 49 {
+      return 7;
+    }
+    if buffer[8] != 53 {
+      return 8;
+    }
+    if buffer[9] != 10 {
+      return 9;
+    }
+    if buffer[10] != 48 {
+      return 10;
+    }
+    return 0;
+  }
+
+  fn main() -> i64 {
+    let argv_count: i64 = host_argv_count();
+    if argv_count < 2 {
+      return 0;
+    }
+
+    let read_len: i64 = 128;
+    let input_buffer: ref Buffer = alloc_buffer(read_len, 0);
+    let input_path: i64 = host_argv_at(1);
+    let input_file: i64 = host_file_open(input_path, 0);
+    if input_file <= 0 {
+      return 21;
+    }
+
+    let bytes_read: i64 =
+      host_file_read(input_file, host_buffer_handle(input_buffer), read_len);
+    let close_code: i64 = host_file_close(input_file);
+    if close_code <= 0 {
+      return 22;
+    }
+    if sample_error_code(input_buffer, bytes_read) > 0 {
+      return 23;
+    }
+    return 0;
+  }
+}

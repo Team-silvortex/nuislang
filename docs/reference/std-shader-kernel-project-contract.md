@@ -473,7 +473,7 @@ Recommended reading order inside shader is now:
 
 Host-side prep rule before bigger shader libraries:
 
-* for future image-processing work such as `galaxy`, the current safest prep
+* for future image-processing work in the `PixelMagic` `Galaxy`, the current safest prep
   route is:
   `filesystem_io_report_recipe -> shader_profile_demo -> shader_render_profile_demo`
 * that route keeps host-side read/report/emit closure separate from

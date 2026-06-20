@@ -32,16 +32,67 @@ Current runnable CLI frontdoor:
   command/session frontdoor
 * `command_runtime_demo` and `subprocess_runtime_demo` now also fit that same
   launch path as the narrow command/process companions
+* `cli_compile_workflow_demo` now fits that same launch path as the current
+  higher-level compile-workflow companion
+* `cli_workflow_automation_demo` now fits that same launch path as the current
+  smaller workflow-automation companion
+* `cli_build_pipeline_demo` and `cli_project_build_report_demo` now extend that
+  same launch path into the higher-level build-pipeline and project-build-report
+  companions
+* `cli_pgm_info_demo` now fits that same launch path as the first checked-in
+  image-shaped CLI companion, proving that the tooling lane can already host a
+  narrow file-backed image probe without adding a new runtime bridge
+* `cli_pgm_invert_demo` now extends that image-shaped lane into a real
+  file-to-file transform companion, which is the current CPU-side stepping
+  stone before shader-backed image examples
+* `cli_pgm_threshold_demo` now extends that same lane into a mask-style image
+  prepass companion, which is closer to the kind of CPU-side preprocessing we
+  can feed into later shader-oriented examples
 
 Current split:
 
 * launch-shaped frontdoors:
   `cli_runtime_demo`, `cli_session_demo`, `cli_report_session_demo`,
   `workflow_runtime_demo`, `command_runtime_demo`, `subprocess_runtime_demo`,
-  `native_artifact_closure_demo`
+  `native_artifact_closure_demo`, `cli_compile_workflow_demo`,
+  `cli_workflow_automation_demo`,
+  `cli_build_pipeline_demo`, `cli_project_build_report_demo`,
+  `cli_pgm_info_demo`, `cli_pgm_invert_demo`, `cli_pgm_threshold_demo`
 * probe-style companions:
   most of the remaining entries in this folder still exist to expose one host
   surface, one report shape, or one runtime observation slice at a time
+
+## Current High-Level Authoring Shape
+
+For the current higher-level tooling companions, prefer one stable
+project-form pattern:
+
+```text
+Seed
+-> capture context
+-> build step bundle
+-> run/skip ordered steps
+-> build success/failure report
+-> build summary
+-> return one exit code
+```
+
+Current exemplars:
+
+* [cli_compile_workflow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_compile_workflow_demo)
+* [cli_workflow_automation_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo)
+* [cli_build_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo)
+* [cli_project_build_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo)
+* [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
+* [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
+* [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
+
+Short rule:
+
+* step assembly should be explicit through one `*Steps` bundle
+* step progression should read as ordered `run_step` / `skipped_step`
+* success/failure collapse should happen through one small report helper set
+* `main()` should stay terminal and lowering-friendly
 
 ## Pick By Goal
 
@@ -73,6 +124,12 @@ Current split:
   [stdin_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/stdin_runtime_demo),
   [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/tty_runtime_demo),
   [terminal_io_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/terminal_io_demo)
+* file-backed image probe:
+  [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
+* file-backed image transform:
+  [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
+* file-backed image mask prepass:
+  [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
 * time and clock:
   [time_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/time_runtime_demo),
   [sleep_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/sleep_runtime_demo),

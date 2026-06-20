@@ -1,0 +1,89 @@
+mod cpu Main {
+  struct PixelMagicImageResource {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    sampler_filter: i64,
+    address_mode: i64
+  }
+
+  struct PixelMagicShaderSeeds {
+    color_seed: i64,
+    speed_seed: i64,
+    radius_seed: i64
+  }
+
+  fn build_pixelmagic_image_resource(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    sampler_filter: i64,
+    address_mode: i64
+  ) -> PixelMagicImageResource {
+    return PixelMagicImageResource {
+      source_handle: source_handle,
+      width: width,
+      height: height,
+      format_kind: format_kind,
+      texel_layout: texel_layout,
+      sampler_filter: sampler_filter,
+      address_mode: address_mode
+    };
+  }
+
+  fn pixelmagic_resource_residency(resource: PixelMagicImageResource) -> i64 {
+    return resource.source_handle +
+      resource.format_kind +
+      resource.texel_layout +
+      resource.sampler_filter +
+      resource.address_mode;
+  }
+
+  fn pixelmagic_resource_set(resource: PixelMagicImageResource) -> NovaResourceSetPacket {
+    return nova_resource_set_packet(
+      resource.texel_layout,
+      1,
+      1,
+      pixelmagic_resource_residency(resource)
+    );
+  }
+
+  fn pixelmagic_resource_state(resource: PixelMagicImageResource) -> NovaResourceSetState {
+    return nova_resource_set_state(pixelmagic_resource_set(resource));
+  }
+
+  fn pixelmagic_shader_seeds(
+    resource: PixelMagicImageResource,
+    state: NovaResourceSetState
+  ) -> PixelMagicShaderSeeds {
+    return PixelMagicShaderSeeds {
+      color_seed: resource.source_handle + nova_resource_set_state_residency(state),
+      speed_seed: resource.width + nova_resource_set_state_textures(state) + resource.sampler_filter,
+      radius_seed: resource.height + nova_resource_set_state_samplers(state) + resource.address_mode
+    };
+  }
+
+  fn summarize_pixelmagic_resource(resource: PixelMagicImageResource) -> i64 {
+    let state: NovaResourceSetState = pixelmagic_resource_state(resource);
+    let seeds: PixelMagicShaderSeeds = pixelmagic_shader_seeds(resource, state);
+    return resource.width +
+      resource.height +
+      nova_resource_set_state_buffers(state) +
+      nova_resource_set_state_textures(state) +
+      nova_resource_set_state_samplers(state) +
+      nova_resource_set_state_residency(state) +
+      seeds.color_seed +
+      seeds.speed_seed +
+      seeds.radius_seed;
+  }
+
+  fn main() {
+    let resource: PixelMagicImageResource =
+      build_pixelmagic_image_resource(4101, 160, 120, 1, 1, 1, 0);
+    print(summarize_pixelmagic_resource(resource));
+  }
+}

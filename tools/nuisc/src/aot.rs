@@ -4588,13 +4588,17 @@ static int64_t nuis_host_file_open(int64_t path_handle, int64_t flags) {
 }
 
 static int64_t nuis_host_file_read(int64_t file_handle, int64_t buffer_handle, int64_t len) {
-    (void)buffer_handle;
-    if (file_handle < 0 || len <= 0) return 0;
+    if (file_handle < 0 || buffer_handle == 0 || len <= 0) return 0;
     char scratch[4096];
     size_t read_len = (size_t)len;
     if (read_len > sizeof(scratch)) read_len = sizeof(scratch);
     ssize_t got = read((int)file_handle, scratch, read_len);
-    return got > 0 ? (int64_t)got : 0;
+    if (got <= 0) return 0;
+    int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
+    for (ssize_t i = 0; i < got; ++i) {
+        buffer[i] = (unsigned char)scratch[i];
+    }
+    return (int64_t)got;
 }
 
 static int64_t nuis_host_file_write(int64_t file_handle, int64_t text_handle) {

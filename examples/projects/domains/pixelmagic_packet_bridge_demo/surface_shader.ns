@@ -1,4 +1,6 @@
-mod shader GalaxySurfaceShader {
+use data FabricPlane;
+
+mod shader PixelMagicSurfaceShader {
   fn profile() {
     const vertex_count: i64 = 4;
     const instance_count: i64 = 1;
@@ -12,8 +14,8 @@ mod shader GalaxySurfaceShader {
 
     let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
     let profile_view: Viewport = shader_viewport(160, 120);
-    let profile_pipe: Pipeline = shader_pipeline("galaxy_profile_seed", "triangle_strip");
-    let profile_wgsl: ShaderModule = shader_inline_wgsl("galaxy_profile_seed", wgsl {
+    let profile_pipe: Pipeline = shader_pipeline("pixelmagic_packet_bridge", "triangle_strip");
+    let profile_wgsl: ShaderModule = shader_inline_wgsl("pixelmagic_packet_bridge", wgsl {
       struct VsOut {
         @builtin(position) pos: vec4<f32>,
         @location(0) uv: vec2<f32>,

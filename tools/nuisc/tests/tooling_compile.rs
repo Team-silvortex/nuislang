@@ -58,3 +58,66 @@ fn compiles_native_artifact_closure_tooling_project() {
     nuisc::pipeline::compile_project(project)
         .expect("native artifact closure tooling project should compile");
 }
+
+#[test]
+fn compiles_cli_compile_workflow_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_compile_workflow_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("cli compile workflow tooling project should compile");
+}
+
+#[test]
+fn compiles_cli_build_pipeline_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("cli build pipeline tooling project should compile");
+}
+
+#[test]
+fn compiles_cli_workflow_automation_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("cli workflow automation tooling project should compile");
+}
+
+#[test]
+fn compiles_cli_project_build_report_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("cli project build report tooling project should compile");
+}
+
+#[test]
+fn compiles_cli_pgm_info_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("cli pgm info tooling project should compile");
+}
+
+#[test]
+fn compiles_cli_pgm_invert_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("cli pgm invert tooling project should compile");
+}
+
+#[test]
+fn compiles_cli_pgm_threshold_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("cli pgm threshold tooling project should compile");
+}

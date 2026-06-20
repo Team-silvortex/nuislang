@@ -14,6 +14,8 @@ Canonical companions:
   [docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
 * tooling/workflow contract:
   [docs/reference/std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+* tooling image-preprocess bridge:
+  [docs/reference/tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
 * mainline layering rule:
   [docs/reference/std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
 * shortest repo-wide route:
@@ -110,6 +112,38 @@ Short rule:
 * if two tooling recipes are expressing the same gate shape, they should differ
   by seeds and reports before they differ by naming style
 
+## Current High-Level Companion Shape
+
+For the current project-form compile ladder companions, prefer one explicit
+high-level pattern:
+
+```text
+Seed
+-> capture context
+-> build step bundle
+-> run/skip ordered steps
+-> build success/failure report
+-> build summary
+-> return one exit code
+```
+
+What that means in practice:
+
+* context capture should happen before step assembly
+* step assembly should be visible through one `*Steps` struct
+* step execution should stay as ordered `run_step` / `skipped_step`
+* success/failure should collapse through small shared helpers such as
+  `build_success_report`, `build_failed_report`, and `should_stop`
+* the final `main()` should remain a narrow terminal handoff instead of
+  re-encoding workflow logic
+
+Current checked-in companion exemplars:
+
+* [cli_compile_workflow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_compile_workflow_demo)
+* [cli_workflow_automation_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo)
+* [cli_build_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo)
+* [cli_project_build_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo)
+
 ## Source Router
 
 ### Runtime Edge
@@ -152,6 +186,12 @@ Short rule:
 * [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
 * [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
 * [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
+
+### Image Preprocess Companions
+
+* [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
+* [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
+* [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
 
 ## Current Reading Rule
 

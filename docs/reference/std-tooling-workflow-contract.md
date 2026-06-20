@@ -72,6 +72,32 @@ That is not yet the final abstraction boundary.
 It is the current minimum source contract that lets us keep multiple checked-in
 tooling lanes aligned while they are still separate files.
 
+Current project-form companion target:
+
+```text
+Seed
+-> capture context
+-> build step bundle
+-> run/skip ordered steps
+-> build success/failure report
+-> build summary
+-> return one exit code
+```
+
+This is not a separate architecture from the narrow recipe shape above.
+
+It is the current higher-level companion expansion of that same rule for the
+checked-in compile-ladder projects.
+
+Current companion anchors:
+
+* [cli_compile_workflow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_compile_workflow_demo)
+* [cli_workflow_automation_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo)
+* [cli_build_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo)
+* [cli_project_build_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo)
+* image-preprocess bridge:
+  [tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
+
 ## Current Problem Statement
 
 Today the command/tooling lane is no longer too raw to express workflow
@@ -144,6 +170,10 @@ Current example routing for this lane:
   [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo),
   [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo),
   [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
+* image-preprocess route:
+  [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo),
+  [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo),
+  [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
 * companion router:
   [examples/projects/tooling/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/README.md)
 * retired historical probes:

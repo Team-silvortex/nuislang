@@ -1,0 +1,48 @@
+mod data FabricPlane {
+  type FabricBindingsTable = HandleTable<FabricPlaneBindings>;
+  type ScalarWindow = Window<i64>;
+  type ScalarWindowMut = WindowMut<i64>;
+  type CpuToShaderMarker = Marker<CpuToShader>;
+  type ShaderToCpuMarker = Marker<ShaderToCpu>;
+  type UplinkPipeMarker = Marker<UplinkPipe>;
+  type DownlinkPipeMarker = Marker<DownlinkPipe>;
+  type UplinkPipeClassMarker = Marker<UplinkPipeClass>;
+  type DownlinkPipeClassMarker = Marker<DownlinkPipeClass>;
+  type PayloadClassMarker = Marker<PayloadClassWindow>;
+  type UplinkPayloadShapeMarker = Marker<PayloadShapeWindowPixelMagicSurfaceShaderPacket>;
+  type DownlinkPayloadShapeMarker = Marker<PayloadShapeWindowFrame>;
+  type UplinkWindowPolicyMarker = Marker<UplinkWindowPolicy>;
+  type DownlinkWindowPolicyMarker = Marker<DownlinkWindowPolicy>;
+
+  fn profile() {
+    const window_offset: i64 = 0;
+    const uplink_len: i64 = 1;
+    const downlink_len: i64 = 1;
+
+    data_bind_core(1);
+    let profile_handles: FabricBindingsTable =
+      data_handle_table("host=cpu0", "render=shader0");
+    let cpu_to_shader: CpuToShaderMarker = data_marker("cpu_to_shader");
+    let shader_to_cpu: ShaderToCpuMarker = data_marker("shader_to_cpu");
+    let uplink_pipe: UplinkPipeMarker = data_marker("uplink_pipe");
+    let downlink_pipe: DownlinkPipeMarker = data_marker("downlink_pipe");
+    let uplink_pipe_class: UplinkPipeClassMarker = data_marker("uplink_pipe_class");
+    let downlink_pipe_class: DownlinkPipeClassMarker = data_marker("downlink_pipe_class");
+    let uplink_payload_class: PayloadClassMarker = data_marker("uplink_payload_class");
+    let downlink_payload_class: PayloadClassMarker =
+      data_marker("downlink_payload_class");
+    let uplink_payload_shape: UplinkPayloadShapeMarker =
+      data_marker("uplink_payload_shape");
+    let downlink_payload_shape: DownlinkPayloadShapeMarker =
+      data_marker("downlink_payload_shape");
+    let uplink_window_policy: UplinkWindowPolicyMarker = data_marker("uplink_window_policy");
+    let downlink_window_policy: DownlinkWindowPolicyMarker =
+      data_marker("downlink_window_policy");
+    let uplink_window_mut: ScalarWindowMut =
+      data_copy_window(window_offset, window_offset, uplink_len);
+    let uplink_window: ScalarWindow = data_freeze_window(uplink_window_mut);
+    let downlink_window_mut: ScalarWindowMut =
+      data_copy_window(window_offset, window_offset, downlink_len);
+    let downlink_window: ScalarWindow = data_freeze_window(downlink_window_mut);
+  }
+}

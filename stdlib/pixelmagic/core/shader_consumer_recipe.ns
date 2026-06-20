@@ -1,0 +1,90 @@
+mod cpu Main {
+  struct PixelMagicShaderPacket {
+    color_seed: i64,
+    speed_seed: i64,
+    radius_seed: i64
+  }
+
+  struct PixelMagicShaderConsumer {
+    target_kind: i64,
+    pass_kind: i64,
+    sample_mode: i64,
+    output_kind: i64,
+    present_mode: i64
+  }
+
+  struct PixelMagicConsumerSummary {
+    frame_budget: i64,
+    packet_score: i64,
+    consumer_score: i64
+  }
+
+  fn build_pixelmagic_shader_packet(
+    color_seed: i64,
+    speed_seed: i64,
+    radius_seed: i64
+  ) -> PixelMagicShaderPacket {
+    return PixelMagicShaderPacket {
+      color_seed: color_seed,
+      speed_seed: speed_seed,
+      radius_seed: radius_seed
+    };
+  }
+
+  fn build_pixelmagic_shader_consumer(
+    target_kind: i64,
+    pass_kind: i64,
+    sample_mode: i64,
+    output_kind: i64,
+    present_mode: i64
+  ) -> PixelMagicShaderConsumer {
+    return PixelMagicShaderConsumer {
+      target_kind: target_kind,
+      pass_kind: pass_kind,
+      sample_mode: sample_mode,
+      output_kind: output_kind,
+      present_mode: present_mode
+    };
+  }
+
+  fn pixelmagic_packet_score(packet: PixelMagicShaderPacket) -> i64 {
+    return packet.color_seed + packet.speed_seed + packet.radius_seed;
+  }
+
+  fn pixelmagic_consumer_score(consumer: PixelMagicShaderConsumer) -> i64 {
+    return consumer.target_kind +
+      consumer.pass_kind +
+      consumer.sample_mode +
+      consumer.output_kind +
+      consumer.present_mode;
+  }
+
+  fn pixelmagic_consumer_summary(
+    packet: PixelMagicShaderPacket,
+    consumer: PixelMagicShaderConsumer
+  ) -> PixelMagicConsumerSummary {
+    return PixelMagicConsumerSummary {
+      frame_budget: packet.speed_seed + consumer.present_mode,
+      packet_score: pixelmagic_packet_score(packet),
+      consumer_score: pixelmagic_consumer_score(consumer)
+    };
+  }
+
+  fn summarize_pixelmagic_shader_consumer(
+    packet: PixelMagicShaderPacket,
+    consumer: PixelMagicShaderConsumer
+  ) -> i64 {
+    let summary: PixelMagicConsumerSummary = pixelmagic_consumer_summary(packet, consumer);
+    return summary.frame_budget +
+      summary.packet_score +
+      summary.consumer_score;
+  }
+
+  fn main() {
+    let packet: PixelMagicShaderPacket =
+      build_pixelmagic_shader_packet(4102, 161, 121);
+    let consumer: PixelMagicShaderConsumer =
+      build_pixelmagic_shader_consumer(1, 1, 0, 1, 1);
+    print(summarize_pixelmagic_shader_consumer(packet, consumer));
+  }
+}

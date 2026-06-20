@@ -16,6 +16,7 @@ surfaces = [
 source_modules = [
   "core/theme_surface.ns",
   "core/frame_runtime.ns",
+  "core/texture_resource_recipe.ns",
   "core/window_controls_runtime_recipe.ns",
   "ui/panel_selection.ns",
   "ui/panel_blueprint.ns",

@@ -63,6 +63,8 @@ Use these as the primary cluster names when placing new work:
     [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
     ->
     [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
+  - current image-preprocess bridge:
+    [docs/reference/tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
 * host I/O and text
   - local router:
     [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
@@ -223,6 +225,11 @@ Recipe modules:
 * automation/workflow tooling
   - local lane router:
     [tooling/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/tooling/README.md)
+  - current project-form companion ladder:
+    [cli_workflow_automation_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo) ->
+    [cli_build_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo) ->
+    [cli_project_build_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo) ->
+    [cli_compile_workflow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_compile_workflow_demo)
   - current recipe shape:
     the checked-in workflow example is now a four-step gate with executed-step
     counting, blocked-step reporting, and per-step launch/cwd/timeout summary

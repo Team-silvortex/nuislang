@@ -4011,7 +4011,7 @@ mod tests {
         project_domain_registry_checks_json, project_workflow_json_fields,
         recommend_project_workflow_step, render_artifact_doctor_json,
         render_project_doctor_json, render_project_status_json, render_scheduler_view_json,
-        render_workflow_json, resolve_runner_clock_domain, run_artifact_command_for_output_dir,
+        render_workflow_json, resolve_run_artifact_binary_path, resolve_runner_clock_domain, run_artifact_command_for_output_dir,
         run_language_benchmarks_for_source_file, run_language_tests_for_source_file,
         scheduler_view_domain_record, scheduler_view_domain_record_json,
         single_source_workflow_source_profile, wait_for_test_child, RawTestOutcome,
@@ -4396,6 +4396,128 @@ mod cpu Main {
             "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo",
             "run_artifact_subprocess_runtime_outputs",
         );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_cli_compile_workflow_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_compile_workflow_demo",
+            "run_artifact_cli_compile_workflow_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_cli_build_pipeline_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo",
+            "run_artifact_cli_build_pipeline_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_cli_workflow_automation_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo",
+            "run_artifact_cli_workflow_automation_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_cli_project_build_report_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo",
+            "run_artifact_cli_project_build_report_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_cli_pgm_info_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo",
+            "run_artifact_cli_pgm_info_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_cli_pgm_invert_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo",
+            "run_artifact_cli_pgm_invert_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_cli_pgm_threshold_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo",
+            "run_artifact_cli_pgm_threshold_outputs",
+        );
+    }
+
+    #[test]
+    fn cli_pgm_info_binary_accepts_real_pgm_input_file() {
+        let project_root =
+            PathBuf::from("/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo");
+        let output_dir = temp_dir("cli_pgm_info_runtime_probe_outputs");
+        let input_path = output_dir.join("probe.pgm");
+        fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let binary = resolve_run_artifact_binary_path(&output_dir.join("nuis.build.manifest.toml"))
+            .expect("resolve built binary");
+        let status = Command::new(&binary)
+            .arg(&input_path)
+            .status()
+            .expect("launch cli pgm info binary");
+        assert!(status.success(), "expected success status, got {status:?}");
+    }
+
+    #[test]
+    fn cli_pgm_invert_binary_writes_inverted_pgm_output_file() {
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo",
+        );
+        let output_dir = temp_dir("cli_pgm_invert_runtime_probe_outputs");
+        let input_path = output_dir.join("probe_in.pgm");
+        let output_path = output_dir.join("probe_out.pgm");
+        fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let binary = resolve_run_artifact_binary_path(&output_dir.join("nuis.build.manifest.toml"))
+            .expect("resolve built binary");
+        let status = Command::new(&binary)
+            .arg(&input_path)
+            .arg(&output_path)
+            .status()
+            .expect("launch cli pgm invert binary");
+        assert!(status.success(), "expected success status, got {status:?}");
+
+        let output = fs::read_to_string(&output_path).expect("read inverted pgm output");
+        assert_eq!(output, "P2\n2 2\n15\n15 14 13 12\n");
+    }
+
+    #[test]
+    fn cli_pgm_threshold_binary_writes_mask_pgm_output_file() {
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo",
+        );
+        let output_dir = temp_dir("cli_pgm_threshold_runtime_probe_outputs");
+        let input_path = output_dir.join("probe_in.pgm");
+        let output_path = output_dir.join("probe_out.pgm");
+        fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let binary = resolve_run_artifact_binary_path(&output_dir.join("nuis.build.manifest.toml"))
+            .expect("resolve built binary");
+        let status = Command::new(&binary)
+            .arg(&input_path)
+            .arg(&output_path)
+            .status()
+            .expect("launch cli pgm threshold binary");
+        assert!(status.success(), "expected success status, got {status:?}");
+
+        let output = fs::read_to_string(&output_path).expect("read threshold pgm output");
+        assert_eq!(output, "P2\n2 2\n15\n0 0 15 15\n");
     }
 
     #[test]

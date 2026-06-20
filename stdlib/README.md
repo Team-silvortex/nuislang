@@ -12,6 +12,8 @@ The current top-level modules are:
   smallest semantics-first base surface and long-lived source contracts
 * [std](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
   practical systems/helper layer built on `core`
+* [pixelmagic](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
+  official image/resource Galaxy built on `core + std`
 * [ns-nova](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
   rendering/application framework layer and the first place where real checked-in
   `.ns` source modules are already accumulating
@@ -21,6 +23,7 @@ The current top-level modules are:
 The intended dependency direction is:
 
 ```text
+core -> std -> pixelmagic
 core -> std -> ns-nova
 ```
 
@@ -28,6 +31,7 @@ Read that as:
 
 * `core` should carry the smallest source-level semantic contracts
 * `std` should add practical systems helpers without hiding execution semantics
+* `pixelmagic` should hold image/resource contracts and shader-facing image prep on top of those lower layers
 * `ns-nova` should build a GPU-first application/rendering framework on top of those lower layers
 
 ## Current Reality
@@ -37,7 +41,7 @@ At the current repo stage:
 * the repository still does not have a crate-like automatic source import flow
   for stdlib modules yet
 * the live implementation focus is still on `nuis / nuisc / YIR / nustar`
-* but `stdlib` is no longer empty scaffolding; all three layers now carry real
+* but `stdlib` is no longer empty scaffolding; all four layers now carry real
   checked-in `.ns` assets
 
 Asset view by layer:
@@ -56,12 +60,19 @@ Asset view by layer:
   - now also carries project-shaped recipe modules
   - facade/recipe split is documented in
     [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* `pixelmagic`
+  - official image/resource Galaxy
+  - current earliest checked-in package skeleton for future GPU-side image work
+  - declared through
+    [stdlib/pixelmagic/module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/module.toml)
+  - see
+    [stdlib/pixelmagic/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
 * `ns-nova`
   - current framework/source-asset layer
   - currently the richest family-shaped stdlib surface
   - declared through
     [stdlib/ns-nova/module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/module.toml)
-    with `10` checked-in source modules
+    with `11` checked-in source modules
   - see
     [stdlib/ns-nova/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
 
@@ -72,6 +83,8 @@ Current asset types:
 * `std`
   host-backed facade modules plus recipe modules for CLI, reporting, automation,
   and early clock/test timing alignment
+* `pixelmagic`
+  image/resource handoff modules and future shader-facing image prep contracts
 * `ns-nova`
   framework-oriented runtime/blueprint/recipe modules across `core`, `ui`, and `scene`
 
@@ -87,6 +100,7 @@ Current boundaries:
 
 * [core](/Users/Shared/chroot/dev/nuislang/stdlib/core/README.md)
 * [std](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* [pixelmagic](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
 * [ns-nova](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
 
 See also:

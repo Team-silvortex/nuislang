@@ -1,0 +1,21 @@
+module_schema = "nuis-stdlib-module-v1"
+name = "pixelmagic"
+package_id = "nuis.pixelmagic"
+tier = "framework"
+depends_on = ["core", "std"]
+summary = "GPU-oriented image and texture processing Galaxy built on nuis heterogeneous execution."
+
+surfaces = [
+  "image-resource-shaping",
+  "texture-handoff-contracts",
+  "shader-facing-image-prep"
+]
+
+source_modules = [
+  "core/image_packet_recipe.ns",
+  "core/image_resource_recipe.ns",
+  "core/texture_binding_recipe.ns",
+  "core/sampling_recipe.ns",
+  "core/shader_packet_recipe.ns",
+  "core/shader_consumer_recipe.ns"
+]
