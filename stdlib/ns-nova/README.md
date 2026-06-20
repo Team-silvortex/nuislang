@@ -60,6 +60,8 @@ Current source-asset status:
   auto-injected into project scope by default
 * projects may still opt into it explicitly through
   `galaxy_imports = ["ns-nova:lib/nova_contracts.ns"]`
+* duplicate `galaxy_imports` entries are rejected during manifest loading, so
+  this opt-in should be listed at most once
 * that manifest currently lists `11` source modules
 * `nuis` smoke tests and `project-doctor` now both inspect that asset set
 

@@ -576,3 +576,75 @@ mod cpu Main {
         .iter()
         .any(|function| function.name == "NovaContracts.runtime_score"));
 }
+
+#[test]
+fn rejects_duplicate_galaxy_import_entries() {
+    let root = write_temp_project_fixture(
+        "galaxy_duplicate_imports",
+        r#"
+name = "galaxy-duplicate-imports"
+entry = "main.ns"
+galaxy = ["ns-nova=workspace"]
+galaxy_imports = [
+  "ns-nova:lib/nova_contracts.ns",
+  "ns-nova:lib/nova_contracts.ns",
+]
+"#,
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+        vec![],
+    );
+
+    let error = load_project(root.as_path()).unwrap_err();
+    assert!(error.contains("declares duplicate galaxy_imports entry"));
+    assert!(error.contains("ns-nova:lib/nova_contracts.ns"));
+}
+
+#[test]
+fn explicit_import_of_auto_injected_library_keeps_single_visible_origin() {
+    let root = write_temp_project_fixture(
+        "galaxy_redundant_auto_import",
+        r#"
+name = "galaxy-redundant-auto-import"
+entry = "main.ns"
+galaxy = ["pixelmagic=workspace"]
+galaxy_imports = ["pixelmagic:lib/image_contracts.ns"]
+"#,
+        r#"
+use cpu PixelMagicContracts;
+
+mod cpu Main {
+  fn main() -> i64 {
+    return PixelMagicContracts.blur_op_kind();
+  }
+}
+"#,
+        vec![],
+    );
+
+    let project = load_project(root.as_path()).unwrap();
+    let pixelmagic_modules = project
+        .modules
+        .iter()
+        .filter(|module| module.ast.unit == "PixelMagicContracts")
+        .collect::<Vec<_>>();
+    assert_eq!(pixelmagic_modules.len(), 1);
+    assert_eq!(
+        pixelmagic_modules[0].origin.source_kind(),
+        "galaxy-auto-inject"
+    );
+
+    let imports_index = render_project_import_index(&project);
+    assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "visible\tcpu\tPixelMagicContracts\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/image_contracts.ns\timport_policy=project-auto"
+    ));
+    assert!(!imports_index.contains("source_kind=galaxy-explicit-import\tgalaxy=pixelmagic"));
+}

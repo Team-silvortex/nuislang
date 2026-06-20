@@ -105,6 +105,27 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
+    let explicit_galaxy_imports = project
+        .manifest
+        .galaxy_imports
+        .iter()
+        .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+        .collect::<std::collections::BTreeSet<_>>();
+    let hidden_manual_only_library_modules = project
+        .resolved_galaxies
+        .iter()
+        .filter(|dependency| dependency.library_import_policy.as_str() == "manual-only")
+        .flat_map(|dependency| {
+            dependency.library_modules.iter().filter_map(|library_module| {
+                let key = format!("{}:{}", dependency.name, library_module);
+                if explicit_galaxy_imports.contains(&key) {
+                    None
+                } else {
+                    Some(key)
+                }
+            })
+        })
+        .collect::<Vec<_>>();
     let mut lines = vec![
         format!("project status: {}", project.manifest.name),
         format!("  root: {}", project.root.display()),
@@ -186,16 +207,6 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
             nuisc::project::describe_project_exchange_route_classes(&plan)
         ),
         format!("  tests: {}", declared_tests.len()),
-        format!("  artifact_output_dir: {}", artifact_output_dir.display()),
-        format!("  artifact_ready_to_run: {}", crate::yes_no(artifact_report.ready_to_run)),
-        format!(
-            "  artifact_recommended_next_step: {}",
-            artifact_report.recommended_next_step
-        ),
-        format!(
-            "  artifact_recommended_command: {}",
-            artifact_report.recommended_command
-        ),
     ];
     append_link_plan_text_fields(&mut lines, link_plan.as_ref());
     for path in &declared_tests {
@@ -221,6 +232,23 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
     ));
     for item in &project.manifest.galaxy_dependencies {
         lines.push(format!("  galaxy: {}={}", item.name, item.version));
+    }
+    lines.push(format!(
+        "  galaxy_imports: {}",
+        project.manifest.galaxy_imports.len()
+    ));
+    for item in &project.manifest.galaxy_imports {
+        lines.push(format!(
+            "  galaxy_import: {}:{}",
+            item.galaxy, item.library_module
+        ));
+    }
+    lines.push(format!(
+        "  galaxy_hidden_manual_only_library_modules: {}",
+        hidden_manual_only_library_modules.len()
+    ));
+    for item in &hidden_manual_only_library_modules {
+        lines.push(format!("  galaxy_hidden_manual_only_library_module: {}", item));
     }
     let lock_path = project.root.join("nuis.galaxy.lock");
     match galaxy_lock_status {
@@ -561,6 +589,12 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
         next_steps.push(
             "some galaxy deps are not available locally; use `nuis galaxy list` to inspect the local registry or publish/install the missing packages first".to_owned(),
         );
+    }
+    if !hidden_manual_only_library_modules.is_empty() {
+        next_steps.push(format!(
+            "this project still has manual-only galaxy library modules that are not visible by default; add them to `galaxy_imports = [...]` if you want them in project scope: {}",
+            hidden_manual_only_library_modules.join(", ")
+        ));
     }
     if galaxy_check_invalid {
         next_steps.push(
@@ -1042,6 +1076,12 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
         next_steps.push(
             "some galaxy deps are not available locally; use `nuis galaxy list` to inspect the local registry or publish/install the missing packages first".to_owned(),
         );
+    }
+    if !hidden_manual_only_library_modules.is_empty() {
+        next_steps.push(format!(
+            "this project still has manual-only galaxy library modules that are not visible by default; add them to `galaxy_imports = [...]` if you want them in project scope: {}",
+            hidden_manual_only_library_modules.join(", ")
+        ));
     }
     if galaxy_check_invalid {
         next_steps.push(

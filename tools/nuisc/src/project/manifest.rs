@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::collections::BTreeSet;
 
 use super::{
     NuisProjectManifest, ProjectAbiRequirement, ProjectGalaxyDependency, ProjectGalaxyImport,
@@ -19,6 +20,7 @@ pub(super) fn parse_project_manifest(
         parse_optional_galaxy_dependency_array(source, "galaxy").unwrap_or_default();
     let galaxy_imports =
         parse_optional_galaxy_import_array(source, "galaxy_imports").unwrap_or_default();
+    validate_unique_galaxy_imports(&galaxy_imports, path)?;
     Ok(NuisProjectManifest {
         name,
         entry,
@@ -29,6 +31,24 @@ pub(super) fn parse_project_manifest(
         galaxy_dependencies,
         galaxy_imports,
     })
+}
+
+fn validate_unique_galaxy_imports(
+    imports: &[ProjectGalaxyImport],
+    path: &Path,
+) -> Result<(), String> {
+    let mut seen = BTreeSet::new();
+    for item in imports {
+        let key = format!("{}:{}", item.galaxy, item.library_module);
+        if !seen.insert(key.clone()) {
+            return Err(format!(
+                "project manifest `{}` declares duplicate galaxy_imports entry `{}`",
+                path.display(),
+                key
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn parse_required_string(source: &str, key: &str, path: &Path) -> Result<String, String> {

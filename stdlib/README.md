@@ -55,6 +55,10 @@ At the current repo stage:
   [ns-nova/lib/nova_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/lib/nova_contracts.ns)
   but unlike `core`, `std`, and `pixelmagic`, it is currently marked
   `manual-only` rather than auto-injected
+* explicit manifest imports such as
+  `galaxy_imports = ["ns-nova:lib/nova_contracts.ns"]` are now validated as a
+  unique set, so duplicate entries fail manifest loading instead of being
+  silently collapsed during path resolution
 * those resolved galaxy dependencies are not auto-injected into the source
   module set yet, because many current stdlib recipe assets still collide on
   repeated bindings such as `mod cpu Main`

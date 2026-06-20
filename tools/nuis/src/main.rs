@@ -157,6 +157,7 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::ProjectStatus { input, json } => handle_project_status(input, json)?,
         cli::CommandKind::ProjectDoctor { input, json } => handle_project_doctor(input, json)?,
+        cli::CommandKind::ProjectImports { input, json } => handle_project_imports(input, json)?,
         cli::CommandKind::ProjectLockAbi { input } => handle_project_lock_abi(input)?,
         cli::CommandKind::Galaxy(command) => handle_galaxy(command)?,
     }
@@ -3328,6 +3329,237 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     surface_render::render_project_doctor_json(input)
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProjectImportRecord {
+    galaxy: String,
+    library_module: String,
+    import_policy: String,
+    auto_injectable: bool,
+    visible: bool,
+    explicit: bool,
+    source_kind: Option<String>,
+    source_detail: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProjectImportsReport {
+    project_name: String,
+    root: PathBuf,
+    manifest_path: PathBuf,
+    galaxy_dependencies: Vec<String>,
+    explicit_galaxy_imports: Vec<String>,
+    suggested_galaxy_imports: Vec<String>,
+    visible_library_modules: Vec<String>,
+    hidden_manual_only_library_modules: Vec<String>,
+    records: Vec<ProjectImportRecord>,
+}
+
+fn collect_project_imports_report(input: &Path) -> Result<ProjectImportsReport, String> {
+    let project = nuisc::project::load_project(input)?;
+    let explicit_galaxy_imports = project
+        .manifest
+        .galaxy_imports
+        .iter()
+        .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+        .collect::<BTreeSet<_>>();
+    let mut records = Vec::new();
+    let mut visible_library_modules = Vec::new();
+    let mut hidden_manual_only_library_modules = Vec::new();
+    let mut suggested_galaxy_imports = Vec::new();
+
+    for dependency in &project.resolved_galaxies {
+        for (library_module, library_path) in dependency
+            .library_modules
+            .iter()
+            .zip(dependency.resolved_library_paths.iter())
+        {
+            let key = format!("{}:{}", dependency.name, library_module);
+            let visible_module = project
+                .modules
+                .iter()
+                .find(|module| module.path == *library_path);
+            let visible = visible_module.is_some();
+            if visible {
+                visible_library_modules.push(key.clone());
+            } else if dependency.library_import_policy.as_str() == "manual-only" {
+                hidden_manual_only_library_modules.push(key.clone());
+            }
+            if dependency.library_import_policy.as_str() == "manual-only"
+                && !explicit_galaxy_imports.contains(&key)
+            {
+                suggested_galaxy_imports.push(key.clone());
+            }
+            records.push(ProjectImportRecord {
+                galaxy: dependency.name.clone(),
+                library_module: library_module.clone(),
+                import_policy: dependency.library_import_policy.as_str().to_owned(),
+                auto_injectable: dependency.auto_injectable,
+                visible,
+                explicit: explicit_galaxy_imports.contains(&key),
+                source_kind: visible_module.map(|module| module.origin.source_kind().to_owned()),
+                source_detail: visible_module.map(|module| module.origin.source_detail()),
+            });
+        }
+    }
+
+    Ok(ProjectImportsReport {
+        project_name: project.manifest.name.clone(),
+        root: project.root.clone(),
+        manifest_path: project.manifest_path.clone(),
+        galaxy_dependencies: project
+            .manifest
+            .galaxy_dependencies
+            .iter()
+            .map(|item| format!("{}={}", item.name, item.version))
+            .collect::<Vec<_>>(),
+        explicit_galaxy_imports: explicit_galaxy_imports.into_iter().collect::<Vec<_>>(),
+        suggested_galaxy_imports,
+        visible_library_modules,
+        hidden_manual_only_library_modules,
+        records,
+    })
+}
+
+fn handle_project_imports(input: std::path::PathBuf, json: bool) -> Result<(), String> {
+    if json {
+        println!("{}", render_project_imports_json(&input)?);
+        return Ok(());
+    }
+    for line in render_project_imports_text_summary(&input)? {
+        println!("{line}");
+    }
+    Ok(())
+}
+
+fn render_project_imports_text_summary(input: &Path) -> Result<Vec<String>, String> {
+    let report = collect_project_imports_report(input)?;
+    let mut lines = vec![
+        format!("project imports: {}", report.project_name),
+        format!("  root: {}", report.root.display()),
+        format!("  manifest: {}", report.manifest_path.display()),
+        format!("  galaxy_dependencies: {}", report.galaxy_dependencies.len()),
+        format!(
+            "  explicit_galaxy_imports: {}",
+            report.explicit_galaxy_imports.len()
+        ),
+        format!(
+            "  visible_library_modules: {}",
+            report.visible_library_modules.len()
+        ),
+        format!(
+            "  hidden_manual_only_library_modules: {}",
+            report.hidden_manual_only_library_modules.len()
+        ),
+        format!(
+            "  suggested_galaxy_imports: {}",
+            report.suggested_galaxy_imports.len()
+        ),
+    ];
+    for item in &report.galaxy_dependencies {
+        lines.push(format!("  galaxy_dependency: {}", item));
+    }
+    for item in &report.explicit_galaxy_imports {
+        lines.push(format!("  explicit_galaxy_import: {}", item));
+    }
+    for item in &report.suggested_galaxy_imports {
+        lines.push(format!("  suggested_galaxy_import: {}", item));
+    }
+    if !report.suggested_galaxy_imports.is_empty() {
+        lines.push(format!(
+            "  manifest_snippet: galaxy_imports = [{}]",
+            report
+                .suggested_galaxy_imports
+                .iter()
+                .map(|item| format!("\"{}\"", item))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    for record in &report.records {
+        let mut line = format!(
+            "  library: {}:{} import_policy={} auto_injectable={} visible={} explicit={}",
+            record.galaxy,
+            record.library_module,
+            record.import_policy,
+            yes_no(record.auto_injectable),
+            yes_no(record.visible),
+            yes_no(record.explicit),
+        );
+        if let Some(source_kind) = record.source_kind.as_deref() {
+            line.push_str(&format!(" source_kind={source_kind}"));
+        }
+        lines.push(line);
+    }
+    Ok(lines)
+}
+
+pub(crate) fn render_project_imports_json(input: &Path) -> Result<String, String> {
+    let report = collect_project_imports_report(input)?;
+    let records = report
+        .records
+        .iter()
+        .map(|record| {
+            let fields = vec![
+                json_field("galaxy", &record.galaxy),
+                json_field("library_module", &record.library_module),
+                json_field("import_policy", &record.import_policy),
+                json_bool_field("auto_injectable", record.auto_injectable),
+                json_bool_field("visible", record.visible),
+                json_bool_field("explicit", record.explicit),
+                json_optional_string_field("source_kind", record.source_kind.as_deref()),
+                json_optional_string_field("source_detail", record.source_detail.as_deref()),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>();
+    let fields = vec![
+        json_field("source_kind", "project"),
+        json_field("input", &input.display().to_string()),
+        json_field("project", &report.project_name),
+        json_field("root", &report.root.display().to_string()),
+        json_field("manifest", &report.manifest_path.display().to_string()),
+        json_usize_field("galaxy_dependencies_count", report.galaxy_dependencies.len()),
+        json_string_array_field("galaxy_dependencies", &report.galaxy_dependencies),
+        json_usize_field(
+            "explicit_galaxy_imports_count",
+            report.explicit_galaxy_imports.len(),
+        ),
+        json_string_array_field("explicit_galaxy_imports", &report.explicit_galaxy_imports),
+        json_usize_field(
+            "visible_library_modules_count",
+            report.visible_library_modules.len(),
+        ),
+        json_string_array_field("visible_library_modules", &report.visible_library_modules),
+        json_usize_field(
+            "hidden_manual_only_library_modules_count",
+            report.hidden_manual_only_library_modules.len(),
+        ),
+        json_string_array_field(
+            "hidden_manual_only_library_modules",
+            &report.hidden_manual_only_library_modules,
+        ),
+        json_usize_field(
+            "suggested_galaxy_imports_count",
+            report.suggested_galaxy_imports.len(),
+        ),
+        json_string_array_field("suggested_galaxy_imports", &report.suggested_galaxy_imports),
+        json_field(
+            "suggested_manifest_snippet",
+            &format!(
+                "galaxy_imports = [{}]",
+                report
+                    .suggested_galaxy_imports
+                    .iter()
+                    .map(|item| format!("\"{}\"", item))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        ),
+        json_object_array_field("library_records", &records),
+    ];
+    Ok(format!("{{{}}}", fields.join(",")))
+}
+
 fn print_domain_contract_group(contract: &nuisc::registry::NustarDomainContract, group: &str) {
     println!("    {}:", group);
     match group {
@@ -3851,6 +4083,7 @@ fn print_help() {
     println!("  project workflow:");
     println!("    nuis project-doctor [--json] [project-dir|nuis.toml]");
     println!("    nuis project-status [--json] [project-dir|nuis.toml]");
+    println!("    nuis project-imports [--json] [project-dir|nuis.toml]");
     println!("    nuis project-lock-abi [project-dir|nuis.toml]");
     println!("  cache:");
     println!(
@@ -4010,7 +4243,8 @@ mod tests {
         project_abi_checks_json, project_compile_workflow_source_profile,
         project_domain_registry_checks_json, project_workflow_json_fields,
         recommend_project_workflow_step, render_artifact_doctor_json,
-        render_project_doctor_json, render_project_status_json, render_scheduler_view_json,
+        render_project_doctor_json, render_project_imports_json, render_project_status_json,
+        render_scheduler_view_json,
         render_workflow_json, resolve_run_artifact_binary_path, resolve_runner_clock_domain, run_artifact_command_for_output_dir,
         run_language_benchmarks_for_source_file, run_language_tests_for_source_file,
         scheduler_view_domain_record, scheduler_view_domain_record_json,
@@ -4941,6 +5175,7 @@ entry = "main.ns"
 modules = ["main.ns"]
 tests = ["tests/smoke.ns"]
 abi = ["cpu=cpu.arm64.apple_aapcs64"]
+galaxy = ["ns-nova=workspace"]
 "#
             .trim_start(),
             r#"
@@ -4978,16 +5213,27 @@ mod cpu Main {
             "\"project_compile_workflow\":\"{}\"",
             nuisc::project_compile_workflow_brief()
         )));
-        assert!(json.contains("\"recommended_next_step\":\"check\""));
+        assert!(json.contains("\"recommended_next_step\":\"galaxy_lock_deps\""));
+        assert!(json.contains(
+            "\"recommended_command\":\"nuis galaxy lock-deps <project-dir|nuis.toml>\""
+        ));
+        assert!(json.contains(
+            "\"recommended_reason\":\"the project already declares galaxy dependencies but does not yet have a lockfile\""
+        ));
         assert!(json.contains("\"artifact_output_dir\":\""));
         assert!(json.contains("\"artifact_ready_to_run\":false"));
         assert!(json.contains("\"artifact_recommended_next_step\":\"build\""));
         assert!(json.contains("\"link_plan_available\":false"));
         assert!(json.contains("\"link_plan_final_stage\":null"));
         assert!(json.contains("\"tests_declared\":1"));
-        assert!(json.contains("\"public_surface_modules\":1"));
-        assert!(json.contains("\"public_functions\":1"));
+        assert!(json.contains("\"public_surface_modules\":3"));
+        assert!(json.contains("\"public_functions\":10"));
         assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
+        assert!(json.contains("\"galaxy_imports_count\":0"));
+        assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":1"));
+        assert!(json.contains(
+            "\"galaxy_hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]"
+        ));
         assert!(json.contains("\"tests\":[{"));
         assert!(json.contains("\"exists\":true"));
         assert!(json.contains("\"domains\":["));
@@ -5040,6 +5286,116 @@ mod cpu Main {
         assert!(json.contains("\"tests\":[{"));
         assert!(json.contains("\"exists\":false"));
         assert!(json.contains("\"domains\":["));
+    }
+
+    #[test]
+    fn project_doctor_json_suggests_galaxy_imports_for_hidden_manual_only_modules() {
+        let project_root = write_temp_project_fixture(
+            "doctor_manual_only_import_hint",
+            r#"
+name = "doctor_manual_only_import_hint"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["ns-nova=workspace"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 4;
+  }
+}
+"#,
+        );
+
+        let json = render_project_doctor_json(&project_root).expect("render doctor json");
+
+        assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":1"));
+        assert!(json.contains(
+            "\"galaxy_hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]"
+        ));
+        assert!(json.contains("manual-only galaxy library modules"));
+        assert!(json.contains("galaxy_imports = [...]"));
+        assert!(json.contains("ns-nova:lib/nova_contracts.ns"));
+    }
+
+    #[test]
+    fn project_imports_json_reports_hidden_manual_only_library_modules() {
+        let project_root = write_temp_project_fixture(
+            "imports_manual_only_hint",
+            r#"
+name = "imports_manual_only_hint"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["ns-nova=workspace"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        );
+
+        let json = render_project_imports_json(&project_root).expect("render imports json");
+
+        assert!(json.contains("\"source_kind\":\"project\""));
+        assert!(json.contains("\"project\":\"imports_manual_only_hint\""));
+        assert!(json.contains("\"explicit_galaxy_imports_count\":0"));
+        assert!(json.contains("\"visible_library_modules_count\":2"));
+        assert!(json.contains("\"hidden_manual_only_library_modules_count\":1"));
+        assert!(json.contains(
+            "\"hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]"
+        ));
+        assert!(json.contains("\"suggested_galaxy_imports_count\":1"));
+        assert!(json.contains(
+            "\"suggested_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"
+        ));
+        assert!(json.contains(
+            "\"suggested_manifest_snippet\":\"galaxy_imports = [\\\"ns-nova:lib/nova_contracts.ns\\\"]\""
+        ));
+        assert!(json.contains("\"library_records\":[{"));
+        assert!(json.contains("\"import_policy\":\"manual-only\""));
+        assert!(json.contains("\"visible\":false"));
+        assert!(json.contains("\"explicit\":false"));
+    }
+
+    #[test]
+    fn project_imports_json_reports_explicit_manual_only_library_as_visible() {
+        let project_root = write_temp_project_fixture(
+            "imports_explicit_manual_only",
+            r#"
+name = "imports_explicit_manual_only"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["ns-nova=workspace"]
+galaxy_imports = ["ns-nova:lib/nova_contracts.ns"]
+"#
+            .trim_start(),
+            r#"
+use cpu NovaContracts;
+
+mod cpu Main {
+  fn main() -> i64 {
+    return NovaContracts.runtime_score(16, 4, 3, 2, 9, 1);
+  }
+}
+"#,
+        );
+
+        let json = render_project_imports_json(&project_root).expect("render imports json");
+
+        assert!(json.contains("\"explicit_galaxy_imports_count\":1"));
+        assert!(json.contains(
+            "\"explicit_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"
+        ));
+        assert!(json.contains("\"hidden_manual_only_library_modules_count\":0"));
+        assert!(json.contains("\"suggested_galaxy_imports_count\":0"));
+        assert!(json.contains("\"visible\":true"));
+        assert!(json.contains("\"explicit\":true"));
+        assert!(json.contains("\"source_kind\":\"galaxy-explicit-import\""));
     }
 
     #[test]

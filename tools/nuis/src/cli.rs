@@ -117,6 +117,10 @@ pub enum CommandKind {
         input: PathBuf,
         json: bool,
     },
+    ProjectImports {
+        input: PathBuf,
+        json: bool,
+    },
     ProjectLockAbi {
         input: PathBuf,
     },
@@ -654,12 +658,32 @@ where
                 json,
             })
         }
+        "project-imports" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis project-imports [--json] [project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::ProjectImports {
+                input: input.unwrap_or_else(|| PathBuf::from(".")),
+                json,
+            })
+        }
         "project-lock-abi" => Ok(CommandKind::ProjectLockAbi {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `artifact-doctor`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `artifact-doctor`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }
@@ -811,6 +835,26 @@ mod tests {
             command,
             CommandKind::Workflow {
                 input: PathBuf::from("examples/demo.ns"),
+                json: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_project_imports_json_with_explicit_input() {
+        let command = parse_args(
+            [
+                "project-imports".to_owned(),
+                "--json".to_owned(),
+                "examples/demo".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .expect("project-imports parses");
+        assert_eq!(
+            command,
+            CommandKind::ProjectImports {
+                input: PathBuf::from("examples/demo"),
                 json: true,
             }
         );
