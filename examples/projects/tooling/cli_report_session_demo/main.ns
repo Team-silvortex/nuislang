@@ -83,17 +83,9 @@ mod cpu Main {
   fn main() -> i64 {
     let summary: CliReportSessionProjectSummary =
       capture_cli_report_session_project(509, 0);
-    return summary.argv_count
-      + summary.line_handle
-      + summary.line_len
-      + summary.completed
-      + summary.timed_out
-      + summary.selected_value
-      + summary.diag_code
-      + summary.stdout_code
-      + summary.stderr_code
-      + summary.stdout_flushed
-      + summary.stderr_flushed
-      + summary.tick_ns;
+    if summary.stdout_code > 0 || summary.stderr_code > 0 || summary.diag_code > 0 {
+      return 0;
+    }
+    return 1;
   }
 }

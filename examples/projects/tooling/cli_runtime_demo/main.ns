@@ -48,13 +48,9 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: CliRuntimeSummary = capture_cli_runtime();
-    return summary.argv_count
-      + summary.env_present
-      + summary.cwd_handle
-      + summary.config_value_handle
-      + summary.cache_hit_handle
-      + summary.stdout_code
-      + summary.diag_code
-      + summary.tick_ns;
+    if summary.stdout_code > 0 {
+      return 0;
+    }
+    return 1;
   }
 }

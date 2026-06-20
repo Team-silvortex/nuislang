@@ -78,13 +78,9 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: SubprocessRuntimeProjectSummary = capture_subprocess_runtime_project();
-    return summary.primary_handle
-      + summary.primary_signal
-      + summary.primary_join
-      + summary.primary_join_exit
-      + summary.secondary_handle
-      + summary.secondary_signal
-      + summary.secondary_join
-      + summary.secondary_join_exit;
+    if summary.primary_handle > 0 && summary.secondary_handle > 0 {
+      return 0;
+    }
+    return 1;
   }
 }

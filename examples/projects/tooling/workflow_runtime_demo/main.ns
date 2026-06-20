@@ -138,32 +138,9 @@ mod cpu Main {
 
   fn main() -> i64 {
     let report: WorkflowReport = capture_workflow_runtime_project();
-    let overall_bonus: i64 = if report.overall_success {
-      1
-    } else {
-      0
-    };
-    let first_executed_bonus: i64 = if report.first.executed {
-      1
-    } else {
-      0
-    };
-    let second_executed_bonus: i64 = if report.second.executed {
-      1
-    } else {
-      0
-    };
-    return report.first.result.handle
-      + report.first.result.status
-      + report.first.result.wait_code
-      + report.first.result.wait_exit
-      + report.second.result.handle
-      + report.second.result.status
-      + report.second.result.wait_code
-      + report.second.result.wait_exit
-      + report.first_failure_handle
-      + overall_bonus
-      + first_executed_bonus
-      + second_executed_bonus;
+    if report.overall_success {
+      return 0;
+    }
+    return 1;
   }
 }

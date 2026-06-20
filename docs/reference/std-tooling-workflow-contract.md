@@ -61,6 +61,17 @@ Short rule:
 
 `the current std tooling lane is readable enough to prove direction, but still too copy-shaped to call finished`
 
+Current authoring-shape target:
+
+```text
+Seed -> build_*_context -> capture_* -> summarize_*
+```
+
+That is not yet the final abstraction boundary.
+
+It is the current minimum source contract that lets us keep multiple checked-in
+tooling lanes aligned while they are still separate files.
+
 ## Current Problem Statement
 
 Today the command/tooling lane is no longer too raw to express workflow
@@ -112,6 +123,20 @@ The current sample ladder is:
   [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
 
 That target still implies four source-level value families.
+
+Current semantic split for this lane:
+
+* launch-shaped frontdoor recipes:
+  recipe/project routes that should survive the current
+  `build -> artifact-doctor -> run-artifact` path without using raw counter
+  accumulation as their process-exit contract
+* probe-style observation recipes:
+  recipe/project routes that still intentionally expose one host/runtime/report
+  slice and are not the default artifact frontdoor
+
+Short rule:
+
+`tooling expressivity is broader than tooling frontdoor status`
 
 Current example routing for this lane:
 

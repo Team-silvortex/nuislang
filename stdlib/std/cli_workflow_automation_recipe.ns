@@ -124,6 +124,29 @@ mod cpu Main {
     recommended_reason_handle: i64
   }
 
+  struct WorkflowAutomationSeed {
+    first_name_handle: i64,
+    first_program_handle: i64,
+    first_argv_handle: i64,
+    first_timeout_ms: i64,
+    first_fail_fast: bool,
+    second_name_handle: i64,
+    second_program_handle: i64,
+    second_argv_handle: i64,
+    second_timeout_ms: i64,
+    second_fail_fast: bool,
+    third_name_handle: i64,
+    third_program_handle: i64,
+    third_argv_handle: i64,
+    third_timeout_ms: i64,
+    third_fail_fast: bool,
+    fourth_name_handle: i64,
+    fourth_program_handle: i64,
+    fourth_argv_handle: i64,
+    fourth_timeout_ms: i64,
+    fourth_fail_fast: bool
+  }
+
   struct CombinedSummary {
     cli: CliSummary,
     automation: AutomationSummary,
@@ -269,6 +292,18 @@ mod cpu Main {
     };
   }
 
+  fn build_workflow_recipe_command_context(
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> CommandContext {
+    return build_command_context(
+      cwd_handle,
+      timeout_ms,
+      cwd_handle == 0,
+      timeout_ms != 0
+    );
+  }
+
   fn build_command_request(
     program_handle: i64,
     argv_handle: i64,
@@ -294,9 +329,34 @@ mod cpu Main {
       request: build_command_request(
         program_handle,
         argv_handle,
-        build_command_context(cwd_handle, timeout_ms, false, true)
+        build_workflow_recipe_command_context(cwd_handle, timeout_ms)
       ),
       fail_fast: fail_fast
+    };
+  }
+
+  fn build_workflow_automation_seed() -> WorkflowAutomationSeed {
+    return WorkflowAutomationSeed {
+      first_name_handle: 4101,
+      first_program_handle: 801,
+      first_argv_handle: 17,
+      first_timeout_ms: 250,
+      first_fail_fast: true,
+      second_name_handle: 4102,
+      second_program_handle: 803,
+      second_argv_handle: 19,
+      second_timeout_ms: 500,
+      second_fail_fast: false,
+      third_name_handle: 4103,
+      third_program_handle: 805,
+      third_argv_handle: 23,
+      third_timeout_ms: 750,
+      third_fail_fast: false,
+      fourth_name_handle: 4104,
+      fourth_program_handle: 807,
+      fourth_argv_handle: 29,
+      fourth_timeout_ms: 1000,
+      fourth_fail_fast: true
     };
   }
 
@@ -532,6 +592,52 @@ mod cpu Main {
     return skipped_quad_report(first_step, second_step, third_step, fourth_step);
   }
 
+  fn build_workflow_from_cli(
+    cli: CliSummary,
+    seed: WorkflowAutomationSeed,
+    automation: AutomationSummary
+  ) -> WorkflowQuadReport {
+    let first_step: WorkflowStep = build_workflow_step(
+      seed.first_name_handle,
+      seed.first_program_handle,
+      seed.first_argv_handle,
+      automation.cwd_handle,
+      seed.first_timeout_ms,
+      seed.first_fail_fast
+    );
+    let second_step: WorkflowStep = build_workflow_step(
+      seed.second_name_handle,
+      seed.second_program_handle,
+      seed.second_argv_handle,
+      automation.cwd_handle,
+      seed.second_timeout_ms,
+      seed.second_fail_fast
+    );
+    let third_step: WorkflowStep = build_workflow_step(
+      seed.third_name_handle,
+      seed.third_program_handle,
+      seed.third_argv_handle,
+      automation.temp_dir_handle,
+      seed.third_timeout_ms,
+      seed.third_fail_fast
+    );
+    let fourth_step: WorkflowStep = build_workflow_step(
+      seed.fourth_name_handle,
+      seed.fourth_program_handle,
+      seed.fourth_argv_handle,
+      automation.cwd_handle,
+      seed.fourth_timeout_ms,
+      seed.fourth_fail_fast
+    );
+    return capture_workflow_from_cli(
+      cli,
+      first_step,
+      second_step,
+      third_step,
+      fourth_step
+    );
+  }
+
   fn emit_success_report(
     cli: CliSummary,
     workflow: WorkflowQuadReport,
@@ -691,20 +797,10 @@ mod cpu Main {
   fn capture_combined(seed: CombinedSeed) -> CombinedSummary {
     let cli: CliSummary = capture_cli(seed.cli);
     let automation: AutomationSummary = capture_automation(seed.automation, cli.selected_value);
-    let first_step: WorkflowStep =
-      build_workflow_step(4101, 801, 17, automation.cwd_handle, 250, true);
-    let second_step: WorkflowStep =
-      build_workflow_step(4102, 803, 19, automation.cwd_handle, 500, false);
-    let third_step: WorkflowStep =
-      build_workflow_step(4103, 805, 23, automation.temp_dir_handle, 750, false);
-    let fourth_step: WorkflowStep =
-      build_workflow_step(4104, 807, 29, automation.cwd_handle, 1000, true);
-    let workflow: WorkflowQuadReport = capture_workflow_from_cli(
+    let workflow: WorkflowQuadReport = build_workflow_from_cli(
       cli,
-      first_step,
-      second_step,
-      third_step,
-      fourth_step
+      build_workflow_automation_seed(),
+      automation
     );
 
     if cli.completed == false {
@@ -742,6 +838,36 @@ mod cpu Main {
       + report.executed_steps;
   }
 
+  fn summarize_cli_summary(summary: CliSummary) -> i64 {
+    return summary.argv_count
+      + summary.line_handle
+      + summary.line_len
+      + encode_bool(summary.completed)
+      + encode_bool(summary.timed_out)
+      + summary.selected_value
+      + summary.tick_ns;
+  }
+
+  fn summarize_automation_summary(summary: AutomationSummary) -> i64 {
+    return summary.cwd_handle
+      + summary.temp_dir_handle
+      + summary.temp_file_handle
+      + summary.cache_hit_handle
+      + summary.cache_store_code;
+  }
+
+  fn summarize_combined_summary(summary: CombinedSummary) -> i64 {
+    return summarize_cli_summary(summary.cli)
+      + summarize_automation_summary(summary.automation)
+      + summarize_quad_report(summary.workflow)
+      + summarize_frontdoor_surface(summary.frontdoor)
+      + summary.diag_code
+      + summary.stdout_code
+      + summary.stderr_code
+      + summary.stdout_flushed
+      + summary.stderr_flushed;
+  }
+
   fn summarize_cli_workflow_automation_recipe(
     prompt_handle: i64,
     ok_text_handle: i64,
@@ -765,25 +891,7 @@ mod cpu Main {
       cache_key_handle
     );
     let summary: CombinedSummary = capture_combined(seed);
-    return summary.cli.argv_count
-      + summary.cli.line_handle
-      + summary.cli.line_len
-      + encode_bool(summary.cli.completed)
-      + encode_bool(summary.cli.timed_out)
-      + summary.cli.selected_value
-      + summary.cli.tick_ns
-      + summary.automation.cwd_handle
-      + summary.automation.temp_dir_handle
-      + summary.automation.temp_file_handle
-      + summary.automation.cache_hit_handle
-      + summary.automation.cache_store_code
-      + summarize_quad_report(summary.workflow)
-      + summarize_frontdoor_surface(summary.frontdoor)
-      + summary.diag_code
-      + summary.stdout_code
-      + summary.stderr_code
-      + summary.stdout_flushed
-      + summary.stderr_flushed;
+    return summarize_combined_summary(summary);
   }
 
   fn main() {

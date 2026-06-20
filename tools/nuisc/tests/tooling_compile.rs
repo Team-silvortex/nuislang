@@ -1,6 +1,29 @@
 use std::path::Path;
 
 #[test]
+fn compiles_cli_runtime_tooling_project() {
+    let project =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo");
+    nuisc::pipeline::compile_project(project).expect("cli runtime tooling project should compile");
+}
+
+#[test]
+fn compiles_cli_session_tooling_project() {
+    let project =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_session_demo");
+    nuisc::pipeline::compile_project(project).expect("cli session tooling project should compile");
+}
+
+#[test]
+fn compiles_cli_report_session_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_report_session_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("cli report session tooling project should compile");
+}
+
+#[test]
 fn compiles_command_runtime_tooling_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo",

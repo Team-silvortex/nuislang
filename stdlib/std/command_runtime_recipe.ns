@@ -158,25 +158,61 @@ mod cpu Main {
       + encode_bool(context.has_timeout);
   }
 
+  fn build_command_recipe_context(
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> CommandContext {
+    return build_command_context(
+      env_handle,
+      cwd_handle,
+      timeout_ms,
+      env_handle == 0,
+      cwd_handle == 0,
+      timeout_ms != 0
+    );
+  }
+
+  fn summarize_command_runtime_recipe_summary(
+    summary: CommandRuntimeRecipeSummary
+  ) -> i64 {
+    return summary.primary_handle
+      + summary.primary_status
+      + summary.primary_wait
+      + summary.primary_wait_exit
+      + summary.primary_context_value
+      + summary.primary_launch_bonus
+      + summary.secondary_handle
+      + summary.secondary_status
+      + summary.secondary_wait
+      + summary.secondary_wait_exit
+      + summary.secondary_context_value
+      + summary.secondary_launch_bonus;
+  }
+
   fn capture_command_runtime_recipe(seed: CommandRuntimeRecipeSeed) -> CommandRuntimeRecipeSummary {
+    let primary_context: CommandContext = build_command_recipe_context(
+      seed.primary_env_handle,
+      seed.primary_cwd_handle,
+      seed.primary_timeout_ms
+    );
+    let secondary_context: CommandContext = build_command_recipe_context(
+      seed.secondary_env_handle,
+      seed.secondary_cwd_handle,
+      seed.secondary_timeout_ms
+    );
     let primary: CommandResult = run_command(
       build_command_request_with_context(
         seed.primary_program_handle,
         seed.primary_argv_handle,
-        build_command_context(
-          seed.primary_env_handle,
-          seed.primary_cwd_handle,
-          seed.primary_timeout_ms,
-          false,
-          false,
-          true
-        )
+        primary_context
       )
     );
     let secondary: CommandResult = run_command(
-      build_command_request(
+      build_command_request_with_context(
         seed.secondary_program_handle,
-        seed.secondary_argv_handle
+        seed.secondary_argv_handle,
+        secondary_context
       )
     );
     return CommandRuntimeRecipeSummary {
@@ -184,22 +220,13 @@ mod cpu Main {
       primary_status: primary.status,
       primary_wait: primary.wait_code,
       primary_wait_exit: primary.wait_exit,
-      primary_context_value: summarize_command_context(
-        build_command_context(
-          seed.primary_env_handle,
-          seed.primary_cwd_handle,
-          seed.primary_timeout_ms,
-          false,
-          false,
-          true
-        )
-      ),
+      primary_context_value: summarize_command_context(primary_context),
       primary_launch_bonus: encode_bool(primary.launched),
       secondary_handle: secondary.handle,
       secondary_status: secondary.status,
       secondary_wait: secondary.wait_code,
       secondary_wait_exit: secondary.wait_exit,
-      secondary_context_value: summarize_command_context(build_default_command_context()),
+      secondary_context_value: summarize_command_context(secondary_context),
       secondary_launch_bonus: encode_bool(secondary.launched)
     };
   }
@@ -219,18 +246,7 @@ mod cpu Main {
         secondary_timeout_ms: 0
       }
     );
-    return summary.primary_handle
-      + summary.primary_status
-      + summary.primary_wait
-      + summary.primary_wait_exit
-      + summary.primary_context_value
-      + summary.primary_launch_bonus
-      + summary.secondary_handle
-      + summary.secondary_status
-      + summary.secondary_wait
-      + summary.secondary_wait_exit
-      + summary.secondary_context_value
-      + summary.secondary_launch_bonus;
+    return summarize_command_runtime_recipe_summary(summary);
   }
 
   fn main() {

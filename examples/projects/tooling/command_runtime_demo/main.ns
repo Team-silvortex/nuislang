@@ -64,13 +64,9 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: CommandRuntimeProjectSummary = capture_command_runtime_project();
-    return summary.primary_handle
-      + summary.primary_status
-      + summary.primary_wait
-      + summary.primary_wait_exit
-      + summary.secondary_handle
-      + summary.secondary_status
-      + summary.secondary_wait
-      + summary.secondary_wait_exit;
+    if summary.primary_handle > 0 && summary.secondary_handle > 0 {
+      return 0;
+    }
+    return 1;
   }
 }

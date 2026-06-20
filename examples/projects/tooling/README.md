@@ -22,6 +22,27 @@ If you only want the shortest tooling route, start with:
 * [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
 * [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
 
+Current runnable CLI frontdoor:
+
+* `cli_runtime_demo` is the shortest checked-in host/CLI project that now fits
+  the normal `build -> artifact-doctor -> run-artifact` success path
+* `cli_session_demo` and `cli_report_session_demo` now also fit the same launch
+  path, while still representing the interactive/session-oriented lane
+* `workflow_runtime_demo` now fits the same launch path as the workflow-shaped
+  command/session frontdoor
+* `command_runtime_demo` and `subprocess_runtime_demo` now also fit that same
+  launch path as the narrow command/process companions
+
+Current split:
+
+* launch-shaped frontdoors:
+  `cli_runtime_demo`, `cli_session_demo`, `cli_report_session_demo`,
+  `workflow_runtime_demo`, `command_runtime_demo`, `subprocess_runtime_demo`,
+  `native_artifact_closure_demo`
+* probe-style companions:
+  most of the remaining entries in this folder still exist to expose one host
+  surface, one report shape, or one runtime observation slice at a time
+
 ## Pick By Goal
 
 * argv and environment:

@@ -141,6 +141,31 @@ mod cpu Main {
     recommended_reason_handle: i64
   }
 
+  struct ProjectBuildWorkflowSeed {
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    configure_name_handle: i64,
+    configure_program_handle: i64,
+    configure_argv_handle: i64,
+    configure_timeout_ms: i64,
+    configure_fail_fast: bool,
+    verify_name_handle: i64,
+    verify_program_handle: i64,
+    verify_argv_handle: i64,
+    verify_timeout_ms: i64,
+    verify_fail_fast: bool,
+    emit_name_handle: i64,
+    emit_program_handle: i64,
+    emit_argv_handle: i64,
+    emit_fail_fast: bool,
+    report_name_handle: i64,
+    report_program_handle: i64,
+    report_argv_handle: i64,
+    report_timeout_ms: i64,
+    report_fail_fast: bool
+  }
+
   struct CliProjectBuildSummary {
     session: ProjectSessionSummary,
     artifact: ProjectArtifactSummary,
@@ -304,6 +329,18 @@ mod cpu Main {
     };
   }
 
+  fn build_project_build_command_context(
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> CommandContext {
+    return build_command_context(
+      cwd_handle,
+      timeout_ms,
+      cwd_handle == 0,
+      timeout_ms != 0
+    );
+  }
+
   fn build_command_request(
     program_handle: i64,
     argv_handle: i64,
@@ -329,9 +366,36 @@ mod cpu Main {
       request: build_command_request(
         program_handle,
         argv_handle,
-        build_command_context(cwd_handle, timeout_ms, false, true)
+        build_project_build_command_context(cwd_handle, timeout_ms)
       ),
       fail_fast: fail_fast
+    };
+  }
+
+  fn build_project_build_workflow_seed() -> ProjectBuildWorkflowSeed {
+    return ProjectBuildWorkflowSeed {
+      plan_handle: 7101,
+      success_handle: 7201,
+      failure_handle: 7203,
+      configure_name_handle: 6101,
+      configure_program_handle: 1001,
+      configure_argv_handle: 47,
+      configure_timeout_ms: 250,
+      configure_fail_fast: true,
+      verify_name_handle: 6102,
+      verify_program_handle: 1003,
+      verify_argv_handle: 53,
+      verify_timeout_ms: 500,
+      verify_fail_fast: true,
+      emit_name_handle: 6103,
+      emit_program_handle: 1005,
+      emit_argv_handle: 59,
+      emit_fail_fast: true,
+      report_name_handle: 6104,
+      report_program_handle: 1007,
+      report_argv_handle: 61,
+      report_timeout_ms: 750,
+      report_fail_fast: true
     };
   }
 
@@ -592,6 +656,20 @@ mod cpu Main {
     };
   }
 
+  fn capture_project_build_report(
+    session: ProjectSessionSummary,
+    manifest: BuildManifest,
+    seed: ProjectBuildWorkflowSeed
+  ) -> ProjectBuildPlanReport {
+    return run_project_build_plan(
+      seed.plan_handle,
+      seed.success_handle,
+      seed.failure_handle,
+      session,
+      manifest
+    );
+  }
+
   fn emit_success_diag(
     session: ProjectSessionSummary,
     build_report: ProjectBuildPlanReport,
@@ -755,8 +833,11 @@ mod cpu Main {
     let artifact: ProjectArtifactSummary =
       capture_project_artifact(seed.build, session.target_handle);
     let manifest: BuildManifest = build_manifest(session, artifact);
-    let build_report: ProjectBuildPlanReport =
-      run_project_build_plan(7101, 7201, 7203, session, manifest);
+    let build_report: ProjectBuildPlanReport = capture_project_build_report(
+      session,
+      manifest,
+      build_project_build_workflow_seed()
+    );
 
     if session.completed == false {
       return build_failure_summary(seed, session, artifact, manifest, build_report);
@@ -801,6 +882,48 @@ mod cpu Main {
       + summarize_project_report(report.build_report);
   }
 
+  fn summarize_project_session_summary(summary: ProjectSessionSummary) -> i64 {
+    return summary.argv_count
+      + summary.line_handle
+      + summary.line_len
+      + encode_bool(summary.completed)
+      + encode_bool(summary.timed_out)
+      + summary.target_handle
+      + summary.tick_ns;
+  }
+
+  fn summarize_project_artifact_summary(summary: ProjectArtifactSummary) -> i64 {
+    return summary.project_root_handle
+      + summary.artifact_dir_handle
+      + summary.artifact_file_handle
+      + summary.cache_hit_handle
+      + summary.cache_store_code;
+  }
+
+  fn summarize_build_manifest(manifest: BuildManifest) -> i64 {
+    return manifest.project_root_handle
+      + manifest.artifact_dir_handle
+      + manifest.artifact_file_handle
+      + manifest.target_handle
+      + manifest.manifest_value_handle
+      + manifest.timeout_budget;
+  }
+
+  fn summarize_cli_project_build_summary(
+    summary: CliProjectBuildSummary
+  ) -> i64 {
+    return summarize_project_session_summary(summary.session)
+      + summarize_project_artifact_summary(summary.artifact)
+      + summarize_build_manifest(summary.manifest)
+      + summarize_frontdoor_surface(summary.frontdoor)
+      + summarize_project_build_plan_report(summary.build_report)
+      + summary.diag_code
+      + summary.stdout_code
+      + summary.stderr_code
+      + summary.stdout_flushed
+      + summary.stderr_flushed;
+  }
+
   fn summarize_cli_project_build_report_recipe(
     prompt_handle: i64,
     ready_text_handle: i64,
@@ -824,31 +947,7 @@ mod cpu Main {
       cache_key_handle
     );
     let summary: CliProjectBuildSummary = capture_cli_project_build(seed);
-    return summary.session.argv_count
-      + summary.session.line_handle
-      + summary.session.line_len
-      + encode_bool(summary.session.completed)
-      + encode_bool(summary.session.timed_out)
-      + summary.session.target_handle
-      + summary.session.tick_ns
-      + summary.artifact.project_root_handle
-      + summary.artifact.artifact_dir_handle
-      + summary.artifact.artifact_file_handle
-      + summary.artifact.cache_hit_handle
-      + summary.artifact.cache_store_code
-      + summary.manifest.project_root_handle
-      + summary.manifest.artifact_dir_handle
-      + summary.manifest.artifact_file_handle
-      + summary.manifest.target_handle
-      + summary.manifest.manifest_value_handle
-      + summary.manifest.timeout_budget
-      + summarize_frontdoor_surface(summary.frontdoor)
-      + summarize_project_build_plan_report(summary.build_report)
-      + summary.diag_code
-      + summary.stdout_code
-      + summary.stderr_code
-      + summary.stdout_flushed
-      + summary.stderr_flushed;
+    return summarize_cli_project_build_summary(summary);
   }
 
   fn main() {

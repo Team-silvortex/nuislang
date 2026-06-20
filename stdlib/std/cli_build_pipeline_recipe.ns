@@ -141,6 +141,31 @@ mod cpu Main {
     recommended_reason_handle: i64
   }
 
+  struct BuildPipelineWorkflowSeed {
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    prepare_name_handle: i64,
+    prepare_program_handle: i64,
+    prepare_argv_handle: i64,
+    prepare_timeout_ms: i64,
+    prepare_fail_fast: bool,
+    check_name_handle: i64,
+    check_program_handle: i64,
+    check_argv_handle: i64,
+    check_timeout_ms: i64,
+    check_fail_fast: bool,
+    compile_name_handle: i64,
+    compile_program_handle: i64,
+    compile_argv_handle: i64,
+    compile_fail_fast: bool,
+    package_name_handle: i64,
+    package_program_handle: i64,
+    package_argv_handle: i64,
+    package_timeout_ms: i64,
+    package_fail_fast: bool
+  }
+
   struct CliBuildPipelineSummary {
     cli: PipelineCliSummary,
     automation: PipelineAutomationSummary,
@@ -304,6 +329,18 @@ mod cpu Main {
     };
   }
 
+  fn build_pipeline_command_context(
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> CommandContext {
+    return build_command_context(
+      cwd_handle,
+      timeout_ms,
+      cwd_handle == 0,
+      timeout_ms != 0
+    );
+  }
+
   fn build_command_request(
     program_handle: i64,
     argv_handle: i64,
@@ -329,9 +366,36 @@ mod cpu Main {
       request: build_command_request(
         program_handle,
         argv_handle,
-        build_command_context(cwd_handle, timeout_ms, false, true)
+        build_pipeline_command_context(cwd_handle, timeout_ms)
       ),
       fail_fast: fail_fast
+    };
+  }
+
+  fn build_build_pipeline_workflow_seed() -> BuildPipelineWorkflowSeed {
+    return BuildPipelineWorkflowSeed {
+      plan_handle: 6101,
+      success_handle: 6201,
+      failure_handle: 6203,
+      prepare_name_handle: 5101,
+      prepare_program_handle: 901,
+      prepare_argv_handle: 31,
+      prepare_timeout_ms: 250,
+      prepare_fail_fast: true,
+      check_name_handle: 5102,
+      check_program_handle: 903,
+      check_argv_handle: 37,
+      check_timeout_ms: 500,
+      check_fail_fast: true,
+      compile_name_handle: 5103,
+      compile_program_handle: 905,
+      compile_argv_handle: 41,
+      compile_fail_fast: true,
+      package_name_handle: 5104,
+      package_program_handle: 907,
+      package_argv_handle: 43,
+      package_timeout_ms: 750,
+      package_fail_fast: true
     };
   }
 
@@ -592,6 +656,20 @@ mod cpu Main {
     };
   }
 
+  fn capture_build_pipeline_report(
+    cli: PipelineCliSummary,
+    plan: BuildPlan,
+    seed: BuildPipelineWorkflowSeed
+  ) -> BuildPipelinePlanReport {
+    return run_build_pipeline_plan(
+      seed.plan_handle,
+      seed.success_handle,
+      seed.failure_handle,
+      cli,
+      plan
+    );
+  }
+
   fn emit_success_diag(
     cli: PipelineCliSummary,
     pipeline: BuildPipelinePlanReport,
@@ -753,12 +831,10 @@ mod cpu Main {
     let automation: PipelineAutomationSummary =
       capture_pipeline_automation(seed.automation, cli.selected_target_handle);
     let plan: BuildPlan = build_plan(cli, automation);
-    let pipeline: BuildPipelinePlanReport = run_build_pipeline_plan(
-      6101,
-      6201,
-      6203,
+    let pipeline: BuildPipelinePlanReport = capture_build_pipeline_report(
       cli,
-      plan
+      plan,
+      build_build_pipeline_workflow_seed()
     );
 
     if cli.completed == false {
@@ -804,6 +880,48 @@ mod cpu Main {
       + summarize_build_pipeline(report.pipeline);
   }
 
+  fn summarize_pipeline_cli_summary(summary: PipelineCliSummary) -> i64 {
+    return summary.argv_count
+      + summary.line_handle
+      + summary.line_len
+      + encode_bool(summary.completed)
+      + encode_bool(summary.timed_out)
+      + summary.selected_target_handle
+      + summary.tick_ns;
+  }
+
+  fn summarize_pipeline_automation_summary(summary: PipelineAutomationSummary) -> i64 {
+    return summary.workspace_handle
+      + summary.artifact_dir_handle
+      + summary.artifact_file_handle
+      + summary.cache_hit_handle
+      + summary.cache_store_code;
+  }
+
+  fn summarize_build_plan(plan: BuildPlan) -> i64 {
+    return plan.workspace_handle
+      + plan.artifact_dir_handle
+      + plan.artifact_file_handle
+      + plan.selected_target_handle
+      + plan.cache_value_handle
+      + plan.timeout_budget;
+  }
+
+  fn summarize_cli_build_pipeline_summary(
+    summary: CliBuildPipelineSummary
+  ) -> i64 {
+    return summarize_pipeline_cli_summary(summary.cli)
+      + summarize_pipeline_automation_summary(summary.automation)
+      + summarize_build_plan(summary.plan)
+      + summarize_frontdoor_surface(summary.frontdoor)
+      + summarize_build_pipeline_plan_report(summary.pipeline)
+      + summary.diag_code
+      + summary.stdout_code
+      + summary.stderr_code
+      + summary.stdout_flushed
+      + summary.stderr_flushed;
+  }
+
   fn summarize_cli_build_pipeline_recipe(
     prompt_handle: i64,
     ready_text_handle: i64,
@@ -827,31 +945,7 @@ mod cpu Main {
       cache_key_handle
     );
     let summary: CliBuildPipelineSummary = capture_cli_build_pipeline(seed);
-    return summary.cli.argv_count
-      + summary.cli.line_handle
-      + summary.cli.line_len
-      + encode_bool(summary.cli.completed)
-      + encode_bool(summary.cli.timed_out)
-      + summary.cli.selected_target_handle
-      + summary.cli.tick_ns
-      + summary.automation.workspace_handle
-      + summary.automation.artifact_dir_handle
-      + summary.automation.artifact_file_handle
-      + summary.automation.cache_hit_handle
-      + summary.automation.cache_store_code
-      + summary.plan.workspace_handle
-      + summary.plan.artifact_dir_handle
-      + summary.plan.artifact_file_handle
-      + summary.plan.selected_target_handle
-      + summary.plan.cache_value_handle
-      + summary.plan.timeout_budget
-      + summarize_frontdoor_surface(summary.frontdoor)
-      + summarize_build_pipeline_plan_report(summary.pipeline)
-      + summary.diag_code
-      + summary.stdout_code
-      + summary.stderr_code
-      + summary.stdout_flushed
-      + summary.stderr_flushed;
+    return summarize_cli_build_pipeline_summary(summary);
   }
 
   fn main() {

@@ -4105,6 +4105,15 @@ mod tests {
         root
     }
 
+    fn assert_checked_in_tooling_project_runs(project_root: &str, output_label: &str) {
+        let project_root = PathBuf::from(project_root);
+        let output_dir = temp_dir(output_label);
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        handle_run_artifact(output_dir.join("nuis.build.manifest.toml"))
+            .expect("checked-in tooling project run-artifact passes");
+    }
+
     fn with_repo_root_cwd<T>(f: impl FnOnce() -> T) -> T {
         static CWD_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         let lock = CWD_LOCK.get_or_init(|| Mutex::new(()));
@@ -4339,6 +4348,54 @@ mod cpu Main {
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
         handle_run_artifact(output_dir.join("nuis.build.manifest.toml"))
             .expect("run-artifact passes");
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_cli_runtime_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo",
+            "run_artifact_cli_runtime_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_cli_session_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_session_demo",
+            "run_artifact_cli_session_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_cli_report_session_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_report_session_demo",
+            "run_artifact_cli_report_session_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_workflow_runtime_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo",
+            "run_artifact_workflow_runtime_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_command_runtime_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo",
+            "run_artifact_command_runtime_outputs",
+        );
+    }
+
+    #[test]
+    fn run_artifact_executes_checked_in_subprocess_runtime_project() {
+        assert_checked_in_tooling_project_runs(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo",
+            "run_artifact_subprocess_runtime_outputs",
+        );
     }
 
     #[test]

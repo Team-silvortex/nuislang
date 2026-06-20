@@ -39,6 +39,77 @@ Short rule:
 * CLI/report/build/project recipes should reuse that gate shape rather than
   silently inventing a new one
 
+## Current Semantic Split
+
+The current tooling lane should now be read in two buckets, not one.
+
+### Launch-Shaped Frontdoor Recipes
+
+These are the recipes that should be read as current AOT/native-artifact
+frontdoors. They are allowed to exercise host bridges internally, but their
+process exit shape should summarize frontdoor success/failure rather than leak
+raw internal counters.
+
+* [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
+* [cli_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_session_recipe.ns)
+* [cli_report_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_report_session_recipe.ns)
+* [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
+* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
+* [workflow_frontdoor_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_frontdoor_runtime_recipe.ns)
+* [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
+* [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
+* [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
+* [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
+
+### Probe-Style Observation Recipes
+
+These are still useful current recipes, but they should be read primarily as
+host/runtime observation or shaping probes rather than as the default CLI
+artifact frontdoor.
+
+* [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
+* [command_text_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_text_builder_recipe.ns)
+* [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
+* [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
+* [host_text_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/host_text_runtime_recipe.ns)
+* [text_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_pipeline_recipe.ns)
+* [text_report_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_report_builder_recipe.ns)
+
+Short rule:
+
+* launch-shaped recipes are the current mainline candidates for
+  `build -> artifact-doctor -> run-artifact`
+* probe-style recipes are still current, but should not be mistaken for the
+  default user-facing CLI frontdoor
+
+## Current Authoring Shape
+
+Within the narrow tooling recipe layer, prefer one stable source pattern:
+
+```text
+Seed -> build_*_context -> capture_* -> summarize_*
+```
+
+What that means in practice:
+
+* recipe seeds should carry the scenario knobs, not implicit magic constants
+* context builders should decide inherit/default policy in one place
+* `capture_*` should assemble typed request/result/report values
+* `summarize_*` should be the only place that collapses those values into one
+  current host-facing integer
+
+Current exemplars:
+
+* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
+* [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
+
+Short rule:
+
+* if two tooling recipes are expressing the same gate shape, they should differ
+  by seeds and reports before they differ by naming style
+
 ## Source Router
 
 ### Runtime Edge
@@ -104,6 +175,18 @@ Shortest grouped route:
 * [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
 * [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo)
 * [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
+
+Current launch-shaped note:
+
+* `cli_runtime_demo` is the shortest checked-in tooling project that should now
+  survive the normal native-artifact launch path through `nuis run-artifact`
+* `cli_session_demo` and `cli_report_session_demo` should be read as the
+  session/report companions that also survive that launch path under the
+  current host EOF/non-interactive runtime behavior
+* `workflow_runtime_demo` should be read as the workflow-facing companion that
+  also survives that same launch path
+* `command_runtime_demo` and `subprocess_runtime_demo` should be read as the
+  narrow command/process companions that also survive that same launch path
 
 Short rule:
 

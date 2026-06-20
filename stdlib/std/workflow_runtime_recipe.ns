@@ -81,6 +81,32 @@ mod cpu Main {
     selected_summary_handle: i64
   }
 
+  struct WorkflowRuntimeRecipeSeed {
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    first_name_handle: i64,
+    first_program_handle: i64,
+    first_argv_handle: i64,
+    first_fail_fast: bool,
+    second_name_handle: i64,
+    second_program_handle: i64,
+    second_argv_handle: i64,
+    second_fail_fast: bool,
+    third_name_handle: i64,
+    third_program_handle: i64,
+    third_argv_handle: i64,
+    third_cwd_handle: i64,
+    third_timeout_ms: i64,
+    third_fail_fast: bool,
+    fourth_name_handle: i64,
+    fourth_program_handle: i64,
+    fourth_argv_handle: i64,
+    fourth_cwd_handle: i64,
+    fourth_timeout_ms: i64,
+    fourth_fail_fast: bool
+  }
+
   fn build_default_command_context() -> CommandContext {
     return CommandContext {
       env_handle: 0,
@@ -128,6 +154,20 @@ mod cpu Main {
       argv_handle: argv_handle,
       context: context
     };
+  }
+
+  fn build_workflow_recipe_command_context(
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> CommandContext {
+    return build_command_context(
+      0,
+      cwd_handle,
+      timeout_ms,
+      true,
+      cwd_handle == 0,
+      timeout_ms != 0
+    );
   }
 
   fn run_command(request: CommandRequest) -> CommandResult {
@@ -181,7 +221,7 @@ mod cpu Main {
       request: build_command_request_with_context(
         program_handle,
         argv_handle,
-        build_command_context(0, cwd_handle, timeout_ms, true, false, true)
+        build_workflow_recipe_command_context(cwd_handle, timeout_ms)
       ),
       fail_fast: fail_fast
     };
@@ -422,100 +462,115 @@ mod cpu Main {
     };
   }
 
-  fn summarize_workflow_runtime_recipe() -> i64 {
-    let plan: WorkflowPlan = build_workflow_plan(
-      4101,
-      4201,
-      4203,
-      build_workflow_step(3001, 401, 17, true),
-      build_workflow_step(3002, 503, 29, false),
-      build_workflow_step_with_context(3003, 601, 31, 1001, 500, false),
-      build_workflow_step_with_context(3004, 701, 37, 1101, 750, true)
+  fn build_workflow_runtime_recipe_plan(
+    seed: WorkflowRuntimeRecipeSeed
+  ) -> WorkflowPlan {
+    return build_workflow_plan(
+      seed.plan_handle,
+      seed.success_handle,
+      seed.failure_handle,
+      build_workflow_step(
+        seed.first_name_handle,
+        seed.first_program_handle,
+        seed.first_argv_handle,
+        seed.first_fail_fast
+      ),
+      build_workflow_step(
+        seed.second_name_handle,
+        seed.second_program_handle,
+        seed.second_argv_handle,
+        seed.second_fail_fast
+      ),
+      build_workflow_step_with_context(
+        seed.third_name_handle,
+        seed.third_program_handle,
+        seed.third_argv_handle,
+        seed.third_cwd_handle,
+        seed.third_timeout_ms,
+        seed.third_fail_fast
+      ),
+      build_workflow_step_with_context(
+        seed.fourth_name_handle,
+        seed.fourth_program_handle,
+        seed.fourth_argv_handle,
+        seed.fourth_cwd_handle,
+        seed.fourth_timeout_ms,
+        seed.fourth_fail_fast
+      )
     );
-    let plan_report: WorkflowPlanReport = run_workflow_plan(plan);
-    let report: WorkflowReport = plan_report.workflow;
-    let overall_bonus: i64 = encode_bool(report.overall_success);
-    let first_executed_bonus: i64 = encode_bool(report.first.executed);
-    let second_executed_bonus: i64 = encode_bool(report.second.executed);
-    let third_executed_bonus: i64 = encode_bool(report.third.executed);
-    let fourth_executed_bonus: i64 = encode_bool(report.fourth.executed);
-    let second_blocked_bonus: i64 = encode_bool(report.second.blocked_by_failure);
-    let third_blocked_bonus: i64 = encode_bool(report.third.blocked_by_failure);
-    let fourth_blocked_bonus: i64 = encode_bool(report.fourth.blocked_by_failure);
-    let first_launch_bonus: i64 = encode_bool(report.first.result.launched);
-    let second_launch_bonus: i64 = encode_bool(report.second.result.launched);
-    let third_launch_bonus: i64 = encode_bool(report.third.result.launched);
-    let fourth_launch_bonus: i64 = encode_bool(report.fourth.result.launched);
-    let first_inherit_env_bonus: i64 = encode_bool(report.first.result.inherit_env);
-    let second_inherit_env_bonus: i64 = encode_bool(report.second.result.inherit_env);
-    let third_inherit_env_bonus: i64 = encode_bool(report.third.result.inherit_env);
-    let fourth_inherit_env_bonus: i64 = encode_bool(report.fourth.result.inherit_env);
-    let first_inherit_cwd_bonus: i64 = encode_bool(report.first.result.inherit_cwd);
-    let second_inherit_cwd_bonus: i64 = encode_bool(report.second.result.inherit_cwd);
-    let third_inherit_cwd_bonus: i64 = encode_bool(report.third.result.inherit_cwd);
-    let fourth_inherit_cwd_bonus: i64 = encode_bool(report.fourth.result.inherit_cwd);
-    let first_timeout_bonus: i64 = encode_bool(report.first.result.has_timeout);
-    let second_timeout_bonus: i64 = encode_bool(report.second.result.has_timeout);
-    let third_timeout_bonus: i64 = encode_bool(report.third.result.has_timeout);
-    let fourth_timeout_bonus: i64 = encode_bool(report.fourth.result.has_timeout);
-    return plan_report.plan_handle
-      + plan_report.success_handle
-      + plan_report.failure_handle
-      + plan_report.selected_summary_handle
-      + report.first.result.handle
-      + report.first.result.status
-      + report.first.result.wait_code
-      + report.first.result.wait_exit
-      + report.first.result.env_handle
-      + report.first.result.cwd_handle
-      + report.first.result.timeout_ms
-      + report.second.result.handle
-      + report.second.result.status
-      + report.second.result.wait_code
-      + report.second.result.wait_exit
-      + report.second.result.env_handle
-      + report.second.result.cwd_handle
-      + report.second.result.timeout_ms
-      + report.third.result.handle
-      + report.third.result.status
-      + report.third.result.wait_code
-      + report.third.result.wait_exit
-      + report.third.result.env_handle
-      + report.third.result.cwd_handle
-      + report.third.result.timeout_ms
-      + report.fourth.result.handle
-      + report.fourth.result.status
-      + report.fourth.result.wait_code
-      + report.fourth.result.wait_exit
-      + report.fourth.result.env_handle
-      + report.fourth.result.cwd_handle
-      + report.fourth.result.timeout_ms
+  }
+
+  fn capture_workflow_runtime_recipe(
+    seed: WorkflowRuntimeRecipeSeed
+  ) -> WorkflowPlanReport {
+    return run_workflow_plan(build_workflow_runtime_recipe_plan(seed));
+  }
+
+  fn summarize_workflow_step_report(report: WorkflowStepReport) -> i64 {
+    return report.name_handle
+      + report.result.handle
+      + report.result.status
+      + report.result.wait_code
+      + report.result.wait_exit
+      + report.result.env_handle
+      + report.result.cwd_handle
+      + report.result.timeout_ms
+      + encode_bool(report.executed)
+      + encode_bool(report.blocked_by_failure)
+      + encode_bool(report.result.launched)
+      + encode_bool(report.result.inherit_env)
+      + encode_bool(report.result.inherit_cwd)
+      + encode_bool(report.result.has_timeout)
+      + encode_bool(report.result.succeeded);
+  }
+
+  fn summarize_workflow_report(report: WorkflowReport) -> i64 {
+    return summarize_workflow_step_report(report.first)
+      + summarize_workflow_step_report(report.second)
+      + summarize_workflow_step_report(report.third)
+      + summarize_workflow_step_report(report.fourth)
       + report.first_failure_handle
       + report.executed_steps
-      + overall_bonus
-      + first_executed_bonus
-      + second_executed_bonus
-      + third_executed_bonus
-      + fourth_executed_bonus
-      + second_blocked_bonus
-      + third_blocked_bonus
-      + fourth_blocked_bonus
-      + first_launch_bonus
-      + second_launch_bonus
-      + third_launch_bonus
-      + fourth_launch_bonus
-      + first_inherit_env_bonus
-      + second_inherit_env_bonus
-      + third_inherit_env_bonus
-      + fourth_inherit_env_bonus
-      + first_inherit_cwd_bonus
-      + second_inherit_cwd_bonus
-      + third_inherit_cwd_bonus
-      + fourth_inherit_cwd_bonus
-      + first_timeout_bonus
-      + second_timeout_bonus
-      + third_timeout_bonus
-      + fourth_timeout_bonus;
+      + encode_bool(report.overall_success);
+  }
+
+  fn summarize_workflow_plan_report(report: WorkflowPlanReport) -> i64 {
+    return report.plan_handle
+      + report.success_handle
+      + report.failure_handle
+      + report.selected_summary_handle
+      + summarize_workflow_report(report.workflow);
+  }
+
+  fn summarize_workflow_runtime_recipe() -> i64 {
+    let plan_report: WorkflowPlanReport = capture_workflow_runtime_recipe(
+      WorkflowRuntimeRecipeSeed {
+        plan_handle: 4101,
+        success_handle: 4201,
+        failure_handle: 4203,
+        first_name_handle: 3001,
+        first_program_handle: 401,
+        first_argv_handle: 17,
+        first_fail_fast: true,
+        second_name_handle: 3002,
+        second_program_handle: 503,
+        second_argv_handle: 29,
+        second_fail_fast: false,
+        third_name_handle: 3003,
+        third_program_handle: 601,
+        third_argv_handle: 31,
+        third_cwd_handle: 1001,
+        third_timeout_ms: 500,
+        third_fail_fast: false,
+        fourth_name_handle: 3004,
+        fourth_program_handle: 701,
+        fourth_argv_handle: 37,
+        fourth_cwd_handle: 1101,
+        fourth_timeout_ms: 750,
+        fourth_fail_fast: true
+      }
+    );
+    return summarize_workflow_plan_report(plan_report);
   }
 
   fn main() {
