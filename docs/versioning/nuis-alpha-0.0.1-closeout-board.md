@@ -3,6 +3,13 @@
 This file is the execution board companion to
 [nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md).
 
+It should now be read as a predecessor closeout board, not as the default
+current-line frontdoor.
+
+If you want the current line first, use:
+
+* [nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
+
 The checklist answers:
 
 `what must be true before alpha?`

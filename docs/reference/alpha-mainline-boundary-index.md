@@ -1,7 +1,7 @@
 # Alpha Mainline Boundary Index
 
-This file is the shortest current index for the mainline boundaries that matter
-most before `alpha-0.0.1`.
+This file is the shortest predecessor index for the mainline boundaries that
+mattered most before `alpha-0.0.1`.
 
 It is not a full architecture manual.
 
@@ -9,9 +9,15 @@ It is the reading page for:
 
 `if I need to understand what nuis already treats as real before alpha, where should I look first?`
 
+If you want the current post-closeout line first, start with:
+
+* [../versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
+* [nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)
+* [nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
+
 ## Short Rule
 
-Before `alpha-0.0.1`, the mainline should be read through a small set of
+Before `alpha-0.0.1`, the mainline was best read through a small set of
 explicit boundaries:
 
 * source compile truth
@@ -158,7 +164,7 @@ If you need the shortest full route, use this order:
 
 ## Why This Exists
 
-Before `alpha`, the repository should stop making people reconstruct the
+Before `alpha`, the repository needed to stop making people reconstruct the
 mainline from memory.
 
 This index exists so the current line can be read as:
@@ -167,5 +173,5 @@ This index exists so the current line can be read as:
 * a small number of explicit boundaries
 * a small number of checked-in anchors that prove those boundaries
 
-That is the level of compression the repository should increasingly prefer on
-the way into `alpha-0.0.1`.
+That is the level of compression the repository needed on the way into
+`alpha-0.0.1`.

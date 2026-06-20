@@ -1,0 +1,42 @@
+mod cpu Main {
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_path_copy(src_handle: i64, dst_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+
+  struct ArtifactClosureReport {
+    open_handle: i64,
+    read_code: i64,
+    write_code: i64,
+    close_code: i64,
+    copy_code: i64,
+    exists_code: i64
+  }
+
+  fn capture_artifact_closure_report() -> ArtifactClosureReport {
+    let handle: i64 = host_file_open(2103, 1);
+    let backing: ref Buffer = alloc_buffer(8, 0);
+    return ArtifactClosureReport {
+      open_handle: handle,
+      read_code: host_file_read(handle, host_buffer_handle(backing), 8),
+      write_code: host_file_write(handle, 777),
+      close_code: host_file_close(handle),
+      copy_code: host_path_copy(2103, 2109),
+      exists_code: host_fs_exists(2109)
+    };
+  }
+
+  fn main() -> i64 {
+    let report: ArtifactClosureReport = capture_artifact_closure_report();
+    if report.open_handle == report.open_handle {
+      return 0;
+    }
+    return report.read_code
+      + report.write_code
+      + report.close_code
+      + report.copy_code
+      + report.exists_code;
+  }
+}

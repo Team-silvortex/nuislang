@@ -55,7 +55,11 @@ Current reference commands:
 * `pack-nustar <package-id> <output.nustar>`
 * `inspect-nustar <input.nustar>`
 * `loader-contract <package-id>`
+* `inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>`
+* `verify-artifact [--json] <nuis.compiled.artifact>`
+* `artifact-doctor [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>`
 * `verify-build-manifest <nuis.build.manifest.toml>`
+* `run-artifact <binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>`
 * `cache-status [--all] [--verbose-cache] [--json] [input]`
 * `clean-cache [--all] [--json] [input]`
 * `cache-prune [--all] [--keep N] [--json] [input]`
@@ -81,10 +85,10 @@ user-facing toolchain surface while reusing `nuisc` as the compiler core.
 
 ### Default compile workflow
 
-For `0.16.0`, the default command order should be read as:
+The current default command order should be read as:
 
 ```text
-workflow -> project-doctor -> check -> test -> build -> release-check
+workflow -> project-doctor -> check -> test -> build -> artifact-doctor -> run-artifact -> release-check
 ```
 
 Use `workflow` when you want the tool itself to restate the shortest route for
@@ -100,7 +104,7 @@ cargo run -p nuis -- workflow <input.ns> --json
 The stable compile order remains:
 
 ```text
-project-doctor -> check -> test -> build -> release-check
+project-doctor -> check -> test -> build -> artifact-doctor -> run-artifact -> release-check
 ```
 
 Shortest project route:
@@ -110,6 +114,8 @@ cargo run -p nuis -- project-doctor <project-dir|nuis.toml>
 cargo run -p nuis -- check <project-dir|nuis.toml>
 cargo run -p nuis -- test <project-dir|nuis.toml>
 cargo run -p nuis -- build <project-dir|nuis.toml> <output-dir>
+cargo run -p nuis -- artifact-doctor <output-dir>
+cargo run -p nuis -- run-artifact <output-dir|nuis.build.manifest.toml>
 cargo run -p nuis -- release-check <project-dir|nuis.toml> <output-dir>
 ```
 
@@ -119,6 +125,8 @@ Shortest single-source route:
 cargo run -p nuis -- check <input.ns>
 cargo run -p nuis -- test <input.ns>
 cargo run -p nuis -- build <input.ns> <output-dir>
+cargo run -p nuis -- artifact-doctor <output-dir>
+cargo run -p nuis -- run-artifact <output-dir|nuis.build.manifest.toml>
 ```
 
 ### Debug workflow

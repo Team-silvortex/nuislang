@@ -27,26 +27,31 @@ Current versioning entrypoints:
 
 * current mainline router:
   [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* current `alpha-0.1.*` status anchor:
+  [docs/versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
 * current alpha closeout board:
   [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
 * current alpha closeout checklist:
   [docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
-* current snapshot:
+* previous pre-alpha snapshot anchor:
   [docs/versioning/nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
-* current workflow:
+* previous pre-alpha workflow anchor:
   [docs/versioning/nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
 * current ABI compile vocabulary bridge into `0.20.*`:
   [docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-* current regression gate:
+* previous pre-alpha regression gate:
   [docs/versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
-* current address/pointer anchor:
+* previous pre-alpha address/pointer anchor:
   [docs/versioning/nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
 * previous minor-line snapshot:
   [docs/versioning/nuis-0.18.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-snapshot.md)
 * historical index:
   [docs/versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md)
 
-If you want the current minor-line history anchor first, start with
+If you want the current line first, start with
+[docs/versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md).
+
+If you want the older pre-alpha history anchor after that, start with
 [`0.19.0` snapshot](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md), then use
 [docs/versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md) only when you intentionally need older lines.
 
@@ -107,6 +112,19 @@ cargo run -p nuis -- project-status examples/projects/window_controls_demo
 cargo run -p nuis -- project-lock-abi examples/projects/window_controls_demo
 ```
 
+If you want the current native artifact closure route specifically, use:
+
+```bash
+cargo run -p nuis -- workflow examples/projects/tooling/native_artifact_closure_demo
+cargo run -p nuis -- project-status examples/projects/tooling/native_artifact_closure_demo
+cargo run -p nuis -- build examples/projects/tooling/native_artifact_closure_demo examples/bins/native_artifact_closure_demo_project
+cargo run -p nuis -- artifact-doctor examples/bins/native_artifact_closure_demo_project
+cargo run -p nuis -- run-artifact examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
+```
+
+Current native artifact closure reference:
+[docs/reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
+
 The current rule of thumb should be:
 
 * `project-doctor` before deep work on a project
@@ -147,7 +165,29 @@ Useful inspection commands:
 cargo run -p nuis -- dump-ast examples/projects/window_controls_demo
 cargo run -p nuis -- dump-nir examples/projects/window_controls_demo
 cargo run -p nuis -- dump-yir examples/projects/window_controls_demo
+cargo run -p nuis -- inspect-artifact examples/bins/window_controls_demo_project/nuis.build.manifest.toml
+cargo run -p nuis -- verify-artifact examples/bins/window_controls_demo_project/nuis.compiled.artifact
+cargo run -p nuis -- artifact-doctor examples/bins/window_controls_demo_project
 cargo run -p nuis -- verify-build-manifest examples/bins/window_controls_demo_project/nuis.build.manifest.toml
+cargo run -p nuis -- run-artifact examples/bins/window_controls_demo_project/nuis.build.manifest.toml
+```
+
+If you want the shortest current native artifact closure route specifically:
+
+```bash
+cargo run -p nuis -- build \
+  examples/projects/tooling/native_artifact_closure_demo \
+  examples/bins/native_artifact_closure_demo_project
+cargo run -p nuis -- inspect-artifact \
+  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
+cargo run -p nuis -- verify-artifact \
+  examples/bins/native_artifact_closure_demo_project/nuis.compiled.artifact
+cargo run -p nuis -- artifact-doctor \
+  examples/bins/native_artifact_closure_demo_project
+cargo run -p nuis -- verify-build-manifest \
+  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
+cargo run -p nuis -- run-artifact \
+  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
 ```
 
 CPU target override is now explicit:

@@ -1,7 +1,7 @@
 mod cpu Main {
-  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
-  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
-  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" @host_symbol("file.open") fn file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" @host_symbol("file.read") fn file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+  extern "c" @host_symbol("file.close") fn file_close(file_handle: i64) -> i64;
 
   struct FileRuntimeFacadeSummary {
     primary_handle: i64,
@@ -13,14 +13,14 @@ mod cpu Main {
   }
 
   fn read_once(path_handle: i64, flags: i64, read_len: i64) -> FileRuntimeFacadeSummary {
-    let handle: i64 = host_file_open(path_handle, flags);
+    let handle: i64 = file_open(path_handle, flags);
     let backing: ref Buffer = alloc_buffer(read_len, 0);
-    let read_bytes: i64 = host_file_read(
+    let read_bytes: i64 = file_read(
       handle,
       host_buffer_handle(backing),
       read_len
     );
-    let close_code: i64 = host_file_close(handle);
+    let close_code: i64 = file_close(handle);
     return FileRuntimeFacadeSummary {
       primary_handle: handle,
       primary_read_bytes: read_bytes,

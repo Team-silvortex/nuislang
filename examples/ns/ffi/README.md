@@ -5,6 +5,7 @@ This folder contains source-level CPU host-bridge examples.
 Use it for:
 
 * narrow `extern "c"` and `extern "nurs"` host facade shapes
+* std-owned `@host_symbol("...")` logical host bridge declarations
 * source-level mirrors of current `std` host/runtime recipes
 * small focused probes before moving to project-form examples
 
@@ -22,6 +23,9 @@ Current role rule:
 * it should not compete with project-form tooling/filesystem/task onboarding
 * before `alpha-0.0.1`, the goal is to keep one short host bridge ladder, one
   short task/runtime ladder, and one short path/runtime ladder obvious
+* when a facade belongs to the std-owned host surface, prefer
+  `extern "c" @host_symbol("...") fn ...;` over hard-coding raw `host_*`
+  symbol names in frontdoor examples
 
 ## Current Frontdoor Ladders
 

@@ -1,8 +1,8 @@
 mod cpu Main {
-  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
-  extern "c" fn host_command_status(command_handle: i64) -> i64;
-  extern "c" fn host_command_wait(command_handle: i64) -> i64;
-  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+  extern "c" @host_symbol("command.spawn") fn command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" @host_symbol("command.status") fn command_status(command_handle: i64) -> i64;
+  extern "c" @host_symbol("command.wait") fn command_wait(command_handle: i64) -> i64;
+  extern "c" @host_symbol("command.wait_exit") fn command_wait_exit(command_handle: i64) -> i64;
 
   struct CommandRuntimeFacadeSummary {
     primary_handle: i64,
@@ -16,17 +16,17 @@ mod cpu Main {
   }
 
   fn capture_command_runtime_facade() -> CommandRuntimeFacadeSummary {
-    let primary_handle: i64 = host_command_spawn(401, 17);
-    let secondary_handle: i64 = host_command_spawn(503, 29);
+    let primary_handle: i64 = command_spawn(401, 17);
+    let secondary_handle: i64 = command_spawn(503, 29);
     return CommandRuntimeFacadeSummary {
       primary_handle: primary_handle,
-      primary_status: host_command_status(primary_handle),
-      primary_wait: host_command_wait(primary_handle),
-      primary_wait_exit: host_command_wait_exit(primary_handle),
+      primary_status: command_status(primary_handle),
+      primary_wait: command_wait(primary_handle),
+      primary_wait_exit: command_wait_exit(primary_handle),
       secondary_handle: secondary_handle,
-      secondary_status: host_command_status(secondary_handle),
-      secondary_wait: host_command_wait(secondary_handle),
-      secondary_wait_exit: host_command_wait_exit(secondary_handle)
+      secondary_status: command_status(secondary_handle),
+      secondary_wait: command_wait(secondary_handle),
+      secondary_wait_exit: command_wait_exit(secondary_handle)
     };
   }
 

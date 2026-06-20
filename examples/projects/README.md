@@ -15,9 +15,9 @@ The important reading rule now is:
   [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 * if you want the current cleanup/status board for project routes, use
   [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
-* if you want the repo-level alpha closeout status that explains why some
+* if you want the current repo-level line status that explains why some
   examples are frontdoor while others are only companions, use
-  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+  [docs/versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
 
 Current source-style rule:
 
@@ -107,7 +107,8 @@ reading an entire subtree.
   Start with:
   [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo),
   [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo),
-  [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
+  [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo),
+  [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
 * path / file / directory surfaces:
   [filesystem](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem)
   Start with:
@@ -175,8 +176,8 @@ Practical consequence:
 * keep old-but-still-useful companions when they still carry regression value
 * keep probe routes when they still support runtime validation or design docs
 * stop treating long directory inventories as the first reading route
-* during the `alpha-0.0.1` closeout pass, prefer demotion and rerouting before
-  deletion
+* during the `alpha-0.1.*` consolidation pass, prefer demotion and rerouting
+  before deletion
 
 ## Artifact Bundles
 

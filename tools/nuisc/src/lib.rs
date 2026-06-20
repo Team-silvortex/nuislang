@@ -7,6 +7,7 @@ pub mod engine;
 pub mod errors;
 pub mod fmt;
 pub mod frontend;
+pub mod linker;
 pub mod lowering;
 pub mod nir_verify;
 pub mod nustar_binary;
@@ -557,12 +558,61 @@ fn domain_build_verification_summary_json(summary: &DomainBuildVerificationSumma
     format!("{{{}}}", fields.join(","))
 }
 
+fn link_plan_domain_unit_json(unit: &linker::LinkPlanDomainUnit) -> String {
+    let mut fields = vec![
+        json_string_field("kind", &unit.kind),
+        json_string_field("package_id", &unit.package_id),
+        json_string_field("domain_family", &unit.domain_family),
+        json_string_field("contract_family", &unit.contract_family),
+        json_string_field("packaging_role", &unit.packaging_role),
+    ];
+    if let Some(value) = unit.abi.as_deref() {
+        fields.push(json_string_field("abi", value));
+    }
+    if let Some(value) = unit.backend_family.as_deref() {
+        fields.push(json_string_field("backend_family", value));
+    }
+    if let Some(value) = unit.selected_lowering_target.as_deref() {
+        fields.push(json_string_field("selected_lowering_target", value));
+    }
+    format!("{{{}}}", fields.join(","))
+}
+
+fn link_plan_json(plan: &linker::LinkPlan) -> String {
+    let domain_units = plan
+        .domain_units
+        .iter()
+        .map(link_plan_domain_unit_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let mut fields = vec![
+        json_string_field("schema", &plan.schema),
+        json_string_field("packaging_mode", &plan.packaging_mode),
+        json_string_field("final_stage_kind", &plan.final_stage.kind),
+        json_string_field("final_stage_driver", &plan.final_stage.driver),
+        json_string_field("final_stage_link_mode", &plan.final_stage.link_mode),
+        json_string_field("final_stage_output", &plan.final_stage.output_path),
+        json_string_array_field("final_stage_inputs", &plan.final_stage.inputs),
+        json_string_array_field("final_stage_notes", &plan.final_stage.notes),
+        json_usize_field("domain_unit_count", plan.domain_units.len()),
+        format!("\"domain_units\":[{}]", domain_units),
+    ];
+    if let Some(path) = &plan.bridge_registry_path {
+        fields.push(json_string_field("bridge_registry_path", path));
+    }
+    if let Some(path) = &plan.host_bridge_plan_index_path {
+        fields.push(json_string_field("host_bridge_plan_index_path", path));
+    }
+    format!("{{{}}}", fields.join(","))
+}
+
 fn artifact_report_summary_lines(
     artifact_verify: &aot::NuisCompiledArtifactVerifyReport,
     verification_summary: &DomainBuildVerificationSummary,
+    link_plan: Option<&linker::LinkPlan>,
     manifest_verify_reconstructed: bool,
 ) -> Vec<String> {
-    vec![
+    let mut lines = vec![
         format!(
             "summary: artifact_roundtrip={} lifecycle={} runtime_flags={} all_units_consistent={}",
             if artifact_verify.artifact_roundtrip_verified {
@@ -606,7 +656,17 @@ fn artifact_report_summary_lines(
                 "false"
             }
         ),
-    ]
+    ];
+    if let Some(plan) = link_plan {
+        lines.push(format!(
+            "summary_link: final_stage={} driver={} link_mode={} output={}",
+            plan.final_stage.kind,
+            plan.final_stage.driver,
+            plan.final_stage.link_mode,
+            plan.final_stage.output_path
+        ));
+    }
+    lines
 }
 
 fn verdict_status(ok: bool, hetero_expected: bool) -> &'static str {
@@ -684,7 +744,7 @@ fn inspect_benchmarks_json(input: &Path, artifacts: &pipeline::PipelineArtifacts
 }
 
 pub fn project_compile_workflow_brief() -> &'static str {
-    "health -> structure -> scheduler -> abi_lock -> check -> test -> build -> release_check"
+    "health -> structure -> scheduler -> abi_lock -> check -> test -> build -> artifact_doctor -> run_artifact -> release_check"
 }
 
 pub fn nuisc_compile_pipeline_brief() -> &'static str {
@@ -692,7 +752,7 @@ pub fn nuisc_compile_pipeline_brief() -> &'static str {
 }
 
 pub fn project_compile_samples_brief() -> &'static str {
-    "health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; compile=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir> -> nuis release-check <project-dir> <output-dir>"
+    "health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; compile=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir> <output-dir> -> nuis artifact-doctor <output-dir> -> nuis run-artifact <output-dir|nuis.build.manifest.toml> -> nuis release-check <project-dir> <output-dir>"
 }
 
 pub fn project_test_workflow_brief() -> &'static str {
@@ -808,6 +868,7 @@ fn inspect_artifact_json(
         ),
     ];
     if let Some(report) = manifest_verify {
+        let link_plan = linker::build_link_plan(report, artifact);
         let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
         let drift_check_count = drift_checks.len();
         let drift_mismatch_count = drift_checks.iter().filter(|check| !check.consistent).count();
@@ -898,6 +959,7 @@ fn inspect_artifact_json(
                 .collect::<Vec<_>>()
                 .join(",")
         ));
+        fields.push(format!("\"link_plan\":{}", link_plan_json(&link_plan)));
     }
     format!("{{{}}}", fields.join(","))
 }
@@ -1161,6 +1223,7 @@ fn artifact_report_json(
 ) -> String {
     let verdicts = collect_domain_build_unit_verdicts(manifest_verify);
     let summary = summarize_domain_build_verification(&verdicts);
+    let link_plan = linker::build_link_plan(manifest_verify, artifact);
     let fields = vec![
         json_string_field("kind", "nuis_artifact_report"),
         json_string_field("input", &input.display().to_string()),
@@ -1184,6 +1247,7 @@ fn artifact_report_json(
             "\"manifest_verify\":{}",
             verify_build_manifest_json(manifest_input, manifest_verify)
         ),
+        format!("\"link_plan\":{}", link_plan_json(&link_plan)),
     ];
     format!("{{{}}}", fields.join(","))
 }
@@ -2062,6 +2126,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 artifact.lifecycle.runtime_capability_flags.join(", ")
             );
             if let Some(report) = &manifest_verify {
+                let link_plan = linker::build_link_plan(report, &artifact);
                 let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
                 let drift_mismatch_count =
                     drift_checks.iter().filter(|check| !check.consistent).count();
@@ -2121,6 +2186,26 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!(
                     "  host_bridge_plan_entries_checked: {}",
                     report.host_bridge_plan_entries_checked
+                );
+                println!(
+                    "  link_plan_final_stage: {}",
+                    link_plan.final_stage.kind
+                );
+                println!(
+                    "  link_plan_final_driver: {}",
+                    link_plan.final_stage.driver
+                );
+                println!(
+                    "  link_plan_final_link_mode: {}",
+                    link_plan.final_stage.link_mode
+                );
+                println!(
+                    "  link_plan_final_output: {}",
+                    link_plan.final_stage.output_path
+                );
+                println!(
+                    "  link_plan_domain_units: {}",
+                    link_plan.domain_units.len()
                 );
                 for unit in &report.domain_build_units {
                     let verdict = domain_build_unit_verification_verdict(unit, report);
@@ -2251,6 +2336,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 for line in artifact_report_summary_lines(
                     &artifact_verify,
                     &summary_view,
+                    Some(&linker::build_link_plan(&manifest_verify, &artifact)),
                     manifest_verify_reconstructed,
                 ) {
                     println!("  {}", line);
@@ -2307,6 +2393,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             for line in artifact_report_summary_lines(
                 &artifact_verify,
                 &summary,
+                Some(&linker::build_link_plan(&manifest_verify, &artifact)),
                 manifest_verify_reconstructed,
             ) {
                 println!("  {}", line);
@@ -3372,6 +3459,7 @@ mod tests {
     use std::{
         fs,
         path::{Path, PathBuf},
+        process::Command,
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -3769,6 +3857,10 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"registry_alignment_ok\":true"));
         assert!(json.contains("\"consistent\":true"));
         assert!(json.contains("\"package_id\":\"official.cpu\""));
+        assert!(json.contains("\"link_plan\":{"));
+        assert!(json.contains("\"final_stage_driver\":\"clang\""));
+        assert!(json.contains("\"final_stage_kind\":\"host-native-link\""));
+        assert!(json.contains("\"final_stage_link_mode\":\"host-toolchain-finalize\""));
     }
 
     #[test]
@@ -3823,6 +3915,8 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"host_units_checked\":1"));
         assert!(json.contains("\"hetero_units_checked\":0"));
         assert!(json.contains("\"failing_units\":[]"));
+        assert!(json.contains("\"link_plan\":{"));
+        assert!(json.contains("\"final_stage_driver\":\"clang\""));
     }
 
     #[test]
@@ -3863,9 +3957,80 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
             registry_drift_units: 0,
             failing_units: Vec::new(),
         };
-        let lines = artifact_report_summary_lines(&artifact_verify, &summary, false);
+        let link_plan = linker::LinkPlan {
+            schema: linker::LINK_PLAN_SCHEMA.to_owned(),
+            input: "main.ns".to_owned(),
+            output_dir: "out".to_owned(),
+            packaging_mode: "native-cpu-llvm".to_owned(),
+            cpu_target: linker::LinkPlanCpuTarget {
+                abi: "cpu.arm64.apple_aapcs64".to_owned(),
+                machine_arch: "arm64".to_owned(),
+                machine_os: "darwin".to_owned(),
+                object_format: "mach-o".to_owned(),
+                calling_abi: "aapcs64-darwin".to_owned(),
+                clang_target: "aarch64-apple-darwin".to_owned(),
+                cross_compile: false,
+            },
+            lifecycle: linker::LinkPlanLifecycle {
+                bootstrap_entry: "main".to_owned(),
+                tick_policy: "poll".to_owned(),
+                shutdown_policy: "flush".to_owned(),
+                yalivia_rpc: "disabled".to_owned(),
+                hook_surface: Vec::new(),
+                export_surface: Vec::new(),
+                runtime_capability_flags: Vec::new(),
+            },
+            envelope: linker::LinkPlanEnvelope {
+                schema: "nuis-executable-envelope-v1".to_owned(),
+                package_count: 1,
+                contract_families: vec!["nustar.cpu".to_owned()],
+                domain_families: vec!["cpu".to_owned()],
+                function_kind: "federated-function".to_owned(),
+                graph_kind: "federated-graph".to_owned(),
+                default_time_mode: "global".to_owned(),
+            },
+            compiled_artifact: linker::LinkPlanArtifact {
+                path: "out/nuis.compiled.artifact".to_owned(),
+                binary_name: "demo".to_owned(),
+                binary_path: "out/demo".to_owned(),
+                binary_bytes: 1,
+                build_manifest_bytes: 1,
+            },
+            bridge_registry_path: None,
+            host_bridge_plan_index_path: None,
+            domain_units: vec![linker::LinkPlanDomainUnit {
+                kind: "host".to_owned(),
+                package_id: "official.cpu".to_owned(),
+                domain_family: "cpu".to_owned(),
+                abi: Some("cpu.arm64.apple_aapcs64".to_owned()),
+                machine_arch: Some("arm64".to_owned()),
+                machine_os: Some("darwin".to_owned()),
+                backend_family: Some("llvm".to_owned()),
+                selected_lowering_target: Some("llvm".to_owned()),
+                contract_family: "nustar.cpu".to_owned(),
+                packaging_role: "host-binary".to_owned(),
+                artifact_stub_path: None,
+                artifact_payload_path: None,
+                artifact_bridge_stub_path: None,
+                artifact_payload_blob_path: None,
+                artifact_payload_blob_bytes: None,
+                artifact_payload_format: None,
+            }],
+            final_stage: linker::LinkPlanFinalStage {
+                kind: "host-native-link".to_owned(),
+                driver: "clang".to_owned(),
+                link_mode: "host-toolchain-finalize".to_owned(),
+                output_path: "out/demo".to_owned(),
+                inputs: vec![
+                    "out/nuis.compiled.artifact".to_owned(),
+                    "out/nuis.executable.envelope.toml".to_owned(),
+                ],
+                notes: vec!["demo".to_owned()],
+            },
+        };
+        let lines = artifact_report_summary_lines(&artifact_verify, &summary, Some(&link_plan), false);
 
-        assert_eq!(lines.len(), 3);
+        assert_eq!(lines.len(), 4);
         assert!(lines[0].contains("artifact_roundtrip=ok"));
         assert!(lines[0].contains("lifecycle=ok"));
         assert!(lines[0].contains("runtime_flags=ok"));
@@ -3876,6 +4041,8 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(lines[1].contains("drift=0"));
         assert!(lines[1].contains("failing=<none>"));
         assert_eq!(lines[2], "summary_manifest: reconstructed=false");
+        assert!(lines[3].contains("final_stage=host-native-link"));
+        assert!(lines[3].contains("driver=clang"));
     }
 
     #[test]
@@ -3964,6 +4131,89 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert_eq!(artifact_report.packaging_mode, "native-cpu-llvm");
         assert!(artifact_report.lifecycle_contract_consistent);
         assert!(artifact_report.artifact_roundtrip_verified);
+    }
+
+    #[test]
+    fn compile_command_writes_host_file_ffi_project_outputs() {
+        let project_name = "compile_command_host_file_smoke";
+        let project_root = write_temp_project_fixture(
+            project_name,
+            r#"
+name = "compile_command_host_file_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+            mod cpu Main {
+              extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+              extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+              extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+              extern "c" fn host_file_close(file_handle: i64) -> i64;
+              extern "c" fn host_path_copy(src_handle: i64, dst_handle: i64) -> i64;
+              extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+
+              fn main() -> i64 {
+                let handle: i64 = host_file_open(2103, 1);
+                let backing: ref Buffer = alloc_buffer(8, 0);
+                host_file_read(handle, host_buffer_handle(backing), 8);
+                host_file_write(handle, 777);
+                host_file_close(handle);
+                host_path_copy(2103, 2109);
+                host_fs_exists(2109);
+                return 0;
+              }
+            }
+            "#,
+        );
+        let output_dir = temp_dir("compile_command_host_file_outputs");
+        let output_stem = project_name.to_owned();
+
+        run(CommandKind::Compile {
+            input: project_root.clone(),
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        for path in [
+            output_dir.join(format!("{output_stem}.ll")),
+            output_dir.join(&output_stem),
+            output_dir.join("nuis.build.manifest.toml"),
+            output_dir.join("nuis.compiled.artifact"),
+            output_dir.join("nuis.project.host_ffi.txt"),
+        ] {
+            assert!(path.exists(), "expected output `{}`", path.display());
+        }
+
+        let manifest_text =
+            fs::read_to_string(output_dir.join("nuis.build.manifest.toml")).unwrap();
+        assert!(manifest_text.contains("host_ffi_index = "));
+
+        let host_ffi_text =
+            fs::read_to_string(output_dir.join("nuis.project.host_ffi.txt")).unwrap();
+        assert!(host_ffi_text.contains("host_file_open"));
+        assert!(host_ffi_text.contains("host_file_read"));
+        assert!(host_ffi_text.contains("host_file_write"));
+        assert!(host_ffi_text.contains("host_file_close"));
+        assert!(host_ffi_text.contains("host_path_copy"));
+        assert!(host_ffi_text.contains("host_fs_exists"));
+
+        let artifact_report =
+            aot::verify_nuis_compiled_artifact(output_dir.join("nuis.compiled.artifact").as_path())
+                .unwrap();
+        assert_eq!(artifact_report.binary_name, output_stem);
+        assert_eq!(artifact_report.packaging_mode, "native-cpu-llvm");
+        assert!(artifact_report.lifecycle_contract_consistent);
+        assert!(artifact_report.artifact_roundtrip_verified);
+
+        let status = Command::new(output_dir.join(&output_stem))
+            .status()
+            .expect("expected compiled binary to launch");
+        assert!(status.success(), "expected compiled binary to exit successfully");
     }
 
     #[test]

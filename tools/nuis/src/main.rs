@@ -75,6 +75,13 @@ fn run() -> Result<(), String> {
         cli::CommandKind::LoaderContract { package_id } => {
             nuisc::run(nuisc::CommandKind::LoaderContract { package_id })?;
         }
+        cli::CommandKind::InspectArtifact { input, json } => {
+            nuisc::run(nuisc::CommandKind::InspectArtifact { input, json })?;
+        }
+        cli::CommandKind::VerifyArtifact { input, json } => {
+            nuisc::run(nuisc::CommandKind::VerifyArtifact { input, json })?;
+        }
+        cli::CommandKind::ArtifactDoctor { input, json } => handle_artifact_doctor(input, json)?,
         cli::CommandKind::VerifyBuildManifest { manifest } => {
             nuisc::run(nuisc::CommandKind::VerifyBuildManifest {
                 manifest,
@@ -139,6 +146,7 @@ fn run() -> Result<(), String> {
             cpu_abi,
             target,
         } => handle_build(input, output_dir, verbose_cache, cpu_abi, target)?,
+        cli::CommandKind::RunArtifact { input } => handle_run_artifact(input)?,
         cli::CommandKind::DumpAst { input } => handle_dump_ast(input)?,
         cli::CommandKind::DumpNir { input } => handle_dump_nir(input)?,
         cli::CommandKind::DumpYir { input } => handle_dump_yir(input)?,
@@ -1707,6 +1715,336 @@ fn handle_build(
     Ok(())
 }
 
+fn resolve_run_artifact_binary_path(input: &Path) -> Result<PathBuf, String> {
+    let file_name = input.file_name().and_then(|value| value.to_str());
+    if file_name == Some("nuis.build.manifest.toml") {
+        let report = nuisc::aot::verify_build_manifest(input)?;
+        let binary = Path::new(&report.output_dir).join(&report.artifact_binary_name);
+        if binary.exists() {
+            return Ok(binary);
+        }
+        return Err(format!(
+            "manifest `{}` points to missing binary `{}`",
+            input.display(),
+            binary.display()
+        ));
+    }
+    if file_name == Some("nuis.compiled.artifact") {
+        let artifact = nuisc::aot::parse_nuis_compiled_artifact(input)?;
+        let binary = input
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(&artifact.binary_name);
+        if binary.exists() {
+            return Ok(binary);
+        }
+        return Err(format!(
+            "artifact `{}` expects unpacked sibling binary `{}`",
+            input.display(),
+            binary.display()
+        ));
+    }
+    if input.exists() {
+        return Ok(input.to_path_buf());
+    }
+    Err(format!(
+        "run-artifact expected a binary path, `nuis.compiled.artifact`, or `nuis.build.manifest.toml`; missing `{}`",
+        input.display()
+    ))
+}
+
+fn handle_run_artifact(input: PathBuf) -> Result<(), String> {
+    let binary = resolve_run_artifact_binary_path(&input)?;
+    let status = Command::new(&binary)
+        .status()
+        .map_err(|error| format!("failed to run `{}`: {error}", binary.display()))?;
+    println!("run-artifact: {}", binary.display());
+    println!(
+        "  exit_status: {}",
+        status
+            .code()
+            .map(|code| code.to_string())
+            .unwrap_or_else(|| "signal".to_owned())
+    );
+    if status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "artifact binary `{}` exited with status {:?}",
+        binary.display(),
+        status.code()
+    ))
+}
+
+pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
+    let mut source_kind = "binary".to_owned();
+    let mut output_dir = if input.is_dir() {
+        Some(input.to_path_buf())
+    } else {
+        input.parent().map(Path::to_path_buf)
+    };
+    let mut manifest_path = None;
+    let mut artifact_path = None;
+    let mut binary_path = None;
+
+    if input.is_dir() {
+        source_kind = "output_dir".to_owned();
+        let candidate_manifest = input.join("nuis.build.manifest.toml");
+        let candidate_artifact = input.join("nuis.compiled.artifact");
+        if candidate_manifest.exists() {
+            manifest_path = Some(candidate_manifest);
+        }
+        if candidate_artifact.exists() {
+            artifact_path = Some(candidate_artifact);
+        }
+    } else if input.file_name().and_then(|value| value.to_str()) == Some("nuis.build.manifest.toml")
+    {
+        source_kind = "manifest".to_owned();
+        manifest_path = Some(input.to_path_buf());
+        output_dir = input.parent().map(Path::to_path_buf);
+    } else if input.file_name().and_then(|value| value.to_str()) == Some("nuis.compiled.artifact")
+    {
+        source_kind = "artifact".to_owned();
+        artifact_path = Some(input.to_path_buf());
+        output_dir = input.parent().map(Path::to_path_buf);
+    } else {
+        binary_path = Some(input.to_path_buf());
+        output_dir = input.parent().map(Path::to_path_buf);
+        if let Some(dir) = output_dir.as_ref() {
+            let candidate_manifest = dir.join("nuis.build.manifest.toml");
+            let candidate_artifact = dir.join("nuis.compiled.artifact");
+            if candidate_manifest.exists() {
+                manifest_path = Some(candidate_manifest);
+            }
+            if candidate_artifact.exists() {
+                artifact_path = Some(candidate_artifact);
+            }
+        }
+    }
+
+    let mut manifest_verified = false;
+    let mut artifact_verified = false;
+    let mut manifest_verify_error = None;
+    let mut artifact_verify_error = None;
+
+    if let Some(path) = manifest_path.as_ref() {
+        match nuisc::aot::verify_build_manifest(path) {
+            Ok(report) => {
+                manifest_verified = true;
+                artifact_path = Some(PathBuf::from(&report.artifact_path));
+                binary_path = Some(Path::new(&report.output_dir).join(&report.artifact_binary_name));
+                output_dir = Some(PathBuf::from(&report.output_dir));
+            }
+            Err(error) => manifest_verify_error = Some(error),
+        }
+    }
+
+    if let Some(path) = artifact_path.as_ref() {
+        match nuisc::aot::verify_nuis_compiled_artifact(path) {
+            Ok(report) => {
+                artifact_verified = true;
+                if binary_path.is_none() {
+                    let base = path.parent().unwrap_or_else(|| Path::new("."));
+                    binary_path = Some(base.join(report.binary_name));
+                }
+            }
+            Err(error) => {
+                artifact_verify_error = Some(error);
+                if binary_path.is_none() {
+                    if let Ok(artifact) = nuisc::aot::parse_nuis_compiled_artifact(path) {
+                        let base = path.parent().unwrap_or_else(|| Path::new("."));
+                        binary_path = Some(base.join(artifact.binary_name));
+                    }
+                }
+            }
+        }
+    }
+
+    let manifest_exists = manifest_path.as_ref().is_some_and(|path| path.exists());
+    let artifact_exists = artifact_path.as_ref().is_some_and(|path| path.exists());
+    let binary_exists = binary_path.as_ref().is_some_and(|path| path.exists());
+    let ready_to_run = binary_exists && manifest_verified && artifact_verified;
+
+    let (recommended_next_step, recommended_command, recommended_reason) = if !manifest_exists
+        && !artifact_exists
+        && !binary_exists
+    {
+        (
+            "build".to_owned(),
+            "nuis build <input> <output-dir>".to_owned(),
+            "no recognizable native artifact outputs were found yet, so the next step is to rebuild a fresh output directory".to_owned(),
+        )
+    } else if manifest_exists && !manifest_verified {
+        (
+            "verify_build_manifest".to_owned(),
+            format!(
+                "nuis verify-build-manifest {}",
+                manifest_path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_else(|| "<nuis.build.manifest.toml>".to_owned())
+            ),
+            "the manifest exists but does not currently pass verification, so the next step is to inspect that contract boundary directly".to_owned(),
+        )
+    } else if artifact_exists && !artifact_verified {
+        (
+            "verify_artifact".to_owned(),
+            format!(
+                "nuis verify-artifact {}",
+                artifact_path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_else(|| "<nuis.compiled.artifact>".to_owned())
+            ),
+            "the compiled artifact exists but does not currently pass verification, so the next step is to inspect the packaged binary bundle directly".to_owned(),
+        )
+    } else if ready_to_run {
+        (
+            "run_artifact".to_owned(),
+            format!(
+                "nuis run-artifact {}",
+                manifest_path
+                    .as_ref()
+                    .or(artifact_path.as_ref())
+                    .or(binary_path.as_ref())
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_else(|| "<artifact-input>".to_owned())
+            ),
+            "the binary, manifest, and compiled artifact are all present and verified, so the next step is to launch the built output through the nuis frontdoor".to_owned(),
+        )
+    } else if manifest_exists || artifact_exists {
+        (
+            "inspect_artifact".to_owned(),
+            format!(
+                "nuis inspect-artifact {}",
+                manifest_path
+                    .as_ref()
+                    .or(artifact_path.as_ref())
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_else(|| "<artifact-input>".to_owned())
+            ),
+            "some artifact outputs are present, but the closure is not fully ready yet, so the next step is to inspect the available bundle metadata".to_owned(),
+        )
+    } else {
+        (
+            "run_artifact".to_owned(),
+            format!(
+                "nuis run-artifact {}",
+                binary_path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_else(|| "<binary-path>".to_owned())
+            ),
+            "only the binary path is currently visible, so the next step is to launch it through the nuis artifact runner".to_owned(),
+        )
+    };
+
+    ArtifactDoctorReport {
+        source_kind,
+        input: input.to_path_buf(),
+        output_dir,
+        manifest_path,
+        artifact_path,
+        binary_path,
+        manifest_exists,
+        artifact_exists,
+        binary_exists,
+        manifest_verified,
+        artifact_verified,
+        ready_to_run,
+        recommended_next_step,
+        recommended_command,
+        recommended_reason,
+        manifest_verify_error,
+        artifact_verify_error,
+    }
+}
+
+pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
+    let report = probe_artifact_doctor(input);
+    let output_dir = report
+        .output_dir
+        .as_ref()
+        .map(|path| path.display().to_string());
+    let manifest_path = report
+        .manifest_path
+        .as_ref()
+        .map(|path| path.display().to_string());
+    let artifact_path = report
+        .artifact_path
+        .as_ref()
+        .map(|path| path.display().to_string());
+    let binary_path = report
+        .binary_path
+        .as_ref()
+        .map(|path| path.display().to_string());
+    let fields = vec![
+        json_field("kind", "artifact_doctor"),
+        json_field("source_kind", &report.source_kind),
+        json_field("input", &report.input.display().to_string()),
+        json_optional_string_field("output_dir", output_dir.as_deref()),
+        json_optional_string_field("manifest_path", manifest_path.as_deref()),
+        json_optional_string_field("artifact_path", artifact_path.as_deref()),
+        json_optional_string_field("binary_path", binary_path.as_deref()),
+        json_bool_field("manifest_exists", report.manifest_exists),
+        json_bool_field("artifact_exists", report.artifact_exists),
+        json_bool_field("binary_exists", report.binary_exists),
+        json_bool_field("manifest_verified", report.manifest_verified),
+        json_bool_field("artifact_verified", report.artifact_verified),
+        json_bool_field("ready_to_run", report.ready_to_run),
+        json_field("recommended_next_step", &report.recommended_next_step),
+        json_field("recommended_command", &report.recommended_command),
+        json_field("recommended_reason", &report.recommended_reason),
+        json_optional_string_field(
+            "manifest_verify_error",
+            report.manifest_verify_error.as_deref(),
+        ),
+        json_optional_string_field(
+            "artifact_verify_error",
+            report.artifact_verify_error.as_deref(),
+        ),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
+    if json {
+        println!("{}", render_artifact_doctor_json(&input));
+        return Ok(());
+    }
+    let report = probe_artifact_doctor(&input);
+    println!("artifact doctor: {}", report.input.display());
+    println!("  source_kind: {}", report.source_kind);
+    if let Some(path) = report.output_dir.as_ref() {
+        println!("  output_dir: {}", path.display());
+    }
+    if let Some(path) = report.manifest_path.as_ref() {
+        println!("  manifest: {}", path.display());
+    }
+    if let Some(path) = report.artifact_path.as_ref() {
+        println!("  artifact: {}", path.display());
+    }
+    if let Some(path) = report.binary_path.as_ref() {
+        println!("  binary: {}", path.display());
+    }
+    println!("  manifest_exists: {}", report.manifest_exists);
+    println!("  artifact_exists: {}", report.artifact_exists);
+    println!("  binary_exists: {}", report.binary_exists);
+    println!("  manifest_verified: {}", report.manifest_verified);
+    println!("  artifact_verified: {}", report.artifact_verified);
+    println!("  ready_to_run: {}", report.ready_to_run);
+    if let Some(error) = report.manifest_verify_error.as_deref() {
+        println!("  manifest_verify_error: {}", error);
+    }
+    if let Some(error) = report.artifact_verify_error.as_deref() {
+        println!("  artifact_verify_error: {}", error);
+    }
+    println!("  recommended_next_step: {}", report.recommended_next_step);
+    println!("  recommended_command: {}", report.recommended_command);
+    println!("  recommended_reason: {}", report.recommended_reason);
+    Ok(())
+}
+
 fn handle_dump_ast(input: std::path::PathBuf) -> Result<(), String> {
     nuisc::run(nuisc::CommandKind::DumpAst { input })?;
     Ok(())
@@ -1731,11 +2069,173 @@ pub(crate) fn debug_workflow_samples_brief() -> &'static str {
 }
 
 fn single_source_compile_workflow_brief() -> &'static str {
-    "check -> test -> build -> release_check"
+    "check -> test -> build -> artifact_doctor -> run_artifact -> release_check"
 }
 
 fn single_source_compile_samples_brief() -> &'static str {
-    "check=nuis check <input.ns>; test=nuis test <input.ns>; build=nuis build <input.ns> <output-dir>; release=nuis release-check <input.ns> <output-dir>"
+    "check=nuis check <input.ns>; test=nuis test <input.ns>; build=nuis build <input.ns> <output-dir>; artifact=nuis artifact-doctor <output-dir>; run=nuis run-artifact <output-dir|nuis.build.manifest.toml>; release=nuis release-check <input.ns> <output-dir>"
+}
+
+fn artifact_workflow_brief() -> &'static str {
+    "build -> inspect_artifact -> verify_artifact -> artifact_doctor -> verify_build_manifest -> run_artifact"
+}
+
+fn artifact_doctor_command_for_output_dir(output_dir: &Path) -> String {
+    format!("nuis artifact-doctor {}", output_dir.display())
+}
+
+fn run_artifact_command_for_output_dir(output_dir: &Path) -> String {
+    format!(
+        "nuis run-artifact {}",
+        output_dir.join("nuis.build.manifest.toml").display()
+    )
+}
+
+fn load_link_plan_for_output_dir(output_dir: &Path) -> Option<nuisc::linker::LinkPlan> {
+    let manifest = output_dir.join("nuis.build.manifest.toml");
+    if !manifest.exists() {
+        return None;
+    }
+    nuisc::linker::build_link_plan_from_manifest(&manifest).ok()
+}
+
+fn workflow_link_plan_json_fields(
+    link_plan: Option<&nuisc::linker::LinkPlan>,
+) -> Vec<String> {
+    vec![
+        json_bool_field("link_plan_available", link_plan.is_some()),
+        json_optional_string_field(
+            "link_plan_final_stage",
+            link_plan.map(|plan| plan.final_stage.kind.as_str()),
+        ),
+        json_optional_string_field(
+            "link_plan_final_driver",
+            link_plan.map(|plan| plan.final_stage.driver.as_str()),
+        ),
+        json_optional_string_field(
+            "link_plan_final_link_mode",
+            link_plan.map(|plan| plan.final_stage.link_mode.as_str()),
+        ),
+    ]
+}
+
+fn render_workflow_json(input: &Path) -> Result<String, String> {
+    if nuisc::project::is_project_input(input) {
+        let project = nuisc::project::load_project(input)?;
+        let plan = nuisc::project::build_project_compilation_plan(&project)?;
+        let galaxy_manifest_path = project.root.join("galaxy.toml");
+        let declared_tests = project
+            .manifest
+            .tests
+            .iter()
+            .map(|relative| project.root.join(relative))
+            .collect::<Vec<_>>();
+        let missing_tests = declared_tests
+            .iter()
+            .filter(|path| !path.exists())
+            .cloned()
+            .collect::<Vec<_>>();
+        let galaxy_check = if galaxy_manifest_path.exists() {
+            Some(galaxy::check(&project.root))
+        } else {
+            None
+        };
+        let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
+        let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+        let frontdoor = project_frontdoor_surface(
+            &plan,
+            &declared_tests,
+            &missing_tests,
+            &galaxy_doctor,
+            galaxy_check_invalid,
+        );
+        let include_galaxy_flow =
+            galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
+        let output_dir = default_build_output_dir(input);
+        let artifact_report = probe_artifact_doctor(&output_dir);
+        let link_plan = load_link_plan_for_output_dir(&output_dir);
+        let mut fields = vec![
+            json_field("source_kind", frontdoor.source_kind),
+            json_field("input", &input.display().to_string()),
+            json_field("project", &project.manifest.name),
+            json_field("root", &project.root.display().to_string()),
+            json_field("entry", &project.manifest.entry),
+            json_field("default_build_output_dir", &output_dir.display().to_string()),
+            json_field(
+                "default_release_output_dir",
+                &default_release_check_output_dir(input).display().to_string(),
+            ),
+            json_field("artifact_workflow", artifact_workflow_brief()),
+            json_field(
+                "artifact_doctor_command",
+                &artifact_doctor_command_for_output_dir(&output_dir),
+            ),
+            json_field(
+                "run_artifact_command",
+                &run_artifact_command_for_output_dir(&output_dir),
+            ),
+            json_bool_field("artifact_ready_to_run", artifact_report.ready_to_run),
+            json_field(
+                "artifact_recommended_next_step",
+                &artifact_report.recommended_next_step,
+            ),
+        ];
+        fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
+        fields.extend(workflow_contract_json_fields(
+            &frontdoor,
+            true,
+            true,
+            include_galaxy_flow,
+            true,
+        ));
+        return Ok(format!("{{{}}}", fields.join(",")));
+    }
+
+    let frontdoor = build_workflow_frontdoor_surface(
+        single_source_workflow_source_profile(),
+        WorkflowRecommendation {
+            label: single_source_workflow_next_step_label(),
+            command: recommended_single_source_workflow_command(),
+            reason: "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
+        },
+    );
+    let output_dir = default_build_output_dir(input);
+    let artifact_report = probe_artifact_doctor(&output_dir);
+    let link_plan = load_link_plan_for_output_dir(&output_dir);
+    let mut fields = vec![
+        json_field("source_kind", frontdoor.source_kind),
+        json_field("input", &input.display().to_string()),
+        json_field("single_source_compile_workflow", frontdoor.workflow_brief),
+        json_field("single_source_compile_samples", frontdoor.workflow_samples),
+        json_field("default_build_output_dir", &output_dir.display().to_string()),
+        json_field(
+            "default_release_output_dir",
+            &default_release_check_output_dir(input).display().to_string(),
+        ),
+        json_field("artifact_workflow", artifact_workflow_brief()),
+        json_field(
+            "artifact_doctor_command",
+            &artifact_doctor_command_for_output_dir(&output_dir),
+        ),
+        json_field(
+            "run_artifact_command",
+            &run_artifact_command_for_output_dir(&output_dir),
+        ),
+        json_bool_field("artifact_ready_to_run", artifact_report.ready_to_run),
+        json_field(
+            "artifact_recommended_next_step",
+            &artifact_report.recommended_next_step,
+        ),
+    ];
+    fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
+    fields.extend(workflow_contract_json_fields(
+        &frontdoor,
+        false,
+        false,
+        false,
+        true,
+    ));
+    Ok(format!("{{{}}}", fields.join(",")))
 }
 
 fn single_source_workflow_next_step_label() -> &'static str {
@@ -1757,6 +2257,26 @@ struct WorkflowSourceProfile {
     workflow_kind: &'static str,
     workflow_brief: &'static str,
     workflow_samples: &'static str,
+}
+
+pub(crate) struct ArtifactDoctorReport {
+    pub(crate) source_kind: String,
+    pub(crate) input: PathBuf,
+    pub(crate) output_dir: Option<PathBuf>,
+    pub(crate) manifest_path: Option<PathBuf>,
+    pub(crate) artifact_path: Option<PathBuf>,
+    pub(crate) binary_path: Option<PathBuf>,
+    pub(crate) manifest_exists: bool,
+    pub(crate) artifact_exists: bool,
+    pub(crate) binary_exists: bool,
+    pub(crate) manifest_verified: bool,
+    pub(crate) artifact_verified: bool,
+    pub(crate) ready_to_run: bool,
+    pub(crate) recommended_next_step: String,
+    pub(crate) recommended_command: String,
+    pub(crate) recommended_reason: String,
+    pub(crate) manifest_verify_error: Option<String>,
+    pub(crate) artifact_verify_error: Option<String>,
 }
 
 pub(crate) struct WorkflowFrontdoorSurface {
@@ -1866,8 +2386,8 @@ fn toolchain_frontdoor_surface() -> WorkflowFrontdoorSurface {
         WorkflowSourceProfile {
             source_kind: "toolchain",
             workflow_kind: "default_compile_frontdoor",
-            workflow_brief: "workflow -> project_doctor -> check -> test -> build -> release_check",
-            workflow_samples: "workflow=nuis workflow [input]; doctor=nuis project-doctor [project-dir|nuis.toml]; check=nuis check [input]; test=nuis test [input]; build=nuis build [input] <output-dir>; release=nuis release-check [input] [output-dir]",
+            workflow_brief: "workflow -> project_doctor -> check -> test -> build -> artifact_doctor -> run_artifact -> release_check",
+            workflow_samples: "workflow=nuis workflow [input]; doctor=nuis project-doctor [project-dir|nuis.toml]; check=nuis check [input]; test=nuis test [input]; build=nuis build [input] <output-dir>; artifact=nuis artifact-doctor <output-dir>; run=nuis run-artifact <output-dir|nuis.build.manifest.toml>; release=nuis release-check [input] [output-dir]",
         },
         WorkflowRecommendation {
             label: "workflow",
@@ -2017,28 +2537,11 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         );
         let include_galaxy_flow =
             galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
+        let output_dir = default_build_output_dir(&input);
+        let artifact_report = probe_artifact_doctor(&output_dir);
+        let link_plan = load_link_plan_for_output_dir(&output_dir);
         if json {
-            let mut fields = vec![
-                json_field("source_kind", frontdoor.source_kind),
-                json_field("input", &input.display().to_string()),
-                json_field("project", &project.manifest.name),
-                json_field("root", &project.root.display().to_string()),
-                json_field("entry", &project.manifest.entry),
-                json_field(
-                    "default_release_output_dir",
-                    &default_release_check_output_dir(&input)
-                        .display()
-                        .to_string(),
-                ),
-            ];
-            fields.extend(workflow_contract_json_fields(
-                &frontdoor,
-                true,
-                true,
-                include_galaxy_flow,
-                true,
-            ));
-            println!("{{{}}}", fields.join(","));
+            println!("{}", render_workflow_json(&input)?);
             return Ok(());
         }
 
@@ -2058,45 +2561,54 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         println!("  debug_workflow: {}", debug_workflow_brief());
         print_scheduler_sample_field("debug_samples", debug_workflow_samples_brief());
         println!(
+            "  default_build_output_dir: {}",
+            output_dir.display()
+        );
+        println!(
             "  default_release_output_dir: {}",
             default_release_check_output_dir(&input).display()
+        );
+        println!("  artifact_workflow: {}", artifact_workflow_brief());
+        println!(
+            "  artifact_doctor_command: {}",
+            artifact_doctor_command_for_output_dir(&output_dir)
+        );
+        println!(
+            "  run_artifact_command: {}",
+            run_artifact_command_for_output_dir(&output_dir)
+        );
+        println!("  artifact_ready_to_run: {}", artifact_report.ready_to_run);
+        println!(
+            "  artifact_recommended_next_step: {}",
+            artifact_report.recommended_next_step
+        );
+        println!("  link_plan_available: {}", link_plan.is_some());
+        println!(
+            "  link_plan_final_stage: {}",
+            link_plan
+                .as_ref()
+                .map(|plan| plan.final_stage.kind.as_str())
+                .unwrap_or("<unavailable>")
+        );
+        println!(
+            "  link_plan_final_driver: {}",
+            link_plan
+                .as_ref()
+                .map(|plan| plan.final_stage.driver.as_str())
+                .unwrap_or("<unavailable>")
+        );
+        println!(
+            "  link_plan_final_link_mode: {}",
+            link_plan
+                .as_ref()
+                .map(|plan| plan.final_stage.link_mode.as_str())
+                .unwrap_or("<unavailable>")
         );
         return Ok(());
     }
 
     if json {
-        let frontdoor = build_workflow_frontdoor_surface(
-            single_source_workflow_source_profile(),
-            WorkflowRecommendation {
-                label: single_source_workflow_next_step_label(),
-                command: recommended_single_source_workflow_command(),
-                reason: "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
-            },
-        );
-        let mut fields = vec![
-            json_field("source_kind", frontdoor.source_kind),
-            json_field("input", &input.display().to_string()),
-            json_field("single_source_compile_workflow", frontdoor.workflow_brief),
-            json_field("single_source_compile_samples", frontdoor.workflow_samples),
-            json_field(
-                "default_build_output_dir",
-                &default_build_output_dir(&input).display().to_string(),
-            ),
-            json_field(
-                "default_release_output_dir",
-                &default_release_check_output_dir(&input)
-                    .display()
-                    .to_string(),
-            ),
-        ];
-        fields.extend(workflow_contract_json_fields(
-            &frontdoor,
-            false,
-            false,
-            false,
-            true,
-        ));
-        println!("{{{}}}", fields.join(","));
+        println!("{}", render_workflow_json(&input)?);
         return Ok(());
     }
 
@@ -2108,6 +2620,9 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
             reason: "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
         },
     );
+    let output_dir = default_build_output_dir(&input);
+    let artifact_report = probe_artifact_doctor(&output_dir);
+    let link_plan = load_link_plan_for_output_dir(&output_dir);
     println!("workflow: single-file");
     println!("  input: {}", input.display());
     print_workflow_frontdoor_surface(&frontdoor);
@@ -2126,11 +2641,47 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
     print_scheduler_sample_field("debug_samples", debug_workflow_samples_brief());
     println!(
         "  default_build_output_dir: {}",
-        default_build_output_dir(&input).display()
+        output_dir.display()
     );
     println!(
         "  default_release_output_dir: {}",
         default_release_check_output_dir(&input).display()
+    );
+    println!("  artifact_workflow: {}", artifact_workflow_brief());
+    println!(
+        "  artifact_doctor_command: {}",
+        artifact_doctor_command_for_output_dir(&output_dir)
+    );
+    println!(
+        "  run_artifact_command: {}",
+        run_artifact_command_for_output_dir(&output_dir)
+    );
+    println!("  artifact_ready_to_run: {}", artifact_report.ready_to_run);
+    println!(
+        "  artifact_recommended_next_step: {}",
+        artifact_report.recommended_next_step
+    );
+    println!("  link_plan_available: {}", link_plan.is_some());
+    println!(
+        "  link_plan_final_stage: {}",
+        link_plan
+            .as_ref()
+            .map(|plan| plan.final_stage.kind.as_str())
+            .unwrap_or("<unavailable>")
+    );
+    println!(
+        "  link_plan_final_driver: {}",
+        link_plan
+            .as_ref()
+            .map(|plan| plan.final_stage.driver.as_str())
+            .unwrap_or("<unavailable>")
+    );
+    println!(
+        "  link_plan_final_link_mode: {}",
+        link_plan
+            .as_ref()
+            .map(|plan| plan.final_stage.link_mode.as_str())
+            .unwrap_or("<unavailable>")
     );
     Ok(())
 }
@@ -3276,6 +3827,9 @@ fn print_help() {
         "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
     );
     println!(
+        "    nuis run-artifact <binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
+    );
+    println!(
         "    nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
     );
     println!("  general:");
@@ -3289,6 +3843,9 @@ fn print_help() {
     println!("    nuis dump-yir [input.ns|project-dir|nuis.toml]");
     println!("    nuis workflow [--json] [input.ns|project-dir|nuis.toml]");
     println!("    nuis scheduler-view [--json] [input.ns|project-dir|nuis.toml]");
+    println!("    nuis inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>");
+    println!("    nuis verify-artifact [--json] <nuis.compiled.artifact>");
+    println!("    nuis artifact-doctor [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>");
     println!("    nuis verify-build-manifest <nuis.build.manifest.toml>");
     println!();
     println!("  project workflow:");
@@ -3447,16 +4004,18 @@ mod tests {
         public_surface_summary_json_fields, workflow_contract_json_fields,
     };
     use super::{
-        build_workflow_frontdoor_surface, handle_build, handle_check, handle_release_check,
-        handle_test, project_abi_checks_json, project_compile_workflow_source_profile,
+        artifact_doctor_command_for_output_dir, artifact_workflow_brief,
+        benchmark_run_report_json, build_workflow_frontdoor_surface, default_build_output_dir,
+        handle_build, handle_check, handle_release_check, handle_run_artifact, handle_test,
+        project_abi_checks_json, project_compile_workflow_source_profile,
         project_domain_registry_checks_json, project_workflow_json_fields,
-        recommend_project_workflow_step, render_project_doctor_json,
-        render_project_status_json, render_scheduler_view_json,
-        benchmark_run_report_json, resolve_runner_clock_domain,
-        run_language_benchmarks_for_source_file,
-        run_language_tests_for_source_file, scheduler_view_domain_record,
-        scheduler_view_domain_record_json, single_source_workflow_source_profile,
-        wait_for_test_child, RawTestOutcome, WorkflowRecommendation,
+        recommend_project_workflow_step, render_artifact_doctor_json,
+        render_project_doctor_json, render_project_status_json, render_scheduler_view_json,
+        render_workflow_json, resolve_runner_clock_domain, run_artifact_command_for_output_dir,
+        run_language_benchmarks_for_source_file, run_language_tests_for_source_file,
+        scheduler_view_domain_record, scheduler_view_domain_record_json,
+        single_source_workflow_source_profile, wait_for_test_child, RawTestOutcome,
+        WorkflowRecommendation,
         PublicSurfaceModuleRecord,
     };
     use std::{
@@ -3585,11 +4144,11 @@ mod tests {
         assert_eq!(frontdoor.workflow_kind, "compile_workflow");
         assert_eq!(
             frontdoor.workflow_brief,
-            "check -> test -> build -> release_check"
+            "check -> test -> build -> artifact_doctor -> run_artifact -> release_check"
         );
         assert!(frontdoor
             .workflow_samples
-            .contains("nuis build <input.ns> <output-dir>"));
+            .contains("nuis artifact-doctor <output-dir>"));
         assert_eq!(frontdoor.recommended_next_step, "check");
     }
 
@@ -3614,6 +4173,22 @@ mod tests {
             nuisc::project_compile_samples_brief()
         );
         assert_eq!(frontdoor.recommended_next_step, "project_lock_abi");
+    }
+
+    #[test]
+    fn project_compile_workflow_brief_includes_artifact_follow_up() {
+        assert!(nuisc::project_compile_workflow_brief().contains("artifact_doctor"));
+        assert!(nuisc::project_compile_workflow_brief().contains("run_artifact"));
+        assert!(nuisc::project_compile_samples_brief().contains("nuis artifact-doctor"));
+    }
+
+    #[test]
+    fn single_source_workflow_helpers_emit_artifact_follow_up_commands() {
+        let input = Path::new("examples/demo.ns");
+        let output_dir = default_build_output_dir(input);
+        assert!(artifact_workflow_brief().contains("artifact_doctor"));
+        assert!(artifact_doctor_command_for_output_dir(&output_dir).contains("nuis artifact-doctor"));
+        assert!(run_artifact_command_for_output_dir(&output_dir).contains("nuis run-artifact"));
     }
 
     #[test]
@@ -3738,6 +4313,172 @@ mod cpu Main {
         .expect("artifact verifies");
         assert!(artifact_report.lifecycle_contract_consistent);
         assert!(artifact_report.artifact_roundtrip_verified);
+    }
+
+    #[test]
+    fn run_artifact_executes_binary_from_manifest_input() {
+        let project_root = write_temp_project_fixture(
+            "run_artifact_smoke",
+            r#"
+name = "run_artifact_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("run_artifact_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        handle_run_artifact(output_dir.join("nuis.build.manifest.toml"))
+            .expect("run-artifact passes");
+    }
+
+    #[test]
+    fn artifact_doctor_json_reports_ready_to_run_for_built_output() {
+        let project_root = write_temp_project_fixture(
+            "artifact_doctor_smoke",
+            r#"
+name = "artifact_doctor_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("artifact_doctor_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_artifact_doctor_json(&output_dir);
+
+        assert!(json.contains("\"kind\":\"artifact_doctor\""));
+        assert!(json.contains("\"source_kind\":\"output_dir\""));
+        assert!(json.contains("\"manifest_exists\":true"));
+        assert!(json.contains("\"artifact_exists\":true"));
+        assert!(json.contains("\"binary_exists\":true"));
+        assert!(json.contains("\"manifest_verified\":true"));
+        assert!(json.contains("\"artifact_verified\":true"));
+        assert!(json.contains("\"ready_to_run\":true"));
+        assert!(json.contains("\"recommended_next_step\":\"run_artifact\""));
+    }
+
+    #[test]
+    fn workflow_json_reports_frontdoor_and_artifact_fields_for_project() {
+        let project_root = write_temp_project_fixture(
+            "workflow_json_smoke",
+            r#"
+name = "workflow_json_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+tests = ["tests/smoke.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 6;
+  }
+}
+"#,
+        );
+        let tests_dir = project_root.join("tests");
+        fs::create_dir_all(&tests_dir).expect("create tests dir");
+        fs::write(
+            tests_dir.join("smoke.ns"),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write smoke test");
+
+        let json = render_workflow_json(&project_root).expect("render workflow json");
+
+        assert!(json.contains("\"source_kind\":\"project\""));
+        assert!(json.contains("\"workflow_kind\":\"project_compile_workflow\""));
+        assert!(json.contains("\"artifact_workflow\":\"build -> inspect_artifact -> verify_artifact -> artifact_doctor -> verify_build_manifest -> run_artifact\""));
+        assert!(json.contains("\"artifact_ready_to_run\":false"));
+        assert!(json.contains("\"artifact_recommended_next_step\":\"build\""));
+        assert!(json.contains("\"link_plan_available\":false"));
+        assert!(json.contains("\"link_plan_final_stage\":null"));
+    }
+
+    #[test]
+    fn workflow_json_reports_link_plan_for_built_project_output() {
+        let project_root = write_temp_project_fixture(
+            "workflow_json_built_smoke",
+            r#"
+name = "workflow_json_built_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 8;
+  }
+}
+"#,
+        );
+        let output_dir = default_build_output_dir(&project_root);
+
+        handle_build(project_root.clone(), output_dir.clone(), false, None, None)
+            .expect("build passes");
+
+        let json = render_workflow_json(&project_root).expect("render workflow json");
+
+        assert!(json.contains("\"artifact_ready_to_run\":true"));
+        assert!(json.contains("\"artifact_recommended_next_step\":\"run_artifact\""));
+        assert!(json.contains("\"link_plan_available\":true"));
+        assert!(json.contains("\"link_plan_final_stage\":\"host-native-link\""));
+        assert!(json.contains("\"link_plan_final_driver\":\"clang\""));
+        assert!(json.contains("\"link_plan_final_link_mode\":\"host-toolchain-finalize\""));
+    }
+
+    #[test]
+    fn workflow_json_reports_frontdoor_and_artifact_fields_for_single_source() {
+        let dir = temp_dir("workflow_json_single_source");
+        let input = dir.join("hello.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 2;
+  }
+}
+"#,
+        )
+        .expect("write source");
+
+        let json = render_workflow_json(&input).expect("render workflow json");
+
+        assert!(json.contains("\"source_kind\":\"single-file\""));
+        assert!(json.contains("\"workflow_kind\":\"compile_workflow\""));
+        assert!(json.contains("\"artifact_ready_to_run\":false"));
+        assert!(json.contains("\"artifact_recommended_next_step\":\"build\""));
+        assert!(json.contains("\"link_plan_available\":false"));
+        assert!(json.contains("\"link_plan_final_stage\":null"));
     }
 
     #[test]
@@ -4059,6 +4800,11 @@ mod cpu Main {
             nuisc::project_compile_workflow_brief()
         )));
         assert!(json.contains("\"recommended_next_step\":\"check\""));
+        assert!(json.contains("\"artifact_output_dir\":\""));
+        assert!(json.contains("\"artifact_ready_to_run\":false"));
+        assert!(json.contains("\"artifact_recommended_next_step\":\"build\""));
+        assert!(json.contains("\"link_plan_available\":false"));
+        assert!(json.contains("\"link_plan_final_stage\":null"));
         assert!(json.contains("\"tests_declared\":1"));
         assert!(json.contains("\"public_surface_modules\":1"));
         assert!(json.contains("\"public_functions\":1"));
@@ -4099,6 +4845,9 @@ mod cpu Main {
         assert!(json.contains("\"abi_checks_ok\":true"));
         assert!(json.contains("\"registry_checks_ok\":true"));
         assert!(json.contains("\"lowering_checks_ok\":true"));
+        assert!(json.contains("\"artifact_output_dir\":\""));
+        assert!(json.contains("\"artifact_ready_to_run\":false"));
+        assert!(json.contains("\"link_plan_available\":false"));
         assert!(json.contains("\"galaxy_check_status\":\"skipped\""));
         assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
         assert!(json.contains("\"next_steps\":["));
@@ -4106,6 +4855,44 @@ mod cpu Main {
         assert!(json.contains("\"tests\":[{"));
         assert!(json.contains("\"exists\":false"));
         assert!(json.contains("\"domains\":["));
+    }
+
+    #[test]
+    fn project_status_json_reports_link_plan_for_built_output() {
+        let project_root = write_temp_project_fixture(
+            "status_json_built_smoke",
+            r#"
+name = "status_json_built_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 5;
+  }
+}
+"#,
+        );
+        let output_dir = default_build_output_dir(&project_root);
+
+        handle_build(project_root.clone(), output_dir.clone(), false, None, None)
+            .expect("build passes");
+
+        let json = render_project_status_json(&project_root).expect("render status json");
+
+        assert!(json.contains(&format!(
+            "\"artifact_output_dir\":\"{}\"",
+            output_dir.display()
+        )));
+        assert!(json.contains("\"artifact_ready_to_run\":true"));
+        assert!(json.contains("\"link_plan_available\":true"));
+        assert!(json.contains("\"link_plan_final_stage\":\"host-native-link\""));
+        assert!(json.contains("\"link_plan_final_driver\":\"clang\""));
+        assert!(json.contains("\"link_plan_final_link_mode\":\"host-toolchain-finalize\""));
+        assert!(json.contains("\"link_plan_domain_units\":"));
     }
 
     #[test]

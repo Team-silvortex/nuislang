@@ -757,6 +757,77 @@ fn lowers_extern_host_symbol_bridge_into_nir_signature() {
 }
 
 #[test]
+fn lowers_non_network_extern_host_symbol_bridges_into_nir_signatures() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" @host_symbol("file.open") fn open_file(path_handle: i64, flags: i64) -> i64;
+          extern "c" @host_symbol("path.join_len") fn join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+
+          fn main() -> i64 {
+            return open_file(join_len(11, 19), 3);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert_eq!(
+        main.body,
+        vec![NirStmt::Return(Some(NirExpr::CpuExternCall {
+            abi: "c".to_owned(),
+            interface: None,
+            callee: "host_file_open".to_owned(),
+            args: vec![
+                NirExpr::CpuExternCall {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    callee: "host_path_join_len".to_owned(),
+                    args: vec![NirExpr::Int(11), NirExpr::Int(19)],
+                },
+                NirExpr::Int(3),
+            ],
+        }))]
+    );
+}
+
+#[test]
+fn lowers_output_host_symbol_extern_bridge_into_nir_signature() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" @host_symbol("stdout.write") fn stdout_write(text_handle: i64) -> i64;
+
+          fn main() -> i64 {
+            return stdout_write(29);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert_eq!(
+        main.body,
+        vec![NirStmt::Return(Some(NirExpr::CpuExternCall {
+            abi: "c".to_owned(),
+            interface: None,
+            callee: "host_stdout_write".to_owned(),
+            args: vec![NirExpr::Int(29)],
+        }))]
+    );
+}
+
+#[test]
 fn lowers_pub_extern_items_into_nir() {
     let module = parse_nuis_module(
         r#"
@@ -783,6 +854,82 @@ fn lowers_pub_extern_items_into_nir() {
     assert_eq!(
         module.extern_interfaces[0].methods[0].visibility,
         NirVisibility::Private
+    );
+}
+
+#[test]
+fn lowers_non_network_host_symbol_bridge_stub_calls_into_cpu_extern_calls() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          @host_symbol("path.is_absolute")
+          fn is_absolute(path_handle: i64) -> i64 {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            return is_absolute(41);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .all(|function| function.name != "is_absolute"));
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert_eq!(
+        main.body,
+        vec![NirStmt::Return(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_path_is_absolute".to_owned(),
+                args: vec![NirExpr::Int(41)],
+            }))]
+    );
+}
+
+#[test]
+fn lowers_output_host_symbol_bridge_stub_call_into_cpu_extern_call() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          @host_symbol("stderr.write")
+          fn stderr_write(text_handle: i64) -> i64 {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            return stderr_write(53);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .all(|function| function.name != "stderr_write"));
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert_eq!(
+        main.body,
+        vec![NirStmt::Return(Some(NirExpr::CpuExternCall {
+            abi: "c".to_owned(),
+            interface: None,
+            callee: "host_stderr_write".to_owned(),
+            args: vec![NirExpr::Int(53)],
+        }))]
     );
 }
 
@@ -940,6 +1087,7 @@ fn lowers_host_symbol_bridge_stub_calls_into_cpu_extern_calls() {
         }))]
     );
 }
+
 
 #[test]
 fn parses_generic_impl_headers() {

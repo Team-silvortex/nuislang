@@ -908,6 +908,102 @@ fn compiles_file_runtime_demo_project_with_host_buffer_handle_bridge() {
 }
 
 #[test]
+fn compiles_file_read_demo_project_with_host_buffer_handle_bridge() {
+    compiled_project("/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo");
+}
+
+#[test]
+fn lowers_file_read_demo_project_with_host_file_read_bridge() {
+    let artifacts =
+        compiled_project("/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo");
+
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_file_open"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_file_read"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_file_close"));
+}
+
+#[test]
+fn compiles_file_write_demo_project_with_host_file_write_bridge() {
+    compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo",
+    );
+}
+
+#[test]
+fn lowers_file_write_demo_project_with_host_file_write_bridge() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo",
+    );
+
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_file_open"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_file_write"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_file_close"));
+}
+
+#[test]
+fn compiles_file_copy_demo_project_with_host_file_copy_bridge() {
+    compiled_project("/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo");
+}
+
+#[test]
+fn lowers_file_copy_demo_project_with_host_path_copy_bridge() {
+    let artifacts =
+        compiled_project("/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo");
+
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_file_open"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_file_write"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_path_copy"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_fs_exists"));
+}
+
+#[test]
+fn compiles_filesystem_report_file_demo_project_with_host_file_output_bridge() {
+    compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_file_demo",
+    );
+}
+
+#[test]
+fn lowers_filesystem_report_file_demo_project_with_host_report_file_bridge() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_file_demo",
+    );
+
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_file_read"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_text_concat"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_temp_file_handle"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_file_write"));
+}
+
+#[test]
 fn compiles_stdin_file_input_runtime_demo_project_with_host_buffer_handle_bridge() {
     compiled_project(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/input_runtime_demo",

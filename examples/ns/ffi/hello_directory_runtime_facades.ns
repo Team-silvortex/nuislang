@@ -1,7 +1,7 @@
 mod cpu Main {
-  extern "c" fn host_dir_open(path_handle: i64) -> i64;
-  extern "c" fn host_dir_entry_count(dir_handle: i64) -> i64;
-  extern "c" fn host_dir_close(dir_handle: i64) -> i64;
+  extern "c" @host_symbol("dir.open") fn dir_open(path_handle: i64) -> i64;
+  extern "c" @host_symbol("dir.entry_count") fn dir_entry_count(dir_handle: i64) -> i64;
+  extern "c" @host_symbol("dir.close") fn dir_close(dir_handle: i64) -> i64;
 
   struct DirectoryRuntimeFacadeSummary {
     primary_handle: i64,
@@ -13,15 +13,15 @@ mod cpu Main {
   }
 
   fn capture_directory_runtime_facade() -> DirectoryRuntimeFacadeSummary {
-    let primary_handle: i64 = host_dir_open(307);
-    let secondary_handle: i64 = host_dir_open(521);
+    let primary_handle: i64 = dir_open(307);
+    let secondary_handle: i64 = dir_open(521);
     return DirectoryRuntimeFacadeSummary {
       primary_handle: primary_handle,
-      primary_entry_count: host_dir_entry_count(primary_handle),
-      primary_close_code: host_dir_close(primary_handle),
+      primary_entry_count: dir_entry_count(primary_handle),
+      primary_close_code: dir_close(primary_handle),
       secondary_handle: secondary_handle,
-      secondary_entry_count: host_dir_entry_count(secondary_handle),
-      secondary_close_code: host_dir_close(secondary_handle)
+      secondary_entry_count: dir_entry_count(secondary_handle),
+      secondary_close_code: dir_close(secondary_handle)
     };
   }
 

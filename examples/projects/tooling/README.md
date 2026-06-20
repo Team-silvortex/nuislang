@@ -20,6 +20,7 @@ If you only want the shortest tooling route, start with:
 * [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
 * [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo)
 * [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
+* [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
 
 ## Pick By Goal
 
@@ -29,7 +30,8 @@ If you only want the shortest tooling route, start with:
 * process and command execution:
   [process_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/process_runtime_demo),
   [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo),
-  [subprocess_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo)
+  [subprocess_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo),
+  [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
 * text, json, diagnostics:
   [host_text_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/host_text_runtime_demo),
   [text_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_pipeline_demo),
@@ -69,3 +71,6 @@ If you only want the shortest tooling route, start with:
   probes, not as equal-entry onboarding material
 * for repo-level routing, prefer
   [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* if the question is specifically “can `nuis` compile its own native/artifact
+  bundle and survive a real launch-shaped host bridge route?”, start with
+  [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)

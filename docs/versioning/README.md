@@ -5,11 +5,37 @@ workflow/history checkpoints, and policy notes.
 
 ## Read This First
 
+### Current Line
+
 If you want the current line instead of historical backfill, start with:
+
+* [nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
+
+Use this first when the question is:
+
+* what the current `alpha-0.1.*` mainline actually is
+* what should count as present-tense repo truth
+* which older files should now be treated as predecessor anchors
+
+### Immediate Predecessor Alpha Transition
+
+If you want the line that handed off into the current one, read:
 
 * [nuis-alpha-0.0.1-preflight-report.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-preflight-report.md)
 * [nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
 * [nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
+
+Use this set when the question is:
+
+* how the closeout-era `0.20.* -> alpha-0.0.1` transition led into the current
+  `alpha-0.1.*` line
+* which closeout-era lanes were still active versus already boundary-shaped
+
+### Pre-Alpha Mainline Anchors
+
+If you want the strongest pre-alpha mainline anchors that still explain the
+current repository shape, read:
+
 * [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 * [nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
 * [nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
@@ -28,10 +54,9 @@ If you want the current line instead of historical backfill, start with:
 * [nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
 * [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
 
-Use that set when the question is:
+Use this set when the question is:
 
-* what the current compile workflow is
-* what the repo currently claims is ready
+* what the current compile workflow grew out of
 * which ABI terms are now canonical
 * where frontend/NIR truth currently outruns the deeper CLI/source-compile route
 * which branch-local runtime-lowering rewrites are already test-backed
@@ -41,16 +66,10 @@ Use that set when the question is:
   regression-backed across helper, async, task, result, and control-flow
   wrappers
 * which `std` lanes should be normalized first during the `0.20.*` refactor
-  instead of being treated as one flat bucket
-* which specific `0.20.*` compile-chain gaps are still being actively closed
-* how `0.20.*` is supposed to hand off into `alpha-0.0.1`
-* whether the next commit should still be closeout-only or is trying to reopen
-  the surface
-* which alpha closeout lanes are still active versus already documented
-  boundaries
-* which project/frontend/workflow matrices should still be treated as live
+* which specific `0.20.*` compile-chain gaps were being actively closed before
+  alpha
 
-## Previous Minor Line
+## Earlier Predecessor Minor Line
 
 When you need the immediate predecessor rather than the current line, use:
 
@@ -69,7 +88,7 @@ Use this line when the question is historical comparison for:
 * example-tree reshaping
 * the first clearer single-mainline compile route before `0.19.*` cleanup
 
-## Earlier Historical Anchors
+## Older Historical Anchors
 
 These are still worth keeping, but they should not be treated as the default
 entry route anymore:
@@ -91,13 +110,22 @@ entry route anymore:
 * first minor-history anchors:
   [nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md),
   [nuis-0.13.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-release-checklist.md)
-* policy:
-  [nuis-minor-snapshot-rule.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-minor-snapshot-rule.md)
+## Policy Anchor
+
+Use this when the question is:
+
+* how minor-line history files should be added and routed
+* how new current-line anchors should demote older ones without deleting them
+
+Read:
+
+* [nuis-minor-snapshot-rule.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-minor-snapshot-rule.md)
 
 Practical rule:
 
-* start at `0.19.*` plus the `0.20.0` ABI vocabulary unless you are
-  intentionally reconstructing older assumptions
+* start at `alpha-0.1.*` first
+* then use `0.20.*` and `0.19.*` only when you are intentionally
+  reconstructing the line that led here
 * drop to `0.18.*` when you need the immediate predecessor line
 * only use `0.17.*` and `0.16.*` as historical/debugging context
 

@@ -61,6 +61,14 @@ If your question is specifically “what command should I run next for this
 project?”, start with
 [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md).
 
+If your question is specifically “what is the shortest real native binary
+closure route today?”, start with
+[nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md).
+
+If your question is specifically “which `nuis` frontdoor fields should I read
+or consume right now?”, start with
+[nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md).
+
 Shortest rule:
 
 * use this README for the implementation-truth anchor set

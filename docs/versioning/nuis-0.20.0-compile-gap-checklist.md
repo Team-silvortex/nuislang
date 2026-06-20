@@ -99,6 +99,7 @@ Current protection:
 
 * [tools/nuisc/src/frontend/tests_try.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_try.rs)
 * [tools/nuisc/tests/memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+* [tools/nuisc/tests/tooling_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/tooling_compile.rs)
 
 Current note:
 
@@ -107,6 +108,11 @@ Current note:
   shapes in `dump-yir`-equivalent coverage
 * the first promotion in this set required the zero-field `cpu.struct`
   aggregate fix for unit enum payloads such as `Error.InvalidInput`
+* the repository now also has a checked-in project-form native artifact
+  closure anchor:
+  [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
+  together with an AOT compile/package/launch smoke in
+  [tools/nuisc/src/lib.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lib.rs)
 
 Done when:
 

@@ -1,7 +1,7 @@
 mod cpu Main {
-  extern "c" fn host_path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
-  extern "c" fn host_path_is_absolute(path_handle: i64) -> i64;
-  extern "c" fn host_path_basename(path_handle: i64) -> i64;
+  extern "c" @host_symbol("path.join_len") fn path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" @host_symbol("path.is_absolute") fn path_is_absolute(path_handle: i64) -> i64;
+  extern "c" @host_symbol("path.basename") fn path_basename(path_handle: i64) -> i64;
 
   struct PathFacadeSummary {
     lhs_is_absolute: i64,
@@ -13,11 +13,11 @@ mod cpu Main {
 
   fn capture_path_facades() -> PathFacadeSummary {
     return PathFacadeSummary {
-      lhs_is_absolute: host_path_is_absolute(31),
-      rhs_is_absolute: host_path_is_absolute(47),
-      lhs_basename_handle: host_path_basename(31),
-      rhs_basename_handle: host_path_basename(47),
-      joined_len: host_path_join_len(31, 47)
+      lhs_is_absolute: path_is_absolute(31),
+      rhs_is_absolute: path_is_absolute(47),
+      lhs_basename_handle: path_basename(31),
+      rhs_basename_handle: path_basename(47),
+      joined_len: path_join_len(31, 47)
     };
   }
 

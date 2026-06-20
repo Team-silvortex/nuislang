@@ -22,20 +22,20 @@ There is also a practical split inside the current tree:
 If you want to understand the repository as it exists today, start here:
 
 * [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* [versioning/nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
-* [versioning/nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
+* [versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
+* [reference/nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)
+* [reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
 * [versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-* [versioning/nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
-* [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
 * [reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
 * [repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
 
 If your immediate question is “what is the canonical compile route today?”,
-start with the `0.19.0` workflow file before drilling into deeper reference
-material.
+start with the `alpha-0.1.*` mainline status file, then the frontdoor/native
+artifact reference pair before drilling into deeper reference material.
 
 If your immediate question is “what is the current minor-line history anchor?”,
-start with the `0.19.0` snapshot.
+start with the `alpha-0.1.*` mainline status file, then drop to the `0.19.0`
+snapshot only when you intentionally need the earlier pre-alpha cleanup line.
 
 If your immediate question is “which ABI words are now preferred before
 `0.20.*` broadens the surface further?”, read the

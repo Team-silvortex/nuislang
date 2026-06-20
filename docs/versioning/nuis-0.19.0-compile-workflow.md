@@ -78,6 +78,8 @@ nuis status / nuis help
   -> nuis check
   -> nuis test
   -> nuis build
+  -> nuis inspect-artifact / nuis verify-artifact / nuis verify-build-manifest
+  -> nuis run-artifact
   -> nuis release-check
 ```
 
@@ -87,6 +89,8 @@ The practical reason is simple:
 * `workflow` classifies single-file vs project-facing routes
 * `project-doctor`, `project-status`, and `scheduler-view` expose grouped
   preflight detail instead of disconnected command-local stories
+* `build` is now followed by explicit artifact/manifest inspection and
+  verification surfaces at the `nuis` frontdoor
 * `check/test/build/release-check` remain the action spine
 
 ## Current Source-Syntax Boundary
@@ -192,6 +196,10 @@ The current believable mainline should still be taught through:
   [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
 * network/http/session proof:
   [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+* native artifact closure proof:
+  [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
+  and the matching AOT compile/package/launch smoke in
+  [lib.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lib.rs)
 
 ## Rule Of Thumb
 

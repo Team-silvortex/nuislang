@@ -1,5 +1,74 @@
 use std::path::Path;
 
+fn load_link_plan(output_dir: &Path) -> Option<nuisc::linker::LinkPlan> {
+    let manifest = output_dir.join("nuis.build.manifest.toml");
+    if !manifest.exists() {
+        return None;
+    }
+    nuisc::linker::build_link_plan_from_manifest(&manifest).ok()
+}
+
+fn append_link_plan_text_fields(
+    lines: &mut Vec<String>,
+    link_plan: Option<&nuisc::linker::LinkPlan>,
+) {
+    lines.push(format!(
+        "  link_plan_available: {}",
+        crate::yes_no(link_plan.is_some())
+    ));
+    if let Some(plan) = link_plan {
+        lines.push(format!("  link_plan_final_stage: {}", plan.final_stage.kind));
+        lines.push(format!(
+            "  link_plan_final_driver: {}",
+            plan.final_stage.driver
+        ));
+        lines.push(format!(
+            "  link_plan_final_link_mode: {}",
+            plan.final_stage.link_mode
+        ));
+        lines.push(format!(
+            "  link_plan_final_output: {}",
+            plan.final_stage.output_path
+        ));
+        lines.push(format!(
+            "  link_plan_domain_units: {}",
+            plan.domain_units.len()
+        ));
+    } else {
+        lines.push("  link_plan_final_stage: <unavailable>".to_owned());
+        lines.push("  link_plan_final_driver: <unavailable>".to_owned());
+        lines.push("  link_plan_final_link_mode: <unavailable>".to_owned());
+        lines.push("  link_plan_final_output: <unavailable>".to_owned());
+        lines.push("  link_plan_domain_units: 0".to_owned());
+    }
+}
+
+fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<String> {
+    vec![
+        crate::json_bool_field("link_plan_available", link_plan.is_some()),
+        crate::json_optional_string_field(
+            "link_plan_final_stage",
+            link_plan.map(|plan| plan.final_stage.kind.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "link_plan_final_driver",
+            link_plan.map(|plan| plan.final_stage.driver.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "link_plan_final_link_mode",
+            link_plan.map(|plan| plan.final_stage.link_mode.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "link_plan_final_output",
+            link_plan.map(|plan| plan.final_stage.output_path.as_str()),
+        ),
+        crate::json_usize_field(
+            "link_plan_domain_units",
+            link_plan.map(|plan| plan.domain_units.len()).unwrap_or(0),
+        ),
+    ]
+}
+
 pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<String>, String> {
     let project = nuisc::project::load_project(input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
@@ -33,6 +102,9 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
         &galaxy_doctor,
         galaxy_check_invalid,
     );
+    let artifact_output_dir = crate::default_build_output_dir(input);
+    let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
+    let link_plan = load_link_plan(&artifact_output_dir);
     let mut lines = vec![
         format!("project status: {}", project.manifest.name),
         format!("  root: {}", project.root.display()),
@@ -57,6 +129,16 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
         format!("  recommended_next_step: {}", frontdoor.recommended_next_step),
         format!("  recommended_command: {}", frontdoor.recommended_command),
         format!("  recommended_reason: {}", frontdoor.recommended_reason),
+        format!("  artifact_output_dir: {}", artifact_output_dir.display()),
+        format!("  artifact_ready_to_run: {}", crate::yes_no(artifact_report.ready_to_run)),
+        format!(
+            "  artifact_recommended_next_step: {}",
+            artifact_report.recommended_next_step
+        ),
+        format!(
+            "  artifact_recommended_command: {}",
+            artifact_report.recommended_command
+        ),
         format!("  modules: {}", project.modules.len()),
         format!(
             "  public_surface: {}",
@@ -104,7 +186,18 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
             nuisc::project::describe_project_exchange_route_classes(&plan)
         ),
         format!("  tests: {}", declared_tests.len()),
+        format!("  artifact_output_dir: {}", artifact_output_dir.display()),
+        format!("  artifact_ready_to_run: {}", crate::yes_no(artifact_report.ready_to_run)),
+        format!(
+            "  artifact_recommended_next_step: {}",
+            artifact_report.recommended_next_step
+        ),
+        format!(
+            "  artifact_recommended_command: {}",
+            artifact_report.recommended_command
+        ),
     ];
+    append_link_plan_text_fields(&mut lines, link_plan.as_ref());
     for path in &declared_tests {
         lines.push(format!("  test: {} exists={}", path.display(), crate::yes_no(path.exists())));
     }
@@ -225,6 +318,9 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
         &galaxy_doctor,
         galaxy_check_invalid,
     );
+    let artifact_output_dir = crate::default_build_output_dir(input);
+    let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
+    let link_plan = load_link_plan(&artifact_output_dir);
     let mut lines = vec![
         format!("project doctor: {}", project.manifest.name),
         format!("  root: {}", project.root.display()),
@@ -249,6 +345,16 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
         format!("  recommended_next_step: {}", frontdoor.recommended_next_step),
         format!("  recommended_command: {}", frontdoor.recommended_command),
         format!("  recommended_reason: {}", frontdoor.recommended_reason),
+        format!("  artifact_output_dir: {}", artifact_output_dir.display()),
+        format!("  artifact_ready_to_run: {}", crate::yes_no(artifact_report.ready_to_run)),
+        format!(
+            "  artifact_recommended_next_step: {}",
+            artifact_report.recommended_next_step
+        ),
+        format!(
+            "  artifact_recommended_command: {}",
+            artifact_report.recommended_command
+        ),
         format!("  modules: {}", project.modules.len()),
         format!(
             "  public_surface: {}",
@@ -266,6 +372,7 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
         format!("  tests_declared: {}", declared_tests.len()),
         format!("  tests_missing: {}", missing_tests.len()),
     ];
+    append_link_plan_text_fields(&mut lines, link_plan.as_ref());
     for path in &declared_tests {
         lines.push(format!("  test: {} exists={}", path.display(), crate::yes_no(path.exists())));
     }
@@ -591,6 +698,9 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
         &galaxy_doctor,
         galaxy_check_invalid,
     );
+    let artifact_output_dir = crate::default_build_output_dir(input);
+    let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
+    let link_plan = load_link_plan(&artifact_output_dir);
     let test_json = declared_tests
         .iter()
         .map(|path| {
@@ -618,6 +728,23 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
     ));
     fields.extend(crate::json_surface::project_plan_json_fields(&plan));
     fields.push(crate::json_usize_field("tests_declared", declared_tests.len()));
+    fields.push(crate::json_field(
+        "artifact_output_dir",
+        &artifact_output_dir.display().to_string(),
+    ));
+    fields.push(crate::json_bool_field(
+        "artifact_ready_to_run",
+        artifact_report.ready_to_run,
+    ));
+    fields.push(crate::json_field(
+        "artifact_recommended_next_step",
+        &artifact_report.recommended_next_step,
+    ));
+    fields.push(crate::json_field(
+        "artifact_recommended_command",
+        &artifact_report.recommended_command,
+    ));
+    fields.extend(link_plan_json_fields(link_plan.as_ref()));
     fields.extend(crate::project_workflow_json_fields(
         &frontdoor,
         include_galaxy_flow,
@@ -714,6 +841,9 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
         &galaxy_doctor,
         galaxy_check_invalid,
     );
+    let artifact_output_dir = crate::default_build_output_dir(input);
+    let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
+    let link_plan = load_link_plan(&artifact_output_dir);
     let mut next_steps = Vec::new();
     if !galaxy_manifest_exists {
         next_steps.push(
@@ -879,6 +1009,23 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     fields.extend(crate::json_surface::project_plan_json_fields(&plan));
     fields.push(crate::json_usize_field("tests_declared", declared_tests.len()));
     fields.push(crate::json_usize_field("tests_missing", missing_tests.len()));
+    fields.push(crate::json_field(
+        "artifact_output_dir",
+        &artifact_output_dir.display().to_string(),
+    ));
+    fields.push(crate::json_bool_field(
+        "artifact_ready_to_run",
+        artifact_report.ready_to_run,
+    ));
+    fields.push(crate::json_field(
+        "artifact_recommended_next_step",
+        &artifact_report.recommended_next_step,
+    ));
+    fields.push(crate::json_field(
+        "artifact_recommended_command",
+        &artifact_report.recommended_command,
+    ));
+    fields.extend(link_plan_json_fields(link_plan.as_ref()));
     fields.extend(crate::project_workflow_json_fields(
         &frontdoor,
         include_galaxy_flow,
