@@ -469,9 +469,18 @@ Recommended reading order inside shader is now:
 * then read the packet branch as:
   packet contract -> packet bridge
 * then read the bridge branch as:
-  pass -> frame -> async result consume -> async fan-in -> async scheduling ->
-  async policy -> async fallback -> async batch -> async windowed batch ->
-  result family -> draw/render split -> wider draw/render
+  pass -> frame -> async result/control -> result family -> draw/render
+
+Host-side prep rule before bigger shader libraries:
+
+* for future image-processing work such as `galaxy`, the current safest prep
+  route is:
+  `filesystem_io_report_recipe -> shader_profile_demo -> shader_render_profile_demo`
+* that route keeps host-side read/report/emit closure separate from
+  shader-domain render growth, which helps us avoid coupling domain execution
+  to temporary host scaffolding
+* the dedicated prep sketch for that future lane lives at:
+  [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
 * only then move to [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
 
 ## Current Axis-Aware Kernel Lane

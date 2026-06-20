@@ -129,6 +129,7 @@ host_text
 -> json
 -> text_pipeline
 -> text_report_builder
+-> io_report
 -> text_json
 ```
 
@@ -139,6 +140,7 @@ Concrete sources:
 * [json_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/json_runtime_recipe.ns)
 * [text_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_pipeline_recipe.ns)
 * [text_report_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_report_builder_recipe.ns)
+* [io_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_report_recipe.ns)
 * [text_json_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_json_recipe.ns)
 
 ### Command / Tooling

@@ -1,0 +1,28 @@
+mod cpu Main {
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+
+  struct FileReadProjectSummary {
+    file_handle: i64,
+    read_bytes: i64,
+    close_code: i64
+  }
+
+  fn capture_file_read_project() -> FileReadProjectSummary {
+    let file_handle: i64 = host_file_open(2103, 1);
+    let backing: ref Buffer = alloc_buffer(8, 0);
+    return FileReadProjectSummary {
+      file_handle: file_handle,
+      read_bytes: host_file_read(file_handle, host_buffer_handle(backing), 8),
+      close_code: host_file_close(file_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: FileReadProjectSummary = capture_file_read_project();
+    return summary.file_handle
+      + summary.read_bytes
+      + summary.close_code;
+  }
+}

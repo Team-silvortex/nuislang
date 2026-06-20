@@ -1,0 +1,73 @@
+mod cpu Main {
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_path_copy(src_handle: i64, dst_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+
+  struct FileCopySeed {
+    src_path_handle: i64,
+    dst_path_handle: i64,
+    text_handle: i64,
+    flags: i64
+  }
+
+  struct FileCopySummary {
+    src_file_handle: i64,
+    write_code: i64,
+    close_code: i64,
+    copy_code: i64,
+    src_exists_code: i64,
+    dst_exists_code: i64
+  }
+
+  fn build_file_copy_seed(
+    src_path_handle: i64,
+    dst_path_handle: i64,
+    text_handle: i64,
+    flags: i64
+  ) -> FileCopySeed {
+    return FileCopySeed {
+      src_path_handle: src_path_handle,
+      dst_path_handle: dst_path_handle,
+      text_handle: text_handle,
+      flags: flags
+    };
+  }
+
+  fn capture_file_copy(seed: FileCopySeed) -> FileCopySummary {
+    let src_file_handle: i64 = host_file_open(seed.src_path_handle, seed.flags);
+    let write_code: i64 = host_file_write(src_file_handle, seed.text_handle);
+    let close_code: i64 = host_file_close(src_file_handle);
+    let copy_code: i64 = host_path_copy(seed.src_path_handle, seed.dst_path_handle);
+    return FileCopySummary {
+      src_file_handle: src_file_handle,
+      write_code: write_code,
+      close_code: close_code,
+      copy_code: copy_code,
+      src_exists_code: host_fs_exists(seed.src_path_handle),
+      dst_exists_code: host_fs_exists(seed.dst_path_handle)
+    };
+  }
+
+  fn summarize_file_copy_recipe(
+    src_path_handle: i64,
+    dst_path_handle: i64,
+    text_handle: i64,
+    flags: i64
+  ) -> i64 {
+    let summary: FileCopySummary = capture_file_copy(
+      build_file_copy_seed(src_path_handle, dst_path_handle, text_handle, flags)
+    );
+    return summary.src_file_handle
+      + summary.write_code
+      + summary.close_code
+      + summary.copy_code
+      + summary.src_exists_code
+      + summary.dst_exists_code;
+  }
+
+  fn main() {
+    print(summarize_file_copy_recipe(2103, 2109, 777, 1));
+  }
+}

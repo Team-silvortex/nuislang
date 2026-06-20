@@ -34,6 +34,8 @@ If you only want the shortest tooling route, start with:
   [host_text_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/host_text_runtime_demo),
   [text_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_pipeline_demo),
   [text_report_builder_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_report_builder_demo),
+  [io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_report_demo),
+  [filesystem_io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/filesystem_io_report_demo),
   [json_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/json_runtime_demo),
   [text_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_json_demo),
   [text_format_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_format_runtime_demo),

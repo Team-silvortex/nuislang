@@ -1,0 +1,27 @@
+mod cpu Main {
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+
+  struct FileWriteProjectSummary {
+    file_handle: i64,
+    write_code: i64,
+    close_code: i64
+  }
+
+  fn capture_file_write_project() -> FileWriteProjectSummary {
+    let file_handle: i64 = host_file_open(2103, 1);
+    return FileWriteProjectSummary {
+      file_handle: file_handle,
+      write_code: host_file_write(file_handle, 777),
+      close_code: host_file_close(file_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: FileWriteProjectSummary = capture_file_write_project();
+    return summary.file_handle
+      + summary.write_code
+      + summary.close_code;
+  }
+}

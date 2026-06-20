@@ -1,0 +1,99 @@
+mod cpu Main {
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stderr_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_stderr_flush() -> i64;
+
+  struct IoReportSeed {
+    title_handle: i64,
+    key_handle: i64,
+    value_handle: i64,
+    status_handle: i64,
+    status_value_handle: i64,
+    footer_handle: i64,
+    colon_handle: i64,
+    space_handle: i64,
+    newline_handle: i64
+  }
+
+  struct IoReportSummary {
+    report_handle: i64,
+    report_len: i64,
+    stdout_written: i64,
+    stderr_written: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64
+  }
+
+  fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
+    let with_colon: i64 = host_text_concat(label_handle, colon_handle);
+    return host_text_concat(with_colon, space_handle);
+  }
+
+  fn build_kv_line(
+    key_handle: i64,
+    value_handle: i64,
+    colon_handle: i64,
+    space_handle: i64
+  ) -> i64 {
+    let prefix: i64 = build_line_prefix(key_handle, colon_handle, space_handle);
+    return host_text_concat(prefix, value_handle);
+  }
+
+  fn append_line(block_handle: i64, line_handle: i64, newline_handle: i64) -> i64 {
+    let with_line: i64 = host_text_concat(block_handle, line_handle);
+    return host_text_concat(with_line, newline_handle);
+  }
+
+  fn capture_io_report(seed: IoReportSeed) -> IoReportSummary {
+    let kv_line_handle: i64 = build_kv_line(
+      seed.key_handle,
+      seed.value_handle,
+      seed.colon_handle,
+      seed.space_handle
+    );
+    let status_line_handle: i64 = build_kv_line(
+      seed.status_handle,
+      seed.status_value_handle,
+      seed.colon_handle,
+      seed.space_handle
+    );
+    let first_block: i64 = append_line(seed.title_handle, kv_line_handle, seed.newline_handle);
+    let second_block: i64 = append_line(first_block, status_line_handle, seed.newline_handle);
+    let report_handle: i64 = host_text_concat(second_block, seed.footer_handle);
+    return IoReportSummary {
+      report_handle: report_handle,
+      report_len: host_text_measure(report_handle),
+      stdout_written: host_stdout_write(report_handle),
+      stderr_written: host_stderr_write(report_handle),
+      stdout_flushed: host_stdout_flush(),
+      stderr_flushed: host_stderr_flush()
+    };
+  }
+
+  fn summarize_io_report_recipe() -> i64 {
+    let summary: IoReportSummary = capture_io_report(IoReportSeed {
+      title_handle: 1501,
+      key_handle: 1601,
+      value_handle: 1602,
+      status_handle: 1701,
+      status_value_handle: 1702,
+      footer_handle: 1801,
+      colon_handle: 58,
+      space_handle: 32,
+      newline_handle: 10
+    });
+    return summary.report_handle
+      + summary.report_len
+      + summary.stdout_written
+      + summary.stderr_written
+      + summary.stdout_flushed
+      + summary.stderr_flushed;
+  }
+
+  fn main() {
+    print(summarize_io_report_recipe());
+  }
+}

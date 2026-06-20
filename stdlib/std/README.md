@@ -67,7 +67,7 @@ Use these as the primary cluster names when placing new work:
   - local router:
     [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
   - shortest lane route:
-    `io_runtime_recipe -> terminal_io_recipe -> host_text_runtime_recipe -> text_format_runtime_recipe -> json_runtime_recipe -> text_pipeline_recipe -> text_report_builder_recipe -> text_json_recipe`
+    `io_runtime_recipe -> terminal_io_recipe -> host_text_runtime_recipe -> text_format_runtime_recipe -> json_runtime_recipe -> text_pipeline_recipe -> text_report_builder_recipe -> io_report_recipe -> text_json_recipe`
 * task/runtime
   - local router:
     [task/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/task/README.md)
@@ -77,7 +77,7 @@ Use these as the primary cluster names when placing new work:
   - local router:
     [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
   - shortest lane route:
-    `path_runtime_recipe -> directory_stat_recipe -> file_runtime_recipe -> filesystem_report_recipe -> location_runtime_recipe`
+    `path_runtime_recipe -> file_read_recipe -> file_write_recipe -> file_copy_recipe -> directory_stat_recipe -> file_runtime_recipe -> filesystem_report_recipe -> filesystem_io_report_recipe -> filesystem_report_file_recipe -> location_runtime_recipe`
   - persistence companion:
     [persistence/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/persistence/README.md)
 * net/session

@@ -37,6 +37,13 @@ If you only want the current front-door examples, start with:
   [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo),
   [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo),
   [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo)
+* shader branch reading order:
+  `profile -> surface branch -> packet branch -> bridge branch`
+  current narrow branch anchors:
+  [galaxy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/galaxy_profile_demo),
+  [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo),
+  [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo),
+  [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
 * kernel profile and async tensor ladder:
   [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo),
   [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo),
@@ -74,6 +81,21 @@ Practical network rule:
 * treat the validation-only cluster as host/runtime verification material
 * treat the exploration-only route as design-space material, not current
   onboarding
+
+Practical shader rule:
+
+* start with `shader_profile_demo`
+* only then choose one local branch:
+  `surface branch` or `packet branch` or `bridge branch`
+* treat the async branch as bridge-branch continuation, not as an independent
+  first-stop ladder
+* for future `galaxy`-style image processing work, treat the current host-side
+  closure as a prep path:
+  `filesystem_io_report -> shader profile/render lanes`
+* the first checked-in `galaxy` seed is:
+  [galaxy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/galaxy_profile_demo)
+* the current prep sketch for that future lane is:
+  [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
 
 ## Retired In Current Cleanup
 

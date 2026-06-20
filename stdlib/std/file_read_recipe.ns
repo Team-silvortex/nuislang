@@ -1,0 +1,56 @@
+mod cpu Main {
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+
+  struct FileReadSeed {
+    path_handle: i64,
+    flags: i64,
+    read_len: i64
+  }
+
+  struct FileReadSummary {
+    file_handle: i64,
+    read_bytes: i64,
+    close_code: i64
+  }
+
+  fn build_file_read_seed(
+    path_handle: i64,
+    flags: i64,
+    read_len: i64
+  ) -> FileReadSeed {
+    return FileReadSeed {
+      path_handle: path_handle,
+      flags: flags,
+      read_len: read_len
+    };
+  }
+
+  fn capture_file_read(seed: FileReadSeed) -> FileReadSummary {
+    let file_handle: i64 = host_file_open(seed.path_handle, seed.flags);
+    let backing: ref Buffer = alloc_buffer(seed.read_len, 0);
+    return FileReadSummary {
+      file_handle: file_handle,
+      read_bytes: host_file_read(file_handle, host_buffer_handle(backing), seed.read_len),
+      close_code: host_file_close(file_handle)
+    };
+  }
+
+  fn summarize_file_read_recipe(
+    path_handle: i64,
+    flags: i64,
+    read_len: i64
+  ) -> i64 {
+    let summary: FileReadSummary = capture_file_read(
+      build_file_read_seed(path_handle, flags, read_len)
+    );
+    return summary.file_handle
+      + summary.read_bytes
+      + summary.close_code;
+  }
+
+  fn main() {
+    print(summarize_file_read_recipe(2103, 1, 8));
+  }
+}
