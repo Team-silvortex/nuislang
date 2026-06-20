@@ -43,6 +43,7 @@ If you only want the current front-door examples, start with:
   [pixelmagic_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_profile_demo),
   [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo),
   [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo),
+  [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo),
   [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo),
   [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo),
   [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
@@ -100,6 +101,8 @@ Practical shader rule:
   [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
 * the first checked-in `PixelMagic` texture-resource handoff scaffold is:
   [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
+* the first checked-in `PixelMagic` project-shaped pipeline scaffold is:
+  [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
 * the first checked-in `PixelMagic` single-binary render scaffold is:
   [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
 * the current prep sketch for that future lane is:

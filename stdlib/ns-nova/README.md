@@ -51,6 +51,15 @@ Current source-asset status:
 * this is currently the only `stdlib` layer that already declares a canonical
   checked-in source set through
   [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/module.toml)
+* the current first project library module is
+  [lib/nova_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/lib/nova_contracts.ns)
+  which exposes the initial `NovaContracts` helper surface for project-level
+  framework contracts
+* that library module currently uses `library_import_policy = "manual-only"`
+  so it is declared and discoverable through project metadata, but it is not
+  auto-injected into project scope by default
+* projects may still opt into it explicitly through
+  `galaxy_imports = ["ns-nova:lib/nova_contracts.ns"]`
 * that manifest currently lists `11` source modules
 * `nuis` smoke tests and `project-doctor` now both inspect that asset set
 

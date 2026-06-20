@@ -12,6 +12,12 @@ surfaces = [
   "prelude.structural-source-contracts"
 ]
 
+library_modules = [
+  "lib/prelude_contracts.ns"
+]
+
+library_import_policy = "project-auto"
+
 source_modules = [
   "basic_scalars.ns",
   "struct_patterns.ns",

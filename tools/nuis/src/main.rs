@@ -5003,6 +5003,8 @@ entry = "main.ns"
 modules = ["main.ns"]
 tests = ["tests/missing.ns"]
 abi = ["cpu=cpu.arm64.apple_aapcs64"]
+galaxy = ["ns-nova=workspace"]
+galaxy_imports = ["ns-nova:lib/nova_contracts.ns"]
 "#
             .trim_start(),
             r#"
@@ -5029,6 +5031,10 @@ mod cpu Main {
         assert!(json.contains("\"link_plan_available\":false"));
         assert!(json.contains("\"galaxy_check_status\":\"skipped\""));
         assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
+        assert!(json.contains("\"galaxy_imports_count\":1"));
+        assert!(json.contains("\"galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"));
+        assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":0"));
+        assert!(json.contains("\"galaxy_hidden_manual_only_library_modules\":[]"));
         assert!(json.contains("\"next_steps\":["));
         assert!(json.contains("some declared project tests are missing on disk"));
         assert!(json.contains("\"tests\":[{"));

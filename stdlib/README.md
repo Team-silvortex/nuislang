@@ -40,6 +40,24 @@ At the current repo stage:
 
 * the repository still does not have a crate-like automatic source import flow
   for stdlib modules yet
+* project manifests can now declare local stdlib galaxy dependencies such as
+  `galaxy = ["pixelmagic=workspace"]`; the compiler resolves them through
+  [index.toml](/Users/Shared/chroot/dev/nuislang/stdlib/index.toml) and emits
+  `nuis.project.galaxy.txt` metadata during project compilation
+* galaxy dependencies may also declare dedicated `library_modules` for safe
+  automatic project injection; `pixelmagic` now exposes its first one through
+  [pixelmagic/lib/image_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/image_contracts.ns)
+* `core` and `std` now also expose their first library-module surfaces through
+  [core/lib/prelude_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/lib/prelude_contracts.ns)
+  and
+  [std/lib/task_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/task_contracts.ns)
+* `ns-nova` now also exposes its first library-module surface through
+  [ns-nova/lib/nova_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/lib/nova_contracts.ns)
+  but unlike `core`, `std`, and `pixelmagic`, it is currently marked
+  `manual-only` rather than auto-injected
+* those resolved galaxy dependencies are not auto-injected into the source
+  module set yet, because many current stdlib recipe assets still collide on
+  repeated bindings such as `mod cpu Main`
 * the live implementation focus is still on `nuis / nuisc / YIR / nustar`
 * but `stdlib` is no longer empty scaffolding; all four layers now carry real
   checked-in `.ns` assets

@@ -321,6 +321,27 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
+    let explicit_galaxy_imports = project
+        .manifest
+        .galaxy_imports
+        .iter()
+        .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+        .collect::<std::collections::BTreeSet<_>>();
+    let hidden_manual_only_library_modules = project
+        .resolved_galaxies
+        .iter()
+        .filter(|dependency| dependency.library_import_policy.as_str() == "manual-only")
+        .flat_map(|dependency| {
+            dependency.library_modules.iter().filter_map(|library_module| {
+                let key = format!("{}:{}", dependency.name, library_module);
+                if explicit_galaxy_imports.contains(&key) {
+                    None
+                } else {
+                    Some(key)
+                }
+            })
+        })
+        .collect::<Vec<_>>();
     let mut lines = vec![
         format!("project doctor: {}", project.manifest.name),
         format!("  root: {}", project.root.display()),
@@ -440,6 +461,23 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
             crate::yes_no(dependency.locked),
             crate::yes_no(dependency.installed)
         ));
+    }
+    lines.push(format!(
+        "  galaxy_imports: {}",
+        project.manifest.galaxy_imports.len()
+    ));
+    for item in &project.manifest.galaxy_imports {
+        lines.push(format!(
+            "  galaxy_import: {}:{}",
+            item.galaxy, item.library_module
+        ));
+    }
+    lines.push(format!(
+        "  galaxy_hidden_manual_only_library_modules: {}",
+        hidden_manual_only_library_modules.len()
+    ));
+    for item in &hidden_manual_only_library_modules {
+        lines.push(format!("  galaxy_hidden_manual_only_library_module: {}", item));
     }
     match nova_profile.as_ref() {
         Some(profile) => {
@@ -701,6 +739,27 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
+    let explicit_galaxy_imports = project
+        .manifest
+        .galaxy_imports
+        .iter()
+        .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+        .collect::<std::collections::BTreeSet<_>>();
+    let hidden_manual_only_library_modules = project
+        .resolved_galaxies
+        .iter()
+        .filter(|dependency| dependency.library_import_policy.as_str() == "manual-only")
+        .flat_map(|dependency| {
+            dependency.library_modules.iter().filter_map(|library_module| {
+                let key = format!("{}:{}", dependency.name, library_module);
+                if explicit_galaxy_imports.contains(&key) {
+                    None
+                } else {
+                    Some(key)
+                }
+            })
+        })
+        .collect::<Vec<_>>();
     let test_json = declared_tests
         .iter()
         .map(|path| {
@@ -765,6 +824,27 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
             .iter()
             .map(|item| format!("{}={}", item.name, item.version))
             .collect::<Vec<_>>(),
+    ));
+    fields.push(crate::json_usize_field(
+        "galaxy_imports_count",
+        project.manifest.galaxy_imports.len(),
+    ));
+    fields.push(crate::json_string_array_field(
+        "galaxy_imports",
+        &project
+            .manifest
+            .galaxy_imports
+            .iter()
+            .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+            .collect::<Vec<_>>(),
+    ));
+    fields.push(crate::json_usize_field(
+        "galaxy_hidden_manual_only_library_modules_count",
+        hidden_manual_only_library_modules.len(),
+    ));
+    fields.push(crate::json_string_array_field(
+        "galaxy_hidden_manual_only_library_modules",
+        &hidden_manual_only_library_modules,
     ));
     let lock_path = project.root.join("nuis.galaxy.lock");
     let declared_galaxy_dependencies = project
@@ -844,6 +924,27 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
+    let explicit_galaxy_imports = project
+        .manifest
+        .galaxy_imports
+        .iter()
+        .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+        .collect::<std::collections::BTreeSet<_>>();
+    let hidden_manual_only_library_modules = project
+        .resolved_galaxies
+        .iter()
+        .filter(|dependency| dependency.library_import_policy.as_str() == "manual-only")
+        .flat_map(|dependency| {
+            dependency.library_modules.iter().filter_map(|library_module| {
+                let key = format!("{}:{}", dependency.name, library_module);
+                if explicit_galaxy_imports.contains(&key) {
+                    None
+                } else {
+                    Some(key)
+                }
+            })
+        })
+        .collect::<Vec<_>>();
     let mut next_steps = Vec::new();
     if !galaxy_manifest_exists {
         next_steps.push(
@@ -1087,6 +1188,27 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     fields.push(crate::json_usize_field(
         "galaxy_dependencies_count",
         galaxy_doctor.dependencies.len(),
+    ));
+    fields.push(crate::json_usize_field(
+        "galaxy_imports_count",
+        project.manifest.galaxy_imports.len(),
+    ));
+    fields.push(crate::json_string_array_field(
+        "galaxy_imports",
+        &project
+            .manifest
+            .galaxy_imports
+            .iter()
+            .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+            .collect::<Vec<_>>(),
+    ));
+    fields.push(crate::json_usize_field(
+        "galaxy_hidden_manual_only_library_modules_count",
+        hidden_manual_only_library_modules.len(),
+    ));
+    fields.push(crate::json_string_array_field(
+        "galaxy_hidden_manual_only_library_modules",
+        &hidden_manual_only_library_modules,
     ));
     fields.push(crate::json_optional_string_field(
         "ns_nova_profile",

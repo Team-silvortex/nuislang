@@ -101,6 +101,12 @@ That means its role is already important for dependency boundaries, and it is
 now starting to accumulate small reusable modules for data/window/pipe helper
 patterns.
 
+First auto-injectable library module:
+
+* [lib/task_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/task_contracts.ns)
+  exposes the initial `StdTaskContracts` helper surface for project-level
+  stdlib galaxy injection
+
 Intended scope:
 
 * convenience APIs that still preserve the AOT-first and semantics-first nature of `nuis`

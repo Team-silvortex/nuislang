@@ -11,11 +11,25 @@ surfaces = [
   "shader-facing-image-prep"
 ]
 
+library_modules = [
+  "lib/image_contracts.ns"
+]
+
+library_import_policy = "project-auto"
+
 source_modules = [
   "core/image_packet_recipe.ns",
+  "core/image_op_contract_recipe.ns",
   "core/image_resource_recipe.ns",
   "core/texture_binding_recipe.ns",
   "core/sampling_recipe.ns",
   "core/shader_packet_recipe.ns",
-  "core/shader_consumer_recipe.ns"
+  "core/shader_consumer_recipe.ns",
+  "core/pixelmagic_pipeline_recipe.ns",
+  "core/grayscale_recipe.ns",
+  "core/invert_recipe.ns",
+  "core/threshold_recipe.ns",
+  "core/brightness_recipe.ns",
+  "core/contrast_recipe.ns",
+  "core/blur_recipe.ns"
 ]

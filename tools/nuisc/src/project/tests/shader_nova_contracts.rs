@@ -1068,6 +1068,73 @@ fn lowers_real_pixelmagic_texture_resource_project_with_expected_resource_shape(
 }
 
 #[test]
+fn lowers_real_pixelmagic_pipeline_project_with_expected_pipeline_shape() {
+    let artifacts =
+        compiled_domain_project("../../examples/projects/domains/pixelmagic_pipeline_demo");
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+
+    for name in [
+        "source_packet",
+        "image_resource",
+        "resource_set",
+        "resource_state",
+        "binding",
+        "sample_intent",
+        "lowered",
+        "gpu_packet",
+        "render_result",
+        "host_frame",
+    ] {
+        assert!(main.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let { name: stmt_name, .. } if stmt_name == name
+            )
+        }));
+    }
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name: stmt_name,
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } if stmt_name == "resource_state" && type_name == "NovaResourceSetState"
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name: stmt_name,
+                value: NirExpr::ShaderResult { .. },
+                ..
+            } if stmt_name == "render_result"
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name: stmt_name,
+                value: NirExpr::ShaderFrameReady(_),
+                ..
+            } if stmt_name == "render_ready"
+        )
+    }));
+    assert!(main
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::Expr(NirExpr::CpuPresentFrame(_)))));
+}
+
+#[test]
 fn lowers_real_shader_async_schedule_project_with_expected_schedule_shape() {
     let artifacts = compiled_domain_project(
         "../../examples/projects/domains/shader_async_schedule_profile_demo",

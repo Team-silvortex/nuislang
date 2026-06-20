@@ -1,0 +1,26 @@
+mod cpu NovaContracts {
+  pub fn frame_score(frame_budget: i64, pass_count: i64) -> i64 {
+    return frame_budget + pass_count;
+  }
+
+  pub fn panel_score(panel_count: i64, selection_count: i64) -> i64 {
+    return panel_count + selection_count;
+  }
+
+  pub fn scene_score(node_count: i64, layer_count: i64) -> i64 {
+    return node_count + layer_count;
+  }
+
+  pub fn runtime_score(
+    frame_budget: i64,
+    pass_count: i64,
+    panel_count: i64,
+    selection_count: i64,
+    node_count: i64,
+    layer_count: i64
+  ) -> i64 {
+    return frame_score(frame_budget, pass_count)
+      + panel_score(panel_count, selection_count)
+      + scene_score(node_count, layer_count);
+  }
+}

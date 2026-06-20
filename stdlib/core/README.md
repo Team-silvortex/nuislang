@@ -46,6 +46,11 @@ First source modules:
 * [value_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/value_blueprint.ns)
 * [result_patterns.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/result_patterns.ns)
 
+First auto-injectable library module:
+
+* [lib/prelude_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/lib/prelude_contracts.ns)
+  exposes the initial `CorePrelude` helper surface for stdlib galaxy injection
+
 What is not true yet:
 
 * `core` is not yet a populated importable source module tree

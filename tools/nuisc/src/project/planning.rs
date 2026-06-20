@@ -6,11 +6,12 @@ use std::path::Path;
 use super::{
     organize_project, organize_project_exchanges, packet, parse_project_manifest,
     render_project_abi_graph_line, render_project_abi_index, render_project_exchange_index,
-    render_project_host_ffi_index, render_project_organization_index, resolve_project_abi,
+    render_project_host_ffi_index, render_project_import_index, render_project_organization_index,
+    resolve_project_abi,
     validate_project_abi_requirements, validate_project_links, validate_project_modules,
     validate_project_unit_bindings, validate_project_uses, LoadedProject, ProjectBuildMetadata,
-    ProjectCompilationDependency, ProjectCompilationPlan, ProjectModule, ProjectOutputIntent,
-    ProjectSyntheticInput,
+    ProjectCompilationDependency, ProjectCompilationPlan, ProjectModule, ProjectModuleOrigin,
+    ProjectOutputIntent, ProjectSyntheticInput,
 };
 
 pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
@@ -31,6 +32,9 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
     let source = fs::read_to_string(&manifest_path)
         .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
     let manifest = parse_project_manifest(&source, &manifest_path)?;
+    let stdlib_root = crate::stdlib_registry::resolve_stdlib_root()?;
+    let resolved_galaxies =
+        crate::stdlib_registry::resolve_galaxy_dependencies(&stdlib_root, &manifest.galaxy_dependencies)?;
 
     let module_specs = if manifest.modules.is_empty() {
         vec![manifest.entry.clone()]
@@ -47,7 +51,85 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
         let source = fs::read_to_string(&path)
             .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
         let ast = crate::frontend::parse_nuis_ast(&source)?;
-        modules.push(ProjectModule { path, ast });
+        modules.push(ProjectModule {
+            path,
+            ast,
+            origin: ProjectModuleOrigin::LocalProject {
+                manifest_spec: spec,
+            },
+        });
+    }
+    for dependency in &resolved_galaxies {
+        if !dependency.auto_injectable {
+            continue;
+        }
+        for (library_module, path) in dependency
+            .library_modules
+            .iter()
+            .zip(dependency.resolved_library_paths.iter())
+        {
+            if !seen_paths.insert(path.clone()) {
+                continue;
+            }
+            let source = fs::read_to_string(path)
+                .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+            let ast = crate::frontend::parse_nuis_ast(&source)?;
+            modules.push(ProjectModule {
+                path: path.clone(),
+                ast,
+                origin: ProjectModuleOrigin::AutoInjectedGalaxy {
+                    galaxy: dependency.name.clone(),
+                    package_id: dependency.package_id.clone(),
+                    library_module: library_module.clone(),
+                    import_policy: dependency.library_import_policy.as_str().to_owned(),
+                },
+            });
+        }
+    }
+    for import in &manifest.galaxy_imports {
+        let dependency = resolved_galaxies
+            .iter()
+            .find(|item| item.name == import.galaxy)
+            .ok_or_else(|| {
+                format!(
+                    "project galaxy import `{}:{}` references unknown resolved galaxy `{}`",
+                    import.galaxy, import.library_module, import.galaxy
+                )
+            })?;
+        let Some((_, path)) = dependency
+            .library_modules
+            .iter()
+            .zip(dependency.resolved_library_paths.iter())
+            .find(|(library_module, _)| *library_module == &import.library_module)
+        else {
+            return Err(format!(
+                "project galaxy import `{}:{}` is not declared by galaxy `{}`; declared library_modules=[{}]",
+                import.galaxy,
+                import.library_module,
+                dependency.name,
+                if dependency.library_modules.is_empty() {
+                    "<none>".to_owned()
+                } else {
+                    dependency.library_modules.join(", ")
+                }
+            ));
+        };
+        if !seen_paths.insert(path.clone()) {
+            continue;
+        }
+        let source = fs::read_to_string(path)
+            .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+        let ast = crate::frontend::parse_nuis_ast(&source)?;
+        modules.push(ProjectModule {
+            path: path.clone(),
+            ast,
+            origin: ProjectModuleOrigin::ExplicitGalaxyImport {
+                galaxy: dependency.name.clone(),
+                package_id: dependency.package_id.clone(),
+                library_module: import.library_module.clone(),
+                import_policy: dependency.library_import_policy.as_str().to_owned(),
+            },
+        });
     }
 
     let entry_path = root.join(&manifest.entry);
@@ -56,7 +138,7 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
 
     validate_project_modules(&modules)?;
     validate_project_unit_bindings(&modules)?;
-    validate_project_uses(&modules)?;
+    validate_project_uses(&modules, &resolved_galaxies)?;
     validate_project_links(&manifest, &modules)?;
     validate_project_abi_requirements(&manifest, &modules)?;
 
@@ -67,6 +149,7 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
         entry_path,
         entry_source,
         modules,
+        resolved_galaxies,
     })
 }
 
@@ -124,9 +207,29 @@ pub fn describe_project(project: &LoadedProject) -> String {
             .join(", ");
         format!("galaxy=[{deps}]")
     };
+    let galaxy_import_summary = if project.manifest.galaxy_imports.is_empty() {
+        "galaxy_imports=<none>".to_owned()
+    } else {
+        format!(
+            "galaxy_imports=[{}]",
+            project
+                .manifest
+                .galaxy_imports
+                .iter()
+                .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
     format!(
-        "project={} entry={} modules={} links={} {} {}",
-        project.manifest.name, project.manifest.entry, modules, links, abi_summary, galaxy_summary
+        "project={} entry={} modules={} links={} {} {} {}",
+        project.manifest.name,
+        project.manifest.entry,
+        modules,
+        links,
+        abi_summary,
+        galaxy_summary,
+        galaxy_import_summary
     )
 }
 
@@ -138,14 +241,21 @@ pub fn build_project_compilation_plan(
     let abi_resolution = resolve_project_abi(project)?;
     let effective_input_path = project.root.join(format!("{}.ns", project.manifest.name));
     let dependencies = project
-        .manifest
-        .galaxy_dependencies
+        .resolved_galaxies
         .iter()
         .map(|item| ProjectCompilationDependency {
-            category: "package-registry".to_owned(),
+            category: if item.direct {
+                "stdlib-galaxy-direct".to_owned()
+            } else {
+                "stdlib-galaxy-transitive".to_owned()
+            },
             name: item.name.clone(),
             version: item.version.clone(),
-            source: "galaxy-manifest".to_owned(),
+            source: if item.direct {
+                "project-galaxy-manifest".to_owned()
+            } else {
+                format!("transitive via {}", item.requested_by.join(","))
+            },
         })
         .collect::<Vec<_>>();
     let synthetic_input = ProjectSyntheticInput {
@@ -182,6 +292,16 @@ pub fn build_project_compilation_plan(
             category: "project-metadata".to_owned(),
             kind: "project-modules-index".to_owned(),
             path_hint: "nuis.project.modules.txt".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "project-metadata".to_owned(),
+            kind: "project-imports-index".to_owned(),
+            path_hint: "nuis.project.imports.txt".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "project-metadata".to_owned(),
+            kind: "project-galaxy-index".to_owned(),
+            path_hint: "nuis.project.galaxy.txt".to_owned(),
         },
         ProjectOutputIntent {
             category: "project-metadata".to_owned(),
@@ -345,6 +465,8 @@ pub fn write_project_metadata(
     let organization_index_path = output_dir.join("nuis.project.organization.txt");
     let exchange_index_path = output_dir.join("nuis.project.exchange.txt");
     let modules_index_path = output_dir.join("nuis.project.modules.txt");
+    let imports_index_path = output_dir.join("nuis.project.imports.txt");
+    let galaxy_index_path = output_dir.join("nuis.project.galaxy.txt");
     let links_index_path = output_dir.join("nuis.project.links.txt");
     let packet_index_path = output_dir.join("nuis.project.packet.txt");
     let host_ffi_index_path = output_dir.join("nuis.project.host_ffi.txt");
@@ -383,8 +505,13 @@ pub fn write_project_metadata(
         .iter()
         .map(|module| {
             format!(
-                "{}\tmod {} {}\tentry={}\n",
-                module.path, module.domain, module.unit, module.is_entry
+                "{}\tmod {} {}\tentry={}\tsource_kind={}\t{}\n",
+                module.path,
+                module.domain,
+                module.unit,
+                module.is_entry,
+                module.source_kind,
+                module.source_detail
             )
         })
         .collect::<String>();
@@ -392,6 +519,20 @@ pub fn write_project_metadata(
         format!(
             "failed to write project modules index `{}`: {error}",
             modules_index_path.display()
+        )
+    })?;
+    let imports_index = render_project_import_index(project);
+    fs::write(&imports_index_path, imports_index).map_err(|error| {
+        format!(
+            "failed to write project imports index `{}`: {error}",
+            imports_index_path.display()
+        )
+    })?;
+    let galaxy_index = crate::stdlib_registry::render_resolved_galaxy_index(&project.resolved_galaxies);
+    fs::write(&galaxy_index_path, galaxy_index).map_err(|error| {
+        format!(
+            "failed to write project galaxy index `{}`: {error}",
+            galaxy_index_path.display()
         )
     })?;
     let links_index = if organization.links.is_empty() {
@@ -442,6 +583,8 @@ pub fn write_project_metadata(
         organization_index_path: organization_index_path.display().to_string(),
         exchange_index_path: exchange_index_path.display().to_string(),
         modules_index_path: modules_index_path.display().to_string(),
+        imports_index_path: imports_index_path.display().to_string(),
+        galaxy_index_path: galaxy_index_path.display().to_string(),
         links_index_path: links_index_path.display().to_string(),
         packet_index_path: packet_index_path.display().to_string(),
         host_ffi_index_path: host_ffi_index_path.display().to_string(),

@@ -1,0 +1,110 @@
+mod cpu Main {
+  struct PixelMagicImagePacket {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    amount: i64,
+    flags: i64
+  }
+
+  struct PixelMagicImageResource {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    sampler_filter: i64,
+    address_mode: i64
+  }
+
+  struct PixelMagicSampleIntent {
+    uv_mode: i64,
+    sample_count: i64,
+    edge_policy: i64,
+    channel_pick: i64,
+    output_kind: i64
+  }
+
+  struct PixelMagicShaderPacket {
+    color_seed: i64,
+    speed_seed: i64,
+    radius_seed: i64
+  }
+
+  fn build_pixelmagic_threshold_packet(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    threshold: i64
+  ) -> PixelMagicImagePacket {
+    return PixelMagicImagePacket {
+      source_handle: source_handle,
+      width: width,
+      height: height,
+      op_kind: 3,
+      amount: threshold,
+      flags: 1
+    };
+  }
+
+  fn lower_threshold_resource(packet: PixelMagicImagePacket) -> PixelMagicImageResource {
+    return PixelMagicImageResource {
+      source_handle: packet.source_handle,
+      width: packet.width,
+      height: packet.height,
+      format_kind: 3,
+      texel_layout: 1,
+      sampler_filter: packet.amount,
+      address_mode: packet.flags
+    };
+  }
+
+  fn build_threshold_sample_intent(resource: PixelMagicImageResource) -> PixelMagicSampleIntent {
+    return PixelMagicSampleIntent {
+      uv_mode: resource.address_mode,
+      sample_count: 1,
+      edge_policy: resource.address_mode,
+      channel_pick: 0,
+      output_kind: resource.format_kind
+    };
+  }
+
+  fn lower_threshold_shader_packet(
+    resource: PixelMagicImageResource,
+    intent: PixelMagicSampleIntent
+  ) -> PixelMagicShaderPacket {
+    return PixelMagicShaderPacket {
+      color_seed: resource.source_handle + resource.sampler_filter + intent.output_kind,
+      speed_seed: resource.width + intent.sample_count + resource.sampler_filter,
+      radius_seed: resource.height + intent.edge_policy + intent.uv_mode + resource.format_kind
+    };
+  }
+
+  fn summarize_pixelmagic_threshold(
+    packet: PixelMagicImagePacket,
+    resource: PixelMagicImageResource,
+    intent: PixelMagicSampleIntent,
+    shader_packet: PixelMagicShaderPacket
+  ) -> i64 {
+    return packet.source_handle +
+      packet.width +
+      packet.height +
+      packet.amount +
+      resource.format_kind +
+      intent.output_kind +
+      shader_packet.color_seed +
+      shader_packet.speed_seed +
+      shader_packet.radius_seed;
+  }
+
+  fn main() {
+    let packet: PixelMagicImagePacket =
+      build_pixelmagic_threshold_packet(5103, 160, 120, 128);
+    let resource: PixelMagicImageResource = lower_threshold_resource(packet);
+    let intent: PixelMagicSampleIntent = build_threshold_sample_intent(resource);
+    let shader_packet: PixelMagicShaderPacket =
+      lower_threshold_shader_packet(resource, intent);
+    print(summarize_pixelmagic_threshold(packet, resource, intent, shader_packet));
+  }
+}

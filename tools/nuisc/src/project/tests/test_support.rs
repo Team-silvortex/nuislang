@@ -63,6 +63,7 @@ pub(super) fn loaded_project_fixture(
             links: vec![],
             abi_requirements,
             galaxy_dependencies: vec![],
+            galaxy_imports: vec![],
         },
         entry_path: PathBuf::from("main.ns"),
         entry_source: entry_source.to_owned(),
@@ -71,7 +72,11 @@ pub(super) fn loaded_project_fixture(
             .map(|(path, source)| ProjectModule {
                 path: PathBuf::from(path),
                 ast: crate::frontend::parse_nuis_ast(source).unwrap(),
+                origin: ProjectModuleOrigin::LocalProject {
+                    manifest_spec: path.to_owned(),
+                },
             })
             .collect(),
+        resolved_galaxies: vec![],
     }
 }

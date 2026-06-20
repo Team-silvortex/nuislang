@@ -1,0 +1,57 @@
+mod cpu PixelMagicContracts {
+  pub fn grayscale_op_kind() -> i64 {
+    return 1;
+  }
+
+  pub fn invert_op_kind() -> i64 {
+    return 2;
+  }
+
+  pub fn threshold_op_kind() -> i64 {
+    return 3;
+  }
+
+  pub fn brightness_op_kind() -> i64 {
+    return 4;
+  }
+
+  pub fn contrast_op_kind() -> i64 {
+    return 5;
+  }
+
+  pub fn blur_op_kind() -> i64 {
+    return 6;
+  }
+
+  pub fn image_packet_total(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    amount: i64,
+    flags: i64
+  ) -> i64 {
+    return source_handle + width + height + op_kind + amount + flags;
+  }
+
+  pub fn grayscale_packet_total(source_handle: i64, width: i64, height: i64) -> i64 {
+    return image_packet_total(
+      source_handle,
+      width,
+      height,
+      grayscale_op_kind(),
+      1,
+      0
+    );
+  }
+
+  pub fn filter_packet_total(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    amount: i64
+  ) -> i64 {
+    return image_packet_total(source_handle, width, height, op_kind, amount, 1);
+  }
+}

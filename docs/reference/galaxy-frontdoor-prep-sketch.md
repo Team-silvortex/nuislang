@@ -83,6 +83,8 @@ Concrete current anchors:
   [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
 * first checked-in `PixelMagic` texture-resource handoff scaffold:
   [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
+* first checked-in `PixelMagic` project-shaped pipeline scaffold:
+  [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
 * first checked-in `PixelMagic` single-binary render scaffold:
   [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
 * shader profile floor:
@@ -167,6 +169,10 @@ Current checked-in closest texture-resource handoff anchor:
 
 * [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
 
+Current checked-in closest project-shaped pipeline anchor:
+
+* [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
+
 Current checked-in closest single-binary render anchor:
 
 * [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
@@ -184,6 +190,7 @@ cli_pgm_info_demo
 -> filesystem_io_report_recipe
 -> pixelmagic_profile_demo
 -> pixelmagic_texture_resource_demo
+-> pixelmagic_pipeline_demo
 -> shader_profile_demo
 -> shader_render_profile_demo
 -> pixelmagic_packet_demo

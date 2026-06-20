@@ -97,6 +97,9 @@ Use this section as a router, not as a full inventory.
 * std layering and tooling:
   [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md),
   [reference/std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+* PixelMagic frontdoor:
+  [stdlib/pixelmagic/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md),
+  [reference/pixelmagic-mainline-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/pixelmagic-mainline-contract.md)
   current image-preprocess bridge:
   [reference/tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
   current high-level tooling ladder:
@@ -148,7 +151,9 @@ If you want one shortest checked-in route per question, use:
   [reference/tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md) ->
   [examples/projects/domains/pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo) ->
   [examples/projects/domains/pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo) ->
+  [examples/projects/domains/pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo) ->
   [examples/projects/domains/pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo) ->
+  [reference/pixelmagic-mainline-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/pixelmagic-mainline-contract.md) ->
   [reference/galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md) ->
   [reference/galaxy-texture-handoff-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-texture-handoff-contract.md)
 * shader/kernel showcase:

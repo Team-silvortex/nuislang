@@ -1,0 +1,233 @@
+mod cpu Main {
+  struct PixelMagicImagePacket {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    amount: i64,
+    flags: i64
+  }
+
+  struct PixelMagicImageResource {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    sampler_filter: i64,
+    address_mode: i64
+  }
+
+  struct PixelMagicTextureBinding {
+    texture_slot: i64,
+    sampler_slot: i64,
+    sample_kind: i64,
+    channel_mode: i64,
+    uv_space: i64
+  }
+
+  struct PixelMagicSampleIntent {
+    uv_mode: i64,
+    sample_count: i64,
+    edge_policy: i64,
+    channel_pick: i64,
+    output_kind: i64
+  }
+
+  struct PixelMagicShaderPacket {
+    color_seed: i64,
+    speed_seed: i64,
+    radius_seed: i64
+  }
+
+  struct PixelMagicShaderConsumer {
+    target_kind: i64,
+    pass_kind: i64,
+    sample_mode: i64,
+    output_kind: i64,
+    present_mode: i64
+  }
+
+  struct PixelMagicPipelineSummary {
+    packet_score: i64,
+    resource_score: i64,
+    binding_score: i64,
+    sample_score: i64,
+    shader_score: i64,
+    consumer_score: i64
+  }
+
+  fn build_pixelmagic_image_packet(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    amount: i64,
+    flags: i64
+  ) -> PixelMagicImagePacket {
+    return PixelMagicImagePacket {
+      source_handle: source_handle,
+      width: width,
+      height: height,
+      op_kind: op_kind,
+      amount: amount,
+      flags: flags
+    };
+  }
+
+  fn lower_pixelmagic_packet_to_resource(
+    packet: PixelMagicImagePacket
+  ) -> PixelMagicImageResource {
+    return PixelMagicImageResource {
+      source_handle: packet.source_handle,
+      width: packet.width,
+      height: packet.height,
+      format_kind: packet.op_kind,
+      texel_layout: 1,
+      sampler_filter: packet.amount,
+      address_mode: packet.flags
+    };
+  }
+
+  fn pixelmagic_resource_state(resource: PixelMagicImageResource) -> NovaResourceSetState {
+    let resource_set: NovaResourceSetPacket = nova_resource_set_packet(
+      resource.texel_layout,
+      1,
+      1,
+      resource.source_handle +
+        resource.format_kind +
+        resource.texel_layout +
+        resource.sampler_filter +
+        resource.address_mode
+    );
+    return nova_resource_set_state(resource_set);
+  }
+
+  fn lower_pixelmagic_resource_to_binding(
+    resource: PixelMagicImageResource,
+    state: NovaResourceSetState
+  ) -> PixelMagicTextureBinding {
+    return PixelMagicTextureBinding {
+      texture_slot: nova_resource_set_state_textures(state) - 1,
+      sampler_slot: nova_resource_set_state_samplers(state) - 1,
+      sample_kind: resource.format_kind,
+      channel_mode: resource.texel_layout,
+      uv_space: resource.address_mode
+    };
+  }
+
+  fn build_pixelmagic_sample_intent(
+    binding: PixelMagicTextureBinding,
+    resource: PixelMagicImageResource
+  ) -> PixelMagicSampleIntent {
+    return PixelMagicSampleIntent {
+      uv_mode: binding.uv_space,
+      sample_count: binding.texture_slot + 1,
+      edge_policy: resource.address_mode,
+      channel_pick: binding.channel_mode - 1,
+      output_kind: binding.sample_kind
+    };
+  }
+
+  fn lower_pixelmagic_sample_to_shader_packet(
+    resource: PixelMagicImageResource,
+    binding: PixelMagicTextureBinding,
+    intent: PixelMagicSampleIntent
+  ) -> PixelMagicShaderPacket {
+    return PixelMagicShaderPacket {
+      color_seed: resource.source_handle + binding.sample_kind + intent.channel_pick,
+      speed_seed: resource.width + binding.texture_slot + intent.sample_count,
+      radius_seed: resource.height + binding.sampler_slot + intent.edge_policy + intent.uv_mode
+    };
+  }
+
+  fn build_pixelmagic_shader_consumer(
+    packet: PixelMagicShaderPacket,
+    intent: PixelMagicSampleIntent
+  ) -> PixelMagicShaderConsumer {
+    return PixelMagicShaderConsumer {
+      target_kind: 1,
+      pass_kind: 1,
+      sample_mode: intent.uv_mode,
+      output_kind: intent.output_kind,
+      present_mode: packet.speed_seed
+    };
+  }
+
+  fn summarize_pixelmagic_pipeline(
+    packet: PixelMagicImagePacket,
+    resource: PixelMagicImageResource,
+    binding: PixelMagicTextureBinding,
+    intent: PixelMagicSampleIntent,
+    shader_packet: PixelMagicShaderPacket,
+    consumer: PixelMagicShaderConsumer
+  ) -> PixelMagicPipelineSummary {
+    return PixelMagicPipelineSummary {
+      packet_score: packet.source_handle +
+        packet.width +
+        packet.height +
+        packet.op_kind +
+        packet.amount +
+        packet.flags,
+      resource_score: resource.source_handle +
+        resource.width +
+        resource.height +
+        resource.format_kind +
+        resource.texel_layout +
+        resource.sampler_filter +
+        resource.address_mode,
+      binding_score: binding.texture_slot +
+        binding.sampler_slot +
+        binding.sample_kind +
+        binding.channel_mode +
+        binding.uv_space,
+      sample_score: intent.uv_mode +
+        intent.sample_count +
+        intent.edge_policy +
+        intent.channel_pick +
+        intent.output_kind,
+      shader_score: shader_packet.color_seed +
+        shader_packet.speed_seed +
+        shader_packet.radius_seed,
+      consumer_score: consumer.target_kind +
+        consumer.pass_kind +
+        consumer.sample_mode +
+        consumer.output_kind +
+        consumer.present_mode
+    };
+  }
+
+  fn summarize_pixelmagic_pipeline_total(summary: PixelMagicPipelineSummary) -> i64 {
+    return summary.packet_score +
+      summary.resource_score +
+      summary.binding_score +
+      summary.sample_score +
+      summary.shader_score +
+      summary.consumer_score;
+  }
+
+  fn main() {
+    let packet: PixelMagicImagePacket =
+      build_pixelmagic_image_packet(4101, 160, 120, 1, 24, 0);
+    let resource: PixelMagicImageResource =
+      lower_pixelmagic_packet_to_resource(packet);
+    let state: NovaResourceSetState = pixelmagic_resource_state(resource);
+    let binding: PixelMagicTextureBinding =
+      lower_pixelmagic_resource_to_binding(resource, state);
+    let intent: PixelMagicSampleIntent =
+      build_pixelmagic_sample_intent(binding, resource);
+    let shader_packet: PixelMagicShaderPacket =
+      lower_pixelmagic_sample_to_shader_packet(resource, binding, intent);
+    let consumer: PixelMagicShaderConsumer =
+      build_pixelmagic_shader_consumer(shader_packet, intent);
+    let summary: PixelMagicPipelineSummary = summarize_pixelmagic_pipeline(
+      packet,
+      resource,
+      binding,
+      intent,
+      shader_packet,
+      consumer
+    );
+    print(summarize_pixelmagic_pipeline_total(summary));
+  }
+}

@@ -16,6 +16,7 @@ pub mod pipeline;
 pub mod project;
 pub mod registry;
 pub mod render;
+pub mod stdlib_registry;
 
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -3328,6 +3329,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                             modules_index_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.modules_index_path.clone()),
+                            galaxy_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.galaxy_index_path.clone()),
                             links_index_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.links_index_path.clone()),
@@ -3442,6 +3446,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("project_organization: {}", metadata.organization_index_path);
                 println!("project_exchange: {}", metadata.exchange_index_path);
                 println!("project_modules: {}", metadata.modules_index_path);
+                println!("project_galaxy: {}", metadata.galaxy_index_path);
                 println!("project_links: {}", metadata.links_index_path);
                 println!("project_packet: {}", metadata.packet_index_path);
                 println!("project_host_ffi: {}", metadata.host_ffi_index_path);

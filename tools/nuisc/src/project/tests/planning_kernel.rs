@@ -29,7 +29,7 @@ fn accepts_local_auxiliary_cpu_units_in_projects() {
 
     validate_project_modules(&project.modules).unwrap();
     validate_project_unit_bindings(&project.modules).unwrap();
-    validate_project_uses(&project.modules).unwrap();
+    validate_project_uses(&project.modules, &project.resolved_galaxies).unwrap();
 }
 
 #[test]

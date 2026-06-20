@@ -13,6 +13,12 @@ surfaces = [
   "gpu-ui-and-3d-runtime"
 ]
 
+library_modules = [
+  "lib/nova_contracts.ns"
+]
+
+library_import_policy = "manual-only"
+
 source_modules = [
   "core/theme_surface.ns",
   "core/frame_runtime.ns",

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use nuis_semantics::model::{AstExternFunction, AstTypeRef};
@@ -356,6 +357,8 @@ pub fn organize_project(project: &LoadedProject) -> ProjectOrganization {
                 path: relative,
                 domain: module.ast.domain.clone(),
                 unit: module.ast.unit.clone(),
+                source_kind: module.origin.source_kind().to_owned(),
+                source_detail: module.origin.source_detail(),
             }
         })
         .collect::<Vec<_>>();
@@ -427,8 +430,13 @@ pub(super) fn render_project_organization_index(project: &LoadedProject) -> Stri
     lines.push(format!("domains\t{}", organization.domains.join(", ")));
     for module in organization.modules {
         lines.push(format!(
-            "module\t{}\t{}\t{}\tentry={}",
-            module.path, module.domain, module.unit, module.is_entry
+            "module\t{}\t{}\t{}\tentry={}\tsource_kind={}\t{}",
+            module.path,
+            module.domain,
+            module.unit,
+            module.is_entry,
+            module.source_kind,
+            module.source_detail
         ));
     }
     for link in organization.links {
@@ -459,6 +467,83 @@ pub(super) fn render_project_exchange_index(project: &LoadedProject) -> String {
             route.domains.join(",")
         ));
     }
+    format!("{}\n", lines.join("\n"))
+}
+
+pub fn render_project_import_index(project: &LoadedProject) -> String {
+    let mut lines = Vec::new();
+    let local_units = project
+        .modules
+        .iter()
+        .map(|module| {
+            (
+                (module.ast.domain.clone(), module.ast.unit.clone()),
+                module,
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let visible_library_paths = project
+        .modules
+        .iter()
+        .filter_map(|module| match &module.origin {
+            super::ProjectModuleOrigin::AutoInjectedGalaxy { .. }
+            | super::ProjectModuleOrigin::ExplicitGalaxyImport { .. } => {
+                Some(module.path.clone())
+            }
+            _ => None,
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+
+    for dependency in &project.resolved_galaxies {
+        for (library_module, library_path) in dependency
+            .library_modules
+            .iter()
+            .zip(dependency.resolved_library_paths.iter())
+        {
+            lines.push(format!(
+                "library\t{}\t{}\timport_policy={}\tauto_injectable={}\tvisible={}",
+                dependency.name,
+                library_module,
+                dependency.library_import_policy.as_str(),
+                if dependency.auto_injectable { "true" } else { "false" },
+                if visible_library_paths.contains(library_path) {
+                    "true"
+                } else {
+                    "false"
+                }
+            ));
+        }
+    }
+
+    for module in &project.modules {
+        lines.push(format!(
+            "visible\t{}\t{}\tsource_kind={}\t{}",
+            module.ast.domain,
+            module.ast.unit,
+            module.origin.source_kind(),
+            module.origin.source_detail()
+        ));
+    }
+
+    for module in &project.modules {
+        let owner = format!("{}.{}", module.ast.domain, module.ast.unit);
+        for item in &module.ast.uses {
+            let target = format!("{}.{}", item.domain, item.unit);
+            let resolution = if let Some(local) =
+                local_units.get(&(item.domain.clone(), item.unit.clone()))
+            {
+                format!(
+                    "local-visible:{}:{}",
+                    local.origin.source_kind(),
+                    local.origin.source_detail()
+                )
+            } else {
+                "registered-domain-unit".to_owned()
+            };
+            lines.push(format!("use\t{}\t{}\tresolution={}", owner, target, resolution));
+        }
+    }
+
     format!("{}\n", lines.join("\n"))
 }
 

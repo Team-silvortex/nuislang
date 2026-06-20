@@ -170,6 +170,7 @@ Current related references:
 * [galaxy-texture-handoff-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-texture-handoff-contract.md)
 * [std-shader-kernel-project-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-shader-kernel-project-contract.md)
 * [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
+* [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
 
 ## Reading Order
 
@@ -180,7 +181,8 @@ If you only need the shortest current route, read:
 3. [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
 4. [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
 5. [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
-6. [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
+6. [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
+7. [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
 
 ## Current Success Condition
 

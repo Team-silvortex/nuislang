@@ -67,7 +67,8 @@ pub use rendering::{
     organize_project_exchanges, project_abi_selection_view_json, project_abi_selection_views,
     project_lowering_selection_json, render_project_abi_graph_line,
     render_project_abi_selection_lines, render_project_abi_selection_view_lines,
-    render_project_lowering_selection_lines, validate_project_lowering_selections,
+    render_project_import_index, render_project_lowering_selection_lines,
+    validate_project_lowering_selections,
 };
 use rendering::{
     render_project_abi_index, render_project_exchange_index, render_project_host_ffi_index,
@@ -104,6 +105,7 @@ pub struct NuisProjectManifest {
     pub links: Vec<ProjectLink>,
     pub abi_requirements: Vec<ProjectAbiRequirement>,
     pub galaxy_dependencies: Vec<ProjectGalaxyDependency>,
+    pub galaxy_imports: Vec<ProjectGalaxyImport>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,9 +128,67 @@ pub struct ProjectGalaxyDependency {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectGalaxyImport {
+    pub galaxy: String,
+    pub library_module: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProjectModuleOrigin {
+    LocalProject {
+        manifest_spec: String,
+    },
+    AutoInjectedGalaxy {
+        galaxy: String,
+        package_id: String,
+        library_module: String,
+        import_policy: String,
+    },
+    ExplicitGalaxyImport {
+        galaxy: String,
+        package_id: String,
+        library_module: String,
+        import_policy: String,
+    },
+}
+
+impl ProjectModuleOrigin {
+    pub fn source_kind(&self) -> &'static str {
+        match self {
+            Self::LocalProject { .. } => "project-local",
+            Self::AutoInjectedGalaxy { .. } => "galaxy-auto-inject",
+            Self::ExplicitGalaxyImport { .. } => "galaxy-explicit-import",
+        }
+    }
+
+    pub fn source_detail(&self) -> String {
+        match self {
+            Self::LocalProject { manifest_spec } => format!("manifest_spec={manifest_spec}"),
+            Self::AutoInjectedGalaxy {
+                galaxy,
+                package_id,
+                library_module,
+                import_policy,
+            } => format!(
+                "galaxy={galaxy}\tpackage={package_id}\tlibrary_module={library_module}\timport_policy={import_policy}"
+            ),
+            Self::ExplicitGalaxyImport {
+                galaxy,
+                package_id,
+                library_module,
+                import_policy,
+            } => format!(
+                "galaxy={galaxy}\tpackage={package_id}\tlibrary_module={library_module}\timport_policy={import_policy}"
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectModule {
     pub path: PathBuf,
     pub ast: AstModule,
+    pub origin: ProjectModuleOrigin,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -139,6 +199,7 @@ pub struct LoadedProject {
     pub entry_path: PathBuf,
     pub entry_source: String,
     pub modules: Vec<ProjectModule>,
+    pub resolved_galaxies: Vec<crate::stdlib_registry::ResolvedGalaxyDependency>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -148,6 +209,8 @@ pub struct ProjectBuildMetadata {
     pub organization_index_path: String,
     pub exchange_index_path: String,
     pub modules_index_path: String,
+    pub imports_index_path: String,
+    pub galaxy_index_path: String,
     pub links_index_path: String,
     pub packet_index_path: String,
     pub host_ffi_index_path: String,
@@ -168,6 +231,8 @@ pub struct ProjectOrganizationModule {
     pub domain: String,
     pub unit: String,
     pub is_entry: bool,
+    pub source_kind: String,
+    pub source_detail: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -472,6 +537,8 @@ mod tests {
     // helpers stay in each test file until they prove reusable across files.
     #[path = "abi_recommendation.rs"]
     mod abi_recommendation;
+    #[path = "galaxy_resolution.rs"]
+    mod galaxy_resolution;
     #[path = "multidomain_async.rs"]
     mod multidomain_async;
     #[path = "packet_data_contracts.rs"]
@@ -495,6 +562,7 @@ mod tests {
                 links: vec![],
                 abi_requirements: vec![],
                 galaxy_dependencies: vec![],
+                galaxy_imports: vec![],
             },
             entry_path: PathBuf::from("main.ns"),
             entry_source: String::new(),
@@ -503,8 +571,12 @@ mod tests {
                 .map(|(path, source)| ProjectModule {
                     path: PathBuf::from(path),
                     ast: crate::frontend::parse_nuis_ast(source).unwrap(),
+                    origin: ProjectModuleOrigin::LocalProject {
+                        manifest_spec: path.to_owned(),
+                    },
                 })
                 .collect(),
+            resolved_galaxies: vec![],
         }
     }
 }

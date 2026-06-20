@@ -1,0 +1,191 @@
+mod cpu Main {
+  struct PixelMagicImagePacket {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    amount: i64,
+    flags: i64
+  }
+
+  struct PixelMagicImageResource {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    sampler_filter: i64,
+    address_mode: i64
+  }
+
+  struct PixelMagicSampleIntent {
+    uv_mode: i64,
+    sample_count: i64,
+    edge_policy: i64,
+    channel_pick: i64,
+    output_kind: i64
+  }
+
+  struct PixelMagicShaderPacket {
+    color_seed: i64,
+    speed_seed: i64,
+    radius_seed: i64
+  }
+
+  struct PixelMagicImageOpProfile {
+    op_kind: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    channel_pick: i64,
+    base_sample_count: i64,
+    default_flags: i64
+  }
+
+  struct PixelMagicImageOpSummary {
+    packet_score: i64,
+    resource_score: i64,
+    sample_score: i64,
+    shader_score: i64
+  }
+
+  fn build_pixelmagic_image_op_profile(
+    op_kind: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    channel_pick: i64,
+    base_sample_count: i64,
+    default_flags: i64
+  ) -> PixelMagicImageOpProfile {
+    return PixelMagicImageOpProfile {
+      op_kind: op_kind,
+      format_kind: format_kind,
+      texel_layout: texel_layout,
+      channel_pick: channel_pick,
+      base_sample_count: base_sample_count,
+      default_flags: default_flags
+    };
+  }
+
+  fn build_pixelmagic_image_op_packet(
+    profile: PixelMagicImageOpProfile,
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    amount: i64
+  ) -> PixelMagicImagePacket {
+    return PixelMagicImagePacket {
+      source_handle: source_handle,
+      width: width,
+      height: height,
+      op_kind: profile.op_kind,
+      amount: amount,
+      flags: profile.default_flags
+    };
+  }
+
+  fn lower_pixelmagic_image_op_resource(
+    profile: PixelMagicImageOpProfile,
+    packet: PixelMagicImagePacket
+  ) -> PixelMagicImageResource {
+    return PixelMagicImageResource {
+      source_handle: packet.source_handle,
+      width: packet.width,
+      height: packet.height,
+      format_kind: profile.format_kind,
+      texel_layout: profile.texel_layout,
+      sampler_filter: packet.amount,
+      address_mode: packet.flags
+    };
+  }
+
+  fn build_pixelmagic_image_op_sample_intent(
+    profile: PixelMagicImageOpProfile,
+    resource: PixelMagicImageResource
+  ) -> PixelMagicSampleIntent {
+    return PixelMagicSampleIntent {
+      uv_mode: resource.address_mode,
+      sample_count: profile.base_sample_count + resource.texel_layout - 1,
+      edge_policy: resource.address_mode,
+      channel_pick: profile.channel_pick,
+      output_kind: resource.format_kind
+    };
+  }
+
+  fn lower_pixelmagic_image_op_shader_packet(
+    profile: PixelMagicImageOpProfile,
+    resource: PixelMagicImageResource,
+    intent: PixelMagicSampleIntent
+  ) -> PixelMagicShaderPacket {
+    return PixelMagicShaderPacket {
+      color_seed: resource.source_handle +
+        profile.op_kind +
+        resource.sampler_filter +
+        intent.channel_pick,
+      speed_seed: resource.width +
+        intent.sample_count +
+        profile.format_kind,
+      radius_seed: resource.height +
+        intent.edge_policy +
+        profile.texel_layout +
+        resource.sampler_filter
+    };
+  }
+
+  fn summarize_pixelmagic_image_op(
+    packet: PixelMagicImagePacket,
+    resource: PixelMagicImageResource,
+    intent: PixelMagicSampleIntent,
+    shader_packet: PixelMagicShaderPacket
+  ) -> PixelMagicImageOpSummary {
+    return PixelMagicImageOpSummary {
+      packet_score: packet.source_handle +
+        packet.width +
+        packet.height +
+        packet.op_kind +
+        packet.amount +
+        packet.flags,
+      resource_score: resource.source_handle +
+        resource.width +
+        resource.height +
+        resource.format_kind +
+        resource.texel_layout +
+        resource.sampler_filter +
+        resource.address_mode,
+      sample_score: intent.uv_mode +
+        intent.sample_count +
+        intent.edge_policy +
+        intent.channel_pick +
+        intent.output_kind,
+      shader_score: shader_packet.color_seed +
+        shader_packet.speed_seed +
+        shader_packet.radius_seed
+    };
+  }
+
+  fn summarize_pixelmagic_image_op_total(summary: PixelMagicImageOpSummary) -> i64 {
+    return summary.packet_score +
+      summary.resource_score +
+      summary.sample_score +
+      summary.shader_score;
+  }
+
+  fn main() {
+    let profile: PixelMagicImageOpProfile =
+      build_pixelmagic_image_op_profile(4, 4, 1, 1, 1, 2);
+    let packet: PixelMagicImagePacket =
+      build_pixelmagic_image_op_packet(profile, 5201, 192, 128, 18);
+    let resource: PixelMagicImageResource =
+      lower_pixelmagic_image_op_resource(profile, packet);
+    let intent: PixelMagicSampleIntent =
+      build_pixelmagic_image_op_sample_intent(profile, resource);
+    let shader_packet: PixelMagicShaderPacket =
+      lower_pixelmagic_image_op_shader_packet(profile, resource, intent);
+    let summary: PixelMagicImageOpSummary = summarize_pixelmagic_image_op(
+      packet,
+      resource,
+      intent,
+      shader_packet
+    );
+    print(summarize_pixelmagic_image_op_total(summary));
+  }
+}

@@ -1,7 +1,7 @@
 layout_schema = "nuis-stdlib-layout-v1"
 name = "nuis-standard-library"
 default_entry = "core"
-modules = ["core", "std", "ns-nova"]
+modules = ["core", "std", "pixelmagic", "ns-nova"]
 
 [[module]]
 name = "core"
@@ -20,10 +20,17 @@ depends_on = ["core"]
 summary = "Practical systems library layered on top of core."
 
 [[module]]
+name = "pixelmagic"
+kind = "framework"
+path = "pixelmagic"
+package_id = "nuis.pixelmagic"
+depends_on = ["core", "std"]
+summary = "GPU-oriented image and texture processing Galaxy built on nuis heterogeneous execution."
+
+[[module]]
 name = "ns-nova"
 kind = "framework"
 path = "ns-nova"
 package_id = "nuis.ns-nova"
 depends_on = ["core", "std"]
 summary = "Engine-style native GPU application framework built on nuis heterogeneous execution."
-

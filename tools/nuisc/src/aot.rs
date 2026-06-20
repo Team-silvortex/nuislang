@@ -48,6 +48,7 @@ pub struct BuildManifestProjectInfo {
     pub organization_index_path: Option<String>,
     pub exchange_index_path: Option<String>,
     pub modules_index_path: Option<String>,
+    pub galaxy_index_path: Option<String>,
     pub links_index_path: Option<String>,
     pub packet_index_path: Option<String>,
     pub host_ffi_index_path: Option<String>,
@@ -786,6 +787,12 @@ pub fn write_build_manifest(
         if let Some(value) = &project.modules_index_path {
             out.push_str(&format!(
                 "modules_index = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &project.galaxy_index_path {
+            out.push_str(&format!(
+                "galaxy_index = \"{}\"\n",
                 escape_toml_string(value)
             ));
         }
@@ -6902,6 +6909,7 @@ mod tests {
                     organization_index_path: None,
                     exchange_index_path: None,
                     modules_index_path: None,
+                    galaxy_index_path: None,
                     links_index_path: None,
                     packet_index_path: None,
                     host_ffi_index_path: None,
@@ -7120,6 +7128,7 @@ mod tests {
                     organization_index_path: None,
                     exchange_index_path: None,
                     modules_index_path: None,
+                    galaxy_index_path: None,
                     links_index_path: None,
                     packet_index_path: None,
                     host_ffi_index_path: None,

@@ -1,4 +1,5 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
 use std::path::Path;
 
 use super::{
@@ -7,13 +8,18 @@ use super::{
 };
 
 pub(super) fn validate_project_modules(modules: &[ProjectModule]) -> Result<(), String> {
-    let mut seen = BTreeSet::new();
+    let mut seen = BTreeMap::new();
     for module in modules {
         let key = (module.ast.domain.clone(), module.ast.unit.clone());
-        if !seen.insert(key.clone()) {
+        if let Some(previous) = seen.insert(key.clone(), module) {
             return Err(format!(
-                "duplicate project mod definition for `mod {} {}`",
-                key.0, key.1
+                "duplicate project mod definition for `mod {} {}`\n  first: {} ({})\n  second: {} ({})",
+                key.0,
+                key.1,
+                previous.path.display(),
+                previous.origin.source_detail(),
+                module.path.display(),
+                module.origin.source_detail(),
             ));
         }
         packet::validate_project_packet_contracts(module)?;
@@ -31,7 +37,10 @@ pub(super) fn validate_project_unit_bindings(modules: &[ProjectModule]) -> Resul
     Ok(())
 }
 
-pub(super) fn validate_project_uses(modules: &[ProjectModule]) -> Result<(), String> {
+pub(super) fn validate_project_uses(
+    modules: &[ProjectModule],
+    resolved_galaxies: &[crate::stdlib_registry::ResolvedGalaxyDependency],
+) -> Result<(), String> {
     let local_units = modules
         .iter()
         .map(|module| (module.ast.domain.clone(), module.ast.unit.clone()))
@@ -45,10 +54,66 @@ pub(super) fn validate_project_uses(modules: &[ProjectModule]) -> Result<(), Str
                 Path::new("nustar-packages"),
                 &item.domain,
             )?;
-            crate::registry::validate_unit_binding(&[manifest], &item.domain, &item.unit)?;
+            if let Err(error) =
+                crate::registry::validate_unit_binding(&[manifest], &item.domain, &item.unit)
+            {
+                if let Some(hint) =
+                    manual_only_library_hint(item.domain.as_str(), item.unit.as_str(), resolved_galaxies)?
+                {
+                    return Err(format!(
+                        "project use `use {} {};` is unavailable in the current scope: {hint}\nregistry detail: {error}",
+                        item.domain, item.unit
+                    ));
+                }
+                return Err(error);
+            }
         }
     }
     Ok(())
+}
+
+fn manual_only_library_hint(
+    domain: &str,
+    unit: &str,
+    resolved_galaxies: &[crate::stdlib_registry::ResolvedGalaxyDependency],
+) -> Result<Option<String>, String> {
+    for dependency in resolved_galaxies {
+        if !matches!(
+            dependency.library_import_policy,
+            crate::stdlib_registry::StdlibLibraryImportPolicy::ManualOnly
+        ) {
+            continue;
+        }
+        for (library_module, path) in dependency
+            .library_modules
+            .iter()
+            .zip(dependency.resolved_library_paths.iter())
+        {
+            let source = fs::read_to_string(path).map_err(|error| {
+                format!(
+                    "failed to read stdlib source module `{}` while resolving manual-only import hint: {error}",
+                    path.display()
+                )
+            })?;
+            let ast = crate::frontend::parse_nuis_ast(&source).map_err(|error| {
+                format!(
+                    "failed to parse stdlib source module `{}` while resolving manual-only import hint: {error}",
+                    path.display()
+                )
+            })?;
+            if ast.domain == domain && ast.unit == unit {
+                return Ok(Some(format!(
+                    "`{}.{}` is provided by galaxy `{}` ({}) through `{}`, but that library module uses import policy `manual-only` and is not auto-injected into project scope",
+                    domain,
+                    unit,
+                    dependency.name,
+                    dependency.package_id,
+                    library_module
+                )));
+            }
+        }
+    }
+    Ok(None)
 }
 
 pub(super) fn validate_project_links(

@@ -23,6 +23,7 @@ Concrete anchors:
 * [tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
 * [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
 * [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
+* [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
 * [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
 
 The next half is not “many more image filters”.
@@ -164,6 +165,10 @@ Current checked-in closest source-level anchor:
 
 * [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
 
+Current checked-in closest project-shaped pipeline anchor:
+
+* [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
+
 That can still be a render-style path before a compute-style path.
 
 It does not need to begin as a general image kernel system. Current
@@ -196,8 +201,9 @@ If you only want the shortest current route, read:
 1. [tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
 2. [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
 3. [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
-4. [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
-5. [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
-6. [galaxy-texture-handoff-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-texture-handoff-contract.md)
-7. [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-8. [nuis-ir.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis-ir.md)
+4. [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
+5. [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
+6. [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
+7. [galaxy-texture-handoff-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-texture-handoff-contract.md)
+8. [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
+9. [nuis-ir.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis-ir.md)

@@ -1,6 +1,9 @@
 use std::path::Path;
 
-use super::{NuisProjectManifest, ProjectAbiRequirement, ProjectGalaxyDependency, ProjectLink};
+use super::{
+    NuisProjectManifest, ProjectAbiRequirement, ProjectGalaxyDependency, ProjectGalaxyImport,
+    ProjectLink,
+};
 
 pub(super) fn parse_project_manifest(
     source: &str,
@@ -14,6 +17,8 @@ pub(super) fn parse_project_manifest(
     let abi_requirements = parse_optional_abi_array(source, "abi").unwrap_or_default();
     let galaxy_dependencies =
         parse_optional_galaxy_dependency_array(source, "galaxy").unwrap_or_default();
+    let galaxy_imports =
+        parse_optional_galaxy_import_array(source, "galaxy_imports").unwrap_or_default();
     Ok(NuisProjectManifest {
         name,
         entry,
@@ -22,6 +27,7 @@ pub(super) fn parse_project_manifest(
         links,
         abi_requirements,
         galaxy_dependencies,
+        galaxy_imports,
     })
 }
 
@@ -134,6 +140,29 @@ fn parse_optional_galaxy_dependency_array(
             return None;
         }
         items.push(ProjectGalaxyDependency { name, version });
+    }
+    Some(items)
+}
+
+fn parse_optional_galaxy_import_array(
+    source: &str,
+    key: &str,
+) -> Option<Vec<ProjectGalaxyImport>> {
+    let values = parse_optional_string_array(source, key)?;
+    let mut items = Vec::new();
+    for value in values {
+        let Some((galaxy, library_module)) = value.split_once(':') else {
+            return None;
+        };
+        let galaxy = galaxy.trim().to_owned();
+        let library_module = library_module.trim().to_owned();
+        if galaxy.is_empty() || library_module.is_empty() {
+            return None;
+        }
+        items.push(ProjectGalaxyImport {
+            galaxy,
+            library_module,
+        });
     }
     Some(items)
 }

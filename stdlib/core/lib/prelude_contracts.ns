@@ -1,0 +1,17 @@
+mod cpu CorePrelude {
+  pub fn zero_i64() -> i64 {
+    return 0;
+  }
+
+  pub fn one_i64() -> i64 {
+    return 1;
+  }
+
+  pub fn add_i64(lhs: i64, rhs: i64) -> i64 {
+    return lhs + rhs;
+  }
+
+  pub fn sum3_i64(a: i64, b: i64, c: i64) -> i64 {
+    return add_i64(add_i64(a, b), c);
+  }
+}
