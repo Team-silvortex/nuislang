@@ -33,6 +33,7 @@ mod signature_building;
 mod specialization_pipeline;
 mod stmt_lowering;
 mod task_builtins;
+mod text_handle_rewrite;
 #[cfg(test)]
 mod tests_benchmark_functions;
 #[cfg(test)]
@@ -142,6 +143,7 @@ use self::module_assembly::{
 use self::return_inference::infer_missing_function_return_type;
 use self::signature_building::{build_initial_function_signatures, FunctionSignature};
 use self::specialization_pipeline::build_lowered_functions_and_impls;
+use self::text_handle_rewrite::rewrite_text_handle_helpers;
 use self::validation::validate_declared_nir_types;
 use self::validation_assignments::validate_ast_assignments;
 use self::validation_generic_constraints::validate_ast_generic_constraints;
@@ -210,6 +212,7 @@ pub fn lower_project_ast_to_nir(
     let visible_type_aliases = build_visible_type_alias_map(&expanded_module, &local_cpu_helpers)?;
     let expanded_module = expand_higher_order_functions(&expanded_module, &visible_type_aliases)?;
     let expanded_module = expand_effectful_match_scrutinees(&expanded_module);
+    let expanded_module = rewrite_text_handle_helpers(&expanded_module);
     let module = &expanded_module;
     validate_export_annotations(module)?;
     validate_extern_host_symbols(module)?;

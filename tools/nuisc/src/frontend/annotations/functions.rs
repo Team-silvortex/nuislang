@@ -11,6 +11,7 @@ pub(crate) fn validate_function_annotations(function: &AstFunction) -> Result<()
 
     for attribute in &function.attributes {
         match attribute.name.as_str() {
+            "__nuisc_text_handle_rewrite" => {}
             "test" => {}
             "benchmark" => {}
             "inline" => {

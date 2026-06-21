@@ -21,6 +21,31 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
     allow_async_calls: bool,
 ) -> Result<Option<NirExpr>, String> {
     match callee {
+        "text_handle" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "text_handle(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [value] = args else {
+                return Err("text_handle(...) expects 1 arg".to_owned());
+            };
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_text_handle".to_owned(),
+                args: vec![lowered],
+            }))
+        }
         "text_len" => {
             if current_domain != "cpu" {
                 return Err(

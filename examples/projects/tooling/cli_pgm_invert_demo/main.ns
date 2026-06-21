@@ -5,11 +5,6 @@ mod cpu Main {
   extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
   extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
   extern "c" fn host_file_close(file_handle: i64) -> i64;
-  extern "c" fn host_serialize_text_into(
-    text_handle: i64,
-    buffer_handle: i64,
-    offset: i64
-  ) -> i64;
   extern "c" fn host_serialize_i64_into(
     value: i64,
     buffer_handle: i64,
@@ -59,21 +54,15 @@ mod cpu Main {
   }
 
   fn prefix_text() -> i64 {
-    let buffer: ref Buffer = alloc_buffer(32, 0);
-    let len: i64 = serialize_text_into("P2\n2 2\n15\n", buffer, 0);
-    return deserialize_text_from(buffer, 0, len);
+    return text_handle("P2\n2 2\n15\n");
   }
 
   fn space_text() -> i64 {
-    let buffer: ref Buffer = alloc_buffer(4, 0);
-    let len: i64 = serialize_text_into(" ", buffer, 0);
-    return deserialize_text_from(buffer, 0, len);
+    return text_handle(" ");
   }
 
   fn newline_text() -> i64 {
-    let buffer: ref Buffer = alloc_buffer(4, 0);
-    let len: i64 = serialize_text_into("\n", buffer, 0);
-    return deserialize_text_from(buffer, 0, len);
+    return text_handle("\n");
   }
 
   fn write_chunk(file_handle: i64, text_handle: i64) -> i64 {

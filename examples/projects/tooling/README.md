@@ -18,6 +18,8 @@ Current role rule:
 If you only want the shortest tooling route, start with:
 
 * [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
+* [cli_cat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_cat_demo)
+* [cli_wc_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_wc_demo)
 * [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo)
 * [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
 * [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
@@ -26,6 +28,12 @@ Current runnable CLI frontdoor:
 
 * `cli_runtime_demo` is the shortest checked-in host/CLI project that now fits
   the normal `build -> artifact-doctor -> run-artifact` success path
+* `cli_cat_demo` now turns that same host bridge into a minimal practical
+  file-to-stdout CLI, so the tooling lane now has a tiny real text utility
+* `cli_wc_demo` now adds a first performance-oriented text/file stats seed over
+  the same host bridge, currently anchored on byte count plus text-bridge
+  length verification while general synchronous scan loops are still being
+  tightened in lowering
 * `cli_session_demo` and `cli_report_session_demo` now also fit the same launch
   path, while still representing the interactive/session-oriented lane
 * `workflow_runtime_demo` now fits the same launch path as the workflow-shaped
@@ -52,7 +60,7 @@ Current runnable CLI frontdoor:
 Current split:
 
 * launch-shaped frontdoors:
-  `cli_runtime_demo`, `cli_session_demo`, `cli_report_session_demo`,
+  `cli_runtime_demo`, `cli_cat_demo`, `cli_wc_demo`, `cli_session_demo`, `cli_report_session_demo`,
   `workflow_runtime_demo`, `command_runtime_demo`, `subprocess_runtime_demo`,
   `native_artifact_closure_demo`, `cli_compile_workflow_demo`,
   `cli_workflow_automation_demo`,
@@ -83,6 +91,8 @@ Current exemplars:
 * [cli_workflow_automation_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo)
 * [cli_build_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo)
 * [cli_project_build_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo)
+* [cli_cat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_cat_demo)
+* [cli_wc_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_wc_demo)
 * [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
 * [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
 * [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
@@ -125,6 +135,8 @@ Short rule:
   [result_diagnostic_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_diagnostic_demo)
 * input and terminal I/O:
   [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/input_runtime_demo),
+  [cli_cat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_cat_demo),
+  [cli_wc_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_wc_demo),
   [io_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_runtime_demo),
   [stdin_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/stdin_runtime_demo),
   [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/tty_runtime_demo),

@@ -349,6 +349,8 @@ mod tests {
             compile_cache_status: None,
             compile_cache_key: None,
             compile_cache_root: None,
+            project_text_handle_rewrite_helper_hits: 0,
+            project_text_handle_rewrite_local_hits: 0,
             project_plan_index: None,
             project_packet_index: None,
             bridge_registry_path: Some("out/nuis.bridge.registry.toml".to_owned()),

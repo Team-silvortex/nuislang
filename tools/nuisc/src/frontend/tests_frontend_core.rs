@@ -619,6 +619,115 @@ fn lowers_bytes_and_subbytes_builtins_as_i64_byte_views() {
 }
 
 #[test]
+fn lowers_text_handle_builtin_as_host_text_handle() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let lifted: i64 = text_handle("hello");
+            return lifted;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuExternCall { callee, args, .. },
+        }) if name == "lifted"
+            && ty.render() == "i64"
+            && callee == "host_text_handle"
+            && args.len() == 1
+    ));
+}
+
+#[test]
+fn rewrites_serialize_then_deserialize_text_helper_into_text_handle() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn helper(value: String) -> i64 {
+            let buffer: ref Buffer = alloc_buffer(128, 0);
+            let len: i64 = serialize_text_into(value, buffer, 0);
+            return deserialize_text_from(buffer, 0, len);
+          }
+
+          fn main() -> i64 {
+            return helper("hello");
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "helper")
+        .unwrap();
+    assert!(matches!(
+        helper.body.first(),
+        Some(NirStmt::Return(Some(NirExpr::CpuExternCall { callee, args, .. })))
+            if callee == "host_text_handle" && args.len() == 1
+    ));
+    assert!(helper
+        .annotations
+        .iter()
+        .any(|annotation| annotation.name == "__nuisc_text_handle_rewrite"));
+}
+
+#[test]
+fn rewrites_local_i64_text_handle_pattern_when_buffer_is_not_reused() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(128, 0);
+            let len: i64 = serialize_text_into("hello", buffer, 0);
+            let handle: i64 = deserialize_text_from(buffer, 0, len);
+            return handle;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(0),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuExternCall { callee, args, .. },
+        }) if name == "handle"
+            && ty.render() == "i64"
+            && callee == "host_text_handle"
+            && args.len() == 1
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Return(Some(NirExpr::Var(name)))) if name == "handle"
+    ));
+    assert!(main
+        .annotations
+        .iter()
+        .any(|annotation| annotation.name == "__nuisc_text_handle_rewrite"));
+}
+
+#[test]
 fn lowers_fill_copy_compare_byte_builtins_as_host_calls() {
     let module = parse_nuis_module(
         r#"

@@ -436,7 +436,8 @@ pub(crate) fn infer_nir_expr_type(
             }
         }
         NirExpr::CpuExternCall { callee, .. }
-            if callee == "host_text_len"
+            if callee == "host_text_handle"
+                || callee == "host_text_len"
                 || callee == "host_serialize_text_into"
                 || callee == "host_serialize_bool_into"
                 || callee == "host_serialize_i64_into"

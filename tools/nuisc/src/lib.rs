@@ -3285,6 +3285,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 } else {
                     None
                 };
+            let project_text_handle_rewrite = resolved
+                .project
+                .as_ref()
+                .map(project::summarize_project_text_handle_rewrites)
+                .transpose()?;
             let build_manifest = aot::write_build_manifest(
                 &output_dir,
                 &written,
@@ -3323,6 +3328,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                                 .collect::<Vec<_>>(),
                             plan_summary: Some(project::describe_project_compilation_plan(plan)),
                             effective_input: Some(plan.effective_input_path.display().to_string()),
+                            text_handle_rewrite_helper_hits: project_text_handle_rewrite
+                                .map(|summary| summary.helper_hits)
+                                .unwrap_or(0),
+                            text_handle_rewrite_local_hits: project_text_handle_rewrite
+                                .map(|summary| summary.local_hits)
+                                .unwrap_or(0),
                             manifest_copy_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.manifest_copy_path.clone()),
@@ -3740,6 +3751,8 @@ mod tests {
             compile_cache_status: None,
             compile_cache_key: None,
             compile_cache_root: None,
+            project_text_handle_rewrite_helper_hits: 0,
+            project_text_handle_rewrite_local_hits: 0,
             project_plan_index: None,
             project_packet_index: None,
             bridge_registry_path: None,

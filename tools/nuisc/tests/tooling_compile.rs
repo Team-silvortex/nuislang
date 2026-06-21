@@ -8,6 +8,20 @@ fn compiles_cli_runtime_tooling_project() {
 }
 
 #[test]
+fn compiles_cli_cat_tooling_project() {
+    let project =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_cat_demo");
+    nuisc::pipeline::compile_project(project).expect("cli cat tooling project should compile");
+}
+
+#[test]
+fn compiles_cli_wc_tooling_project() {
+    let project =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_wc_demo");
+    nuisc::pipeline::compile_project(project).expect("cli wc tooling project should compile");
+}
+
+#[test]
 fn compiles_cli_session_tooling_project() {
     let project =
         Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_session_demo");

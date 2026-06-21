@@ -42,6 +42,8 @@ pub struct BuildManifestProjectInfo {
     pub abi_entries: Vec<(String, String)>,
     pub plan_summary: Option<String>,
     pub effective_input: Option<String>,
+    pub text_handle_rewrite_helper_hits: usize,
+    pub text_handle_rewrite_local_hits: usize,
     pub manifest_copy_path: Option<String>,
     pub plan_index_path: Option<String>,
     pub organization_index_path: Option<String>,
@@ -801,6 +803,14 @@ pub fn write_build_manifest(
                 escape_toml_string(value)
             ));
         }
+        out.push_str(&format!(
+            "text_handle_rewrite_helper_hits = {}\n",
+            project.text_handle_rewrite_helper_hits
+        ));
+        out.push_str(&format!(
+            "text_handle_rewrite_local_hits = {}\n",
+            project.text_handle_rewrite_local_hits
+        ));
         let mut abi_entries = project
             .abi_entries
             .iter()
@@ -2362,6 +2372,8 @@ pub struct BuildManifestVerifyReport {
     pub compile_cache_status: Option<String>,
     pub compile_cache_key: Option<String>,
     pub compile_cache_root: Option<String>,
+    pub project_text_handle_rewrite_helper_hits: usize,
+    pub project_text_handle_rewrite_local_hits: usize,
     pub project_plan_index: Option<String>,
     pub project_packet_index: Option<String>,
     pub bridge_registry_path: Option<String>,
@@ -2496,6 +2508,10 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let compile_cache_status = parse_optional_toml_string(&source, "compile_cache_status");
     let compile_cache_key = parse_optional_toml_string(&source, "compile_cache_key");
     let compile_cache_root = parse_optional_toml_string(&source, "compile_cache_root");
+    let project_text_handle_rewrite_helper_hits =
+        parse_optional_toml_usize(&source, "text_handle_rewrite_helper_hits").unwrap_or(0);
+    let project_text_handle_rewrite_local_hits =
+        parse_optional_toml_usize(&source, "text_handle_rewrite_local_hits").unwrap_or(0);
     let project_plan_index = parse_optional_toml_string(&source, "plan_index");
     let project_packet_index = parse_optional_toml_string(&source, "packet_index");
     let bridge_registry_path = parse_optional_toml_string(&source, "bridge_registry_path");
@@ -3157,6 +3173,8 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         compile_cache_status,
         compile_cache_key,
         compile_cache_root,
+        project_text_handle_rewrite_helper_hits,
+        project_text_handle_rewrite_local_hits,
         project_plan_index,
         project_packet_index,
         bridge_registry_path,
@@ -3710,6 +3728,9 @@ extern int64_t nuis_yir_entry(void);
 static int nuis_argc = 0;
 static char** nuis_argv = NULL;
 static char* nuis_host_text_slots[4096];
+static size_t nuis_host_text_slot_lens[4096];
+static uint64_t nuis_host_text_slot_hashes[4096];
+static int64_t nuis_host_text_intern_table[8192];
 static int64_t nuis_host_text_len = 0;
 static DIR* nuis_host_dir_slots[256];
 static int64_t nuis_host_dir_entry_counts[256];
@@ -3862,20 +3883,101 @@ static int64_t nuis_lifecycle_yalivia_rpc_hook_v1(void) {
     return nuis_lifecycle_state.yalivia_rpc_enabled;
 }
 
-static int64_t nuis_host_text_register(const char* text) {
+static uint64_t nuis_host_text_hash_bytes(const char* text, size_t len) {
+    uint64_t hash = 1469598103934665603ULL;
+    for (size_t index = 0; index < len; ++index) {
+        hash ^= (unsigned char)text[index];
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+static int64_t nuis_host_text_find_interned(const char* text, size_t len, uint64_t hash) {
+    if (text == NULL) return 0;
+    size_t mask = (sizeof(nuis_host_text_intern_table) / sizeof(nuis_host_text_intern_table[0])) - 1;
+    size_t slot = (size_t)hash & mask;
+    for (size_t probe = 0; probe <= mask; ++probe) {
+        int64_t handle = nuis_host_text_intern_table[slot];
+        if (handle == 0) return 0;
+        if (handle <= nuis_host_text_len && nuis_host_text_slots[handle - 1] != NULL) {
+            if (nuis_host_text_slot_hashes[handle - 1] == hash
+                && nuis_host_text_slot_lens[handle - 1] == len
+                && memcmp(nuis_host_text_slots[handle - 1], text, len) == 0) {
+                return handle;
+            }
+        }
+        slot = (slot + 1) & mask;
+    }
+    return 0;
+}
+
+static void nuis_host_text_intern_insert(int64_t handle, uint64_t hash) {
+    if (handle <= 0) return;
+    size_t mask = (sizeof(nuis_host_text_intern_table) / sizeof(nuis_host_text_intern_table[0])) - 1;
+    size_t slot = (size_t)hash & mask;
+    for (size_t probe = 0; probe <= mask; ++probe) {
+        if (nuis_host_text_intern_table[slot] == 0) {
+            nuis_host_text_intern_table[slot] = handle;
+            return;
+        }
+        slot = (slot + 1) & mask;
+    }
+}
+
+static int64_t nuis_host_text_register_sized(const char* text, size_t len) {
     if (text == NULL) return 0;
     if (nuis_host_text_len >= 4096) return 0;
-    size_t size = strlen(text) + 1;
+    uint64_t hash = nuis_host_text_hash_bytes(text, len);
+    int64_t interned = nuis_host_text_find_interned(text, len, hash);
+    if (interned != 0) return interned;
+    size_t size = len + 1;
     char* copy = (char*)malloc(size);
     if (copy == NULL) return 0;
     memcpy(copy, text, size);
     nuis_host_text_slots[nuis_host_text_len] = copy;
+    nuis_host_text_slot_lens[nuis_host_text_len] = len;
+    nuis_host_text_slot_hashes[nuis_host_text_len] = hash;
     nuis_host_text_len += 1;
+    nuis_host_text_intern_insert(nuis_host_text_len, hash);
     return nuis_host_text_len;
+}
+
+static int64_t nuis_host_text_register(const char* text) {
+    if (text == NULL) return 0;
+    return nuis_host_text_register_sized(text, strlen(text));
+}
+
+static int64_t nuis_host_text_register_owned_sized(char* text, size_t len) {
+    if (text == NULL) return 0;
+    uint64_t hash = nuis_host_text_hash_bytes(text, len);
+    int64_t interned = nuis_host_text_find_interned(text, len, hash);
+    if (interned != 0) {
+        free(text);
+        return interned;
+    }
+    if (nuis_host_text_len >= 4096) {
+        free(text);
+        return 0;
+    }
+    nuis_host_text_slots[nuis_host_text_len] = text;
+    nuis_host_text_slot_lens[nuis_host_text_len] = len;
+    nuis_host_text_slot_hashes[nuis_host_text_len] = hash;
+    nuis_host_text_len += 1;
+    nuis_host_text_intern_insert(nuis_host_text_len, hash);
+    return nuis_host_text_len;
+}
+
+static int64_t nuis_host_text_register_owned(char* text) {
+    if (text == NULL) return 0;
+    return nuis_host_text_register_owned_sized(text, strlen(text));
 }
 
 int64_t nuis_host_text_lift(const char* text) {
     return nuis_host_text_register(text);
+}
+
+static int64_t nuis_host_text_handle(int64_t text_handle) {
+    return text_handle;
 }
 
 static const char* nuis_host_text_lookup(int64_t handle) {
@@ -3890,6 +3992,14 @@ static const char* nuis_host_text_lookup(int64_t handle) {
 
 const char* nuis_host_text_ptr(int64_t handle) {
     return nuis_host_text_lookup(handle);
+}
+
+static size_t nuis_host_text_lookup_len(int64_t handle) {
+    if (handle > 0 && handle <= nuis_host_text_len && nuis_host_text_slots[handle - 1] != NULL) {
+        return nuis_host_text_slot_lens[handle - 1];
+    }
+    if (handle == 0) return 0;
+    return strlen(nuis_host_text_lookup(handle));
 }
 
 static int64_t nuis_host_argv_count(void) {
@@ -3915,21 +4025,25 @@ static int64_t nuis_host_env_get(int64_t key_handle) {
 }
 
 static int64_t nuis_host_text_len_value(int64_t handle) {
-    return (int64_t)strlen(nuis_host_text_lookup(handle));
+    return (int64_t)nuis_host_text_lookup_len(handle);
 }
 
 static int64_t nuis_host_text_concat(int64_t lhs_handle, int64_t rhs_handle) {
     const char* lhs = nuis_host_text_lookup(lhs_handle);
     const char* rhs = nuis_host_text_lookup(rhs_handle);
-    size_t lhs_len = lhs != NULL ? strlen(lhs) : 0;
-    size_t rhs_len = rhs != NULL ? strlen(rhs) : 0;
+    size_t lhs_len = lhs != NULL ? nuis_host_text_lookup_len(lhs_handle) : 0;
+    size_t rhs_len = rhs != NULL ? nuis_host_text_lookup_len(rhs_handle) : 0;
     size_t total = lhs_len + rhs_len + 1;
     char* buffer = (char*)malloc(total);
     if (buffer == NULL) return 0;
-    snprintf(buffer, total, "%s%s", lhs != NULL ? lhs : "", rhs != NULL ? rhs : "");
-    int64_t handle = nuis_host_text_register(buffer);
-    free(buffer);
-    return handle;
+    if (lhs_len > 0) {
+        memcpy(buffer, lhs, lhs_len);
+    }
+    if (rhs_len > 0) {
+        memcpy(buffer + lhs_len, rhs, rhs_len);
+    }
+    buffer[lhs_len + rhs_len] = '\0';
+    return nuis_host_text_register_owned_sized(buffer, lhs_len + rhs_len);
 }
 
 static int64_t nuis_host_serialize_text_into(int64_t text_handle, int64_t buffer_handle, int64_t offset) {
@@ -3937,7 +4051,7 @@ static int64_t nuis_host_serialize_text_into(int64_t text_handle, int64_t buffer
     const char* text = nuis_host_text_lookup(text_handle);
     if (text == NULL) return 0;
     int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
-    size_t len = strlen(text);
+    size_t len = nuis_host_text_lookup_len(text_handle);
     for (size_t index = 0; index < len; ++index) {
         buffer[offset + (int64_t)index] = (unsigned char)text[index];
     }
@@ -4030,9 +4144,7 @@ static int64_t nuis_host_deserialize_text_from(int64_t buffer_handle, int64_t of
         text[index] = (char)value;
     }
     text[len] = '\0';
-    int64_t handle = nuis_host_text_register(text);
-    free(text);
-    return handle;
+    return nuis_host_text_register_owned_sized(text, (size_t)len);
 }
 
 static int64_t nuis_host_parse_header_line(int64_t buffer_handle, int64_t offset, int64_t len, int64_t expected_name_handle) {
@@ -4090,9 +4202,68 @@ static int64_t nuis_host_parse_header_line(int64_t buffer_handle, int64_t offset
         text[index] = (char)value;
     }
     text[value_len] = '\0';
-    int64_t handle = nuis_host_text_register(text);
-    free(text);
-    return handle;
+    return nuis_host_text_register_owned_sized(text, (size_t)value_len);
+}
+
+static int64_t nuis_host_parse_header_line_named(
+    int64_t buffer_handle,
+    int64_t offset,
+    int64_t len,
+    const char* expected_name,
+    size_t expected_len
+) {
+    if (buffer_handle == 0 || offset < 0 || len < 0 || expected_name == NULL) return 0;
+    int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
+    int64_t trimmed_len = len;
+    if (trimmed_len > 0) {
+        int64_t end = offset + trimmed_len - 1;
+        int64_t last = buffer[end];
+        if (last == 10) {
+            if (trimmed_len >= 2 && buffer[end - 1] == 13) {
+                trimmed_len -= 2;
+            } else {
+                trimmed_len -= 1;
+            }
+        } else if (last == 13) {
+            trimmed_len -= 1;
+        }
+    }
+    if (trimmed_len <= 0) return 0;
+    int64_t colon = -1;
+    for (int64_t index = 0; index < trimmed_len; ++index) {
+        if (buffer[offset + index] == 58) {
+            colon = offset + index;
+            break;
+        }
+    }
+    if (colon < offset) return 0;
+    int64_t name_len = colon - offset;
+    if ((int64_t)expected_len != name_len) return 0;
+    for (int64_t index = 0; index < name_len; ++index) {
+        int64_t value = buffer[offset + index];
+        if (value < 0 || value > 255) return 0;
+        if ((unsigned char)value != (unsigned char)expected_name[index]) return 0;
+    }
+    int64_t value_offset = colon + 1;
+    int64_t line_end = offset + trimmed_len;
+    while (value_offset < line_end) {
+        int64_t value = buffer[value_offset];
+        if (value != 32 && value != 9) break;
+        value_offset += 1;
+    }
+    int64_t value_len = line_end - value_offset;
+    char* text = (char*)malloc((size_t)value_len + 1);
+    if (text == NULL) return 0;
+    for (int64_t index = 0; index < value_len; ++index) {
+        int64_t value = buffer[value_offset + index];
+        if (value < 0 || value > 255) {
+            free(text);
+            return 0;
+        }
+        text[index] = (char)value;
+    }
+    text[value_len] = '\0';
+    return nuis_host_text_register_owned_sized(text, (size_t)value_len);
 }
 
 static int64_t nuis_host_find_header_value(int64_t buffer_handle, int64_t offset, int64_t len, int64_t expected_name_handle) {
@@ -4113,6 +4284,45 @@ static int64_t nuis_host_find_header_value(int64_t buffer_handle, int64_t offset
             cursor,
             line_end < limit ? (line_end - cursor + 1) : line_len,
             expected_name_handle
+        );
+        if (parsed != 0) return parsed;
+        if (line_end >= limit) break;
+        if (((int64_t*)(intptr_t)buffer_handle)[line_end] == 13
+            && line_end + 1 < limit
+            && ((int64_t*)(intptr_t)buffer_handle)[line_end + 1] == 10) {
+            cursor = line_end + 2;
+        } else {
+            cursor = line_end + 1;
+        }
+    }
+    return 0;
+}
+
+static int64_t nuis_host_find_header_value_named(
+    int64_t buffer_handle,
+    int64_t offset,
+    int64_t len,
+    const char* expected_name,
+    size_t expected_len
+) {
+    if (buffer_handle == 0 || offset < 0 || len < 0 || expected_name == NULL) return 0;
+    int64_t cursor = offset;
+    int64_t limit = offset + len;
+    while (cursor < limit) {
+        int64_t line_end = cursor;
+        while (line_end < limit) {
+            int64_t value = ((int64_t*)(intptr_t)buffer_handle)[line_end];
+            if (value == 13 || value == 10) break;
+            line_end += 1;
+        }
+        int64_t line_len = line_end - cursor;
+        if (line_len == 0) return 0;
+        int64_t parsed = nuis_host_parse_header_line_named(
+            buffer_handle,
+            cursor,
+            line_end < limit ? (line_end - cursor + 1) : line_len,
+            expected_name,
+            expected_len
         );
         if (parsed != 0) return parsed;
         if (line_end >= limit) break;
@@ -4172,12 +4382,14 @@ static int64_t nuis_host_find_status_line_reason(int64_t buffer_handle, int64_t 
         text[index] = (char)value;
     }
     text[reason_len] = '\0';
-    int64_t handle = nuis_host_text_register(text);
-    free(text);
-    return handle;
+    return nuis_host_text_register_owned_sized(text, (size_t)reason_len);
 }
 
 static int64_t nuis_host_parse_http_response_summary(int64_t buffer_handle, int64_t offset, int64_t len) {
+    static const char content_type_name[] = "Content-Type";
+    static const char content_length_name[] = "Content-Length";
+    static const char content_type_prefix[] = " | content-type=";
+    static const char content_length_prefix[] = " | content-length=";
     if (buffer_handle == 0 || offset < 0 || len < 0) return 0;
     int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
     int64_t limit = offset + len;
@@ -4209,25 +4421,36 @@ static int64_t nuis_host_parse_http_response_summary(int64_t buffer_handle, int6
 
     int64_t reason_handle = nuis_host_find_status_line_reason(buffer_handle, offset, len);
     const char* reason = nuis_host_text_lookup(reason_handle);
-    int64_t content_type_name = nuis_host_text_register("Content-Type");
-    int64_t content_length_name = nuis_host_text_register("Content-Length");
-    const char* content_type = nuis_host_text_lookup(
-        nuis_host_find_header_value(buffer_handle, offset, len, content_type_name)
-    );
-    const char* content_length = nuis_host_text_lookup(
-        nuis_host_find_header_value(buffer_handle, offset, len, content_length_name)
-    );
+    int64_t content_type_handle =
+        nuis_host_find_header_value_named(
+            buffer_handle,
+            offset,
+            len,
+            content_type_name,
+            sizeof(content_type_name) - 1
+        );
+    int64_t content_length_handle =
+        nuis_host_find_header_value_named(
+            buffer_handle,
+            offset,
+            len,
+            content_length_name,
+            sizeof(content_length_name) - 1
+        );
+    const char* content_type = nuis_host_text_lookup(content_type_handle);
+    const char* content_length = nuis_host_text_lookup(content_length_handle);
 
     int has_reason = reason != NULL && reason[0] != '\0';
     int has_content_type = content_type != NULL && content_type[0] != '\0';
     int has_content_length = content_length != NULL && content_length[0] != '\0';
-    size_t reason_len = has_reason ? strlen(reason) : 0;
-    size_t content_type_len = has_content_type ? strlen(content_type) : 0;
-    size_t content_length_len = has_content_length ? strlen(content_length) : 0;
+    size_t reason_len = has_reason ? nuis_host_text_lookup_len(reason_handle) : 0;
+    size_t content_type_len = has_content_type ? nuis_host_text_lookup_len(content_type_handle) : 0;
+    size_t content_length_len =
+        has_content_length ? nuis_host_text_lookup_len(content_length_handle) : 0;
     size_t total = (size_t)status_len + 1;
     if (has_reason) total += 1 + reason_len;
-    if (has_content_type) total += strlen(" | content-type=") + content_type_len;
-    if (has_content_length) total += strlen(" | content-length=") + content_length_len;
+    if (has_content_type) total += sizeof(content_type_prefix) - 1 + content_type_len;
+    if (has_content_length) total += sizeof(content_length_prefix) - 1 + content_length_len;
 
     char* text = (char*)malloc(total);
     if (text == NULL) return 0;
@@ -4246,24 +4469,26 @@ static int64_t nuis_host_parse_http_response_summary(int64_t buffer_handle, int6
         cursor += reason_len;
     }
     if (has_content_type) {
-        memcpy(text + cursor, " | content-type=", strlen(" | content-type="));
-        cursor += strlen(" | content-type=");
+        memcpy(text + cursor, content_type_prefix, sizeof(content_type_prefix) - 1);
+        cursor += sizeof(content_type_prefix) - 1;
         memcpy(text + cursor, content_type, content_type_len);
         cursor += content_type_len;
     }
     if (has_content_length) {
-        memcpy(text + cursor, " | content-length=", strlen(" | content-length="));
-        cursor += strlen(" | content-length=");
+        memcpy(text + cursor, content_length_prefix, sizeof(content_length_prefix) - 1);
+        cursor += sizeof(content_length_prefix) - 1;
         memcpy(text + cursor, content_length, content_length_len);
         cursor += content_length_len;
     }
     text[cursor] = '\0';
-    int64_t handle = nuis_host_text_register(text);
-    free(text);
-    return handle;
+    return nuis_host_text_register_owned_sized(text, cursor);
 }
 
 static int64_t nuis_host_parse_http_request_summary(int64_t buffer_handle, int64_t offset, int64_t len) {
+    static const char host_name[] = "Host";
+    static const char connection_name[] = "Connection";
+    static const char host_prefix[] = " | host=";
+    static const char connection_prefix[] = " | connection=";
     if (buffer_handle == 0 || offset < 0 || len < 0) return 0;
     int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
     int64_t limit = offset + len;
@@ -4294,21 +4519,30 @@ static int64_t nuis_host_parse_http_request_summary(int64_t buffer_handle, int64
     int64_t path_offset = first_space + 1;
     int64_t path_len = second_space - path_offset;
 
-    int64_t host_name = nuis_host_text_register("Host");
-    int64_t connection_name = nuis_host_text_register("Connection");
-    const char* host = nuis_host_text_lookup(
-        nuis_host_find_header_value(buffer_handle, offset, len, host_name)
+    int64_t host_handle = nuis_host_find_header_value_named(
+        buffer_handle,
+        offset,
+        len,
+        host_name,
+        sizeof(host_name) - 1
     );
-    const char* connection = nuis_host_text_lookup(
-        nuis_host_find_header_value(buffer_handle, offset, len, connection_name)
-    );
+    int64_t connection_handle =
+        nuis_host_find_header_value_named(
+            buffer_handle,
+            offset,
+            len,
+            connection_name,
+            sizeof(connection_name) - 1
+        );
+    const char* host = nuis_host_text_lookup(host_handle);
+    const char* connection = nuis_host_text_lookup(connection_handle);
     int has_host = host != NULL && host[0] != '\0';
     int has_connection = connection != NULL && connection[0] != '\0';
-    size_t host_len = has_host ? strlen(host) : 0;
-    size_t connection_len = has_connection ? strlen(connection) : 0;
+    size_t host_len = has_host ? nuis_host_text_lookup_len(host_handle) : 0;
+    size_t connection_len = has_connection ? nuis_host_text_lookup_len(connection_handle) : 0;
     size_t total = (size_t)method_len + 1 + (size_t)path_len + 1;
-    if (has_host) total += strlen(" | host=") + host_len;
-    if (has_connection) total += strlen(" | connection=") + connection_len;
+    if (has_host) total += sizeof(host_prefix) - 1 + host_len;
+    if (has_connection) total += sizeof(connection_prefix) - 1 + connection_len;
 
     char* text = (char*)malloc(total);
     if (text == NULL) return 0;
@@ -4331,21 +4565,19 @@ static int64_t nuis_host_parse_http_request_summary(int64_t buffer_handle, int64
         text[cursor++] = (char)value;
     }
     if (has_host) {
-        memcpy(text + cursor, " | host=", strlen(" | host="));
-        cursor += strlen(" | host=");
+        memcpy(text + cursor, host_prefix, sizeof(host_prefix) - 1);
+        cursor += sizeof(host_prefix) - 1;
         memcpy(text + cursor, host, host_len);
         cursor += host_len;
     }
     if (has_connection) {
-        memcpy(text + cursor, " | connection=", strlen(" | connection="));
-        cursor += strlen(" | connection=");
+        memcpy(text + cursor, connection_prefix, sizeof(connection_prefix) - 1);
+        cursor += sizeof(connection_prefix) - 1;
         memcpy(text + cursor, connection, connection_len);
         cursor += connection_len;
     }
     text[cursor] = '\0';
-    int64_t handle = nuis_host_text_register(text);
-    free(text);
-    return handle;
+    return nuis_host_text_register_owned_sized(text, cursor);
 }
 
 static int64_t nuis_host_parse_http_roundtrip_summary(
@@ -4356,6 +4588,7 @@ static int64_t nuis_host_parse_http_roundtrip_summary(
     int64_t response_offset,
     int64_t response_len
 ) {
+    static const char arrow_separator[] = " -> ";
     int64_t request_handle =
         nuis_host_parse_http_request_summary(request_buffer_handle, request_offset, request_len);
     int64_t response_handle =
@@ -4364,18 +4597,20 @@ static int64_t nuis_host_parse_http_roundtrip_summary(
     const char* response = nuis_host_text_lookup(response_handle);
     if (request == NULL) request = "";
     if (response == NULL) response = "";
-    size_t request_len_text = strlen(request);
-    size_t response_len_text = strlen(response);
-    size_t total = request_len_text + strlen(" -> ") + response_len_text + 1;
+    size_t request_len_text = nuis_host_text_lookup_len(request_handle);
+    size_t response_len_text = nuis_host_text_lookup_len(response_handle);
+    size_t total = request_len_text + (sizeof(arrow_separator) - 1) + response_len_text + 1;
     char* text = (char*)malloc(total);
     if (text == NULL) return 0;
     memcpy(text, request, request_len_text);
-    memcpy(text + request_len_text, " -> ", strlen(" -> "));
-    memcpy(text + request_len_text + strlen(" -> "), response, response_len_text);
+    memcpy(text + request_len_text, arrow_separator, sizeof(arrow_separator) - 1);
+    memcpy(
+        text + request_len_text + (sizeof(arrow_separator) - 1),
+        response,
+        response_len_text
+    );
     text[total - 1] = '\0';
-    int64_t handle = nuis_host_text_register(text);
-    free(text);
-    return handle;
+    return nuis_host_text_register_owned_sized(text, total - 1);
 }
 
 static int64_t nuis_host_deserialize_text_equals(int64_t buffer_handle, int64_t offset, int64_t len, int64_t expected_handle) {
@@ -5985,6 +6220,31 @@ int64_t nuis_lifecycle_hetero_submission_progress_export_v1(void) {
 
 fn collect_host_ffi_symbols(ast: &AstModule) -> BTreeMap<String, AstExternFunction> {
     let mut out = BTreeMap::new();
+    out.insert(
+        "host_text_handle".to_owned(),
+        AstExternFunction {
+            visibility: nuis_semantics::model::AstVisibility::Private,
+            abi: "c".to_owned(),
+            interface: None,
+            name: "host_text_handle".to_owned(),
+            params: vec![nuis_semantics::model::AstParam {
+                name: "text".to_owned(),
+                ty: AstTypeRef {
+                    name: "String".to_owned(),
+                    generic_args: vec![],
+                    is_optional: false,
+                    is_ref: false,
+                },
+            }],
+            return_type: AstTypeRef {
+                name: "i64".to_owned(),
+                generic_args: vec![],
+                is_optional: false,
+                is_ref: false,
+            },
+            host_symbol: None,
+        },
+    );
     for function in &ast.externs {
         if function.name.starts_with("host_") {
             out.insert(function.name.clone(), function.clone());
@@ -6039,6 +6299,8 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
         format!("    return nuis_host_env_has({});", arg_name(0, &function))
     } else if symbol == "host_env_get" {
         format!("    return nuis_host_env_get({});", arg_name(0, &function))
+    } else if symbol == "host_text_handle" {
+        format!("    return nuis_host_text_handle({});", arg_name(0, &function))
     } else if symbol == "host_text_len" {
         format!(
             "    return nuis_host_text_len_value({});",
@@ -6875,6 +7137,8 @@ mod tests {
                     abi_entries: vec![("cpu".to_owned(), cpu_target.abi.clone())],
                     plan_summary: None,
                     effective_input: None,
+                    text_handle_rewrite_helper_hits: 0,
+                    text_handle_rewrite_local_hits: 0,
                     manifest_copy_path: None,
                     plan_index_path: None,
                     organization_index_path: None,
@@ -7094,6 +7358,8 @@ mod tests {
                     ],
                     plan_summary: None,
                     effective_input: None,
+                    text_handle_rewrite_helper_hits: 0,
+                    text_handle_rewrite_local_hits: 0,
                     manifest_copy_path: None,
                     plan_index_path: None,
                     organization_index_path: None,
@@ -7440,6 +7706,8 @@ mod tests {
                     ],
                     plan_summary: None,
                     effective_input: None,
+                    text_handle_rewrite_helper_hits: 0,
+                    text_handle_rewrite_local_hits: 0,
                     manifest_copy_path: None,
                     plan_index_path: None,
                     organization_index_path: None,

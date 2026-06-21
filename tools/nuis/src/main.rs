@@ -6,13 +6,17 @@ mod surface_render;
 use std::{
     collections::BTreeSet,
     fs,
+    io::Read,
     path::{Path, PathBuf},
     process::{Child, Command, ExitStatus, Stdio},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use nuis_semantics::model::{AstExpr, AstFunction, AstModule, AstStmt, AstTypeRef, AstVisibility};
+use nuis_semantics::model::{
+    AstExpr, AstExternFunction, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef,
+    AstVisibility,
+};
 use json_surface::workflow_contract_json_fields;
 
 fn main() {
@@ -440,6 +444,8 @@ fn handle_bench(
         let mut completed = 0usize;
         let mut failed = 0usize;
         let mut timed_out = 0usize;
+        let mut text_handle_rewrite_helper_hits = 0usize;
+        let mut text_handle_rewrite_local_hits = 0usize;
         for path in paths {
             let report = run_language_benchmarks_for_source_file(
                 &path,
@@ -451,9 +457,23 @@ fn handle_bench(
             completed += report.completed;
             failed += report.failed;
             timed_out += report.timed_out;
+            text_handle_rewrite_helper_hits += report.text_handle_rewrite_helper_hits;
+            text_handle_rewrite_local_hits += report.text_handle_rewrite_local_hits;
         }
         if success_logs_enabled() {
             println!("  collected language benchmarks: {}", collected);
+            println!(
+                "  text_handle_rewrite_helper_hits: {}",
+                text_handle_rewrite_helper_hits
+            );
+            println!(
+                "  text_handle_rewrite_local_hits: {}",
+                text_handle_rewrite_local_hits
+            );
+            println!(
+                "  text_handle_rewrite_total_hits: {}",
+                text_handle_rewrite_helper_hits + text_handle_rewrite_local_hits
+            );
         }
         if list {
             if success_logs_enabled() {
@@ -483,6 +503,18 @@ fn handle_bench(
     } else {
         println!("bench: {}", input.display());
         let report = run_language_benchmarks_for_source_file(&input, filter.as_deref(), list, exact)?;
+        println!(
+            "  text_handle_rewrite_helper_hits: {}",
+            report.text_handle_rewrite_helper_hits
+        );
+        println!(
+            "  text_handle_rewrite_local_hits: {}",
+            report.text_handle_rewrite_local_hits
+        );
+        println!(
+            "  text_handle_rewrite_total_hits: {}",
+            report.text_handle_rewrite_helper_hits + report.text_handle_rewrite_local_hits
+        );
         if report.collected == 0 {
             handle_check(input.clone())?;
         }
@@ -521,6 +553,8 @@ fn collect_language_benchmark_run_report(
         let mut completed = 0usize;
         let mut failed = 0usize;
         let mut timed_out = 0usize;
+        let mut text_handle_rewrite_helper_hits = 0usize;
+        let mut text_handle_rewrite_local_hits = 0usize;
         let mut records = Vec::new();
         for path in paths {
             let report =
@@ -529,6 +563,8 @@ fn collect_language_benchmark_run_report(
             completed += report.completed;
             failed += report.failed;
             timed_out += report.timed_out;
+            text_handle_rewrite_helper_hits += report.text_handle_rewrite_helper_hits;
+            text_handle_rewrite_local_hits += report.text_handle_rewrite_local_hits;
             records.extend(report.records);
         }
         Ok(LanguageBenchmarkRunReport {
@@ -536,6 +572,8 @@ fn collect_language_benchmark_run_report(
             completed,
             failed,
             timed_out,
+            text_handle_rewrite_helper_hits,
+            text_handle_rewrite_local_hits,
             records,
         })
     } else {
@@ -560,6 +598,8 @@ struct LanguageBenchmarkRunReport {
     completed: usize,
     failed: usize,
     timed_out: usize,
+    text_handle_rewrite_helper_hits: usize,
+    text_handle_rewrite_local_hits: usize,
     records: Vec<BenchmarkRunRecord>,
 }
 
@@ -607,6 +647,18 @@ fn benchmark_run_report_json(
         json_usize_field("completed", report.completed),
         json_usize_field("failed", report.failed),
         json_usize_field("timed_out", report.timed_out),
+        json_usize_field(
+            "text_handle_rewrite_helper_hits",
+            report.text_handle_rewrite_helper_hits,
+        ),
+        json_usize_field(
+            "text_handle_rewrite_local_hits",
+            report.text_handle_rewrite_local_hits,
+        ),
+        json_usize_field(
+            "text_handle_rewrite_total_hits",
+            report.text_handle_rewrite_helper_hits + report.text_handle_rewrite_local_hits,
+        ),
         json_object_array_field("benchmarks", &record_json),
     ];
     fields.push(json_field(
@@ -893,6 +945,18 @@ fn run_language_benchmarks_for_source_file(
     }
     if verbose {
         println!("  collected language benchmarks: {}", report.collected);
+        println!(
+            "  text_handle_rewrite_helper_hits: {}",
+            report.text_handle_rewrite_helper_hits
+        );
+        println!(
+            "  text_handle_rewrite_local_hits: {}",
+            report.text_handle_rewrite_local_hits
+        );
+        println!(
+            "  text_handle_rewrite_total_hits: {}",
+            report.text_handle_rewrite_helper_hits + report.text_handle_rewrite_local_hits
+        );
         for record in &report.records {
             let mut line = format!("  bench_fn: {} ({})", record.function_name, record.label);
             if record.warmup_iters > 0 {
@@ -1004,6 +1068,7 @@ fn collect_language_benchmarks_for_source_file(
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
     let ast = nuisc::frontend::parse_nuis_ast(&source)?;
     let nir = nuisc::frontend::lower_ast_to_nir(&ast)?;
+    let text_handle_rewrite = summarize_text_handle_rewrites_from_nir(&nir);
     let benchmarks = nuisc::frontend::collect_nir_benchmarks(&nir);
     let matched = ast
         .functions
@@ -1066,6 +1131,8 @@ fn collect_language_benchmarks_for_source_file(
             completed: 0,
             failed: 0,
             timed_out: 0,
+            text_handle_rewrite_helper_hits: text_handle_rewrite.helper_hits,
+            text_handle_rewrite_local_hits: text_handle_rewrite.local_hits,
             records: discovered,
         });
     }
@@ -1118,8 +1185,40 @@ fn collect_language_benchmarks_for_source_file(
         completed,
         failed,
         timed_out,
+        text_handle_rewrite_helper_hits: text_handle_rewrite.helper_hits,
+        text_handle_rewrite_local_hits: text_handle_rewrite.local_hits,
         records,
     })
+}
+
+fn summarize_text_handle_rewrites_from_nir(
+    nir: &nuis_semantics::model::NirModule,
+) -> nuisc::project::ProjectTextHandleRewriteSummary {
+    let mut summary = nuisc::project::ProjectTextHandleRewriteSummary::default();
+    for function in &nir.functions {
+        for annotation in &function.annotations {
+            if annotation.name != "__nuisc_text_handle_rewrite" {
+                continue;
+            }
+            for arg in &annotation.args {
+                let Some(name) = arg.name.as_deref() else {
+                    continue;
+                };
+                let nuis_semantics::model::NirAttributeValue::Int(value) = arg.value else {
+                    continue;
+                };
+                if value <= 0 {
+                    continue;
+                }
+                match name {
+                    "helper" => summary.helper_hits += value as usize,
+                    "local" => summary.local_hits += value as usize,
+                    _ => {}
+                }
+            }
+        }
+    }
+    summary
 }
 
 fn test_matches_ignored_mode(
@@ -1342,7 +1441,11 @@ fn execute_language_benchmark(
         resolved_clock.map(|clock| clock.domain),
     )?;
     let measurement = match outcome {
-        RawBenchmarkOutcome::Completed { elapsed_ns, status } => {
+        RawBenchmarkOutcome::Completed {
+            elapsed_ns,
+            internal_elapsed_ns,
+            status,
+        } => {
             if status.code().is_none() {
                 return Ok(BenchmarkVerdict {
                     status: "FAIL",
@@ -1366,8 +1469,11 @@ fn execute_language_benchmark(
                     resolved_clock_source: resolved_clock.map(|clock| clock.source),
                 });
             }
+            let measured_total_ns = internal_elapsed_ns.unwrap_or(elapsed_ns);
             Some(BenchmarkMeasurement {
-                run_mode: if warmup_iters > 0 {
+                run_mode: if internal_elapsed_ns.is_some() {
+                    "in-process-clock"
+                } else if warmup_iters > 0 {
                     "dual-process-loop"
                 } else {
                     "single-process-loop"
@@ -1375,8 +1481,8 @@ fn execute_language_benchmark(
                 sample_count: measure_iters,
                 min_ns: None,
                 max_ns: None,
-                avg_ns: elapsed_ns / measure_iters as u128,
-                total_ns: elapsed_ns,
+                avg_ns: measured_total_ns / measure_iters as u128,
+                total_ns: measured_total_ns,
             })
         }
         RawBenchmarkOutcome::TimedOut { timeout_ms } => {
@@ -1429,7 +1535,11 @@ enum RawTestOutcome {
 }
 
 enum RawBenchmarkOutcome {
-    Completed { elapsed_ns: u128, status: ExitStatus },
+    Completed {
+        elapsed_ns: u128,
+        internal_elapsed_ns: Option<u128>,
+        status: ExitStatus,
+    },
     TimedOut { timeout_ms: i64 },
 }
 
@@ -1462,20 +1572,42 @@ fn run_benchmark_process(
     clock_domain: Option<nuis_semantics::model::TestClockDomain>,
 ) -> Result<RawBenchmarkOutcome, String> {
     let mut child = Command::new(binary_path)
-        .stdout(Stdio::null())
+        .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
         .map_err(|error| format!("failed to run `{binary_path}`: {error}"))?;
     let started = Instant::now();
     match wait_for_test_child(&mut child, timeout_ms, clock_domain)? {
-        RawTestOutcome::Completed(status) => Ok(RawBenchmarkOutcome::Completed {
-            elapsed_ns: started.elapsed().as_nanos(),
-            status,
-        }),
+        RawTestOutcome::Completed(status) => {
+            let stdout = read_child_stdout(&mut child)?;
+            Ok(RawBenchmarkOutcome::Completed {
+                elapsed_ns: started.elapsed().as_nanos(),
+                internal_elapsed_ns: parse_internal_benchmark_elapsed_ns(&stdout),
+                status,
+            })
+        }
         RawTestOutcome::TimedOut(timeout_ms) => Ok(RawBenchmarkOutcome::TimedOut {
             timeout_ms,
         }),
     }
+}
+
+fn read_child_stdout(child: &mut Child) -> Result<String, String> {
+    let mut stdout = String::new();
+    if let Some(mut pipe) = child.stdout.take() {
+        pipe.read_to_string(&mut stdout)
+            .map_err(|error| format!("failed to read benchmark stdout: {error}"))?;
+    }
+    Ok(stdout)
+}
+
+fn parse_internal_benchmark_elapsed_ns(stdout: &str) -> Option<u128> {
+    stdout
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .and_then(|line| line.parse::<u128>().ok())
 }
 
 fn wait_for_test_child(
@@ -1560,9 +1692,11 @@ fn build_benchmark_harness_module(
 ) -> Result<AstModule, String> {
     let mut harness = ast.clone();
     harness.functions.retain(|function| function.name != "main");
+    ensure_benchmark_timing_externs(&mut harness);
     harness
         .functions
         .push(build_benchmark_loop_function(benchmark_function));
+    harness.functions.push(build_benchmark_elapsed_text_function());
     harness
         .functions
         .push(build_benchmark_main_function(benchmark_function, iterations));
@@ -1739,7 +1873,54 @@ fn build_benchmark_main_function(benchmark_function: &AstFunction, iterations: i
         where_bounds: vec![],
         params: vec![],
         return_type: Some(i64_type_ref()),
-        body: vec![AstStmt::Return(Some(return_expr))],
+        body: vec![
+            AstStmt::Let {
+                mutable: false,
+                name: "benchmark_started_ns".to_owned(),
+                ty: Some(i64_type_ref()),
+                value: AstExpr::Call {
+                    callee: "host_monotonic_time_ns".to_owned(),
+                    generic_args: vec![],
+                    args: vec![],
+                },
+            },
+            AstStmt::Let {
+                mutable: false,
+                name: "benchmark_status".to_owned(),
+                ty: Some(i64_type_ref()),
+                value: return_expr,
+            },
+            AstStmt::Let {
+                mutable: false,
+                name: "benchmark_ended_ns".to_owned(),
+                ty: Some(i64_type_ref()),
+                value: AstExpr::Call {
+                    callee: "host_monotonic_time_ns".to_owned(),
+                    generic_args: vec![],
+                    args: vec![],
+                },
+            },
+            AstStmt::Let {
+                mutable: false,
+                name: "benchmark_elapsed_ns".to_owned(),
+                ty: Some(i64_type_ref()),
+                value: AstExpr::Binary {
+                    op: nuis_semantics::model::AstBinaryOp::Sub,
+                    lhs: Box::new(AstExpr::Var("benchmark_ended_ns".to_owned())),
+                    rhs: Box::new(AstExpr::Var("benchmark_started_ns".to_owned())),
+                },
+            },
+            AstStmt::Expr(AstExpr::Call {
+                callee: "host_stdout_write".to_owned(),
+                generic_args: vec![],
+                args: vec![AstExpr::Call {
+                    callee: benchmark_elapsed_text_function_name(),
+                    generic_args: vec![],
+                    args: vec![AstExpr::Var("benchmark_elapsed_ns".to_owned())],
+                }],
+            }),
+            AstStmt::Return(Some(AstExpr::Int(0))),
+        ],
     }
 }
 
@@ -1759,12 +1940,164 @@ fn benchmark_loop_function_name() -> String {
     "__nuis_benchmark_loop".to_owned()
 }
 
+fn benchmark_elapsed_text_function_name() -> String {
+    "__nuis_benchmark_elapsed_text".to_owned()
+}
+
+fn build_benchmark_elapsed_text_function() -> AstFunction {
+    AstFunction {
+        name: benchmark_elapsed_text_function_name(),
+        visibility: AstVisibility::Private,
+        attributes: vec![],
+        test_name: None,
+        test_ignored: false,
+        test_should_fail: false,
+        test_reason: None,
+        test_timeout_ms: None,
+        test_clock_domain: None,
+        test_clock_policy: None,
+        benchmark_name: None,
+        benchmark_warmup_iters: None,
+        benchmark_measure_iters: None,
+        benchmark_timeout_ms: None,
+        benchmark_clock_domain: None,
+        benchmark_clock_policy: None,
+        is_async: false,
+        generic_params: vec![],
+        where_bounds: vec![],
+        params: vec![AstParam {
+            name: "elapsed_ns".to_owned(),
+            ty: i64_type_ref(),
+        }],
+        return_type: Some(i64_type_ref()),
+        body: vec![
+            AstStmt::Let {
+                mutable: false,
+                name: "buffer".to_owned(),
+                ty: Some(ref_buffer_type_ref()),
+                value: AstExpr::Call {
+                    callee: "alloc_buffer".to_owned(),
+                    generic_args: vec![],
+                    args: vec![AstExpr::Int(64), AstExpr::Int(0)],
+                },
+            },
+            AstStmt::Let {
+                mutable: false,
+                name: "written".to_owned(),
+                ty: Some(i64_type_ref()),
+                value: AstExpr::Call {
+                    callee: "serialize_i64_into".to_owned(),
+                    generic_args: vec![],
+                    args: vec![
+                        AstExpr::Var("elapsed_ns".to_owned()),
+                        AstExpr::Var("buffer".to_owned()),
+                        AstExpr::Int(0),
+                    ],
+                },
+            },
+            AstStmt::Return(Some(AstExpr::Call {
+                callee: "deserialize_text_from".to_owned(),
+                generic_args: vec![],
+                args: vec![
+                    AstExpr::Var("buffer".to_owned()),
+                    AstExpr::Int(0),
+                    AstExpr::Var("written".to_owned()),
+                ],
+            })),
+        ],
+    }
+}
+
+fn ensure_benchmark_timing_externs(module: &mut AstModule) {
+    ensure_benchmark_timing_extern(module, "host_monotonic_time_ns", vec![]);
+    ensure_benchmark_timing_extern(
+        module,
+        "host_serialize_i64_into",
+        vec![
+            AstParam {
+                name: "value".to_owned(),
+                ty: i64_type_ref(),
+            },
+            AstParam {
+                name: "buffer_handle".to_owned(),
+                ty: i64_type_ref(),
+            },
+            AstParam {
+                name: "offset".to_owned(),
+                ty: i64_type_ref(),
+            },
+        ],
+    );
+    ensure_benchmark_timing_extern(
+        module,
+        "host_deserialize_text_from",
+        vec![
+            AstParam {
+                name: "buffer_handle".to_owned(),
+                ty: i64_type_ref(),
+            },
+            AstParam {
+                name: "offset".to_owned(),
+                ty: i64_type_ref(),
+            },
+            AstParam {
+                name: "len".to_owned(),
+                ty: i64_type_ref(),
+            },
+        ],
+    );
+    ensure_benchmark_timing_extern(
+        module,
+        "host_text_len",
+        vec![AstParam {
+            name: "text_handle".to_owned(),
+            ty: i64_type_ref(),
+        }],
+    );
+    ensure_benchmark_timing_extern(
+        module,
+        "host_stdout_write",
+        vec![AstParam {
+            name: "text_handle".to_owned(),
+            ty: i64_type_ref(),
+        }],
+    );
+}
+
+fn ensure_benchmark_timing_extern(
+    module: &mut AstModule,
+    name: &str,
+    params: Vec<AstParam>,
+) {
+    if module.externs.iter().any(|function| function.name == name) {
+        return;
+    }
+    module.externs.push(AstExternFunction {
+        visibility: AstVisibility::Private,
+        abi: "c".to_owned(),
+        interface: None,
+        name: name.to_owned(),
+        host_symbol: None,
+        params,
+        return_type: i64_type_ref(),
+    });
+}
+
 fn i64_type_ref() -> AstTypeRef {
     AstTypeRef {
         name: "i64".to_owned(),
         generic_args: vec![],
         is_optional: false,
         is_ref: false,
+    }
+}
+
+fn ref_buffer_type_ref() -> AstTypeRef {
+    AstTypeRef {
+        name: "Buffer".to_owned(),
+        generic_args: vec![],
+        is_optional: false,
+        is_ref: true,
     }
 }
 
@@ -2500,6 +2833,19 @@ pub(crate) fn render_build_report_json(input: &Path) -> String {
         json_object_array_field("domain_units", &domain_unit_records),
     ];
     if let Some(report) = manifest_verify.as_ref() {
+        fields.push(json_usize_field(
+            "text_handle_rewrite_helper_hits",
+            report.project_text_handle_rewrite_helper_hits,
+        ));
+        fields.push(json_usize_field(
+            "text_handle_rewrite_local_hits",
+            report.project_text_handle_rewrite_local_hits,
+        ));
+        fields.push(json_usize_field(
+            "text_handle_rewrite_total_hits",
+            report.project_text_handle_rewrite_helper_hits
+                + report.project_text_handle_rewrite_local_hits,
+        ));
         fields.push(json_field("packaging_mode", &report.packaging_mode));
         fields.push(json_field("binary_name", &report.artifact_binary_name));
         fields.push(json_usize_field("binary_bytes", report.artifact_binary_bytes));
@@ -2673,6 +3019,19 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
     println!("  recommended_next_step: {}", doctor.recommended_next_step);
     println!("  recommended_command: {}", doctor.recommended_command);
     if let Some(report) = manifest_verify.as_ref() {
+        println!(
+            "  text_handle_rewrite_helper_hits: {}",
+            report.project_text_handle_rewrite_helper_hits
+        );
+        println!(
+            "  text_handle_rewrite_local_hits: {}",
+            report.project_text_handle_rewrite_local_hits
+        );
+        println!(
+            "  text_handle_rewrite_total_hits: {}",
+            report.project_text_handle_rewrite_helper_hits
+                + report.project_text_handle_rewrite_local_hits
+        );
         println!("  packaging_mode: {}", report.packaging_mode);
         println!("  binary_name: {}", report.artifact_binary_name);
         println!("  binary_bytes: {}", report.artifact_binary_bytes);
@@ -5209,6 +5568,7 @@ mod tests {
         galaxy_lock_json_fields, project_check_summary_json_fields,
         public_surface_summary_json_fields, workflow_contract_json_fields,
     };
+    use crate::surface_render;
     use super::{
         artifact_doctor_command_for_output_dir, artifact_workflow_brief,
         benchmark_run_report_json, build_workflow_frontdoor_surface, default_build_output_dir,
@@ -5557,8 +5917,17 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
             .trim_start(),
             r#"
 mod cpu Main {
+  fn text_handle_helper() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("demo", buffer, 0);
+    return deserialize_text_from(buffer, 0, len);
+  }
+
   fn main() -> i64 {
-    return 0;
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("hello", buffer, 0);
+    let handle: i64 = deserialize_text_from(buffer, 0, len);
+    return text_handle_helper() + handle;
   }
 }
 "#,
@@ -5753,8 +6122,17 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
             .trim_start(),
             r#"
 mod cpu Main {
+  fn text_handle_helper() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("demo", buffer, 0);
+    return deserialize_text_from(buffer, 0, len);
+  }
+
   fn main() -> i64 {
-    return 0;
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("hello", buffer, 0);
+    let handle: i64 = deserialize_text_from(buffer, 0, len);
+    return text_handle_helper() + handle;
   }
 }
 "#,
@@ -5797,8 +6175,17 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
             .trim_start(),
             r#"
 mod cpu Main {
+  fn text_handle_helper() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("demo", buffer, 0);
+    return deserialize_text_from(buffer, 0, len);
+  }
+
   fn main() -> i64 {
-    return 0;
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("hello", buffer, 0);
+    let handle: i64 = deserialize_text_from(buffer, 0, len);
+    return text_handle_helper() + handle;
   }
 }
 "#,
@@ -5810,6 +6197,9 @@ mod cpu Main {
 
         assert!(json.contains("\"kind\":\"build_report\""));
         assert!(json.contains("\"ready_to_run\":true"));
+        assert!(json.contains("\"text_handle_rewrite_helper_hits\":1"));
+        assert!(json.contains("\"text_handle_rewrite_local_hits\":1"));
+        assert!(json.contains("\"text_handle_rewrite_total_hits\":2"));
         assert!(json.contains("\"packaging_mode\":\"native-cpu-llvm\""));
         assert!(json.contains("\"lifecycle_bootstrap_entry\":\"nuis.bootstrap.lifecycle.v1\""));
         assert!(json.contains("\"lifecycle_tick_policy\":\"owned-pump.active-wait-drain\""));
@@ -6472,12 +6862,21 @@ galaxy = ["ns-nova=workspace"]
             .trim_start(),
             r#"
 mod cpu Main {
+  fn text_handle_helper() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("demo", buffer, 0);
+    return deserialize_text_from(buffer, 0, len);
+  }
+
   pub fn exported() -> i64 {
-    return 3;
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("hello", buffer, 0);
+    let handle: i64 = deserialize_text_from(buffer, 0, len);
+    return handle;
   }
 
   fn main() -> i64 {
-    return exported();
+    return text_handle_helper() + exported();
   }
 }
 "#,
@@ -6518,6 +6917,9 @@ mod cpu Main {
         assert!(json.contains("\"link_plan_available\":false"));
         assert!(json.contains("\"link_plan_final_stage\":null"));
         assert!(json.contains("\"tests_declared\":1"));
+        assert!(json.contains("\"text_handle_rewrite_helper_hits\":1"));
+        assert!(json.contains("\"text_handle_rewrite_local_hits\":1"));
+        assert!(json.contains("\"text_handle_rewrite_total_hits\":2"));
         assert!(json.contains("\"public_surface_modules\":3"));
         assert!(json.contains("\"public_functions\":10"));
         assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
@@ -6537,6 +6939,49 @@ mod cpu Main {
     }
 
     #[test]
+    fn project_status_text_summary_reports_text_handle_rewrite_hits() {
+        let project_root = write_temp_project_fixture(
+            "status_text_handle_summary",
+            r#"
+name = "status_text_handle_summary"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn text_handle_helper() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("demo", buffer, 0);
+    return deserialize_text_from(buffer, 0, len);
+  }
+
+  fn main() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("hello", buffer, 0);
+    let handle: i64 = deserialize_text_from(buffer, 0, len);
+    return text_handle_helper() + handle;
+  }
+}
+"#,
+        );
+
+        let lines = surface_render::render_project_status_text_summary(&project_root)
+            .expect("render status text summary");
+
+        assert!(lines
+            .iter()
+            .any(|line| line == "  text_handle_rewrite_helper_hits: 1"));
+        assert!(lines
+            .iter()
+            .any(|line| line == "  text_handle_rewrite_local_hits: 1"));
+        assert!(lines
+            .iter()
+            .any(|line| line == "  text_handle_rewrite_total_hits: 2"));
+    }
+
+    #[test]
     fn project_doctor_json_reports_missing_test_and_health_checks() {
         let project_root = write_temp_project_fixture(
             "doctor_json_smoke",
@@ -6552,8 +6997,17 @@ galaxy_imports = ["ns-nova:lib/nova_contracts.ns"]
             .trim_start(),
             r#"
 mod cpu Main {
+  fn text_handle_helper() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("demo", buffer, 0);
+    return deserialize_text_from(buffer, 0, len);
+  }
+
   fn main() -> i64 {
-    return 4;
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("hello", buffer, 0);
+    let handle: i64 = deserialize_text_from(buffer, 0, len);
+    return text_handle_helper() + handle;
   }
 }
 "#,
@@ -6566,6 +7020,9 @@ mod cpu Main {
         assert!(json.contains("\"workflow_kind\":\"project_compile_workflow\""));
         assert!(json.contains("\"tests_declared\":1"));
         assert!(json.contains("\"tests_missing\":1"));
+        assert!(json.contains("\"text_handle_rewrite_helper_hits\":1"));
+        assert!(json.contains("\"text_handle_rewrite_local_hits\":1"));
+        assert!(json.contains("\"text_handle_rewrite_total_hits\":2"));
         assert!(json.contains("\"abi_checks_ok\":true"));
         assert!(json.contains("\"registry_checks_ok\":true"));
         assert!(json.contains("\"lowering_checks_ok\":true"));
@@ -6588,6 +7045,49 @@ mod cpu Main {
         assert!(json.contains("\"tests\":[{"));
         assert!(json.contains("\"exists\":false"));
         assert!(json.contains("\"domains\":["));
+    }
+
+    #[test]
+    fn project_doctor_text_summary_reports_text_handle_rewrite_hits() {
+        let project_root = write_temp_project_fixture(
+            "doctor_text_handle_summary",
+            r#"
+name = "doctor_text_handle_summary"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn text_handle_helper() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("demo", buffer, 0);
+    return deserialize_text_from(buffer, 0, len);
+  }
+
+  fn main() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("hello", buffer, 0);
+    let handle: i64 = deserialize_text_from(buffer, 0, len);
+    return text_handle_helper() + handle;
+  }
+}
+"#,
+        );
+
+        let lines = surface_render::render_project_doctor_text_summary(&project_root)
+            .expect("render doctor text summary");
+
+        assert!(lines
+            .iter()
+            .any(|line| line == "  text_handle_rewrite_helper_hits: 1"));
+        assert!(lines
+            .iter()
+            .any(|line| line == "  text_handle_rewrite_local_hits: 1"));
+        assert!(lines
+            .iter()
+            .any(|line| line == "  text_handle_rewrite_total_hits: 2"));
     }
 
     #[test]
@@ -7248,8 +7748,17 @@ mod cpu Main {
             &input,
             r#"
 mod cpu Main {
+  fn text_handle_helper() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("demo", buffer, 0);
+    return deserialize_text_from(buffer, 0, len);
+  }
+
   benchmark("sum_loop", warmup_iters=1, measure_iters=1) fn sum_loop() -> i64 {
-    return 1;
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("hello", buffer, 0);
+    let handle: i64 = deserialize_text_from(buffer, 0, len);
+    return text_handle_helper() + handle;
   }
 }
 "#,
@@ -7263,12 +7772,62 @@ mod cpu Main {
         assert!(json.contains("\"kind\":\"nuis_benchmark_run\""));
         assert!(json.contains("\"source_kind\":\"single-file\""));
         assert!(json.contains("\"result\":\"passed\""));
+        assert!(json.contains("\"text_handle_rewrite_helper_hits\":1"));
+        assert!(json.contains("\"text_handle_rewrite_local_hits\":1"));
+        assert!(json.contains("\"text_handle_rewrite_total_hits\":2"));
         assert!(json.contains("\"label\":\"sum_loop\""));
         assert!(json.contains("\"status\":\"OK\""));
         assert!(json.contains("\"min_ns\":"));
         assert!(json.contains("\"avg_ns\":"));
         assert!(json.contains("\"max_ns\":"));
         assert!(json.contains("\"total_ns\":"));
+    }
+
+    #[test]
+    fn benchmark_report_json_includes_project_text_handle_rewrite_summary() {
+        let project_root = write_temp_project_fixture(
+            "benchmark_project_json",
+            r#"
+name = "benchmark_project_json"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn text_handle_helper() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("demo", buffer, 0);
+    return deserialize_text_from(buffer, 0, len);
+  }
+
+  benchmark("sum_loop", warmup_iters=1, measure_iters=1) fn sum_loop() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(128, 0);
+    let len: i64 = serialize_text_into("hello", buffer, 0);
+    let handle: i64 = deserialize_text_from(buffer, 0, len);
+    return text_handle_helper() + handle;
+  }
+
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+        );
+
+        let report = super::collect_language_benchmark_run_report(&project_root, None, false, false)
+            .expect("project benchmark report should collect");
+        let json = benchmark_run_report_json(&project_root, "project", false, false, None, &report);
+
+        assert!(json.contains("\"kind\":\"nuis_benchmark_run\""));
+        assert!(json.contains("\"source_kind\":\"project\""));
+        assert!(json.contains("\"result\":\"passed\""));
+        assert!(json.contains("\"text_handle_rewrite_helper_hits\":1"));
+        assert!(json.contains("\"text_handle_rewrite_local_hits\":1"));
+        assert!(json.contains("\"text_handle_rewrite_total_hits\":2"));
+        assert!(json.contains("\"label\":\"sum_loop\""));
+        assert!(json.contains("\"status\":\"OK\""));
     }
 
     #[test]

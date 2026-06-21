@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use nuis_semantics::model::{AstExpr, AstModule, NirDataFlowState, NirResultStage, NirTypeRef};
+use nuis_semantics::model::{
+    AstExpr, AstModule, NirAttributeValue, NirDataFlowState, NirResultStage, NirTypeRef,
+};
 #[cfg(test)]
 use yir_core::YirModule;
 
@@ -200,6 +202,57 @@ pub struct LoadedProject {
     pub entry_source: String,
     pub modules: Vec<ProjectModule>,
     pub resolved_galaxies: Vec<crate::stdlib_registry::ResolvedGalaxyDependency>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ProjectTextHandleRewriteSummary {
+    pub helper_hits: usize,
+    pub local_hits: usize,
+}
+
+impl ProjectTextHandleRewriteSummary {
+    pub fn total_hits(self) -> usize {
+        self.helper_hits + self.local_hits
+    }
+}
+
+pub fn summarize_project_text_handle_rewrites(
+    project: &LoadedProject,
+) -> Result<ProjectTextHandleRewriteSummary, String> {
+    let mut summary = ProjectTextHandleRewriteSummary::default();
+    for module in &project.modules {
+        let helper_modules = project
+            .modules
+            .iter()
+            .filter(|candidate| candidate.path != module.path)
+            .map(|candidate| candidate.ast.clone())
+            .collect::<Vec<_>>();
+        let nir = crate::frontend::lower_project_ast_to_nir(&module.ast, &helper_modules)?;
+        for function in &nir.functions {
+            for annotation in &function.annotations {
+                if annotation.name != "__nuisc_text_handle_rewrite" {
+                    continue;
+                }
+                for arg in &annotation.args {
+                    let Some(name) = arg.name.as_deref() else {
+                        continue;
+                    };
+                    let NirAttributeValue::Int(value) = arg.value else {
+                        continue;
+                    };
+                    if value <= 0 {
+                        continue;
+                    }
+                    match name {
+                        "helper" => summary.helper_hits += value as usize,
+                        "local" => summary.local_hits += value as usize,
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    Ok(summary)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

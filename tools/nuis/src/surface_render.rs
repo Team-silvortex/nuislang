@@ -72,6 +72,7 @@ fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<Str
 pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<String>, String> {
     let project = nuisc::project::load_project(input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let text_handle_rewrite = nuisc::project::summarize_project_text_handle_rewrites(&project)?;
     let public_surface = crate::public_surface_records(&project);
     let galaxy_lock_status = crate::galaxy::verify_project_lock(input);
     let galaxy_manifest_path = project.root.join("galaxy.toml");
@@ -143,6 +144,18 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
             artifact_report.recommended_command
         ),
         format!("  modules: {}", project.modules.len()),
+        format!(
+            "  text_handle_rewrite_helper_hits: {}",
+            text_handle_rewrite.helper_hits
+        ),
+        format!(
+            "  text_handle_rewrite_local_hits: {}",
+            text_handle_rewrite.local_hits
+        ),
+        format!(
+            "  text_handle_rewrite_total_hits: {}",
+            text_handle_rewrite.total_hits()
+        ),
         format!(
             "  public_surface: {}",
             crate::describe_public_surface(&public_surface)
@@ -276,6 +289,7 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
 pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<String>, String> {
     let project = nuisc::project::load_project(input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let text_handle_rewrite = nuisc::project::summarize_project_text_handle_rewrites(&project)?;
     let public_surface = crate::public_surface_records(&project);
     let declared_tests = project
         .manifest
@@ -369,6 +383,18 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
             artifact_report.recommended_command
         ),
         format!("  modules: {}", project.modules.len()),
+        format!(
+            "  text_handle_rewrite_helper_hits: {}",
+            text_handle_rewrite.helper_hits
+        ),
+        format!(
+            "  text_handle_rewrite_local_hits: {}",
+            text_handle_rewrite.local_hits
+        ),
+        format!(
+            "  text_handle_rewrite_total_hits: {}",
+            text_handle_rewrite.total_hits()
+        ),
         format!(
             "  public_surface: {}",
             crate::describe_public_surface(&public_surface)
@@ -707,6 +733,7 @@ pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String>
 pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String> {
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let text_handle_rewrite = nuisc::project::summarize_project_text_handle_rewrites(&project)?;
     let public_surface = crate::public_surface_records(&project);
     let galaxy_lock_status = crate::galaxy::verify_project_lock(&input);
     let galaxy_manifest_path = project.root.join("galaxy.toml");
@@ -784,6 +811,18 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
         crate::json_field("entry", &project.manifest.entry),
         crate::json_usize_field("modules", project.modules.len()),
         crate::json_usize_field("links", project.manifest.links.len()),
+        crate::json_usize_field(
+            "text_handle_rewrite_helper_hits",
+            text_handle_rewrite.helper_hits,
+        ),
+        crate::json_usize_field(
+            "text_handle_rewrite_local_hits",
+            text_handle_rewrite.local_hits,
+        ),
+        crate::json_usize_field(
+            "text_handle_rewrite_total_hits",
+            text_handle_rewrite.total_hits(),
+        ),
     ];
     fields.extend(crate::json_surface::public_surface_summary_json_fields(
         &public_surface,
@@ -884,6 +923,7 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
 pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String> {
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let text_handle_rewrite = nuisc::project::summarize_project_text_handle_rewrites(&project)?;
     let public_surface = crate::public_surface_records(&project);
     let declared_tests = project
         .manifest
@@ -1126,6 +1166,18 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
         crate::json_field("entry", &project.manifest.entry),
         crate::json_usize_field("modules", project.modules.len()),
         crate::json_usize_field("links", project.manifest.links.len()),
+        crate::json_usize_field(
+            "text_handle_rewrite_helper_hits",
+            text_handle_rewrite.helper_hits,
+        ),
+        crate::json_usize_field(
+            "text_handle_rewrite_local_hits",
+            text_handle_rewrite.local_hits,
+        ),
+        crate::json_usize_field(
+            "text_handle_rewrite_total_hits",
+            text_handle_rewrite.total_hits(),
+        ),
     ];
     fields.extend(crate::json_surface::public_surface_summary_json_fields(
         &public_surface,
