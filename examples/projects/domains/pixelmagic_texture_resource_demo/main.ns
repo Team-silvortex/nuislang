@@ -1,3 +1,4 @@
+use cpu PixelMagicContracts;
 use data FabricPlane;
 use shader PixelMagicTextureShader;
 
@@ -37,19 +38,17 @@ mod cpu Main {
     };
   }
 
-  fn pixelmagic_resource_residency(resource: PixelMagicImageResource) -> i64 {
-    return resource.source_handle +
-      resource.format_kind +
-      resource.texel_layout +
-      resource.sampler_filter +
-      resource.address_mode;
-  }
-
   fn lower_pixelmagic_resource(resource: PixelMagicImageResource) -> NovaResourceSetPacket {
     let buffer_count: i64 = resource.texel_layout;
     let texture_count: i64 = 1;
     let sampler_count: i64 = 1;
-    let residency: i64 = pixelmagic_resource_residency(resource);
+    let residency: i64 = PixelMagicContracts.resource_residency_total(
+      resource.source_handle,
+      resource.format_kind,
+      resource.texel_layout,
+      resource.sampler_filter,
+      resource.address_mode
+    );
     return nova_resource_set_packet(
       buffer_count,
       texture_count,
@@ -64,18 +63,26 @@ mod cpu Main {
   ) -> PixelMagicTextureShaderPacket {
     let color_seed: i64 = shader_profile_color_seed(
       "PixelMagicTextureShader",
-      resource.source_handle + nova_resource_set_state_residency(state),
+      PixelMagicContracts.shader_color_seed_base(
+        resource.source_handle,
+        nova_resource_set_state_residency(state),
+        0
+      ),
       0
     );
     let speed_seed: i64 = shader_profile_speed_seed(
       "PixelMagicTextureShader",
       nova_resource_set_state_textures(state),
       resource.sampler_filter + 1,
-      resource.width
+      PixelMagicContracts.shader_speed_seed_base(resource.width, 0)
     );
     let radius_seed: i64 = shader_profile_radius_seed(
       "PixelMagicTextureShader",
-      resource.height + nova_resource_set_state_samplers(state) + resource.address_mode,
+      PixelMagicContracts.shader_radius_seed_base(
+        resource.height,
+        nova_resource_set_state_samplers(state),
+        resource.address_mode
+      ),
       0
     );
     return shader_profile_packet("PixelMagicTextureShader", color_seed, speed_seed, radius_seed);

@@ -157,7 +157,11 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::ProjectStatus { input, json } => handle_project_status(input, json)?,
         cli::CommandKind::ProjectDoctor { input, json } => handle_project_doctor(input, json)?,
-        cli::CommandKind::ProjectImports { input, json } => handle_project_imports(input, json)?,
+        cli::CommandKind::ProjectImports {
+            input,
+            json,
+            apply_suggested,
+        } => handle_project_imports(input, json, apply_suggested)?,
         cli::CommandKind::ProjectLockAbi { input } => handle_project_lock_abi(input)?,
         cli::CommandKind::Galaxy(command) => handle_galaxy(command)?,
     }
@@ -2143,12 +2147,15 @@ fn render_workflow_json(input: &Path) -> Result<String, String> {
         };
         let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
         let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+        let hidden_manual_only_library_modules =
+            hidden_manual_only_library_modules_for_project(&project);
         let frontdoor = project_frontdoor_surface(
             &plan,
             &declared_tests,
             &missing_tests,
             &galaxy_doctor,
             galaxy_check_invalid,
+            !hidden_manual_only_library_modules.is_empty(),
         );
         let include_galaxy_flow =
             galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
@@ -2360,6 +2367,7 @@ pub(crate) fn project_frontdoor_surface(
     missing_tests: &[PathBuf],
     galaxy_doctor: &galaxy::GalaxyDoctorReport,
     galaxy_check_invalid: bool,
+    has_hidden_manual_only_library_modules: bool,
 ) -> WorkflowFrontdoorSurface {
     let recommendation = recommend_project_workflow_step(
         plan,
@@ -2367,6 +2375,7 @@ pub(crate) fn project_frontdoor_surface(
         missing_tests,
         galaxy_doctor,
         galaxy_check_invalid,
+        has_hidden_manual_only_library_modules,
     );
     build_workflow_frontdoor_surface(project_compile_workflow_source_profile(), recommendation)
 }
@@ -2404,6 +2413,7 @@ fn recommend_project_workflow_step(
     missing_tests: &[PathBuf],
     galaxy_doctor: &galaxy::GalaxyDoctorReport,
     galaxy_check_invalid: bool,
+    has_hidden_manual_only_library_modules: bool,
 ) -> WorkflowRecommendation {
     let deps_len = galaxy_doctor.dependencies.len();
     let any_lock_missing = galaxy_doctor
@@ -2450,6 +2460,13 @@ fn recommend_project_workflow_step(
             label: "galaxy_sync_deps",
             command: "nuis galaxy sync-deps <project-dir|nuis.toml>",
             reason: "the dependency lock is valid, but some locked galaxy packages are not materialized locally yet",
+        };
+    }
+    if has_hidden_manual_only_library_modules {
+        return WorkflowRecommendation {
+            label: "project_imports_apply_suggested",
+            command: "nuis project-imports --apply-suggested <project-dir|nuis.toml>",
+            reason: "the project still has manual-only galaxy library modules hidden from project scope, so the highest-value next step is to write the suggested galaxy_imports entries first",
         };
     }
     if !plan.abi_resolution.explicit {
@@ -2529,12 +2546,15 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         };
         let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
         let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+        let hidden_manual_only_library_modules =
+            hidden_manual_only_library_modules_for_project(&project);
         let frontdoor = project_frontdoor_surface(
             &plan,
             &declared_tests,
             &missing_tests,
             &galaxy_doctor,
             galaxy_check_invalid,
+            !hidden_manual_only_library_modules.is_empty(),
         );
         let include_galaxy_flow =
             galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
@@ -3099,12 +3119,15 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
         };
         let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
         let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+        let hidden_manual_only_library_modules =
+            hidden_manual_only_library_modules_for_project(&project);
         let frontdoor = project_frontdoor_surface(
             &plan,
             &declared_tests,
             &missing_tests,
             &galaxy_doctor,
             galaxy_check_invalid,
+            !hidden_manual_only_library_modules.is_empty(),
         );
         println!("  source_kind: project");
         println!("  project: {}", project.manifest.name);
@@ -3354,6 +3377,40 @@ struct ProjectImportsReport {
     records: Vec<ProjectImportRecord>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProjectImportsApplyResult {
+    manifest_path: PathBuf,
+    applied: Vec<String>,
+    total_explicit_galaxy_imports: usize,
+    manifest_updated: bool,
+}
+
+pub(crate) fn hidden_manual_only_library_modules_for_project(
+    project: &nuisc::project::LoadedProject,
+) -> Vec<String> {
+    let explicit_galaxy_imports = project
+        .manifest
+        .galaxy_imports
+        .iter()
+        .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+        .collect::<BTreeSet<_>>();
+    project
+        .resolved_galaxies
+        .iter()
+        .filter(|dependency| dependency.library_import_policy.as_str() == "manual-only")
+        .flat_map(|dependency| {
+            dependency.library_modules.iter().filter_map(|library_module| {
+                let key = format!("{}:{}", dependency.name, library_module);
+                if explicit_galaxy_imports.contains(&key) {
+                    None
+                } else {
+                    Some(key)
+                }
+            })
+        })
+        .collect::<Vec<_>>()
+}
+
 fn collect_project_imports_report(input: &Path) -> Result<ProjectImportsReport, String> {
     let project = nuisc::project::load_project(input)?;
     let explicit_galaxy_imports = project
@@ -3364,8 +3421,8 @@ fn collect_project_imports_report(input: &Path) -> Result<ProjectImportsReport, 
         .collect::<BTreeSet<_>>();
     let mut records = Vec::new();
     let mut visible_library_modules = Vec::new();
-    let mut hidden_manual_only_library_modules = Vec::new();
-    let mut suggested_galaxy_imports = Vec::new();
+    let hidden_manual_only_library_modules = hidden_manual_only_library_modules_for_project(&project);
+    let suggested_galaxy_imports = hidden_manual_only_library_modules.clone();
 
     for dependency in &project.resolved_galaxies {
         for (library_module, library_path) in dependency
@@ -3381,13 +3438,6 @@ fn collect_project_imports_report(input: &Path) -> Result<ProjectImportsReport, 
             let visible = visible_module.is_some();
             if visible {
                 visible_library_modules.push(key.clone());
-            } else if dependency.library_import_policy.as_str() == "manual-only" {
-                hidden_manual_only_library_modules.push(key.clone());
-            }
-            if dependency.library_import_policy.as_str() == "manual-only"
-                && !explicit_galaxy_imports.contains(&key)
-            {
-                suggested_galaxy_imports.push(key.clone());
             }
             records.push(ProjectImportRecord {
                 galaxy: dependency.name.clone(),
@@ -3420,7 +3470,36 @@ fn collect_project_imports_report(input: &Path) -> Result<ProjectImportsReport, 
     })
 }
 
-fn handle_project_imports(input: std::path::PathBuf, json: bool) -> Result<(), String> {
+fn handle_project_imports(
+    input: std::path::PathBuf,
+    json: bool,
+    apply_suggested: bool,
+) -> Result<(), String> {
+    if apply_suggested {
+        let applied = apply_suggested_project_imports(&input)?;
+        if json {
+            println!("{}", render_project_imports_apply_json(&input, &applied)?);
+            return Ok(());
+        }
+        println!("applied project imports: {}", applied.manifest_path.display());
+        println!("  applied_galaxy_imports: {}", applied.applied.len());
+        println!(
+            "  total_explicit_galaxy_imports: {}",
+            applied.total_explicit_galaxy_imports
+        );
+        println!("  manifest_updated: {}", yes_no(applied.manifest_updated));
+        if applied.applied.is_empty() {
+            println!("  result: no suggested galaxy imports needed to be written");
+        } else {
+            for item in &applied.applied {
+                println!("  applied_galaxy_import: {}", item);
+            }
+        }
+        for line in render_project_imports_text_summary(&input)? {
+            println!("{line}");
+        }
+        return Ok(());
+    }
     if json {
         println!("{}", render_project_imports_json(&input)?);
         return Ok(());
@@ -3429,6 +3508,117 @@ fn handle_project_imports(input: std::path::PathBuf, json: bool) -> Result<(), S
         println!("{line}");
     }
     Ok(())
+}
+
+fn apply_suggested_project_imports(input: &Path) -> Result<ProjectImportsApplyResult, String> {
+    let report = collect_project_imports_report(input)?;
+    let manifest_source = fs::read_to_string(&report.manifest_path).map_err(|error| {
+        format!(
+            "failed to read project manifest `{}`: {error}",
+            report.manifest_path.display()
+        )
+    })?;
+    let updated_source = write_manifest_galaxy_imports(
+        &manifest_source,
+        &report.explicit_galaxy_imports,
+        &report.suggested_galaxy_imports,
+    )?;
+    let manifest_updated = updated_source != manifest_source;
+    if manifest_updated {
+        fs::write(&report.manifest_path, updated_source).map_err(|error| {
+            format!(
+                "failed to update project manifest `{}`: {error}",
+                report.manifest_path.display()
+            )
+        })?;
+    }
+    Ok(ProjectImportsApplyResult {
+        manifest_path: report.manifest_path,
+        total_explicit_galaxy_imports: report.explicit_galaxy_imports.len()
+            + report.suggested_galaxy_imports.len(),
+        applied: report.suggested_galaxy_imports,
+        manifest_updated,
+    })
+}
+
+fn write_manifest_galaxy_imports(
+    source: &str,
+    explicit: &[String],
+    suggested: &[String],
+) -> Result<String, String> {
+    if suggested.is_empty() {
+        return Ok(source.to_owned());
+    }
+    let merged = merge_manifest_galaxy_imports(explicit, suggested);
+    let replacement = render_manifest_galaxy_imports_block(&merged);
+    if let Some((start, end)) = find_manifest_field_span(source, "galaxy_imports") {
+        let mut updated = String::new();
+        updated.push_str(&source[..start]);
+        updated.push_str(&replacement);
+        updated.push_str(&source[end..]);
+        Ok(updated)
+    } else {
+        let mut updated = source.to_owned();
+        if !updated.ends_with('\n') {
+            updated.push('\n');
+        }
+        updated.push_str(&replacement);
+        Ok(updated)
+    }
+}
+
+fn merge_manifest_galaxy_imports(explicit: &[String], suggested: &[String]) -> Vec<String> {
+    let mut merged = Vec::new();
+    let mut seen = BTreeSet::new();
+    for item in explicit.iter().chain(suggested.iter()) {
+        if seen.insert(item.clone()) {
+            merged.push(item.clone());
+        }
+    }
+    merged
+}
+
+fn render_manifest_galaxy_imports_block(values: &[String]) -> String {
+    let mut rendered = String::from("galaxy_imports = [\n");
+    for value in values {
+        rendered.push_str("  \"");
+        rendered.push_str(value);
+        rendered.push_str("\",\n");
+    }
+    rendered.push_str("]\n");
+    rendered
+}
+
+fn find_manifest_field_span(source: &str, key: &str) -> Option<(usize, usize)> {
+    let prefix = format!("{key} = ");
+    let mut cursor = 0usize;
+    for line in source.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        let offset = line.len() - trimmed.len();
+        if let Some(rest) = trimmed.strip_prefix(&prefix) {
+            let start = cursor + offset;
+            let mut end = cursor + line.len();
+            if !rest.contains(']') {
+                let mut scan = end;
+                while scan < source.len() {
+                    let remaining = &source[scan..];
+                    let next_len = remaining
+                        .find('\n')
+                        .map(|idx| idx + 1)
+                        .unwrap_or(remaining.len());
+                    let next = &remaining[..next_len];
+                    end += next.len();
+                    if next.contains(']') {
+                        break;
+                    }
+                    scan += next_len;
+                }
+            }
+            return Some((start, end));
+        }
+        cursor += line.len();
+    }
+    None
 }
 
 fn render_project_imports_text_summary(input: &Path) -> Result<Vec<String>, String> {
@@ -3557,6 +3747,30 @@ pub(crate) fn render_project_imports_json(input: &Path) -> Result<String, String
         ),
         json_object_array_field("library_records", &records),
     ];
+    Ok(format!("{{{}}}", fields.join(",")))
+}
+
+pub(crate) fn render_project_imports_apply_json(
+    input: &Path,
+    applied: &ProjectImportsApplyResult,
+) -> Result<String, String> {
+    let base = render_project_imports_json(input)?;
+    let Some(prefix) = base.strip_suffix('}') else {
+        return Err("project imports json renderer returned malformed object".to_owned());
+    };
+    let mut fields = vec![
+        json_field("kind", "project_imports_apply"),
+        json_field("action", "apply_suggested"),
+        json_field("manifest_path", &applied.manifest_path.display().to_string()),
+        json_bool_field("manifest_updated", applied.manifest_updated),
+        json_usize_field("applied_galaxy_imports_count", applied.applied.len()),
+        json_string_array_field("applied_galaxy_imports", &applied.applied),
+        json_usize_field(
+            "total_explicit_galaxy_imports",
+            applied.total_explicit_galaxy_imports,
+        ),
+    ];
+    fields.push(prefix.trim_start_matches('{').to_owned());
     Ok(format!("{{{}}}", fields.join(",")))
 }
 
@@ -4083,7 +4297,7 @@ fn print_help() {
     println!("  project workflow:");
     println!("    nuis project-doctor [--json] [project-dir|nuis.toml]");
     println!("    nuis project-status [--json] [project-dir|nuis.toml]");
-    println!("    nuis project-imports [--json] [project-dir|nuis.toml]");
+    println!("    nuis project-imports [--json] [--apply-suggested] [project-dir|nuis.toml]");
     println!("    nuis project-lock-abi [project-dir|nuis.toml]");
     println!("  cache:");
     println!(
@@ -4243,7 +4457,9 @@ mod tests {
         project_abi_checks_json, project_compile_workflow_source_profile,
         project_domain_registry_checks_json, project_workflow_json_fields,
         recommend_project_workflow_step, render_artifact_doctor_json,
-        render_project_doctor_json, render_project_imports_json, render_project_status_json,
+        apply_suggested_project_imports,
+        render_project_doctor_json, render_project_imports_apply_json,
+        render_project_imports_json, render_project_status_json,
         render_scheduler_view_json,
         render_workflow_json, resolve_run_artifact_binary_path, resolve_runner_clock_domain, run_artifact_command_for_output_dir,
         run_language_benchmarks_for_source_file, run_language_tests_for_source_file,
@@ -4918,7 +5134,7 @@ mod cpu Main {
         let doctor = empty_galaxy_doctor(&project.root);
 
         let recommendation =
-            recommend_project_workflow_step(&plan, &[], &[], &doctor, false);
+            recommend_project_workflow_step(&plan, &[], &[], &doctor, false, false);
 
         assert_eq!(recommendation.label, "project_lock_abi");
         assert_eq!(
@@ -4953,8 +5169,14 @@ mod cpu Main {
         let doctor = empty_galaxy_doctor(&project.root);
         let missing_tests = vec![project.root.join("tests/smoke.ns")];
 
-        let recommendation =
-            recommend_project_workflow_step(&plan, &missing_tests, &missing_tests, &doctor, false);
+        let recommendation = recommend_project_workflow_step(
+            &plan,
+            &missing_tests,
+            &missing_tests,
+            &doctor,
+            false,
+            false,
+        );
 
         assert_eq!(recommendation.label, "project_status");
         assert_eq!(
@@ -5003,10 +5225,68 @@ mod cpu Main {
         let declared_tests = vec![project.root.join("tests/smoke.ns")];
 
         let recommendation =
-            recommend_project_workflow_step(&plan, &declared_tests, &[], &doctor, false);
+            recommend_project_workflow_step(&plan, &declared_tests, &[], &doctor, false, false);
 
         assert_eq!(recommendation.label, "check");
         assert_eq!(recommendation.command, "nuis check <project-dir|nuis.toml>");
+    }
+
+    #[test]
+    fn project_workflow_recommendation_prefers_project_imports_apply_for_hidden_manual_only_modules(
+    ) {
+        let project_root = write_temp_project_fixture(
+            "workflow_manual_only_imports",
+            r#"
+name = "workflow_manual_only_imports"
+entry = "main.ns"
+modules = ["main.ns"]
+tests = ["tests/smoke.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+galaxy = ["ns-nova=workspace"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        );
+        let tests_dir = project_root.join("tests");
+        fs::create_dir_all(&tests_dir).expect("create tests dir");
+        fs::write(
+            tests_dir.join("smoke.ns"),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 2;
+  }
+}
+"#,
+        )
+        .expect("write smoke test");
+        let project = nuisc::project::load_project(&project_root).expect("load project");
+        let plan =
+            nuisc::project::build_project_compilation_plan(&project).expect("build project plan");
+        let mut doctor = empty_galaxy_doctor(&project.root);
+        doctor.lock_status = "ok".to_owned();
+        let declared_tests = vec![project.root.join("tests/smoke.ns")];
+
+        let recommendation = recommend_project_workflow_step(
+            &plan,
+            &declared_tests,
+            &[],
+            &doctor,
+            false,
+            true,
+        );
+
+        assert_eq!(recommendation.label, "project_imports_apply_suggested");
+        assert_eq!(
+            recommendation.command,
+            "nuis project-imports --apply-suggested <project-dir|nuis.toml>"
+        );
     }
 
     #[test]
@@ -5315,6 +5595,7 @@ mod cpu Main {
             "\"galaxy_hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]"
         ));
         assert!(json.contains("manual-only galaxy library modules"));
+        assert!(json.contains("nuis project-imports --apply-suggested <project-dir>"));
         assert!(json.contains("galaxy_imports = [...]"));
         assert!(json.contains("ns-nova:lib/nova_contracts.ns"));
     }
@@ -5396,6 +5677,161 @@ mod cpu Main {
         assert!(json.contains("\"visible\":true"));
         assert!(json.contains("\"explicit\":true"));
         assert!(json.contains("\"source_kind\":\"galaxy-explicit-import\""));
+    }
+
+    #[test]
+    fn apply_suggested_project_imports_adds_manifest_field_when_missing() {
+        let project_root = write_temp_project_fixture(
+            "imports_apply_missing_field",
+            r#"
+name = "imports_apply_missing_field"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["ns-nova=workspace"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        );
+
+        let applied = apply_suggested_project_imports(&project_root).expect("apply imports");
+        assert_eq!(
+            applied.applied,
+            vec!["ns-nova:lib/nova_contracts.ns".to_owned()]
+        );
+        assert_eq!(applied.total_explicit_galaxy_imports, 1);
+        assert!(applied.manifest_updated);
+
+        let manifest = fs::read_to_string(project_root.join("nuis.toml")).expect("read manifest");
+        assert!(manifest.contains("galaxy_imports = ["));
+        assert!(manifest.contains("\"ns-nova:lib/nova_contracts.ns\""));
+
+        let json = render_project_imports_json(&project_root).expect("render imports json");
+        assert!(json.contains("\"explicit_galaxy_imports_count\":1"));
+        assert!(json.contains("\"suggested_galaxy_imports_count\":0"));
+    }
+
+    #[test]
+    fn apply_suggested_project_imports_preserves_existing_entries_and_appends_new_ones() {
+        let project_root = write_temp_project_fixture(
+            "imports_apply_append",
+            r#"
+name = "imports_apply_append"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["pixelmagic=workspace", "ns-nova=workspace"]
+galaxy_imports = [
+  "pixelmagic:lib/image_contracts.ns",
+]
+"#
+            .trim_start(),
+            r#"
+use cpu PixelMagicContracts;
+
+mod cpu Main {
+  fn main() -> i64 {
+    return PixelMagicContracts.blur_op_kind();
+  }
+}
+"#,
+        );
+
+        let applied = apply_suggested_project_imports(&project_root).expect("apply imports");
+        assert_eq!(
+            applied.applied,
+            vec!["ns-nova:lib/nova_contracts.ns".to_owned()]
+        );
+        assert_eq!(applied.total_explicit_galaxy_imports, 2);
+        assert!(applied.manifest_updated);
+
+        let manifest = fs::read_to_string(project_root.join("nuis.toml")).expect("read manifest");
+        assert!(manifest.contains("\"pixelmagic:lib/image_contracts.ns\""));
+        assert!(manifest.contains("\"ns-nova:lib/nova_contracts.ns\""));
+        assert!(manifest.contains("galaxy_imports = ["));
+
+        let pixelmagic_pos = manifest
+            .find("\"pixelmagic:lib/image_contracts.ns\"")
+            .expect("pixelmagic import present");
+        let ns_nova_pos = manifest
+            .find("\"ns-nova:lib/nova_contracts.ns\"")
+            .expect("ns-nova import present");
+        assert!(pixelmagic_pos < ns_nova_pos);
+    }
+
+    #[test]
+    fn project_imports_apply_json_reports_mutation_result() {
+        let project_root = write_temp_project_fixture(
+            "imports_apply_json",
+            r#"
+name = "imports_apply_json"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["ns-nova=workspace"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        );
+
+        let applied = apply_suggested_project_imports(&project_root).expect("apply imports");
+        let json = render_project_imports_apply_json(&project_root, &applied)
+            .expect("render imports apply json");
+
+        assert!(json.contains("\"kind\":\"project_imports_apply\""));
+        assert!(json.contains("\"action\":\"apply_suggested\""));
+        assert!(json.contains("\"manifest_updated\":true"));
+        assert!(json.contains("\"applied_galaxy_imports_count\":1"));
+        assert!(json.contains(
+            "\"applied_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"
+        ));
+        assert!(json.contains("\"total_explicit_galaxy_imports\":1"));
+        assert!(json.contains("\"explicit_galaxy_imports_count\":1"));
+        assert!(json.contains("\"suggested_galaxy_imports_count\":0"));
+    }
+
+    #[test]
+    fn project_imports_apply_json_reports_noop_when_manifest_already_complete() {
+        let project_root = write_temp_project_fixture(
+            "imports_apply_json_noop",
+            r#"
+name = "imports_apply_json_noop"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["ns-nova=workspace"]
+galaxy_imports = ["ns-nova:lib/nova_contracts.ns"]
+"#
+            .trim_start(),
+            r#"
+use cpu NovaContracts;
+
+mod cpu Main {
+  fn main() -> i64 {
+    return NovaContracts.runtime_score(16, 4, 3, 2, 9, 1);
+  }
+}
+"#,
+        );
+
+        let applied = apply_suggested_project_imports(&project_root).expect("apply imports");
+        assert!(!applied.manifest_updated);
+        let json = render_project_imports_apply_json(&project_root, &applied)
+            .expect("render imports apply json");
+
+        assert!(json.contains("\"manifest_updated\":false"));
+        assert!(json.contains("\"applied_galaxy_imports_count\":0"));
+        assert!(json.contains("\"applied_galaxy_imports\":[]"));
+        assert!(json.contains("\"total_explicit_galaxy_imports\":1"));
+        assert!(json.contains("\"suggested_galaxy_imports_count\":0"));
     }
 
     #[test]

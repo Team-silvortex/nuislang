@@ -947,7 +947,14 @@ fn lowers_real_pixelmagic_packet_bridge_project_with_expected_bridge_shape() {
         .find(|function| function.name == "main")
         .unwrap();
 
-    for name in ["source_packet", "lowered", "gpu_packet", "frame", "host_frame"] {
+    for name in [
+        "op_kind",
+        "image_packet_total",
+        "lowered",
+        "gpu_packet",
+        "frame",
+        "host_frame",
+    ] {
         assert!(main.body.iter().any(|stmt| {
             matches!(
                 stmt,
@@ -974,10 +981,12 @@ fn lowers_real_pixelmagic_render_project_with_expected_render_shape() {
         .unwrap();
 
     for name in [
-        "source_packet",
+        "op_kind",
+        "image_packet_total",
         "lowered",
         "gpu_packet",
         "render_result",
+        "render_ready",
         "host_frame",
     ] {
         assert!(main.body.iter().any(|stmt| {
@@ -1080,15 +1089,16 @@ fn lowers_real_pixelmagic_pipeline_project_with_expected_pipeline_shape() {
         .unwrap();
 
     for name in [
-        "source_packet",
-        "image_resource",
+        "sample_kind",
+        "output_kind",
+        "image_packet_total",
+        "shader_pipeline_total",
         "resource_set",
         "resource_state",
-        "binding",
-        "sample_intent",
         "lowered",
         "gpu_packet",
         "render_result",
+        "render_ready",
         "host_frame",
     ] {
         assert!(main.body.iter().any(|stmt| {

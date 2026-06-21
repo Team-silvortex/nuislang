@@ -1,3 +1,4 @@
+use cpu PixelMagicContracts;
 use data FabricPlane;
 use shader PixelMagicSurfaceShader;
 
@@ -6,56 +7,30 @@ mod cpu Main {
   type ShaderPacketWindow = Window<PixelMagicSurfaceShaderPacket>;
   type HostFrameWindow = Window<Frame>;
 
-  struct PixelMagicImagePacket {
+  fn lower_pixelmagic_packet(
     source_handle: i64,
     width: i64,
     height: i64,
     op_kind: i64,
     amount: i64,
     flags: i64
-  }
-
-  fn build_pixelmagic_packet(
-    source_handle: i64,
-    width: i64,
-    height: i64,
-    op_kind: i64,
-    amount: i64,
-    flags: i64
-  ) -> PixelMagicImagePacket {
-    return PixelMagicImagePacket {
-      source_handle: source_handle,
-      width: width,
-      height: height,
-      op_kind: op_kind,
-      amount: amount,
-      flags: flags
-    };
-  }
-
-  fn pixelmagic_color_base(packet: PixelMagicImagePacket) -> i64 {
-    return packet.source_handle + packet.op_kind + packet.flags;
-  }
-
-  fn pixelmagic_speed_base(packet: PixelMagicImagePacket) -> i64 {
-    return packet.width + packet.amount;
-  }
-
-  fn pixelmagic_radius_base(packet: PixelMagicImagePacket) -> i64 {
-    return packet.height + packet.flags + packet.op_kind;
-  }
-
-  fn lower_pixelmagic_packet(packet: PixelMagicImagePacket) -> PixelMagicSurfaceShaderPacket {
-    let color_seed: i64 =
-      shader_profile_color_seed("PixelMagicSurfaceShader", pixelmagic_color_base(packet), 0);
+  ) -> PixelMagicSurfaceShaderPacket {
+    let color_seed: i64 = shader_profile_color_seed(
+      "PixelMagicSurfaceShader",
+      PixelMagicContracts.shader_color_seed_base(source_handle, op_kind, flags),
+      0
+    );
     let speed_seed: i64 = shader_profile_speed_seed(
       "PixelMagicSurfaceShader",
-      packet.flags,
+      flags,
       2,
-      pixelmagic_speed_base(packet)
+      PixelMagicContracts.shader_speed_seed_base(width, amount)
     );
-    let radius_seed: i64 =
-      shader_profile_radius_seed("PixelMagicSurfaceShader", pixelmagic_radius_base(packet), 0);
+    let radius_seed: i64 = shader_profile_radius_seed(
+      "PixelMagicSurfaceShader",
+      PixelMagicContracts.shader_radius_seed_base(height, flags, op_kind),
+      0
+    );
     return shader_profile_packet("PixelMagicSurfaceShader", color_seed, speed_seed, radius_seed);
   }
 
@@ -63,9 +38,16 @@ mod cpu Main {
     cpu_bind_core(0);
     cpu_window(320, 200, "pixelmagic_packet_bridge_demo");
 
-    let source_packet: PixelMagicImagePacket =
-      build_pixelmagic_packet(3101, 160, 120, 2, 24, 1);
-    let lowered: PixelMagicSurfaceShaderPacket = lower_pixelmagic_packet(source_packet);
+    let source_handle: i64 = 3101;
+    let width: i64 = 160;
+    let height: i64 = 120;
+    let op_kind: i64 = PixelMagicContracts.invert_op_kind();
+    let amount: i64 = 24;
+    let flags: i64 = 1;
+    let image_packet_total: i64 =
+      PixelMagicContracts.filter_packet_total(source_handle, width, height, op_kind, amount);
+    let lowered: PixelMagicSurfaceShaderPacket =
+      lower_pixelmagic_packet(source_handle, width, height, op_kind, amount, flags);
 
     data_profile_bind_core("FabricPlane");
     let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
@@ -75,12 +57,17 @@ mod cpu Main {
     let host_frame: HostFrameWindow = data_profile_send_downlink("FabricPlane", frame);
 
     print(
-      source_packet.source_handle
-        + source_packet.width
-        + source_packet.height
-        + source_packet.op_kind
-        + source_packet.amount
-        + source_packet.flags
+      image_packet_total +
+        PixelMagicContracts.shader_packet_total(
+          source_handle,
+          width,
+          height,
+          op_kind,
+          0,
+          amount,
+          flags,
+          0
+        )
     );
 
     cpu_present_frame(host_frame);

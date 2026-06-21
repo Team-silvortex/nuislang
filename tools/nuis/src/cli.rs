@@ -120,6 +120,7 @@ pub enum CommandKind {
     ProjectImports {
         input: PathBuf,
         json: bool,
+        apply_suggested: bool,
     },
     ProjectLockAbi {
         input: PathBuf,
@@ -660,15 +661,18 @@ where
         }
         "project-imports" => {
             let mut json = false;
+            let mut apply_suggested = false;
             let mut input = None;
             for arg in args.by_ref() {
                 if arg == "--json" {
                     json = true;
+                } else if arg == "--apply-suggested" {
+                    apply_suggested = true;
                 } else if input.is_none() {
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuis project-imports [--json] [project-dir|nuis.toml]"
+                        "usage: nuis project-imports [--json] [--apply-suggested] [project-dir|nuis.toml]"
                             .to_owned(),
                     );
                 }
@@ -676,6 +680,7 @@ where
             Ok(CommandKind::ProjectImports {
                 input: input.unwrap_or_else(|| PathBuf::from(".")),
                 json,
+                apply_suggested,
             })
         }
         "project-lock-abi" => Ok(CommandKind::ProjectLockAbi {
@@ -856,6 +861,23 @@ mod tests {
             CommandKind::ProjectImports {
                 input: PathBuf::from("examples/demo"),
                 json: true,
+                apply_suggested: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_project_imports_apply_suggested_with_default_input() {
+        let command = parse_args(
+            ["project-imports".to_owned(), "--apply-suggested".to_owned()].into_iter(),
+        )
+        .expect("project-imports apply parses");
+        assert_eq!(
+            command,
+            CommandKind::ProjectImports {
+                input: PathBuf::from("."),
+                json: false,
+                apply_suggested: true,
             }
         );
     }

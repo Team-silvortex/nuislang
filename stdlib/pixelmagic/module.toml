@@ -12,7 +12,8 @@ surfaces = [
 ]
 
 library_modules = [
-  "lib/image_contracts.ns"
+  "lib/image_contracts.ns",
+  "lib/shader_contracts.ns"
 ]
 
 library_import_policy = "project-auto"

@@ -36,6 +36,15 @@ Current source-asset status:
 * the current first auto-injectable library module is
   [lib/image_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/image_contracts.ns)
   which exposes a small `PixelMagicContracts` helper surface for project-level `galaxy = ["pixelmagic=workspace"]` resolution
+* `PixelMagic` now also exposes an auto-injectable shader-side library module
+  through
+  [lib/shader_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/shader_contracts.ns),
+  so project galaxy resolution can surface a canonical `PixelMagicSurfaceContracts`
+  shader profile alongside the CPU helper layer
+* that helper surface now covers both image-op packet shaping and the first
+  shader-facing packet / consumer / pipeline scoring helpers, so projects can
+  depend on one stable auto-injected entry point while deeper recipe modules
+  continue to evolve
 * the current first canonical source assets are
   [core/image_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_packet_recipe.ns)
   and

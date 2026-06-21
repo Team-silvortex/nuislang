@@ -41,7 +41,10 @@ mod cpu Main {
     assert_eq!(pixelmagic.library_import_policy.as_str(), "project-auto");
     assert_eq!(
         pixelmagic.library_modules,
-        vec!["lib/image_contracts.ns".to_owned()]
+        vec![
+            "lib/image_contracts.ns".to_owned(),
+            "lib/shader_contracts.ns".to_owned()
+        ]
     );
 
     let std = project
@@ -95,7 +98,7 @@ mod cpu Main {
         fs::read_to_string(root.join("build").join("nuis.project.organization.txt")).unwrap();
 
     assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true"));
-    assert!(galaxy_index.contains("library_modules=lib/image_contracts.ns"));
+    assert!(galaxy_index.contains("library_modules=lib/image_contracts.ns, lib/shader_contracts.ns"));
     assert!(galaxy_index.contains("core\tpackage=nuis.core\tdirect=false"));
     assert!(galaxy_index.contains("library_modules=lib/prelude_contracts.ns"));
     assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true\trequested_by=pixelmagic\tsource_modules=14\tauto_injectable=true"));
@@ -110,6 +113,9 @@ mod cpu Main {
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/shader_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
         "library\tcore\tlib/prelude_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
@@ -121,9 +127,15 @@ mod cpu Main {
     assert!(imports_index.contains(
         "visible\tcpu\tPixelMagicContracts\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/image_contracts.ns"
     ));
+    assert!(imports_index.contains(
+        "visible\tshader\tPixelMagicSurfaceContracts\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/shader_contracts.ns"
+    ));
     assert!(imports_index.contains("import_policy=project-auto"));
     assert!(modules_index.contains(
         "stdlib/pixelmagic/lib/image_contracts.ns\tmod cpu PixelMagicContracts\tentry=false\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/image_contracts.ns"
+    ));
+    assert!(modules_index.contains(
+        "stdlib/pixelmagic/lib/shader_contracts.ns\tmod shader PixelMagicSurfaceContracts\tentry=false\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/shader_contracts.ns"
     ));
     assert!(organization_index.contains(
         "cpu\tCorePrelude\tentry=false\tsource_kind=galaxy-auto-inject\tgalaxy=core\tpackage=nuis.core\tlibrary_module=lib/prelude_contracts.ns"
@@ -166,6 +178,10 @@ mod cpu Main {
     assert!(project
         .modules
         .iter()
+        .any(|module| module.ast.domain == "shader" && module.ast.unit == "PixelMagicSurfaceContracts"));
+    assert!(project
+        .modules
+        .iter()
         .any(|module| module.ast.unit == "CorePrelude"));
     assert!(project
         .modules
@@ -188,6 +204,46 @@ mod cpu Main {
         .functions
         .iter()
         .any(|function| function.name == "PixelMagicContracts.grayscale_packet_total"));
+}
+
+#[test]
+fn injects_pixelmagic_shader_library_module_into_project_scope() {
+    let root = write_temp_project_fixture(
+        "galaxy_shader_library_injection",
+        r#"
+name = "galaxy-shader-library-injection"
+entry = "main.ns"
+galaxy = ["pixelmagic=workspace"]
+"#,
+        r#"
+use shader PixelMagicSurfaceContracts;
+
+mod cpu Main {
+  fn main() -> i64 {
+    return shader_profile_vertex_count("PixelMagicSurfaceContracts")
+      + shader_profile_instance_count("PixelMagicSurfaceContracts")
+      + shader_profile_packet_tag("PixelMagicSurfaceContracts")
+      + shader_profile_material_mode("PixelMagicSurfaceContracts")
+      + shader_profile_pass_kind("PixelMagicSurfaceContracts");
+  }
+}
+"#,
+        vec![],
+    );
+
+    let project = load_project(root.as_path()).unwrap();
+    assert!(project
+        .modules
+        .iter()
+        .any(|module| module.ast.domain == "shader" && module.ast.unit == "PixelMagicSurfaceContracts"));
+
+    let imports_index = render_project_import_index(&project);
+    assert!(imports_index.contains(
+        "use\tcpu.Main\tshader.PixelMagicSurfaceContracts\tresolution=local-visible:galaxy-auto-inject:galaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/shader_contracts.ns"
+    ));
+
+    let artifacts = crate::pipeline::compile_project(root.as_path()).unwrap();
+    assert_eq!(artifacts.nir.unit, "Main");
 }
 
 #[test]
@@ -233,6 +289,84 @@ mod cpu Main {
         .functions
         .iter()
         .any(|function| function.name == "PixelMagicContracts.grayscale_packet_total"));
+}
+
+#[test]
+fn injects_pixelmagic_shader_facing_contract_helpers_into_project_scope() {
+    let root = write_temp_project_fixture(
+        "galaxy_pixelmagic_shader_helpers",
+        r#"
+name = "galaxy-pixelmagic-shader-helpers"
+entry = "main.ns"
+galaxy = ["pixelmagic=workspace"]
+"#,
+        r#"
+use cpu PixelMagicContracts;
+
+mod cpu Main {
+  fn main() -> i64 {
+    let residency: i64 = PixelMagicContracts.resource_residency_total(6101, 1, 1, 2, 0);
+    let color_base: i64 = PixelMagicContracts.shader_color_seed_base(
+      6101,
+      PixelMagicContracts.blur_op_kind(),
+      1
+    );
+    let speed_base: i64 = PixelMagicContracts.shader_speed_seed_base(320, 4);
+    let radius_base: i64 = PixelMagicContracts.shader_radius_seed_base(200, 0, 0);
+    return residency + color_base + speed_base + radius_base +
+      PixelMagicContracts.shader_pipeline_total(
+        6101,
+        320,
+        200,
+        PixelMagicContracts.blur_op_kind(),
+        1,
+        4,
+        0,
+        0,
+        PixelMagicContracts.sample_output_kind_color()
+      );
+  }
+}
+"#,
+        vec![],
+    );
+
+    let artifacts = crate::pipeline::compile_project(root.as_path()).unwrap();
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.resource_residency_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.shader_color_seed_base"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.shader_speed_seed_base"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.shader_radius_seed_base"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.shader_packet_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.shader_consumer_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.shader_pipeline_total"));
 }
 
 #[test]
@@ -644,7 +778,13 @@ mod cpu Main {
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/shader_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
         "visible\tcpu\tPixelMagicContracts\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/image_contracts.ns\timport_policy=project-auto"
+    ));
+    assert!(imports_index.contains(
+        "visible\tshader\tPixelMagicSurfaceContracts\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/shader_contracts.ns\timport_policy=project-auto"
     ));
     assert!(!imports_index.contains("source_kind=galaxy-explicit-import\tgalaxy=pixelmagic"));
 }

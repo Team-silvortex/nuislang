@@ -95,37 +95,19 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
     };
     let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
     let galaxy_doctor = crate::galaxy::doctor_project(&project.root)?;
+    let hidden_manual_only_library_modules =
+        crate::hidden_manual_only_library_modules_for_project(&project);
     let frontdoor = crate::project_frontdoor_surface(
         &plan,
         &declared_tests,
         &missing_tests,
         &galaxy_doctor,
         galaxy_check_invalid,
+        !hidden_manual_only_library_modules.is_empty(),
     );
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
-    let explicit_galaxy_imports = project
-        .manifest
-        .galaxy_imports
-        .iter()
-        .map(|item| format!("{}:{}", item.galaxy, item.library_module))
-        .collect::<std::collections::BTreeSet<_>>();
-    let hidden_manual_only_library_modules = project
-        .resolved_galaxies
-        .iter()
-        .filter(|dependency| dependency.library_import_policy.as_str() == "manual-only")
-        .flat_map(|dependency| {
-            dependency.library_modules.iter().filter_map(|library_module| {
-                let key = format!("{}:{}", dependency.name, library_module);
-                if explicit_galaxy_imports.contains(&key) {
-                    None
-                } else {
-                    Some(key)
-                }
-            })
-        })
-        .collect::<Vec<_>>();
     let mut lines = vec![
         format!("project status: {}", project.manifest.name),
         format!("  root: {}", project.root.display()),
@@ -339,37 +321,19 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
     let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
     let lowering_checks =
         nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
+    let hidden_manual_only_library_modules =
+        crate::hidden_manual_only_library_modules_for_project(&project);
     let frontdoor = crate::project_frontdoor_surface(
         &plan,
         &declared_tests,
         &missing_tests,
         &galaxy_doctor,
         galaxy_check_invalid,
+        !hidden_manual_only_library_modules.is_empty(),
     );
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
-    let explicit_galaxy_imports = project
-        .manifest
-        .galaxy_imports
-        .iter()
-        .map(|item| format!("{}:{}", item.galaxy, item.library_module))
-        .collect::<std::collections::BTreeSet<_>>();
-    let hidden_manual_only_library_modules = project
-        .resolved_galaxies
-        .iter()
-        .filter(|dependency| dependency.library_import_policy.as_str() == "manual-only")
-        .flat_map(|dependency| {
-            dependency.library_modules.iter().filter_map(|library_module| {
-                let key = format!("{}:{}", dependency.name, library_module);
-                if explicit_galaxy_imports.contains(&key) {
-                    None
-                } else {
-                    Some(key)
-                }
-            })
-        })
-        .collect::<Vec<_>>();
     let mut lines = vec![
         format!("project doctor: {}", project.manifest.name),
         format!("  root: {}", project.root.display()),
@@ -592,7 +556,7 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
     }
     if !hidden_manual_only_library_modules.is_empty() {
         next_steps.push(format!(
-            "this project still has manual-only galaxy library modules that are not visible by default; add them to `galaxy_imports = [...]` if you want them in project scope: {}",
+            "this project still has manual-only galaxy library modules that are not visible by default; run `nuis project-imports --apply-suggested <project-dir>` to write the recommended `galaxy_imports`, or edit `galaxy_imports = [...]` yourself if you want them in project scope: {}",
             hidden_manual_only_library_modules.join(", ")
         ));
     }
@@ -655,12 +619,15 @@ pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String>
         };
         let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
         let galaxy_doctor = crate::galaxy::doctor_project(&project.root)?;
+        let hidden_manual_only_library_modules =
+            crate::hidden_manual_only_library_modules_for_project(&project);
         let frontdoor = crate::project_frontdoor_surface(
             &plan,
             &declared_tests,
             &missing_tests,
             &galaxy_doctor,
             galaxy_check_invalid,
+            !hidden_manual_only_library_modules.is_empty(),
         );
         let mut domains = Vec::new();
         for item in &plan.abi_resolution.requirements {
@@ -763,37 +730,19 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
     };
     let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
     let galaxy_doctor = crate::galaxy::doctor_project(&project.root)?;
+    let hidden_manual_only_library_modules =
+        crate::hidden_manual_only_library_modules_for_project(&project);
     let frontdoor = crate::project_frontdoor_surface(
         &plan,
         &declared_tests,
         &missing_tests,
         &galaxy_doctor,
         galaxy_check_invalid,
+        !hidden_manual_only_library_modules.is_empty(),
     );
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
-    let explicit_galaxy_imports = project
-        .manifest
-        .galaxy_imports
-        .iter()
-        .map(|item| format!("{}:{}", item.galaxy, item.library_module))
-        .collect::<std::collections::BTreeSet<_>>();
-    let hidden_manual_only_library_modules = project
-        .resolved_galaxies
-        .iter()
-        .filter(|dependency| dependency.library_import_policy.as_str() == "manual-only")
-        .flat_map(|dependency| {
-            dependency.library_modules.iter().filter_map(|library_module| {
-                let key = format!("{}:{}", dependency.name, library_module);
-                if explicit_galaxy_imports.contains(&key) {
-                    None
-                } else {
-                    Some(key)
-                }
-            })
-        })
-        .collect::<Vec<_>>();
     let test_json = declared_tests
         .iter()
         .map(|path| {
@@ -948,37 +897,19 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
     let lowering_checks =
         nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
+    let hidden_manual_only_library_modules =
+        crate::hidden_manual_only_library_modules_for_project(&project);
     let frontdoor = crate::project_frontdoor_surface(
         &plan,
         &declared_tests,
         &missing_tests,
         &galaxy_doctor,
         galaxy_check_invalid,
+        !hidden_manual_only_library_modules.is_empty(),
     );
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
-    let explicit_galaxy_imports = project
-        .manifest
-        .galaxy_imports
-        .iter()
-        .map(|item| format!("{}:{}", item.galaxy, item.library_module))
-        .collect::<std::collections::BTreeSet<_>>();
-    let hidden_manual_only_library_modules = project
-        .resolved_galaxies
-        .iter()
-        .filter(|dependency| dependency.library_import_policy.as_str() == "manual-only")
-        .flat_map(|dependency| {
-            dependency.library_modules.iter().filter_map(|library_module| {
-                let key = format!("{}:{}", dependency.name, library_module);
-                if explicit_galaxy_imports.contains(&key) {
-                    None
-                } else {
-                    Some(key)
-                }
-            })
-        })
-        .collect::<Vec<_>>();
     let mut next_steps = Vec::new();
     if !galaxy_manifest_exists {
         next_steps.push(
@@ -1079,7 +1010,7 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     }
     if !hidden_manual_only_library_modules.is_empty() {
         next_steps.push(format!(
-            "this project still has manual-only galaxy library modules that are not visible by default; add them to `galaxy_imports = [...]` if you want them in project scope: {}",
+            "this project still has manual-only galaxy library modules that are not visible by default; run `nuis project-imports --apply-suggested <project-dir>` to write the recommended `galaxy_imports`, or edit `galaxy_imports = [...]` yourself if you want them in project scope: {}",
             hidden_manual_only_library_modules.join(", ")
         ));
     }

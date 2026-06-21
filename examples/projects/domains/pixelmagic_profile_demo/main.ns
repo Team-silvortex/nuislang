@@ -1,83 +1,59 @@
-use shader PixelMagicSurfaceShader;
+use cpu PixelMagicContracts;
+use shader PixelMagicSurfaceContracts;
 
 mod cpu Main {
-  struct PixelMagicPacket {
-    source_handle: i64,
-    width: i64,
-    height: i64,
-    op_kind: i64,
-    amount: i64,
-    flags: i64
-  }
-
-  fn build_pixelmagic_packet(
-    source_handle: i64,
-    width: i64,
-    height: i64,
-    op_kind: i64,
-    amount: i64,
-    flags: i64
-  ) -> PixelMagicPacket {
-    return PixelMagicPacket {
-      source_handle: source_handle,
-      width: width,
-      height: height,
-      op_kind: op_kind,
-      amount: amount,
-      flags: flags
-    };
-  }
-
-  fn pixelmagic_color_base(packet: PixelMagicPacket) -> i64 {
-    return packet.source_handle + packet.op_kind + packet.flags;
-  }
-
-  fn pixelmagic_speed_base(packet: PixelMagicPacket) -> i64 {
-    return packet.width + packet.amount;
-  }
-
-  fn pixelmagic_radius_base(packet: PixelMagicPacket) -> i64 {
-    return packet.height + packet.flags + packet.op_kind;
-  }
-
-  fn lower_pixelmagic_packet(packet: PixelMagicPacket) -> PixelMagicSurfaceShaderPacket {
-    let color_seed: i64 =
-      shader_profile_color_seed("PixelMagicSurfaceShader", pixelmagic_color_base(packet), 0);
-    let speed_seed: i64 = shader_profile_speed_seed(
-      "PixelMagicSurfaceShader",
-      packet.flags,
-      2,
-      pixelmagic_speed_base(packet)
-    );
-    let radius_seed: i64 =
-      shader_profile_radius_seed("PixelMagicSurfaceShader", pixelmagic_radius_base(packet), 0);
-    return shader_profile_packet("PixelMagicSurfaceShader", color_seed, speed_seed, radius_seed);
-  }
-
   fn summarize_pixelmagic_profile_demo() -> i64 {
-    let vertex_budget: i64 = shader_profile_vertex_count("PixelMagicSurfaceShader");
-    let instance_budget: i64 = shader_profile_instance_count("PixelMagicSurfaceShader");
-    let packet_tag: i64 = shader_profile_packet_tag("PixelMagicSurfaceShader");
-    let material_mode: i64 = shader_profile_material_mode("PixelMagicSurfaceShader");
-    let pass_kind: i64 = shader_profile_pass_kind("PixelMagicSurfaceShader");
+    let source_handle: i64 = 3101;
+    let width: i64 = 160;
+    let height: i64 = 120;
+    let sample_kind: i64 = PixelMagicContracts.blur_op_kind();
+    let channel_pick: i64 = 1;
+    let sample_count: i64 = 4;
+    let edge_policy: i64 = 0;
+    let uv_mode: i64 = 0;
+    let output_kind: i64 = PixelMagicContracts.sample_output_kind_color();
+
+    let vertex_budget: i64 = shader_profile_vertex_count("PixelMagicSurfaceContracts");
+    let instance_budget: i64 = shader_profile_instance_count("PixelMagicSurfaceContracts");
+    let packet_tag: i64 = shader_profile_packet_tag("PixelMagicSurfaceContracts");
+    let material_mode: i64 = shader_profile_material_mode("PixelMagicSurfaceContracts");
+    let pass_kind: i64 = shader_profile_pass_kind("PixelMagicSurfaceContracts");
     let packet_field_count: i64 =
-      shader_profile_packet_field_count("PixelMagicSurfaceShader");
-    let color_slot: i64 = shader_profile_packet_color_slot("PixelMagicSurfaceShader");
-    let speed_slot: i64 = shader_profile_packet_speed_slot("PixelMagicSurfaceShader");
-    let radius_slot: i64 = shader_profile_packet_radius_slot("PixelMagicSurfaceShader");
-    let target: Target = shader_profile_target("PixelMagicSurfaceShader");
-    let view: Viewport = shader_profile_viewport("PixelMagicSurfaceShader");
-    let pipe: Pipeline = shader_profile_pipeline("PixelMagicSurfaceShader");
+      shader_profile_packet_field_count("PixelMagicSurfaceContracts");
+    let color_slot: i64 = shader_profile_packet_color_slot("PixelMagicSurfaceContracts");
+    let speed_slot: i64 = shader_profile_packet_speed_slot("PixelMagicSurfaceContracts");
+    let radius_slot: i64 = shader_profile_packet_radius_slot("PixelMagicSurfaceContracts");
+    let target: Target = shader_profile_target("PixelMagicSurfaceContracts");
+    let view: Viewport = shader_profile_viewport("PixelMagicSurfaceContracts");
+    let pipe: Pipeline = shader_profile_pipeline("PixelMagicSurfaceContracts");
 
-    let packet: PixelMagicPacket = build_pixelmagic_packet(3101, 160, 120, 2, 24, 1);
-    let lowered: PixelMagicSurfaceShaderPacket = lower_pixelmagic_packet(packet);
+    let color_seed: i64 = source_handle + sample_kind + channel_pick;
+    let speed_seed: i64 = width + sample_count;
+    let radius_seed: i64 = height + edge_policy + uv_mode;
+    let lowered: PixelMagicSurfaceContractsPacket =
+      shader_profile_packet("PixelMagicSurfaceContracts", color_seed, speed_seed, radius_seed);
 
-    return packet.source_handle
-      + packet.width
-      + packet.height
-      + packet.op_kind
-      + packet.amount
-      + packet.flags
+    return PixelMagicContracts.shader_packet_total(
+      source_handle,
+      width,
+      height,
+      sample_kind,
+      channel_pick,
+      sample_count,
+      edge_policy,
+      uv_mode
+    )
+      + PixelMagicContracts.shader_pipeline_total(
+        source_handle,
+        width,
+        height,
+        sample_kind,
+        channel_pick,
+        sample_count,
+        edge_policy,
+        uv_mode,
+        output_kind
+      )
       + vertex_budget
       + instance_budget
       + packet_tag
