@@ -41,6 +41,14 @@ Current source-asset status:
   [lib/shader_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/shader_contracts.ns),
   so project galaxy resolution can surface a canonical `PixelMagicSurfaceContracts`
   shader profile alongside the CPU helper layer
+* `PixelMagic` now also ships checked-in official shader demo surfaces through
+  [lib/packet_bridge_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/packet_bridge_surface.ns),
+  [lib/render_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/render_surface.ns),
+  [lib/texture_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/texture_surface.ns),
+  and
+  [lib/pipeline_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/pipeline_surface.ns),
+  so the domain demos can consume stdlib-owned shader profiles instead of
+  carrying project-local `surface_shader.ns` copies
 * that helper surface now covers both image-op packet shaping and the first
   shader-facing packet / consumer / pipeline scoring helpers, so projects can
   depend on one stable auto-injected entry point while deeper recipe modules
@@ -88,6 +96,17 @@ Current first responsibility:
 * establish the next checked-in filter family for brightness / contrast / blur style work
 * establish one explicit shared image-op contract that all checked-in filter recipes can align to
 * provide a stable checked-in bridge from host-preprocessed image description to shader-facing resource metadata
+
+Current official surface registry:
+
+* `contract.pixelmagic.image-resource-shaping.v1`
+* `contract.pixelmagic.texture-handoff.v1`
+* `contract.pixelmagic.shader-facing-image-prep.v1`
+* `surface.pixelmagic.shader.contracts.v1`
+* `surface.pixelmagic.shader.packet-bridge.v1`
+* `surface.pixelmagic.shader.render.v1`
+* `surface.pixelmagic.shader.texture.v1`
+* `surface.pixelmagic.shader.pipeline.v1`
 
 See also:
 

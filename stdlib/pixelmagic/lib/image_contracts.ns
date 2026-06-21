@@ -167,4 +167,48 @@ mod cpu PixelMagicContracts {
       shader_present_mode_frame()
     );
   }
+
+  pub fn surface_contract_profile_total() -> i64 {
+    let target: Target = shader_profile_target("PixelMagicSurfaceContracts");
+    let view: Viewport = shader_profile_viewport("PixelMagicSurfaceContracts");
+    let pipe: Pipeline = shader_profile_pipeline("PixelMagicSurfaceContracts");
+    return shader_profile_vertex_count("PixelMagicSurfaceContracts")
+      + shader_profile_instance_count("PixelMagicSurfaceContracts")
+      + shader_profile_packet_tag("PixelMagicSurfaceContracts")
+      + shader_profile_material_mode("PixelMagicSurfaceContracts")
+      + shader_profile_pass_kind("PixelMagicSurfaceContracts")
+      + shader_profile_packet_field_count("PixelMagicSurfaceContracts")
+      + shader_profile_packet_color_slot("PixelMagicSurfaceContracts")
+      + shader_profile_packet_speed_slot("PixelMagicSurfaceContracts")
+      + shader_profile_packet_radius_slot("PixelMagicSurfaceContracts");
+  }
+
+  pub fn surface_contract_packet(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    sample_kind: i64,
+    channel_pick: i64,
+    sample_count: i64,
+    edge_policy: i64,
+    uv_mode: i64
+  ) -> PixelMagicSurfaceContractsPacket {
+    let color_seed: i64 = shader_profile_color_seed(
+      "PixelMagicSurfaceContracts",
+      shader_color_seed_base(source_handle, sample_kind, channel_pick),
+      0
+    );
+    let speed_seed: i64 = shader_profile_speed_seed(
+      "PixelMagicSurfaceContracts",
+      sample_count,
+      1,
+      shader_speed_seed_base(width, 0)
+    );
+    let radius_seed: i64 = shader_profile_radius_seed(
+      "PixelMagicSurfaceContracts",
+      shader_radius_seed_base(height, edge_policy, uv_mode),
+      0
+    );
+    return shader_profile_packet("PixelMagicSurfaceContracts", color_seed, speed_seed, radius_seed);
+  }
 }

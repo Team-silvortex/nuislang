@@ -7,7 +7,7 @@ use std::{
     collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
-    process::{Child, Command, ExitStatus},
+    process::{Child, Command, ExitStatus, Stdio},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -81,7 +81,18 @@ fn run() -> Result<(), String> {
         cli::CommandKind::VerifyArtifact { input, json } => {
             nuisc::run(nuisc::CommandKind::VerifyArtifact { input, json })?;
         }
+        cli::CommandKind::UnpackArtifactSupport {
+            input,
+            output_dir,
+            json,
+        } => handle_unpack_artifact_support(input, output_dir, json)?,
+        cli::CommandKind::MaterializeArtifact {
+            input,
+            output_dir,
+            json,
+        } => handle_materialize_artifact(input, output_dir, json)?,
         cli::CommandKind::ArtifactDoctor { input, json } => handle_artifact_doctor(input, json)?,
+        cli::CommandKind::BuildReport { input, json } => handle_build_report(input, json)?,
         cli::CommandKind::VerifyBuildManifest { manifest } => {
             nuisc::run(nuisc::CommandKind::VerifyBuildManifest {
                 manifest,
@@ -146,7 +157,7 @@ fn run() -> Result<(), String> {
             cpu_abi,
             target,
         } => handle_build(input, output_dir, verbose_cache, cpu_abi, target)?,
-        cli::CommandKind::RunArtifact { input } => handle_run_artifact(input)?,
+        cli::CommandKind::RunArtifact { input, json } => handle_run_artifact(input, json)?,
         cli::CommandKind::DumpAst { input } => handle_dump_ast(input)?,
         cli::CommandKind::DumpNir { input } => handle_dump_nir(input)?,
         cli::CommandKind::DumpYir { input } => handle_dump_yir(input)?,
@@ -183,10 +194,14 @@ fn handle_release_check(
         let registry_checks = nuisc::registry::validate_project_domain_registry(&plan);
         let lowering_checks =
             nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
-        println!("release-check: abi");
+        if success_logs_enabled() {
+            println!("release-check: abi");
+        }
         for check in &abi_checks {
-            for line in nuisc::project::render_project_abi_selection_check_lines(check) {
-                println!("  {}", line);
+            if success_logs_enabled() {
+                for line in nuisc::project::render_project_abi_selection_check_lines(check) {
+                    println!("  {}", line);
+                }
             }
         }
         if abi_checks.iter().any(|check| !check.ok) {
@@ -195,10 +210,14 @@ fn handle_release_check(
                     .to_owned(),
             );
         }
-        println!("release-check: registry");
+        if success_logs_enabled() {
+            println!("release-check: registry");
+        }
         for check in &registry_checks {
-            for line in nuisc::registry::render_project_domain_registry_check_lines(check) {
-                println!("  {}", line);
+            if success_logs_enabled() {
+                for line in nuisc::registry::render_project_domain_registry_check_lines(check) {
+                    println!("  {}", line);
+                }
             }
         }
         if registry_checks.iter().any(|check| !check.ok) {
@@ -207,10 +226,14 @@ fn handle_release_check(
                     .to_owned(),
             );
         }
-        println!("release-check: lowering");
+        if success_logs_enabled() {
+            println!("release-check: lowering");
+        }
         for check in &lowering_checks {
-            for line in nuisc::project::render_project_lowering_selection_lines(check) {
-                println!("  {}", line);
+            if success_logs_enabled() {
+                for line in nuisc::project::render_project_lowering_selection_lines(check) {
+                    println!("  {}", line);
+                }
             }
         }
         if lowering_checks.iter().any(|check| !check.ok) {
@@ -220,11 +243,15 @@ fn handle_release_check(
             );
         }
     }
-    println!("release-check: check");
+    if success_logs_enabled() {
+        println!("release-check: check");
+    }
     nuisc::run(nuisc::CommandKind::Check {
         input: input.clone(),
     })?;
-    println!("release-check: build");
+    if success_logs_enabled() {
+        println!("release-check: build");
+    }
     nuisc::run(nuisc::CommandKind::Compile {
         input: input.clone(),
         output_dir: output_dir.clone(),
@@ -232,15 +259,29 @@ fn handle_release_check(
         cpu_abi,
         target,
     })?;
-    println!("release-check: verify-build-manifest");
+    if success_logs_enabled() {
+        println!("release-check: verify-build-manifest");
+    }
     let manifest = output_dir.join("nuis.build.manifest.toml");
     nuisc::run(nuisc::CommandKind::VerifyBuildManifest {
         manifest: manifest.clone(),
         json: false,
     })?;
-    println!("release-check: ok");
-    println!("  output_dir: {}", output_dir.display());
-    println!("  manifest: {}", manifest.display());
+    if success_logs_enabled() {
+        println!("release-check: artifact-doctor");
+    }
+    let artifact_report = probe_artifact_doctor(&output_dir);
+    if !artifact_report.ready_to_run {
+        return Err(format!(
+            "release-check aborted because built outputs are not ready to run yet; next step: {} ({})",
+            artifact_report.recommended_next_step, artifact_report.recommended_command
+        ));
+    }
+    if success_logs_enabled() {
+        println!("release-check: ok");
+        println!("  output_dir: {}", output_dir.display());
+        println!("  manifest: {}", manifest.display());
+    }
     Ok(())
 }
 
@@ -259,7 +300,9 @@ fn handle_test(
 ) -> Result<(), String> {
     if nuisc::project::is_project_input(&input) {
         let project = nuisc::project::load_project(&input)?;
-        println!("test: checking project {}", project.manifest.name);
+        if success_logs_enabled() {
+            println!("test: checking project {}", project.manifest.name);
+        }
         handle_check(input.clone())?;
         let mut paths = project
             .modules
@@ -267,10 +310,14 @@ fn handle_test(
             .map(|module| module.path.clone())
             .collect::<BTreeSet<_>>();
         let mut collected = 0usize;
-        if project.manifest.tests.is_empty() {
-            println!("  no explicit tests declared");
-        } else {
-            println!("  declared tests: {}", project.manifest.tests.len());
+        if success_logs_enabled() {
+            if project.manifest.tests.is_empty() {
+                println!("  no explicit tests declared");
+            } else {
+                println!("  declared tests: {}", project.manifest.tests.len());
+            }
+        }
+        if !project.manifest.tests.is_empty() {
             for relative in &project.manifest.tests {
                 paths.insert(project.root.join(relative));
             }
@@ -292,28 +339,38 @@ fn handle_test(
             failed += report.failed;
             skipped += report.skipped;
         }
-        println!("  collected language tests: {}", collected);
+        if success_logs_enabled() {
+            println!("  collected language tests: {}", collected);
+        }
         if list {
-            println!("  listed language tests: {}", collected);
+            if success_logs_enabled() {
+                println!("  listed language tests: {}", collected);
+            }
             return Ok(());
         }
-        println!("  executed language tests: {}", passed + failed + skipped);
-        println!("  passed: {}", passed);
-        println!("  failed: {}", failed);
-        println!("  skipped: {}", skipped);
+        if success_logs_enabled() {
+            println!("  executed language tests: {}", passed + failed + skipped);
+            println!("  passed: {}", passed);
+            println!("  failed: {}", failed);
+            println!("  skipped: {}", skipped);
+        }
         if failed > 0 {
             return Err(format!(
                 "project test run failed: {failed} language test(s) failed"
             ));
         }
-        if collected == 0 {
-            println!("  result: project check passed");
-        } else {
-            println!("  result: all discovered language tests passed");
+        if success_logs_enabled() {
+            if collected == 0 {
+                println!("  result: project check passed");
+            } else {
+                println!("  result: all discovered language tests passed");
+            }
         }
         Ok(())
     } else {
-        println!("test: {}", input.display());
+        if success_logs_enabled() {
+            println!("test: {}", input.display());
+        }
         let report = run_language_tests_for_source_file(
             &input,
             filter.as_deref(),
@@ -326,7 +383,9 @@ fn handle_test(
             handle_check(input.clone())?;
         }
         if list {
-            println!("  listed language tests: {}", report.collected);
+            if success_logs_enabled() {
+                println!("  listed language tests: {}", report.collected);
+            }
             return Ok(());
         }
         if report.failed > 0 {
@@ -335,7 +394,9 @@ fn handle_test(
                 report.failed
             ));
         }
-        println!("  result: passed");
+        if success_logs_enabled() {
+            println!("  result: passed");
+        }
         Ok(())
     }
 }
@@ -366,7 +427,9 @@ fn handle_bench(
     }
     if nuisc::project::is_project_input(&input) {
         let project = nuisc::project::load_project(&input)?;
-        println!("bench: checking project {}", project.manifest.name);
+        if success_logs_enabled() {
+            println!("bench: checking project {}", project.manifest.name);
+        }
         handle_check(input.clone())?;
         let paths = project
             .modules
@@ -389,24 +452,32 @@ fn handle_bench(
             failed += report.failed;
             timed_out += report.timed_out;
         }
-        println!("  collected language benchmarks: {}", collected);
+        if success_logs_enabled() {
+            println!("  collected language benchmarks: {}", collected);
+        }
         if list {
-            println!("  listed language benchmarks: {}", collected);
+            if success_logs_enabled() {
+                println!("  listed language benchmarks: {}", collected);
+            }
             return Ok(());
         }
-        println!("  executed language benchmarks: {}", completed + failed + timed_out);
-        println!("  completed: {}", completed);
-        println!("  failed: {}", failed);
-        println!("  timed_out: {}", timed_out);
+        if success_logs_enabled() {
+            println!("  executed language benchmarks: {}", completed + failed + timed_out);
+            println!("  completed: {}", completed);
+            println!("  failed: {}", failed);
+            println!("  timed_out: {}", timed_out);
+        }
         if failed > 0 || timed_out > 0 {
             return Err(format!(
                 "project benchmark run failed: {failed} failed, {timed_out} timed out"
             ));
         }
-        if collected == 0 {
-            println!("  result: project check passed");
-        } else {
-            println!("  result: all discovered language benchmarks completed");
+        if success_logs_enabled() {
+            if collected == 0 {
+                println!("  result: project check passed");
+            } else {
+                println!("  result: all discovered language benchmarks completed");
+            }
         }
         Ok(())
     } else {
@@ -642,6 +713,7 @@ fn run_language_tests_for_source_file(
     include_ignored: bool,
     exact: bool,
 ) -> Result<LanguageTestRunReport, String> {
+    let verbose = success_logs_enabled();
     let source = std::fs::read_to_string(path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
     let ast = nuisc::frontend::parse_nuis_ast(&source)?;
@@ -663,46 +735,48 @@ fn run_language_tests_for_source_file(
             test_matches_ignored_mode(function.test_ignored, ignored_only, include_ignored)
         })
         .collect::<Vec<_>>();
-    if !matched.is_empty() {
+    if verbose && !matched.is_empty() {
         println!("  source: {}", path.display());
     }
-    println!("  collected language tests: {}", matched.len());
-    for function in &tests {
-        if !test_matches_filter(
-            function.name.as_str(),
-            function.test_name.as_deref(),
-            filter,
-            exact,
-        ) {
-            continue;
+    if verbose {
+        println!("  collected language tests: {}", matched.len());
+        for function in &tests {
+            if !test_matches_filter(
+                function.name.as_str(),
+                function.test_name.as_deref(),
+                filter,
+                exact,
+            ) {
+                continue;
+            }
+            if !test_matches_ignored_mode(function.test_ignored, ignored_only, include_ignored) {
+                continue;
+            }
+            let mut line = format!(
+                "  test_fn: {} ({})",
+                function.name,
+                function.test_name.as_deref().unwrap_or(&function.name)
+            );
+            if function.test_ignored {
+                line.push_str(" [ignored]");
+            }
+            if function.test_should_fail {
+                line.push_str(" [should_fail]");
+            }
+            if let Some(reason) = &function.test_reason {
+                line.push_str(&format!(" [reason: {}]", reason));
+            }
+            if let Some(timeout_ms) = function.test_timeout_ms {
+                line.push_str(&format!(" [timeout_ms: {}]", timeout_ms));
+            }
+            if let Some(clock_domain) = &function.test_clock_domain {
+                line.push_str(&format!(" [clock_domain: {}]", clock_domain.as_str()));
+            }
+            if let Some(clock_policy) = &function.test_clock_policy {
+                line.push_str(&format!(" [clock_policy: {}]", clock_policy.as_str()));
+            }
+            println!("{line}");
         }
-        if !test_matches_ignored_mode(function.test_ignored, ignored_only, include_ignored) {
-            continue;
-        }
-        let mut line = format!(
-            "  test_fn: {} ({})",
-            function.name,
-            function.test_name.as_deref().unwrap_or(&function.name)
-        );
-        if function.test_ignored {
-            line.push_str(" [ignored]");
-        }
-        if function.test_should_fail {
-            line.push_str(" [should_fail]");
-        }
-        if let Some(reason) = &function.test_reason {
-            line.push_str(&format!(" [reason: {}]", reason));
-        }
-        if let Some(timeout_ms) = function.test_timeout_ms {
-            line.push_str(&format!(" [timeout_ms: {}]", timeout_ms));
-        }
-        if let Some(clock_domain) = &function.test_clock_domain {
-            line.push_str(&format!(" [clock_domain: {}]", clock_domain.as_str()));
-        }
-        if let Some(clock_policy) = &function.test_clock_policy {
-            line.push_str(&format!(" [clock_policy: {}]", clock_policy.as_str()));
-        }
-        println!("{line}");
     }
     if list_only {
         return Ok(LanguageTestRunReport {
@@ -717,42 +791,59 @@ fn run_language_tests_for_source_file(
     let mut skipped = 0usize;
     for function in matched {
         let verdict = execute_language_test(path, &ast, function, ignored_only || include_ignored)?;
-        println!(
-            "  {} {}",
-            verdict.status,
-            function.test_name.as_deref().unwrap_or(&function.name)
-        );
-        if let Some(reason) = &function.test_reason {
-            println!("    reason: {}", reason);
-        }
-        if let Some(clock_policy) = verdict.clock_policy {
-            println!("    clock_policy: {}", clock_policy);
-        }
-        if let Some(clock_bridge) = verdict.resolved_clock_bridge {
-            println!("    resolved_clock_bridge: {}", clock_bridge);
-        }
-        if let Some(clock_surface) = verdict.resolved_clock_surface {
-            println!("    resolved_clock_surface: {}", clock_surface);
-        }
-        if let Some(clock_domain) = verdict.declared_clock_domain {
-            let code = verdict
-                .declared_clock_domain_code
-                .map(|code| format!(" ({code})"))
-                .unwrap_or_default();
-            println!("    declared_clock_domain: {}{}", clock_domain, code);
-        }
-        if let Some(clock_domain) = verdict.resolved_clock_domain {
-            let code = verdict
-                .resolved_clock_domain_code
-                .map(|code| format!(" ({code})"))
-                .unwrap_or_default();
-            println!("    resolved_clock_domain: {}{}", clock_domain, code);
-        }
-        if let Some(source) = verdict.resolved_clock_source {
-            println!("    resolved_clock_source: {}", source);
-        }
-        if let Some(note) = &verdict.note {
-            println!("    note: {}", note);
+        let show_record = verbose || !verdict.counted_pass || verdict.status == "SKIP";
+        if show_record {
+            let label = function.test_name.as_deref().unwrap_or(&function.name);
+            if verbose {
+                println!("  {} {}", verdict.status, label);
+                if let Some(reason) = &function.test_reason {
+                    println!("    reason: {}", reason);
+                }
+                if let Some(clock_policy) = verdict.clock_policy {
+                    println!("    clock_policy: {}", clock_policy);
+                }
+                if let Some(clock_bridge) = verdict.resolved_clock_bridge {
+                    println!("    resolved_clock_bridge: {}", clock_bridge);
+                }
+                if let Some(clock_surface) = verdict.resolved_clock_surface {
+                    println!("    resolved_clock_surface: {}", clock_surface);
+                }
+                if let Some(clock_domain) = verdict.declared_clock_domain {
+                    let code = verdict
+                        .declared_clock_domain_code
+                        .map(|code| format!(" ({code})"))
+                        .unwrap_or_default();
+                    println!("    declared_clock_domain: {}{}", clock_domain, code);
+                }
+                if let Some(clock_domain) = verdict.resolved_clock_domain {
+                    let code = verdict
+                        .resolved_clock_domain_code
+                        .map(|code| format!(" ({code})"))
+                        .unwrap_or_default();
+                    println!("    resolved_clock_domain: {}{}", clock_domain, code);
+                }
+                if let Some(source) = verdict.resolved_clock_source {
+                    println!("    resolved_clock_source: {}", source);
+                }
+                if let Some(note) = &verdict.note {
+                    println!("    note: {}", note);
+                }
+            } else {
+                let mut line = format!("  {} {}", verdict.status, label);
+                if let Some(reason) = &function.test_reason {
+                    line.push_str(&format!(" [reason={}]", reason));
+                }
+                if let Some(clock_domain) = verdict.resolved_clock_domain {
+                    line.push_str(&format!(" [clock={}]", clock_domain));
+                }
+                if let Some(clock_policy) = verdict.clock_policy {
+                    line.push_str(&format!(" [policy={}]", clock_policy));
+                }
+                if let Some(note) = &verdict.note {
+                    line.push_str(&format!(" [note={}]", note));
+                }
+                println!("{line}");
+            }
         }
         if verdict.status == "SKIP" {
             skipped += 1;
@@ -762,10 +853,12 @@ fn run_language_tests_for_source_file(
             failed += 1;
         }
     }
-    println!("  executed language tests: {}", passed + failed + skipped);
-    println!("  passed: {}", passed);
-    println!("  failed: {}", failed);
-    println!("  skipped: {}", skipped);
+    if verbose || failed > 0 {
+        println!("  executed language tests: {}", passed + failed + skipped);
+        println!("  passed: {}", passed);
+        println!("  failed: {}", failed);
+        println!("  skipped: {}", skipped);
+    }
     Ok(LanguageTestRunReport {
         collected: tests
             .iter()
@@ -793,86 +886,111 @@ fn run_language_benchmarks_for_source_file(
     list_only: bool,
     exact: bool,
 ) -> Result<LanguageBenchmarkRunReport, String> {
+    let verbose = success_logs_enabled();
     let report = collect_language_benchmarks_for_source_file(path, filter, list_only, exact)?;
-    if !report.records.is_empty() {
+    if verbose && !report.records.is_empty() {
         println!("  source: {}", path.display());
     }
-    println!("  collected language benchmarks: {}", report.collected);
-    for record in &report.records {
-        let mut line = format!("  bench_fn: {} ({})", record.function_name, record.label);
-        if record.warmup_iters > 0 {
-            line.push_str(&format!(" [warmup_iters: {}]", record.warmup_iters));
-        }
-        line.push_str(&format!(" [measure_iters: {}]", record.measure_iters));
-        if let Some(note) = &record.note {
-            if record.status == "DISCOVERED" {
-                line.push_str(&format!(" [note: {}]", note));
+    if verbose {
+        println!("  collected language benchmarks: {}", report.collected);
+        for record in &report.records {
+            let mut line = format!("  bench_fn: {} ({})", record.function_name, record.label);
+            if record.warmup_iters > 0 {
+                line.push_str(&format!(" [warmup_iters: {}]", record.warmup_iters));
             }
+            line.push_str(&format!(" [measure_iters: {}]", record.measure_iters));
+            if let Some(note) = &record.note {
+                if record.status == "DISCOVERED" {
+                    line.push_str(&format!(" [note: {}]", note));
+                }
+            }
+            if let Some(clock_domain) = record.declared_clock_domain {
+                line.push_str(&format!(" [clock_domain: {}]", clock_domain));
+            }
+            if let Some(clock_policy) = record.clock_policy {
+                line.push_str(&format!(" [clock_policy: {}]", clock_policy));
+            }
+            println!("{line}");
         }
-        if let Some(clock_domain) = record.declared_clock_domain {
-            line.push_str(&format!(" [clock_domain: {}]", clock_domain));
-        }
-        if let Some(clock_policy) = record.clock_policy {
-            line.push_str(&format!(" [clock_policy: {}]", clock_policy));
-        }
-        println!("{line}");
     }
     if list_only {
         return Ok(report);
     }
     for record in &report.records {
-        println!("  {} {}", record.status, record.label);
-        println!("    warmup_iters: {}", record.warmup_iters);
-        println!("    measure_iters: {}", record.measure_iters);
-        if let Some(clock_policy) = record.clock_policy {
-            println!("    clock_policy: {}", clock_policy);
-        }
-        if let Some(clock_bridge) = record.resolved_clock_bridge {
-            println!("    resolved_clock_bridge: {}", clock_bridge);
-        }
-        if let Some(clock_surface) = record.resolved_clock_surface {
-            println!("    resolved_clock_surface: {}", clock_surface);
-        }
-        if let Some(clock_domain) = record.declared_clock_domain {
-            let code = record
-                .declared_clock_domain_code
-                .map(|code| format!(" ({code})"))
-                .unwrap_or_default();
-            println!("    declared_clock_domain: {}{}", clock_domain, code);
-        }
-        if let Some(clock_domain) = record.resolved_clock_domain {
-            let code = record
-                .resolved_clock_domain_code
-                .map(|code| format!(" ({code})"))
-                .unwrap_or_default();
-            println!("    resolved_clock_domain: {}{}", clock_domain, code);
-        }
-        if let Some(source) = record.resolved_clock_source {
-            println!("    resolved_clock_source: {}", source);
-        }
-        if let Some(measurement) = record.measurement {
-            println!("    run_mode: {}", measurement.run_mode);
-            println!("    sample_count: {}", measurement.sample_count);
-            if let Some(min_ns) = measurement.min_ns {
-                println!("    min_ns: {}", min_ns);
+        let show_record = verbose || record.status != "OK";
+        if show_record {
+            if verbose {
+                println!("  {} {}", record.status, record.label);
+                println!("    warmup_iters: {}", record.warmup_iters);
+                println!("    measure_iters: {}", record.measure_iters);
+                if let Some(clock_policy) = record.clock_policy {
+                    println!("    clock_policy: {}", clock_policy);
+                }
+                if let Some(clock_bridge) = record.resolved_clock_bridge {
+                    println!("    resolved_clock_bridge: {}", clock_bridge);
+                }
+                if let Some(clock_surface) = record.resolved_clock_surface {
+                    println!("    resolved_clock_surface: {}", clock_surface);
+                }
+                if let Some(clock_domain) = record.declared_clock_domain {
+                    let code = record
+                        .declared_clock_domain_code
+                        .map(|code| format!(" ({code})"))
+                        .unwrap_or_default();
+                    println!("    declared_clock_domain: {}{}", clock_domain, code);
+                }
+                if let Some(clock_domain) = record.resolved_clock_domain {
+                    let code = record
+                        .resolved_clock_domain_code
+                        .map(|code| format!(" ({code})"))
+                        .unwrap_or_default();
+                    println!("    resolved_clock_domain: {}{}", clock_domain, code);
+                }
+                if let Some(source) = record.resolved_clock_source {
+                    println!("    resolved_clock_source: {}", source);
+                }
+                if let Some(measurement) = record.measurement {
+                    println!("    run_mode: {}", measurement.run_mode);
+                    println!("    sample_count: {}", measurement.sample_count);
+                    if let Some(min_ns) = measurement.min_ns {
+                        println!("    min_ns: {}", min_ns);
+                    }
+                    println!("    avg_ns: {}", measurement.avg_ns);
+                    if let Some(max_ns) = measurement.max_ns {
+                        println!("    max_ns: {}", max_ns);
+                    }
+                    println!("    total_ns: {}", measurement.total_ns);
+                }
+                if let Some(note) = &record.note {
+                    println!("    note: {}", note);
+                }
+            } else {
+                let mut line = format!(
+                    "  {} {} [warmup={}] [measure={}]",
+                    record.status, record.label, record.warmup_iters, record.measure_iters
+                );
+                if let Some(clock_domain) = record.resolved_clock_domain {
+                    line.push_str(&format!(" [clock={}]", clock_domain));
+                }
+                if let Some(clock_policy) = record.clock_policy {
+                    line.push_str(&format!(" [policy={}]", clock_policy));
+                }
+                if let Some(note) = &record.note {
+                    line.push_str(&format!(" [note={}]", note));
+                }
+                println!("{line}");
             }
-            println!("    avg_ns: {}", measurement.avg_ns);
-            if let Some(max_ns) = measurement.max_ns {
-                println!("    max_ns: {}", max_ns);
-            }
-            println!("    total_ns: {}", measurement.total_ns);
-        }
-        if let Some(note) = &record.note {
-            println!("    note: {}", note);
         }
     }
-    println!(
-        "  executed language benchmarks: {}",
-        report.completed + report.failed + report.timed_out
-    );
-    println!("  completed: {}", report.completed);
-    println!("  failed: {}", report.failed);
-    println!("  timed_out: {}", report.timed_out);
+    if verbose || report.failed > 0 || report.timed_out > 0 {
+        println!(
+            "  executed language benchmarks: {}",
+            report.completed + report.failed + report.timed_out
+        );
+        println!("  completed: {}", report.completed);
+        println!("  failed: {}", report.failed);
+        println!("  timed_out: {}", report.timed_out);
+    }
     Ok(report)
 }
 
@@ -1070,6 +1188,8 @@ fn execute_language_test(
         &cpu_target,
     )?;
     let mut child = Command::new(&written.binary_path)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|error| format!("failed to run `{}`: {error}", written.binary_path))?;
     let declared_clock_domain = test_function.test_clock_domain;
@@ -1342,6 +1462,8 @@ fn run_benchmark_process(
     clock_domain: Option<nuis_semantics::model::TestClockDomain>,
 ) -> Result<RawBenchmarkOutcome, String> {
     let mut child = Command::new(binary_path)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|error| format!("failed to run `{binary_path}`: {error}"))?;
     let started = Instant::now();
@@ -1758,19 +1880,199 @@ fn resolve_run_artifact_binary_path(input: &Path) -> Result<PathBuf, String> {
     ))
 }
 
-fn handle_run_artifact(input: PathBuf) -> Result<(), String> {
+fn load_frontdoor_compiled_artifact(input: &Path) -> Result<nuisc::aot::NuisCompiledArtifact, String> {
+    let file_name = input.file_name().and_then(|value| value.to_str());
+    if file_name == Some("nuis.compiled.artifact") {
+        return nuisc::aot::parse_nuis_compiled_artifact(input);
+    }
+    if file_name == Some("nuis.build.manifest.toml") {
+        let report = nuisc::aot::verify_build_manifest(input)?;
+        return nuisc::aot::parse_nuis_compiled_artifact(Path::new(&report.artifact_path));
+    }
+    Err(format!(
+        "artifact materialization expected `nuis.compiled.artifact` or `nuis.build.manifest.toml`; got `{}`",
+        input.display()
+    ))
+}
+
+fn success_logs_enabled() -> bool {
+    std::env::var_os("NUIS_TEST_QUIET_SUCCESS_LOGS").is_none()
+}
+
+fn render_artifact_materialization_json(
+    kind: &str,
+    input: &Path,
+    output_dir: &Path,
+    written_files: &[PathBuf],
+) -> String {
+    let files = written_files
+        .iter()
+        .map(|path| format!("\"{}\"", json_escape_local(&path.display().to_string())))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{{}}}",
+        vec![
+            json_field("kind", kind),
+            json_field("input", &input.display().to_string()),
+            json_field("output_dir", &output_dir.display().to_string()),
+            json_usize_field("written_files_count", written_files.len()),
+            format!("\"written_files\":[{}]", files),
+        ]
+        .join(",")
+    )
+}
+
+fn materialize_artifact_bundle(input: &Path, output_dir: &Path) -> Result<Vec<PathBuf>, String> {
+    let artifact = load_frontdoor_compiled_artifact(input)?;
+    fs::create_dir_all(output_dir)
+        .map_err(|error| format!("failed to create `{}`: {error}", output_dir.display()))?;
+    let envelope_path = output_dir.join("nuis.executable.envelope.toml");
+    let manifest_path = output_dir.join("nuis.build.manifest.toml");
+    let artifact_path = output_dir.join("nuis.compiled.artifact");
+    let binary_path = output_dir.join(&artifact.binary_name);
+    nuisc::aot::write_nuis_executable_envelope(&envelope_path, &artifact.envelope)?;
+    fs::write(&binary_path, &artifact.binary_blob)
+        .map_err(|error| format!("failed to write `{}`: {error}", binary_path.display()))?;
+    let relocated_manifest = nuisc::aot::render_relocated_unpacked_build_manifest(
+        &artifact,
+        output_dir,
+        &envelope_path,
+        &artifact_path,
+        &binary_path,
+    )?;
+    let mut relocated_artifact = artifact.clone();
+    relocated_artifact.build_manifest_source = relocated_manifest.clone();
+    relocated_artifact.build_manifest_bytes = relocated_manifest.len();
+    nuisc::aot::write_nuis_compiled_artifact(&artifact_path, &relocated_artifact)?;
+    fs::write(&manifest_path, relocated_manifest)
+        .map_err(|error| format!("failed to write `{}`: {error}", manifest_path.display()))?;
+    let mut written = vec![
+        envelope_path,
+        manifest_path,
+        artifact_path,
+        binary_path,
+    ];
+    written.extend(
+        nuis_artifact::materialize_embedded_artifact_support(&relocated_artifact, output_dir)
+            .map_err(|error| error.to_string())?,
+    );
+    written.sort();
+    written.dedup();
+    Ok(written)
+}
+
+fn handle_unpack_artifact_support(input: PathBuf, output_dir: PathBuf, json: bool) -> Result<(), String> {
+    let artifact = load_frontdoor_compiled_artifact(&input)?;
+    let mut written = nuis_artifact::materialize_embedded_artifact_support(&artifact, &output_dir)
+        .map_err(|error| error.to_string())?;
+    written.sort();
+    written.dedup();
+    if json {
+        println!(
+            "{}",
+            render_artifact_materialization_json(
+                "unpack_artifact_support",
+                &input,
+                &output_dir,
+                &written,
+            )
+        );
+        return Ok(());
+    }
+    if success_logs_enabled() {
+        println!("unpacked artifact support: {}", output_dir.display());
+        println!("  source: {}", input.display());
+        println!("  written_files: {}", written.len());
+        for path in &written {
+            println!("  file: {}", path.display());
+        }
+    }
+    Ok(())
+}
+
+fn handle_materialize_artifact(input: PathBuf, output_dir: PathBuf, json: bool) -> Result<(), String> {
+    let written = materialize_artifact_bundle(&input, &output_dir)?;
+    if json {
+        println!(
+            "{}",
+            render_artifact_materialization_json(
+                "materialize_artifact",
+                &input,
+                &output_dir,
+                &written,
+            )
+        );
+        return Ok(());
+    }
+    if success_logs_enabled() {
+        println!("materialized artifact: {}", output_dir.display());
+        println!("  source: {}", input.display());
+        println!("  written_files: {}", written.len());
+        for path in &written {
+            println!("  file: {}", path.display());
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn render_run_artifact_json(input: &Path) -> String {
+    let doctor = probe_artifact_doctor(input);
+    let resolved_binary = resolve_run_artifact_binary_path(input).ok();
+    let manifest_verify = doctor
+        .manifest_path
+        .as_ref()
+        .filter(|_| doctor.manifest_verified)
+        .and_then(|path| nuisc::aot::verify_build_manifest(path).ok());
+    let link_plan = doctor
+        .output_dir
+        .as_ref()
+        .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
+    let mut fields = vec![
+        json_field("kind", "run_artifact"),
+        json_field("input", &input.display().to_string()),
+        json_field("source_kind", &doctor.source_kind),
+        json_bool_field("ready_to_run", doctor.ready_to_run),
+        json_field("recommended_next_step", &doctor.recommended_next_step),
+        json_field("recommended_command", &doctor.recommended_command),
+        json_field("recommended_reason", &doctor.recommended_reason),
+        json_optional_string_field(
+            "binary_path",
+            resolved_binary
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .as_deref(),
+        ),
+        json_bool_field("binary_resolved", resolved_binary.is_some()),
+    ];
+    fields.extend(runtime_session_json_fields(manifest_verify.as_ref()));
+    fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
+    format!("{{{}}}", fields.join(","))
+}
+
+fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), String> {
+    if json {
+        println!("{}", render_run_artifact_json(&input));
+        return Ok(());
+    }
     let binary = resolve_run_artifact_binary_path(&input)?;
-    let status = Command::new(&binary)
+    let mut command = Command::new(&binary);
+    if cfg!(test) {
+        command.stdout(Stdio::null()).stderr(Stdio::null());
+    }
+    let status = command
         .status()
         .map_err(|error| format!("failed to run `{}`: {error}", binary.display()))?;
-    println!("run-artifact: {}", binary.display());
-    println!(
-        "  exit_status: {}",
-        status
-            .code()
-            .map(|code| code.to_string())
-            .unwrap_or_else(|| "signal".to_owned())
-    );
+    if success_logs_enabled() {
+        println!("run-artifact: {}", binary.display());
+        println!(
+            "  exit_status: {}",
+            status
+                .code()
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "signal".to_owned())
+        );
+    }
     if status.success() {
         return Ok(());
     }
@@ -1967,6 +2269,10 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
 
 pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
     let report = probe_artifact_doctor(input);
+    let link_plan = report
+        .output_dir
+        .as_ref()
+        .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
     let output_dir = report
         .output_dir
         .as_ref()
@@ -2009,6 +2315,246 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
             report.artifact_verify_error.as_deref(),
         ),
     ];
+    let mut fields = fields;
+    fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
+    format!("{{{}}}", fields.join(","))
+}
+
+fn build_report_domain_unit_record(unit: &nuisc::aot::BuildManifestDomainBuildUnit) -> String {
+    let mut fields = vec![
+        json_field("package_id", &unit.package_id),
+        json_field("domain_family", &unit.domain_family),
+        json_field("contract_family", &unit.contract_family),
+        json_field("packaging_role", &unit.packaging_role),
+        json_bool_field("heterogeneous", unit.is_heterogeneous()),
+    ];
+    if let Some(value) = unit.abi.as_deref() {
+        fields.push(json_field("abi", value));
+    }
+    if let Some(value) = unit.machine_arch.as_deref() {
+        fields.push(json_field("machine_arch", value));
+    }
+    if let Some(value) = unit.machine_os.as_deref() {
+        fields.push(json_field("machine_os", value));
+    }
+    if let Some(value) = unit.backend_family.as_deref() {
+        fields.push(json_field("backend_family", value));
+    }
+    if let Some(value) = unit.selected_lowering_target.as_deref() {
+        fields.push(json_field("selected_lowering_target", value));
+    }
+    if let Some(value) = unit.artifact_payload_format.as_deref() {
+        fields.push(json_field("artifact_payload_format", value));
+    }
+    if let Some(value) = unit.artifact_payload_blob_bytes {
+        fields.push(json_usize_field("artifact_payload_blob_bytes", value));
+    }
+    format!("{{{}}}", fields.join(","))
+}
+
+fn runtime_session_json_fields(
+    manifest_verify: Option<&nuisc::aot::BuildManifestVerifyReport>,
+) -> Vec<String> {
+    let Some(report) = manifest_verify else {
+        return vec![
+            json_usize_field("heterogeneous_domain_count", 0),
+            json_optional_string_field("bridge_registry_path", None),
+            json_usize_field("bridge_registry_units", 0),
+            json_usize_field("bridge_registry_checked", 0),
+            json_usize_field("bridge_registry_entries_checked", 0),
+            json_optional_string_field("host_bridge_plan_index_path", None),
+            json_usize_field("host_bridge_plan_units", 0),
+            json_usize_field("host_bridge_plan_checked", 0),
+            json_usize_field("host_bridge_plan_entries_checked", 0),
+            json_usize_field("domain_payload_blobs_checked", 0),
+            json_usize_field("domain_payload_blob_sections_checked", 0),
+            json_usize_field("domain_payload_contract_sections_checked", 0),
+            json_usize_field("domain_payload_lowering_plans_checked", 0),
+            json_usize_field("domain_payload_backend_stubs_checked", 0),
+            json_usize_field("domain_payload_bridge_plans_checked", 0),
+            json_usize_field("domain_bridge_stubs_checked", 0),
+        ];
+    };
+    vec![
+        json_usize_field(
+            "heterogeneous_domain_count",
+            report.heterogeneous_domain_count,
+        ),
+        json_optional_string_field(
+            "bridge_registry_path",
+            report.bridge_registry_path.as_deref(),
+        ),
+        json_usize_field("bridge_registry_units", report.bridge_registry_units),
+        json_usize_field("bridge_registry_checked", report.bridge_registry_checked),
+        json_usize_field(
+            "bridge_registry_entries_checked",
+            report.bridge_registry_entries_checked,
+        ),
+        json_optional_string_field(
+            "host_bridge_plan_index_path",
+            report.host_bridge_plan_index_path.as_deref(),
+        ),
+        json_usize_field("host_bridge_plan_units", report.host_bridge_plan_units),
+        json_usize_field("host_bridge_plan_checked", report.host_bridge_plan_checked),
+        json_usize_field(
+            "host_bridge_plan_entries_checked",
+            report.host_bridge_plan_entries_checked,
+        ),
+        json_usize_field(
+            "domain_payload_blobs_checked",
+            report.domain_payload_blobs_checked,
+        ),
+        json_usize_field(
+            "domain_payload_blob_sections_checked",
+            report.domain_payload_blob_sections_checked,
+        ),
+        json_usize_field(
+            "domain_payload_contract_sections_checked",
+            report.domain_payload_contract_sections_checked,
+        ),
+        json_usize_field(
+            "domain_payload_lowering_plans_checked",
+            report.domain_payload_lowering_plans_checked,
+        ),
+        json_usize_field(
+            "domain_payload_backend_stubs_checked",
+            report.domain_payload_backend_stubs_checked,
+        ),
+        json_usize_field(
+            "domain_payload_bridge_plans_checked",
+            report.domain_payload_bridge_plans_checked,
+        ),
+        json_usize_field("domain_bridge_stubs_checked", report.domain_bridge_stubs_checked),
+    ]
+}
+
+pub(crate) fn render_build_report_json(input: &Path) -> String {
+    let doctor = probe_artifact_doctor(input);
+    let manifest_verify = doctor
+        .manifest_path
+        .as_ref()
+        .filter(|_| doctor.manifest_verified)
+        .and_then(|path| nuisc::aot::verify_build_manifest(path).ok());
+    let artifact_verify = doctor
+        .artifact_path
+        .as_ref()
+        .filter(|_| doctor.artifact_verified)
+        .and_then(|path| nuisc::aot::verify_nuis_compiled_artifact(path).ok());
+    let link_plan = doctor
+        .output_dir
+        .as_ref()
+        .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
+    let domain_unit_records = manifest_verify
+        .as_ref()
+        .map(|report| {
+            report
+                .domain_build_units
+                .iter()
+                .map(build_report_domain_unit_record)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let mut fields = vec![
+        json_field("kind", "build_report"),
+        json_field("source_kind", &doctor.source_kind),
+        json_field("input", &doctor.input.display().to_string()),
+        json_optional_string_field(
+            "output_dir",
+            doctor
+                .output_dir
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "manifest_path",
+            doctor
+                .manifest_path
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "artifact_path",
+            doctor
+                .artifact_path
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "binary_path",
+            doctor
+                .binary_path
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .as_deref(),
+        ),
+        json_bool_field("manifest_verified", doctor.manifest_verified),
+        json_bool_field("artifact_verified", doctor.artifact_verified),
+        json_bool_field("ready_to_run", doctor.ready_to_run),
+        json_field("recommended_next_step", &doctor.recommended_next_step),
+        json_field("recommended_command", &doctor.recommended_command),
+        json_field("recommended_reason", &doctor.recommended_reason),
+        json_usize_field("domain_units_count", domain_unit_records.len()),
+        json_object_array_field("domain_units", &domain_unit_records),
+    ];
+    if let Some(report) = manifest_verify.as_ref() {
+        fields.push(json_field("packaging_mode", &report.packaging_mode));
+        fields.push(json_field("binary_name", &report.artifact_binary_name));
+        fields.push(json_usize_field("binary_bytes", report.artifact_binary_bytes));
+        fields.push(json_field("lifecycle_schema", &report.lifecycle_schema));
+        fields.push(json_field(
+            "lifecycle_bootstrap_entry",
+            &report.lifecycle_bootstrap_entry,
+        ));
+        fields.push(json_field(
+            "lifecycle_tick_policy",
+            &report.lifecycle_tick_policy,
+        ));
+        fields.push(json_field(
+            "lifecycle_shutdown_policy",
+            &report.lifecycle_shutdown_policy,
+        ));
+        fields.push(json_field("lifecycle_yalivia_rpc", &report.lifecycle_yalivia_rpc));
+        fields.push(json_string_array_field(
+            "lifecycle_hook_surface",
+            &report.lifecycle_hook_surface,
+        ));
+        fields.push(json_string_array_field(
+            "lifecycle_export_surface",
+            &report.lifecycle_export_surface,
+        ));
+        fields.push(json_string_array_field(
+            "lifecycle_runtime_capability_flags",
+            &report.lifecycle_runtime_capability_flags,
+        ));
+        fields.push(json_field("cpu_target_abi", &report.cpu_target_abi));
+        fields.push(json_field(
+            "cpu_target_machine_arch",
+            &report.cpu_target_machine_arch,
+        ));
+        fields.push(json_field(
+            "cpu_target_machine_os",
+            &report.cpu_target_machine_os,
+        ));
+    }
+    if let Some(report) = artifact_verify.as_ref() {
+        fields.push(json_bool_field(
+            "artifact_roundtrip_verified",
+            report.artifact_roundtrip_verified,
+        ));
+        fields.push(json_bool_field(
+            "lifecycle_contract_consistent",
+            report.lifecycle_contract_consistent,
+        ));
+        fields.push(json_bool_field(
+            "lifecycle_runtime_capability_flags_consistent",
+            report.lifecycle_runtime_capability_flags_consistent,
+        ));
+    }
+    fields.extend(runtime_session_json_fields(manifest_verify.as_ref()));
+    fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
     format!("{{{}}}", fields.join(","))
 }
 
@@ -2018,6 +2564,10 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
         return Ok(());
     }
     let report = probe_artifact_doctor(&input);
+    let link_plan = report
+        .output_dir
+        .as_ref()
+        .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
     println!("artifact doctor: {}", report.input.display());
     println!("  source_kind: {}", report.source_kind);
     if let Some(path) = report.output_dir.as_ref() {
@@ -2047,6 +2597,169 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
     println!("  recommended_next_step: {}", report.recommended_next_step);
     println!("  recommended_command: {}", report.recommended_command);
     println!("  recommended_reason: {}", report.recommended_reason);
+    println!("  link_plan_available: {}", link_plan.is_some());
+    println!(
+        "  link_plan_final_stage: {}",
+        link_plan
+            .as_ref()
+            .map(|plan| plan.final_stage.kind.as_str())
+            .unwrap_or("<unavailable>")
+    );
+    println!(
+        "  link_plan_final_driver: {}",
+        link_plan
+            .as_ref()
+            .map(|plan| plan.final_stage.driver.as_str())
+            .unwrap_or("<unavailable>")
+    );
+    println!(
+        "  link_plan_final_link_mode: {}",
+        link_plan
+            .as_ref()
+            .map(|plan| plan.final_stage.link_mode.as_str())
+            .unwrap_or("<unavailable>")
+    );
+    println!(
+        "  link_plan_final_output: {}",
+        link_plan
+            .as_ref()
+            .map(|plan| plan.final_stage.output_path.as_str())
+            .unwrap_or("<unavailable>")
+    );
+    println!(
+        "  link_plan_domain_units: {}",
+        link_plan
+            .as_ref()
+            .map(|plan| plan.domain_units.len())
+            .unwrap_or(0)
+    );
+    if let Some(plan) = link_plan.as_ref() {
+        for unit in &plan.domain_units {
+            let abi = unit.abi.as_deref().unwrap_or("<none>");
+            let lowering = unit.selected_lowering_target.as_deref().unwrap_or("<none>");
+            let backend = unit.backend_family.as_deref().unwrap_or("<none>");
+            println!(
+                "  link_plan_domain_unit: {} package={} role={} abi={} lowering={} backend={}",
+                unit.domain_family, unit.package_id, unit.packaging_role, abi, lowering, backend
+            );
+        }
+    }
+    Ok(())
+}
+
+fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
+    if json {
+        println!("{}", render_build_report_json(&input));
+        return Ok(());
+    }
+    let doctor = probe_artifact_doctor(&input);
+    let manifest_verify = doctor
+        .manifest_path
+        .as_ref()
+        .filter(|_| doctor.manifest_verified)
+        .and_then(|path| nuisc::aot::verify_build_manifest(path).ok());
+    let artifact_verify = doctor
+        .artifact_path
+        .as_ref()
+        .filter(|_| doctor.artifact_verified)
+        .and_then(|path| nuisc::aot::verify_nuis_compiled_artifact(path).ok());
+    let link_plan = doctor
+        .output_dir
+        .as_ref()
+        .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
+    println!("build report: {}", doctor.input.display());
+    println!("  source_kind: {}", doctor.source_kind);
+    println!("  ready_to_run: {}", doctor.ready_to_run);
+    println!("  recommended_next_step: {}", doctor.recommended_next_step);
+    println!("  recommended_command: {}", doctor.recommended_command);
+    if let Some(report) = manifest_verify.as_ref() {
+        println!("  packaging_mode: {}", report.packaging_mode);
+        println!("  binary_name: {}", report.artifact_binary_name);
+        println!("  binary_bytes: {}", report.artifact_binary_bytes);
+        println!("  cpu_target_abi: {}", report.cpu_target_abi);
+        println!("  lifecycle_bootstrap_entry: {}", report.lifecycle_bootstrap_entry);
+        println!("  lifecycle_tick_policy: {}", report.lifecycle_tick_policy);
+        println!(
+            "  lifecycle_shutdown_policy: {}",
+            report.lifecycle_shutdown_policy
+        );
+        println!("  lifecycle_yalivia_rpc: {}", report.lifecycle_yalivia_rpc);
+        println!(
+            "  lifecycle_runtime_capability_flags: {}",
+            if report.lifecycle_runtime_capability_flags.is_empty() {
+                "<none>".to_owned()
+            } else {
+                report.lifecycle_runtime_capability_flags.join(", ")
+            }
+        );
+        println!(
+            "  heterogeneous_domain_count: {}",
+            report.heterogeneous_domain_count
+        );
+        println!(
+            "  bridge_registry_path: {}",
+            report
+                .bridge_registry_path
+                .as_deref()
+                .unwrap_or("<none>")
+        );
+        println!("  bridge_registry_units: {}", report.bridge_registry_units);
+        println!("  bridge_registry_checked: {}", report.bridge_registry_checked);
+        println!(
+            "  bridge_registry_entries_checked: {}",
+            report.bridge_registry_entries_checked
+        );
+        println!(
+            "  host_bridge_plan_index_path: {}",
+            report
+                .host_bridge_plan_index_path
+                .as_deref()
+                .unwrap_or("<none>")
+        );
+        println!("  host_bridge_plan_units: {}", report.host_bridge_plan_units);
+        println!(
+            "  host_bridge_plan_checked: {}",
+            report.host_bridge_plan_checked
+        );
+        println!(
+            "  host_bridge_plan_entries_checked: {}",
+            report.host_bridge_plan_entries_checked
+        );
+        println!("  domain_units: {}", report.domain_build_units.len());
+        for unit in &report.domain_build_units {
+            let abi = unit.abi.as_deref().unwrap_or("<none>");
+            let lowering = unit.selected_lowering_target.as_deref().unwrap_or("<none>");
+            let backend = unit.backend_family.as_deref().unwrap_or("<none>");
+            println!(
+                "  domain_unit: {} package={} role={} abi={} lowering={} backend={}",
+                unit.domain_family, unit.package_id, unit.packaging_role, abi, lowering, backend
+            );
+        }
+    } else {
+        println!("  packaging_mode: <unavailable>");
+        println!("  domain_units: 0");
+    }
+    if let Some(report) = artifact_verify.as_ref() {
+        println!(
+            "  artifact_roundtrip_verified: {}",
+            report.artifact_roundtrip_verified
+        );
+        println!(
+            "  lifecycle_contract_consistent: {}",
+            report.lifecycle_contract_consistent
+        );
+        println!(
+            "  lifecycle_runtime_capability_flags_consistent: {}",
+            report.lifecycle_runtime_capability_flags_consistent
+        );
+    }
+    println!("  link_plan_available: {}", link_plan.is_some());
+    if let Some(plan) = link_plan.as_ref() {
+        println!("  link_plan_final_stage: {}", plan.final_stage.kind);
+        println!("  link_plan_final_driver: {}", plan.final_stage.driver);
+        println!("  link_plan_final_link_mode: {}", plan.final_stage.link_mode);
+        println!("  link_plan_final_output: {}", plan.final_stage.output_path);
+    }
     Ok(())
 }
 
@@ -2104,9 +2817,43 @@ fn load_link_plan_for_output_dir(output_dir: &Path) -> Option<nuisc::linker::Lin
     nuisc::linker::build_link_plan_from_manifest(&manifest).ok()
 }
 
+fn workflow_link_plan_domain_unit_record(unit: &nuisc::linker::LinkPlanDomainUnit) -> String {
+    let mut fields = vec![
+        json_field("kind", &unit.kind),
+        json_field("package_id", &unit.package_id),
+        json_field("domain_family", &unit.domain_family),
+        json_field("contract_family", &unit.contract_family),
+        json_field("packaging_role", &unit.packaging_role),
+    ];
+    if let Some(value) = unit.abi.as_deref() {
+        fields.push(json_field("abi", value));
+    }
+    if let Some(value) = unit.backend_family.as_deref() {
+        fields.push(json_field("backend_family", value));
+    }
+    if let Some(value) = unit.selected_lowering_target.as_deref() {
+        fields.push(json_field("selected_lowering_target", value));
+    }
+    if let Some(value) = unit.machine_arch.as_deref() {
+        fields.push(json_field("machine_arch", value));
+    }
+    if let Some(value) = unit.machine_os.as_deref() {
+        fields.push(json_field("machine_os", value));
+    }
+    format!("{{{}}}", fields.join(","))
+}
+
 fn workflow_link_plan_json_fields(
     link_plan: Option<&nuisc::linker::LinkPlan>,
 ) -> Vec<String> {
+    let domain_unit_records = link_plan
+        .map(|plan| {
+            plan.domain_units
+                .iter()
+                .map(workflow_link_plan_domain_unit_record)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
     vec![
         json_bool_field("link_plan_available", link_plan.is_some()),
         json_optional_string_field(
@@ -2121,6 +2868,15 @@ fn workflow_link_plan_json_fields(
             "link_plan_final_link_mode",
             link_plan.map(|plan| plan.final_stage.link_mode.as_str()),
         ),
+        json_optional_string_field(
+            "link_plan_final_output",
+            link_plan.map(|plan| plan.final_stage.output_path.as_str()),
+        ),
+        json_usize_field(
+            "link_plan_domain_units",
+            link_plan.map(|plan| plan.domain_units.len()).unwrap_or(0),
+        ),
+        json_object_array_field("link_plan_domain_unit_records", &domain_unit_records),
     ]
 }
 
@@ -4273,7 +5029,7 @@ fn print_help() {
         "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
     );
     println!(
-        "    nuis run-artifact <binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
+        "    nuis run-artifact [--json] <binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
     );
     println!(
         "    nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
@@ -4291,7 +5047,10 @@ fn print_help() {
     println!("    nuis scheduler-view [--json] [input.ns|project-dir|nuis.toml]");
     println!("    nuis inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>");
     println!("    nuis verify-artifact [--json] <nuis.compiled.artifact>");
+    println!("    nuis unpack-artifact-support [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>");
+    println!("    nuis materialize-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>");
     println!("    nuis artifact-doctor [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>");
+    println!("    nuis build-report [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>");
     println!("    nuis verify-build-manifest <nuis.build.manifest.toml>");
     println!();
     println!("  project workflow:");
@@ -4453,10 +5212,12 @@ mod tests {
     use super::{
         artifact_doctor_command_for_output_dir, artifact_workflow_brief,
         benchmark_run_report_json, build_workflow_frontdoor_surface, default_build_output_dir,
-        handle_build, handle_check, handle_release_check, handle_run_artifact, handle_test,
+        handle_build, handle_check, handle_materialize_artifact, handle_release_check,
+        handle_run_artifact, handle_test, handle_unpack_artifact_support,
         project_abi_checks_json, project_compile_workflow_source_profile,
         project_domain_registry_checks_json, project_workflow_json_fields,
-        recommend_project_workflow_step, render_artifact_doctor_json,
+        recommend_project_workflow_step, render_artifact_doctor_json, render_build_report_json,
+        render_run_artifact_json,
         apply_suggested_project_imports,
         render_project_doctor_json, render_project_imports_apply_json,
         render_project_imports_json, render_project_status_json,
@@ -4471,12 +5232,20 @@ mod tests {
     use std::{
         env, fs,
         path::{Path, PathBuf},
-        process::Command,
-        sync::{Mutex, OnceLock},
+        process::{Command, Stdio},
+        sync::{Mutex, Once, OnceLock},
         time::{SystemTime, UNIX_EPOCH},
     };
 
+    fn enable_test_quiet_success_logs() {
+        static ONCE: Once = Once::new();
+        ONCE.call_once(|| {
+            env::set_var("NUIS_TEST_QUIET_SUCCESS_LOGS", "1");
+        });
+    }
+
     fn repo_root() -> PathBuf {
+        enable_test_quiet_success_logs();
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
             .canonicalize()
@@ -4539,6 +5308,7 @@ mod tests {
     }
 
     fn temp_dir(label: &str) -> PathBuf {
+        enable_test_quiet_success_logs();
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("time")
@@ -4560,7 +5330,7 @@ mod tests {
         let output_dir = temp_dir(output_label);
 
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
-        handle_run_artifact(output_dir.join("nuis.build.manifest.toml"))
+        handle_run_artifact(output_dir.join("nuis.build.manifest.toml"), false)
             .expect("checked-in tooling project run-artifact passes");
     }
 
@@ -4796,7 +5566,7 @@ mod cpu Main {
         let output_dir = temp_dir("run_artifact_outputs");
 
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
-        handle_run_artifact(output_dir.join("nuis.build.manifest.toml"))
+        handle_run_artifact(output_dir.join("nuis.build.manifest.toml"), false)
             .expect("run-artifact passes");
     }
 
@@ -5003,6 +5773,248 @@ mod cpu Main {
         assert!(json.contains("\"artifact_verified\":true"));
         assert!(json.contains("\"ready_to_run\":true"));
         assert!(json.contains("\"recommended_next_step\":\"run_artifact\""));
+        assert!(json.contains("\"link_plan_available\":true"));
+        assert!(json.contains("\"link_plan_final_stage\":\"host-native-link\""));
+        assert!(json.contains("\"link_plan_final_driver\":\"clang\""));
+        assert!(json.contains("\"link_plan_final_link_mode\":\"host-toolchain-finalize\""));
+        assert!(json.contains("\"link_plan_final_output\":\""));
+        assert!(json.contains("\"link_plan_domain_units\":1"));
+        assert!(json.contains("\"link_plan_domain_unit_records\":[{"));
+        assert!(json.contains("\"domain_family\":\"cpu\""));
+        assert!(json.contains("\"packaging_role\":\"host-binary\""));
+    }
+
+    #[test]
+    fn build_report_json_exposes_lifecycle_and_domain_unit_summary() {
+        let project_root = write_temp_project_fixture(
+            "build_report_smoke",
+            r#"
+name = "build_report_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("build_report_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_build_report_json(&output_dir);
+
+        assert!(json.contains("\"kind\":\"build_report\""));
+        assert!(json.contains("\"ready_to_run\":true"));
+        assert!(json.contains("\"packaging_mode\":\"native-cpu-llvm\""));
+        assert!(json.contains("\"lifecycle_bootstrap_entry\":\"nuis.bootstrap.lifecycle.v1\""));
+        assert!(json.contains("\"lifecycle_tick_policy\":\"owned-pump.active-wait-drain\""));
+        assert!(json.contains("\"domain_units_count\":1"));
+        assert!(json.contains("\"domain_units\":[{"));
+        assert!(json.contains("\"domain_family\":\"cpu\""));
+        assert!(json.contains("\"artifact_roundtrip_verified\":true"));
+        assert!(json.contains("\"lifecycle_contract_consistent\":true"));
+        assert!(json.contains("\"heterogeneous_domain_count\":0"));
+        assert!(json.contains("\"bridge_registry_units\":0"));
+        assert!(json.contains("\"host_bridge_plan_units\":0"));
+        assert!(json.contains("\"link_plan_domain_unit_records\":[{"));
+    }
+
+    #[test]
+    fn run_artifact_json_reports_prelaunch_summary_for_built_output() {
+        let project_root = write_temp_project_fixture(
+            "run_artifact_json_smoke",
+            r#"
+name = "run_artifact_json_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("run_artifact_json_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
+
+        assert!(json.contains("\"kind\":\"run_artifact\""));
+        assert!(json.contains("\"ready_to_run\":true"));
+        assert!(json.contains("\"binary_resolved\":true"));
+        assert!(json.contains("\"binary_path\":\""));
+        assert!(json.contains("\"heterogeneous_domain_count\":0"));
+        assert!(json.contains("\"bridge_registry_units\":0"));
+        assert!(json.contains("\"host_bridge_plan_units\":0"));
+        assert!(json.contains("\"link_plan_available\":true"));
+        assert!(json.contains("\"link_plan_final_stage\":\"host-native-link\""));
+    }
+
+    #[test]
+    fn build_report_json_exposes_real_heterogeneous_runtime_summary() {
+        let project_root =
+            PathBuf::from("/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo");
+        let output_dir = temp_dir("build_report_shader_profile_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_build_report_json(&output_dir);
+
+        assert!(json.contains("\"domain_units_count\":2"));
+        assert!(json.contains("\"heterogeneous_domain_count\":1"));
+        assert!(json.contains("\"domain_family\":\"shader\""));
+        assert!(json.contains("\"packaging_role\":\"hetero-contract\""));
+        assert!(json.contains("\"artifact_payload_format\":\"ndpb-v2\""));
+        assert!(json.contains("\"bridge_registry_units\":1"));
+        assert!(json.contains("\"bridge_registry_checked\":1"));
+        assert!(json.contains("\"host_bridge_plan_units\":1"));
+        assert!(json.contains("\"domain_payload_blobs_checked\":1"));
+        assert!(json.contains("\"domain_payload_bridge_plans_checked\":1"));
+        assert!(json.contains("\"domain_bridge_stubs_checked\":1"));
+        assert!(json.contains("\"link_plan_domain_units\":2"));
+    }
+
+    #[test]
+    fn run_artifact_json_exposes_real_heterogeneous_runtime_summary() {
+        let project_root =
+            PathBuf::from("/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo");
+        let output_dir = temp_dir("run_artifact_shader_profile_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
+
+        assert!(json.contains("\"binary_resolved\":true"));
+        assert!(json.contains("\"heterogeneous_domain_count\":1"));
+        assert!(json.contains("\"bridge_registry_units\":1"));
+        assert!(json.contains("\"host_bridge_plan_units\":1"));
+        assert!(json.contains("\"domain_payload_blobs_checked\":1"));
+        assert!(json.contains("\"link_plan_domain_units\":2"));
+        assert!(json.contains("\"domain_family\":\"shader\""));
+    }
+
+    #[test]
+    fn build_report_json_exposes_bridge_bearing_exchange_summary() {
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo",
+        );
+        let output_dir = temp_dir("build_report_shader_packet_bridge_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_build_report_json(&output_dir);
+
+        assert!(json.contains("\"packaging_mode\":\"window-aot-bundle\""));
+        assert!(json.contains("\"domain_units_count\":3"));
+        assert!(json.contains("\"heterogeneous_domain_count\":2"));
+        assert!(json.contains("\"domain_family\":\"data\""));
+        assert!(json.contains("\"domain_family\":\"shader\""));
+        assert!(json.contains("\"bridge_registry_units\":2"));
+        assert!(json.contains("\"bridge_registry_entries_checked\":2"));
+        assert!(json.contains("\"host_bridge_plan_units\":2"));
+        assert!(json.contains("\"host_bridge_plan_entries_checked\":2"));
+        assert!(json.contains("\"domain_payload_blobs_checked\":2"));
+        assert!(json.contains("\"domain_payload_bridge_plans_checked\":2"));
+        assert!(json.contains("\"domain_bridge_stubs_checked\":2"));
+        assert!(json.contains("\"link_plan_final_stage\":\"heterogeneous-bundle-pack\""));
+        assert!(json.contains("\"link_plan_final_driver\":\"yir-pack-aot\""));
+        assert!(json.contains("\"link_plan_domain_units\":3"));
+    }
+
+    #[test]
+    fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo",
+        );
+        let output_dir = temp_dir("run_artifact_shader_packet_bridge_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
+
+        assert!(json.contains("\"binary_resolved\":true"));
+        assert!(json.contains("\"heterogeneous_domain_count\":2"));
+        assert!(json.contains("\"bridge_registry_units\":2"));
+        assert!(json.contains("\"host_bridge_plan_units\":2"));
+        assert!(json.contains("\"domain_payload_blobs_checked\":2"));
+        assert!(json.contains("\"domain_payload_bridge_plans_checked\":2"));
+        assert!(json.contains("\"link_plan_final_stage\":\"heterogeneous-bundle-pack\""));
+        assert!(json.contains("\"link_plan_final_driver\":\"yir-pack-aot\""));
+        assert!(json.contains("\"link_plan_domain_units\":3"));
+    }
+
+    #[test]
+    fn unpack_artifact_support_materializes_embedded_sidecars_for_bridge_project() {
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo",
+        );
+        let output_dir = temp_dir("unpack_artifact_support_bridge_build_outputs");
+        let unpack_dir = temp_dir("unpack_artifact_support_bridge_unpack_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        handle_unpack_artifact_support(
+            output_dir.join("nuis.compiled.artifact"),
+            unpack_dir.clone(),
+            false,
+        )
+        .expect("unpack-artifact-support passes");
+
+        for path in [
+            unpack_dir.join("nuis.bridge.registry.toml"),
+            unpack_dir.join("nuis.host-bridge.plan-index.toml"),
+            unpack_dir.join("nuis.domain.data.artifact.toml"),
+            unpack_dir.join("nuis.domain.data.payload.toml"),
+            unpack_dir.join("nuis.domain.data.payload.bin"),
+            unpack_dir.join("nuis.domain.data.bridge.stub.txt"),
+            unpack_dir.join("nuis.domain.shader.artifact.toml"),
+            unpack_dir.join("nuis.domain.shader.payload.toml"),
+            unpack_dir.join("nuis.domain.shader.payload.bin"),
+            unpack_dir.join("nuis.domain.shader.bridge.stub.txt"),
+        ] {
+            assert!(path.exists(), "expected unpacked support `{}`", path.display());
+        }
+    }
+
+    #[test]
+    fn materialize_artifact_rebuilds_frontdoor_bundle_and_support_sidecars() {
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo",
+        );
+        let build_output_dir = temp_dir("materialize_artifact_bridge_build_outputs");
+        let materialize_dir = temp_dir("materialize_artifact_bridge_bundle_outputs");
+
+        handle_build(project_root, build_output_dir.clone(), false, None, None).expect("build passes");
+        handle_materialize_artifact(
+            build_output_dir.join("nuis.build.manifest.toml"),
+            materialize_dir.clone(),
+            false,
+        )
+        .expect("materialize-artifact passes");
+
+        for path in [
+            materialize_dir.join("nuis.executable.envelope.toml"),
+            materialize_dir.join("nuis.build.manifest.toml"),
+            materialize_dir.join("nuis.compiled.artifact"),
+            materialize_dir.join("shader_packet_bridge_demo"),
+            materialize_dir.join("nuis.bridge.registry.toml"),
+            materialize_dir.join("nuis.host-bridge.plan-index.toml"),
+            materialize_dir.join("nuis.domain.data.payload.bin"),
+            materialize_dir.join("nuis.domain.shader.payload.bin"),
+        ] {
+            assert!(path.exists(), "expected materialized output `{}`", path.display());
+        }
+
+        let report = nuisc::aot::verify_build_manifest(
+            materialize_dir.join("nuis.build.manifest.toml").as_path(),
+        )
+        .expect("materialized manifest verifies");
+        assert_eq!(report.artifact_binary_name, "shader_packet_bridge_demo");
+        assert_eq!(report.packaging_mode, "window-aot-bundle");
     }
 
     #[test]
@@ -5509,6 +6521,11 @@ mod cpu Main {
         assert!(json.contains("\"public_surface_modules\":3"));
         assert!(json.contains("\"public_functions\":10"));
         assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
+        assert!(json.contains("\"galaxy_surface_ids_count\":13"));
+        assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
+        assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
+        assert!(json.contains("\"surface.std.collections.v1\""));
+        assert!(json.contains("\"galaxy_records\":[{"));
         assert!(json.contains("\"galaxy_imports_count\":0"));
         assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":1"));
         assert!(json.contains(
@@ -5558,6 +6575,11 @@ mod cpu Main {
         assert!(json.contains("\"galaxy_check_status\":\"skipped\""));
         assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
         assert!(json.contains("\"galaxy_imports_count\":1"));
+        assert!(json.contains("\"galaxy_surface_ids_count\":13"));
+        assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
+        assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
+        assert!(json.contains("\"surface.std.collections.v1\""));
+        assert!(json.contains("\"galaxy_records\":[{"));
         assert!(json.contains("\"galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"));
         assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":0"));
         assert!(json.contains("\"galaxy_hidden_manual_only_library_modules\":[]"));
@@ -5590,6 +6612,11 @@ mod cpu Main {
 
         let json = render_project_doctor_json(&project_root).expect("render doctor json");
 
+        assert!(json.contains("\"galaxy_surface_ids_count\":13"));
+        assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
+        assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
+        assert!(json.contains("\"surface.std.collections.v1\""));
+        assert!(json.contains("\"galaxy_records\":[{"));
         assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":1"));
         assert!(json.contains(
             "\"galaxy_hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]"
@@ -6249,6 +7276,8 @@ mod cpu Main {
         let mut child = Command::new("/bin/sh")
             .arg("-c")
             .arg("sleep 1")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .expect("spawn sleep child");
         let outcome = wait_for_test_child(
@@ -6270,6 +7299,8 @@ mod cpu Main {
         let mut child = Command::new("/bin/sh")
             .arg("-c")
             .arg("sleep 1")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .expect("spawn sleep child");
         let outcome = wait_for_test_child(
@@ -6318,6 +7349,8 @@ mod cpu Main {
         let mut child = Command::new("/bin/sh")
             .arg("-c")
             .arg("sleep 1")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .expect("spawn sleep child");
         let outcome = wait_for_test_child(

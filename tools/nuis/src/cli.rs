@@ -31,7 +31,21 @@ pub enum CommandKind {
         input: PathBuf,
         json: bool,
     },
+    UnpackArtifactSupport {
+        input: PathBuf,
+        output_dir: PathBuf,
+        json: bool,
+    },
+    MaterializeArtifact {
+        input: PathBuf,
+        output_dir: PathBuf,
+        json: bool,
+    },
     ArtifactDoctor {
+        input: PathBuf,
+        json: bool,
+    },
+    BuildReport {
         input: PathBuf,
         json: bool,
     },
@@ -88,6 +102,7 @@ pub enum CommandKind {
     },
     RunArtifact {
         input: PathBuf,
+        json: bool,
     },
     DumpAst {
         input: PathBuf,
@@ -277,6 +292,66 @@ where
                 json,
             })
         }
+        "unpack-artifact-support" => {
+            let mut json = false;
+            let mut input = None;
+            let mut output_dir = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else if output_dir.is_none() {
+                    output_dir = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis unpack-artifact-support [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::UnpackArtifactSupport {
+                input: input.ok_or_else(|| {
+                    "usage: nuis unpack-artifact-support [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                        .to_owned()
+                })?,
+                output_dir: output_dir.ok_or_else(|| {
+                    "usage: nuis unpack-artifact-support [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
+        "materialize-artifact" => {
+            let mut json = false;
+            let mut input = None;
+            let mut output_dir = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else if output_dir.is_none() {
+                    output_dir = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis materialize-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::MaterializeArtifact {
+                input: input.ok_or_else(|| {
+                    "usage: nuis materialize-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                        .to_owned()
+                })?,
+                output_dir: output_dir.ok_or_else(|| {
+                    "usage: nuis materialize-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
         "artifact-doctor" => {
             let mut json = false;
             let mut input = None;
@@ -295,6 +370,29 @@ where
             Ok(CommandKind::ArtifactDoctor {
                 input: input.ok_or_else(|| {
                     "usage: nuis artifact-doctor [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
+        "build-report" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis build-report [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::BuildReport {
+                input: input.ok_or_else(|| {
+                    "usage: nuis build-report [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
                         .to_owned()
                 })?,
                 json,
@@ -561,12 +659,29 @@ where
                 target,
             })
         }
-        "run-artifact" => Ok(CommandKind::RunArtifact {
-            input: PathBuf::from(args.next().ok_or_else(|| {
-                "usage: nuis run-artifact <binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
-                    .to_owned()
-            })?),
-        }),
+        "run-artifact" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis run-artifact [--json] <binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::RunArtifact {
+                input: input.ok_or_else(|| {
+                    "usage: nuis run-artifact [--json] <binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
         "dump-ast" => Ok(CommandKind::DumpAst {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
@@ -688,7 +803,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `artifact-doctor`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }
@@ -935,6 +1050,27 @@ mod tests {
             command,
             CommandKind::RunArtifact {
                 input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
+                json: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_run_artifact_json_with_manifest_input() {
+        let command = parse_args(
+            [
+                "run-artifact".to_owned(),
+                "--json".to_owned(),
+                "target/demo/nuis.build.manifest.toml".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .expect("run-artifact json parses");
+        assert_eq!(
+            command,
+            CommandKind::RunArtifact {
+                input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
+                json: true,
             }
         );
     }
@@ -955,6 +1091,69 @@ mod tests {
             CommandKind::ArtifactDoctor {
                 input: PathBuf::from("target/demo"),
                 json: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_build_report_json_with_output_dir() {
+        let command = parse_args(
+            [
+                "build-report".to_owned(),
+                "--json".to_owned(),
+                "target/demo".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .expect("build-report parses");
+        assert_eq!(
+            command,
+            CommandKind::BuildReport {
+                input: PathBuf::from("target/demo"),
+                json: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_unpack_artifact_support_json_with_output_dir() {
+        let command = parse_args(
+            [
+                "unpack-artifact-support".to_owned(),
+                "--json".to_owned(),
+                "target/demo/nuis.compiled.artifact".to_owned(),
+                "target/unpacked".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .expect("unpack-artifact-support parses");
+        assert_eq!(
+            command,
+            CommandKind::UnpackArtifactSupport {
+                input: PathBuf::from("target/demo/nuis.compiled.artifact"),
+                output_dir: PathBuf::from("target/unpacked"),
+                json: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_materialize_artifact_with_output_dir() {
+        let command = parse_args(
+            [
+                "materialize-artifact".to_owned(),
+                "target/demo/nuis.build.manifest.toml".to_owned(),
+                "target/materialized".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .expect("materialize-artifact parses");
+        assert_eq!(
+            command,
+            CommandKind::MaterializeArtifact {
+                input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
+                output_dir: PathBuf::from("target/materialized"),
+                json: false,
             }
         );
     }

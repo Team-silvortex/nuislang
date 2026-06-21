@@ -6,11 +6,11 @@ depends_on = ["core", "std"]
 summary = "GPU-first native rendering and application framework built on nuis heterogeneous execution."
 
 surfaces = [
-  "renderer",
-  "scene-and-frame-graph",
-  "window-input-lifecycle",
-  "material-and-shader-packaging",
-  "gpu-ui-and-3d-runtime"
+  "surface.ns-nova.renderer.v1",
+  "surface.ns-nova.scene-frame-graph.v1",
+  "surface.ns-nova.window-input-lifecycle.v1",
+  "surface.ns-nova.material-shader-packaging.v1",
+  "surface.ns-nova.gpu-ui-3d-runtime.v1"
 ]
 
 library_modules = [

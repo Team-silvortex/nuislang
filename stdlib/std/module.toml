@@ -6,10 +6,10 @@ depends_on = ["core"]
 summary = "Practical systems layer built on core."
 
 surfaces = [
-  "collections",
-  "host-ffi-helpers",
-  "data-plane-helpers",
-  "project-utility-surfaces"
+  "surface.std.collections.v1",
+  "surface.std.host-ffi-helpers.v1",
+  "surface.std.data-plane-helpers.v1",
+  "surface.std.project-utility.v1"
 ]
 
 library_modules = [
@@ -39,6 +39,7 @@ source_modules = [
   "filesystem_io_report_recipe.ns",
   "filesystem_report_file_recipe.ns",
   "file_output_recipe.ns",
+  "file_roundtrip_recipe.ns",
   "argv_runtime.ns",
   "argv_runtime_recipe.ns",
   "env_runtime.ns",
@@ -125,7 +126,10 @@ source_modules = [
   "text_format_runtime_recipe.ns",
   "text_pipeline_recipe.ns",
   "text_report_builder_recipe.ns",
+  "text_report_json_recipe.ns",
   "text_json_recipe.ns",
+  "time_report_recipe.ns",
+  "benchmark_report_recipe.ns",
   "cwd_runtime.ns",
   "cwd_runtime_recipe.ns",
   "temp_runtime.ns",

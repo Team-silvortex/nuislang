@@ -45,7 +45,7 @@ pub(crate) fn parse_optional_toml_string(source: &str, key: &str) -> Option<Stri
         if let Some(rest) = line.strip_prefix(&prefix) {
             let value = rest.trim();
             if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
-                return Some(value[1..value.len() - 1].to_owned());
+                return unescape_toml_basic_string(&value[1..value.len() - 1]);
             }
             return None;
         }
@@ -109,7 +109,7 @@ pub(crate) fn parse_optional_toml_string_array(source: &str, key: &str) -> Optio
 pub(crate) fn parse_optional_map_string(values: &BTreeMap<String, String>, key: &str) -> Option<String> {
     let value = values.get(key)?;
     if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
-        Some(value[1..value.len() - 1].to_owned())
+        unescape_toml_basic_string(&value[1..value.len() - 1])
     } else {
         None
     }
@@ -145,7 +145,12 @@ pub(crate) fn parse_required_map_string_in_block(
         ))
     })?;
     if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
-        return Ok(value[1..value.len() - 1].to_owned());
+        return unescape_toml_basic_string(&value[1..value.len() - 1]).ok_or_else(|| {
+            ArtifactError::new(format!(
+                "`{}` {block_name} key `{key}` contains an unsupported escape sequence",
+                manifest_path.display()
+            ))
+        });
     }
     Err(ArtifactError::new(format!(
         "`{}` {block_name} key `{key}` must be a quoted string",
@@ -154,7 +159,10 @@ pub(crate) fn parse_required_map_string_in_block(
 }
 
 pub(crate) fn escape_toml_string(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('"', "\\\"")
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
 }
 
 pub(crate) fn render_string_array(values: &[String]) -> String {
@@ -163,4 +171,25 @@ pub(crate) fn render_string_array(values: &[String]) -> String {
         .map(|value| format!("\"{}\"", escape_toml_string(value)))
         .collect::<Vec<_>>();
     format!("[{}]", quoted.join(", "))
+}
+
+fn unescape_toml_basic_string(value: &str) -> Option<String> {
+    let mut out = String::with_capacity(value.len());
+    let mut chars = value.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            out.push(ch);
+            continue;
+        }
+        let escaped = chars.next()?;
+        match escaped {
+            '\\' => out.push('\\'),
+            '"' => out.push('"'),
+            'n' => out.push('\n'),
+            't' => out.push('\t'),
+            'r' => out.push('\r'),
+            _ => return None,
+        }
+    }
+    Some(out)
 }

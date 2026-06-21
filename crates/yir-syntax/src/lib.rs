@@ -350,7 +350,11 @@ fn synthesize_lane_effect_edges(module: &mut YirModule) {
             let exists = module.edges.iter().any(|edge| {
                 edge.kind == EdgeKind::Effect && edge.from == *previous && edge.to == node.name
             });
-            if !exists {
+            let reverse_exists = module
+                .edges
+                .iter()
+                .any(|edge| edge.from == node.name && edge.to == *previous);
+            if !exists && !reverse_exists {
                 module.edges.push(Edge {
                     kind: EdgeKind::Effect,
                     from: previous.clone(),
@@ -546,5 +550,30 @@ node print out cpu0@main sum
             .edges
             .iter()
             .any(|edge| edge.kind == EdgeKind::Effect && edge.from == "sum" && edge.to == "out"));
+    }
+
+    #[test]
+    fn does_not_synthesize_lane_effect_edge_against_reverse_explicit_dependency() {
+        let module = parse_module(
+            r#"
+resource cpu0 cpu.arm64
+
+cpu.target_config lowering_cpu_target_config cpu0@contract arm64 cpu.arm64.apple_aapcs64 128
+cpu.text lowering_cpu_target_contract_type cpu0@contract arch=symbol:arm64;abi=symbol:cpu.arm64.apple_aapcs64;vector_bits=i64:128
+edge dep lowering_cpu_target_contract_type lowering_cpu_target_config
+"#,
+        )
+        .unwrap();
+
+        assert!(module.edges.iter().any(|edge| {
+            edge.kind == EdgeKind::Dep
+                && edge.from == "lowering_cpu_target_contract_type"
+                && edge.to == "lowering_cpu_target_config"
+        }));
+        assert!(!module.edges.iter().any(|edge| {
+            edge.kind == EdgeKind::Effect
+                && edge.from == "lowering_cpu_target_config"
+                && edge.to == "lowering_cpu_target_contract_type"
+        }));
     }
 }

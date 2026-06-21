@@ -1,9 +1,10 @@
-use std::{fs, path::Path};
+use std::{fs, path::{Path, PathBuf}};
 
 use crate::{
+    decode_domain_payload_blob, parse_build_manifest_from_source,
     envelope::{decode_nuis_executable_envelope_binary, encode_nuis_executable_envelope_binary},
     toml::{parse_optional_toml_string_array, render_string_array},
-    ArtifactError, NuisExecutableEnvelope,
+    ArtifactError, BuildManifestDomainBuildUnit, NuisExecutableEnvelope,
 };
 
 const NUIS_COMPILED_ARTIFACT_MAGIC: &[u8; 4] = b"NART";
@@ -362,4 +363,303 @@ pub fn parse_nuis_compiled_artifact(path: &Path) -> Result<NuisCompiledArtifact,
     let bytes =
         fs::read(path).map_err(|error| ArtifactError::new(format!("failed to read `{}`: {error}", path.display())))?;
     decode_nuis_compiled_artifact_binary(&bytes)
+}
+
+pub fn materialize_embedded_artifact_support(
+    artifact: &NuisCompiledArtifact,
+    output_dir: &Path,
+) -> Result<Vec<PathBuf>, ArtifactError> {
+    fs::create_dir_all(output_dir).map_err(|error| {
+        ArtifactError::new(format!(
+            "failed to create materialization directory `{}`: {error}",
+            output_dir.display()
+        ))
+    })?;
+    let manifest =
+        parse_build_manifest_from_source(&artifact.build_manifest_source, Path::new("<embedded-build-manifest>"))?;
+    let mut written = Vec::new();
+
+    if let Some(source) = &manifest.bridge_registry_inline {
+        let path = output_dir.join("nuis.bridge.registry.toml");
+        fs::write(&path, source).map_err(|error| {
+            ArtifactError::new(format!("failed to write `{}`: {error}", path.display()))
+        })?;
+        written.push(path);
+    }
+    if let Some(source) = &manifest.host_bridge_plan_index_inline {
+        let path = output_dir.join("nuis.host-bridge.plan-index.toml");
+        fs::write(&path, source).map_err(|error| {
+            ArtifactError::new(format!("failed to write `{}`: {error}", path.display()))
+        })?;
+        written.push(path);
+    }
+
+    for unit in manifest.domain_build_units.iter().filter(|unit| unit.is_heterogeneous()) {
+        materialize_domain_unit_support(output_dir, unit, &mut written)?;
+    }
+
+    Ok(written)
+}
+
+fn materialize_domain_unit_support(
+    output_dir: &Path,
+    unit: &BuildManifestDomainBuildUnit,
+    written: &mut Vec<PathBuf>,
+) -> Result<(), ArtifactError> {
+    if let Some(source) = &unit.artifact_stub_inline {
+        let path = output_dir.join(format!("nuis.domain.{}.artifact.toml", unit.domain_family));
+        fs::write(&path, source).map_err(|error| {
+            ArtifactError::new(format!("failed to write `{}`: {error}", path.display()))
+        })?;
+        written.push(path);
+    }
+
+    if let Some(hex_blob) = &unit.artifact_payload_blob_inline {
+        let blob = decode_hex_bytes(hex_blob)?;
+        let blob_path = output_dir.join(format!("nuis.domain.{}.payload.bin", unit.domain_family));
+        fs::write(&blob_path, &blob).map_err(|error| {
+            ArtifactError::new(format!("failed to write `{}`: {error}", blob_path.display()))
+        })?;
+        written.push(blob_path);
+
+        let decoded = decode_domain_payload_blob(&blob)?;
+        if let Some(contract_section) = decoded.sections.iter().find(|section| section.name == "contract_toml") {
+            let path = output_dir.join(format!("nuis.domain.{}.payload.toml", unit.domain_family));
+            fs::write(&path, &contract_section.bytes).map_err(|error| {
+                ArtifactError::new(format!("failed to write `{}`: {error}", path.display()))
+            })?;
+            written.push(path);
+        }
+    }
+
+    if let Some(source) = &unit.artifact_bridge_stub_inline {
+        let path = output_dir.join(format!("nuis.domain.{}.bridge.stub.txt", unit.domain_family));
+        fs::write(&path, source).map_err(|error| {
+            ArtifactError::new(format!("failed to write `{}`: {error}", path.display()))
+        })?;
+        written.push(path);
+    }
+
+    Ok(())
+}
+
+fn decode_hex_bytes(value: &str) -> Result<Vec<u8>, ArtifactError> {
+    if value.len() % 2 != 0 {
+        return Err(ArtifactError::new("hex payload length must be even"));
+    }
+    let mut out = Vec::with_capacity(value.len() / 2);
+    let bytes = value.as_bytes();
+    let mut index = 0usize;
+    while index < bytes.len() {
+        let chunk = std::str::from_utf8(&bytes[index..index + 2])
+            .map_err(|_| ArtifactError::new("hex payload is not valid UTF-8"))?;
+        let byte = u8::from_str_radix(chunk, 16)
+            .map_err(|_| ArtifactError::new(format!("invalid hex byte `{chunk}`")))?;
+        out.push(byte);
+        index += 2;
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use crate::{
+        encode_domain_payload_blob, materialize_embedded_artifact_support, DomainBuildUnitPayloadBlob,
+        DomainBuildUnitPayloadBlobSection, NuisCompiledArtifact, NuisExecutableEnvelope,
+        NuisLifecycleContract,
+    };
+
+    fn temp_dir(label: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("nuis_artifact_{label}_{unique}"));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn hex_encode_bytes(bytes: &[u8]) -> String {
+        let mut out = String::with_capacity(bytes.len() * 2);
+        for byte in bytes {
+            use std::fmt::Write as _;
+            let _ = write!(&mut out, "{byte:02x}");
+        }
+        out
+    }
+
+    #[test]
+    fn materializes_embedded_heterogeneous_support_files() {
+        let blob = DomainBuildUnitPayloadBlob {
+            domain_family: "network".to_owned(),
+            package_id: "official.network".to_owned(),
+            backend_family: Some("urlsession".to_owned()),
+            selected_lowering_target: Some("urlsession".to_owned()),
+            contract_family: "nustar.network".to_owned(),
+            packaging_role: "hetero-contract".to_owned(),
+            payload_kind: "contract-sidecar".to_owned(),
+            payload_format: "toml".to_owned(),
+            sections: vec![
+                DomainBuildUnitPayloadBlobSection {
+                    name: "contract_toml".to_owned(),
+                    bytes: br#"schema = "nuis-domain-build-payload-v1""#.to_vec(),
+                },
+                DomainBuildUnitPayloadBlobSection {
+                    name: "lowering_plan".to_owned(),
+                    bytes: b"lowering".to_vec(),
+                },
+                DomainBuildUnitPayloadBlobSection {
+                    name: "backend_stub".to_owned(),
+                    bytes: b"backend".to_vec(),
+                },
+                DomainBuildUnitPayloadBlobSection {
+                    name: "bridge_plan".to_owned(),
+                    bytes: b"bridge-plan".to_vec(),
+                },
+            ],
+        };
+        let encoded_blob = encode_domain_payload_blob(&blob).unwrap();
+        let manifest = format!(
+            r#"manifest_schema = "nuis-build-manifest-v1"
+input = "/tmp/demo.ns"
+output_dir = "/tmp/out"
+packaging_mode = "window-aot-bundle"
+path = "/tmp/out/nuis.executable.envelope.toml"
+schema = "nuis-executable-envelope-v1"
+package_count = 2
+artifact_path = "/tmp/out/nuis.compiled.artifact"
+artifact_schema = "nuis-compiled-artifact-v1"
+artifact_binary_name = "demo.bin"
+artifact_binary_bytes = 3
+lifecycle_schema = "nuis-lifecycle-contract-v1"
+lifecycle_bootstrap_entry = "nuis.bootstrap.lifecycle.v1"
+lifecycle_tick_policy = "cooperative"
+lifecycle_shutdown_policy = "graceful"
+lifecycle_yalivia_rpc = "yalivia.rpc.bootstrap.v1"
+lifecycle_hook_surface = ["on_bootstrap"]
+lifecycle_export_surface = ["tick_export"]
+lifecycle_runtime_capability_flags = ["runtime.tick"]
+function_kind = "function-node"
+graph_kind = "function-graph"
+default_time_mode = "logical"
+cpu_target_abi = "cpu.x86_64.sysv64"
+cpu_target_machine_arch = "x86_64"
+cpu_target_machine_os = "linux"
+cpu_target_object_format = "elf"
+cpu_target_calling_abi = "sysv64"
+cpu_target_clang = "x86_64-unknown-linux-gnu"
+cpu_target_cross = true
+bridge_registry_path = "/tmp/out/nuis.bridge.registry.toml"
+bridge_registry_schema = "nuis-bridge-registry-v1"
+bridge_registry_units = 1
+bridge_registry_inline = "schema = \"nuis-bridge-registry-v1\"\nbridge_count = 1\ndomains = [\"network\"]\n"
+host_bridge_plan_index_path = "/tmp/out/nuis.host-bridge.plan-index.toml"
+host_bridge_plan_index_schema = "nuis-host-bridge-plan-index-v1"
+host_bridge_plan_units = 1
+host_bridge_plan_index_inline = "schema = \"nuis-host-bridge-plan-index-v1\"\nplan_count = 1\ndomains = [\"network\"]\n"
+
+[[artifact_hash]]
+kind = "artifact"
+path = "/tmp/out/nuis.compiled.artifact"
+bytes = 3
+fnv1a64 = "0x0000000000000000"
+
+[[execution_contract]]
+package_id = "official.cpu"
+domain_family = "cpu"
+
+[[execution_contract]]
+package_id = "official.network"
+domain_family = "network"
+
+[[domain_build_unit]]
+package_id = "official.cpu"
+domain_family = "cpu"
+selected_lowering_target = "llvm"
+contract_family = "nustar.cpu"
+packaging_role = "host-binary"
+
+[[domain_build_unit]]
+package_id = "official.network"
+domain_family = "network"
+backend_family = "urlsession"
+selected_lowering_target = "urlsession"
+artifact_stub_path = "/tmp/out/nuis.domain.network.artifact.toml"
+artifact_stub_inline = "schema = \"nuis-domain-build-unit-v1\""
+artifact_payload_path = "/tmp/out/nuis.domain.network.payload.toml"
+artifact_bridge_stub_path = "/tmp/out/nuis.domain.network.bridge.stub.txt"
+artifact_bridge_stub_inline = "schema = \"nuis-host-bridge-spec-v1\""
+artifact_payload_blob_path = "/tmp/out/nuis.domain.network.payload.bin"
+artifact_payload_blob_bytes = {blob_bytes}
+artifact_payload_format = "ndpb-v2"
+artifact_payload_blob_inline = "{blob_hex}"
+contract_family = "nustar.network"
+packaging_role = "hetero-contract"
+"#,
+            blob_bytes = encoded_blob.len(),
+            blob_hex = hex_encode_bytes(&encoded_blob),
+        );
+        let artifact = NuisCompiledArtifact {
+            schema: "nuis-compiled-artifact-v1".to_owned(),
+            packaging_mode: "window-aot-bundle".to_owned(),
+            cpu_target_abi: "cpu.x86_64.sysv64".to_owned(),
+            cpu_target_machine_arch: "x86_64".to_owned(),
+            cpu_target_machine_os: "linux".to_owned(),
+            cpu_target_object_format: "elf".to_owned(),
+            cpu_target_calling_abi: "sysv64".to_owned(),
+            binary_name: "demo.bin".to_owned(),
+            binary_bytes: 3,
+            build_manifest_bytes: manifest.len(),
+            envelope: NuisExecutableEnvelope {
+                schema: "nuis-executable-envelope-v1".to_owned(),
+                executable_kind: "window-aot-bundle".to_owned(),
+                package_count: 2,
+                domain_families: vec!["cpu".to_owned(), "network".to_owned()],
+                contract_families: vec!["nustar.cpu".to_owned(), "nustar.network".to_owned()],
+                function_kind: "function-node".to_owned(),
+                graph_kind: "function-graph".to_owned(),
+                default_time_mode: "logical".to_owned(),
+            },
+            lifecycle: NuisLifecycleContract {
+                schema: "nuis-lifecycle-contract-v1".to_owned(),
+                bootstrap_entry: "nuis.bootstrap.lifecycle.v1".to_owned(),
+                tick_policy: "cooperative".to_owned(),
+                shutdown_policy: "graceful".to_owned(),
+                yalivia_rpc: "yalivia.rpc.bootstrap.v1".to_owned(),
+                hook_surface: vec!["on_bootstrap".to_owned()],
+                export_surface: vec!["tick_export".to_owned()],
+                runtime_capability_flags: vec!["runtime.tick".to_owned()],
+            },
+            build_manifest_source: manifest,
+            binary_blob: b"bin".to_vec(),
+        };
+
+        let out = temp_dir("materialize_support");
+        let written = materialize_embedded_artifact_support(&artifact, &out).unwrap();
+
+        assert!(written.iter().any(|path| path.ends_with("nuis.bridge.registry.toml")));
+        assert!(written.iter().any(|path| path.ends_with("nuis.host-bridge.plan-index.toml")));
+        assert!(written.iter().any(|path| path.ends_with("nuis.domain.network.artifact.toml")));
+        assert!(written.iter().any(|path| path.ends_with("nuis.domain.network.payload.toml")));
+        assert!(written.iter().any(|path| path.ends_with("nuis.domain.network.payload.bin")));
+        assert!(written.iter().any(|path| path.ends_with("nuis.domain.network.bridge.stub.txt")));
+        assert_eq!(
+            fs::read(out.join("nuis.domain.network.payload.bin")).unwrap(),
+            encoded_blob
+        );
+        assert_eq!(
+            fs::read(out.join("nuis.domain.network.payload.toml")).unwrap(),
+            br#"schema = "nuis-domain-build-payload-v1""#
+        );
+        assert_eq!(
+            fs::read_to_string(out.join("nuis.domain.network.bridge.stub.txt")).unwrap(),
+            r#"schema = "nuis-host-bridge-spec-v1""#
+        );
+    }
 }

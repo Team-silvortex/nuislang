@@ -41,6 +41,7 @@ pub struct StdlibModuleManifest {
     pub tier: String,
     pub depends_on: Vec<String>,
     pub summary: String,
+    pub surfaces: Vec<String>,
     pub source_modules: Vec<String>,
     pub library_modules: Vec<String>,
     pub library_import_policy: StdlibLibraryImportPolicy,
@@ -56,6 +57,7 @@ pub struct ResolvedGalaxyDependency {
     pub module_dir: PathBuf,
     pub manifest_path: PathBuf,
     pub depends_on: Vec<String>,
+    pub surfaces: Vec<String>,
     pub source_modules: Vec<String>,
     pub resolved_source_paths: Vec<PathBuf>,
     pub library_modules: Vec<String>,
@@ -121,10 +123,95 @@ pub fn load_stdlib_module_manifest(
         tier: parse_required_string(&source, "tier", &path)?,
         depends_on: parse_optional_string_array(&source, "depends_on").unwrap_or_default(),
         summary: parse_required_string(&source, "summary", &path)?,
+        surfaces: parse_optional_string_array(&source, "surfaces").unwrap_or_default(),
         source_modules: parse_optional_string_array(&source, "source_modules").unwrap_or_default(),
         library_modules: parse_optional_string_array(&source, "library_modules").unwrap_or_default(),
         library_import_policy: parse_library_import_policy(&source, &path)?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pixelmagic_manifest_exposes_canonical_surface_registry_ids() {
+        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
+        let manifest =
+            load_stdlib_module_manifest(&stdlib_root, "pixelmagic").expect("load pixelmagic");
+        assert_eq!(manifest.name, "pixelmagic");
+        assert_eq!(
+            manifest.surfaces,
+            vec![
+                "contract.pixelmagic.image-resource-shaping.v1".to_owned(),
+                "contract.pixelmagic.texture-handoff.v1".to_owned(),
+                "contract.pixelmagic.shader-facing-image-prep.v1".to_owned(),
+                "surface.pixelmagic.shader.contracts.v1".to_owned(),
+                "surface.pixelmagic.shader.packet-bridge.v1".to_owned(),
+                "surface.pixelmagic.shader.render.v1".to_owned(),
+                "surface.pixelmagic.shader.texture.v1".to_owned(),
+                "surface.pixelmagic.shader.pipeline.v1".to_owned(),
+            ]
+        );
+        assert_eq!(
+            manifest.library_modules,
+            vec![
+                "lib/image_contracts.ns".to_owned(),
+                "lib/shader_contracts.ns".to_owned(),
+                "lib/packet_bridge_surface.ns".to_owned(),
+                "lib/render_surface.ns".to_owned(),
+                "lib/texture_surface.ns".to_owned(),
+                "lib/pipeline_surface.ns".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn core_manifest_exposes_canonical_surface_registry_ids() {
+        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
+        let manifest = load_stdlib_module_manifest(&stdlib_root, "core").expect("load core");
+        assert_eq!(
+            manifest.surfaces,
+            vec![
+                "contract.core.prelude.primitive-values.v1".to_owned(),
+                "contract.core.prelude.ref-ownership-conventions.v1".to_owned(),
+                "contract.core.prelude.basic-math.v1".to_owned(),
+                "contract.core.prelude.structural-source.v1".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn std_manifest_exposes_canonical_surface_registry_ids() {
+        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
+        let manifest = load_stdlib_module_manifest(&stdlib_root, "std").expect("load std");
+        assert_eq!(
+            manifest.surfaces,
+            vec![
+                "surface.std.collections.v1".to_owned(),
+                "surface.std.host-ffi-helpers.v1".to_owned(),
+                "surface.std.data-plane-helpers.v1".to_owned(),
+                "surface.std.project-utility.v1".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn ns_nova_manifest_exposes_canonical_surface_registry_ids() {
+        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
+        let manifest =
+            load_stdlib_module_manifest(&stdlib_root, "ns-nova").expect("load ns-nova");
+        assert_eq!(
+            manifest.surfaces,
+            vec![
+                "surface.ns-nova.renderer.v1".to_owned(),
+                "surface.ns-nova.scene-frame-graph.v1".to_owned(),
+                "surface.ns-nova.window-input-lifecycle.v1".to_owned(),
+                "surface.ns-nova.material-shader-packaging.v1".to_owned(),
+                "surface.ns-nova.gpu-ui-3d-runtime.v1".to_owned(),
+            ]
+        );
+    }
 }
 
 pub fn resolve_galaxy_dependencies(
@@ -182,6 +269,7 @@ pub fn resolve_galaxy_dependencies(
                 module_dir: module_dir.clone(),
                 manifest_path: module_dir.join("module.toml"),
                 depends_on: manifest.depends_on.clone(),
+                surfaces: manifest.surfaces.clone(),
                 source_modules: manifest.source_modules.clone(),
                 resolved_source_paths,
                 library_modules: manifest.library_modules.clone(),
@@ -410,6 +498,14 @@ pub fn render_resolved_galaxy_index(
                 "<none>".to_owned()
             } else {
                 item.library_modules.join(", ")
+            }
+        ));
+        out.push_str(&format!(
+            "  surfaces={}\n",
+            if item.surfaces.is_empty() {
+                "<none>".to_owned()
+            } else {
+                item.surfaces.join(", ")
             }
         ));
         out.push_str(&format!(

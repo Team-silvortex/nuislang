@@ -755,6 +755,26 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
         .collect::<Vec<_>>();
     let domain_json = crate::project_plan_domains_json(&plan)?;
     let public_surface_json = crate::public_surface_json(&public_surface);
+    let galaxy_surface_ids = project
+        .resolved_galaxies
+        .iter()
+        .flat_map(|dependency| dependency.surfaces.iter().cloned())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let galaxy_records = project
+        .resolved_galaxies
+        .iter()
+        .map(|dependency| {
+            format!(
+                "{{{},{},{},{}}}",
+                crate::json_field("name", &dependency.name),
+                crate::json_field("package_id", &dependency.package_id),
+                crate::json_string_array_field("surfaces", &dependency.surfaces),
+                crate::json_string_array_field("library_modules", &dependency.library_modules)
+            )
+        })
+        .collect::<Vec<_>>();
     let mut fields = vec![
         crate::json_field("source_kind", "project"),
         crate::json_field("input", &input.display().to_string()),
@@ -807,6 +827,18 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
             .iter()
             .map(|item| format!("{}={}", item.name, item.version))
             .collect::<Vec<_>>(),
+    ));
+    fields.push(crate::json_usize_field(
+        "galaxy_surface_ids_count",
+        galaxy_surface_ids.len(),
+    ));
+    fields.push(crate::json_string_array_field(
+        "galaxy_surface_ids",
+        &galaxy_surface_ids,
+    ));
+    fields.push(crate::json_object_array_field(
+        "galaxy_records",
+        &galaxy_records,
     ));
     fields.push(crate::json_usize_field(
         "galaxy_imports_count",
@@ -1046,6 +1078,26 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
             )
         })
         .collect::<Vec<_>>();
+    let galaxy_surface_ids = project
+        .resolved_galaxies
+        .iter()
+        .flat_map(|dependency| dependency.surfaces.iter().cloned())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let galaxy_records = project
+        .resolved_galaxies
+        .iter()
+        .map(|dependency| {
+            format!(
+                "{{{},{},{},{}}}",
+                crate::json_field("name", &dependency.name),
+                crate::json_field("package_id", &dependency.package_id),
+                crate::json_string_array_field("surfaces", &dependency.surfaces),
+                crate::json_string_array_field("library_modules", &dependency.library_modules)
+            )
+        })
+        .collect::<Vec<_>>();
     let dependency_json = galaxy_doctor
         .dependencies
         .iter()
@@ -1163,6 +1215,18 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     fields.push(crate::json_usize_field(
         "galaxy_imports_count",
         project.manifest.galaxy_imports.len(),
+    ));
+    fields.push(crate::json_usize_field(
+        "galaxy_surface_ids_count",
+        galaxy_surface_ids.len(),
+    ));
+    fields.push(crate::json_string_array_field(
+        "galaxy_surface_ids",
+        &galaxy_surface_ids,
+    ));
+    fields.push(crate::json_object_array_field(
+        "galaxy_records",
+        &galaxy_records,
     ));
     fields.push(crate::json_string_array_field(
         "galaxy_imports",

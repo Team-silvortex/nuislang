@@ -67,6 +67,9 @@ Current rule:
 * [json_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/json_runtime_recipe.ns)
 * [text_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_pipeline_recipe.ns)
 * [text_report_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_report_builder_recipe.ns)
+* [text_report_json_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_report_json_recipe.ns)
+* [time_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/time_report_recipe.ns)
+* [benchmark_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/benchmark_report_recipe.ns)
 * [io_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_report_recipe.ns)
 * cross-lane closure:
   [filesystem_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_report_recipe.ns)
@@ -111,7 +114,10 @@ Shortest grouped route:
   [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/input_runtime_demo),
   [terminal_io_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/terminal_io_demo),
   [host_text_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/host_text_runtime_demo),
-  [text_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_json_demo)
+  [text_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_json_demo),
+  [text_report_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_report_json_demo),
+  [time_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/time_report_demo),
+  [benchmark_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_demo)
 
 Wider grouped route:
 
@@ -120,6 +126,10 @@ Wider grouped route:
   [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/tty_runtime_demo)
 * formatting and result/report probes:
   [text_format_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_format_runtime_demo),
+  [text_report_builder_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_report_builder_demo),
+  [text_report_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_report_json_demo),
+  [time_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/time_report_demo),
+  [benchmark_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_demo),
   [error_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/error_runtime_demo),
   [result_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_runtime_demo),
   [result_enum_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_enum_runtime_demo),

@@ -1,6 +1,6 @@
 use data FabricPlane;
 
-mod shader PixelMagicSurfaceShader {
+mod shader PixelMagicRenderSurface {
   fn profile() {
     const vertex_count: i64 = 4;
     const instance_count: i64 = 1;
@@ -14,8 +14,8 @@ mod shader PixelMagicSurfaceShader {
 
     let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
     let profile_view: Viewport = shader_viewport(160, 120);
-    let profile_pipe: Pipeline = shader_pipeline("pixelmagic_packet_bridge", "triangle_strip");
-    let profile_wgsl: ShaderModule = shader_inline_wgsl("pixelmagic_packet_bridge", wgsl {
+    let profile_pipe: Pipeline = shader_pipeline("pixelmagic_render_demo", "triangle_strip");
+    let profile_wgsl: ShaderModule = shader_inline_wgsl("pixelmagic_render_demo", wgsl {
       struct VsOut {
         @builtin(position) pos: vec4<f32>,
         @location(0) uv: vec2<f32>,
@@ -33,8 +33,9 @@ mod shader PixelMagicSurfaceShader {
 
       @fragment
       fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-        let luma: f32 = 0.22 + uv.x * 0.33 + uv.y * 0.19;
-        return vec4<f32>(vec3<f32>(luma), 1.0);
+        let luma: f32 = 0.18 + uv.x * 0.37 + uv.y * 0.23;
+        let glow: f32 = 0.08 + uv.x * 0.11;
+        return vec4<f32>(luma, luma + glow, luma, 1.0);
       }
     });
   }

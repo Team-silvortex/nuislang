@@ -9,7 +9,7 @@ mod data FabricPlane {
   type UplinkPipeClassMarker = Marker<UplinkPipeClass>;
   type DownlinkPipeClassMarker = Marker<DownlinkPipeClass>;
   type PayloadClassMarker = Marker<PayloadClassWindow>;
-  type UplinkPayloadShapeMarker = Marker<PayloadShapeWindowPixelMagicPipelineShaderPacket>;
+  type UplinkPayloadShapeMarker = Marker<PayloadShapeWindowPixelMagicPipelineSurfacePacket>;
   type DownlinkPayloadShapeMarker = Marker<PayloadShapeWindowFrame>;
   type UplinkWindowPolicyMarker = Marker<UplinkWindowPolicy>;
   type DownlinkWindowPolicyMarker = Marker<DownlinkWindowPolicy>;

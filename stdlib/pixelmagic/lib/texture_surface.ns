@@ -1,21 +1,22 @@
 use data FabricPlane;
 
-mod shader PixelMagicSurfaceShader {
+mod shader PixelMagicTextureSurface {
   fn profile() {
     const vertex_count: i64 = 4;
     const instance_count: i64 = 1;
     const packet_color_slot: i64 = 0;
     const packet_speed_slot: i64 = 1;
     const packet_radius_slot: i64 = 2;
-    const packet_tag: i64 = 71;
-    const material_mode: i64 = 4;
+    const packet_tag: i64 = 79;
+    const material_mode: i64 = 5;
     const pass_kind: i64 = 1;
     const packet_field_count: i64 = 6;
 
     let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
     let profile_view: Viewport = shader_viewport(160, 120);
-    let profile_pipe: Pipeline = shader_pipeline("pixelmagic_render_demo", "triangle_strip");
-    let profile_wgsl: ShaderModule = shader_inline_wgsl("pixelmagic_render_demo", wgsl {
+    let profile_pipe: Pipeline =
+      shader_pipeline("pixelmagic_texture_resource_demo", "triangle_strip");
+    let profile_wgsl: ShaderModule = shader_inline_wgsl("pixelmagic_texture_resource_demo", wgsl {
       struct VsOut {
         @builtin(position) pos: vec4<f32>,
         @location(0) uv: vec2<f32>,
@@ -33,9 +34,9 @@ mod shader PixelMagicSurfaceShader {
 
       @fragment
       fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-        let luma: f32 = 0.18 + uv.x * 0.37 + uv.y * 0.23;
-        let glow: f32 = 0.08 + uv.x * 0.11;
-        return vec4<f32>(luma, luma + glow, luma, 1.0);
+        let luma: f32 = 0.12 + uv.x * 0.46 + uv.y * 0.19;
+        let tint: f32 = 0.10 + uv.y * 0.17;
+        return vec4<f32>(luma, luma + tint, luma + 0.04, 1.0);
       }
     });
   }

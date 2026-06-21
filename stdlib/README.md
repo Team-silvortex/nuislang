@@ -47,6 +47,9 @@ At the current repo stage:
 * galaxy dependencies may also declare dedicated `library_modules` for safe
   automatic project injection; `pixelmagic` now exposes its first one through
   [pixelmagic/lib/image_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/image_contracts.ns)
+* stdlib package manifests now also use registry-style stable `surfaces` ids,
+  so discovery vocabulary can stay stable even if concrete module filenames
+  continue to evolve
 * `core` and `std` now also expose their first library-module surfaces through
   [core/lib/prelude_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/lib/prelude_contracts.ns)
   and

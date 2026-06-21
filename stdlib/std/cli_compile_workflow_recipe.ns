@@ -1191,7 +1191,7 @@ mod cpu Main {
           test_report,
           project_build,
           true,
-          skipped_build_step(release_step)
+          skipped_build_step(steps.release)
         ),
         failure_handle
       );

@@ -65,6 +65,7 @@ Current rule:
 * [file_read_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_read_recipe.ns)
 * [file_write_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_write_recipe.ns)
 * [file_copy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_copy_recipe.ns)
+* [file_roundtrip_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_roundtrip_recipe.ns)
 * report bridge:
   [path_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_runtime_recipe.ns)
   ->
@@ -88,6 +89,7 @@ Current rule:
 * [file_read_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_read_recipe.ns)
 * [file_write_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_write_recipe.ns)
 * [file_copy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_copy_recipe.ns)
+* [file_roundtrip_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_roundtrip_recipe.ns)
 * [file_output_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_output_recipe.ns)
 
 ### Location Roots
@@ -136,6 +138,7 @@ Wider grouped route:
   [file_read_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo),
   [file_write_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo),
   [file_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo),
+  [file_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_roundtrip_demo),
   [file_output_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_output_demo),
   [directory_create_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_create_demo),
   [directory_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_remove_demo),

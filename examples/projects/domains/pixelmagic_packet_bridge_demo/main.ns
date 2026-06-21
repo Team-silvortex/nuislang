@@ -1,10 +1,10 @@
 use cpu PixelMagicContracts;
 use data FabricPlane;
-use shader PixelMagicSurfaceShader;
+use shader PixelMagicPacketBridgeSurface;
 
 mod cpu Main {
   type FabricBindings = HandleTable<FabricPlaneBindings>;
-  type ShaderPacketWindow = Window<PixelMagicSurfaceShaderPacket>;
+  type ShaderPacketWindow = Window<PixelMagicPacketBridgeSurfacePacket>;
   type HostFrameWindow = Window<Frame>;
 
   fn lower_pixelmagic_packet(
@@ -14,24 +14,24 @@ mod cpu Main {
     op_kind: i64,
     amount: i64,
     flags: i64
-  ) -> PixelMagicSurfaceShaderPacket {
+  ) -> PixelMagicPacketBridgeSurfacePacket {
     let color_seed: i64 = shader_profile_color_seed(
-      "PixelMagicSurfaceShader",
+      "PixelMagicPacketBridgeSurface",
       PixelMagicContracts.shader_color_seed_base(source_handle, op_kind, flags),
       0
     );
     let speed_seed: i64 = shader_profile_speed_seed(
-      "PixelMagicSurfaceShader",
+      "PixelMagicPacketBridgeSurface",
       flags,
       2,
       PixelMagicContracts.shader_speed_seed_base(width, amount)
     );
     let radius_seed: i64 = shader_profile_radius_seed(
-      "PixelMagicSurfaceShader",
+      "PixelMagicPacketBridgeSurface",
       PixelMagicContracts.shader_radius_seed_base(height, flags, op_kind),
       0
     );
-    return shader_profile_packet("PixelMagicSurfaceShader", color_seed, speed_seed, radius_seed);
+    return shader_profile_packet("PixelMagicPacketBridgeSurface", color_seed, speed_seed, radius_seed);
   }
 
   fn main() {
@@ -46,14 +46,14 @@ mod cpu Main {
     let flags: i64 = 1;
     let image_packet_total: i64 =
       PixelMagicContracts.filter_packet_total(source_handle, width, height, op_kind, amount);
-    let lowered: PixelMagicSurfaceShaderPacket =
+    let lowered: PixelMagicPacketBridgeSurfacePacket =
       lower_pixelmagic_packet(source_handle, width, height, op_kind, amount, flags);
 
     data_profile_bind_core("FabricPlane");
     let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
     let gpu_packet: ShaderPacketWindow =
       data_profile_send_uplink("FabricPlane", lowered);
-    let frame: Frame = shader_profile_render("PixelMagicSurfaceShader", gpu_packet);
+    let frame: Frame = shader_profile_render("PixelMagicPacketBridgeSurface", gpu_packet);
     let host_frame: HostFrameWindow = data_profile_send_downlink("FabricPlane", frame);
 
     print(

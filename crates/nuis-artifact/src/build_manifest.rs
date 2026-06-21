@@ -58,9 +58,11 @@ pub struct BuildManifest {
     pub bridge_registry_path: Option<String>,
     pub bridge_registry_schema: Option<String>,
     pub bridge_registry_units: usize,
+    pub bridge_registry_inline: Option<String>,
     pub host_bridge_plan_index_path: Option<String>,
     pub host_bridge_plan_index_schema: Option<String>,
     pub host_bridge_plan_units: usize,
+    pub host_bridge_plan_index_inline: Option<String>,
     pub artifact_hashes: Vec<ArtifactHashEntry>,
     pub execution_contract_count: usize,
     pub domain_build_units: Vec<BuildManifestDomainBuildUnit>,
@@ -131,12 +133,15 @@ pub fn parse_build_manifest_from_source(
     let bridge_registry_path = parse_optional_toml_string(source, "bridge_registry_path");
     let bridge_registry_schema = parse_optional_toml_string(source, "bridge_registry_schema");
     let bridge_registry_units = parse_optional_toml_usize(source, "bridge_registry_units").unwrap_or(0);
+    let bridge_registry_inline = parse_optional_toml_string(source, "bridge_registry_inline");
     let host_bridge_plan_index_path =
         parse_optional_toml_string(source, "host_bridge_plan_index_path");
     let host_bridge_plan_index_schema =
         parse_optional_toml_string(source, "host_bridge_plan_index_schema");
     let host_bridge_plan_units =
         parse_optional_toml_usize(source, "host_bridge_plan_units").unwrap_or(0);
+    let host_bridge_plan_index_inline =
+        parse_optional_toml_string(source, "host_bridge_plan_index_inline");
     let artifact_hashes = parse_artifact_hash_blocks(source, path)?;
     let execution_contract_count = source
         .lines()
@@ -183,9 +188,11 @@ pub fn parse_build_manifest_from_source(
         bridge_registry_path,
         bridge_registry_schema,
         bridge_registry_units,
+        bridge_registry_inline,
         host_bridge_plan_index_path,
         host_bridge_plan_index_schema,
         host_bridge_plan_units,
+        host_bridge_plan_index_inline,
         artifact_hashes,
         execution_contract_count,
         domain_build_units,

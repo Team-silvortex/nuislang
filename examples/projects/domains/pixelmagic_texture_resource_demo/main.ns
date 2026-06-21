@@ -1,10 +1,10 @@
 use cpu PixelMagicContracts;
 use data FabricPlane;
-use shader PixelMagicTextureShader;
+use shader PixelMagicTextureSurface;
 
 mod cpu Main {
   type FabricBindings = HandleTable<FabricPlaneBindings>;
-  type ShaderPacketWindow = Window<PixelMagicTextureShaderPacket>;
+  type ShaderPacketWindow = Window<PixelMagicTextureSurfacePacket>;
   type HostFrameWindow = Window<Frame>;
   type FrameStatus = ShaderResult<Frame>;
 
@@ -60,9 +60,9 @@ mod cpu Main {
   fn lower_resource_to_shader_packet(
     resource: PixelMagicImageResource,
     state: NovaResourceSetState
-  ) -> PixelMagicTextureShaderPacket {
+  ) -> PixelMagicTextureSurfacePacket {
     let color_seed: i64 = shader_profile_color_seed(
-      "PixelMagicTextureShader",
+      "PixelMagicTextureSurface",
       PixelMagicContracts.shader_color_seed_base(
         resource.source_handle,
         nova_resource_set_state_residency(state),
@@ -71,13 +71,13 @@ mod cpu Main {
       0
     );
     let speed_seed: i64 = shader_profile_speed_seed(
-      "PixelMagicTextureShader",
+      "PixelMagicTextureSurface",
       nova_resource_set_state_textures(state),
       resource.sampler_filter + 1,
       PixelMagicContracts.shader_speed_seed_base(resource.width, 0)
     );
     let radius_seed: i64 = shader_profile_radius_seed(
-      "PixelMagicTextureShader",
+      "PixelMagicTextureSurface",
       PixelMagicContracts.shader_radius_seed_base(
         resource.height,
         nova_resource_set_state_samplers(state),
@@ -85,7 +85,7 @@ mod cpu Main {
       ),
       0
     );
-    return shader_profile_packet("PixelMagicTextureShader", color_seed, speed_seed, radius_seed);
+    return shader_profile_packet("PixelMagicTextureSurface", color_seed, speed_seed, radius_seed);
   }
 
   fn main() {
@@ -99,12 +99,12 @@ mod cpu Main {
 
     data_profile_bind_core("FabricPlane");
     let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
-    let lowered: PixelMagicTextureShaderPacket =
+    let lowered: PixelMagicTextureSurfacePacket =
       lower_resource_to_shader_packet(image_resource, resource_state);
     let gpu_packet: ShaderPacketWindow =
       data_profile_send_uplink("FabricPlane", lowered);
     let render_result: FrameStatus =
-      shader_result(shader_profile_render("PixelMagicTextureShader", gpu_packet));
+      shader_result(shader_profile_render("PixelMagicTextureSurface", gpu_packet));
     let render_ready: bool = shader_frame_ready(render_result);
     let host_frame: HostFrameWindow =
       data_profile_send_downlink("FabricPlane", shader_value(render_result));

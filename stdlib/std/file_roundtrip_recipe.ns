@@ -1,0 +1,92 @@
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+
+  struct FileRoundtripSeed {
+    prefix_handle: i64,
+    text_handle: i64,
+    write_flags: i64,
+    read_flags: i64,
+    read_len: i64
+  }
+
+  struct FileRoundtripSummary {
+    path_handle: i64,
+    write_file_handle: i64,
+    write_code: i64,
+    write_close_code: i64,
+    read_file_handle: i64,
+    read_code: i64,
+    read_close_code: i64
+  }
+
+  fn build_file_roundtrip_seed(
+    prefix_handle: i64,
+    text_handle: i64,
+    write_flags: i64,
+    read_flags: i64,
+    read_len: i64
+  ) -> FileRoundtripSeed {
+    return FileRoundtripSeed {
+      prefix_handle: prefix_handle,
+      text_handle: text_handle,
+      write_flags: write_flags,
+      read_flags: read_flags,
+      read_len: read_len
+    };
+  }
+
+  fn capture_file_roundtrip(seed: FileRoundtripSeed) -> FileRoundtripSummary {
+    let path_handle: i64 = host_temp_file_handle(seed.prefix_handle);
+    let write_file_handle: i64 = host_file_open(path_handle, seed.write_flags);
+    let write_code: i64 = host_file_write(write_file_handle, seed.text_handle);
+    let write_close_code: i64 = host_file_close(write_file_handle);
+    let read_file_handle: i64 = host_file_open(path_handle, seed.read_flags);
+    let backing: ref Buffer = alloc_buffer(seed.read_len, 0);
+    let read_code: i64 = host_file_read(
+      read_file_handle,
+      host_buffer_handle(backing),
+      seed.read_len
+    );
+    return FileRoundtripSummary {
+      path_handle: path_handle,
+      write_file_handle: write_file_handle,
+      write_code: write_code,
+      write_close_code: write_close_code,
+      read_file_handle: read_file_handle,
+      read_code: read_code,
+      read_close_code: host_file_close(read_file_handle)
+    };
+  }
+
+  fn summarize_file_roundtrip_recipe(
+    prefix_handle: i64,
+    text_handle: i64,
+    write_flags: i64,
+    read_flags: i64,
+    read_len: i64
+  ) -> i64 {
+    let seed: FileRoundtripSeed = build_file_roundtrip_seed(
+      prefix_handle,
+      text_handle,
+      write_flags,
+      read_flags,
+      read_len
+    );
+    let summary: FileRoundtripSummary = capture_file_roundtrip(seed);
+    return summary.path_handle
+      + summary.write_file_handle
+      + summary.write_code
+      + summary.write_close_code
+      + summary.read_file_handle
+      + summary.read_code
+      + summary.read_close_code;
+  }
+
+  fn main() {
+    print(summarize_file_roundtrip_recipe(2221, 777, 1, 0, 16));
+  }
+}

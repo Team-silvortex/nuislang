@@ -6,10 +6,10 @@ depends_on = []
 summary = "Minimal semantics-first foundation."
 
 surfaces = [
-  "prelude.primitive-values",
-  "prelude.ref-ownership-conventions",
-  "prelude.basic-math-contracts",
-  "prelude.structural-source-contracts"
+  "contract.core.prelude.primitive-values.v1",
+  "contract.core.prelude.ref-ownership-conventions.v1",
+  "contract.core.prelude.basic-math.v1",
+  "contract.core.prelude.structural-source.v1"
 ]
 
 library_modules = [

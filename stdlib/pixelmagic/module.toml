@@ -6,14 +6,23 @@ depends_on = ["core", "std"]
 summary = "GPU-oriented image and texture processing Galaxy built on nuis heterogeneous execution."
 
 surfaces = [
-  "image-resource-shaping",
-  "texture-handoff-contracts",
-  "shader-facing-image-prep"
+  "contract.pixelmagic.image-resource-shaping.v1",
+  "contract.pixelmagic.texture-handoff.v1",
+  "contract.pixelmagic.shader-facing-image-prep.v1",
+  "surface.pixelmagic.shader.contracts.v1",
+  "surface.pixelmagic.shader.packet-bridge.v1",
+  "surface.pixelmagic.shader.render.v1",
+  "surface.pixelmagic.shader.texture.v1",
+  "surface.pixelmagic.shader.pipeline.v1"
 ]
 
 library_modules = [
   "lib/image_contracts.ns",
-  "lib/shader_contracts.ns"
+  "lib/shader_contracts.ns",
+  "lib/packet_bridge_surface.ns",
+  "lib/render_surface.ns",
+  "lib/texture_surface.ns",
+  "lib/pipeline_surface.ns"
 ]
 
 library_import_policy = "project-auto"

@@ -50,6 +50,16 @@ impl RuntimeLoader {
         &self,
         manifest: &BuildManifest,
     ) -> Result<Option<BridgeRegistry>, RuntimeError> {
+        if let Some(source) = &manifest.bridge_registry_inline {
+            return nuis_artifact::parse_bridge_registry_from_source(
+                source,
+                Path::new("<embedded-bridge-registry>"),
+            )
+            .map(Some)
+            .map_err(|error| {
+                RuntimeError::new(format!("failed to parse embedded bridge registry: {error}"))
+            });
+        }
         let Some(path) = &manifest.bridge_registry_path else {
             return Ok(None);
         };
@@ -62,6 +72,18 @@ impl RuntimeLoader {
         &self,
         manifest: &BuildManifest,
     ) -> Result<Option<HostBridgePlanIndex>, RuntimeError> {
+        if let Some(source) = &manifest.host_bridge_plan_index_inline {
+            return nuis_artifact::parse_host_bridge_plan_index_from_source(
+                source,
+                Path::new("<embedded-host-bridge-plan-index>"),
+            )
+            .map(Some)
+            .map_err(|error| {
+                RuntimeError::new(format!(
+                    "failed to parse embedded host bridge plan index: {error}"
+                ))
+            });
+        }
         let Some(path) = &manifest.host_bridge_plan_index_path else {
             return Ok(None);
         };
@@ -197,11 +219,7 @@ packaging_role = "host-binary"
     #[test]
     fn loader_reads_bridge_registry_and_host_plan_index() {
         let dir = temp_dir("bridge_assets");
-        let bridge_registry_path = dir.join("nuis.bridge.registry.toml");
-        let host_plan_path = dir.join("nuis.host-bridge.plan-index.toml");
-        fs::write(
-            &bridge_registry_path,
-            r#"schema = "nuis-bridge-registry-v1"
+        let bridge_registry_source = r#"schema = "nuis-bridge-registry-v1"
 bridge_count = 1
 domains = ["network"]
 
@@ -212,12 +230,8 @@ backend_family = "urlsession"
 selected_lowering_target = "urlsession"
 bridge_stub_path = "/tmp/network.bridge.stub.txt"
 payload_blob_path = "/tmp/network.payload.bin"
-"#,
-        )
-        .unwrap();
-        fs::write(
-            &host_plan_path,
-            r#"schema = "nuis-host-bridge-plan-index-v1"
+"#;
+        let host_plan_source = r#"schema = "nuis-host-bridge-plan-index-v1"
 plan_count = 1
 domains = ["network"]
 
@@ -229,9 +243,7 @@ bridge_surface = "host-ffi.bridge.network"
 scheduler_binding = "network-poll-bridge"
 phase_order = ["bind", "submit", "wait", "finalize"]
 plan_inline = "bridge_kind = \"managed-lifecycle-bridge\""
-"#,
-        )
-        .unwrap();
+"#;
         let manifest = format!(
             r#"manifest_schema = "nuis-build-manifest-v1"
 input = "/tmp/demo.ns"
@@ -262,12 +274,14 @@ cpu_target_object_format = "elf"
 cpu_target_calling_abi = "sysv64"
 cpu_target_clang = "x86_64-unknown-linux-gnu"
 cpu_target_cross = true
-bridge_registry_path = "{bridge_registry_path}"
+bridge_registry_path = "/tmp/missing.bridge.registry.toml"
 bridge_registry_schema = "nuis-bridge-registry-v1"
 bridge_registry_units = 1
-host_bridge_plan_index_path = "{host_plan_path}"
+bridge_registry_inline = "{bridge_registry_source}"
+host_bridge_plan_index_path = "/tmp/missing.host-bridge.plan-index.toml"
 host_bridge_plan_index_schema = "nuis-host-bridge-plan-index-v1"
 host_bridge_plan_units = 1
+host_bridge_plan_index_inline = "{host_plan_source}"
 
 [[artifact_hash]]
 kind = "artifact"
@@ -301,8 +315,14 @@ contract_family = "nustar.network"
 packaging_role = "hetero-contract"
 "#,
             output_dir = dir.display(),
-            bridge_registry_path = bridge_registry_path.display(),
-            host_plan_path = host_plan_path.display(),
+            bridge_registry_source = bridge_registry_source
+                .replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n"),
+            host_plan_source = host_plan_source
+                .replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n"),
         );
         let envelope = NuisExecutableEnvelope {
             schema: "nuis-executable-envelope-v1".to_owned(),

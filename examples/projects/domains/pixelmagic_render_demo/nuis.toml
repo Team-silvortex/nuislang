@@ -1,11 +1,11 @@
 name = "pixelmagic_render_demo"
 version = "0.1.0"
 entry = "main.ns"
-modules = ["main.ns", "surface_shader.ns", "fabric_plane.ns"]
+modules = ["main.ns", "fabric_plane.ns"]
 galaxy = ["pixelmagic=workspace"]
 links = [
-  "cpu.Main -> shader.PixelMagicSurfaceShader via data.FabricPlane",
-  "shader.PixelMagicSurfaceShader -> cpu.Main via data.FabricPlane"
+  "cpu.Main -> shader.PixelMagicRenderSurface via data.FabricPlane",
+  "shader.PixelMagicRenderSurface -> cpu.Main via data.FabricPlane"
 ]
 abi = [
   "cpu=cpu.arm64.apple_aapcs64",

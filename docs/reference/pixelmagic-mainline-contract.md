@@ -76,6 +76,25 @@ Short rule:
 
 `recipe first for contract truth; demo second for end-to-end lowering truth`
 
+## Official Surface Registry
+
+The current registry-facing `PixelMagic` surface ids are:
+
+1. `contract.pixelmagic.image-resource-shaping.v1`
+2. `contract.pixelmagic.texture-handoff.v1`
+3. `contract.pixelmagic.shader-facing-image-prep.v1`
+4. `surface.pixelmagic.shader.contracts.v1`
+5. `surface.pixelmagic.shader.packet-bridge.v1`
+6. `surface.pixelmagic.shader.render.v1`
+7. `surface.pixelmagic.shader.texture.v1`
+8. `surface.pixelmagic.shader.pipeline.v1`
+
+The intended rule is:
+
+* `contract.*` ids name semantic lowering/bridge commitments
+* `surface.*` ids name checked-in shader-facing public units
+* library module filenames may evolve, but these registry ids should remain the stable discovery vocabulary
+
 ## What Is Already Real
 
 At the current repository stage, `PixelMagic` already has:

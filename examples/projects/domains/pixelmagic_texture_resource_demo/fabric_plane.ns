@@ -16,7 +16,7 @@ mod data FabricPlane {
     let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
     let downlink_payload_class: Marker<PayloadClassWindow> =
       data_marker("downlink_payload_class");
-    let uplink_payload_shape: Marker<PayloadShapeWindowPixelMagicTextureShaderPacket> =
+    let uplink_payload_shape: Marker<PayloadShapeWindowPixelMagicTextureSurfacePacket> =
       data_marker("uplink_payload_shape");
     let downlink_payload_shape: Marker<PayloadShapeWindowFrame> =
       data_marker("downlink_payload_shape");

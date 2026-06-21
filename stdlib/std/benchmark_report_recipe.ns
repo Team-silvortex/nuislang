@@ -1,0 +1,216 @@
+mod cpu Main {
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_json_object_len(field_count: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+
+  struct BenchmarkReportSeed {
+    first_duration_ns: i64,
+    second_duration_ns: i64,
+    third_duration_ns: i64,
+    title_handle: i64,
+    key_handle: i64,
+    value_handle: i64,
+    status_handle: i64,
+    status_value_handle: i64,
+    footer_handle: i64,
+    colon_handle: i64,
+    space_handle: i64,
+    newline_handle: i64
+  }
+
+  struct BenchmarkReportSummary {
+    first_span_ns: i64,
+    second_span_ns: i64,
+    third_span_ns: i64,
+    first_sleep_ns: i64,
+    second_sleep_ns: i64,
+    third_sleep_ns: i64,
+    total_span_ns: i64,
+    total_sleep_ns: i64,
+    kv_line_handle: i64,
+    kv_line_len: i64,
+    status_line_handle: i64,
+    status_line_len: i64,
+    report_handle: i64,
+    report_len: i64,
+    pair_len: i64,
+    object_len: i64,
+    stdout_written: i64,
+    stdout_flushed: i64
+  }
+
+  fn build_benchmark_report_seed(
+    first_duration_ns: i64,
+    second_duration_ns: i64,
+    third_duration_ns: i64,
+    title_handle: i64,
+    key_handle: i64,
+    value_handle: i64,
+    status_handle: i64,
+    status_value_handle: i64,
+    footer_handle: i64,
+    colon_handle: i64,
+    space_handle: i64,
+    newline_handle: i64
+  ) -> BenchmarkReportSeed {
+    return BenchmarkReportSeed {
+      first_duration_ns: first_duration_ns,
+      second_duration_ns: second_duration_ns,
+      third_duration_ns: third_duration_ns,
+      title_handle: title_handle,
+      key_handle: key_handle,
+      value_handle: value_handle,
+      status_handle: status_handle,
+      status_value_handle: status_value_handle,
+      footer_handle: footer_handle,
+      colon_handle: colon_handle,
+      space_handle: space_handle,
+      newline_handle: newline_handle
+    };
+  }
+
+  fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
+    let with_colon: i64 = host_text_concat(label_handle, colon_handle);
+    return host_text_concat(with_colon, space_handle);
+  }
+
+  fn build_kv_line(
+    key_handle: i64,
+    value_handle: i64,
+    colon_handle: i64,
+    space_handle: i64
+  ) -> i64 {
+    let prefix: i64 = build_line_prefix(key_handle, colon_handle, space_handle);
+    return host_text_concat(prefix, value_handle);
+  }
+
+  fn append_line(block_handle: i64, line_handle: i64, newline_handle: i64) -> i64 {
+    let with_line: i64 = host_text_concat(block_handle, line_handle);
+    return host_text_concat(with_line, newline_handle);
+  }
+
+  fn capture_benchmark_report(seed: BenchmarkReportSeed) -> BenchmarkReportSummary {
+    let first_start_ns: i64 = host_monotonic_time_ns();
+    let first_sleep_ns: i64 = host_sleep_ns(seed.first_duration_ns);
+    let first_end_ns: i64 = host_monotonic_time_ns();
+    let second_start_ns: i64 = host_monotonic_time_ns();
+    let second_sleep_ns: i64 = host_sleep_ns(seed.second_duration_ns);
+    let second_end_ns: i64 = host_monotonic_time_ns();
+    let third_start_ns: i64 = host_monotonic_time_ns();
+    let third_sleep_ns: i64 = host_sleep_ns(seed.third_duration_ns);
+    let third_end_ns: i64 = host_monotonic_time_ns();
+    let first_span_ns: i64 = first_end_ns - first_start_ns;
+    let second_span_ns: i64 = second_end_ns - second_start_ns;
+    let third_span_ns: i64 = third_end_ns - third_start_ns;
+    let total_span_ns: i64 = first_span_ns + second_span_ns + third_span_ns;
+    let total_sleep_ns: i64 = first_sleep_ns + second_sleep_ns + third_sleep_ns;
+    let kv_line_handle: i64 = build_kv_line(
+      seed.key_handle,
+      seed.value_handle,
+      seed.colon_handle,
+      seed.space_handle
+    );
+    let status_line_handle: i64 = build_kv_line(
+      seed.status_handle,
+      seed.status_value_handle,
+      seed.colon_handle,
+      seed.space_handle
+    );
+    let first_block: i64 = append_line(seed.title_handle, kv_line_handle, seed.newline_handle);
+    let second_block: i64 = append_line(first_block, status_line_handle, seed.newline_handle);
+    let report_handle: i64 = host_text_concat(second_block, seed.footer_handle);
+    return BenchmarkReportSummary {
+      first_span_ns: first_span_ns,
+      second_span_ns: second_span_ns,
+      third_span_ns: third_span_ns,
+      first_sleep_ns: first_sleep_ns,
+      second_sleep_ns: second_sleep_ns,
+      third_sleep_ns: third_sleep_ns,
+      total_span_ns: total_span_ns,
+      total_sleep_ns: total_sleep_ns,
+      kv_line_handle: kv_line_handle,
+      kv_line_len: host_text_measure(kv_line_handle),
+      status_line_handle: status_line_handle,
+      status_line_len: host_text_measure(status_line_handle),
+      report_handle: report_handle,
+      report_len: host_text_measure(report_handle),
+      pair_len: host_json_pair_len(seed.key_handle, seed.value_handle),
+      object_len: host_json_object_len(5),
+      stdout_written: host_stdout_write(report_handle),
+      stdout_flushed: host_stdout_flush()
+    };
+  }
+
+  fn summarize_benchmark_report_recipe(
+    first_duration_ns: i64,
+    second_duration_ns: i64,
+    third_duration_ns: i64,
+    title_handle: i64,
+    key_handle: i64,
+    value_handle: i64,
+    status_handle: i64,
+    status_value_handle: i64,
+    footer_handle: i64,
+    colon_handle: i64,
+    space_handle: i64,
+    newline_handle: i64
+  ) -> i64 {
+    let seed: BenchmarkReportSeed = build_benchmark_report_seed(
+      first_duration_ns,
+      second_duration_ns,
+      third_duration_ns,
+      title_handle,
+      key_handle,
+      value_handle,
+      status_handle,
+      status_value_handle,
+      footer_handle,
+      colon_handle,
+      space_handle,
+      newline_handle
+    );
+    let summary: BenchmarkReportSummary = capture_benchmark_report(seed);
+    return summary.first_span_ns
+      + summary.second_span_ns
+      + summary.third_span_ns
+      + summary.first_sleep_ns
+      + summary.second_sleep_ns
+      + summary.third_sleep_ns
+      + summary.total_span_ns
+      + summary.total_sleep_ns
+      + summary.kv_line_handle
+      + summary.kv_line_len
+      + summary.status_line_handle
+      + summary.status_line_len
+      + summary.report_handle
+      + summary.report_len
+      + summary.pair_len
+      + summary.object_len
+      + summary.stdout_written
+      + summary.stdout_flushed;
+  }
+
+  fn main() {
+    print(
+      summarize_benchmark_report_recipe(
+        1000,
+        2000,
+        3000,
+        1501,
+        1601,
+        1602,
+        1701,
+        1702,
+        1801,
+        58,
+        32,
+        10
+      )
+    );
+  }
+}

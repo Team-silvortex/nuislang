@@ -43,7 +43,11 @@ mod cpu Main {
         pixelmagic.library_modules,
         vec![
             "lib/image_contracts.ns".to_owned(),
-            "lib/shader_contracts.ns".to_owned()
+            "lib/shader_contracts.ns".to_owned(),
+            "lib/packet_bridge_surface.ns".to_owned(),
+            "lib/render_surface.ns".to_owned(),
+            "lib/texture_surface.ns".to_owned(),
+            "lib/pipeline_surface.ns".to_owned()
         ]
     );
 
@@ -98,7 +102,7 @@ mod cpu Main {
         fs::read_to_string(root.join("build").join("nuis.project.organization.txt")).unwrap();
 
     assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true"));
-    assert!(galaxy_index.contains("library_modules=lib/image_contracts.ns, lib/shader_contracts.ns"));
+    assert!(galaxy_index.contains("library_modules=lib/image_contracts.ns, lib/shader_contracts.ns, lib/packet_bridge_surface.ns, lib/render_surface.ns, lib/texture_surface.ns, lib/pipeline_surface.ns"));
     assert!(galaxy_index.contains("core\tpackage=nuis.core\tdirect=false"));
     assert!(galaxy_index.contains("library_modules=lib/prelude_contracts.ns"));
     assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true\trequested_by=pixelmagic\tsource_modules=14\tauto_injectable=true"));
@@ -114,6 +118,18 @@ mod cpu Main {
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/shader_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/packet_bridge_surface.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/render_surface.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/texture_surface.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/pipeline_surface.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
         "library\tcore\tlib/prelude_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -136,6 +152,18 @@ mod cpu Main {
     ));
     assert!(modules_index.contains(
         "stdlib/pixelmagic/lib/shader_contracts.ns\tmod shader PixelMagicSurfaceContracts\tentry=false\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/shader_contracts.ns"
+    ));
+    assert!(modules_index.contains(
+        "stdlib/pixelmagic/lib/packet_bridge_surface.ns\tmod shader PixelMagicPacketBridgeSurface\tentry=false\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/packet_bridge_surface.ns"
+    ));
+    assert!(modules_index.contains(
+        "stdlib/pixelmagic/lib/render_surface.ns\tmod shader PixelMagicRenderSurface\tentry=false\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/render_surface.ns"
+    ));
+    assert!(modules_index.contains(
+        "stdlib/pixelmagic/lib/texture_surface.ns\tmod shader PixelMagicTextureSurface\tentry=false\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/texture_surface.ns"
+    ));
+    assert!(modules_index.contains(
+        "stdlib/pixelmagic/lib/pipeline_surface.ns\tmod shader PixelMagicPipelineSurface\tentry=false\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/pipeline_surface.ns"
     ));
     assert!(organization_index.contains(
         "cpu\tCorePrelude\tentry=false\tsource_kind=galaxy-auto-inject\tgalaxy=core\tpackage=nuis.core\tlibrary_module=lib/prelude_contracts.ns"
@@ -313,7 +341,18 @@ mod cpu Main {
     );
     let speed_base: i64 = PixelMagicContracts.shader_speed_seed_base(320, 4);
     let radius_base: i64 = PixelMagicContracts.shader_radius_seed_base(200, 0, 0);
+    let lowered: PixelMagicSurfaceContractsPacket = PixelMagicContracts.surface_contract_packet(
+      6101,
+      320,
+      200,
+      PixelMagicContracts.blur_op_kind(),
+      1,
+      4,
+      0,
+      0
+    );
     return residency + color_base + speed_base + radius_base +
+      PixelMagicContracts.surface_contract_profile_total() +
       PixelMagicContracts.shader_pipeline_total(
         6101,
         320,
@@ -332,6 +371,16 @@ mod cpu Main {
     );
 
     let artifacts = crate::pipeline::compile_project(root.as_path()).unwrap();
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.surface_contract_profile_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.surface_contract_packet"));
     assert!(artifacts
         .nir
         .functions
@@ -606,6 +655,7 @@ mod cpu Main {
             module_dir: PathBuf::from("stdlib/manual"),
             manifest_path: PathBuf::from("stdlib/manual/module.toml"),
             depends_on: vec![],
+            surfaces: vec!["surface.manual.contracts.v1".to_owned()],
             source_modules: vec![],
             resolved_source_paths: vec![],
             library_modules: vec!["lib/manual_contracts.ns".to_owned()],
@@ -779,6 +829,18 @@ mod cpu Main {
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/shader_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/packet_bridge_surface.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/render_surface.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/texture_surface.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tpixelmagic\tlib/pipeline_surface.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
         "visible\tcpu\tPixelMagicContracts\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/image_contracts.ns\timport_policy=project-auto"

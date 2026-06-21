@@ -1,0 +1,117 @@
+mod cpu Main {
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_json_object_len(field_count: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+
+  struct BenchmarkReportProjectSummary {
+    first_span_ns: i64,
+    second_span_ns: i64,
+    third_span_ns: i64,
+    first_sleep_ns: i64,
+    second_sleep_ns: i64,
+    third_sleep_ns: i64,
+    total_span_ns: i64,
+    total_sleep_ns: i64,
+    kv_line_handle: i64,
+    kv_line_len: i64,
+    status_line_handle: i64,
+    status_line_len: i64,
+    report_handle: i64,
+    report_len: i64,
+    pair_len: i64,
+    object_len: i64,
+    stdout_written: i64,
+    stdout_flushed: i64
+  }
+
+  fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
+    let with_colon: i64 = host_text_concat(label_handle, colon_handle);
+    return host_text_concat(with_colon, space_handle);
+  }
+
+  fn build_kv_line(
+    key_handle: i64,
+    value_handle: i64,
+    colon_handle: i64,
+    space_handle: i64
+  ) -> i64 {
+    let prefix: i64 = build_line_prefix(key_handle, colon_handle, space_handle);
+    return host_text_concat(prefix, value_handle);
+  }
+
+  fn append_line(block_handle: i64, line_handle: i64, newline_handle: i64) -> i64 {
+    let with_line: i64 = host_text_concat(block_handle, line_handle);
+    return host_text_concat(with_line, newline_handle);
+  }
+
+  fn capture_benchmark_report_project() -> BenchmarkReportProjectSummary {
+    let first_start_ns: i64 = host_monotonic_time_ns();
+    let first_sleep_ns: i64 = host_sleep_ns(1000);
+    let first_end_ns: i64 = host_monotonic_time_ns();
+    let second_start_ns: i64 = host_monotonic_time_ns();
+    let second_sleep_ns: i64 = host_sleep_ns(2000);
+    let second_end_ns: i64 = host_monotonic_time_ns();
+    let third_start_ns: i64 = host_monotonic_time_ns();
+    let third_sleep_ns: i64 = host_sleep_ns(3000);
+    let third_end_ns: i64 = host_monotonic_time_ns();
+    let first_span_ns: i64 = first_end_ns - first_start_ns;
+    let second_span_ns: i64 = second_end_ns - second_start_ns;
+    let third_span_ns: i64 = third_end_ns - third_start_ns;
+    let kv_line_handle: i64 = build_kv_line(1601, 1602, 58, 32);
+    let status_line_handle: i64 = build_kv_line(1701, 1702, 58, 32);
+    let first_block: i64 = append_line(1501, kv_line_handle, 10);
+    let second_block: i64 = append_line(first_block, status_line_handle, 10);
+    let report_handle: i64 = host_text_concat(second_block, 1801);
+    return BenchmarkReportProjectSummary {
+      first_span_ns: first_span_ns,
+      second_span_ns: second_span_ns,
+      third_span_ns: third_span_ns,
+      first_sleep_ns: first_sleep_ns,
+      second_sleep_ns: second_sleep_ns,
+      third_sleep_ns: third_sleep_ns,
+      total_span_ns: first_span_ns + second_span_ns + third_span_ns,
+      total_sleep_ns: first_sleep_ns + second_sleep_ns + third_sleep_ns,
+      kv_line_handle: kv_line_handle,
+      kv_line_len: host_text_measure(kv_line_handle),
+      status_line_handle: status_line_handle,
+      status_line_len: host_text_measure(status_line_handle),
+      report_handle: report_handle,
+      report_len: host_text_measure(report_handle),
+      pair_len: host_json_pair_len(1601, 1602),
+      object_len: host_json_object_len(5),
+      stdout_written: host_stdout_write(report_handle),
+      stdout_flushed: host_stdout_flush()
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: BenchmarkReportProjectSummary = capture_benchmark_report_project();
+    let total: i64 = summary.first_span_ns
+      + summary.second_span_ns
+      + summary.third_span_ns
+      + summary.first_sleep_ns
+      + summary.second_sleep_ns
+      + summary.third_sleep_ns
+      + summary.total_span_ns
+      + summary.total_sleep_ns
+      + summary.kv_line_handle
+      + summary.kv_line_len
+      + summary.status_line_handle
+      + summary.status_line_len
+      + summary.report_handle
+      + summary.report_len
+      + summary.pair_len
+      + summary.object_len
+      + summary.stdout_written
+      + summary.stdout_flushed;
+    if total > 0 {
+      return 0;
+    }
+    return 1;
+  }
+}

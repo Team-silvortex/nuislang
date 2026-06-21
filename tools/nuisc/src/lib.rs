@@ -133,6 +133,10 @@ fn json_optional_string_field(name: &str, value: Option<&str>) -> String {
     }
 }
 
+fn success_logs_enabled() -> bool {
+    std::env::var_os("NUIS_TEST_QUIET_SUCCESS_LOGS").is_none()
+}
+
 fn domain_build_contract_summary_json(
     summary: &registry::NustarDomainBuildContractSummary,
 ) -> String {
@@ -2584,266 +2588,269 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("{}", verify_build_manifest_json(&manifest, &report));
                 return Ok(());
             }
-            println!("build manifest verified: {}", manifest.display());
-            println!("  schema: {}", report.schema);
-            println!("  input: {}", report.input);
-            println!("  output_dir: {}", report.output_dir);
-            println!("  packaging_mode: {}", report.packaging_mode);
-            println!("  envelope_path: {}", report.envelope_path);
-            println!("  envelope_schema: {}", report.envelope_schema);
-            println!(
-                "  envelope_package_count: {}",
-                report.envelope_package_count
-            );
-            println!("  artifact_path: {}", report.artifact_path);
-            println!("  artifact_schema: {}", report.artifact_schema);
-            println!("  artifact_binary_name: {}", report.artifact_binary_name);
-            println!("  artifact_binary_bytes: {}", report.artifact_binary_bytes);
-            println!("  lifecycle_schema: {}", report.lifecycle_schema);
-            println!(
-                "  lifecycle_bootstrap_entry: {}",
-                report.lifecycle_bootstrap_entry
-            );
-            println!("  lifecycle_tick_policy: {}", report.lifecycle_tick_policy);
-            println!(
-                "  lifecycle_shutdown_policy: {}",
-                report.lifecycle_shutdown_policy
-            );
-            println!("  lifecycle_yalivia_rpc: {}", report.lifecycle_yalivia_rpc);
-            println!("  lifecycle_hook_count: {}", report.lifecycle_hook_count);
-            println!(
-                "  lifecycle_hook_surface: {}",
-                report.lifecycle_hook_surface.join(", ")
-            );
-            println!(
-                "  lifecycle_export_count: {}",
-                report.lifecycle_export_count
-            );
-            println!(
-                "  lifecycle_export_surface: {}",
-                report.lifecycle_export_surface.join(", ")
-            );
-            println!(
-                "  lifecycle_runtime_capability_flags: {}",
-                report.lifecycle_runtime_capability_flags.join(", ")
-            );
-            println!(
-                "  execution_contracts_checked: {}",
-                report.execution_contracts_checked
-            );
-            println!("  domain_build_unit_count: {}", report.domain_build_unit_count);
-            println!(
-                "  heterogeneous_domain_count: {}",
-                report.heterogeneous_domain_count
-            );
-            println!(
-                "  domain_payload_blobs_checked: {}",
-                report.domain_payload_blobs_checked
-            );
-            println!(
-                "  domain_payload_blob_sections_checked: {}",
-                report.domain_payload_blob_sections_checked
-            );
-            println!(
-                "  domain_payload_contract_sections_checked: {}",
-                report.domain_payload_contract_sections_checked
-            );
-            println!(
-                "  domain_payload_lowering_plans_checked: {}",
-                report.domain_payload_lowering_plans_checked
-            );
-            println!(
-                "  domain_payload_backend_stubs_checked: {}",
-                report.domain_payload_backend_stubs_checked
-            );
-            println!(
-                "  domain_payload_bridge_plans_checked: {}",
-                report.domain_payload_bridge_plans_checked
-            );
-            println!(
-                "  domain_bridge_stubs_checked: {}",
-                report.domain_bridge_stubs_checked
-            );
-            let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
-            let drift_mismatch_count = drift_checks.iter().filter(|check| !check.consistent).count();
-            println!(
-                "  domain_build_contract_drift_checked: {}",
-                drift_checks.len()
-            );
-            println!(
-                "  domain_build_contract_drift_mismatches: {}",
-                drift_mismatch_count
-            );
-            println!(
-                "  domain_build_contracts_consistent: {}",
-                if drift_mismatch_count == 0 {
-                    "true"
-                } else {
-                    "false"
-                }
-            );
-            for unit in &report.domain_build_units {
-                let verdict = domain_build_unit_verification_verdict(unit, &report);
-                let build_contract = domain_build_unit_effective_contract_summary(unit);
-                println!("  domain_build_contract: {} [{}]", unit.package_id, unit.domain_family);
-                if let Some(abi) = unit.abi.as_deref() {
-                    println!("    abi: {}", abi);
-                }
-                if let Some(target) = unit.selected_lowering_target.as_deref() {
-                    println!("    selected_lowering_target: {}", target);
-                }
+            if success_logs_enabled() {
+                println!("build manifest verified: {}", manifest.display());
+                println!("  schema: {}", report.schema);
+                println!("  input: {}", report.input);
+                println!("  output_dir: {}", report.output_dir);
+                println!("  packaging_mode: {}", report.packaging_mode);
+                println!("  envelope_path: {}", report.envelope_path);
+                println!("  envelope_schema: {}", report.envelope_schema);
                 println!(
-                    "    lowering: lane_policy={}, bridge_surface={}, emission_kind={}",
-                    build_contract.lowering.lane_policy,
-                    build_contract.lowering.bridge_surface,
-                    build_contract.lowering.emission_kind
+                    "  envelope_package_count: {}",
+                    report.envelope_package_count
+                );
+                println!("  artifact_path: {}", report.artifact_path);
+                println!("  artifact_schema: {}", report.artifact_schema);
+                println!("  artifact_binary_name: {}", report.artifact_binary_name);
+                println!("  artifact_binary_bytes: {}", report.artifact_binary_bytes);
+                println!("  lifecycle_schema: {}", report.lifecycle_schema);
+                println!(
+                    "  lifecycle_bootstrap_entry: {}",
+                    report.lifecycle_bootstrap_entry
+                );
+                println!("  lifecycle_tick_policy: {}", report.lifecycle_tick_policy);
+                println!(
+                    "  lifecycle_shutdown_policy: {}",
+                    report.lifecycle_shutdown_policy
+                );
+                println!("  lifecycle_yalivia_rpc: {}", report.lifecycle_yalivia_rpc);
+                println!("  lifecycle_hook_count: {}", report.lifecycle_hook_count);
+                println!(
+                    "  lifecycle_hook_surface: {}",
+                    report.lifecycle_hook_surface.join(", ")
                 );
                 println!(
-                    "    backend: stub_kind={}, bridge_entry={}, submission_mode={}, wake_policy={}, scheduler_binding={}",
-                    build_contract.backend.stub_kind,
-                    build_contract.backend.bridge_entry,
-                    build_contract.backend.submission_mode,
-                    build_contract.backend.wake_policy,
-                    build_contract.backend.scheduler_binding
+                    "  lifecycle_export_count: {}",
+                    report.lifecycle_export_count
                 );
                 println!(
-                    "    bridge: bridge_surface={}, bridge_entry={}, scheduler_binding={}, phase_bind={}, phase_submit={}, phase_wait={}, phase_finalize={}, bridge_kind={}",
-                    build_contract.bridge.bridge_surface,
-                    build_contract.bridge.bridge_entry,
-                    build_contract.bridge.scheduler_binding,
-                    build_contract.bridge.phase_bind,
-                    build_contract.bridge.phase_submit,
-                    build_contract.bridge.phase_wait,
-                    build_contract.bridge.phase_finalize,
-                    build_contract.bridge.bridge_kind
+                    "  lifecycle_export_surface: {}",
+                    report.lifecycle_export_surface.join(", ")
                 );
                 println!(
-                    "    host_bridge: host_ffi_surface={}, handle_family={}, phase_order={}, phase_bind_wake={}, phase_submit_wake={}, phase_wait_wake={}, phase_finalize_wake={}, bridge_plan_begin={}, bridge_plan_end={}",
-                    build_contract.host_bridge.host_ffi_surface,
-                    build_contract.host_bridge.handle_family,
-                    build_contract.host_bridge.phase_order.join(", "),
-                    build_contract.host_bridge.phase_bind_wake,
-                    build_contract.host_bridge.phase_submit_wake,
-                    build_contract.host_bridge.phase_wait_wake,
-                    build_contract.host_bridge.phase_finalize_wake,
-                    build_contract.host_bridge.bridge_plan_begin,
-                    build_contract.host_bridge.bridge_plan_end
-                );
-                let drift = evaluate_domain_build_contract_drift(unit);
-                println!(
-                    "    registry_alignment: {}",
-                    if drift.consistent { "ok" } else { "drift" }
+                    "  lifecycle_runtime_capability_flags: {}",
+                    report.lifecycle_runtime_capability_flags.join(", ")
                 );
                 println!(
-                    "    verification_verdict: kind={} payload_blob={} lowering_plan={} backend_stub={} bridge_plan={} bridge_stub={} bridge_registry={} host_bridge_plan={} registry_alignment={} consistent={}",
-                    verdict.kind,
-                    verdict_status(verdict.payload_blob_ok, verdict.kind == "hetero"),
-                    verdict_status(verdict.lowering_plan_ok, verdict.kind == "hetero"),
-                    verdict_status(verdict.backend_stub_ok, verdict.kind == "hetero"),
-                    verdict_status(verdict.bridge_plan_ok, verdict.kind == "hetero"),
-                    verdict_status(verdict.bridge_stub_ok, verdict.kind == "hetero"),
-                    verdict_status(verdict.bridge_registry_ok, verdict.kind == "hetero"),
-                    verdict_status(verdict.host_bridge_plan_ok, verdict.kind == "hetero"),
-                    if verdict.registry_alignment_ok { "ok" } else { "drift" },
-                    if verdict.consistent { "true" } else { "false" }
+                    "  execution_contracts_checked: {}",
+                    report.execution_contracts_checked
                 );
-                if !verdict.failure_reasons.is_empty() {
+                println!("  domain_build_unit_count: {}", report.domain_build_unit_count);
+                println!(
+                    "  heterogeneous_domain_count: {}",
+                    report.heterogeneous_domain_count
+                );
+                println!(
+                    "  domain_payload_blobs_checked: {}",
+                    report.domain_payload_blobs_checked
+                );
+                println!(
+                    "  domain_payload_blob_sections_checked: {}",
+                    report.domain_payload_blob_sections_checked
+                );
+                println!(
+                    "  domain_payload_contract_sections_checked: {}",
+                    report.domain_payload_contract_sections_checked
+                );
+                println!(
+                    "  domain_payload_lowering_plans_checked: {}",
+                    report.domain_payload_lowering_plans_checked
+                );
+                println!(
+                    "  domain_payload_backend_stubs_checked: {}",
+                    report.domain_payload_backend_stubs_checked
+                );
+                println!(
+                    "  domain_payload_bridge_plans_checked: {}",
+                    report.domain_payload_bridge_plans_checked
+                );
+                println!(
+                    "  domain_bridge_stubs_checked: {}",
+                    report.domain_bridge_stubs_checked
+                );
+                let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
+                let drift_mismatch_count =
+                    drift_checks.iter().filter(|check| !check.consistent).count();
+                println!(
+                    "  domain_build_contract_drift_checked: {}",
+                    drift_checks.len()
+                );
+                println!(
+                    "  domain_build_contract_drift_mismatches: {}",
+                    drift_mismatch_count
+                );
+                println!(
+                    "  domain_build_contracts_consistent: {}",
+                    if drift_mismatch_count == 0 {
+                        "true"
+                    } else {
+                        "false"
+                    }
+                );
+                for unit in &report.domain_build_units {
+                    let verdict = domain_build_unit_verification_verdict(unit, &report);
+                    let build_contract = domain_build_unit_effective_contract_summary(unit);
+                    println!("  domain_build_contract: {} [{}]", unit.package_id, unit.domain_family);
+                    if let Some(abi) = unit.abi.as_deref() {
+                        println!("    abi: {}", abi);
+                    }
+                    if let Some(target) = unit.selected_lowering_target.as_deref() {
+                        println!("    selected_lowering_target: {}", target);
+                    }
                     println!(
-                        "      failure_reasons: {}",
-                        verdict.failure_reasons.join(", ")
+                        "    lowering: lane_policy={}, bridge_surface={}, emission_kind={}",
+                        build_contract.lowering.lane_policy,
+                        build_contract.lowering.bridge_surface,
+                        build_contract.lowering.emission_kind
+                    );
+                    println!(
+                        "    backend: stub_kind={}, bridge_entry={}, submission_mode={}, wake_policy={}, scheduler_binding={}",
+                        build_contract.backend.stub_kind,
+                        build_contract.backend.bridge_entry,
+                        build_contract.backend.submission_mode,
+                        build_contract.backend.wake_policy,
+                        build_contract.backend.scheduler_binding
+                    );
+                    println!(
+                        "    bridge: bridge_surface={}, bridge_entry={}, scheduler_binding={}, phase_bind={}, phase_submit={}, phase_wait={}, phase_finalize={}, bridge_kind={}",
+                        build_contract.bridge.bridge_surface,
+                        build_contract.bridge.bridge_entry,
+                        build_contract.bridge.scheduler_binding,
+                        build_contract.bridge.phase_bind,
+                        build_contract.bridge.phase_submit,
+                        build_contract.bridge.phase_wait,
+                        build_contract.bridge.phase_finalize,
+                        build_contract.bridge.bridge_kind
+                    );
+                    println!(
+                        "    host_bridge: host_ffi_surface={}, handle_family={}, phase_order={}, phase_bind_wake={}, phase_submit_wake={}, phase_wait_wake={}, phase_finalize_wake={}, bridge_plan_begin={}, bridge_plan_end={}",
+                        build_contract.host_bridge.host_ffi_surface,
+                        build_contract.host_bridge.handle_family,
+                        build_contract.host_bridge.phase_order.join(", "),
+                        build_contract.host_bridge.phase_bind_wake,
+                        build_contract.host_bridge.phase_submit_wake,
+                        build_contract.host_bridge.phase_wait_wake,
+                        build_contract.host_bridge.phase_finalize_wake,
+                        build_contract.host_bridge.bridge_plan_begin,
+                        build_contract.host_bridge.bridge_plan_end
+                    );
+                    let drift = evaluate_domain_build_contract_drift(unit);
+                    println!(
+                        "    registry_alignment: {}",
+                        if drift.consistent { "ok" } else { "drift" }
+                    );
+                    println!(
+                        "    verification_verdict: kind={} payload_blob={} lowering_plan={} backend_stub={} bridge_plan={} bridge_stub={} bridge_registry={} host_bridge_plan={} registry_alignment={} consistent={}",
+                        verdict.kind,
+                        verdict_status(verdict.payload_blob_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.lowering_plan_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.backend_stub_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.bridge_plan_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.bridge_stub_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.bridge_registry_ok, verdict.kind == "hetero"),
+                        verdict_status(verdict.host_bridge_plan_ok, verdict.kind == "hetero"),
+                        if verdict.registry_alignment_ok { "ok" } else { "drift" },
+                        if verdict.consistent { "true" } else { "false" }
+                    );
+                    if !verdict.failure_reasons.is_empty() {
+                        println!(
+                            "      failure_reasons: {}",
+                            verdict.failure_reasons.join(", ")
+                        );
+                    }
+                    for issue in drift.issues {
+                        println!("      issue: {}", issue);
+                    }
+                }
+                if let Some(path) = &report.bridge_registry_path {
+                    println!("  bridge_registry_path: {}", path);
+                }
+                println!("  bridge_registry_units: {}", report.bridge_registry_units);
+                println!(
+                    "  bridge_registry_checked: {}",
+                    report.bridge_registry_checked
+                );
+                println!(
+                    "  bridge_registry_entries_checked: {}",
+                    report.bridge_registry_entries_checked
+                );
+                if let Some(path) = &report.host_bridge_plan_index_path {
+                    println!("  host_bridge_plan_index_path: {}", path);
+                }
+                println!("  host_bridge_plan_units: {}", report.host_bridge_plan_units);
+                println!(
+                    "  host_bridge_plan_checked: {}",
+                    report.host_bridge_plan_checked
+                );
+                println!(
+                    "  host_bridge_plan_entries_checked: {}",
+                    report.host_bridge_plan_entries_checked
+                );
+                for unit in &report.domain_build_units {
+                    let payload_blob_bytes = unit
+                        .artifact_payload_blob_bytes
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "<none>".to_owned());
+                    println!(
+                        "  domain_build_unit: {} package={} abi={} lowering={} backend={} role={} stub={} payload={} bridge_stub={} payload_blob={} payload_blob_bytes={} payload_format={}",
+                        unit.domain_family,
+                        unit.package_id,
+                        unit.abi.as_deref().unwrap_or("<none>"),
+                        unit.selected_lowering_target.as_deref().unwrap_or("<none>"),
+                        unit.backend_family.as_deref().unwrap_or("<none>"),
+                        unit.packaging_role,
+                        unit.artifact_stub_path.as_deref().unwrap_or("<none>"),
+                        unit.artifact_payload_path.as_deref().unwrap_or("<none>"),
+                        unit.artifact_bridge_stub_path.as_deref().unwrap_or("<none>"),
+                        unit.artifact_payload_blob_path.as_deref().unwrap_or("<none>"),
+                        payload_blob_bytes,
+                        unit.artifact_payload_format.as_deref().unwrap_or("<none>")
                     );
                 }
-                for issue in drift.issues {
-                    println!("      issue: {}", issue);
-                }
-            }
-            if let Some(path) = &report.bridge_registry_path {
-                println!("  bridge_registry_path: {}", path);
-            }
-            println!("  bridge_registry_units: {}", report.bridge_registry_units);
-            println!(
-                "  bridge_registry_checked: {}",
-                report.bridge_registry_checked
-            );
-            println!(
-                "  bridge_registry_entries_checked: {}",
-                report.bridge_registry_entries_checked
-            );
-            if let Some(path) = &report.host_bridge_plan_index_path {
-                println!("  host_bridge_plan_index_path: {}", path);
-            }
-            println!("  host_bridge_plan_units: {}", report.host_bridge_plan_units);
-            println!(
-                "  host_bridge_plan_checked: {}",
-                report.host_bridge_plan_checked
-            );
-            println!(
-                "  host_bridge_plan_entries_checked: {}",
-                report.host_bridge_plan_entries_checked
-            );
-            for unit in &report.domain_build_units {
-                let payload_blob_bytes = unit
-                    .artifact_payload_blob_bytes
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| "<none>".to_owned());
+                println!("  cpu_target_abi: {}", report.cpu_target_abi);
                 println!(
-                    "  domain_build_unit: {} package={} abi={} lowering={} backend={} role={} stub={} payload={} bridge_stub={} payload_blob={} payload_blob_bytes={} payload_format={}",
-                    unit.domain_family,
-                    unit.package_id,
-                    unit.abi.as_deref().unwrap_or("<none>"),
-                    unit.selected_lowering_target.as_deref().unwrap_or("<none>"),
-                    unit.backend_family.as_deref().unwrap_or("<none>"),
-                    unit.packaging_role,
-                    unit.artifact_stub_path.as_deref().unwrap_or("<none>"),
-                    unit.artifact_payload_path.as_deref().unwrap_or("<none>"),
-                    unit.artifact_bridge_stub_path.as_deref().unwrap_or("<none>"),
-                    unit.artifact_payload_blob_path.as_deref().unwrap_or("<none>"),
-                    payload_blob_bytes,
-                    unit.artifact_payload_format.as_deref().unwrap_or("<none>")
+                    "  cpu_target_machine: {}-{}",
+                    report.cpu_target_machine_arch, report.cpu_target_machine_os
+                );
+                println!(
+                    "  cpu_target_object_format: {}",
+                    report.cpu_target_object_format
+                );
+                println!(
+                    "  cpu_target_calling_abi: {}",
+                    report.cpu_target_calling_abi
+                );
+                println!("  cpu_target_clang: {}", report.cpu_target_clang);
+                println!(
+                    "  cpu_target_cross: {}",
+                    if report.cpu_target_cross {
+                        "true"
+                    } else {
+                        "false"
+                    }
+                );
+                if let Some(status) = report.compile_cache_status {
+                    println!("  compile_cache_status: {}", status);
+                }
+                if let Some(key) = report.compile_cache_key {
+                    println!("  compile_cache_key: {}", key);
+                }
+                if let Some(root) = report.compile_cache_root {
+                    println!("  compile_cache_root: {}", root);
+                }
+                if let Some(plan_index) = report.project_plan_index {
+                    println!("  project_plan_index: {}", plan_index);
+                }
+                if let Some(packet_index) = report.project_packet_index {
+                    println!("  project_packet_index: {}", packet_index);
+                }
+                println!("  artifacts_checked: {}", report.artifacts_checked);
+                println!(
+                    "  project_metadata_checked: {}",
+                    report.project_metadata_checked
                 );
             }
-            println!("  cpu_target_abi: {}", report.cpu_target_abi);
-            println!(
-                "  cpu_target_machine: {}-{}",
-                report.cpu_target_machine_arch, report.cpu_target_machine_os
-            );
-            println!(
-                "  cpu_target_object_format: {}",
-                report.cpu_target_object_format
-            );
-            println!(
-                "  cpu_target_calling_abi: {}",
-                report.cpu_target_calling_abi
-            );
-            println!("  cpu_target_clang: {}", report.cpu_target_clang);
-            println!(
-                "  cpu_target_cross: {}",
-                if report.cpu_target_cross {
-                    "true"
-                } else {
-                    "false"
-                }
-            );
-            if let Some(status) = report.compile_cache_status {
-                println!("  compile_cache_status: {}", status);
-            }
-            if let Some(key) = report.compile_cache_key {
-                println!("  compile_cache_key: {}", key);
-            }
-            if let Some(root) = report.compile_cache_root {
-                println!("  compile_cache_root: {}", root);
-            }
-            if let Some(plan_index) = report.project_plan_index {
-                println!("  project_plan_index: {}", plan_index);
-            }
-            if let Some(packet_index) = report.project_packet_index {
-                println!("  project_packet_index: {}", packet_index);
-            }
-            println!("  artifacts_checked: {}", report.artifacts_checked);
-            println!(
-                "  project_metadata_checked: {}",
-                report.project_metadata_checked
-            );
         }
         CommandKind::InspectBenchmarks { input, json } => {
             let compiled = compile_command_input(&input)?;
@@ -3182,45 +3189,47 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         CommandKind::Check { input } => {
             let resolved = resolve_compile_input(&input)?;
             let artifacts = resolved.compile()?;
-            println!("checked nuis source: {}", input.display());
-            if let Some(project) = &resolved.project {
-                println!("project: {}", project::describe_project(project));
-            }
-            if let Some(plan) = &resolved.project_plan {
-                println!(
-                    "project_plan: {}",
-                    project::describe_project_compilation_plan(plan)
-                );
-                println!(
-                    "project_abi_graph: {}",
-                    project::render_project_abi_graph_line(&plan.abi_resolution)
-                );
-            }
-            println!(
-                "loaded_nustar: {}",
-                artifacts
-                    .loaded_nustar
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-            println!("nir_functions: {}", artifacts.nir.functions.len());
             let benchmarks = collect_benchmark_inventory(&artifacts);
-            println!("nir_benchmarks: {}", benchmarks.len());
-            if !benchmarks.is_empty() {
+            if success_logs_enabled() {
+                println!("checked nuis source: {}", input.display());
+                if let Some(project) = &resolved.project {
+                    println!("project: {}", project::describe_project(project));
+                }
+                if let Some(plan) = &resolved.project_plan {
+                    println!(
+                        "project_plan: {}",
+                        project::describe_project_compilation_plan(plan)
+                    );
+                    println!(
+                        "project_abi_graph: {}",
+                        project::render_project_abi_graph_line(&plan.abi_resolution)
+                    );
+                }
                 println!(
-                    "benchmark_symbols: {}",
-                    benchmarks
+                    "loaded_nustar: {}",
+                    artifacts
+                        .loaded_nustar
                         .iter()
-                        .map(|entry| entry.symbol.as_str())
+                        .map(String::as_str)
                         .collect::<Vec<_>>()
                         .join(", ")
                 );
+                println!("nir_functions: {}", artifacts.nir.functions.len());
+                println!("nir_benchmarks: {}", benchmarks.len());
+                if !benchmarks.is_empty() {
+                    println!(
+                        "benchmark_symbols: {}",
+                        benchmarks
+                            .iter()
+                            .map(|entry| entry.symbol.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
+                }
+                println!("yir_nodes: {}", artifacts.yir.nodes.len());
+                println!("yir_edges: {}", artifacts.yir.edges.len());
+                println!("llvm_ir_bytes: {}", artifacts.llvm_ir.len());
             }
-            println!("yir_nodes: {}", artifacts.yir.nodes.len());
-            println!("yir_edges: {}", artifacts.yir.edges.len());
-            println!("llvm_ir_bytes: {}", artifacts.llvm_ir.len());
         }
         CommandKind::Compile {
             input,
@@ -3348,109 +3357,111 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     cpu_target: cpu_target.clone(),
                 },
             )?;
-            println!("compiled nuis source: {}", input.display());
-            println!(
-                "compile_cache: {} ({})",
-                if cache_hit.is_some() { "hit" } else { "miss" },
-                cache_key.key
-            );
-            println!("compile_cache_inputs: {}", cache_key.input_labels.len());
-            if verbose_cache {
-                for label in &cache_key.input_labels {
-                    println!("  compile_cache_input: {}", label);
-                }
-            }
-            if let Some(project) = &resolved.project {
-                println!("project: {}", project::describe_project(project));
-                if let Ok(graph) = project::describe_project_abi_graph(project) {
-                    println!("project_abi_graph: {}", graph);
-                }
-            }
-            if let Some(plan) = &resolved.project_plan {
+            if success_logs_enabled() {
+                println!("compiled nuis source: {}", input.display());
                 println!(
-                    "project_plan: {}",
-                    project::describe_project_compilation_plan(plan)
+                    "compile_cache: {} ({})",
+                    if cache_hit.is_some() { "hit" } else { "miss" },
+                    cache_key.key
                 );
-                println!(
-                    "project_abi_graph: {}",
-                    project::render_project_abi_graph_line(&plan.abi_resolution)
-                );
-            }
-            println!(
-                "loaded_nustar: {}",
-                artifacts
-                    .loaded_nustar
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-            println!("cpu_target_abi: {}", cpu_target.abi);
-            println!(
-                "cpu_target_machine: {}-{}",
-                cpu_target.machine_arch, cpu_target.machine_os
-            );
-            println!("cpu_target_clang: {}", cpu_target.clang_target);
-            println!(
-                "cpu_target_cross: {}",
-                if cpu_target.cross_compile {
-                    "true"
-                } else {
-                    "false"
+                println!("compile_cache_inputs: {}", cache_key.input_labels.len());
+                if verbose_cache {
+                    for label in &cache_key.input_labels {
+                        println!("  compile_cache_input: {}", label);
+                    }
                 }
-            );
-            if let Some(plan) = &resolved.project_plan {
-                for item in &plan.abi_resolution.requirements {
-                    println!("abi: {}={}", item.domain, item.abi);
-                    if let Ok(manifest) = registry::load_manifest_for_domain(
-                        Path::new("nustar-packages"),
-                        &item.domain,
-                    ) {
-                        if let Ok(target) = registry::registered_abi_target(&manifest, &item.abi) {
-                            println!(
-                                "  abi_target_machine: {}-{}",
-                                target.machine_arch, target.machine_os
-                            );
-                            println!("  abi_target_object: {}", target.object_format);
-                            println!("  abi_target_calling: {}", target.calling_abi);
-                            println!("  abi_target_clang: {}", target.clang_target);
-                            if let Some(backend) = target.backend_family {
-                                println!("  abi_target_backend: {}", backend);
-                            }
-                            println!(
-                                "  abi_target_host_adaptive: {}",
-                                if target.host_adaptive {
-                                    "true"
-                                } else {
-                                    "false"
+                if let Some(project) = &resolved.project {
+                    println!("project: {}", project::describe_project(project));
+                    if let Ok(graph) = project::describe_project_abi_graph(project) {
+                        println!("project_abi_graph: {}", graph);
+                    }
+                }
+                if let Some(plan) = &resolved.project_plan {
+                    println!(
+                        "project_plan: {}",
+                        project::describe_project_compilation_plan(plan)
+                    );
+                    println!(
+                        "project_abi_graph: {}",
+                        project::render_project_abi_graph_line(&plan.abi_resolution)
+                    );
+                }
+                println!(
+                    "loaded_nustar: {}",
+                    artifacts
+                        .loaded_nustar
+                        .iter()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                println!("cpu_target_abi: {}", cpu_target.abi);
+                println!(
+                    "cpu_target_machine: {}-{}",
+                    cpu_target.machine_arch, cpu_target.machine_os
+                );
+                println!("cpu_target_clang: {}", cpu_target.clang_target);
+                println!(
+                    "cpu_target_cross: {}",
+                    if cpu_target.cross_compile {
+                        "true"
+                    } else {
+                        "false"
+                    }
+                );
+                if let Some(plan) = &resolved.project_plan {
+                    for item in &plan.abi_resolution.requirements {
+                        println!("abi: {}={}", item.domain, item.abi);
+                        if let Ok(manifest) = registry::load_manifest_for_domain(
+                            Path::new("nustar-packages"),
+                            &item.domain,
+                        ) {
+                            if let Ok(target) = registry::registered_abi_target(&manifest, &item.abi) {
+                                println!(
+                                    "  abi_target_machine: {}-{}",
+                                    target.machine_arch, target.machine_os
+                                );
+                                println!("  abi_target_object: {}", target.object_format);
+                                println!("  abi_target_calling: {}", target.calling_abi);
+                                println!("  abi_target_clang: {}", target.clang_target);
+                                if let Some(backend) = target.backend_family {
+                                    println!("  abi_target_backend: {}", backend);
                                 }
-                            );
+                                println!(
+                                    "  abi_target_host_adaptive: {}",
+                                    if target.host_adaptive {
+                                        "true"
+                                    } else {
+                                        "false"
+                                    }
+                                );
+                            }
                         }
                     }
                 }
-            }
-            println!("ast: {}", written.ast_path);
-            println!("nir: {}", written.nir_path);
-            println!("yir: {}", written.yir_path);
-            println!("llvm_ir: {}", written.llvm_ir_path);
-            println!("packaging_mode: {}", written.packaging_mode);
-            println!("binary: {}", written.binary_path);
-            println!(
-                "compiled_artifact: {}",
-                output_dir.join("nuis.compiled.artifact").display()
-            );
-            println!("build_manifest: {}", build_manifest);
-            if let Some(metadata) = &project_metadata {
-                println!("project_manifest: {}", metadata.manifest_copy_path);
-                println!("project_plan_index: {}", metadata.plan_index_path);
-                println!("project_organization: {}", metadata.organization_index_path);
-                println!("project_exchange: {}", metadata.exchange_index_path);
-                println!("project_modules: {}", metadata.modules_index_path);
-                println!("project_galaxy: {}", metadata.galaxy_index_path);
-                println!("project_links: {}", metadata.links_index_path);
-                println!("project_packet: {}", metadata.packet_index_path);
-                println!("project_host_ffi: {}", metadata.host_ffi_index_path);
-                println!("project_abi: {}", metadata.abi_index_path);
+                println!("ast: {}", written.ast_path);
+                println!("nir: {}", written.nir_path);
+                println!("yir: {}", written.yir_path);
+                println!("llvm_ir: {}", written.llvm_ir_path);
+                println!("packaging_mode: {}", written.packaging_mode);
+                println!("binary: {}", written.binary_path);
+                println!(
+                    "compiled_artifact: {}",
+                    output_dir.join("nuis.compiled.artifact").display()
+                );
+                println!("build_manifest: {}", build_manifest);
+                if let Some(metadata) = &project_metadata {
+                    println!("project_manifest: {}", metadata.manifest_copy_path);
+                    println!("project_plan_index: {}", metadata.plan_index_path);
+                    println!("project_organization: {}", metadata.organization_index_path);
+                    println!("project_exchange: {}", metadata.exchange_index_path);
+                    println!("project_modules: {}", metadata.modules_index_path);
+                    println!("project_galaxy: {}", metadata.galaxy_index_path);
+                    println!("project_links: {}", metadata.links_index_path);
+                    println!("project_packet: {}", metadata.packet_index_path);
+                    println!("project_host_ffi: {}", metadata.host_ffi_index_path);
+                    println!("project_abi: {}", metadata.abi_index_path);
+                }
             }
         }
     }
@@ -3577,11 +3588,14 @@ mod tests {
             backend_family: Some("urlsession".to_owned()),
             selected_lowering_target: Some("urlsession".to_owned()),
             artifact_stub_path: None,
+            artifact_stub_inline: None,
             artifact_payload_path: None,
             artifact_bridge_stub_path: None,
+            artifact_bridge_stub_inline: None,
             artifact_payload_blob_path: None,
             artifact_payload_blob_bytes: None,
             artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
             contract_family: "nustar.network".to_owned(),
             packaging_role: "domain-sidecar".to_owned(),
         };
@@ -3605,11 +3619,14 @@ mod tests {
             backend_family: Some("urlsession".to_owned()),
             selected_lowering_target: Some("urlsession".to_owned()),
             artifact_stub_path: None,
+            artifact_stub_inline: None,
             artifact_payload_path: None,
             artifact_bridge_stub_path: None,
+            artifact_bridge_stub_inline: None,
             artifact_payload_blob_path: None,
             artifact_payload_blob_bytes: None,
             artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
             contract_family: "nustar.network".to_owned(),
             packaging_role: "domain-sidecar".to_owned(),
         };
@@ -3630,11 +3647,14 @@ mod tests {
             backend_family: Some("imaginary-backend".to_owned()),
             selected_lowering_target: Some("imaginary-target".to_owned()),
             artifact_stub_path: None,
+            artifact_stub_inline: None,
             artifact_payload_path: None,
             artifact_bridge_stub_path: None,
+            artifact_bridge_stub_inline: None,
             artifact_payload_blob_path: None,
             artifact_payload_blob_bytes: None,
             artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
             contract_family: "nustar.network.drifted".to_owned(),
             packaging_role: "domain-sidecar".to_owned(),
         };
@@ -3666,11 +3686,14 @@ mod tests {
             backend_family: Some("llvm".to_owned()),
             selected_lowering_target: Some("llvm".to_owned()),
             artifact_stub_path: None,
+            artifact_stub_inline: None,
             artifact_payload_path: None,
             artifact_bridge_stub_path: None,
+            artifact_bridge_stub_inline: None,
             artifact_payload_blob_path: None,
             artifact_payload_blob_bytes: None,
             artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
             contract_family: "nustar.cpu".to_owned(),
             packaging_role: "host-binary".to_owned(),
         };
@@ -4015,11 +4038,14 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
                 contract_family: "nustar.cpu".to_owned(),
                 packaging_role: "host-binary".to_owned(),
                 artifact_stub_path: None,
+                artifact_stub_inline: None,
                 artifact_payload_path: None,
                 artifact_bridge_stub_path: None,
+                artifact_bridge_stub_inline: None,
                 artifact_payload_blob_path: None,
                 artifact_payload_blob_bytes: None,
                 artifact_payload_format: None,
+                artifact_payload_blob_inline: None,
             }],
             final_stage: linker::LinkPlanFinalStage {
                 kind: "host-native-link".to_owned(),
