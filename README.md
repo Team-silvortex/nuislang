@@ -70,8 +70,8 @@ Current source-style note:
 nuis     -> front-door workflow tool
 nuis-rc  -> resident control tool (later-stage, still intentionally thin)
 nuisc    -> compiler/scheduler core
-yalivia  -> separate future JIT/runtime project
-vulpoya  -> separate future analyzer/verifier project
+yalivia  -> hosted future JIT/runtime subproject under `subprojects/yalivia`
+vulpoya  -> hosted future analyzer/verifier subproject under `subprojects/vulpoya`
 ```
 
 Current responsibility split:
@@ -80,6 +80,7 @@ Current responsibility split:
 * `nuisc` is the compiler/scheduler core that consumes `.ns` or project inputs and emits `NIR`, `YIR`, LLVM IR, and AOT outputs.
 * `nustar` packages are where per-domain ABI support, default lanes, frontend/lowering entrypoints, and package contracts are registered.
 * `nustar` packages are also starting to declare per-domain clock contracts such as `clock_domain_id`, `clock_kind`, `clock_epoch_kind`, `clock_resolution`, and `clock_bridge_default`.
+* `subprojects/yalivia` and `subprojects/vulpoya` are now hosted inside this repository tree as sibling ecosystem projects while their boundaries are still evolving.
 
 ## Quick Start
 
