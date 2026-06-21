@@ -3948,6 +3948,68 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
     }
 
     #[test]
+    fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo",
+        );
+        let output_dir = temp_dir("benchmark_report_file_artifact_json_outputs");
+
+        run(CommandKind::Compile {
+            input: project_root,
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let artifact_path = output_dir.join("nuis.compiled.artifact");
+        let artifact = load_nuis_compiled_artifact(&manifest_path).unwrap();
+        let manifest_verify = aot::verify_build_manifest(&manifest_path).unwrap();
+        let artifact_verify = aot::verify_nuis_compiled_artifact(&artifact_path).unwrap();
+
+        let inspect_json = inspect_artifact_json(&manifest_path, &artifact, Some(&manifest_verify));
+        assert!(inspect_json.contains("\"kind\":\"nuis_artifact_inspect\""));
+        assert!(inspect_json.contains("\"binary_name\":\"benchmark_report_file_demo\""));
+        assert!(inspect_json.contains("\"packaging_mode\":\"native-cpu-llvm\""));
+        assert!(inspect_json.contains("\"domain_build_units\":["));
+        assert!(inspect_json.contains("\"domain_build_contracts\":["));
+        assert!(inspect_json.contains("\"link_plan\":{"));
+        assert!(inspect_json.contains("\"final_stage_driver\":\"clang\""));
+
+        let verify_manifest_json = verify_build_manifest_json(&manifest_path, &manifest_verify);
+        assert!(verify_manifest_json.contains("\"kind\":\"nuis_build_manifest_verify\""));
+        assert!(verify_manifest_json.contains("\"artifact_binary_name\":\"benchmark_report_file_demo\""));
+        assert!(verify_manifest_json.contains("\"project_metadata_checked\":"));
+        assert!(verify_manifest_json.contains("\"domain_build_verification_summary\":{"));
+        assert!(verify_manifest_json.contains("\"all_units_consistent\":true"));
+
+        let verify_artifact_json_text = verify_artifact_json(&artifact_path, &artifact_verify);
+        assert!(verify_artifact_json_text.contains("\"kind\":\"nuis_artifact_verify\""));
+        assert!(verify_artifact_json_text.contains("\"binary_name\":\"benchmark_report_file_demo\""));
+        assert!(verify_artifact_json_text.contains("\"artifact_roundtrip_verified\":true"));
+        assert!(verify_artifact_json_text.contains("\"lifecycle_contract_consistent\":true"));
+
+        let artifact_report = artifact_report_json(
+            &manifest_path,
+            &artifact,
+            &artifact_path,
+            &artifact_verify,
+            &manifest_path,
+            &manifest_verify,
+            false,
+        );
+        assert!(artifact_report.contains("\"kind\":\"nuis_artifact_report\""));
+        assert!(artifact_report.contains("\"manifest_verify_reconstructed\":false"));
+        assert!(artifact_report.contains("\"artifact_inspect\":{"));
+        assert!(artifact_report.contains("\"artifact_verify\":{"));
+        assert!(artifact_report.contains("\"manifest_verify\":{"));
+        assert!(artifact_report.contains("\"binary_name\":\"benchmark_report_file_demo\""));
+        assert!(artifact_report.contains("\"all_units_consistent\":true"));
+    }
+
+    #[test]
     fn artifact_report_summary_lines_expose_compact_overview() {
         let artifact_verify = aot::NuisCompiledArtifactVerifyReport {
             schema: "nuis-compiled-artifact-v1".to_owned(),
@@ -4245,6 +4307,68 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
             .status()
             .expect("expected compiled binary to launch");
         assert!(status.success(), "expected compiled binary to exit successfully");
+    }
+
+    #[test]
+    fn compile_command_writes_benchmark_report_file_tooling_outputs() {
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo",
+        );
+        let output_dir = temp_dir("compile_command_benchmark_report_file_outputs");
+        let output_stem = "benchmark_report_file_demo".to_owned();
+
+        run(CommandKind::Compile {
+            input: project_root,
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        for path in [
+            output_dir.join(format!("{output_stem}.ll")),
+            output_dir.join(&output_stem),
+            output_dir.join("nuis.build.manifest.toml"),
+            output_dir.join("nuis.compiled.artifact"),
+            output_dir.join("nuis.project.host_ffi.txt"),
+            output_dir.join("nuis.project.plan.txt"),
+        ] {
+            assert!(path.exists(), "expected output `{}`", path.display());
+        }
+
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let manifest_text = fs::read_to_string(&manifest_path).unwrap();
+        assert!(manifest_text.contains("name = \"benchmark_report_file_demo\""));
+        assert!(manifest_text.contains("packaging_mode = \"native-cpu-llvm\""));
+        assert!(manifest_text.contains("host_ffi_index = "));
+
+        let manifest_report = aot::verify_build_manifest(&manifest_path).unwrap();
+        assert_eq!(manifest_report.artifact_binary_name, output_stem);
+        assert_eq!(manifest_report.artifact_schema, "nuis-compiled-artifact-v1");
+        assert!(manifest_report.project_metadata_checked >= 2);
+
+        let host_ffi_text =
+            fs::read_to_string(output_dir.join("nuis.project.host_ffi.txt")).unwrap();
+        assert!(host_ffi_text.contains("host_monotonic_time_ns"));
+        assert!(host_ffi_text.contains("host_sleep_ns"));
+        assert!(host_ffi_text.contains("host_file_open"));
+        assert!(host_ffi_text.contains("host_file_write"));
+        assert!(host_ffi_text.contains("host_file_close"));
+        assert!(host_ffi_text.contains("host_temp_file_handle"));
+
+        let artifact_report =
+            aot::verify_nuis_compiled_artifact(output_dir.join("nuis.compiled.artifact").as_path())
+                .unwrap();
+        assert_eq!(artifact_report.binary_name, output_stem);
+        assert_eq!(artifact_report.packaging_mode, "native-cpu-llvm");
+        assert!(artifact_report.lifecycle_contract_consistent);
+        assert!(artifact_report.artifact_roundtrip_verified);
+
+        let status = Command::new(output_dir.join(&output_stem))
+            .status()
+            .expect("expected compiled benchmark report binary to launch");
+        assert!(status.success(), "expected compiled benchmark report binary to exit successfully");
     }
 
     #[test]

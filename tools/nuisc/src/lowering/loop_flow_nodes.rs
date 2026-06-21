@@ -306,6 +306,7 @@ pub(super) fn lower_async_flow_while(
             to: name.clone(),
         });
     }
+    super::body_lowering::chain_statement_effect(state, &name);
     let current_name = next_name(state, "loop_current");
     state.yir.nodes.push(Node {
         name: current_name.clone(),
@@ -487,6 +488,7 @@ pub(super) fn lower_flow_while(
             to: name.clone(),
         });
     }
+    super::body_lowering::chain_statement_effect(state, &name);
     let current_name = next_name(state, "loop_current");
     state.yir.nodes.push(Node {
         name: current_name.clone(),
@@ -652,6 +654,7 @@ pub(super) fn lower_post_flow_while(
     for extra_effect_input in &extra_effect_inputs {
         push_effect_edge(state, extra_effect_input, &name);
     }
+    super::body_lowering::chain_statement_effect(state, &name);
 
     let current_name = next_name(state, "loop_current");
     state.yir.nodes.push(Node {
@@ -833,6 +836,7 @@ pub(super) fn lower_async_post_flow_while(
     for extra_effect_input in &extra_effect_inputs {
         push_effect_edge(state, extra_effect_input, &name);
     }
+    super::body_lowering::chain_statement_effect(state, &name);
 
     let current_name = next_name(state, "loop_current");
     state.yir.nodes.push(Node {

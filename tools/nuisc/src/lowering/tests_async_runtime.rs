@@ -318,7 +318,8 @@ fn lowers_await_if_expression_branches_into_cpu_effect_nodes() {
           }
 
           async fn main() -> i64 {
-            let value: i64 = await if true {
+            let choose: i64 = cpu_input_i64("choose", 1, 0, 1, 1);
+            let value: i64 = await if choose > 0 {
               one()
             } else {
               two()
@@ -360,7 +361,8 @@ fn lowers_await_match_expression_branches_into_cpu_effect_nodes() {
           }
 
           async fn main() -> i64 {
-            let value: i64 = await match 1 {
+            let choice: i64 = cpu_input_i64("choice", 1, 0, 2, 1);
+            let value: i64 = await match choice {
               1 => { one() },
               _ => { two() }
             };
@@ -454,12 +456,6 @@ fn lowers_self_tail_recursive_async_function_into_loop_while_i64_chain() {
     )
     .unwrap();
     let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
-    dbg!(yir
-        .nodes
-        .iter()
-        .map(|node| format!("{}::{}", node.op.module, node.op.instruction))
-        .collect::<Vec<_>>());
-
     let loop_node = yir
         .nodes
         .iter()

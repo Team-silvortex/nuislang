@@ -713,6 +713,38 @@ impl PreparedCarrySource {
                     Self::PreviousCurrent => "add_prev_current_plus_invariant".to_owned(),
                     Self::PreviousCarry(index) => format!("add_prev_carry{index}_plus_invariant"),
                     Self::Carry(index) => format!("add_carry{index}_plus_invariant"),
+                    Self::FixedRead(PreparedFixedReadCarrySource::Value(_)) => {
+                        "add_read_value_fixed_plus_invariant".to_owned()
+                    }
+                    Self::FixedRead(PreparedFixedReadCarrySource::At { .. }) => {
+                        "add_read_at_fixed_plus_invariant".to_owned()
+                    }
+                    Self::DynamicReadAt { index_source, .. } => match index_source.as_ref() {
+                        Self::Current => "add_read_at_dynamic_current_plus_invariant".to_owned(),
+                        Self::PreviousCurrent => {
+                            "add_read_at_dynamic_prev_current_plus_invariant".to_owned()
+                        }
+                        Self::PreviousCarry(index) => {
+                            format!("add_read_at_dynamic_prev_carry{index}_plus_invariant")
+                        }
+                        Self::Carry(index) => {
+                            format!("add_read_at_dynamic_carry{index}_plus_invariant")
+                        }
+                        Self::InvariantExpr(_)
+                        | Self::AddInvariant { .. }
+                        | Self::AddStateList { .. }
+                        | Self::ScaledStateList { .. }
+                        | Self::ScaledStateListByState { .. }
+                        | Self::ScaledStateListByStatePlusInvariant { .. }
+                        | Self::ScaledStateListByFactorStateList { .. }
+                        | Self::ScaledStateListByFactorStateListTimesInvariant { .. }
+                        | Self::ScaledStateListByFactorGroupProduct { .. }
+                        | Self::ScaledStateListByFactorGroupProductTimesInvariant { .. }
+                        | Self::FixedRead(_)
+                        | Self::DynamicReadAt { .. } => unreachable!(
+                            "dynamic read index sources must be simple loop-state sources"
+                        ),
+                    },
                     Self::InvariantExpr(_)
                     | Self::AddInvariant { .. }
                     | Self::AddStateList { .. }
@@ -722,9 +754,9 @@ impl PreparedCarrySource {
                     | Self::ScaledStateListByFactorStateList { .. }
                     | Self::ScaledStateListByFactorStateListTimesInvariant { .. }
                     | Self::ScaledStateListByFactorGroupProduct { .. }
-                    | Self::ScaledStateListByFactorGroupProductTimesInvariant { .. }
-                    | Self::FixedRead(_)
-                    | Self::DynamicReadAt { .. } => "add_source_plus_invariant".to_owned(),
+                    | Self::ScaledStateListByFactorGroupProductTimesInvariant { .. } => {
+                        "add_source_plus_invariant".to_owned()
+                    }
                 }
             }
             (
@@ -856,6 +888,38 @@ impl PreparedCarrySource {
                     Self::PreviousCurrent => "mul_prev_current_plus_invariant".to_owned(),
                     Self::PreviousCarry(index) => format!("mul_prev_carry{index}_plus_invariant"),
                     Self::Carry(index) => format!("mul_carry{index}_plus_invariant"),
+                    Self::FixedRead(PreparedFixedReadCarrySource::Value(_)) => {
+                        "mul_read_value_fixed_plus_invariant".to_owned()
+                    }
+                    Self::FixedRead(PreparedFixedReadCarrySource::At { .. }) => {
+                        "mul_read_at_fixed_plus_invariant".to_owned()
+                    }
+                    Self::DynamicReadAt { index_source, .. } => match index_source.as_ref() {
+                        Self::Current => "mul_read_at_dynamic_current_plus_invariant".to_owned(),
+                        Self::PreviousCurrent => {
+                            "mul_read_at_dynamic_prev_current_plus_invariant".to_owned()
+                        }
+                        Self::PreviousCarry(index) => {
+                            format!("mul_read_at_dynamic_prev_carry{index}_plus_invariant")
+                        }
+                        Self::Carry(index) => {
+                            format!("mul_read_at_dynamic_carry{index}_plus_invariant")
+                        }
+                        Self::InvariantExpr(_)
+                        | Self::AddInvariant { .. }
+                        | Self::AddStateList { .. }
+                        | Self::ScaledStateList { .. }
+                        | Self::ScaledStateListByState { .. }
+                        | Self::ScaledStateListByStatePlusInvariant { .. }
+                        | Self::ScaledStateListByFactorStateList { .. }
+                        | Self::ScaledStateListByFactorStateListTimesInvariant { .. }
+                        | Self::ScaledStateListByFactorGroupProduct { .. }
+                        | Self::ScaledStateListByFactorGroupProductTimesInvariant { .. }
+                        | Self::FixedRead(_)
+                        | Self::DynamicReadAt { .. } => unreachable!(
+                            "dynamic read index sources must be simple loop-state sources"
+                        ),
+                    },
                     Self::InvariantExpr(_)
                     | Self::AddInvariant { .. }
                     | Self::AddStateList { .. }
@@ -865,9 +929,9 @@ impl PreparedCarrySource {
                     | Self::ScaledStateListByFactorStateList { .. }
                     | Self::ScaledStateListByFactorStateListTimesInvariant { .. }
                     | Self::ScaledStateListByFactorGroupProduct { .. }
-                    | Self::ScaledStateListByFactorGroupProductTimesInvariant { .. }
-                    | Self::FixedRead(_)
-                    | Self::DynamicReadAt { .. } => "mul_source_plus_invariant".to_owned(),
+                    | Self::ScaledStateListByFactorGroupProductTimesInvariant { .. } => {
+                        "mul_source_plus_invariant".to_owned()
+                    }
                 }
             }
             (

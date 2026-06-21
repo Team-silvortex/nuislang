@@ -111,6 +111,8 @@ Short rule:
   [text_report_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_report_json_demo),
   [time_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/time_report_demo),
   [benchmark_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_demo),
+  [benchmark_report_count_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_count_demo),
+  [benchmark_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo),
   [io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_report_demo),
   [filesystem_io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/filesystem_io_report_demo),
   [json_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/json_runtime_demo),

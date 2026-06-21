@@ -96,6 +96,33 @@ fn compiles_cli_project_build_report_tooling_project() {
 }
 
 #[test]
+fn compiles_benchmark_report_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("benchmark report tooling project should compile");
+}
+
+#[test]
+fn compiles_benchmark_report_count_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_count_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("benchmark report count tooling project should compile");
+}
+
+#[test]
+fn compiles_benchmark_report_file_tooling_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("benchmark report file tooling project should compile");
+}
+
+#[test]
 fn compiles_cli_pgm_info_tooling_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo",

@@ -1,14 +1,16 @@
 mod cpu Main {
   extern "c" fn host_monotonic_time_ns() -> i64;
   extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
   extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
   extern "c" fn host_json_object_len(field_count: i64) -> i64;
-  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
-  extern "c" fn host_stdout_flush() -> i64;
 
-  struct BenchmarkReportFacadeSummary {
+  struct BenchmarkReportFileFacadeSummary {
     first_span_ns: i64,
     second_span_ns: i64,
     third_span_ns: i64,
@@ -29,8 +31,10 @@ mod cpu Main {
     report_len: i64,
     pair_len: i64,
     object_len: i64,
-    stdout_written: i64,
-    stdout_flushed: i64
+    output_path_handle: i64,
+    output_file_handle: i64,
+    write_code: i64,
+    output_close_code: i64
   }
 
   fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
@@ -75,7 +79,7 @@ mod cpu Main {
     return max2(max2(first, second), third);
   }
 
-  fn capture_benchmark_report_facades() -> BenchmarkReportFacadeSummary {
+  fn capture_benchmark_report_file_facades() -> BenchmarkReportFileFacadeSummary {
     let first_start_ns: i64 = host_monotonic_time_ns();
     let first_sleep_ns: i64 = host_sleep_ns(1000);
     let first_end_ns: i64 = host_monotonic_time_ns();
@@ -96,7 +100,11 @@ mod cpu Main {
     let first_block: i64 = append_line(1501, kv_line_handle, 10);
     let second_block: i64 = append_line(first_block, status_line_handle, 10);
     let report_handle: i64 = host_text_concat(second_block, 1801);
-    return BenchmarkReportFacadeSummary {
+    let output_path_handle: i64 = host_temp_file_handle(221);
+    let output_file_handle: i64 = host_file_open(output_path_handle, 1);
+    let write_code: i64 = host_file_write(output_file_handle, report_handle);
+    let output_close_code: i64 = host_file_close(output_file_handle);
+    return BenchmarkReportFileFacadeSummary {
       first_span_ns: first_span_ns,
       second_span_ns: second_span_ns,
       third_span_ns: third_span_ns,
@@ -117,13 +125,16 @@ mod cpu Main {
       report_len: host_text_measure(report_handle),
       pair_len: host_json_pair_len(1601, 1602),
       object_len: host_json_object_len(5),
-      stdout_written: host_stdout_write(report_handle),
-      stdout_flushed: host_stdout_flush()
+      output_path_handle: output_path_handle,
+      output_file_handle: output_file_handle,
+      write_code: write_code,
+      output_close_code: output_close_code
     };
   }
 
   fn main() {
-    let summary: BenchmarkReportFacadeSummary = capture_benchmark_report_facades();
+    let summary: BenchmarkReportFileFacadeSummary =
+      capture_benchmark_report_file_facades();
     print(
       summary.first_span_ns
         + summary.second_span_ns
@@ -145,8 +156,10 @@ mod cpu Main {
         + summary.report_len
         + summary.pair_len
         + summary.object_len
-        + summary.stdout_written
-        + summary.stdout_flushed
+        + summary.output_path_handle
+        + summary.output_file_handle
+        + summary.write_code
+        + summary.output_close_code
     );
   }
 }

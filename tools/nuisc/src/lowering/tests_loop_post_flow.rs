@@ -306,7 +306,6 @@ fn lowers_post_flow_breaking_after_branching_carry_into_loop_while_scalar_post_f
                 && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
         })
         .expect("expected loop_while_scalar_post_flow_cond_chain node");
-    dbg!(&loop_node.op.args);
     assert_eq!(loop_node.op.args[5], "carry0_gt");
     assert_eq!(loop_node.op.args[7], "break");
     assert_eq!(loop_node.op.args[9], "current_gt");

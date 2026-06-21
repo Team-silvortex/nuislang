@@ -284,6 +284,18 @@ pub(super) fn lower_function_body(
     allow_implicit_return: bool,
 ) -> Result<Option<String>, String> {
     let saved_effect_anchor = state.last_effect_anchor.take();
+    if function
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::If { else_body, .. } if else_body.is_empty()))
+    {
+        if let Some(returned) =
+            super::if_lowering::lower_guard_return_chain(&function.body, state, bindings)?
+        {
+            state.last_effect_anchor = saved_effect_anchor;
+            return Ok(Some(returned));
+        }
+    }
     let mut const_bindings = BTreeMap::new();
     if let Some(returned) =
         lower_inline_stmts(&function.body, state, bindings, &mut const_bindings)?
@@ -323,7 +335,16 @@ pub(super) fn lower_if_stmt(
         }
     }
     let condition_name = lower_expr(condition, state, bindings)?;
-    let lowered = lower_if_pair(condition_name, then_body, else_body, state, bindings)?;
+    let lowered = lower_if_pair(condition_name, then_body, else_body, state, bindings).map_err(
+        |error| {
+            let function_name = state
+                .call_stack
+                .last()
+                .cloned()
+                .unwrap_or_else(|| "<top-level>".to_owned());
+            format!("in function `{function_name}` while lowering `if`: {error}")
+        },
+    )?;
     match lowered {
         LoweredIfOutcome::Continued => Ok(None),
         LoweredIfOutcome::Bind { name, value } => {

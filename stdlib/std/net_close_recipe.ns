@@ -23,7 +23,8 @@ mod cpu Main {
     let local_port_value: i64 = network_profile_local_port("NetworkUnit");
     let local_port: NetworkResult<i64> =
       network_result(network_profile_local_port("NetworkUnit"));
-    let close_result: NetworkResult<i64> = network_result(host_network_close(local_port_value));
+    let close_result: NetworkResult<i64> =
+      network_result(host_network_close(local_port_value));
 
     return NetCloseSummary {
       local_port_ready: encode_ready(local_port),

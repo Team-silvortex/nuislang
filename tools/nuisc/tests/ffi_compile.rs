@@ -37,6 +37,9 @@ fn compiles_path_runtime_ffi_frontdoor_sources() {
 fn compiles_representative_ffi_companion_sources() {
     for path in [
         "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_argv_runtime_facades.ns",
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_benchmark_report_facades.ns",
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_benchmark_report_count_facades.ns",
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_benchmark_report_file_facades.ns",
         "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_env_runtime_facades.ns",
         "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_process_runtime_facades.ns",
         "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_command_runtime_facades.ns",

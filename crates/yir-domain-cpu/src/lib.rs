@@ -403,6 +403,8 @@ fn carry_source_payload_len(kind: &str) -> Option<usize> {
         kind,
         "add_read_value_fixed"
             | "mul_read_value_fixed"
+            | "add_read_value_fixed_plus_invariant"
+            | "mul_read_value_fixed_plus_invariant"
             | "add_invariant"
             | "add_current_plus_invariant"
             | "add_prev_current_plus_invariant"
@@ -411,7 +413,21 @@ fn carry_source_payload_len(kind: &str) -> Option<usize> {
             | "mul_prev_current_plus_invariant"
     ) {
         Some(1)
-    } else if matches!(kind, "add_read_at_fixed" | "mul_read_at_fixed") {
+    } else if matches!(
+        kind,
+        "add_read_at_fixed"
+            | "mul_read_at_fixed"
+            | "add_read_at_fixed_plus_invariant"
+            | "mul_read_at_fixed_plus_invariant"
+    ) {
+        Some(if kind.ends_with("_plus_invariant") { 3 } else { 2 })
+    } else if matches!(
+        kind,
+        "add_read_at_dynamic_current_plus_invariant"
+            | "add_read_at_dynamic_prev_current_plus_invariant"
+            | "mul_read_at_dynamic_current_plus_invariant"
+            | "mul_read_at_dynamic_prev_current_plus_invariant"
+    ) {
         Some(2)
     } else if matches!(
         kind,
@@ -423,6 +439,33 @@ fn carry_source_payload_len(kind: &str) -> Option<usize> {
             | "mul_source_plus_invariant"
     ) {
         Some(1)
+    } else if [
+        "add_read_at_dynamic_prev_carry",
+        "mul_read_at_dynamic_prev_carry",
+        "add_read_at_dynamic_carry",
+        "mul_read_at_dynamic_carry",
+    ]
+    .iter()
+    .any(|prefix| {
+        kind.strip_prefix(prefix)
+            .is_some_and(|index| index.parse::<usize>().is_ok())
+    }) {
+        Some(1)
+    } else if [
+        "add_read_at_dynamic_prev_carry",
+        "mul_read_at_dynamic_prev_carry",
+        "add_read_at_dynamic_carry",
+        "mul_read_at_dynamic_carry",
+    ]
+    .iter()
+    .any(|prefix| {
+        kind.strip_prefix(prefix).is_some_and(|suffix| {
+            suffix
+                .strip_suffix("_plus_invariant")
+                .is_some_and(|index| index.parse::<usize>().is_ok())
+        })
+    }) {
+        Some(2)
     } else {
         None
     }

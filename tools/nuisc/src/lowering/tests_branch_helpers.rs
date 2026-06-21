@@ -904,6 +904,52 @@ fn lowers_multi_arm_match_return_chain_with_pure_local_bindings_into_selects() {
 }
 
 #[test]
+fn lowers_guard_style_helper_return_chain_into_selects_without_guard_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn min2(lhs: i64, rhs: i64) -> i64 {
+            if lhs < rhs {
+              return lhs;
+            }
+            return rhs;
+          }
+
+          fn clamp3(first: i64, second: i64, third: i64) -> i64 {
+            return min2(min2(first, second), third);
+          }
+
+          fn main() -> i64 {
+            return clamp3(7, 4, 9);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .collect::<Vec<_>>();
+    let guard_returns = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "guard_return")
+        .collect::<Vec<_>>();
+    assert!(
+        !selects.is_empty(),
+        "expected guard-style helper return chain to lower through select nodes"
+    );
+    assert!(
+        guard_returns.is_empty(),
+        "expected helper guard-return chain to avoid guard_return nodes, found {}",
+        guard_returns.len()
+    );
+}
+
+#[test]
 fn lowers_if_return_chain_with_shared_suffix_after_branch_local_binding() {
     let module = parse_nuis_module(
         r#"

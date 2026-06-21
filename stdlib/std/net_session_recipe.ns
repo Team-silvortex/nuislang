@@ -347,7 +347,6 @@ mod cpu Main {
 
   fn capture_net_control_session_summary() -> NetControlSessionSummary {
     let argv_count: i64 = host_argv_count();
-    let local_port_value: i64 = network_profile_local_port("NetworkUnit");
     let local_port: NetworkResult<i64> =
       network_result(network_profile_local_port("NetworkUnit"));
     let remote_port: NetworkResult<i64> =
@@ -358,7 +357,8 @@ mod cpu Main {
       network_result(network_profile_read_timeout("NetworkUnit"));
     let write_timeout: NetworkResult<i64> =
       network_result(network_profile_write_timeout("NetworkUnit"));
-    let close_result: NetworkResult<i64> = network_result(host_network_close(local_port_value));
+    let close_result: NetworkResult<i64> =
+      network_result(host_network_close(encode_result_value(local_port)));
 
     return NetControlSessionSummary {
       session_value: argv_count

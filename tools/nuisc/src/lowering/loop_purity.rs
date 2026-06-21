@@ -541,6 +541,20 @@ pub(super) fn substitute_branch_binding(
                 .map(|arg| substitute_branch_binding(arg, binding_name, binding_value))
                 .collect(),
         },
+        NirExpr::CpuExternCall {
+            abi,
+            callee,
+            interface,
+            args,
+        } => NirExpr::CpuExternCall {
+            abi: abi.clone(),
+            callee: callee.clone(),
+            interface: interface.clone(),
+            args: args
+                .iter()
+                .map(|arg| substitute_branch_binding(arg, binding_name, binding_value))
+                .collect(),
+        },
         NirExpr::MethodCall {
             receiver,
             method,
@@ -583,6 +597,78 @@ pub(super) fn substitute_branch_binding(
             lhs: Box::new(substitute_branch_binding(lhs, binding_name, binding_value)),
             rhs: Box::new(substitute_branch_binding(rhs, binding_name, binding_value)),
         },
+        NirExpr::NetworkResult { value, state } => NirExpr::NetworkResult {
+            value: Box::new(substitute_branch_binding(value, binding_name, binding_value)),
+            state: *state,
+        },
+        NirExpr::NetworkConfigReady(inner) => NirExpr::NetworkConfigReady(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::NetworkSendReady(inner) => NirExpr::NetworkSendReady(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::NetworkRecvReady(inner) => NirExpr::NetworkRecvReady(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::NetworkAcceptReady(inner) => NirExpr::NetworkAcceptReady(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::NetworkValue(inner) => NirExpr::NetworkValue(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::DataResult { value, state } => NirExpr::DataResult {
+            value: Box::new(substitute_branch_binding(value, binding_name, binding_value)),
+            state: *state,
+        },
+        NirExpr::DataReady(inner) => NirExpr::DataReady(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::DataMoved(inner) => NirExpr::DataMoved(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::DataWindowed(inner) => NirExpr::DataWindowed(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::DataValue(inner) => NirExpr::DataValue(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::KernelResult { value, state } => NirExpr::KernelResult {
+            value: Box::new(substitute_branch_binding(value, binding_name, binding_value)),
+            state: *state,
+        },
+        NirExpr::KernelConfigReady(inner) => NirExpr::KernelConfigReady(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::KernelValue(inner) => NirExpr::KernelValue(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::ShaderResult { value, state } => NirExpr::ShaderResult {
+            value: Box::new(substitute_branch_binding(value, binding_name, binding_value)),
+            state: *state,
+        },
+        NirExpr::ShaderPassReady(inner) => NirExpr::ShaderPassReady(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::ShaderFrameReady(inner) => NirExpr::ShaderFrameReady(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::ShaderValue(inner) => NirExpr::ShaderValue(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
         _ => expr.clone(),
     }
 }

@@ -1,6 +1,139 @@
 use super::lower_nir_to_yir_builtin_cpu;
 use crate::frontend::parse_nuis_module;
 
+// Layer 0: synchronous host transport bindings should lower even when host probes/close
+// consume profile values through local `let` bindings.
+#[test]
+fn lowers_sync_network_host_transport_profile_bindings_without_unbound_variable_errors() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_network_send_probe(
+            stream_window: i64,
+            send_window: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_probe(
+            stream_window: i64,
+            recv_window: i64,
+            local_port: i64
+          ) -> i64;
+          extern "c" fn host_network_close(handle: i64) -> i64;
+
+          fn main() -> i64 {
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let send_value: i64 = host_network_send_probe(stream_window, send_window, remote_port);
+            let recv_value: i64 = host_network_recv_probe(stream_window, recv_window, local_port);
+            let close_value: i64 = host_network_close(local_port);
+            return send_value + recv_value + close_value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let extern_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "extern_call_i64")
+        .count();
+    assert!(
+        extern_call_count >= 3,
+        "expected host transport lowering to emit extern i64 calls, found {extern_call_count}"
+    );
+}
+
+#[test]
+fn lowers_sync_network_result_local_binding_in_direct_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_network_send_probe(
+            stream_window: i64,
+            send_window: i64,
+            remote_port: i64
+          ) -> i64;
+
+          fn main() -> i64 {
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let send_result: NetworkResult<i64> =
+              network_result(host_network_send_probe(stream_window, send_window, remote_port));
+            return network_value(send_result);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "value"));
+}
+
+#[test]
+fn lowers_sync_network_result_local_bindings_inside_guard_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_network_send_probe(
+            stream_window: i64,
+            send_window: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_probe(
+            stream_window: i64,
+            recv_window: i64,
+            local_port: i64
+          ) -> i64;
+          extern "c" fn host_network_close(handle: i64) -> i64;
+
+          fn main() -> i64 {
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let config_result: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let send_result: NetworkResult<i64> =
+              network_result(host_network_send_probe(stream_window, send_window, remote_port));
+            let recv_result: NetworkResult<i64> =
+              network_result(host_network_recv_probe(stream_window, recv_window, local_port));
+            let close_result: NetworkResult<i64> =
+              network_result(host_network_close(local_port));
+            if network_config_ready(config_result) {
+              return network_value(config_result)
+                + network_value(send_result)
+                + network_value(recv_result)
+                + network_value(close_result);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "is_config_ready"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "value"));
+}
+
 // Layer 1: observer-driven async steps that only sample network readiness/value.
 #[test]
 fn lowers_async_network_observer_step_into_async_loop_carry_chain() {

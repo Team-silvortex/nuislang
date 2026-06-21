@@ -86,6 +86,7 @@ pub(super) fn lower_counted_while(
         from: step_name,
         to: name.clone(),
     });
+    super::body_lowering::chain_statement_effect(state, &name);
     bindings.insert(prepared.binding_name, name);
     Ok(())
 }
@@ -236,6 +237,7 @@ pub(super) fn lower_chained_while(
             to: name.clone(),
         });
     }
+    super::body_lowering::chain_statement_effect(state, &name);
 
     let current_name = next_name(state, "loop_current");
     state.yir.nodes.push(Node {
@@ -409,6 +411,7 @@ pub(super) fn lower_async_chained_while(
         push_effect_edge(state, extra_effect_input, &name);
         push_lifetime_edge(state, extra_effect_input, &name);
     }
+    super::body_lowering::chain_statement_effect(state, &name);
 
     let current_name = next_name(state, "loop_current");
     state.yir.nodes.push(Node {

@@ -78,6 +78,8 @@ Current rule:
   [filesystem_io_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_io_report_recipe.ns)
   ->
   [filesystem_report_file_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_report_file_recipe.ns)
+  ->
+  [benchmark_report_file_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/benchmark_report_file_recipe.ns)
 
 ### Mutate And Output Helpers
 
@@ -124,6 +126,7 @@ Shortest grouped route:
   [directory_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_runtime_demo),
   [filesystem_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_demo),
   [filesystem_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_file_demo),
+  [benchmark_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo),
   [filesystem_io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/filesystem_io_report_demo),
   [cwd_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/cwd_runtime_demo),
   [location_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/location_runtime_demo)

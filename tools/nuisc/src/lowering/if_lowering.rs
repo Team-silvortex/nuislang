@@ -860,6 +860,10 @@ fn is_branch_local_runtime_consumer(expr: &NirExpr) -> bool {
 
 fn expr_contains_conditional_effect_primitive(expr: &NirExpr) -> bool {
     match expr {
+        NirExpr::Await(inner) => !matches!(
+            inner.as_ref(),
+            NirExpr::Call { .. } | NirExpr::MethodCall { .. }
+        ),
         _ if is_branch_local_runtime_consumer(expr) => true,
         _ if is_branch_local_runtime_observer(expr) => false,
         NirExpr::Borrow(inner)
@@ -1434,6 +1438,55 @@ fn lower_return_if_chain(
                 return Ok(None);
             };
             let Some(rhs) = lower_return_if_chain(else_body, state, bindings)? else {
+                return Ok(None);
+            };
+            Ok(Some(lower_select(condition_name, lhs, rhs, state)?))
+        }
+        _ => Ok(None),
+    }
+}
+
+pub(super) fn lower_guard_return_chain(
+    stmts: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    match stmts {
+        [NirStmt::Return(Some(value))] | [NirStmt::Expr(value)] => {
+            if expr_contains_conditional_effect_primitive(value) {
+                return Ok(None);
+            }
+            Ok(Some(lower_expr(value, state, bindings)?))
+        }
+        [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {
+            let pure_helpers = state.pure_helpers.clone();
+            let Some((name, value)) = extract_pure_branch_binding(binding, &pure_helpers) else {
+                return Ok(None);
+            };
+            let substituted: Vec<NirStmt> = tail
+                .iter()
+                .map(|stmt| {
+                    super::loop_purity::substitute_stmt_bindings(
+                        stmt,
+                        &[(name.clone(), value.clone())],
+                    )
+                })
+                .collect();
+            lower_guard_return_chain(&substituted, state, bindings)
+        }
+        [
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            },
+            tail @ ..,
+        ] if else_body.is_empty() => {
+            let condition_name = lower_expr(condition, state, bindings)?;
+            let Some(lhs) = lower_return_if_chain(then_body, state, bindings)? else {
+                return Ok(None);
+            };
+            let Some(rhs) = lower_guard_return_chain(tail, state, bindings)? else {
                 return Ok(None);
             };
             Ok(Some(lower_select(condition_name, lhs, rhs, state)?))

@@ -8,17 +8,20 @@ mod cpu Main {
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
   extern "c" fn host_stdout_flush() -> i64;
 
-  struct BenchmarkReportFacadeSummary {
+  struct BenchmarkReportCountFacadeSummary {
+    requested_sample_count: i64,
+    effective_sample_count: i64,
     first_span_ns: i64,
     second_span_ns: i64,
     third_span_ns: i64,
+    fourth_span_ns: i64,
     min_span_ns: i64,
     max_span_ns: i64,
-    mid_span_ns: i64,
     avg_span_ns: i64,
     first_sleep_ns: i64,
     second_sleep_ns: i64,
     third_sleep_ns: i64,
+    fourth_sleep_ns: i64,
     total_span_ns: i64,
     total_sleep_ns: i64,
     kv_line_handle: i64,
@@ -53,6 +56,16 @@ mod cpu Main {
     return host_text_concat(with_line, newline_handle);
   }
 
+  fn clamp_sample_count(sample_count: i64) -> i64 {
+    if sample_count < 1 {
+      return 1;
+    }
+    if sample_count > 4 {
+      return 4;
+    }
+    return sample_count;
+  }
+
   fn min2(lhs: i64, rhs: i64) -> i64 {
     if lhs < rhs {
       return lhs;
@@ -75,40 +88,109 @@ mod cpu Main {
     return max2(max2(first, second), third);
   }
 
-  fn capture_benchmark_report_facades() -> BenchmarkReportFacadeSummary {
+  fn min4(first: i64, second: i64, third: i64, fourth: i64) -> i64 {
+    return min2(min3(first, second, third), fourth);
+  }
+
+  fn max4(first: i64, second: i64, third: i64, fourth: i64) -> i64 {
+    return max2(max3(first, second, third), fourth);
+  }
+
+  fn active_or_zero(value: i64, enabled: bool) -> i64 {
+    if enabled {
+      return value;
+    }
+    return 0;
+  }
+
+  fn capture_benchmark_report_count_facades() -> BenchmarkReportCountFacadeSummary {
+    let effective_sample_count: i64 = clamp_sample_count(4);
+
     let first_start_ns: i64 = host_monotonic_time_ns();
-    let first_sleep_ns: i64 = host_sleep_ns(1000);
+    let first_sleep_ns_raw: i64 = host_sleep_ns(1000);
     let first_end_ns: i64 = host_monotonic_time_ns();
     let second_start_ns: i64 = host_monotonic_time_ns();
-    let second_sleep_ns: i64 = host_sleep_ns(2000);
+    let second_sleep_ns_raw: i64 = host_sleep_ns(2000);
     let second_end_ns: i64 = host_monotonic_time_ns();
     let third_start_ns: i64 = host_monotonic_time_ns();
-    let third_sleep_ns: i64 = host_sleep_ns(3000);
+    let third_sleep_ns_raw: i64 = host_sleep_ns(3000);
     let third_end_ns: i64 = host_monotonic_time_ns();
-    let first_span_ns: i64 = first_end_ns - first_start_ns;
-    let second_span_ns: i64 = second_end_ns - second_start_ns;
-    let third_span_ns: i64 = third_end_ns - third_start_ns;
-    let min_span_ns: i64 = min3(first_span_ns, second_span_ns, third_span_ns);
-    let max_span_ns: i64 = max3(first_span_ns, second_span_ns, third_span_ns);
-    let total_span_ns: i64 = first_span_ns + second_span_ns + third_span_ns;
+    let fourth_start_ns: i64 = host_monotonic_time_ns();
+    let fourth_sleep_ns_raw: i64 = host_sleep_ns(4000);
+    let fourth_end_ns: i64 = host_monotonic_time_ns();
+
+    let first_span_ns_raw: i64 = first_end_ns - first_start_ns;
+    let second_span_ns_raw: i64 = second_end_ns - second_start_ns;
+    let third_span_ns_raw: i64 = third_end_ns - third_start_ns;
+    let fourth_span_ns_raw: i64 = fourth_end_ns - fourth_start_ns;
+
+    let first_span_ns: i64 = first_span_ns_raw;
+    let second_span_ns: i64 = active_or_zero(second_span_ns_raw, effective_sample_count > 1);
+    let third_span_ns: i64 = active_or_zero(third_span_ns_raw, effective_sample_count > 2);
+    let fourth_span_ns: i64 = active_or_zero(fourth_span_ns_raw, effective_sample_count > 3);
+
+    let first_sleep_ns: i64 = first_sleep_ns_raw;
+    let second_sleep_ns: i64 = active_or_zero(second_sleep_ns_raw, effective_sample_count > 1);
+    let third_sleep_ns: i64 = active_or_zero(third_sleep_ns_raw, effective_sample_count > 2);
+    let fourth_sleep_ns: i64 = active_or_zero(fourth_sleep_ns_raw, effective_sample_count > 3);
+
+    let total_span_ns: i64 =
+      first_span_ns + second_span_ns + third_span_ns + fourth_span_ns;
+    let total_sleep_ns: i64 =
+      first_sleep_ns + second_sleep_ns + third_sleep_ns + fourth_sleep_ns;
+
+    let min_span_ns: i64 =
+      if effective_sample_count == 1 {
+        first_span_ns
+      } else {
+        if effective_sample_count == 2 {
+          min2(first_span_ns, second_span_ns)
+        } else {
+          if effective_sample_count == 3 {
+            min3(first_span_ns, second_span_ns, third_span_ns)
+          } else {
+            min4(first_span_ns, second_span_ns, third_span_ns, fourth_span_ns)
+          }
+        }
+      };
+
+    let max_span_ns: i64 =
+      if effective_sample_count == 1 {
+        first_span_ns
+      } else {
+        if effective_sample_count == 2 {
+          max2(first_span_ns, second_span_ns)
+        } else {
+          if effective_sample_count == 3 {
+            max3(first_span_ns, second_span_ns, third_span_ns)
+          } else {
+            max4(first_span_ns, second_span_ns, third_span_ns, fourth_span_ns)
+          }
+        }
+      };
+
     let kv_line_handle: i64 = build_kv_line(1601, 1602, 58, 32);
     let status_line_handle: i64 = build_kv_line(1701, 1702, 58, 32);
     let first_block: i64 = append_line(1501, kv_line_handle, 10);
     let second_block: i64 = append_line(first_block, status_line_handle, 10);
     let report_handle: i64 = host_text_concat(second_block, 1801);
-    return BenchmarkReportFacadeSummary {
+
+    return BenchmarkReportCountFacadeSummary {
+      requested_sample_count: 4,
+      effective_sample_count: effective_sample_count,
       first_span_ns: first_span_ns,
       second_span_ns: second_span_ns,
       third_span_ns: third_span_ns,
+      fourth_span_ns: fourth_span_ns,
       min_span_ns: min_span_ns,
       max_span_ns: max_span_ns,
-      mid_span_ns: total_span_ns - min_span_ns - max_span_ns,
-      avg_span_ns: total_span_ns / 3,
+      avg_span_ns: total_span_ns / effective_sample_count,
       first_sleep_ns: first_sleep_ns,
       second_sleep_ns: second_sleep_ns,
       third_sleep_ns: third_sleep_ns,
+      fourth_sleep_ns: fourth_sleep_ns,
       total_span_ns: total_span_ns,
-      total_sleep_ns: first_sleep_ns + second_sleep_ns + third_sleep_ns,
+      total_sleep_ns: total_sleep_ns,
       kv_line_handle: kv_line_handle,
       kv_line_len: host_text_measure(kv_line_handle),
       status_line_handle: status_line_handle,
@@ -116,25 +198,29 @@ mod cpu Main {
       report_handle: report_handle,
       report_len: host_text_measure(report_handle),
       pair_len: host_json_pair_len(1601, 1602),
-      object_len: host_json_object_len(5),
+      object_len: host_json_object_len(6),
       stdout_written: host_stdout_write(report_handle),
       stdout_flushed: host_stdout_flush()
     };
   }
 
   fn main() {
-    let summary: BenchmarkReportFacadeSummary = capture_benchmark_report_facades();
+    let summary: BenchmarkReportCountFacadeSummary =
+      capture_benchmark_report_count_facades();
     print(
-      summary.first_span_ns
+      summary.requested_sample_count
+        + summary.effective_sample_count
+        + summary.first_span_ns
         + summary.second_span_ns
         + summary.third_span_ns
+        + summary.fourth_span_ns
         + summary.min_span_ns
         + summary.max_span_ns
-        + summary.mid_span_ns
         + summary.avg_span_ns
         + summary.first_sleep_ns
         + summary.second_sleep_ns
         + summary.third_sleep_ns
+        + summary.fourth_sleep_ns
         + summary.total_span_ns
         + summary.total_sleep_ns
         + summary.kv_line_handle

@@ -130,6 +130,8 @@ source_modules = [
   "text_json_recipe.ns",
   "time_report_recipe.ns",
   "benchmark_report_recipe.ns",
+  "benchmark_report_count_recipe.ns",
+  "benchmark_report_file_recipe.ns",
   "cwd_runtime.ns",
   "cwd_runtime_recipe.ns",
   "temp_runtime.ns",

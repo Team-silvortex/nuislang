@@ -75,7 +75,6 @@ mod cpu Main {
     let send_window: i64 = network_profile_send_window("NetworkUnit");
     let local_port: i64 = network_profile_local_port("NetworkUnit");
     let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-
     let config_result: NetworkResult<i64> =
       network_result(network_profile_bind_core("NetworkUnit"));
     let send_result: NetworkResult<i64> = network_result(

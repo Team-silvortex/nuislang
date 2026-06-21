@@ -3437,6 +3437,162 @@ fn compiles_async_loop_chain_project() {
 }
 
 #[test]
+fn compiles_loop_chain_project_with_dynamic_buffer_index_carry() {
+    let root = write_temp_project(
+        "loop_chain_dynamic_buffer_index",
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let buffer: ref Buffer = alloc_buffer(8, 9);
+            while value < 4 {
+              let value: i64 = value + 1;
+              let acc: i64 = acc + load_at(buffer, value);
+            }
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let artifacts = crate::pipeline::compile_source_path(&root).unwrap();
+    let _ = fs::remove_dir_all(&root);
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_read_at_dynamic_current"));
+    assert!(artifacts.llvm_ir.contains("load_at"));
+}
+
+#[test]
+fn compiles_tail_recursive_project_with_dynamic_buffer_index_carry() {
+    let root = write_temp_project(
+        "tail_recursive_dynamic_buffer_index",
+        r#"
+        mod cpu Main {
+          fn accumulate(current: i64, buffer: ref Buffer, acc: i64) -> i64 {
+            if current <= 1 {
+              return acc;
+            }
+            return accumulate(current - 1, buffer, acc + load_at(buffer, current));
+          }
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 9);
+            let acc: i64 = accumulate(4, buffer, 0);
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let artifacts = crate::pipeline::compile_source_path(&root).unwrap();
+    let _ = fs::remove_dir_all(&root);
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected tail-recursive loop_while_scalar_chain node");
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_read_at_dynamic_prev_current"));
+    assert!(artifacts.llvm_ir.contains("load_at"));
+}
+
+#[test]
+fn compiles_tail_recursive_project_with_fixed_buffer_index_carry() {
+    let root = write_temp_project(
+        "tail_recursive_fixed_buffer_index",
+        r#"
+        mod cpu Main {
+          fn accumulate(current: i64, buffer: ref Buffer, acc: i64) -> i64 {
+            if current <= 1 {
+              return acc;
+            }
+            return accumulate(current - 1, buffer, acc + load_at(buffer, 0));
+          }
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 9);
+            let acc: i64 = accumulate(4, buffer, 0);
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let artifacts = crate::pipeline::compile_source_path(&root).unwrap();
+    let _ = fs::remove_dir_all(&root);
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected tail-recursive loop_while_scalar_chain node");
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_read_at_fixed"));
+    assert!(artifacts.llvm_ir.contains("getelementptr inbounds i64"));
+}
+
+#[test]
+fn compiles_loop_chain_project_with_fixed_node_value_carry() {
+    let root = write_temp_project(
+        "loop_chain_fixed_node_value",
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let current: i64 = 0;
+            let acc: i64 = 0;
+            let head: ref Node = alloc_node(7, null());
+            while current < 3 {
+              let current: i64 = current + 1;
+              let acc: i64 = acc + load_value(head);
+            }
+            free(head);
+            return acc;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let artifacts = crate::pipeline::compile_source_path(&root).unwrap();
+    let _ = fs::remove_dir_all(&root);
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_read_value_fixed"));
+    assert!(artifacts.llvm_ir.contains("load i64, ptr"));
+}
+
+#[test]
 fn compiles_async_loop_flow_chain_project() {
     let root = write_temp_project(
         "async_loop_flow_chain",

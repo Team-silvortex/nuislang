@@ -731,12 +731,36 @@ pub(super) fn parse_prepared_dynamic_read_carry_source(
     binding_name: &str,
     carries: &[PreparedCarryUpdate],
 ) -> Option<PreparedCarrySource> {
+    fn direct_dynamic_index_driver(
+        expr: &NirExpr,
+        binding_name: &str,
+        carries: &[PreparedCarryUpdate],
+    ) -> Option<PreparedCarrySource> {
+        if let Some(state_ref) = parse_prepared_loop_state_ref_expr(expr, binding_name, carries) {
+            return Some(loop_state_ref_into_carry_source(state_ref));
+        }
+
+        let PreparedCarrySource::AddInvariant { base, offset } =
+            parse_additive_carry_source(expr, binding_name, carries)?
+        else {
+            return None;
+        };
+        if offset != NirExpr::Int(0) {
+            return None;
+        }
+        match *base {
+            PreparedCarrySource::Current
+            | PreparedCarrySource::PreviousCurrent
+            | PreparedCarrySource::PreviousCarry(_)
+            | PreparedCarrySource::Carry(_) => Some(*base),
+            _ => None,
+        }
+    }
+
     let candidate = parse_prepared_readable_carry_source_candidate(rhs, binding_name, carries)?;
     match candidate {
         PreparedReadableCarrySourceCandidate::DynamicIndexAt { buffer, index } => {
-            let index_source = loop_state_ref_into_carry_source(
-                parse_prepared_loop_state_ref_expr(&index, binding_name, carries)?,
-            );
+            let index_source = direct_dynamic_index_driver(&index, binding_name, carries)?;
             Some(PreparedCarrySource::DynamicReadAt {
                 buffer,
                 index_source: Box::new(index_source),
@@ -1280,6 +1304,57 @@ mod tests {
         assert_eq!(
             prev_carry.contract_kind(PreparedCarryLinearOp::Add),
             "add_read_at_dynamic_prev_carry0"
+        );
+    }
+
+    #[test]
+    fn add_invariant_contract_kind_distinguishes_fixed_read_shapes() {
+        let fixed_value = PreparedCarrySource::AddInvariant {
+            base: Box::new(PreparedCarrySource::FixedRead(
+                PreparedFixedReadCarrySource::Value(NirExpr::Var("head".to_owned())),
+            )),
+            offset: NirExpr::Int(1),
+        };
+        let fixed_at = PreparedCarrySource::AddInvariant {
+            base: Box::new(PreparedCarrySource::FixedRead(PreparedFixedReadCarrySource::At {
+                buffer: NirExpr::Var("buffer".to_owned()),
+                index: NirExpr::Int(0),
+            })),
+            offset: NirExpr::Int(1),
+        };
+        assert_eq!(
+            fixed_value.contract_kind(PreparedCarryLinearOp::Add),
+            "add_read_value_fixed_plus_invariant"
+        );
+        assert_eq!(
+            fixed_at.contract_kind(PreparedCarryLinearOp::Add),
+            "add_read_at_fixed_plus_invariant"
+        );
+    }
+
+    #[test]
+    fn add_invariant_contract_kind_distinguishes_dynamic_read_shapes() {
+        let dynamic_current = PreparedCarrySource::AddInvariant {
+            base: Box::new(PreparedCarrySource::DynamicReadAt {
+                buffer: NirExpr::Var("buffer".to_owned()),
+                index_source: Box::new(PreparedCarrySource::Current),
+            }),
+            offset: NirExpr::Int(1),
+        };
+        let dynamic_prev_carry = PreparedCarrySource::AddInvariant {
+            base: Box::new(PreparedCarrySource::DynamicReadAt {
+                buffer: NirExpr::Var("buffer".to_owned()),
+                index_source: Box::new(PreparedCarrySource::PreviousCarry(0)),
+            }),
+            offset: NirExpr::Int(1),
+        };
+        assert_eq!(
+            dynamic_current.contract_kind(PreparedCarryLinearOp::Add),
+            "add_read_at_dynamic_current_plus_invariant"
+        );
+        assert_eq!(
+            dynamic_prev_carry.contract_kind(PreparedCarryLinearOp::Add),
+            "add_read_at_dynamic_prev_carry0_plus_invariant"
         );
     }
 

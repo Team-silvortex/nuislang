@@ -3191,6 +3191,54 @@ fn emit_cpu_function(
                 let cmp_kind = node.op.args[3].as_str();
                 let step_kind = node.op.args[4].as_str();
                 let carry_payload_len = |kind: &str| -> usize {
+                    let carry_state_fragment_is_valid = |fragment: &str| -> bool {
+                        fragment == "current"
+                            || fragment == "prev_current"
+                            || fragment
+                                .strip_prefix("prev_carry")
+                                .is_some_and(|index| index.parse::<usize>().is_ok())
+                            || fragment
+                                .strip_prefix("carry")
+                                .is_some_and(|index| index.parse::<usize>().is_ok())
+                    };
+                    let add_state_list_payload_len = |kind: &str| -> Option<usize> {
+                        let (terms_part, payload_len) = if let Some(prefix) =
+                            kind.strip_prefix("add_")
+                        {
+                            if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                (prefix, 1usize)
+                            } else {
+                                (prefix, 0usize)
+                            }
+                        } else if let Some(prefix) = kind.strip_prefix("mul_") {
+                            if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                (prefix, 1usize)
+                            } else {
+                                (prefix, 0usize)
+                            }
+                        } else {
+                            return None;
+                        };
+                        let terms = terms_part.split("_plus_").collect::<Vec<_>>();
+                        if terms.len() < 2 {
+                            return None;
+                        }
+                        if terms.iter().all(|term| carry_state_fragment_is_valid(term)) {
+                            Some(payload_len)
+                        } else {
+                            None
+                        }
+                    };
+                    let zero_payload_indexed_prefixes =
+                        ["add_prev_carry", "mul_prev_carry", "add_carry", "mul_carry"];
+                    let one_payload_zero_payload_indexed_prefixes =
+                        ["add_prev_carry", "add_carry", "mul_prev_carry", "mul_carry"];
+                    let one_payload_indexed_prefixes = [
+                        "add_read_at_dynamic_prev_carry",
+                        "mul_read_at_dynamic_prev_carry",
+                        "add_read_at_dynamic_carry",
+                        "mul_read_at_dynamic_carry",
+                    ];
                     if kind.contains("_plus_factor_invariant_")
                         && kind.starts_with("mul_scaled_by_")
                     {
@@ -3231,6 +3279,108 @@ fn emit_cpu_function(
                             | "mul_source_plus_invariant"
                     ) {
                         1
+                    } else if matches!(
+                        kind,
+                        "keep"
+                            | "keep_prev_carry"
+                            | "add_current"
+                            | "add_prev_current"
+                            | "mul_current"
+                            | "mul_prev_current"
+                    ) || zero_payload_indexed_prefixes.iter().any(|prefix| {
+                        kind.strip_prefix(prefix)
+                            .is_some_and(|index| index.parse::<usize>().is_ok())
+                    }) {
+                        0
+                    } else if one_payload_indexed_prefixes.iter().any(|prefix| {
+                        kind.strip_prefix(prefix)
+                            .is_some_and(|index| index.parse::<usize>().is_ok())
+                    }) {
+                        1
+                    } else if one_payload_zero_payload_indexed_prefixes
+                        .iter()
+                        .any(|prefix| {
+                            kind.strip_prefix(prefix).is_some_and(|suffix| {
+                                suffix
+                                    .strip_suffix("_plus_invariant")
+                                    .is_some_and(|index| index.parse::<usize>().is_ok())
+                            })
+                        })
+                    {
+                        1
+                    } else if let Some(payload_len) = add_state_list_payload_len(kind) {
+                        payload_len
+                    } else if matches!(
+                        kind,
+                        "add_read_value_fixed"
+                            | "mul_read_value_fixed"
+                            | "add_read_value_fixed_plus_invariant"
+                            | "mul_read_value_fixed_plus_invariant"
+                            | "add_invariant"
+                            | "add_current_plus_invariant"
+                            | "add_prev_current_plus_invariant"
+                            | "mul_invariant"
+                            | "mul_current_plus_invariant"
+                            | "mul_prev_current_plus_invariant"
+                    ) {
+                        1
+                    } else if matches!(
+                        kind,
+                        "add_read_at_fixed"
+                            | "mul_read_at_fixed"
+                            | "add_read_at_fixed_plus_invariant"
+                            | "mul_read_at_fixed_plus_invariant"
+                    ) {
+                        if kind.ends_with("_plus_invariant") {
+                            3
+                        } else {
+                            2
+                        }
+                    } else if matches!(
+                        kind,
+                        "add_read_at_dynamic_current_plus_invariant"
+                            | "add_read_at_dynamic_prev_current_plus_invariant"
+                            | "mul_read_at_dynamic_current_plus_invariant"
+                            | "mul_read_at_dynamic_prev_current_plus_invariant"
+                    ) {
+                        2
+                    } else if matches!(
+                        kind,
+                        "add_read_at_dynamic_current"
+                            | "add_read_at_dynamic_prev_current"
+                            | "mul_read_at_dynamic_current"
+                            | "mul_read_at_dynamic_prev_current"
+                            | "add_source_plus_invariant"
+                            | "mul_source_plus_invariant"
+                    ) {
+                        1
+                    } else if [
+                        "add_read_at_dynamic_prev_carry",
+                        "mul_read_at_dynamic_prev_carry",
+                        "add_read_at_dynamic_carry",
+                        "mul_read_at_dynamic_carry",
+                    ]
+                    .iter()
+                    .any(|prefix| {
+                        kind.strip_prefix(prefix)
+                            .is_some_and(|index| index.parse::<usize>().is_ok())
+                    }) {
+                        1
+                    } else if [
+                        "add_read_at_dynamic_prev_carry",
+                        "mul_read_at_dynamic_prev_carry",
+                        "add_read_at_dynamic_carry",
+                        "mul_read_at_dynamic_carry",
+                    ]
+                    .iter()
+                    .any(|prefix| {
+                        kind.strip_prefix(prefix).is_some_and(|suffix| {
+                            suffix
+                                .strip_suffix("_plus_invariant")
+                                .is_some_and(|index| index.parse::<usize>().is_ok())
+                        })
+                    }) {
+                        2
                     } else {
                         0
                     }
@@ -3413,7 +3563,11 @@ fn emit_cpu_function(
                     current_carries.push(carry_before);
                 }
                 let mut next_carries = Vec::new();
-                for (index, (carry_kind, payloads)) in carry_specs.iter().enumerate() {
+                for (index, ((carry_kind, raw_payloads), (_, payloads))) in carry_specs_raw
+                    .iter()
+                    .zip(carry_specs.iter())
+                    .enumerate()
+                {
                     let (source, op) = if carry_kind == "add_current" {
                         (next_current.clone(), "add")
                     } else if carry_kind == "add_prev_current" {
@@ -3422,6 +3576,363 @@ fn emit_cpu_function(
                         (next_current.clone(), "mul")
                     } else if carry_kind == "mul_prev_current" {
                         (current.clone(), "mul")
+                    } else if matches!(
+                        carry_kind.as_str(),
+                        "add_read_value_fixed" | "mul_read_value_fixed"
+                    ) {
+                        let ptr = match raw_payloads.first() {
+                            Some(LlvmValueRef::Ptr(ptr)) => ptr.clone(),
+                            _ => {
+                                return Err(format!(
+                                    "cpu.{loop_instruction} `{}` is missing fixed read pointer payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                ));
+                            }
+                        };
+                        let loaded = fresh_reg(&mut next_reg);
+                        body.push(format!("  {loaded} = load i64, ptr {ptr}"));
+                        let source = coerce_to_loop_scalar(
+                            &LlvmValueRef::I64(loaded),
+                            loop_scalar_kind,
+                            &mut body,
+                            &mut next_reg,
+                        )
+                        .ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` cannot coerce fixed read source `{carry_kind}` to the selected loop scalar kind during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let op = if carry_kind.starts_with("add_") {
+                            "add"
+                        } else {
+                            "mul"
+                        };
+                        (source, op)
+                    } else if matches!(
+                        carry_kind.as_str(),
+                        "add_read_value_fixed_plus_invariant"
+                            | "mul_read_value_fixed_plus_invariant"
+                    ) {
+                        let ptr = match raw_payloads.first() {
+                            Some(LlvmValueRef::Ptr(ptr)) => ptr.clone(),
+                            _ => {
+                                return Err(format!(
+                                    "cpu.{loop_instruction} `{}` is missing fixed read pointer payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                ));
+                            }
+                        };
+                        let offset = payloads.last().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` is missing invariant payload for `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let loaded = fresh_reg(&mut next_reg);
+                        body.push(format!("  {loaded} = load i64, ptr {ptr}"));
+                        let read_source = coerce_to_loop_scalar(
+                            &LlvmValueRef::I64(loaded),
+                            loop_scalar_kind,
+                            &mut body,
+                            &mut next_reg,
+                        )
+                        .ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` cannot coerce fixed read source `{carry_kind}` to the selected loop scalar kind during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let source = emit_loop_numeric_op(
+                            &mut body,
+                            &mut next_reg,
+                            loop_scalar_kind,
+                            "add",
+                            &read_source,
+                            offset,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let op = if carry_kind.starts_with("add_") {
+                            "add"
+                        } else {
+                            "mul"
+                        };
+                        (source, op)
+                    } else if matches!(
+                        carry_kind.as_str(),
+                        "add_read_at_fixed" | "mul_read_at_fixed"
+                    ) {
+                        let ptr = match raw_payloads.first() {
+                            Some(LlvmValueRef::Ptr(ptr)) => ptr.clone(),
+                            _ => {
+                                return Err(format!(
+                                    "cpu.{loop_instruction} `{}` is missing fixed indexed-read buffer payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                ));
+                            }
+                        };
+                        let index_value = raw_payloads
+                            .get(1)
+                            .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg))
+                            .ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing fixed indexed-read index payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                        let slot = fresh_reg(&mut next_reg);
+                        body.push(format!(
+                            "  {slot} = getelementptr inbounds i64, ptr {ptr}, i64 {index_value}"
+                        ));
+                        let loaded = fresh_reg(&mut next_reg);
+                        body.push(format!("  {loaded} = load i64, ptr {slot}"));
+                        let source = coerce_to_loop_scalar(
+                            &LlvmValueRef::I64(loaded),
+                            loop_scalar_kind,
+                            &mut body,
+                            &mut next_reg,
+                        )
+                        .ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` cannot coerce fixed indexed-read source `{carry_kind}` to the selected loop scalar kind during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let op = if carry_kind.starts_with("add_") {
+                            "add"
+                        } else {
+                            "mul"
+                        };
+                        (source, op)
+                    } else if matches!(
+                        carry_kind.as_str(),
+                        "add_read_at_fixed_plus_invariant"
+                            | "mul_read_at_fixed_plus_invariant"
+                    ) {
+                        let ptr = match raw_payloads.first() {
+                            Some(LlvmValueRef::Ptr(ptr)) => ptr.clone(),
+                            _ => {
+                                return Err(format!(
+                                    "cpu.{loop_instruction} `{}` is missing fixed indexed-read buffer payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                ));
+                            }
+                        };
+                        let index_value = raw_payloads
+                            .get(1)
+                            .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg))
+                            .ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing fixed indexed-read index payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                        let offset = payloads.last().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` is missing invariant payload for `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let slot = fresh_reg(&mut next_reg);
+                        body.push(format!(
+                            "  {slot} = getelementptr inbounds i64, ptr {ptr}, i64 {index_value}"
+                        ));
+                        let loaded = fresh_reg(&mut next_reg);
+                        body.push(format!("  {loaded} = load i64, ptr {slot}"));
+                        let read_source = coerce_to_loop_scalar(
+                            &LlvmValueRef::I64(loaded),
+                            loop_scalar_kind,
+                            &mut body,
+                            &mut next_reg,
+                        )
+                        .ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` cannot coerce fixed indexed-read source `{carry_kind}` to the selected loop scalar kind during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let source = emit_loop_numeric_op(
+                            &mut body,
+                            &mut next_reg,
+                            loop_scalar_kind,
+                            "add",
+                            &read_source,
+                            offset,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let op = if carry_kind.starts_with("add_") {
+                            "add"
+                        } else {
+                            "mul"
+                        };
+                        (source, op)
+                    } else if matches!(
+                        carry_kind.as_str(),
+                        "add_read_at_dynamic_current"
+                            | "add_read_at_dynamic_prev_current"
+                            | "mul_read_at_dynamic_current"
+                            | "mul_read_at_dynamic_prev_current"
+                            | "add_read_at_dynamic_current_plus_invariant"
+                            | "add_read_at_dynamic_prev_current_plus_invariant"
+                            | "mul_read_at_dynamic_current_plus_invariant"
+                            | "mul_read_at_dynamic_prev_current_plus_invariant"
+                    ) || carry_kind.strip_prefix("add_read_at_dynamic_prev_carry").is_some()
+                        || carry_kind.strip_prefix("mul_read_at_dynamic_prev_carry").is_some()
+                        || carry_kind.strip_prefix("add_read_at_dynamic_carry").is_some()
+                        || carry_kind.strip_prefix("mul_read_at_dynamic_carry").is_some()
+                        || carry_kind
+                            .strip_prefix("add_read_at_dynamic_prev_carry")
+                            .is_some_and(|suffix| suffix.ends_with("_plus_invariant"))
+                        || carry_kind
+                            .strip_prefix("mul_read_at_dynamic_prev_carry")
+                            .is_some_and(|suffix| suffix.ends_with("_plus_invariant"))
+                        || carry_kind
+                            .strip_prefix("add_read_at_dynamic_carry")
+                            .is_some_and(|suffix| suffix.ends_with("_plus_invariant"))
+                        || carry_kind
+                            .strip_prefix("mul_read_at_dynamic_carry")
+                            .is_some_and(|suffix| suffix.ends_with("_plus_invariant"))
+                    {
+                        let buffer_ptr = match raw_payloads.first() {
+                            Some(LlvmValueRef::Ptr(ptr)) => ptr.clone(),
+                            _ => {
+                                return Err(format!(
+                                    "cpu.{loop_instruction} `{}` is missing dynamic read buffer payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                ));
+                            }
+                        };
+                        let dynamic_kind = carry_kind
+                            .strip_suffix("_plus_invariant")
+                            .unwrap_or(carry_kind.as_str());
+                        let index_value = if dynamic_kind.ends_with("_prev_current") {
+                            current.clone()
+                        } else if dynamic_kind.ends_with("_current") {
+                            next_current.clone()
+                        } else if let Some(rest) =
+                            dynamic_kind.strip_prefix("add_read_at_dynamic_prev_carry")
+                        {
+                            let source_index = rest.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            current_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?
+                        } else if let Some(rest) =
+                            dynamic_kind.strip_prefix("mul_read_at_dynamic_prev_carry")
+                        {
+                            let source_index = rest.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            current_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?
+                        } else if let Some(rest) =
+                            dynamic_kind.strip_prefix("add_read_at_dynamic_carry")
+                        {
+                            let source_index = rest.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            next_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?
+                        } else if let Some(rest) =
+                            dynamic_kind.strip_prefix("mul_read_at_dynamic_carry")
+                        {
+                            let source_index = rest.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            next_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?
+                        } else {
+                            return Err(format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            ));
+                        };
+                        let slot = fresh_reg(&mut next_reg);
+                        body.push(format!(
+                            "  {slot} = getelementptr inbounds i64, ptr {buffer_ptr}, i64 {index_value}"
+                        ));
+                        let loaded = fresh_reg(&mut next_reg);
+                        body.push(format!("  {loaded} = load i64, ptr {slot}"));
+                        let read_source = coerce_to_loop_scalar(
+                            &LlvmValueRef::I64(loaded),
+                            loop_scalar_kind,
+                            &mut body,
+                            &mut next_reg,
+                        )
+                        .ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` cannot coerce dynamic read source `{carry_kind}` to the selected loop scalar kind during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let source = if carry_kind.ends_with("_plus_invariant") {
+                            let offset = payloads.last().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing invariant payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            emit_loop_numeric_op(
+                                &mut body,
+                                &mut next_reg,
+                                loop_scalar_kind,
+                                "add",
+                                &read_source,
+                                offset,
+                            )
+                            .map_err(|error| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                    node.name,
+                                )
+                            })?
+                        } else {
+                            read_source
+                        };
+                        let op = if carry_kind.starts_with("add_") {
+                            "add"
+                        } else {
+                            "mul"
+                        };
+                        (source, op)
                     } else if let Some(rest) = carry_kind.strip_prefix("add_prev_carry") {
                         let source_index = rest.parse::<usize>().map_err(|_| {
                             format!(
@@ -7791,6 +8302,8 @@ fn emit_cpu_function(
                         kind,
                         "add_read_value_fixed"
                             | "mul_read_value_fixed"
+                            | "add_read_value_fixed_plus_invariant"
+                            | "mul_read_value_fixed_plus_invariant"
                             | "add_invariant"
                             | "add_current_plus_invariant"
                             | "add_prev_current_plus_invariant"
@@ -7799,7 +8312,21 @@ fn emit_cpu_function(
                             | "mul_prev_current_plus_invariant"
                     ) {
                         Some(1)
-                    } else if matches!(kind, "add_read_at_fixed" | "mul_read_at_fixed") {
+                    } else if matches!(
+                        kind,
+                        "add_read_at_fixed"
+                            | "mul_read_at_fixed"
+                            | "add_read_at_fixed_plus_invariant"
+                            | "mul_read_at_fixed_plus_invariant"
+                    ) {
+                        Some(if kind.ends_with("_plus_invariant") { 3 } else { 2 })
+                    } else if matches!(
+                        kind,
+                        "add_read_at_dynamic_current_plus_invariant"
+                            | "add_read_at_dynamic_prev_current_plus_invariant"
+                            | "mul_read_at_dynamic_current_plus_invariant"
+                            | "mul_read_at_dynamic_prev_current_plus_invariant"
+                    ) {
                         Some(2)
                     } else if matches!(
                         kind,
@@ -7811,6 +8338,33 @@ fn emit_cpu_function(
                             | "mul_source_plus_invariant"
                     ) {
                         Some(1)
+                    } else if [
+                        "add_read_at_dynamic_prev_carry",
+                        "mul_read_at_dynamic_prev_carry",
+                        "add_read_at_dynamic_carry",
+                        "mul_read_at_dynamic_carry",
+                    ]
+                    .iter()
+                    .any(|prefix| {
+                        kind.strip_prefix(prefix)
+                            .is_some_and(|index| index.parse::<usize>().is_ok())
+                    }) {
+                        Some(1)
+                    } else if [
+                        "add_read_at_dynamic_prev_carry",
+                        "mul_read_at_dynamic_prev_carry",
+                        "add_read_at_dynamic_carry",
+                        "mul_read_at_dynamic_carry",
+                    ]
+                    .iter()
+                    .any(|prefix| {
+                        kind.strip_prefix(prefix).is_some_and(|suffix| {
+                            suffix
+                                .strip_suffix("_plus_invariant")
+                                .is_some_and(|index| index.parse::<usize>().is_ok())
+                        })
+                    }) {
+                        Some(2)
                     } else {
                         None
                     }
