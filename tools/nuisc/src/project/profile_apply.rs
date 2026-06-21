@@ -590,7 +590,11 @@ fn expect_profile_value_input_name(
 }
 
 pub(super) fn ensure_project_resource(module: &mut YirModule, name: &str, kind: &str) {
-    if let Some(resource) = module.resources.iter_mut().find(|resource| resource.name == name) {
+    if let Some(resource) = module
+        .resources
+        .iter_mut()
+        .find(|resource| resource.name == name)
+    {
         resource.kind = ResourceKind::parse(kind);
         return;
     }

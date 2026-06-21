@@ -306,10 +306,14 @@ fn accepts_typed_data_profile_tokens_for_project_link() {
 #[test]
 fn data_profile_required_slots_include_network_bridge_markers() {
     let cpu_to_network = data_profile_required_slots_for_link("cpu", "network");
-    assert!(cpu_to_network.iter().any(|slot| slot == "marker:cpu_to_network"));
+    assert!(cpu_to_network
+        .iter()
+        .any(|slot| slot == "marker:cpu_to_network"));
 
     let network_to_cpu = data_profile_required_slots_for_link("network", "cpu");
-    assert!(network_to_cpu.iter().any(|slot| slot == "marker:network_to_cpu"));
+    assert!(network_to_cpu
+        .iter()
+        .any(|slot| slot == "marker:network_to_cpu"));
 }
 
 #[test]

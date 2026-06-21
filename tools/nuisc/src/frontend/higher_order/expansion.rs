@@ -355,7 +355,10 @@ fn infer_call_result_type(
     if generic_names.is_empty() && substitutions.is_empty() {
         return Some(return_ty);
     }
-    Some(specialize_type_with_substitutions(&return_ty, &substitutions))
+    Some(specialize_type_with_substitutions(
+        &return_ty,
+        &substitutions,
+    ))
 }
 
 fn infer_callable_binding_substitutions(
@@ -494,10 +497,7 @@ fn infer_callable_generic_substitutions_from_expected_parts(
     Ok(callable_substitutions)
 }
 
-fn contains_unresolved_template_generic(
-    ty: &AstTypeRef,
-    generic_names: &BTreeSet<String>,
-) -> bool {
+fn contains_unresolved_template_generic(ty: &AstTypeRef, generic_names: &BTreeSet<String>) -> bool {
     (ty.generic_args.is_empty() && generic_names.contains(&ty.name))
         || ty
             .generic_args
@@ -677,7 +677,10 @@ fn infer_higher_order_substitutions(
         let arg_ty = match arg_ty {
             Some(arg_ty)
                 if type_ref_looks_unresolved_placeholder(&arg_ty)
-                    && !contains_unresolved_template_generic(&specialized_param_ty, &generic_names) =>
+                    && !contains_unresolved_template_generic(
+                        &specialized_param_ty,
+                        &generic_names,
+                    ) =>
             {
                 Some(specialized_param_ty.clone())
             }
@@ -1127,8 +1130,12 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 specialized_cache,
                 specialized_functions,
             )?;
-            let scrutinee_type =
-                infer_local_binding_type(&rewritten_value, local_types, function_table, module_impls);
+            let scrutinee_type = infer_local_binding_type(
+                &rewritten_value,
+                local_types,
+                function_table,
+                module_impls,
+            );
             AstStmt::Match {
                 value: rewritten_value,
                 arms: arms
@@ -1891,12 +1898,11 @@ pub(crate) fn specialize_higher_order_call(
             let resolved_param_ty = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
             let specialized_param_ty =
                 specialize_type_with_substitutions(&resolved_param_ty, &inferred_ast_substitutions);
-            let callable_specific_substitutions =
-                infer_callable_generic_substitutions(
-                    &specialized_param_ty,
-                    callable,
-                    visible_type_aliases,
-                )?;
+            let callable_specific_substitutions = infer_callable_generic_substitutions(
+                &specialized_param_ty,
+                callable,
+                visible_type_aliases,
+            )?;
             let mut callable_specialization = inferred_ast_substitutions.clone();
             callable_specialization.extend(callable_specific_substitutions);
             let callable_contains_placeholder = callable_specialization

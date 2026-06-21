@@ -1474,14 +1474,13 @@ pub(super) fn lower_guard_return_chain(
                 .collect();
             lower_guard_return_chain(&substituted, state, bindings)
         }
-        [
-            NirStmt::If {
-                condition,
-                then_body,
-                else_body,
-            },
-            tail @ ..,
-        ] if else_body.is_empty() => {
+        [NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        }, tail @ ..]
+            if else_body.is_empty() =>
+        {
             let condition_name = lower_expr(condition, state, bindings)?;
             let Some(lhs) = lower_return_if_chain(then_body, state, bindings)? else {
                 return Ok(None);

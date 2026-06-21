@@ -1,9 +1,5 @@
 use super::*;
-use std::{
-    collections::BTreeMap,
-    fs,
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, fs, path::PathBuf};
 use yir_core::EdgeKind;
 
 // Base project builders and shared support-module fixtures for multidomain tests.
@@ -916,7 +912,8 @@ fn network_close_owned_through_recursive_helper_returned_handle_entry() -> &'sta
     "#
 }
 
-fn network_close_owned_through_timed_and_cancelled_spawned_helper_parameter_entry() -> &'static str {
+fn network_close_owned_through_timed_and_cancelled_spawned_helper_parameter_entry() -> &'static str
+{
     r#"
     use network NetworkUnit;
 
@@ -1118,7 +1115,10 @@ fn forward_network_data_bridge_project_with_link(bridge_source: &'static str) ->
 fn kernel_task_async_shapes_project() -> LoadedProject {
     kernel_data_project_with_entry(kernel_task_async_shapes_entry(), {
         let mut modules = kernel_data_support_modules();
-        modules.push(("kernel_task_async_shapes.ns", kernel_task_async_shapes_module()));
+        modules.push((
+            "kernel_task_async_shapes.ns",
+            kernel_task_async_shapes_module(),
+        ));
         modules
     })
 }
@@ -1540,7 +1540,10 @@ fn compiles_reverse_network_project_via_data_bridge() {
         reverse_network_data_bridge_entry(),
         {
             let mut modules = network_data_support_modules();
-            modules.push(("network_data_bridge.ns", reverse_network_data_bridge_module()));
+            modules.push((
+                "network_data_bridge.ns",
+                reverse_network_data_bridge_module(),
+            ));
             modules
         },
         &["network.NetworkUnit -> cpu.Main via data.FabricPlane"],
@@ -1610,7 +1613,10 @@ fn rejects_reverse_network_project_via_data_bridge_when_network_to_data_xfer_is_
         reverse_network_data_bridge_entry(),
         {
             let mut modules = network_data_support_modules();
-            modules.push(("network_data_bridge.ns", reverse_network_data_bridge_module()));
+            modules.push((
+                "network_data_bridge.ns",
+                reverse_network_data_bridge_module(),
+            ));
             let fabric_plane = network_fabric_plane_module(false);
             modules.push(("fabric_plane.ns", Box::leak(fabric_plane.into_boxed_str())));
             modules
@@ -1694,9 +1700,8 @@ fn validates_network_project_links_against_nir_with_shared_cpu_helper_indirectio
 
 #[test]
 fn validates_network_project_links_against_nir_via_data_bridge() {
-    let project = forward_network_data_bridge_project_with_link(
-        reverse_network_data_bridge_module(),
-    );
+    let project =
+        forward_network_data_bridge_project_with_link(reverse_network_data_bridge_module());
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
@@ -1704,8 +1709,9 @@ fn validates_network_project_links_against_nir_via_data_bridge() {
 
 #[test]
 fn rejects_network_project_links_via_data_bridge_missing_downlink_usage() {
-    let project =
-        forward_network_data_bridge_project_with_link(forward_network_data_bridge_missing_downlink_module());
+    let project = forward_network_data_bridge_project_with_link(
+        forward_network_data_bridge_missing_downlink_module(),
+    );
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -1714,9 +1720,8 @@ fn rejects_network_project_links_via_data_bridge_missing_downlink_usage() {
 
 #[test]
 fn validates_network_project_links_against_yir_via_data_bridge() {
-    let project = forward_network_data_bridge_project_with_link(
-        reverse_network_data_bridge_module(),
-    );
+    let project =
+        forward_network_data_bridge_project_with_link(reverse_network_data_bridge_module());
 
     let mut yir = YirModule::new("0.1");
     apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
@@ -1726,9 +1731,8 @@ fn validates_network_project_links_against_yir_via_data_bridge() {
 
 #[test]
 fn rejects_network_project_links_against_yir_when_data_to_network_xfer_is_missing() {
-    let project = forward_network_data_bridge_project_with_link(
-        reverse_network_data_bridge_module(),
-    );
+    let project =
+        forward_network_data_bridge_project_with_link(reverse_network_data_bridge_module());
 
     let mut yir = YirModule::new("0.1");
     apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
@@ -1962,8 +1966,9 @@ fn rejects_owned_udp_open_calls_without_profile_routing() {
 
 #[test]
 fn rejects_accept_owned_without_listener_source() {
-    let project =
-        direct_network_default_project_with_link(network_accept_owned_without_listener_source_entry());
+    let project = direct_network_default_project_with_link(
+        network_accept_owned_without_listener_source_entry(),
+    );
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -1985,8 +1990,9 @@ fn rejects_close_owned_without_owned_handle_source() {
 
 #[test]
 fn rejects_close_owned_after_shadowing_handle_with_plain_value() {
-    let project =
-        direct_network_default_project_with_link(network_close_owned_after_shadowing_handle_entry());
+    let project = direct_network_default_project_with_link(
+        network_close_owned_after_shadowing_handle_entry(),
+    );
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
@@ -2014,8 +2020,9 @@ fn rejects_close_owned_after_while_shadowing_handle_with_plain_value() {
 
 #[test]
 fn validates_close_owned_through_helper_parameter() {
-    let project =
-        direct_network_default_project_with_link(network_close_owned_through_helper_parameter_entry());
+    let project = direct_network_default_project_with_link(
+        network_close_owned_through_helper_parameter_entry(),
+    );
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();

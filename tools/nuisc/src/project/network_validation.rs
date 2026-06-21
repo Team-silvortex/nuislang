@@ -7,7 +7,7 @@ use super::support_contracts::{
     network_profile_slot_targets, support_profile_slots_for_domain, support_surface_for_domain,
 };
 use super::{
-    collect_profile_int_bindings, resolve_project_abi, require_declared_profile_slot,
+    collect_profile_int_bindings, require_declared_profile_slot, resolve_project_abi,
     split_domain_unit, LoadedProject,
 };
 
@@ -149,7 +149,10 @@ pub(super) fn validate_network_target_projection(
         ));
     }
 
-    let expected_name = format!("project_profile_network_{}_network_target_config_auto", unit);
+    let expected_name = format!(
+        "project_profile_network_{}_network_target_config_auto",
+        unit
+    );
     let node = module
         .nodes
         .iter()
@@ -165,7 +168,11 @@ pub(super) fn validate_network_target_projection(
     if node.op.module != "network"
         || node.op.instruction != "target_config"
         || node.op.args
-            != vec![expected_arch.clone(), expected_runtime.clone(), expected_lane.clone()]
+            != vec![
+                expected_arch.clone(),
+                expected_runtime.clone(),
+                expected_lane.clone(),
+            ]
     {
         return Err(format!(
             "project network unit `network.{}` requires `{}` to materialize network.target_config({}, {}, {}) for selected ABI `{}`",

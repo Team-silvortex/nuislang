@@ -213,7 +213,9 @@ fn expected_kernel_target_config_literals(
         .requirements
         .iter()
         .find(|item| item.domain == "kernel")
-        .ok_or_else(|| "missing kernel ABI requirement while validating kernel profile".to_owned())?;
+        .ok_or_else(|| {
+            "missing kernel ABI requirement while validating kernel profile".to_owned()
+        })?;
     let (arch, runtime, _) = target_config_tokens_for_domain("kernel", target);
     Ok((arch, runtime))
 }

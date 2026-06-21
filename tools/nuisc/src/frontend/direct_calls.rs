@@ -24,8 +24,7 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
         "text_handle" => {
             if current_domain != "cpu" {
                 return Err(
-                    "text_handle(...) is currently only allowed inside `mod cpu <unit>`"
-                        .to_owned(),
+                    "text_handle(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
                 );
             }
             let [value] = args else {

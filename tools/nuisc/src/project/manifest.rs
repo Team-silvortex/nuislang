@@ -1,5 +1,5 @@
-use std::path::Path;
 use std::collections::BTreeSet;
+use std::path::Path;
 
 use super::{
     NuisProjectManifest, ProjectAbiRequirement, ProjectGalaxyDependency, ProjectGalaxyImport,
@@ -164,10 +164,7 @@ fn parse_optional_galaxy_dependency_array(
     Some(items)
 }
 
-fn parse_optional_galaxy_import_array(
-    source: &str,
-    key: &str,
-) -> Option<Vec<ProjectGalaxyImport>> {
+fn parse_optional_galaxy_import_array(source: &str, key: &str) -> Option<Vec<ProjectGalaxyImport>> {
     let values = parse_optional_string_array(source, key)?;
     let mut items = Vec::new();
     for value in values {

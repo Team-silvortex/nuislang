@@ -1316,10 +1316,12 @@ mod tests {
             offset: NirExpr::Int(1),
         };
         let fixed_at = PreparedCarrySource::AddInvariant {
-            base: Box::new(PreparedCarrySource::FixedRead(PreparedFixedReadCarrySource::At {
-                buffer: NirExpr::Var("buffer".to_owned()),
-                index: NirExpr::Int(0),
-            })),
+            base: Box::new(PreparedCarrySource::FixedRead(
+                PreparedFixedReadCarrySource::At {
+                    buffer: NirExpr::Var("buffer".to_owned()),
+                    index: NirExpr::Int(0),
+                },
+            )),
             offset: NirExpr::Int(1),
         };
         assert_eq!(

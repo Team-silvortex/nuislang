@@ -125,7 +125,8 @@ pub fn load_stdlib_module_manifest(
         summary: parse_required_string(&source, "summary", &path)?,
         surfaces: parse_optional_string_array(&source, "surfaces").unwrap_or_default(),
         source_modules: parse_optional_string_array(&source, "source_modules").unwrap_or_default(),
-        library_modules: parse_optional_string_array(&source, "library_modules").unwrap_or_default(),
+        library_modules: parse_optional_string_array(&source, "library_modules")
+            .unwrap_or_default(),
         library_import_policy: parse_library_import_policy(&source, &path)?,
     })
 }
@@ -199,8 +200,7 @@ mod tests {
     #[test]
     fn ns_nova_manifest_exposes_canonical_surface_registry_ids() {
         let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
-        let manifest =
-            load_stdlib_module_manifest(&stdlib_root, "ns-nova").expect("load ns-nova");
+        let manifest = load_stdlib_module_manifest(&stdlib_root, "ns-nova").expect("load ns-nova");
         assert_eq!(
             manifest.surfaces,
             vec![
@@ -230,7 +230,14 @@ pub fn resolve_galaxy_dependencies(
     let mut resolved = BTreeMap::<String, ResolvedGalaxyDependency>::new();
     let mut stack = requested
         .iter()
-        .map(|item| (item.name.clone(), item.version.clone(), true, item.name.clone()))
+        .map(|item| {
+            (
+                item.name.clone(),
+                item.version.clone(),
+                true,
+                item.name.clone(),
+            )
+        })
         .collect::<Vec<_>>();
 
     while let Some((name, version, direct, requested_by)) = stack.pop() {
@@ -253,10 +260,8 @@ pub fn resolve_galaxy_dependencies(
             .iter()
             .map(|item| module_dir.join(item))
             .collect::<Vec<_>>();
-        let (auto_injectable, auto_inject_blockers) = detect_auto_injectability(
-            &resolved_library_paths,
-            &manifest.library_import_policy,
-        )?;
+        let (auto_injectable, auto_inject_blockers) =
+            detect_auto_injectability(&resolved_library_paths, &manifest.library_import_policy)?;
 
         let item = resolved
             .entry(name.clone())
@@ -314,7 +319,10 @@ fn detect_auto_injectability(
     if matches!(import_policy, StdlibLibraryImportPolicy::ManualOnly) {
         return Ok((
             false,
-            vec!["library import policy `manual-only` disables automatic project injection".to_owned()],
+            vec![
+                "library import policy `manual-only` disables automatic project injection"
+                    .to_owned(),
+            ],
         ));
     }
 
@@ -346,10 +354,7 @@ fn detect_auto_injectability(
     Ok((blockers.is_empty(), blockers))
 }
 
-fn parse_stdlib_index_modules(
-    source: &str,
-    path: &Path,
-) -> Result<Vec<StdlibIndexModule>, String> {
+fn parse_stdlib_index_modules(source: &str, path: &Path) -> Result<Vec<StdlibIndexModule>, String> {
     let blocks = split_table_array_blocks(source, "[[module]]");
     let mut modules = Vec::new();
     for block in blocks {
@@ -465,9 +470,7 @@ fn parse_quoted(raw: &str) -> Option<String> {
     Some(inner.to_owned())
 }
 
-pub fn render_resolved_galaxy_index(
-    dependencies: &[ResolvedGalaxyDependency],
-) -> String {
+pub fn render_resolved_galaxy_index(dependencies: &[ResolvedGalaxyDependency]) -> String {
     if dependencies.is_empty() {
         return String::new();
     }
@@ -490,7 +493,11 @@ pub fn render_resolved_galaxy_index(
             if item.direct { "true" } else { "false" },
             requested_by,
             item.source_modules.len(),
-            if item.auto_injectable { "true" } else { "false" }
+            if item.auto_injectable {
+                "true"
+            } else {
+                "false"
+            }
         ));
         out.push_str(&format!(
             "  library_modules={}\n",
@@ -512,10 +519,7 @@ pub fn render_resolved_galaxy_index(
             "  library_import_policy={}\n",
             item.library_import_policy.as_str()
         ));
-        out.push_str(&format!(
-            "  manifest={}\n",
-            item.manifest_path.display()
-        ));
+        out.push_str(&format!("  manifest={}\n", item.manifest_path.display()));
         out.push_str(&format!(
             "  depends_on={}\n",
             if item.depends_on.is_empty() {

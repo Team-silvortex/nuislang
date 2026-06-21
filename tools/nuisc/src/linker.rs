@@ -234,9 +234,7 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
             unit.kind,
             unit.domain_family,
             unit.package_id,
-            unit.selected_lowering_target
-                .as_deref()
-                .unwrap_or("none"),
+            unit.selected_lowering_target.as_deref().unwrap_or("none"),
             unit.backend_family.as_deref().unwrap_or("none"),
             unit.packaging_role
         ));

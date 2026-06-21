@@ -12,9 +12,13 @@ use crate::{LoadedExecutable, RuntimeError};
 pub struct RuntimeLoader;
 
 impl RuntimeLoader {
-    pub fn load_from_artifact_path(&self, artifact_path: &Path) -> Result<LoadedExecutable, RuntimeError> {
-        let artifact = parse_nuis_compiled_artifact(artifact_path)
-            .map_err(|error| RuntimeError::new(format!("failed to load compiled artifact: {error}")))?;
+    pub fn load_from_artifact_path(
+        &self,
+        artifact_path: &Path,
+    ) -> Result<LoadedExecutable, RuntimeError> {
+        let artifact = parse_nuis_compiled_artifact(artifact_path).map_err(|error| {
+            RuntimeError::new(format!("failed to load compiled artifact: {error}"))
+        })?;
         self.load_from_compiled_artifact(artifact)
     }
 
@@ -43,7 +47,9 @@ impl RuntimeLoader {
             &artifact.build_manifest_source,
             Path::new("<embedded-build-manifest>"),
         )
-        .map_err(|error| RuntimeError::new(format!("failed to parse embedded build manifest: {error}")))
+        .map_err(|error| {
+            RuntimeError::new(format!("failed to parse embedded build manifest: {error}"))
+        })
     }
 
     fn load_bridge_registry(
@@ -87,17 +93,20 @@ impl RuntimeLoader {
         let Some(path) = &manifest.host_bridge_plan_index_path else {
             return Ok(None);
         };
-        parse_host_bridge_plan_index(Path::new(path)).map(Some).map_err(|error| {
-            RuntimeError::new(format!(
-                "failed to parse host bridge plan index: {error}"
-            ))
-        })
+        parse_host_bridge_plan_index(Path::new(path))
+            .map(Some)
+            .map_err(|error| {
+                RuntimeError::new(format!("failed to parse host bridge plan index: {error}"))
+            })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, time::{SystemTime, UNIX_EPOCH}};
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     use nuis_artifact::{NuisCompiledArtifact, NuisExecutableEnvelope, NuisLifecycleContract};
 

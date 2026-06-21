@@ -7,8 +7,12 @@ pub(crate) fn parse_required_toml_string(
     key: &str,
     path: &Path,
 ) -> Result<String, ArtifactError> {
-    parse_optional_toml_string(source, key)
-        .ok_or_else(|| ArtifactError::new(format!("`{}` is missing required key `{key}`", path.display())))
+    parse_optional_toml_string(source, key).ok_or_else(|| {
+        ArtifactError::new(format!(
+            "`{}` is missing required key `{key}`",
+            path.display()
+        ))
+    })
 }
 
 pub(crate) fn parse_required_toml_usize(
@@ -16,8 +20,12 @@ pub(crate) fn parse_required_toml_usize(
     key: &str,
     path: &Path,
 ) -> Result<usize, ArtifactError> {
-    parse_optional_toml_usize(source, key)
-        .ok_or_else(|| ArtifactError::new(format!("`{}` is missing required key `{key}`", path.display())))
+    parse_optional_toml_usize(source, key).ok_or_else(|| {
+        ArtifactError::new(format!(
+            "`{}` is missing required key `{key}`",
+            path.display()
+        ))
+    })
 }
 
 pub(crate) fn parse_required_toml_bool(
@@ -25,8 +33,12 @@ pub(crate) fn parse_required_toml_bool(
     key: &str,
     path: &Path,
 ) -> Result<bool, ArtifactError> {
-    parse_optional_toml_bool(source, key)
-        .ok_or_else(|| ArtifactError::new(format!("`{}` is missing required key `{key}`", path.display())))
+    parse_optional_toml_bool(source, key).ok_or_else(|| {
+        ArtifactError::new(format!(
+            "`{}` is missing required key `{key}`",
+            path.display()
+        ))
+    })
 }
 
 pub(crate) fn parse_required_toml_string_array(
@@ -34,8 +46,12 @@ pub(crate) fn parse_required_toml_string_array(
     key: &str,
     path: &Path,
 ) -> Result<Vec<String>, ArtifactError> {
-    parse_optional_toml_string_array(source, key)
-        .ok_or_else(|| ArtifactError::new(format!("`{}` is missing required key `{key}`", path.display())))
+    parse_optional_toml_string_array(source, key).ok_or_else(|| {
+        ArtifactError::new(format!(
+            "`{}` is missing required key `{key}`",
+            path.display()
+        ))
+    })
 }
 
 pub(crate) fn parse_optional_toml_string(source: &str, key: &str) -> Option<String> {
@@ -106,7 +122,10 @@ pub(crate) fn parse_optional_toml_string_array(source: &str, key: &str) -> Optio
     None
 }
 
-pub(crate) fn parse_optional_map_string(values: &BTreeMap<String, String>, key: &str) -> Option<String> {
+pub(crate) fn parse_optional_map_string(
+    values: &BTreeMap<String, String>,
+    key: &str,
+) -> Option<String> {
     let value = values.get(key)?;
     if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
         unescape_toml_basic_string(&value[1..value.len() - 1])

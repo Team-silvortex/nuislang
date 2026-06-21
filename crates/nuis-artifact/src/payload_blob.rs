@@ -47,9 +47,18 @@ pub fn encode_domain_payload_blob(
     let mut out = Vec::new();
     out.extend_from_slice(NUIS_DOMAIN_PAYLOAD_BLOB_MAGIC);
     out.extend_from_slice(&NUIS_DOMAIN_PAYLOAD_BLOB_VERSION.to_le_bytes());
-    out.extend_from_slice(&encode_u32_len(domain_family.len(), "domain payload blob domain_family")?);
-    out.extend_from_slice(&encode_u32_len(package_id.len(), "domain payload blob package_id")?);
-    out.extend_from_slice(&encode_u32_len(backend_family.len(), "domain payload blob backend_family")?);
+    out.extend_from_slice(&encode_u32_len(
+        domain_family.len(),
+        "domain payload blob domain_family",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        package_id.len(),
+        "domain payload blob package_id",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        backend_family.len(),
+        "domain payload blob backend_family",
+    )?);
     out.extend_from_slice(&encode_u32_len(
         selected_lowering_target.len(),
         "domain payload blob selected_lowering_target",
@@ -62,7 +71,10 @@ pub fn encode_domain_payload_blob(
         packaging_role.len(),
         "domain payload blob packaging_role",
     )?);
-    out.extend_from_slice(&encode_u32_len(payload_kind.len(), "domain payload blob payload_kind")?);
+    out.extend_from_slice(&encode_u32_len(
+        payload_kind.len(),
+        "domain payload blob payload_kind",
+    )?);
     out.extend_from_slice(&encode_u32_len(
         payload_format.len(),
         "domain payload blob payload_format",
@@ -114,7 +126,9 @@ pub fn decode_domain_payload_blob(
     let mut offset = 6usize;
     let next_len = |bytes: &[u8], offset: &mut usize| -> Result<usize, ArtifactError> {
         if *offset + 4 > bytes.len() {
-            return Err(ArtifactError::new("domain payload blob header is truncated"));
+            return Err(ArtifactError::new(
+                "domain payload blob header is truncated",
+            ));
         }
         let value = u32::from_le_bytes([
             bytes[*offset],
@@ -160,36 +174,75 @@ pub fn decode_domain_payload_blob(
     let take_bytes =
         |bytes: &[u8], offset: &mut usize, len: usize| -> Result<Vec<u8>, ArtifactError> {
             if *offset + len > bytes.len() {
-                return Err(ArtifactError::new("domain payload blob payload is truncated"));
+                return Err(ArtifactError::new(
+                    "domain payload blob payload is truncated",
+                ));
             }
             let value = bytes[*offset..*offset + len].to_vec();
             *offset += len;
             Ok(value)
         };
     let domain_family = String::from_utf8(take_bytes(bytes, &mut offset, domain_family_len)?)
-        .map_err(|error| ArtifactError::new(format!("domain payload blob domain_family is not valid UTF-8: {error}")))?;
-    let package_id = String::from_utf8(take_bytes(bytes, &mut offset, package_id_len)?)
-        .map_err(|error| ArtifactError::new(format!("domain payload blob package_id is not valid UTF-8: {error}")))?;
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob domain_family is not valid UTF-8: {error}"
+            ))
+        })?;
+    let package_id =
+        String::from_utf8(take_bytes(bytes, &mut offset, package_id_len)?).map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob package_id is not valid UTF-8: {error}"
+            ))
+        })?;
     let backend_family = String::from_utf8(take_bytes(bytes, &mut offset, backend_family_len)?)
-        .map_err(|error| ArtifactError::new(format!("domain payload blob backend_family is not valid UTF-8: {error}")))?;
-    let selected_lowering_target = String::from_utf8(
-        take_bytes(bytes, &mut offset, selected_lowering_target_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "domain payload blob selected_lowering_target is not valid UTF-8: {error}"
-    )))?;
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob backend_family is not valid UTF-8: {error}"
+            ))
+        })?;
+    let selected_lowering_target = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        selected_lowering_target_len,
+    )?)
+    .map_err(|error| {
+        ArtifactError::new(format!(
+            "domain payload blob selected_lowering_target is not valid UTF-8: {error}"
+        ))
+    })?;
     let contract_family = String::from_utf8(take_bytes(bytes, &mut offset, contract_family_len)?)
-        .map_err(|error| ArtifactError::new(format!("domain payload blob contract_family is not valid UTF-8: {error}")))?;
+        .map_err(|error| {
+        ArtifactError::new(format!(
+            "domain payload blob contract_family is not valid UTF-8: {error}"
+        ))
+    })?;
     let packaging_role = String::from_utf8(take_bytes(bytes, &mut offset, packaging_role_len)?)
-        .map_err(|error| ArtifactError::new(format!("domain payload blob packaging_role is not valid UTF-8: {error}")))?;
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob packaging_role is not valid UTF-8: {error}"
+            ))
+        })?;
     let payload_kind = String::from_utf8(take_bytes(bytes, &mut offset, payload_kind_len)?)
-        .map_err(|error| ArtifactError::new(format!("domain payload blob payload_kind is not valid UTF-8: {error}")))?;
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob payload_kind is not valid UTF-8: {error}"
+            ))
+        })?;
     let payload_format = String::from_utf8(take_bytes(bytes, &mut offset, payload_format_len)?)
-        .map_err(|error| ArtifactError::new(format!("domain payload blob payload_format is not valid UTF-8: {error}")))?;
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob payload_format is not valid UTF-8: {error}"
+            ))
+        })?;
     let mut sections = Vec::new();
     for (section_name_len, section_payload_len) in sections_meta {
-        let name = String::from_utf8(take_bytes(bytes, &mut offset, section_name_len)?)
-            .map_err(|error| ArtifactError::new(format!("domain payload blob section name is not valid UTF-8: {error}")))?;
+        let name = String::from_utf8(take_bytes(bytes, &mut offset, section_name_len)?).map_err(
+            |error| {
+                ArtifactError::new(format!(
+                    "domain payload blob section name is not valid UTF-8: {error}"
+                ))
+            },
+        )?;
         let section_bytes = take_bytes(bytes, &mut offset, section_payload_len)?;
         sections.push(DomainBuildUnitPayloadBlobSection {
             name,

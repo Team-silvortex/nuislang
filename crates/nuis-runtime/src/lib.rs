@@ -6,9 +6,9 @@
 
 pub mod bridge;
 pub mod error;
+pub mod executor;
 pub mod loader;
 pub mod registry;
-pub mod executor;
 pub mod session;
 
 pub use bridge::{BridgeExecutor, PreparedDomainExecution};

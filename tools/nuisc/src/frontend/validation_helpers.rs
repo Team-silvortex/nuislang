@@ -229,10 +229,7 @@ pub(super) fn validate_benchmark_function_signature(
     module: &NirModule,
     function: &NirFunction,
 ) -> Result<(), String> {
-    let label = function
-        .benchmark_name
-        .as_deref()
-        .unwrap_or(&function.name);
+    let label = function.benchmark_name.as_deref().unwrap_or(&function.name);
     if module.domain != "cpu" {
         return Err(format!(
             "benchmark function `{}::{}` ({}) is only supported in `mod cpu` for now",
@@ -307,8 +304,7 @@ pub(super) fn validate_benchmark_function_signature(
                 function.name, label
             ));
         }
-        if function.benchmark_clock_domain != Some(nuis_semantics::model::TestClockDomain::Global)
-        {
+        if function.benchmark_clock_domain != Some(nuis_semantics::model::TestClockDomain::Global) {
             return Err(format!(
                 "benchmark function `{}` ({}) can only use `clock_policy=\"{}\"` together with `clock_domain=\"global\"` in the current MVP",
                 function.name,

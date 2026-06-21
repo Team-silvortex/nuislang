@@ -138,11 +138,9 @@ fn compiles_benchmark_report_file_tooling_project() {
 
 #[test]
 fn compiles_cli_pgm_info_tooling_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo",
-    );
-    nuisc::pipeline::compile_project(project)
-        .expect("cli pgm info tooling project should compile");
+    let project =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo");
+    nuisc::pipeline::compile_project(project).expect("cli pgm info tooling project should compile");
 }
 
 #[test]

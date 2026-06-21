@@ -15,6 +15,8 @@ pub struct LoadedExecutable {
 
 impl LoadedExecutable {
     pub fn heterogeneous_units(&self) -> impl Iterator<Item = &BuildManifestDomainBuildUnit> {
-        self.domain_units.iter().filter(|unit| unit.is_heterogeneous())
+        self.domain_units
+            .iter()
+            .filter(|unit| unit.is_heterogeneous())
     }
 }

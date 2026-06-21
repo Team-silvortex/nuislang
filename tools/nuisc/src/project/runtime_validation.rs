@@ -278,9 +278,9 @@ pub fn prune_project_topology_for_codegen(
         .collect::<BTreeSet<_>>();
     if !removable.is_empty() {
         module.nodes.retain(|node| !removable.contains(&node.name));
-        module.edges.retain(|edge| {
-            !removable.contains(&edge.from) && !removable.contains(&edge.to)
-        });
+        module
+            .edges
+            .retain(|edge| !removable.contains(&edge.from) && !removable.contains(&edge.to));
     }
     Ok(())
 }
@@ -314,7 +314,9 @@ pub fn validate_project_links_against_nir(
                 }
             }
         }
-        if let Some(network_unit) = cpu_network_link_unit(&from_domain, &link.from, &to_domain, &link.to)? {
+        if let Some(network_unit) =
+            cpu_network_link_unit(&from_domain, &link.from, &to_domain, &link.to)?
+        {
             let network_support =
                 support_surface_for_domain(&mut support_surface_cache, "network")?;
             require_declared_support_surface(
@@ -449,34 +451,19 @@ fn validate_data_profile_nir_usage(
     unit: &str,
 ) -> Result<(), String> {
     let data_support = support_surface_for_domain(support_surface_cache, "data")?;
-    require_declared_support_surface(
-        &data_support,
-        "data",
-        unit,
-        "data.profile.handle-table.v1",
-    )?;
+    require_declared_support_surface(&data_support, "data", unit, "data.profile.handle-table.v1")?;
     if !nir_uses_data_profile_handle_table(module, unit) {
         return Err(format!(
             "project link `{from}` -> `{data_endpoint}` requires CPU entry to use data_handle_table(\"{unit}\", ...) at NIR level"
         ));
     }
-    require_declared_support_surface(
-        &data_support,
-        "data",
-        unit,
-        "data.profile.send.uplink.v1",
-    )?;
+    require_declared_support_surface(&data_support, "data", unit, "data.profile.send.uplink.v1")?;
     if !nir_uses_data_profile_send_uplink(module, unit) {
         return Err(format!(
             "project link `{from}` -> `{data_endpoint}` requires CPU entry to use data_send_uplink(\"{unit}\", ...) at NIR level"
         ));
     }
-    require_declared_support_surface(
-        &data_support,
-        "data",
-        unit,
-        "data.profile.send.downlink.v1",
-    )?;
+    require_declared_support_surface(&data_support, "data", unit, "data.profile.send.downlink.v1")?;
     if !nir_uses_data_profile_send_downlink(module, unit) {
         return Err(format!(
             "project link `{from}` -> `{data_endpoint}` requires CPU entry to use data_send_downlink(\"{unit}\", ...) at NIR level"

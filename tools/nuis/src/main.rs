@@ -13,11 +13,11 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use json_surface::workflow_contract_json_fields;
 use nuis_semantics::model::{
     AstExpr, AstExternFunction, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef,
     AstVisibility,
 };
-use json_surface::workflow_contract_json_fields;
 
 fn main() {
     let result = thread::Builder::new()
@@ -418,9 +418,11 @@ fn handle_bench(
         } else {
             "single-file"
         };
-        let report =
-            collect_language_benchmark_run_report(&input, filter.as_deref(), list, exact)?;
-        println!("{}", benchmark_run_report_json(&input, source_kind, list, exact, filter.as_deref(), &report));
+        let report = collect_language_benchmark_run_report(&input, filter.as_deref(), list, exact)?;
+        println!(
+            "{}",
+            benchmark_run_report_json(&input, source_kind, list, exact, filter.as_deref(), &report)
+        );
         if !list && (report.failed > 0 || report.timed_out > 0) {
             return Err(format!(
                 "benchmark run failed: {} failed, {} timed out",
@@ -447,12 +449,8 @@ fn handle_bench(
         let mut text_handle_rewrite_helper_hits = 0usize;
         let mut text_handle_rewrite_local_hits = 0usize;
         for path in paths {
-            let report = run_language_benchmarks_for_source_file(
-                &path,
-                filter.as_deref(),
-                list,
-                exact,
-            )?;
+            let report =
+                run_language_benchmarks_for_source_file(&path, filter.as_deref(), list, exact)?;
             collected += report.collected;
             completed += report.completed;
             failed += report.failed;
@@ -482,7 +480,10 @@ fn handle_bench(
             return Ok(());
         }
         if success_logs_enabled() {
-            println!("  executed language benchmarks: {}", completed + failed + timed_out);
+            println!(
+                "  executed language benchmarks: {}",
+                completed + failed + timed_out
+            );
             println!("  completed: {}", completed);
             println!("  failed: {}", failed);
             println!("  timed_out: {}", timed_out);
@@ -502,7 +503,8 @@ fn handle_bench(
         Ok(())
     } else {
         println!("bench: {}", input.display());
-        let report = run_language_benchmarks_for_source_file(&input, filter.as_deref(), list, exact)?;
+        let report =
+            run_language_benchmarks_for_source_file(&input, filter.as_deref(), list, exact)?;
         println!(
             "  text_handle_rewrite_helper_hits: {}",
             report.text_handle_rewrite_helper_hits
@@ -687,9 +689,15 @@ fn benchmark_run_record_json(record: &BenchmarkRunRecord) -> String {
         json_optional_string_field("resolved_clock_bridge", record.resolved_clock_bridge),
         json_optional_string_field("resolved_clock_surface", record.resolved_clock_surface),
         json_optional_string_field("declared_clock_domain", record.declared_clock_domain),
-        json_optional_i64_field("declared_clock_domain_code", record.declared_clock_domain_code),
+        json_optional_i64_field(
+            "declared_clock_domain_code",
+            record.declared_clock_domain_code,
+        ),
         json_optional_string_field("resolved_clock_domain", record.resolved_clock_domain),
-        json_optional_i64_field("resolved_clock_domain_code", record.resolved_clock_domain_code),
+        json_optional_i64_field(
+            "resolved_clock_domain_code",
+            record.resolved_clock_domain_code,
+        ),
         json_optional_string_field("resolved_clock_source", record.resolved_clock_source),
     ];
     if let Some(measurement) = record.measurement {
@@ -1115,10 +1123,14 @@ fn collect_language_benchmarks_for_source_file(
                 .benchmark_timeout_ms
                 .map(|timeout_ms| format!("timeout_ms={timeout_ms}")),
             measurement: None,
-            clock_policy: function.benchmark_clock_policy.map(|policy| policy.as_str()),
+            clock_policy: function
+                .benchmark_clock_policy
+                .map(|policy| policy.as_str()),
             resolved_clock_bridge: None,
             resolved_clock_surface: None,
-            declared_clock_domain: function.benchmark_clock_domain.map(|domain| domain.as_str()),
+            declared_clock_domain: function
+                .benchmark_clock_domain
+                .map(|domain| domain.as_str()),
             declared_clock_domain_code: function.benchmark_clock_domain.map(|domain| domain.code()),
             resolved_clock_domain: None,
             resolved_clock_domain_code: None,
@@ -1396,7 +1408,8 @@ fn execute_language_benchmark(
                         resolved_clock_surface: resolved_clock
                             .map(|clock| clock.bridge.host_surface().as_str()),
                         declared_clock_domain: declared_clock_domain.map(|domain| domain.as_str()),
-                        declared_clock_domain_code: declared_clock_domain.map(|domain| domain.code()),
+                        declared_clock_domain_code: declared_clock_domain
+                            .map(|domain| domain.code()),
                         resolved_clock_domain: resolved_clock.map(|clock| clock.domain.as_str()),
                         resolved_clock_domain_code: resolved_clock.map(|clock| clock.domain.code()),
                         resolved_clock_source: resolved_clock.map(|clock| clock.source),
@@ -1540,7 +1553,9 @@ enum RawBenchmarkOutcome {
         internal_elapsed_ns: Option<u128>,
         status: ExitStatus,
     },
-    TimedOut { timeout_ms: i64 },
+    TimedOut {
+        timeout_ms: i64,
+    },
 }
 
 fn compile_benchmark_harness_binary(
@@ -1586,9 +1601,7 @@ fn run_benchmark_process(
                 status,
             })
         }
-        RawTestOutcome::TimedOut(timeout_ms) => Ok(RawBenchmarkOutcome::TimedOut {
-            timeout_ms,
-        }),
+        RawTestOutcome::TimedOut(timeout_ms) => Ok(RawBenchmarkOutcome::TimedOut { timeout_ms }),
     }
 }
 
@@ -1696,10 +1709,13 @@ fn build_benchmark_harness_module(
     harness
         .functions
         .push(build_benchmark_loop_function(benchmark_function));
-    harness.functions.push(build_benchmark_elapsed_text_function());
     harness
         .functions
-        .push(build_benchmark_main_function(benchmark_function, iterations));
+        .push(build_benchmark_elapsed_text_function());
+    harness.functions.push(build_benchmark_main_function(
+        benchmark_function,
+        iterations,
+    ));
     Ok(harness)
 }
 
@@ -2064,11 +2080,7 @@ fn ensure_benchmark_timing_externs(module: &mut AstModule) {
     );
 }
 
-fn ensure_benchmark_timing_extern(
-    module: &mut AstModule,
-    name: &str,
-    params: Vec<AstParam>,
-) {
+fn ensure_benchmark_timing_extern(module: &mut AstModule, name: &str, params: Vec<AstParam>) {
     if module.externs.iter().any(|function| function.name == name) {
         return;
     }
@@ -2213,7 +2225,9 @@ fn resolve_run_artifact_binary_path(input: &Path) -> Result<PathBuf, String> {
     ))
 }
 
-fn load_frontdoor_compiled_artifact(input: &Path) -> Result<nuisc::aot::NuisCompiledArtifact, String> {
+fn load_frontdoor_compiled_artifact(
+    input: &Path,
+) -> Result<nuisc::aot::NuisCompiledArtifact, String> {
     let file_name = input.file_name().and_then(|value| value.to_str());
     if file_name == Some("nuis.compiled.artifact") {
         return nuisc::aot::parse_nuis_compiled_artifact(input);
@@ -2280,12 +2294,7 @@ fn materialize_artifact_bundle(input: &Path, output_dir: &Path) -> Result<Vec<Pa
     nuisc::aot::write_nuis_compiled_artifact(&artifact_path, &relocated_artifact)?;
     fs::write(&manifest_path, relocated_manifest)
         .map_err(|error| format!("failed to write `{}`: {error}", manifest_path.display()))?;
-    let mut written = vec![
-        envelope_path,
-        manifest_path,
-        artifact_path,
-        binary_path,
-    ];
+    let mut written = vec![envelope_path, manifest_path, artifact_path, binary_path];
     written.extend(
         nuis_artifact::materialize_embedded_artifact_support(&relocated_artifact, output_dir)
             .map_err(|error| error.to_string())?,
@@ -2295,7 +2304,11 @@ fn materialize_artifact_bundle(input: &Path, output_dir: &Path) -> Result<Vec<Pa
     Ok(written)
 }
 
-fn handle_unpack_artifact_support(input: PathBuf, output_dir: PathBuf, json: bool) -> Result<(), String> {
+fn handle_unpack_artifact_support(
+    input: PathBuf,
+    output_dir: PathBuf,
+    json: bool,
+) -> Result<(), String> {
     let artifact = load_frontdoor_compiled_artifact(&input)?;
     let mut written = nuis_artifact::materialize_embedded_artifact_support(&artifact, &output_dir)
         .map_err(|error| error.to_string())?;
@@ -2324,7 +2337,11 @@ fn handle_unpack_artifact_support(input: PathBuf, output_dir: PathBuf, json: boo
     Ok(())
 }
 
-fn handle_materialize_artifact(input: PathBuf, output_dir: PathBuf, json: bool) -> Result<(), String> {
+fn handle_materialize_artifact(
+    input: PathBuf,
+    output_dir: PathBuf,
+    json: bool,
+) -> Result<(), String> {
     let written = materialize_artifact_bundle(&input, &output_dir)?;
     if json {
         println!(
@@ -2442,8 +2459,7 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
         source_kind = "manifest".to_owned();
         manifest_path = Some(input.to_path_buf());
         output_dir = input.parent().map(Path::to_path_buf);
-    } else if input.file_name().and_then(|value| value.to_str()) == Some("nuis.compiled.artifact")
-    {
+    } else if input.file_name().and_then(|value| value.to_str()) == Some("nuis.compiled.artifact") {
         source_kind = "artifact".to_owned();
         artifact_path = Some(input.to_path_buf());
         output_dir = input.parent().map(Path::to_path_buf);
@@ -2472,7 +2488,8 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
             Ok(report) => {
                 manifest_verified = true;
                 artifact_path = Some(PathBuf::from(&report.artifact_path));
-                binary_path = Some(Path::new(&report.output_dir).join(&report.artifact_binary_name));
+                binary_path =
+                    Some(Path::new(&report.output_dir).join(&report.artifact_binary_name));
                 output_dir = Some(PathBuf::from(&report.output_dir));
             }
             Err(error) => manifest_verify_error = Some(error),
@@ -2757,7 +2774,10 @@ fn runtime_session_json_fields(
             "domain_payload_bridge_plans_checked",
             report.domain_payload_bridge_plans_checked,
         ),
-        json_usize_field("domain_bridge_stubs_checked", report.domain_bridge_stubs_checked),
+        json_usize_field(
+            "domain_bridge_stubs_checked",
+            report.domain_bridge_stubs_checked,
+        ),
     ]
 }
 
@@ -2848,7 +2868,10 @@ pub(crate) fn render_build_report_json(input: &Path) -> String {
         ));
         fields.push(json_field("packaging_mode", &report.packaging_mode));
         fields.push(json_field("binary_name", &report.artifact_binary_name));
-        fields.push(json_usize_field("binary_bytes", report.artifact_binary_bytes));
+        fields.push(json_usize_field(
+            "binary_bytes",
+            report.artifact_binary_bytes,
+        ));
         fields.push(json_field("lifecycle_schema", &report.lifecycle_schema));
         fields.push(json_field(
             "lifecycle_bootstrap_entry",
@@ -2862,7 +2885,10 @@ pub(crate) fn render_build_report_json(input: &Path) -> String {
             "lifecycle_shutdown_policy",
             &report.lifecycle_shutdown_policy,
         ));
-        fields.push(json_field("lifecycle_yalivia_rpc", &report.lifecycle_yalivia_rpc));
+        fields.push(json_field(
+            "lifecycle_yalivia_rpc",
+            &report.lifecycle_yalivia_rpc,
+        ));
         fields.push(json_string_array_field(
             "lifecycle_hook_surface",
             &report.lifecycle_hook_surface,
@@ -3036,7 +3062,10 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
         println!("  binary_name: {}", report.artifact_binary_name);
         println!("  binary_bytes: {}", report.artifact_binary_bytes);
         println!("  cpu_target_abi: {}", report.cpu_target_abi);
-        println!("  lifecycle_bootstrap_entry: {}", report.lifecycle_bootstrap_entry);
+        println!(
+            "  lifecycle_bootstrap_entry: {}",
+            report.lifecycle_bootstrap_entry
+        );
         println!("  lifecycle_tick_policy: {}", report.lifecycle_tick_policy);
         println!(
             "  lifecycle_shutdown_policy: {}",
@@ -3057,13 +3086,13 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
         );
         println!(
             "  bridge_registry_path: {}",
-            report
-                .bridge_registry_path
-                .as_deref()
-                .unwrap_or("<none>")
+            report.bridge_registry_path.as_deref().unwrap_or("<none>")
         );
         println!("  bridge_registry_units: {}", report.bridge_registry_units);
-        println!("  bridge_registry_checked: {}", report.bridge_registry_checked);
+        println!(
+            "  bridge_registry_checked: {}",
+            report.bridge_registry_checked
+        );
         println!(
             "  bridge_registry_entries_checked: {}",
             report.bridge_registry_entries_checked
@@ -3075,7 +3104,10 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
                 .as_deref()
                 .unwrap_or("<none>")
         );
-        println!("  host_bridge_plan_units: {}", report.host_bridge_plan_units);
+        println!(
+            "  host_bridge_plan_units: {}",
+            report.host_bridge_plan_units
+        );
         println!(
             "  host_bridge_plan_checked: {}",
             report.host_bridge_plan_checked
@@ -3116,7 +3148,10 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
     if let Some(plan) = link_plan.as_ref() {
         println!("  link_plan_final_stage: {}", plan.final_stage.kind);
         println!("  link_plan_final_driver: {}", plan.final_stage.driver);
-        println!("  link_plan_final_link_mode: {}", plan.final_stage.link_mode);
+        println!(
+            "  link_plan_final_link_mode: {}",
+            plan.final_stage.link_mode
+        );
         println!("  link_plan_final_output: {}", plan.final_stage.output_path);
     }
     Ok(())
@@ -3202,9 +3237,7 @@ fn workflow_link_plan_domain_unit_record(unit: &nuisc::linker::LinkPlanDomainUni
     format!("{{{}}}", fields.join(","))
 }
 
-fn workflow_link_plan_json_fields(
-    link_plan: Option<&nuisc::linker::LinkPlan>,
-) -> Vec<String> {
+fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<String> {
     let domain_unit_records = link_plan
         .map(|plan| {
             plan.domain_units
@@ -3283,10 +3316,15 @@ fn render_workflow_json(input: &Path) -> Result<String, String> {
             json_field("project", &project.manifest.name),
             json_field("root", &project.root.display().to_string()),
             json_field("entry", &project.manifest.entry),
-            json_field("default_build_output_dir", &output_dir.display().to_string()),
+            json_field(
+                "default_build_output_dir",
+                &output_dir.display().to_string(),
+            ),
             json_field(
                 "default_release_output_dir",
-                &default_release_check_output_dir(input).display().to_string(),
+                &default_release_check_output_dir(input)
+                    .display()
+                    .to_string(),
             ),
             json_field("artifact_workflow", artifact_workflow_brief()),
             json_field(
@@ -3330,10 +3368,15 @@ fn render_workflow_json(input: &Path) -> Result<String, String> {
         json_field("input", &input.display().to_string()),
         json_field("single_source_compile_workflow", frontdoor.workflow_brief),
         json_field("single_source_compile_samples", frontdoor.workflow_samples),
-        json_field("default_build_output_dir", &output_dir.display().to_string()),
+        json_field(
+            "default_build_output_dir",
+            &output_dir.display().to_string(),
+        ),
         json_field(
             "default_release_output_dir",
-            &default_release_check_output_dir(input).display().to_string(),
+            &default_release_check_output_dir(input)
+                .display()
+                .to_string(),
         ),
         json_field("artifact_workflow", artifact_workflow_brief()),
         json_field(
@@ -3352,11 +3395,7 @@ fn render_workflow_json(input: &Path) -> Result<String, String> {
     ];
     fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
     fields.extend(workflow_contract_json_fields(
-        &frontdoor,
-        false,
-        false,
-        false,
-        true,
+        &frontdoor, false, false, false, true,
     ));
     Ok(format!("{{{}}}", fields.join(",")))
 }
@@ -3696,10 +3735,7 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         print_project_management_hints(include_galaxy_flow);
         println!("  debug_workflow: {}", debug_workflow_brief());
         print_scheduler_sample_field("debug_samples", debug_workflow_samples_brief());
-        println!(
-            "  default_build_output_dir: {}",
-            output_dir.display()
-        );
+        println!("  default_build_output_dir: {}", output_dir.display());
         println!(
             "  default_release_output_dir: {}",
             default_release_check_output_dir(&input).display()
@@ -3775,10 +3811,7 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
     print_scheduler_sample_field("single_source_compile_samples", frontdoor.workflow_samples);
     println!("  debug_workflow: {}", debug_workflow_brief());
     print_scheduler_sample_field("debug_samples", debug_workflow_samples_brief());
-    println!(
-        "  default_build_output_dir: {}",
-        output_dir.display()
-    );
+    println!("  default_build_output_dir: {}", output_dir.display());
     println!(
         "  default_release_output_dir: {}",
         default_release_check_output_dir(&input).display()
@@ -4514,14 +4547,17 @@ pub(crate) fn hidden_manual_only_library_modules_for_project(
         .iter()
         .filter(|dependency| dependency.library_import_policy.as_str() == "manual-only")
         .flat_map(|dependency| {
-            dependency.library_modules.iter().filter_map(|library_module| {
-                let key = format!("{}:{}", dependency.name, library_module);
-                if explicit_galaxy_imports.contains(&key) {
-                    None
-                } else {
-                    Some(key)
-                }
-            })
+            dependency
+                .library_modules
+                .iter()
+                .filter_map(|library_module| {
+                    let key = format!("{}:{}", dependency.name, library_module);
+                    if explicit_galaxy_imports.contains(&key) {
+                        None
+                    } else {
+                        Some(key)
+                    }
+                })
         })
         .collect::<Vec<_>>()
 }
@@ -4536,7 +4572,8 @@ fn collect_project_imports_report(input: &Path) -> Result<ProjectImportsReport, 
         .collect::<BTreeSet<_>>();
     let mut records = Vec::new();
     let mut visible_library_modules = Vec::new();
-    let hidden_manual_only_library_modules = hidden_manual_only_library_modules_for_project(&project);
+    let hidden_manual_only_library_modules =
+        hidden_manual_only_library_modules_for_project(&project);
     let suggested_galaxy_imports = hidden_manual_only_library_modules.clone();
 
     for dependency in &project.resolved_galaxies {
@@ -4596,7 +4633,10 @@ fn handle_project_imports(
             println!("{}", render_project_imports_apply_json(&input, &applied)?);
             return Ok(());
         }
-        println!("applied project imports: {}", applied.manifest_path.display());
+        println!(
+            "applied project imports: {}",
+            applied.manifest_path.display()
+        );
         println!("  applied_galaxy_imports: {}", applied.applied.len());
         println!(
             "  total_explicit_galaxy_imports: {}",
@@ -4742,7 +4782,10 @@ fn render_project_imports_text_summary(input: &Path) -> Result<Vec<String>, Stri
         format!("project imports: {}", report.project_name),
         format!("  root: {}", report.root.display()),
         format!("  manifest: {}", report.manifest_path.display()),
-        format!("  galaxy_dependencies: {}", report.galaxy_dependencies.len()),
+        format!(
+            "  galaxy_dependencies: {}",
+            report.galaxy_dependencies.len()
+        ),
         format!(
             "  explicit_galaxy_imports: {}",
             report.explicit_galaxy_imports.len()
@@ -4823,7 +4866,10 @@ pub(crate) fn render_project_imports_json(input: &Path) -> Result<String, String
         json_field("project", &report.project_name),
         json_field("root", &report.root.display().to_string()),
         json_field("manifest", &report.manifest_path.display().to_string()),
-        json_usize_field("galaxy_dependencies_count", report.galaxy_dependencies.len()),
+        json_usize_field(
+            "galaxy_dependencies_count",
+            report.galaxy_dependencies.len(),
+        ),
         json_string_array_field("galaxy_dependencies", &report.galaxy_dependencies),
         json_usize_field(
             "explicit_galaxy_imports_count",
@@ -4876,7 +4922,10 @@ pub(crate) fn render_project_imports_apply_json(
     let mut fields = vec![
         json_field("kind", "project_imports_apply"),
         json_field("action", "apply_suggested"),
-        json_field("manifest_path", &applied.manifest_path.display().to_string()),
+        json_field(
+            "manifest_path",
+            &applied.manifest_path.display().to_string(),
+        ),
         json_bool_field("manifest_updated", applied.manifest_updated),
         json_usize_field("applied_galaxy_imports_count", applied.applied.len()),
         json_string_array_field("applied_galaxy_imports", &applied.applied),
@@ -5404,7 +5453,9 @@ fn print_help() {
     println!("    nuis dump-yir [input.ns|project-dir|nuis.toml]");
     println!("    nuis workflow [--json] [input.ns|project-dir|nuis.toml]");
     println!("    nuis scheduler-view [--json] [input.ns|project-dir|nuis.toml]");
-    println!("    nuis inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>");
+    println!(
+        "    nuis inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+    );
     println!("    nuis verify-artifact [--json] <nuis.compiled.artifact>");
     println!("    nuis unpack-artifact-support [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>");
     println!("    nuis materialize-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>");
@@ -5563,32 +5614,28 @@ fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
 
 #[cfg(test)]
 mod tests {
+    use super::{
+        apply_suggested_project_imports, artifact_doctor_command_for_output_dir,
+        artifact_workflow_brief, benchmark_run_report_json, build_workflow_frontdoor_surface,
+        default_build_output_dir, handle_build, handle_check, handle_materialize_artifact,
+        handle_release_check, handle_run_artifact, handle_test, handle_unpack_artifact_support,
+        project_abi_checks_json, project_compile_workflow_source_profile,
+        project_domain_registry_checks_json, project_workflow_json_fields,
+        recommend_project_workflow_step, render_artifact_doctor_json, render_build_report_json,
+        render_project_doctor_json, render_project_imports_apply_json, render_project_imports_json,
+        render_project_status_json, render_run_artifact_json, render_scheduler_view_json,
+        render_workflow_json, resolve_run_artifact_binary_path, resolve_runner_clock_domain,
+        run_artifact_command_for_output_dir, run_language_benchmarks_for_source_file,
+        run_language_tests_for_source_file, scheduler_view_domain_record,
+        scheduler_view_domain_record_json, single_source_workflow_source_profile,
+        wait_for_test_child, PublicSurfaceModuleRecord, RawTestOutcome, WorkflowRecommendation,
+    };
     use crate::galaxy;
     use crate::json_surface::{
         galaxy_lock_json_fields, project_check_summary_json_fields,
         public_surface_summary_json_fields, workflow_contract_json_fields,
     };
     use crate::surface_render;
-    use super::{
-        artifact_doctor_command_for_output_dir, artifact_workflow_brief,
-        benchmark_run_report_json, build_workflow_frontdoor_surface, default_build_output_dir,
-        handle_build, handle_check, handle_materialize_artifact, handle_release_check,
-        handle_run_artifact, handle_test, handle_unpack_artifact_support,
-        project_abi_checks_json, project_compile_workflow_source_profile,
-        project_domain_registry_checks_json, project_workflow_json_fields,
-        recommend_project_workflow_step, render_artifact_doctor_json, render_build_report_json,
-        render_run_artifact_json,
-        apply_suggested_project_imports,
-        render_project_doctor_json, render_project_imports_apply_json,
-        render_project_imports_json, render_project_status_json,
-        render_scheduler_view_json,
-        render_workflow_json, resolve_run_artifact_binary_path, resolve_runner_clock_domain, run_artifact_command_for_output_dir,
-        run_language_benchmarks_for_source_file, run_language_tests_for_source_file,
-        scheduler_view_domain_record, scheduler_view_domain_record_json,
-        single_source_workflow_source_profile, wait_for_test_child, RawTestOutcome,
-        WorkflowRecommendation,
-        PublicSurfaceModuleRecord,
-    };
     use std::{
         env, fs,
         path::{Path, PathBuf},
@@ -5776,7 +5823,9 @@ mod tests {
         let input = Path::new("examples/demo.ns");
         let output_dir = default_build_output_dir(input);
         assert!(artifact_workflow_brief().contains("artifact_doctor"));
-        assert!(artifact_doctor_command_for_output_dir(&output_dir).contains("nuis artifact-doctor"));
+        assert!(
+            artifact_doctor_command_for_output_dir(&output_dir).contains("nuis artifact-doctor")
+        );
         assert!(run_artifact_command_for_output_dir(&output_dir).contains("nuis run-artifact"));
     }
 
@@ -5858,9 +5907,10 @@ mod cpu Main {
             assert!(path.exists(), "expected build output `{}`", path.display());
         }
 
-        let manifest_report =
-            nuisc::aot::verify_build_manifest(output_dir.join("nuis.build.manifest.toml").as_path())
-                .expect("manifest verifies");
+        let manifest_report = nuisc::aot::verify_build_manifest(
+            output_dir.join("nuis.build.manifest.toml").as_path(),
+        )
+        .expect("manifest verifies");
         assert_eq!(manifest_report.artifact_schema, "nuis-compiled-artifact-v1");
         assert_eq!(manifest_report.artifact_binary_name, "build_command_smoke");
     }
@@ -6045,8 +6095,9 @@ mod cpu Main {
 
     #[test]
     fn cli_pgm_info_binary_accepts_real_pgm_input_file() {
-        let project_root =
-            PathBuf::from("/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo");
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo",
+        );
         let output_dir = temp_dir("cli_pgm_info_runtime_probe_outputs");
         let input_path = output_dir.join("probe.pgm");
         fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
@@ -6251,8 +6302,9 @@ mod cpu Main {
 
     #[test]
     fn build_report_json_exposes_real_heterogeneous_runtime_summary() {
-        let project_root =
-            PathBuf::from("/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo");
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo",
+        );
         let output_dir = temp_dir("build_report_shader_profile_outputs");
 
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
@@ -6274,8 +6326,9 @@ mod cpu Main {
 
     #[test]
     fn run_artifact_json_exposes_real_heterogeneous_runtime_summary() {
-        let project_root =
-            PathBuf::from("/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo");
+        let project_root = PathBuf::from(
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo",
+        );
         let output_dir = temp_dir("run_artifact_shader_profile_outputs");
 
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
@@ -6366,7 +6419,11 @@ mod cpu Main {
             unpack_dir.join("nuis.domain.shader.payload.bin"),
             unpack_dir.join("nuis.domain.shader.bridge.stub.txt"),
         ] {
-            assert!(path.exists(), "expected unpacked support `{}`", path.display());
+            assert!(
+                path.exists(),
+                "expected unpacked support `{}`",
+                path.display()
+            );
         }
     }
 
@@ -6378,7 +6435,8 @@ mod cpu Main {
         let build_output_dir = temp_dir("materialize_artifact_bridge_build_outputs");
         let materialize_dir = temp_dir("materialize_artifact_bridge_bundle_outputs");
 
-        handle_build(project_root, build_output_dir.clone(), false, None, None).expect("build passes");
+        handle_build(project_root, build_output_dir.clone(), false, None, None)
+            .expect("build passes");
         handle_materialize_artifact(
             build_output_dir.join("nuis.build.manifest.toml"),
             materialize_dir.clone(),
@@ -6396,7 +6454,11 @@ mod cpu Main {
             materialize_dir.join("nuis.domain.data.payload.bin"),
             materialize_dir.join("nuis.domain.shader.payload.bin"),
         ] {
-            assert!(path.exists(), "expected materialized output `{}`", path.display());
+            assert!(
+                path.exists(),
+                "expected materialized output `{}`",
+                path.display()
+            );
         }
 
         let report = nuisc::aot::verify_build_manifest(
@@ -6675,14 +6737,8 @@ mod cpu Main {
         doctor.lock_status = "ok".to_owned();
         let declared_tests = vec![project.root.join("tests/smoke.ns")];
 
-        let recommendation = recommend_project_workflow_step(
-            &plan,
-            &declared_tests,
-            &[],
-            &doctor,
-            false,
-            true,
-        );
+        let recommendation =
+            recommend_project_workflow_step(&plan, &declared_tests, &[], &doctor, false, true);
 
         assert_eq!(recommendation.label, "project_imports_apply_suggested");
         assert_eq!(
@@ -6704,16 +6760,18 @@ mod cpu Main {
 
         let without_galaxy = project_workflow_json_fields(&frontdoor, false);
         assert!(without_galaxy.iter().any(|field| {
-            field == &format!(
-                "\"project_compile_workflow\":\"{}\"",
-                nuisc::project_compile_workflow_brief()
-            )
+            field
+                == &format!(
+                    "\"project_compile_workflow\":\"{}\"",
+                    nuisc::project_compile_workflow_brief()
+                )
         }));
         assert!(without_galaxy.iter().any(|field| {
-            field == &format!(
-                "\"project_test_workflow\":\"{}\"",
-                nuisc::project_test_workflow_brief()
-            )
+            field
+                == &format!(
+                    "\"project_test_workflow\":\"{}\"",
+                    nuisc::project_test_workflow_brief()
+                )
         }));
         assert!(!without_galaxy
             .iter()
@@ -6721,10 +6779,11 @@ mod cpu Main {
 
         let with_galaxy = project_workflow_json_fields(&frontdoor, true);
         assert!(with_galaxy.iter().any(|field| {
-            field == &format!(
-                "\"project_galaxy_workflow\":\"{}\"",
-                nuisc::project_galaxy_workflow_brief()
-            )
+            field
+                == &format!(
+                    "\"project_galaxy_workflow\":\"{}\"",
+                    nuisc::project_galaxy_workflow_brief()
+                )
         }));
     }
 
@@ -6905,9 +6964,8 @@ mod cpu Main {
             nuisc::project_compile_workflow_brief()
         )));
         assert!(json.contains("\"recommended_next_step\":\"galaxy_lock_deps\""));
-        assert!(json.contains(
-            "\"recommended_command\":\"nuis galaxy lock-deps <project-dir|nuis.toml>\""
-        ));
+        assert!(json
+            .contains("\"recommended_command\":\"nuis galaxy lock-deps <project-dir|nuis.toml>\""));
         assert!(json.contains(
             "\"recommended_reason\":\"the project already declares galaxy dependencies but does not yet have a lockfile\""
         ));
@@ -7158,9 +7216,7 @@ mod cpu Main {
             "\"hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]"
         ));
         assert!(json.contains("\"suggested_galaxy_imports_count\":1"));
-        assert!(json.contains(
-            "\"suggested_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"
-        ));
+        assert!(json.contains("\"suggested_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"));
         assert!(json.contains(
             "\"suggested_manifest_snippet\":\"galaxy_imports = [\\\"ns-nova:lib/nova_contracts.ns\\\"]\""
         ));
@@ -7196,9 +7252,7 @@ mod cpu Main {
         let json = render_project_imports_json(&project_root).expect("render imports json");
 
         assert!(json.contains("\"explicit_galaxy_imports_count\":1"));
-        assert!(json.contains(
-            "\"explicit_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"
-        ));
+        assert!(json.contains("\"explicit_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"));
         assert!(json.contains("\"hidden_manual_only_library_modules_count\":0"));
         assert!(json.contains("\"suggested_galaxy_imports_count\":0"));
         assert!(json.contains("\"visible\":true"));
@@ -7318,9 +7372,7 @@ mod cpu Main {
         assert!(json.contains("\"action\":\"apply_suggested\""));
         assert!(json.contains("\"manifest_updated\":true"));
         assert!(json.contains("\"applied_galaxy_imports_count\":1"));
-        assert!(json.contains(
-            "\"applied_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"
-        ));
+        assert!(json.contains("\"applied_galaxy_imports\":[\"ns-nova:lib/nova_contracts.ns\"]"));
         assert!(json.contains("\"total_explicit_galaxy_imports\":1"));
         assert!(json.contains("\"explicit_galaxy_imports_count\":1"));
         assert!(json.contains("\"suggested_galaxy_imports_count\":0"));
@@ -7419,7 +7471,8 @@ mod cpu Main {
 "#,
         );
 
-        let json = render_scheduler_view_json(&project_root).expect("render scheduler project json");
+        let json =
+            render_scheduler_view_json(&project_root).expect("render scheduler project json");
 
         assert!(json.contains("\"source_kind\":\"project\""));
         assert!(json.contains("\"project\":\"scheduler_project_smoke\""));
@@ -7704,9 +7757,8 @@ mod cpu Main {
         )
         .expect("write benchmark file");
 
-        let report =
-            run_language_benchmarks_for_source_file(&input, Some("sum_loop"), false, true)
-                .expect("exact benchmark filter should run");
+        let report = run_language_benchmarks_for_source_file(&input, Some("sum_loop"), false, true)
+            .expect("exact benchmark filter should run");
         assert_eq!(report.collected, 1);
         assert_eq!(report.completed, 1);
         assert_eq!(report.failed, 0);
@@ -7816,8 +7868,9 @@ mod cpu Main {
 "#,
         );
 
-        let report = super::collect_language_benchmark_run_report(&project_root, None, false, false)
-            .expect("project benchmark report should collect");
+        let report =
+            super::collect_language_benchmark_run_report(&project_root, None, false, false)
+                .expect("project benchmark report should collect");
         let json = benchmark_run_report_json(&project_root, "project", false, false, None, &report);
 
         assert!(json.contains("\"kind\":\"nuis_benchmark_run\""));

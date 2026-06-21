@@ -1,10 +1,6 @@
 use super::*;
 use nuis_semantics::model::{NirExpr, NirStmt};
-use std::{
-    collections::BTreeMap,
-    fs,
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, fs, path::PathBuf};
 use yir_core::EdgeKind;
 
 fn compiled_domain_project(path: &str) -> crate::pipeline::PipelineArtifacts {

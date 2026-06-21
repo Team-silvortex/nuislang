@@ -187,7 +187,10 @@ fn domain_build_contract_summary_json(
         json_string_field("handle_family", &summary.host_bridge.handle_family),
         json_string_array_field("phase_order", &summary.host_bridge.phase_order),
         json_string_array_field("phase_bind_inputs", &summary.host_bridge.phase_bind_inputs),
-        json_string_array_field("phase_bind_outputs", &summary.host_bridge.phase_bind_outputs),
+        json_string_array_field(
+            "phase_bind_outputs",
+            &summary.host_bridge.phase_bind_outputs,
+        ),
         json_string_array_field(
             "phase_submit_inputs",
             &summary.host_bridge.phase_submit_inputs,
@@ -197,7 +200,10 @@ fn domain_build_contract_summary_json(
             &summary.host_bridge.phase_submit_outputs,
         ),
         json_string_array_field("phase_wait_inputs", &summary.host_bridge.phase_wait_inputs),
-        json_string_array_field("phase_wait_outputs", &summary.host_bridge.phase_wait_outputs),
+        json_string_array_field(
+            "phase_wait_outputs",
+            &summary.host_bridge.phase_wait_outputs,
+        ),
         json_string_array_field(
             "phase_finalize_inputs",
             &summary.host_bridge.phase_finalize_inputs,
@@ -209,7 +215,10 @@ fn domain_build_contract_summary_json(
         json_string_field("phase_bind_wake", &summary.host_bridge.phase_bind_wake),
         json_string_field("phase_submit_wake", &summary.host_bridge.phase_submit_wake),
         json_string_field("phase_wait_wake", &summary.host_bridge.phase_wait_wake),
-        json_string_field("phase_finalize_wake", &summary.host_bridge.phase_finalize_wake),
+        json_string_field(
+            "phase_finalize_wake",
+            &summary.host_bridge.phase_finalize_wake,
+        ),
         json_bool_field("bridge_plan_begin", summary.host_bridge.bridge_plan_begin),
         json_bool_field("bridge_plan_end", summary.host_bridge.bridge_plan_end),
     ];
@@ -310,7 +319,8 @@ fn domain_build_unit_contract_json(unit: &aot::BuildManifestDomainBuildUnit) -> 
 }
 
 fn domain_build_unit_contracts_json(units: &[aot::BuildManifestDomainBuildUnit]) -> String {
-    units.iter()
+    units
+        .iter()
         .map(domain_build_unit_contract_json)
         .collect::<Vec<_>>()
         .join(",")
@@ -394,7 +404,8 @@ fn domain_build_contract_drift_json(check: &DomainBuildContractDriftCheck) -> St
 fn domain_build_contract_drift_checks(
     units: &[aot::BuildManifestDomainBuildUnit],
 ) -> Vec<DomainBuildContractDriftCheck> {
-    units.iter()
+    units
+        .iter()
         .map(evaluate_domain_build_contract_drift)
         .collect()
 }
@@ -416,7 +427,8 @@ fn domain_build_unit_verification_verdict(
         failure_reasons.push("payload_blob_missing_or_unverified".to_owned());
     }
     let lowering_plan_ok = if is_heterogeneous {
-        unit.artifact_payload_blob_path.is_some() && report.domain_payload_lowering_plans_checked > 0
+        unit.artifact_payload_blob_path.is_some()
+            && report.domain_payload_lowering_plans_checked > 0
     } else {
         true
     };
@@ -527,7 +539,10 @@ fn summarize_domain_build_verification(
     verdicts: &[DomainBuildUnitVerificationVerdict],
 ) -> DomainBuildVerificationSummary {
     let total_units = verdicts.len();
-    let host_units_checked = verdicts.iter().filter(|verdict| verdict.kind == "host").count();
+    let host_units_checked = verdicts
+        .iter()
+        .filter(|verdict| verdict.kind == "host")
+        .count();
     let hetero_units_checked = verdicts
         .iter()
         .filter(|verdict| verdict.kind == "hetero")
@@ -876,7 +891,10 @@ fn inspect_artifact_json(
         let link_plan = linker::build_link_plan(report, artifact);
         let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
         let drift_check_count = drift_checks.len();
-        let drift_mismatch_count = drift_checks.iter().filter(|check| !check.consistent).count();
+        let drift_mismatch_count = drift_checks
+            .iter()
+            .filter(|check| !check.consistent)
+            .count();
         let verdicts = collect_domain_build_unit_verdicts(report);
         let summary = summarize_domain_build_verification(&verdicts);
         fields.push(json_usize_field(
@@ -1033,7 +1051,10 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
         .join(",");
     let domain_build_contracts = domain_build_unit_contracts_json(&report.domain_build_units);
     let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
-    let drift_mismatch_count = drift_checks.iter().filter(|check| !check.consistent).count();
+    let drift_mismatch_count = drift_checks
+        .iter()
+        .filter(|check| !check.consistent)
+        .count();
     let verdicts = collect_domain_build_unit_verdicts(report);
     let summary = summarize_domain_build_verification(&verdicts);
     let fields = vec![
@@ -1074,7 +1095,10 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
             report.execution_contracts_checked,
         ),
         json_usize_field("domain_build_unit_count", report.domain_build_unit_count),
-        json_usize_field("heterogeneous_domain_count", report.heterogeneous_domain_count),
+        json_usize_field(
+            "heterogeneous_domain_count",
+            report.heterogeneous_domain_count,
+        ),
         json_usize_field(
             "domain_payload_blobs_checked",
             report.domain_payload_blobs_checked,
@@ -1105,10 +1129,7 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
         ),
         format!("\"domain_build_units\":[{}]", domain_build_units),
         format!("\"domain_build_contracts\":[{}]", domain_build_contracts),
-        json_usize_field(
-            "domain_build_contract_drift_checked",
-            drift_checks.len(),
-        ),
+        json_usize_field("domain_build_contract_drift_checked", drift_checks.len()),
         json_usize_field(
             "domain_build_contract_drift_mismatches",
             drift_mismatch_count,
@@ -1495,8 +1516,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 if let Some(resource_binding) = build_contract.backend.resource_binding.as_deref() {
                     println!("  build_backend_resource_binding: {}", resource_binding);
                 }
-                if let Some(completion_model) = build_contract.backend.completion_model.as_deref()
-                {
+                if let Some(completion_model) = build_contract.backend.completion_model.as_deref() {
                     println!("  build_backend_completion_model: {}", completion_model);
                 }
                 println!(
@@ -2133,9 +2153,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             if let Some(report) = &manifest_verify {
                 let link_plan = linker::build_link_plan(report, &artifact);
                 let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
-                let drift_mismatch_count =
-                    drift_checks.iter().filter(|check| !check.consistent).count();
-                println!("  domain_build_unit_count: {}", report.domain_build_unit_count);
+                let drift_mismatch_count = drift_checks
+                    .iter()
+                    .filter(|check| !check.consistent)
+                    .count();
+                println!(
+                    "  domain_build_unit_count: {}",
+                    report.domain_build_unit_count
+                );
                 println!(
                     "  heterogeneous_domain_count: {}",
                     report.heterogeneous_domain_count
@@ -2192,14 +2217,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "  host_bridge_plan_entries_checked: {}",
                     report.host_bridge_plan_entries_checked
                 );
-                println!(
-                    "  link_plan_final_stage: {}",
-                    link_plan.final_stage.kind
-                );
-                println!(
-                    "  link_plan_final_driver: {}",
-                    link_plan.final_stage.driver
-                );
+                println!("  link_plan_final_stage: {}", link_plan.final_stage.kind);
+                println!("  link_plan_final_driver: {}", link_plan.final_stage.driver);
                 println!(
                     "  link_plan_final_link_mode: {}",
                     link_plan.final_stage.link_mode
@@ -2208,10 +2227,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "  link_plan_final_output: {}",
                     link_plan.final_stage.output_path
                 );
-                println!(
-                    "  link_plan_domain_units: {}",
-                    link_plan.domain_units.len()
-                );
+                println!("  link_plan_domain_units: {}", link_plan.domain_units.len());
                 for unit in &report.domain_build_units {
                     let verdict = domain_build_unit_verification_verdict(unit, report);
                     let build_contract = domain_build_unit_effective_contract_summary(unit);
@@ -2636,7 +2652,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "  execution_contracts_checked: {}",
                     report.execution_contracts_checked
                 );
-                println!("  domain_build_unit_count: {}", report.domain_build_unit_count);
+                println!(
+                    "  domain_build_unit_count: {}",
+                    report.domain_build_unit_count
+                );
                 println!(
                     "  heterogeneous_domain_count: {}",
                     report.heterogeneous_domain_count
@@ -2670,8 +2689,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     report.domain_bridge_stubs_checked
                 );
                 let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
-                let drift_mismatch_count =
-                    drift_checks.iter().filter(|check| !check.consistent).count();
+                let drift_mismatch_count = drift_checks
+                    .iter()
+                    .filter(|check| !check.consistent)
+                    .count();
                 println!(
                     "  domain_build_contract_drift_checked: {}",
                     drift_checks.len()
@@ -2691,7 +2712,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 for unit in &report.domain_build_units {
                     let verdict = domain_build_unit_verification_verdict(unit, &report);
                     let build_contract = domain_build_unit_effective_contract_summary(unit);
-                    println!("  domain_build_contract: {} [{}]", unit.package_id, unit.domain_family);
+                    println!(
+                        "  domain_build_contract: {} [{}]",
+                        unit.package_id, unit.domain_family
+                    );
                     if let Some(abi) = unit.abi.as_deref() {
                         println!("    abi: {}", abi);
                     }
@@ -2778,7 +2802,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 if let Some(path) = &report.host_bridge_plan_index_path {
                     println!("  host_bridge_plan_index_path: {}", path);
                 }
-                println!("  host_bridge_plan_units: {}", report.host_bridge_plan_units);
+                println!(
+                    "  host_bridge_plan_units: {}",
+                    report.host_bridge_plan_units
+                );
                 println!(
                     "  host_bridge_plan_checked: {}",
                     report.host_bridge_plan_checked
@@ -2869,7 +2896,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             for entry in benchmarks {
                 println!("  benchmark: {}", entry.symbol);
                 println!("    label: {}", entry.label);
-                println!("    async: {}", if entry.is_async { "true" } else { "false" });
+                println!(
+                    "    async: {}",
+                    if entry.is_async { "true" } else { "false" }
+                );
                 println!("    return_type: {}", entry.return_type);
                 println!(
                     "    warmup_iters: {}",
@@ -3427,7 +3457,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                             Path::new("nustar-packages"),
                             &item.domain,
                         ) {
-                            if let Ok(target) = registry::registered_abi_target(&manifest, &item.abi) {
+                            if let Ok(target) =
+                                registry::registered_abi_target(&manifest, &item.abi)
+                            {
                                 println!(
                                     "  abi_target_machine: {}-{}",
                                     target.machine_arch, target.machine_os
@@ -3551,11 +3583,11 @@ mod tests {
 
     #[test]
     fn domain_build_contract_summary_json_exposes_grouped_sections() {
-        let manifest = registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), "network")
-            .expect("expected network manifest");
-        let json = domain_build_contract_summary_json(&registry::domain_build_contract_summary(
-            &manifest,
-        ));
+        let manifest =
+            registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), "network")
+                .expect("expected network manifest");
+        let json =
+            domain_build_contract_summary_json(&registry::domain_build_contract_summary(&manifest));
 
         assert!(json.contains("\"lowering\":{"));
         assert!(json.contains("\"backend\":{"));
@@ -3576,8 +3608,9 @@ mod tests {
             .into_iter()
             .find(|item| item.domain_family == "network")
             .expect("expected network registration");
-        let manifest = registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), "network")
-            .expect("expected network manifest");
+        let manifest =
+            registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), "network")
+                .expect("expected network manifest");
         let json = domain_registry_json(&registration, &manifest);
 
         assert!(json.contains("\"registration\":{"));
@@ -3993,14 +4026,17 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
 
         let verify_manifest_json = verify_build_manifest_json(&manifest_path, &manifest_verify);
         assert!(verify_manifest_json.contains("\"kind\":\"nuis_build_manifest_verify\""));
-        assert!(verify_manifest_json.contains("\"artifact_binary_name\":\"benchmark_report_file_demo\""));
+        assert!(verify_manifest_json
+            .contains("\"artifact_binary_name\":\"benchmark_report_file_demo\""));
         assert!(verify_manifest_json.contains("\"project_metadata_checked\":"));
         assert!(verify_manifest_json.contains("\"domain_build_verification_summary\":{"));
         assert!(verify_manifest_json.contains("\"all_units_consistent\":true"));
 
         let verify_artifact_json_text = verify_artifact_json(&artifact_path, &artifact_verify);
         assert!(verify_artifact_json_text.contains("\"kind\":\"nuis_artifact_verify\""));
-        assert!(verify_artifact_json_text.contains("\"binary_name\":\"benchmark_report_file_demo\""));
+        assert!(
+            verify_artifact_json_text.contains("\"binary_name\":\"benchmark_report_file_demo\"")
+        );
         assert!(verify_artifact_json_text.contains("\"artifact_roundtrip_verified\":true"));
         assert!(verify_artifact_json_text.contains("\"lifecycle_contract_consistent\":true"));
 
@@ -4134,7 +4170,8 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
                 notes: vec!["demo".to_owned()],
             },
         };
-        let lines = artifact_report_summary_lines(&artifact_verify, &summary, Some(&link_plan), false);
+        let lines =
+            artifact_report_summary_lines(&artifact_verify, &summary, Some(&link_plan), false);
 
         assert_eq!(lines.len(), 4);
         assert!(lines[0].contains("artifact_roundtrip=ok"));
@@ -4223,7 +4260,10 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(manifest_text.contains("abi_index = "));
 
         let manifest_report = aot::verify_build_manifest(&manifest_path).unwrap();
-        assert_eq!(manifest_report.envelope_schema, "nuis-executable-envelope-v1");
+        assert_eq!(
+            manifest_report.envelope_schema,
+            "nuis-executable-envelope-v1"
+        );
         assert_eq!(manifest_report.artifact_schema, "nuis-compiled-artifact-v1");
         assert_eq!(manifest_report.artifact_binary_name, output_stem);
         assert!(Path::new(&manifest_report.envelope_path).exists());
@@ -4319,7 +4359,10 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         let status = Command::new(output_dir.join(&output_stem))
             .status()
             .expect("expected compiled binary to launch");
-        assert!(status.success(), "expected compiled binary to exit successfully");
+        assert!(
+            status.success(),
+            "expected compiled binary to exit successfully"
+        );
     }
 
     #[test]
@@ -4381,7 +4424,10 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         let status = Command::new(output_dir.join(&output_stem))
             .status()
             .expect("expected compiled benchmark report binary to launch");
-        assert!(status.success(), "expected compiled benchmark report binary to exit successfully");
+        assert!(
+            status.success(),
+            "expected compiled benchmark report binary to exit successfully"
+        );
     }
 
     #[test]

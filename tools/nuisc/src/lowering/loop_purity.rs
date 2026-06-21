@@ -498,6 +498,24 @@ pub(super) fn substitute_branch_binding(
             binding_name,
             binding_value,
         ))),
+        NirExpr::Borrow(inner) => NirExpr::Borrow(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::BorrowEnd(inner) => NirExpr::BorrowEnd(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::HostBufferHandle(inner) => NirExpr::HostBufferHandle(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::Move(inner) => NirExpr::Move(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
         NirExpr::CastI64ToI32(inner) => NirExpr::CastI64ToI32(Box::new(substitute_branch_binding(
             inner,
             binding_name,
@@ -597,8 +615,125 @@ pub(super) fn substitute_branch_binding(
             lhs: Box::new(substitute_branch_binding(lhs, binding_name, binding_value)),
             rhs: Box::new(substitute_branch_binding(rhs, binding_name, binding_value)),
         },
+        NirExpr::LoadValue(inner) => NirExpr::LoadValue(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::LoadNext(inner) => NirExpr::LoadNext(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::BufferLen(inner) => NirExpr::BufferLen(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::LoadAt { buffer, index } => NirExpr::LoadAt {
+            buffer: Box::new(substitute_branch_binding(
+                buffer,
+                binding_name,
+                binding_value,
+            )),
+            index: Box::new(substitute_branch_binding(
+                index,
+                binding_name,
+                binding_value,
+            )),
+        },
+        NirExpr::DataReadWindow { window, index } => NirExpr::DataReadWindow {
+            window: Box::new(substitute_branch_binding(
+                window,
+                binding_name,
+                binding_value,
+            )),
+            index: Box::new(substitute_branch_binding(
+                index,
+                binding_name,
+                binding_value,
+            )),
+        },
+        NirExpr::StoreValue { target, value } => NirExpr::StoreValue {
+            target: Box::new(substitute_branch_binding(
+                target,
+                binding_name,
+                binding_value,
+            )),
+            value: Box::new(substitute_branch_binding(
+                value,
+                binding_name,
+                binding_value,
+            )),
+        },
+        NirExpr::StoreNext { target, next } => NirExpr::StoreNext {
+            target: Box::new(substitute_branch_binding(
+                target,
+                binding_name,
+                binding_value,
+            )),
+            next: Box::new(substitute_branch_binding(next, binding_name, binding_value)),
+        },
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        } => NirExpr::StoreAt {
+            buffer: Box::new(substitute_branch_binding(
+                buffer,
+                binding_name,
+                binding_value,
+            )),
+            index: Box::new(substitute_branch_binding(
+                index,
+                binding_name,
+                binding_value,
+            )),
+            value: Box::new(substitute_branch_binding(
+                value,
+                binding_name,
+                binding_value,
+            )),
+        },
+        NirExpr::DataWriteWindow {
+            window,
+            index,
+            value,
+        } => NirExpr::DataWriteWindow {
+            window: Box::new(substitute_branch_binding(
+                window,
+                binding_name,
+                binding_value,
+            )),
+            index: Box::new(substitute_branch_binding(
+                index,
+                binding_name,
+                binding_value,
+            )),
+            value: Box::new(substitute_branch_binding(
+                value,
+                binding_name,
+                binding_value,
+            )),
+        },
+        NirExpr::AllocNode { value, next } => NirExpr::AllocNode {
+            value: Box::new(substitute_branch_binding(
+                value,
+                binding_name,
+                binding_value,
+            )),
+            next: Box::new(substitute_branch_binding(next, binding_name, binding_value)),
+        },
+        NirExpr::AllocBuffer { len, fill } => NirExpr::AllocBuffer {
+            len: Box::new(substitute_branch_binding(len, binding_name, binding_value)),
+            fill: Box::new(substitute_branch_binding(fill, binding_name, binding_value)),
+        },
         NirExpr::NetworkResult { value, state } => NirExpr::NetworkResult {
-            value: Box::new(substitute_branch_binding(value, binding_name, binding_value)),
+            value: Box::new(substitute_branch_binding(
+                value,
+                binding_name,
+                binding_value,
+            )),
             state: *state,
         },
         NirExpr::NetworkConfigReady(inner) => NirExpr::NetworkConfigReady(Box::new(
@@ -619,7 +754,11 @@ pub(super) fn substitute_branch_binding(
             binding_value,
         ))),
         NirExpr::DataResult { value, state } => NirExpr::DataResult {
-            value: Box::new(substitute_branch_binding(value, binding_name, binding_value)),
+            value: Box::new(substitute_branch_binding(
+                value,
+                binding_name,
+                binding_value,
+            )),
             state: *state,
         },
         NirExpr::DataReady(inner) => NirExpr::DataReady(Box::new(substitute_branch_binding(
@@ -643,7 +782,11 @@ pub(super) fn substitute_branch_binding(
             binding_value,
         ))),
         NirExpr::KernelResult { value, state } => NirExpr::KernelResult {
-            value: Box::new(substitute_branch_binding(value, binding_name, binding_value)),
+            value: Box::new(substitute_branch_binding(
+                value,
+                binding_name,
+                binding_value,
+            )),
             state: *state,
         },
         NirExpr::KernelConfigReady(inner) => NirExpr::KernelConfigReady(Box::new(
@@ -655,7 +798,11 @@ pub(super) fn substitute_branch_binding(
             binding_value,
         ))),
         NirExpr::ShaderResult { value, state } => NirExpr::ShaderResult {
-            value: Box::new(substitute_branch_binding(value, binding_name, binding_value)),
+            value: Box::new(substitute_branch_binding(
+                value,
+                binding_name,
+                binding_value,
+            )),
             state: *state,
         },
         NirExpr::ShaderPassReady(inner) => NirExpr::ShaderPassReady(Box::new(

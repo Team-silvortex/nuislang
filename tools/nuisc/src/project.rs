@@ -48,9 +48,9 @@ use data_validation::validate_data_profile_token_types;
 use kernel_validation::{
     validate_kernel_profile_slot_contract, validate_kernel_target_config_contract,
 };
+use manifest::{parse_project_manifest, sanitize_ident};
 #[cfg(test)]
 use network_validation::validate_network_target_projection;
-use manifest::{parse_project_manifest, sanitize_ident};
 pub use packet::render_project_packet_index;
 pub use planning::{
     build_project_compilation_plan, describe_project, describe_project_compilation_plan,
@@ -78,9 +78,8 @@ use rendering::{
 };
 pub use runtime_validation::{
     apply_project_links_to_yir, apply_project_support_modules_to_yir,
-    prune_project_topology_for_codegen,
-    validate_project_abi_against_yir, validate_project_links_against_nir,
-    validate_project_links_against_yir,
+    prune_project_topology_for_codegen, validate_project_abi_against_yir,
+    validate_project_links_against_nir, validate_project_links_against_yir,
 };
 use shader_validation::{has_edge_to, infer_shader_packet_contract};
 #[cfg(test)]
@@ -562,7 +561,11 @@ impl ProjectLinkBridgeContract {
 }
 
 fn bridge_direction_index(is_uplink: bool) -> usize {
-    if is_uplink { 0 } else { 1 }
+    if is_uplink {
+        0
+    } else {
+        1
+    }
 }
 
 pub fn is_project_input(path: &Path) -> bool {

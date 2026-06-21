@@ -62,10 +62,16 @@ const STD_HOST_SYMBOLS: &[(&str, &str)] = &[
     ("network.close_owned", "host_network_close_owned"),
     ("network.connect", "host_network_connect_probe"),
     ("network.open_tcp", "host_network_open_tcp_stream"),
-    ("network.open_tcp_listener", "host_network_open_tcp_listener"),
+    (
+        "network.open_tcp_listener",
+        "host_network_open_tcp_listener",
+    ),
     ("network.open_udp", "host_network_open_udp_datagram"),
     ("network.recv", "host_network_recv_probe"),
-    ("network.recv_http_status_owned", "host_network_recv_http_status_owned"),
+    (
+        "network.recv_http_status_owned",
+        "host_network_recv_http_status_owned",
+    ),
     ("network.recv_owned", "host_network_recv_owned"),
     ("network.send", "host_network_send_probe"),
     ("network.send_owned", "host_network_send_owned"),

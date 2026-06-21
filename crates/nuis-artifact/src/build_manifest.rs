@@ -3,9 +3,9 @@ use std::{collections::BTreeMap, fs, path::Path};
 use crate::{
     parse_domain_build_unit_blocks,
     toml::{
-        parse_optional_map_usize, parse_optional_toml_string,
-        parse_optional_toml_usize, parse_required_map_string_in_block, parse_required_toml_bool,
-        parse_required_toml_string, parse_required_toml_string_array, parse_required_toml_usize,
+        parse_optional_map_usize, parse_optional_toml_string, parse_optional_toml_usize,
+        parse_required_map_string_in_block, parse_required_toml_bool, parse_required_toml_string,
+        parse_required_toml_string_array, parse_required_toml_usize,
     },
     ArtifactError, BuildManifestDomainBuildUnit,
 };
@@ -78,8 +78,9 @@ impl BuildManifest {
 }
 
 pub fn parse_build_manifest(path: &Path) -> Result<BuildManifest, ArtifactError> {
-    let source = fs::read_to_string(path)
-        .map_err(|error| ArtifactError::new(format!("failed to read `{}`: {error}", path.display())))?;
+    let source = fs::read_to_string(path).map_err(|error| {
+        ArtifactError::new(format!("failed to read `{}`: {error}", path.display()))
+    })?;
     parse_build_manifest_from_source(&source, path)
 }
 
@@ -132,7 +133,8 @@ pub fn parse_build_manifest_from_source(
     let project_plan_summary = parse_optional_toml_string(source, "plan_summary");
     let bridge_registry_path = parse_optional_toml_string(source, "bridge_registry_path");
     let bridge_registry_schema = parse_optional_toml_string(source, "bridge_registry_schema");
-    let bridge_registry_units = parse_optional_toml_usize(source, "bridge_registry_units").unwrap_or(0);
+    let bridge_registry_units =
+        parse_optional_toml_usize(source, "bridge_registry_units").unwrap_or(0);
     let bridge_registry_inline = parse_optional_toml_string(source, "bridge_registry_inline");
     let host_bridge_plan_index_path =
         parse_optional_toml_string(source, "host_bridge_plan_index_path");
@@ -246,13 +248,14 @@ fn parse_artifact_hash_row(
     Ok(ArtifactHashEntry {
         kind: parse_required_map_string_in_block(values, "kind", path, "artifact_hash")?,
         path: parse_required_map_string_in_block(values, "path", path, "artifact_hash")?,
-        bytes: parse_optional_map_usize(values, "bytes", path, "artifact_hash")?
-            .ok_or_else(|| {
+        bytes: parse_optional_map_usize(values, "bytes", path, "artifact_hash")?.ok_or_else(
+            || {
                 ArtifactError::new(format!(
                     "`{}` artifact_hash block is missing required key `bytes`",
                     path.display()
                 ))
-            })?,
+            },
+        )?,
         fnv1a64: parse_required_map_string_in_block(values, "fnv1a64", path, "artifact_hash")?,
     })
 }

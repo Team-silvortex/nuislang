@@ -983,10 +983,9 @@ mod tests {
 
     #[test]
     fn parses_project_imports_apply_suggested_with_default_input() {
-        let command = parse_args(
-            ["project-imports".to_owned(), "--apply-suggested".to_owned()].into_iter(),
-        )
-        .expect("project-imports apply parses");
+        let command =
+            parse_args(["project-imports".to_owned(), "--apply-suggested".to_owned()].into_iter())
+                .expect("project-imports apply parses");
         assert_eq!(
             command,
             CommandKind::ProjectImports {

@@ -36,10 +36,7 @@ pub(super) fn materialize_project_bridge_contract_nodes(
                 .join(";"),
         );
         for direction in bridge_directions() {
-            let payload_node = format!(
-                "project_link_{id}_{}_bridge_payload_type",
-                direction.name
-            );
+            let payload_node = format!("project_link_{id}_{}_bridge_payload_type", direction.name);
             push_profile_text_node(
                 module,
                 payload_node.clone(),
@@ -51,12 +48,20 @@ pub(super) fn materialize_project_bridge_contract_nodes(
             connect_project_contract_node(
                 module,
                 &stage_node,
-                &resolve_project_profile_target_name("data", &via_unit, direction.window_policy_marker),
+                &resolve_project_profile_target_name(
+                    "data",
+                    &via_unit,
+                    direction.window_policy_marker,
+                ),
             );
             connect_project_contract_node(
                 module,
                 &payload_node,
-                &resolve_project_profile_target_name("data", &via_unit, direction.payload_shape_marker),
+                &resolve_project_profile_target_name(
+                    "data",
+                    &via_unit,
+                    direction.payload_shape_marker,
+                ),
             );
         }
     }
@@ -113,7 +118,8 @@ pub(super) fn build_project_link_bridge_contract(
     let mut payloads = [None, None];
     for direction in bridge_directions() {
         let source = resolve_bridge_payload_source(from, to, direction.is_uplink)?;
-        let payload = infer_project_route_payload_type(project, &source, &data_unit, direction.is_uplink)?;
+        let payload =
+            infer_project_route_payload_type(project, &source, &data_unit, direction.is_uplink)?;
         validate_bridge_stage_payload(
             direction.name,
             from,

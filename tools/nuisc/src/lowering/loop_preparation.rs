@@ -2211,32 +2211,42 @@ pub(super) fn diagnose_unsupported_prepared_while_carry(
 ) -> Option<String> {
     let (binding_name, _, _) =
         parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
-
-    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), carry_bindings @ ..] = body
-    else {
-        return None;
-    };
+    let (step_temp_bindings, step_binding, carry_bindings) =
+        split_temp_prefixed_loop_step_bindings(
+            body,
+            &binding_name,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )?;
     if carry_bindings.is_empty() {
         return None;
     }
+    let substituted_step = substitute_stmt_bindings(step_binding, &step_temp_bindings);
     let sync_step = parse_prepared_loop_step(
-        step_binding,
+        &substituted_step,
         &binding_name,
         pure_helpers,
         inlineable_pure_helpers,
     );
-    let async_step = parse_prepared_async_loop_step(step_binding, &binding_name);
+    let async_step = parse_prepared_async_loop_step(&substituted_step, &binding_name);
     if sync_step.is_none() && async_step.is_none() {
         return None;
     }
+    let substituted_carry_bindings = carry_bindings
+        .iter()
+        .map(|stmt| substitute_stmt_bindings(stmt, &step_temp_bindings))
+        .collect::<Vec<_>>();
 
-    let carry_names =
-        collect_loop_carry_binding_names(carry_bindings, pure_helpers, inlineable_pure_helpers)?;
+    let carry_names = collect_loop_carry_binding_names(
+        &substituted_carry_bindings,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
     let mut carries = Vec::<PreparedCarryUpdate>::new();
     let mut temp_bindings = Vec::<(String, NirExpr)>::new();
     let mut conditional_temps = BTreeMap::<String, PreparedConditionalTempBinding>::new();
     let mut carry_index = 0usize;
-    for stmt in carry_bindings {
+    for stmt in &substituted_carry_bindings {
         let substituted = substitute_stmt_bindings(stmt, &temp_bindings);
         if let Some(current_carry_name) =
             extract_non_temp_loop_carry_name(stmt, pure_helpers, inlineable_pure_helpers)
@@ -2321,33 +2331,45 @@ pub(super) fn diagnose_unstructured_while_shape(
     let (binding_name, _, _) =
         parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
 
-    let Some((first_stmt, rest)) = body.split_first() else {
-        return Some(
-            "structured `while` lowering recognized the loop header, but the body is empty; expected a loop-state step, a guarded terminal body, or a structured carry/control sequence"
-                .to_owned(),
-        );
+    let Some((step_temp_bindings, step_binding, rest)) = split_temp_prefixed_loop_step_bindings(
+        body,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    ) else {
+        let Some((first_stmt, _)) = body.split_first() else {
+            return Some(
+                "structured `while` lowering recognized the loop header, but the body is empty; expected a loop-state step, a guarded terminal body, or a structured carry/control sequence"
+                    .to_owned(),
+            );
+        };
+        let first_binding_name = match first_stmt {
+            NirStmt::Let { name, .. } | NirStmt::Const { name, .. } => Some(name.as_str()),
+            _ => None,
+        };
+        return Some(match first_binding_name {
+            Some(name) => format!(
+                "structured `while` lowering recognized loop state `{binding_name}`, but the first body binding `{name}` is not a supported temp/step prefix; expected pure temp bindings followed by `{binding_name}` updated via `{binding_name} +/- ...` or `await callee({binding_name})`"
+            ),
+            None => format!(
+                "structured `while` lowering recognized loop state `{binding_name}`, but the body does not begin with a supported step prefix; expected pure temp bindings followed by `let {binding_name} = {binding_name} +/- ...`, `let {binding_name} = await callee({binding_name})`, or a guarded terminal body"
+            ),
+        });
     };
-
-    let first_binding_name = match first_stmt {
-        NirStmt::Let { name, .. } | NirStmt::Const { name, .. } => Some(name.as_str()),
-        _ => None,
-    };
+    let substituted_step = substitute_stmt_bindings(step_binding, &step_temp_bindings);
     let sync_step = parse_prepared_loop_step(
-        first_stmt,
+        &substituted_step,
         &binding_name,
         pure_helpers,
         inlineable_pure_helpers,
     );
-    let async_step = parse_prepared_async_loop_step(first_stmt, &binding_name);
+    let async_step = parse_prepared_async_loop_step(&substituted_step, &binding_name);
     if sync_step.is_none() && async_step.is_none() {
-        return Some(match first_binding_name {
-            Some(name) => format!(
-                "structured `while` lowering recognized loop state `{binding_name}`, but the first body binding `{name}` is not a supported step; expected `{binding_name}` to be updated via `{binding_name} +/- ...` or `await callee({binding_name})`"
+        return Some(
+            format!(
+                "structured `while` lowering recognized loop state `{binding_name}`, but the step binding is not supported after the pure temp prefix; expected `{binding_name}` to be updated via `{binding_name} +/- ...` or `await callee({binding_name})`"
             ),
-            None => format!(
-                "structured `while` lowering recognized loop state `{binding_name}`, but the body does not begin with a supported step binding; expected `let {binding_name} = {binding_name} +/- ...`, `let {binding_name} = await callee({binding_name})`, or a guarded terminal body"
-            ),
-        });
+        );
     }
 
     if rest.is_empty() {
@@ -2360,7 +2382,12 @@ pub(super) fn diagnose_unstructured_while_shape(
         return None;
     }
 
-    if rest.iter().any(|stmt| {
+    let substituted_rest = rest
+        .iter()
+        .map(|stmt| substitute_stmt_bindings(stmt, &step_temp_bindings))
+        .collect::<Vec<_>>();
+
+    if substituted_rest.iter().any(|stmt| {
         matches!(
             stmt,
             NirStmt::Print(_)
@@ -2371,19 +2398,19 @@ pub(super) fn diagnose_unstructured_while_shape(
         )
     }) {
         return Some(format!(
-            "structured `while` lowering recognized loop state `{binding_name}` and its step, but the remaining body still contains arbitrary executable statements; only structured carry updates and flow/post-flow control are lowered after the step"
+            "structured `while` lowering recognized loop state `{binding_name}` and its step, but the remaining body still contains arbitrary executable statements; only pure temp prefixes before the step plus structured carry updates and flow/post-flow control after the step are lowered"
         ));
     }
 
     let carries = prepare_loop_carry_sequence(
-        rest,
+        &substituted_rest,
         &binding_name,
         pure_helpers,
         inlineable_pure_helpers,
         &BTreeMap::<String, PureHelperBlock>::new(),
     )
     .unwrap_or_default();
-    if let Some(diagnostic) = rest.iter().find_map(|stmt| {
+    if let Some(diagnostic) = substituted_rest.iter().find_map(|stmt| {
         diagnose_unstructured_loop_flow_control(
             stmt,
             &binding_name,
@@ -2448,6 +2475,34 @@ fn split_trailing_loop_control_temp_bindings<'a>(
     ))
 }
 
+fn split_temp_prefixed_loop_step_bindings<'a>(
+    body: &'a [NirStmt],
+    binding_name: &str,
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<(Vec<(String, NirExpr)>, &'a NirStmt, &'a [NirStmt])> {
+    let mut temp_bindings = Vec::<(String, NirExpr)>::new();
+    let prev_current = NirExpr::Var(TAIL_RECURSIVE_PREV_CURRENT_BINDING.to_owned());
+    for (index, stmt) in body.iter().enumerate() {
+        let binding = match stmt {
+            NirStmt::Let { .. } | NirStmt::Const { .. } => stmt,
+            _ => return None,
+        };
+        let (name, expr) = extract_pure_branch_binding(binding, pure_helpers)?;
+        if name == binding_name {
+            return Some((
+                normalize_loop_control_temp_bindings(temp_bindings),
+                stmt,
+                &body[index + 1..],
+            ));
+        }
+        let normalized = inline_pure_helper_calls(&expr, inlineable_pure_helpers);
+        let preserved = substitute_branch_binding(&normalized, binding_name, &prev_current);
+        temp_bindings.push((name, preserved));
+    }
+    None
+}
+
 pub(super) fn prepare_counted_while(
     condition: &NirExpr,
     body: &[NirStmt],
@@ -2457,25 +2512,29 @@ pub(super) fn prepare_counted_while(
 ) -> Option<PreparedCountedWhile> {
     let (binding_name, limit, compare) =
         parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
-
-    match body {
-        [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] => {
-            let (step, step_kind) = parse_prepared_loop_step(
-                binding,
-                &binding_name,
-                pure_helpers,
-                inlineable_pure_helpers,
-            )?;
-            Some(PreparedCountedWhile {
-                binding_name,
-                limit,
-                step,
-                compare,
-                step_kind,
-            })
-        }
-        _ => None,
+    let (temp_bindings, step_binding, rest) = split_temp_prefixed_loop_step_bindings(
+        body,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
+    if !rest.is_empty() {
+        return None;
     }
+    let substituted_step = substitute_stmt_bindings(step_binding, &temp_bindings);
+    let (step, step_kind) = parse_prepared_loop_step(
+        &substituted_step,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
+    Some(PreparedCountedWhile {
+        binding_name,
+        limit,
+        step,
+        compare,
+        step_kind,
+    })
 }
 
 pub(super) fn prepare_chained_while(
@@ -2487,23 +2546,29 @@ pub(super) fn prepare_chained_while(
 ) -> Option<PreparedChainedWhile> {
     let (binding_name, limit, compare) =
         parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
-
-    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), carry_bindings @ ..] = body
-    else {
-        return None;
-    };
-    if carry_bindings.is_empty() {
-        return None;
-    }
-    let (step, step_kind) = parse_prepared_loop_step(
-        step_binding,
+    let (temp_bindings, step_binding, carry_bindings) = split_temp_prefixed_loop_step_bindings(
+        body,
         &binding_name,
         pure_helpers,
         inlineable_pure_helpers,
     )?;
+    if carry_bindings.is_empty() {
+        return None;
+    }
+    let substituted_step = substitute_stmt_bindings(step_binding, &temp_bindings);
+    let (step, step_kind) = parse_prepared_loop_step(
+        &substituted_step,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
+    let substituted_carry_bindings = carry_bindings
+        .iter()
+        .map(|stmt| substitute_stmt_bindings(stmt, &temp_bindings))
+        .collect::<Vec<_>>();
 
     let carries = prepare_loop_carry_sequence(
-        carry_bindings,
+        &substituted_carry_bindings,
         &binding_name,
         pure_helpers,
         inlineable_pure_helpers,
@@ -2532,18 +2597,24 @@ pub(super) fn prepare_async_chained_while(
 ) -> Option<PreparedAsyncChainedWhile> {
     let (binding_name, limit, compare) =
         parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
-
-    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), carry_bindings @ ..] = body
-    else {
-        return None;
-    };
+    let (temp_bindings, step_binding, carry_bindings) = split_temp_prefixed_loop_step_bindings(
+        body,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
     if carry_bindings.is_empty() {
         return None;
     }
-    let step_callee = parse_prepared_async_loop_step(step_binding, &binding_name)?;
+    let substituted_step = substitute_stmt_bindings(step_binding, &temp_bindings);
+    let step_callee = parse_prepared_async_loop_step(&substituted_step, &binding_name)?;
+    let substituted_carry_bindings = carry_bindings
+        .iter()
+        .map(|stmt| substitute_stmt_bindings(stmt, &temp_bindings))
+        .collect::<Vec<_>>();
 
     let carries = prepare_loop_carry_sequence(
-        carry_bindings,
+        &substituted_carry_bindings,
         &binding_name,
         pure_helpers,
         inlineable_pure_helpers,
@@ -2571,16 +2642,23 @@ pub(super) fn prepare_async_flow_while(
 ) -> Option<PreparedAsyncFlowWhile> {
     let (binding_name, limit, compare) =
         parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
-
-    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), rest @ ..] = body else {
-        return None;
-    };
+    let (temp_bindings, step_binding, rest) = split_temp_prefixed_loop_step_bindings(
+        body,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
     if rest.is_empty() {
         return None;
     }
-    let step_callee = parse_prepared_async_loop_step(step_binding, &binding_name)?;
+    let substituted_step = substitute_stmt_bindings(step_binding, &temp_bindings);
+    let step_callee = parse_prepared_async_loop_step(&substituted_step, &binding_name)?;
+    let substituted_rest = rest
+        .iter()
+        .map(|stmt| substitute_stmt_bindings(stmt, &temp_bindings))
+        .collect::<Vec<_>>();
     let (control_temp_bindings, raw_control_stmt, carry_bindings) =
-        split_temp_prefixed_loop_flow_control(rest, pure_helpers)?;
+        split_temp_prefixed_loop_flow_control(&substituted_rest, pure_helpers)?;
     let substituted_control_stmt =
         substitute_stmt_bindings(raw_control_stmt, &control_temp_bindings);
     let (control, prepared_carries) = if let NirStmt::If {
@@ -2707,21 +2785,28 @@ pub(super) fn prepare_flow_while(
 ) -> Option<PreparedFlowWhile> {
     let (binding_name, limit, compare) =
         parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
-
-    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), rest @ ..] = body else {
-        return None;
-    };
-    if rest.is_empty() {
-        return None;
-    }
-    let (step, step_kind) = parse_prepared_loop_step(
-        step_binding,
+    let (temp_bindings, step_binding, rest) = split_temp_prefixed_loop_step_bindings(
+        body,
         &binding_name,
         pure_helpers,
         inlineable_pure_helpers,
     )?;
+    if rest.is_empty() {
+        return None;
+    }
+    let substituted_step = substitute_stmt_bindings(step_binding, &temp_bindings);
+    let (step, step_kind) = parse_prepared_loop_step(
+        &substituted_step,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
+    let substituted_rest = rest
+        .iter()
+        .map(|stmt| substitute_stmt_bindings(stmt, &temp_bindings))
+        .collect::<Vec<_>>();
     let (control_temp_bindings, raw_control_stmt, carry_bindings) =
-        split_temp_prefixed_loop_flow_control(rest, pure_helpers)?;
+        split_temp_prefixed_loop_flow_control(&substituted_rest, pure_helpers)?;
     let substituted_control_stmt =
         substitute_stmt_bindings(raw_control_stmt, &control_temp_bindings);
     let (control, prepared_carries) = if let NirStmt::If {
@@ -2848,24 +2933,36 @@ pub(super) fn prepare_post_flow_while(
 ) -> Option<PreparedPostFlowWhile> {
     let (binding_name, limit, compare) =
         parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
-
-    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), middle @ .., control_stmt] =
-        body
-    else {
+    let (temp_bindings, step_binding, rest) = split_temp_prefixed_loop_step_bindings(
+        body,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
+    let [middle @ .., control_stmt] = rest else {
         return None;
     };
     if middle.is_empty() {
         return None;
     }
+    let substituted_step = substitute_stmt_bindings(step_binding, &temp_bindings);
     let (step, step_kind) = parse_prepared_loop_step(
-        step_binding,
+        &substituted_step,
         &binding_name,
         pure_helpers,
         inlineable_pure_helpers,
     )?;
+    let substituted_middle = middle
+        .iter()
+        .map(|stmt| substitute_stmt_bindings(stmt, &temp_bindings))
+        .collect::<Vec<_>>();
+    let substituted_control_stmt = substitute_stmt_bindings(control_stmt, &temp_bindings);
 
-    let (carry_bindings, control_temp_bindings) =
-        split_trailing_loop_control_temp_bindings(middle, control_stmt, pure_helpers)?;
+    let (carry_bindings, control_temp_bindings) = split_trailing_loop_control_temp_bindings(
+        &substituted_middle,
+        &substituted_control_stmt,
+        pure_helpers,
+    )?;
     let prepared_carries = prepare_loop_carry_sequence(
         carry_bindings,
         &binding_name,
@@ -2873,9 +2970,10 @@ pub(super) fn prepare_post_flow_while(
         inlineable_pure_helpers,
         pure_helper_blocks,
     )?;
-    let substituted_control_stmt = substitute_stmt_bindings(control_stmt, &control_temp_bindings);
+    let final_control_stmt =
+        substitute_stmt_bindings(&substituted_control_stmt, &control_temp_bindings);
     let control = parse_loop_flow_control(
-        &substituted_control_stmt,
+        &final_control_stmt,
         &binding_name,
         &prepared_carries,
         pure_helpers,
@@ -2901,19 +2999,31 @@ pub(super) fn prepare_async_post_flow_while(
 ) -> Option<PreparedAsyncPostFlowWhile> {
     let (binding_name, limit, compare) =
         parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
-
-    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), middle @ .., control_stmt] =
-        body
-    else {
+    let (temp_bindings, step_binding, rest) = split_temp_prefixed_loop_step_bindings(
+        body,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
+    let [middle @ .., control_stmt] = rest else {
         return None;
     };
     if middle.is_empty() {
         return None;
     }
-    let step_callee = parse_prepared_async_loop_step(step_binding, &binding_name)?;
+    let substituted_step = substitute_stmt_bindings(step_binding, &temp_bindings);
+    let step_callee = parse_prepared_async_loop_step(&substituted_step, &binding_name)?;
+    let substituted_middle = middle
+        .iter()
+        .map(|stmt| substitute_stmt_bindings(stmt, &temp_bindings))
+        .collect::<Vec<_>>();
+    let substituted_control_stmt = substitute_stmt_bindings(control_stmt, &temp_bindings);
 
-    let (carry_bindings, control_temp_bindings) =
-        split_trailing_loop_control_temp_bindings(middle, control_stmt, pure_helpers)?;
+    let (carry_bindings, control_temp_bindings) = split_trailing_loop_control_temp_bindings(
+        &substituted_middle,
+        &substituted_control_stmt,
+        pure_helpers,
+    )?;
     let prepared_carries = prepare_loop_carry_sequence(
         carry_bindings,
         &binding_name,
@@ -2921,9 +3031,10 @@ pub(super) fn prepare_async_post_flow_while(
         inlineable_pure_helpers,
         pure_helper_blocks,
     )?;
-    let substituted_control_stmt = substitute_stmt_bindings(control_stmt, &control_temp_bindings);
+    let final_control_stmt =
+        substitute_stmt_bindings(&substituted_control_stmt, &control_temp_bindings);
     let control = parse_loop_flow_control(
-        &substituted_control_stmt,
+        &final_control_stmt,
         &binding_name,
         &prepared_carries,
         pure_helpers,

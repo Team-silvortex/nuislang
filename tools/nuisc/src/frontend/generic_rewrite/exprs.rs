@@ -929,8 +929,7 @@ fn resolved_struct_literal_alias(
     let resolved = match resolve_ast_type_ref_aliases(&type_ref, visible_type_aliases) {
         Ok(resolved) => resolved,
         Err(error) => {
-            if has_placeholder_type_args {
-            }
+            if has_placeholder_type_args {}
             if visible_type_aliases.contains_key(type_name) {
                 return Err(error);
             }

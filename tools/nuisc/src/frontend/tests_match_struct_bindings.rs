@@ -1,11 +1,14 @@
 use super::{parse_nuis_ast, parse_nuis_module};
 use nuis_semantics::model::{AstMatchPattern, NirBinaryOp, NirExpr, NirStmt};
 
-fn match_arms_from_stmt(stmt: &nuis_semantics::model::AstStmt) -> &[nuis_semantics::model::AstMatchArm] {
+fn match_arms_from_stmt(
+    stmt: &nuis_semantics::model::AstStmt,
+) -> &[nuis_semantics::model::AstMatchArm] {
     match stmt {
         nuis_semantics::model::AstStmt::Match { arms, .. } => arms,
         nuis_semantics::model::AstStmt::Return(Some(nuis_semantics::model::AstExpr::Match {
-            arms, ..
+            arms,
+            ..
         })) => arms,
         other => panic!("expected match statement, found {other:?}"),
     }

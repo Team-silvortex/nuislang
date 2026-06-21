@@ -36,8 +36,9 @@ impl HostBridgePlanIndex {
 }
 
 pub fn parse_host_bridge_plan_index(path: &Path) -> Result<HostBridgePlanIndex, ArtifactError> {
-    let source = fs::read_to_string(path)
-        .map_err(|error| ArtifactError::new(format!("failed to read `{}`: {error}", path.display())))?;
+    let source = fs::read_to_string(path).map_err(|error| {
+        ArtifactError::new(format!("failed to read `{}`: {error}", path.display()))
+    })?;
     parse_host_bridge_plan_index_from_source(&source, path)
 }
 
@@ -57,7 +58,10 @@ pub fn parse_host_bridge_plan_index_from_source(
     })
 }
 
-fn parse_plan_entries(source: &str, path: &Path) -> Result<Vec<HostBridgePlanEntry>, ArtifactError> {
+fn parse_plan_entries(
+    source: &str,
+    path: &Path,
+) -> Result<Vec<HostBridgePlanEntry>, ArtifactError> {
     let mut rows = Vec::new();
     let mut current = BTreeMap::<String, String>::new();
     let mut in_block = false;
@@ -100,9 +104,9 @@ fn parse_plan_entry(
 ) -> Result<HostBridgePlanEntry, ArtifactError> {
     let phase_order_raw = parse_required_map_string_in_block(values, "phase_order", path, "plan")
         .or_else(|_| {
-            let source = values.get("phase_order").cloned().unwrap_or_default();
-            parse_inline_string_array(&source, path, "plan", "phase_order")
-        })?;
+        let source = values.get("phase_order").cloned().unwrap_or_default();
+        parse_inline_string_array(&source, path, "plan", "phase_order")
+    })?;
     let phase_order = if phase_order_raw.contains(',') || phase_order_raw.is_empty() {
         phase_order_raw
             .split(',')
@@ -115,9 +119,19 @@ fn parse_plan_entry(
     Ok(HostBridgePlanEntry {
         domain_family: parse_required_map_string_in_block(values, "domain_family", path, "plan")?,
         package_id: parse_required_map_string_in_block(values, "package_id", path, "plan")?,
-        bridge_stub_path: parse_required_map_string_in_block(values, "bridge_stub_path", path, "plan")?,
+        bridge_stub_path: parse_required_map_string_in_block(
+            values,
+            "bridge_stub_path",
+            path,
+            "plan",
+        )?,
         bridge_surface: parse_required_map_string_in_block(values, "bridge_surface", path, "plan")?,
-        scheduler_binding: parse_required_map_string_in_block(values, "scheduler_binding", path, "plan")?,
+        scheduler_binding: parse_required_map_string_in_block(
+            values,
+            "scheduler_binding",
+            path,
+            "plan",
+        )?,
         phase_order,
         plan_inline: parse_optional_map_string(values, "plan_inline").unwrap_or_default(),
     })

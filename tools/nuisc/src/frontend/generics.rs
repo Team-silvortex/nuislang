@@ -132,8 +132,7 @@ pub(crate) fn infer_generic_substitutions(
                 &resolved_param_ty,
                 &generic_names,
                 &substitutions,
-            )
-        {
+            ) {
             resolved_param_ty.clone()
         } else {
             arg_ty

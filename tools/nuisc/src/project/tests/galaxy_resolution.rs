@@ -60,7 +60,10 @@ mod cpu Main {
     assert!(std.requested_by.iter().any(|item| item == "pixelmagic"));
     assert!(std.auto_injectable);
     assert_eq!(std.library_import_policy.as_str(), "project-auto");
-    assert_eq!(std.library_modules, vec!["lib/task_contracts.ns".to_owned()]);
+    assert_eq!(
+        std.library_modules,
+        vec!["lib/task_contracts.ns".to_owned()]
+    );
 
     let core = project
         .resolved_galaxies
@@ -69,7 +72,10 @@ mod cpu Main {
         .unwrap();
     assert!(core.auto_injectable);
     assert_eq!(core.library_import_policy.as_str(), "project-auto");
-    assert_eq!(core.library_modules, vec!["lib/prelude_contracts.ns".to_owned()]);
+    assert_eq!(
+        core.library_modules,
+        vec!["lib/prelude_contracts.ns".to_owned()]
+    );
 }
 
 #[test]
@@ -96,8 +102,10 @@ mod cpu Main {
     let output_dir = root.join("build");
     let metadata = write_project_metadata(&output_dir, &project, &plan).unwrap();
     let galaxy_index = fs::read_to_string(&metadata.galaxy_index_path).unwrap();
-    let modules_index = fs::read_to_string(root.join("build").join("nuis.project.modules.txt")).unwrap();
-    let imports_index = fs::read_to_string(root.join("build").join("nuis.project.imports.txt")).unwrap();
+    let modules_index =
+        fs::read_to_string(root.join("build").join("nuis.project.modules.txt")).unwrap();
+    let imports_index =
+        fs::read_to_string(root.join("build").join("nuis.project.imports.txt")).unwrap();
     let organization_index =
         fs::read_to_string(root.join("build").join("nuis.project.organization.txt")).unwrap();
 
@@ -134,9 +142,8 @@ mod cpu Main {
     assert!(imports_index.contains(
         "library\tcore\tlib/prelude_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
-    assert!(imports_index.contains(
-        "visible\tcpu\tMain\tsource_kind=project-local\tmanifest_spec=main.ns"
-    ));
+    assert!(imports_index
+        .contains("visible\tcpu\tMain\tsource_kind=project-local\tmanifest_spec=main.ns"));
     assert!(imports_index.contains(
         "visible\tcpu\tStdTaskContracts\tsource_kind=galaxy-auto-inject\tgalaxy=std\tpackage=nuis.std\tlibrary_module=lib/task_contracts.ns"
     ));
@@ -206,7 +213,8 @@ mod cpu Main {
     assert!(project
         .modules
         .iter()
-        .any(|module| module.ast.domain == "shader" && module.ast.unit == "PixelMagicSurfaceContracts"));
+        .any(|module| module.ast.domain == "shader"
+            && module.ast.unit == "PixelMagicSurfaceContracts"));
     assert!(project
         .modules
         .iter()
@@ -263,7 +271,8 @@ mod cpu Main {
     assert!(project
         .modules
         .iter()
-        .any(|module| module.ast.domain == "shader" && module.ast.unit == "PixelMagicSurfaceContracts"));
+        .any(|module| module.ast.domain == "shader"
+            && module.ast.unit == "PixelMagicSurfaceContracts"));
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
@@ -568,7 +577,10 @@ library_import_policy = "manual-only"
     .unwrap();
     fs::create_dir_all(stdlib_root.join("manual").join("lib")).unwrap();
     fs::write(
-        stdlib_root.join("manual").join("lib").join("manual_contracts.ns"),
+        stdlib_root
+            .join("manual")
+            .join("lib")
+            .join("manual_contracts.ns"),
         r#"
 mod cpu ManualContracts {
   pub fn value() -> i64 {
@@ -698,7 +710,9 @@ mod cpu Main {
     );
 
     let error = load_project(root.as_path()).unwrap_err();
-    assert!(error.contains("project use `use cpu NovaContracts;` is unavailable in the current scope"));
+    assert!(
+        error.contains("project use `use cpu NovaContracts;` is unavailable in the current scope")
+    );
     assert!(error.contains("provided by galaxy `ns-nova` (nuis.ns-nova)"));
     assert!(error.contains("`lib/nova_contracts.ns`"));
     assert!(error.contains("import policy `manual-only`"));

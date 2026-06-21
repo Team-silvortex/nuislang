@@ -57,9 +57,11 @@ pub(super) fn validate_project_uses(
             if let Err(error) =
                 crate::registry::validate_unit_binding(&[manifest], &item.domain, &item.unit)
             {
-                if let Some(hint) =
-                    manual_only_library_hint(item.domain.as_str(), item.unit.as_str(), resolved_galaxies)?
-                {
+                if let Some(hint) = manual_only_library_hint(
+                    item.domain.as_str(),
+                    item.unit.as_str(),
+                    resolved_galaxies,
+                )? {
                     return Err(format!(
                         "project use `use {} {};` is unavailable in the current scope: {hint}\nregistry detail: {error}",
                         item.domain, item.unit

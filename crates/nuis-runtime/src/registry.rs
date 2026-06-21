@@ -60,8 +60,7 @@ mod tests {
         }
 
         fn supports(&self, unit: &BuildManifestDomainBuildUnit) -> bool {
-            unit.domain_family == "network"
-                && unit.backend_family.as_deref() == Some("urlsession")
+            unit.domain_family == "network" && unit.backend_family.as_deref() == Some("urlsession")
         }
     }
 

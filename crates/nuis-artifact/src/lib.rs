@@ -1,6 +1,6 @@
 mod artifact;
-mod build_manifest;
 mod bridge_registry;
+mod build_manifest;
 mod domain_unit;
 mod envelope;
 mod error;
@@ -13,15 +13,13 @@ pub use artifact::{
     materialize_embedded_artifact_support, parse_nuis_compiled_artifact,
     write_nuis_compiled_artifact, NuisCompiledArtifact, NuisLifecycleContract,
 };
-pub use build_manifest::{
-    parse_build_manifest, parse_build_manifest_from_source, ArtifactHashEntry, BuildManifest,
-};
 pub use bridge_registry::{
     parse_bridge_registry, parse_bridge_registry_from_source, BridgeRegistry, BridgeRegistryEntry,
 };
-pub use domain_unit::{
-    parse_domain_build_unit_blocks, BuildManifestDomainBuildUnit,
+pub use build_manifest::{
+    parse_build_manifest, parse_build_manifest_from_source, ArtifactHashEntry, BuildManifest,
 };
+pub use domain_unit::{parse_domain_build_unit_blocks, BuildManifestDomainBuildUnit};
 pub use envelope::{
     decode_nuis_executable_envelope_binary, encode_nuis_executable_envelope_binary,
     parse_nuis_executable_envelope, parse_nuis_executable_envelope_from_source,

@@ -10,7 +10,10 @@ pub(crate) fn workflow_contract_json_fields(
     include_debug: bool,
 ) -> Vec<String> {
     let mut fields = vec![
-        crate::json_object_field("frontdoor", &crate::workflow_frontdoor_json_fields(frontdoor)),
+        crate::json_object_field(
+            "frontdoor",
+            &crate::workflow_frontdoor_json_fields(frontdoor),
+        ),
         crate::json_field("workflow_kind", frontdoor.workflow_kind),
         crate::json_field("workflow_brief", frontdoor.workflow_brief),
         crate::json_field("workflow_samples", frontdoor.workflow_samples),
@@ -56,12 +59,18 @@ pub(crate) fn workflow_contract_json_fields(
 pub(crate) fn public_surface_summary_json_fields(
     records: &[PublicSurfaceModuleRecord],
 ) -> Vec<String> {
-    let public_extern_count = records.iter().map(|record| record.externs.len()).sum::<usize>();
+    let public_extern_count = records
+        .iter()
+        .map(|record| record.externs.len())
+        .sum::<usize>();
     let public_extern_interface_count = records
         .iter()
         .map(|record| record.extern_interfaces.len())
         .sum::<usize>();
-    let public_const_count = records.iter().map(|record| record.consts.len()).sum::<usize>();
+    let public_const_count = records
+        .iter()
+        .map(|record| record.consts.len())
+        .sum::<usize>();
     let public_function_count = records
         .iter()
         .map(|record| record.functions.len())
@@ -70,8 +79,14 @@ pub(crate) fn public_surface_summary_json_fields(
         .iter()
         .map(|record| record.type_aliases.len())
         .sum::<usize>();
-    let public_struct_count = records.iter().map(|record| record.structs.len()).sum::<usize>();
-    let public_trait_count = records.iter().map(|record| record.traits.len()).sum::<usize>();
+    let public_struct_count = records
+        .iter()
+        .map(|record| record.structs.len())
+        .sum::<usize>();
+    let public_trait_count = records
+        .iter()
+        .map(|record| record.traits.len())
+        .sum::<usize>();
     vec![
         crate::json_usize_field("public_surface_modules", records.len()),
         crate::json_usize_field("public_externs", public_extern_count),

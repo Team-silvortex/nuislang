@@ -7,11 +7,10 @@ use super::{
     organize_project, organize_project_exchanges, packet, parse_project_manifest,
     render_project_abi_graph_line, render_project_abi_index, render_project_exchange_index,
     render_project_host_ffi_index, render_project_import_index, render_project_organization_index,
-    resolve_project_abi,
-    validate_project_abi_requirements, validate_project_links, validate_project_modules,
-    validate_project_unit_bindings, validate_project_uses, LoadedProject, ProjectBuildMetadata,
-    ProjectCompilationDependency, ProjectCompilationPlan, ProjectModule, ProjectModuleOrigin,
-    ProjectOutputIntent, ProjectSyntheticInput,
+    resolve_project_abi, validate_project_abi_requirements, validate_project_links,
+    validate_project_modules, validate_project_unit_bindings, validate_project_uses, LoadedProject,
+    ProjectBuildMetadata, ProjectCompilationDependency, ProjectCompilationPlan, ProjectModule,
+    ProjectModuleOrigin, ProjectOutputIntent, ProjectSyntheticInput,
 };
 
 pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
@@ -33,8 +32,10 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
         .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
     let manifest = parse_project_manifest(&source, &manifest_path)?;
     let stdlib_root = crate::stdlib_registry::resolve_stdlib_root()?;
-    let resolved_galaxies =
-        crate::stdlib_registry::resolve_galaxy_dependencies(&stdlib_root, &manifest.galaxy_dependencies)?;
+    let resolved_galaxies = crate::stdlib_registry::resolve_galaxy_dependencies(
+        &stdlib_root,
+        &manifest.galaxy_dependencies,
+    )?;
 
     let module_specs = if manifest.modules.is_empty() {
         vec![manifest.entry.clone()]
@@ -528,7 +529,8 @@ pub fn write_project_metadata(
             imports_index_path.display()
         )
     })?;
-    let galaxy_index = crate::stdlib_registry::render_resolved_galaxy_index(&project.resolved_galaxies);
+    let galaxy_index =
+        crate::stdlib_registry::render_resolved_galaxy_index(&project.resolved_galaxies);
     fs::write(&galaxy_index_path, galaxy_index).map_err(|error| {
         format!(
             "failed to write project galaxy index `{}`: {error}",

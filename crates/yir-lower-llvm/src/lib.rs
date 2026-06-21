@@ -3202,23 +3202,22 @@ fn emit_cpu_function(
                                 .is_some_and(|index| index.parse::<usize>().is_ok())
                     };
                     let add_state_list_payload_len = |kind: &str| -> Option<usize> {
-                        let (terms_part, payload_len) = if let Some(prefix) =
-                            kind.strip_prefix("add_")
-                        {
-                            if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
-                                (prefix, 1usize)
+                        let (terms_part, payload_len) =
+                            if let Some(prefix) = kind.strip_prefix("add_") {
+                                if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                    (prefix, 1usize)
+                                } else {
+                                    (prefix, 0usize)
+                                }
+                            } else if let Some(prefix) = kind.strip_prefix("mul_") {
+                                if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+                                    (prefix, 1usize)
+                                } else {
+                                    (prefix, 0usize)
+                                }
                             } else {
-                                (prefix, 0usize)
-                            }
-                        } else if let Some(prefix) = kind.strip_prefix("mul_") {
-                            if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
-                                (prefix, 1usize)
-                            } else {
-                                (prefix, 0usize)
-                            }
-                        } else {
-                            return None;
-                        };
+                                return None;
+                            };
                         let terms = terms_part.split("_plus_").collect::<Vec<_>>();
                         if terms.len() < 2 {
                             return None;
@@ -3563,10 +3562,8 @@ fn emit_cpu_function(
                     current_carries.push(carry_before);
                 }
                 let mut next_carries = Vec::new();
-                for (index, ((carry_kind, raw_payloads), (_, payloads))) in carry_specs_raw
-                    .iter()
-                    .zip(carry_specs.iter())
-                    .enumerate()
+                for (index, ((carry_kind, raw_payloads), (_, payloads))) in
+                    carry_specs_raw.iter().zip(carry_specs.iter()).enumerate()
                 {
                     let (source, op) = if carry_kind == "add_current" {
                         (next_current.clone(), "add")
@@ -3711,8 +3708,7 @@ fn emit_cpu_function(
                         (source, op)
                     } else if matches!(
                         carry_kind.as_str(),
-                        "add_read_at_fixed_plus_invariant"
-                            | "mul_read_at_fixed_plus_invariant"
+                        "add_read_at_fixed_plus_invariant" | "mul_read_at_fixed_plus_invariant"
                     ) {
                         let ptr = match raw_payloads.first() {
                             Some(LlvmValueRef::Ptr(ptr)) => ptr.clone(),
@@ -3786,10 +3782,18 @@ fn emit_cpu_function(
                             | "add_read_at_dynamic_prev_current_plus_invariant"
                             | "mul_read_at_dynamic_current_plus_invariant"
                             | "mul_read_at_dynamic_prev_current_plus_invariant"
-                    ) || carry_kind.strip_prefix("add_read_at_dynamic_prev_carry").is_some()
-                        || carry_kind.strip_prefix("mul_read_at_dynamic_prev_carry").is_some()
-                        || carry_kind.strip_prefix("add_read_at_dynamic_carry").is_some()
-                        || carry_kind.strip_prefix("mul_read_at_dynamic_carry").is_some()
+                    ) || carry_kind
+                        .strip_prefix("add_read_at_dynamic_prev_carry")
+                        .is_some()
+                        || carry_kind
+                            .strip_prefix("mul_read_at_dynamic_prev_carry")
+                            .is_some()
+                        || carry_kind
+                            .strip_prefix("add_read_at_dynamic_carry")
+                            .is_some()
+                        || carry_kind
+                            .strip_prefix("mul_read_at_dynamic_carry")
+                            .is_some()
                         || carry_kind
                             .strip_prefix("add_read_at_dynamic_prev_carry")
                             .is_some_and(|suffix| suffix.ends_with("_plus_invariant"))
@@ -8319,7 +8323,11 @@ fn emit_cpu_function(
                             | "add_read_at_fixed_plus_invariant"
                             | "mul_read_at_fixed_plus_invariant"
                     ) {
-                        Some(if kind.ends_with("_plus_invariant") { 3 } else { 2 })
+                        Some(if kind.ends_with("_plus_invariant") {
+                            3
+                        } else {
+                            2
+                        })
                     } else if matches!(
                         kind,
                         "add_read_at_dynamic_current_plus_invariant"

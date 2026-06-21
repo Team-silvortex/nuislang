@@ -1,6 +1,4 @@
-use nuis_artifact::{
-    BridgeRegistryEntry, BuildManifestDomainBuildUnit, HostBridgePlanEntry,
-};
+use nuis_artifact::{BridgeRegistryEntry, BuildManifestDomainBuildUnit, HostBridgePlanEntry};
 
 use crate::{AdapterRegistry, DomainAdapter, LoadedExecutable, RuntimeError};
 
@@ -249,10 +247,7 @@ mod tests {
             "urlsession"
         );
         assert_eq!(
-            prepared
-                .host_bridge_plan_entry
-                .unwrap()
-                .scheduler_binding,
+            prepared.host_bridge_plan_entry.unwrap().scheduler_binding,
             "network-poll-bridge"
         );
     }

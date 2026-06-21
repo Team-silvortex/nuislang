@@ -33,7 +33,6 @@ mod signature_building;
 mod specialization_pipeline;
 mod stmt_lowering;
 mod task_builtins;
-mod text_handle_rewrite;
 #[cfg(test)]
 mod tests_benchmark_functions;
 #[cfg(test)]
@@ -46,6 +45,7 @@ mod tests_destructure_let;
 mod tests_enums;
 #[cfg(test)]
 mod tests_frontend_core;
+mod text_handle_rewrite;
 
 // Generic specialization and higher-order behavior.
 #[cfg(test)]
@@ -148,9 +148,9 @@ use self::validation::validate_declared_nir_types;
 use self::validation_assignments::validate_ast_assignments;
 use self::validation_generic_constraints::validate_ast_generic_constraints;
 use self::validation_helpers::{
-    async_boundary_violation_detail, async_parameter_violation_detail,
-    render_type_name, select_expected_semantic_token_type,
-    validate_benchmark_function_signature, validate_test_function_signature, validate_type_ref,
+    async_boundary_violation_detail, async_parameter_violation_detail, render_type_name,
+    select_expected_semantic_token_type, validate_benchmark_function_signature,
+    validate_test_function_signature, validate_type_ref,
 };
 use aliases::*;
 use nuis_semantics::model::{

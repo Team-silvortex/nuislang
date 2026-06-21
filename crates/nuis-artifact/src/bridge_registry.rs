@@ -36,8 +36,9 @@ impl BridgeRegistry {
 }
 
 pub fn parse_bridge_registry(path: &Path) -> Result<BridgeRegistry, ArtifactError> {
-    let source = fs::read_to_string(path)
-        .map_err(|error| ArtifactError::new(format!("failed to read `{}`: {error}", path.display())))?;
+    let source = fs::read_to_string(path).map_err(|error| {
+        ArtifactError::new(format!("failed to read `{}`: {error}", path.display()))
+    })?;
     parse_bridge_registry_from_source(&source, path)
 }
 
@@ -57,7 +58,10 @@ pub fn parse_bridge_registry_from_source(
     })
 }
 
-fn parse_bridge_entries(source: &str, path: &Path) -> Result<Vec<BridgeRegistryEntry>, ArtifactError> {
+fn parse_bridge_entries(
+    source: &str,
+    path: &Path,
+) -> Result<Vec<BridgeRegistryEntry>, ArtifactError> {
     let mut rows = Vec::new();
     let mut current = BTreeMap::<String, String>::new();
     let mut in_block = false;
@@ -101,15 +105,30 @@ fn parse_bridge_entry(
     Ok(BridgeRegistryEntry {
         domain_family: parse_required_map_string_in_block(values, "domain_family", path, "bridge")?,
         package_id: parse_required_map_string_in_block(values, "package_id", path, "bridge")?,
-        backend_family: parse_required_map_string_in_block(values, "backend_family", path, "bridge")?,
+        backend_family: parse_required_map_string_in_block(
+            values,
+            "backend_family",
+            path,
+            "bridge",
+        )?,
         selected_lowering_target: parse_required_map_string_in_block(
             values,
             "selected_lowering_target",
             path,
             "bridge",
         )?,
-        bridge_stub_path: parse_required_map_string_in_block(values, "bridge_stub_path", path, "bridge")?,
-        payload_blob_path: parse_required_map_string_in_block(values, "payload_blob_path", path, "bridge")?,
+        bridge_stub_path: parse_required_map_string_in_block(
+            values,
+            "bridge_stub_path",
+            path,
+            "bridge",
+        )?,
+        payload_blob_path: parse_required_map_string_in_block(
+            values,
+            "payload_blob_path",
+            path,
+            "bridge",
+        )?,
         plan_inline: parse_optional_map_string(values, "plan_inline").unwrap_or_default(),
     })
 }

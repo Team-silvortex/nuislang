@@ -536,7 +536,10 @@ pub fn domain_build_contract_summary(
                 .clone()
                 .unwrap_or(fallback.backend.scheduler_binding),
             phase_bind: manifest.phase_bind.clone().or(fallback.backend.phase_bind),
-            phase_submit: manifest.phase_submit.clone().or(fallback.backend.phase_submit),
+            phase_submit: manifest
+                .phase_submit
+                .clone()
+                .or(fallback.backend.phase_submit),
             phase_wait: manifest.phase_wait.clone().or(fallback.backend.phase_wait),
             phase_finalize: manifest
                 .phase_finalize
@@ -1253,7 +1256,9 @@ pub fn domain_registration(
     })
 }
 
-fn load_registered_domains_unvalidated(root: &Path) -> Result<Vec<NustarDomainRegistration>, String> {
+fn load_registered_domains_unvalidated(
+    root: &Path,
+) -> Result<Vec<NustarDomainRegistration>, String> {
     let root = resolve_registry_root(root);
     let mut registrations = load_index(&root)?
         .into_iter()
@@ -1289,7 +1294,11 @@ fn lane_target_is_declared(manifest: &NustarPackageManifest, target: &str) -> bo
 
 fn parse_backend_family_from_abi_target(raw: &str) -> Option<String> {
     let (_, fields) = raw.split_once(':')?;
-    for field in fields.split('|').map(str::trim).filter(|field| !field.is_empty()) {
+    for field in fields
+        .split('|')
+        .map(str::trim)
+        .filter(|field| !field.is_empty())
+    {
         let (key, value) = field.split_once('=')?;
         if key.trim() == "backend" {
             return Some(value.trim().to_owned());
@@ -1364,9 +1373,8 @@ fn validate_shader_domain_contract(
             package: Some(manifest.package_id.clone()),
             domain: Some(manifest.domain_family.clone()),
             manifest_path: Some(manifest_path.display().to_string()),
-            message:
-                "shader domain must expose target/viewport/pipeline support_profile_slots"
-                    .to_owned(),
+            message: "shader domain must expose target/viewport/pipeline support_profile_slots"
+                .to_owned(),
         });
     }
     issues
@@ -1581,7 +1589,10 @@ fn validate_build_contract_fields(
                 "backend_submission_mode",
                 manifest.backend_submission_mode.as_deref(),
             ),
-            ("backend_wake_policy", manifest.backend_wake_policy.as_deref()),
+            (
+                "backend_wake_policy",
+                manifest.backend_wake_policy.as_deref(),
+            ),
             ("phase_bind", manifest.phase_bind.as_deref()),
             ("phase_submit", manifest.phase_submit.as_deref()),
             ("phase_wait", manifest.phase_wait.as_deref()),
@@ -1689,7 +1700,10 @@ fn validate_build_contract_fields(
                 "host_bridge_plan_begin",
                 manifest.host_bridge_plan_begin.is_some(),
             ),
-            ("host_bridge_plan_end", manifest.host_bridge_plan_end.is_some()),
+            (
+                "host_bridge_plan_end",
+                manifest.host_bridge_plan_end.is_some(),
+            ),
         ] {
             if !present {
                 missing.push(name.to_owned());
@@ -1736,12 +1750,14 @@ fn validate_build_contract_fields(
                 });
             }
             if manifest.host_bridge_phase_order.as_deref()
-                != Some(&[
-                    "bind".to_owned(),
-                    "submit".to_owned(),
-                    "wait".to_owned(),
-                    "finalize".to_owned(),
-                ][..])
+                != Some(
+                    &[
+                        "bind".to_owned(),
+                        "submit".to_owned(),
+                        "wait".to_owned(),
+                        "finalize".to_owned(),
+                    ][..],
+                )
             {
                 issues.push(NustarRegistryIssue {
                     kind: NustarRegistryIssueKind::DomainContractMismatch,
@@ -1780,7 +1796,10 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
             package: None,
             domain: None,
             manifest_path: Some(root.join(INDEX_FILE).display().to_string()),
-            message: format!("no nustar packages are indexed in `{}`", root.join(INDEX_FILE).display()),
+            message: format!(
+                "no nustar packages are indexed in `{}`",
+                root.join(INDEX_FILE).display()
+            ),
         }]);
     }
 
@@ -1857,7 +1876,8 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
                 ),
             });
         }
-        if manifest.loader_abi != "nustar-loader-v1" || manifest.loader_entry != "nustar.bootstrap.v1"
+        if manifest.loader_abi != "nustar-loader-v1"
+            || manifest.loader_entry != "nustar.bootstrap.v1"
         {
             issues.push(NustarRegistryIssue {
                 kind: NustarRegistryIssueKind::LoaderContractMismatch,
@@ -1940,7 +1960,10 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
             });
         }
         issues.extend(validate_build_contract_fields(&manifest, &manifest_path));
-        issues.extend(validate_domain_specific_contracts(&manifest, &manifest_path));
+        issues.extend(validate_domain_specific_contracts(
+            &manifest,
+            &manifest_path,
+        ));
     }
 
     Ok(issues)
@@ -2749,7 +2772,8 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> Vec<String> 
             let mut slots = vec!["window_offset".to_owned(), "uplink_len".to_owned()];
             slots.extend(all_uplink_directional_marker_slots());
             slots.extend(data_common_marker_slots().iter().filter_map(|slot| {
-                slot.starts_with("marker:uplink_").then_some((*slot).to_owned())
+                slot.starts_with("marker:uplink_")
+                    .then_some((*slot).to_owned())
             }));
             return slots;
         }
@@ -2757,7 +2781,8 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> Vec<String> 
             let mut slots = vec!["window_offset".to_owned(), "downlink_len".to_owned()];
             slots.extend(all_downlink_directional_marker_slots());
             slots.extend(data_common_marker_slots().iter().filter_map(|slot| {
-                slot.starts_with("marker:downlink_").then_some((*slot).to_owned())
+                slot.starts_with("marker:downlink_")
+                    .then_some((*slot).to_owned())
             }));
             return slots;
         }
@@ -3592,8 +3617,7 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         parse_optional_string_array(source, "host_bridge_host_ffi_surface");
     let host_bridge_handle_family =
         parse_optional_string_array(source, "host_bridge_handle_family");
-    let host_bridge_phase_order =
-        parse_optional_string_array(source, "host_bridge_phase_order");
+    let host_bridge_phase_order = parse_optional_string_array(source, "host_bridge_phase_order");
     let host_bridge_phase_bind_inputs =
         parse_optional_string_array(source, "host_bridge_phase_bind_inputs");
     let host_bridge_phase_bind_outputs =
@@ -3610,12 +3634,10 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         parse_optional_string_array(source, "host_bridge_phase_finalize_inputs");
     let host_bridge_phase_finalize_outputs =
         parse_optional_string_array(source, "host_bridge_phase_finalize_outputs");
-    let host_bridge_phase_bind_wake =
-        parse_optional_string(source, "host_bridge_phase_bind_wake");
+    let host_bridge_phase_bind_wake = parse_optional_string(source, "host_bridge_phase_bind_wake");
     let host_bridge_phase_submit_wake =
         parse_optional_string(source, "host_bridge_phase_submit_wake");
-    let host_bridge_phase_wait_wake =
-        parse_optional_string(source, "host_bridge_phase_wait_wake");
+    let host_bridge_phase_wait_wake = parse_optional_string(source, "host_bridge_phase_wait_wake");
     let host_bridge_phase_finalize_wake =
         parse_optional_string(source, "host_bridge_phase_finalize_wake");
     let host_bridge_plan_begin = parse_optional_bool(source, "host_bridge_plan_begin");
@@ -4604,10 +4626,7 @@ mod cpu Main {
             summary.backend.transport_model.as_deref(),
             Some("client-session")
         );
-        assert_eq!(
-            summary.bridge.scheduler_binding,
-            "network-poll-bridge"
-        );
+        assert_eq!(summary.bridge.scheduler_binding, "network-poll-bridge");
         assert_eq!(summary.bridge.phase_submit, "packet-write-dispatch");
         assert_eq!(summary.bridge.phase_wait, "callback-or-read-ready");
         assert_eq!(summary.bridge.bridge_kind, "managed-lifecycle-bridge");
@@ -4739,7 +4758,8 @@ mod cpu Main {
     fn validate_registered_domains_rejects_duplicate_domain_and_bad_lane_target() {
         let root = temp_registry_root("registry-duplicate-domain");
         let cpu = cpu_manifest_with_host_target();
-        let mut network = load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
+        let mut network =
+            load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
         network.default_lanes.push("network.ghost=rx".to_owned());
         let entries = vec![
             NustarPackageIndexEntry {
@@ -4797,7 +4817,9 @@ mod cpu Main {
     fn validate_registered_domains_rejects_shader_backend_without_lowering_target() {
         let root = temp_registry_root("registry-shader-backend");
         let mut shader = load_manifest_for_domain(Path::new("nustar-packages"), "shader").unwrap();
-        shader.lowering_targets.retain(|target| target != "cpu-fallback");
+        shader
+            .lowering_targets
+            .retain(|target| target != "cpu-fallback");
         let entries = vec![NustarPackageIndexEntry {
             package_id: shader.package_id.clone(),
             manifest: "shader.toml".to_owned(),
@@ -4838,7 +4860,9 @@ mod cpu Main {
         let root = temp_registry_root("registry-network-lowering");
         let mut network =
             load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
-        network.lowering_targets.retain(|target| target != "socket-abi");
+        network
+            .lowering_targets
+            .retain(|target| target != "socket-abi");
         let entries = vec![NustarPackageIndexEntry {
             package_id: network.package_id.clone(),
             manifest: "network.toml".to_owned(),

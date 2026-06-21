@@ -227,7 +227,12 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         },
         DataPlaneDirectionContext {
             direction: data_bridge_directions()[1],
-            pipe_targets: data_pipe_nodes.iter().skip(2).take(2).cloned().collect::<Vec<_>>(),
+            pipe_targets: data_pipe_nodes
+                .iter()
+                .skip(2)
+                .take(2)
+                .cloned()
+                .collect::<Vec<_>>(),
             windows: downlink_windows.clone(),
             len: downlink_len.clone(),
         },
@@ -238,21 +243,46 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
             push_edge_if_missing(module, EdgeKind::Dep, handle, pipe);
         }
     }
-    for (index, (_domain, uplink_markers, downlink_markers)) in directional_markers.iter().enumerate() {
+    for (index, (_domain, uplink_markers, downlink_markers)) in
+        directional_markers.iter().enumerate()
+    {
         let _ = index;
-        push_effect_edges_from_first_marker(module, uplink_markers, &plane_directions[0].pipe_targets);
-        push_effect_edges_from_first_marker(module, downlink_markers, &plane_directions[1].pipe_targets);
+        push_effect_edges_from_first_marker(
+            module,
+            uplink_markers,
+            &plane_directions[0].pipe_targets,
+        );
+        push_effect_edges_from_first_marker(
+            module,
+            downlink_markers,
+            &plane_directions[1].pipe_targets,
+        );
     }
     for context in &plane_directions {
         let pipe_markers = collect_data_marker_nodes(module, context.direction.pipe_marker);
         let pipe_class_markers =
             collect_data_marker_nodes(module, context.direction.pipe_class_marker);
-        let payload_class_markers =
-            collect_data_marker_nodes(module, context.direction.payload_class_marker.trim_start_matches("marker:"));
-        let payload_shape_markers =
-            collect_data_marker_nodes(module, context.direction.payload_shape_marker.trim_start_matches("marker:"));
-        let window_policy_markers =
-            collect_data_marker_nodes(module, context.direction.window_policy_marker.trim_start_matches("marker:"));
+        let payload_class_markers = collect_data_marker_nodes(
+            module,
+            context
+                .direction
+                .payload_class_marker
+                .trim_start_matches("marker:"),
+        );
+        let payload_shape_markers = collect_data_marker_nodes(
+            module,
+            context
+                .direction
+                .payload_shape_marker
+                .trim_start_matches("marker:"),
+        );
+        let window_policy_markers = collect_data_marker_nodes(
+            module,
+            context
+                .direction
+                .window_policy_marker
+                .trim_start_matches("marker:"),
+        );
         push_effect_edges_from_first_marker(module, &pipe_markers, &context.pipe_targets);
         push_effect_edges_from_first_marker(module, &pipe_class_markers, &context.pipe_targets);
         push_effect_edges_from_first_marker(module, &payload_class_markers, &context.pipe_targets);

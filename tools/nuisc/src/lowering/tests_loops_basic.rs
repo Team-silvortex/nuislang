@@ -283,15 +283,15 @@ fn rejects_general_sync_while_with_structured_shape_diagnostic() {
 }
 
 #[test]
-fn rejects_structured_while_with_unsupported_first_step_binding_diagnostic() {
+fn rejects_structured_while_with_unsupported_first_step_prefix_diagnostic() {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
           fn main() -> i64 {
             let value: i64 = 0;
             while value < 3 {
-              let next: i64 = value + 1;
-              let value: i64 = next;
+              print(value);
+              let value: i64 = value + 1;
             }
             return value;
           }
@@ -301,8 +301,8 @@ fn rejects_structured_while_with_unsupported_first_step_binding_diagnostic() {
     .unwrap();
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains("the first body binding `next` is not a supported step"));
-    assert!(error.contains("loop state `value`"));
+    assert!(error.contains("does not begin with a supported step prefix"));
+    assert!(error.contains("pure temp bindings followed by"));
 }
 
 #[test]
@@ -439,6 +439,35 @@ fn lowers_simple_counted_while_into_loop_while_i64() {
 }
 
 #[test]
+fn lowers_counted_while_with_prefixed_step_temp_into_loop_while_i64() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            while value < 3 {
+              let one: i64 = 1;
+              let value: i64 = value + one;
+            }
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64")
+        .expect("expected loop_while_i64 node");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "add");
+}
+
+#[test]
 fn lowers_descending_counted_while_into_loop_while_i64() {
     let mut module = parse_nuis_module(
         r#"
@@ -551,4 +580,47 @@ fn lowers_accumulating_counted_while_into_loop_while_scalar_chain() {
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[6], "add_current");
+}
+
+#[test]
+fn lowers_accumulating_counted_while_with_prefixed_prev_current_read_into_loop_while_scalar_chain()
+{
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let buffer: ref Buffer = alloc_buffer(8, 9);
+            while value < 4 {
+              let current_byte: i64 = load_at(buffer, value);
+              let value: i64 = value + 1;
+              let acc: i64 = acc + current_byte;
+            }
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "add");
+    assert!(
+        loop_node
+            .op
+            .args
+            .iter()
+            .any(|arg| arg == "add_read_at_dynamic_prev_current"),
+        "args: {:?}",
+        loop_node.op.args
+    );
 }

@@ -46,21 +46,17 @@ fn rewrite_text_handle_helper_function(function: &AstFunction) -> AstFunction {
 }
 
 fn match_text_handle_helper_body(body: &[AstStmt]) -> Option<AstExpr> {
-    let [
-        AstStmt::Let {
-            mutable: false,
-            name: buffer_name,
-            ty: _,
-            value: buffer_value,
-        },
-        AstStmt::Let {
-            mutable: false,
-            name: len_name,
-            ty: _,
-            value: len_value,
-        },
-        AstStmt::Return(Some(return_value)),
-    ] = body
+    let [AstStmt::Let {
+        mutable: false,
+        name: buffer_name,
+        ty: _,
+        value: buffer_value,
+    }, AstStmt::Let {
+        mutable: false,
+        name: len_name,
+        ty: _,
+        value: len_value,
+    }, AstStmt::Return(Some(return_value))] = body
     else {
         return None;
     };
@@ -300,22 +296,17 @@ fn rewrite_expr(expr: &AstExpr) -> AstExpr {
 }
 
 fn match_local_text_handle_pattern(stmts: &[AstStmt]) -> Option<(AstStmt, usize)> {
-    let [
-        AstStmt::Let {
-            mutable: false,
-            name: buffer_name,
-            ty: _,
-            value: buffer_value,
-        },
-        AstStmt::Let {
-            mutable: false,
-            name: len_name,
-            ty: _,
-            value: len_value,
-        },
-        third,
-        ..,
-    ] = stmts
+    let [AstStmt::Let {
+        mutable: false,
+        name: buffer_name,
+        ty: _,
+        value: buffer_value,
+    }, AstStmt::Let {
+        mutable: false,
+        name: len_name,
+        ty: _,
+        value: len_value,
+    }, third, ..] = stmts
     else {
         return None;
     };
@@ -376,8 +367,12 @@ fn stmt_references_any_name(stmt: &AstStmt, names: &[&str]) -> bool {
             else_body,
         } => {
             expr_references_any_name(condition, names)
-                || then_body.iter().any(|stmt| stmt_references_any_name(stmt, names))
-                || else_body.iter().any(|stmt| stmt_references_any_name(stmt, names))
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_references_any_name(stmt, names))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_references_any_name(stmt, names))
         }
         AstStmt::Match { value, arms } => {
             expr_references_any_name(value, names)
@@ -393,7 +388,9 @@ fn stmt_references_any_name(stmt: &AstStmt, names: &[&str]) -> bool {
         }
         AstStmt::While { condition, body } => {
             expr_references_any_name(condition, names)
-                || body.iter().any(|stmt| stmt_references_any_name(stmt, names))
+                || body
+                    .iter()
+                    .any(|stmt| stmt_references_any_name(stmt, names))
         }
         AstStmt::Return(Some(value)) => expr_references_any_name(value, names),
         _ => false,
@@ -409,8 +406,12 @@ fn expr_references_any_name(expr: &AstExpr, names: &[&str]) -> bool {
             else_body,
         } => {
             expr_references_any_name(condition, names)
-                || then_body.iter().any(|stmt| stmt_references_any_name(stmt, names))
-                || else_body.iter().any(|stmt| stmt_references_any_name(stmt, names))
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_references_any_name(stmt, names))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_references_any_name(stmt, names))
         }
         AstExpr::Match { value, arms } => {
             expr_references_any_name(value, names)
@@ -424,7 +425,9 @@ fn expr_references_any_name(expr: &AstExpr, names: &[&str]) -> bool {
                             .any(|stmt| stmt_references_any_name(stmt, names))
                 })
         }
-        AstExpr::Lambda { body, .. } => body.iter().any(|stmt| stmt_references_any_name(stmt, names)),
+        AstExpr::Lambda { body, .. } => body
+            .iter()
+            .any(|stmt| stmt_references_any_name(stmt, names)),
         AstExpr::Await(value) | AstExpr::Try(value) => expr_references_any_name(value, names),
         AstExpr::Call { args, .. } => args.iter().any(|arg| expr_references_any_name(arg, names)),
         AstExpr::Invoke { callee, args } => {

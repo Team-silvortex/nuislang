@@ -24,8 +24,14 @@ fn parses_benchmark_call_syntax_into_ast() {
     assert_eq!(function.benchmark_warmup_iters, Some(10));
     assert_eq!(function.benchmark_measure_iters, Some(100));
     assert_eq!(function.benchmark_timeout_ms, Some(25));
-    assert_eq!(function.benchmark_clock_domain, Some(TestClockDomain::Global));
-    assert_eq!(function.benchmark_clock_policy, Some(TestClockPolicy::Bridge));
+    assert_eq!(
+        function.benchmark_clock_domain,
+        Some(TestClockDomain::Global)
+    );
+    assert_eq!(
+        function.benchmark_clock_policy,
+        Some(TestClockPolicy::Bridge)
+    );
 }
 
 #[test]

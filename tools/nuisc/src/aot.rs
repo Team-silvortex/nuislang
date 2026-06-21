@@ -73,9 +73,8 @@ struct BuildManifestExecutionContract {
 }
 
 pub use nuis_artifact::{
-    BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob,
-    DomainBuildUnitPayloadBlobSection, NuisCompiledArtifact, NuisExecutableEnvelope,
-    NuisLifecycleContract,
+    BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob, DomainBuildUnitPayloadBlobSection,
+    NuisCompiledArtifact, NuisExecutableEnvelope, NuisLifecycleContract,
 };
 
 pub struct BuildManifestCacheInfo {
@@ -699,10 +698,7 @@ pub fn write_build_manifest(
             ));
         }
         if let Some(value) = &unit.machine_os {
-            out.push_str(&format!(
-                "machine_os = \"{}\"\n",
-                escape_toml_string(value)
-            ));
+            out.push_str(&format!("machine_os = \"{}\"\n", escape_toml_string(value)));
         }
         if let Some(value) = &unit.backend_family {
             out.push_str(&format!(
@@ -1209,19 +1205,15 @@ fn write_domain_build_unit_stubs(
             output_dir.join(format!("nuis.domain.{}.payload.bin", unit.domain_family));
         let payload_blob = encode_domain_build_unit_payload_blob(unit, &payload_path)?;
         fs::write(&payload_blob_path, &payload_blob).map_err(|error| {
-            format!(
-                "failed to write `{}`: {error}",
-                payload_blob_path.display()
-            )
+            format!("failed to write `{}`: {error}", payload_blob_path.display())
         })?;
-        let bridge_stub_path =
-            output_dir.join(format!("nuis.domain.{}.bridge.stub.txt", unit.domain_family));
+        let bridge_stub_path = output_dir.join(format!(
+            "nuis.domain.{}.bridge.stub.txt",
+            unit.domain_family
+        ));
         let bridge_stub = render_domain_build_unit_host_bridge_stub(unit);
         fs::write(&bridge_stub_path, &bridge_stub).map_err(|error| {
-            format!(
-                "failed to write `{}`: {error}",
-                bridge_stub_path.display()
-            )
+            format!("failed to write `{}`: {error}", bridge_stub_path.display())
         })?;
         let path = output_dir.join(format!("nuis.domain.{}.artifact.toml", unit.domain_family));
         unit.artifact_payload_path = Some(payload_path.display().to_string());
@@ -1236,10 +1228,7 @@ fn write_domain_build_unit_stubs(
             .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
         unit.artifact_stub_path = Some(path.display().to_string());
         unit.artifact_stub_inline = Some(source);
-        artifacts.push((
-            format!("domain_stub_{}", unit.domain_family),
-            path,
-        ));
+        artifacts.push((format!("domain_stub_{}", unit.domain_family), path));
         artifacts.push((
             format!("domain_payload_{}", unit.domain_family),
             payload_path,
@@ -1411,10 +1400,7 @@ fn render_domain_build_unit_stub(unit: &BuildManifestDomainBuildUnit) -> String 
         ));
     }
     if let Some(value) = &unit.machine_os {
-        out.push_str(&format!(
-            "machine_os = \"{}\"\n",
-            escape_toml_string(value)
-        ));
+        out.push_str(&format!("machine_os = \"{}\"\n", escape_toml_string(value)));
     }
     if let Some(value) = &unit.backend_family {
         out.push_str(&format!(
@@ -1602,10 +1588,7 @@ fn render_domain_build_unit_payload(unit: &BuildManifestDomainBuildUnit) -> Resu
         "lowering_targets = {}\n",
         render_string_array(&execution.lowering_targets)
     ));
-    out.push_str(&format!(
-        "ops = {}\n",
-        render_string_array(&manifest.ops)
-    ));
+    out.push_str(&format!("ops = {}\n", render_string_array(&manifest.ops)));
     out.push_str(&format!(
         "host_ffi_surface = {}\n",
         render_string_array(&manifest.host_ffi_surface)
@@ -1773,25 +1756,46 @@ fn render_domain_build_unit_backend_stub(unit: &BuildManifestDomainBuildUnit) ->
         escape_toml_string(&backend.wake_policy)
     ));
     if let Some(value) = backend.transport_model {
-        out.push_str(&format!("transport_model = \"{}\"\n", escape_toml_string(&value)));
+        out.push_str(&format!(
+            "transport_model = \"{}\"\n",
+            escape_toml_string(&value)
+        ));
     }
     if let Some(value) = backend.request_shape {
-        out.push_str(&format!("request_shape = \"{}\"\n", escape_toml_string(&value)));
+        out.push_str(&format!(
+            "request_shape = \"{}\"\n",
+            escape_toml_string(&value)
+        ));
     }
     if let Some(value) = backend.response_shape {
-        out.push_str(&format!("response_shape = \"{}\"\n", escape_toml_string(&value)));
+        out.push_str(&format!(
+            "response_shape = \"{}\"\n",
+            escape_toml_string(&value)
+        ));
     }
     if let Some(value) = backend.dispatch_shape {
-        out.push_str(&format!("dispatch_shape = \"{}\"\n", escape_toml_string(&value)));
+        out.push_str(&format!(
+            "dispatch_shape = \"{}\"\n",
+            escape_toml_string(&value)
+        ));
     }
     if let Some(value) = backend.memory_binding {
-        out.push_str(&format!("memory_binding = \"{}\"\n", escape_toml_string(&value)));
+        out.push_str(&format!(
+            "memory_binding = \"{}\"\n",
+            escape_toml_string(&value)
+        ));
     }
     if let Some(value) = backend.resource_binding {
-        out.push_str(&format!("resource_binding = \"{}\"\n", escape_toml_string(&value)));
+        out.push_str(&format!(
+            "resource_binding = \"{}\"\n",
+            escape_toml_string(&value)
+        ));
     }
     if let Some(value) = backend.completion_model {
-        out.push_str(&format!("completion_model = \"{}\"\n", escape_toml_string(&value)));
+        out.push_str(&format!(
+            "completion_model = \"{}\"\n",
+            escape_toml_string(&value)
+        ));
     }
     out.push_str(&format!(
         "scheduler_binding = \"{}\"\n",
@@ -1999,7 +2003,15 @@ fn render_domain_build_unit_host_bridge_stub(unit: &BuildManifestDomainBuildUnit
 fn resolve_domain_build_unit_target(
     domain_family: &str,
     abi: Option<&str>,
-) -> Result<(Option<String>, Option<String>, Option<String>, Option<String>), String> {
+) -> Result<
+    (
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    ),
+    String,
+> {
     let Some(abi) = abi else {
         return Ok((None, None, None, None));
     };
@@ -2190,8 +2202,8 @@ fn hex_decode_bytes(value: &str) -> Result<Vec<u8>, String> {
     while index < bytes.len() {
         let chunk = std::str::from_utf8(&bytes[index..index + 2])
             .map_err(|_| "hex payload is not valid UTF-8".to_owned())?;
-        let byte = u8::from_str_radix(chunk, 16)
-            .map_err(|_| format!("invalid hex byte `{chunk}`"))?;
+        let byte =
+            u8::from_str_radix(chunk, 16).map_err(|_| format!("invalid hex byte `{chunk}`"))?;
         out.push(byte);
         index += 2;
     }
@@ -2516,8 +2528,8 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let project_packet_index = parse_optional_toml_string(&source, "packet_index");
     let bridge_registry_path = parse_optional_toml_string(&source, "bridge_registry_path");
     let bridge_registry_schema = parse_optional_toml_string(&source, "bridge_registry_schema");
-    let bridge_registry_units = parse_optional_toml_usize(&source, "bridge_registry_units")
-        .unwrap_or(0);
+    let bridge_registry_units =
+        parse_optional_toml_usize(&source, "bridge_registry_units").unwrap_or(0);
     let bridge_registry_inline = parse_optional_toml_string(&source, "bridge_registry_inline");
     let host_bridge_plan_index_path =
         parse_optional_toml_string(&source, "host_bridge_plan_index_path");
@@ -2763,47 +2775,37 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         if decoded_blob.domain_family != unit.domain_family {
             return Err(format!(
                 "domain payload blob `{}` domain mismatch: manifest={}, blob={}",
-                blob_label,
-                unit.domain_family,
-                decoded_blob.domain_family
+                blob_label, unit.domain_family, decoded_blob.domain_family
             ));
         }
         if decoded_blob.package_id != unit.package_id {
             return Err(format!(
                 "domain payload blob `{}` package mismatch: manifest={}, blob={}",
-                blob_label,
-                unit.package_id,
-                decoded_blob.package_id
+                blob_label, unit.package_id, decoded_blob.package_id
             ));
         }
         if decoded_blob.backend_family != unit.backend_family {
             return Err(format!(
                 "domain payload blob `{}` backend_family mismatch for `{}`",
-                blob_label,
-                unit.domain_family
+                blob_label, unit.domain_family
             ));
         }
         if decoded_blob.selected_lowering_target != unit.selected_lowering_target {
             return Err(format!(
                 "domain payload blob `{}` selected_lowering_target mismatch for `{}`",
-                blob_label,
-                unit.domain_family
+                blob_label, unit.domain_family
             ));
         }
         if decoded_blob.contract_family != unit.contract_family {
             return Err(format!(
                 "domain payload blob `{}` contract_family mismatch: manifest={}, blob={}",
-                blob_label,
-                unit.contract_family,
-                decoded_blob.contract_family
+                blob_label, unit.contract_family, decoded_blob.contract_family
             ));
         }
         if decoded_blob.packaging_role != unit.packaging_role {
             return Err(format!(
                 "domain payload blob `{}` packaging_role mismatch: manifest={}, blob={}",
-                blob_label,
-                unit.packaging_role,
-                decoded_blob.packaging_role
+                blob_label, unit.packaging_role, decoded_blob.packaging_role
             ));
         }
         if decoded_blob.payload_kind != "contract-sidecar" {
@@ -2816,8 +2818,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         if decoded_blob.payload_format != "toml" {
             return Err(format!(
                 "domain payload blob `{}` payload_format mismatch: expected `toml`, found `{}`",
-                blob_label,
-                decoded_blob.payload_format
+                blob_label, decoded_blob.payload_format
             ));
         }
         let payload_path = unit.artifact_payload_path.as_ref().ok_or_else(|| {
@@ -2853,8 +2854,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         if contract_section.bytes != payload {
             return Err(format!(
                 "domain payload blob `{}` payload content mismatch against `{}`",
-                blob_label,
-                payload_path
+                blob_label, payload_path
             ));
         }
         domain_payload_contract_sections_checked += 1;
@@ -2870,8 +2870,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         if lowering_section.bytes != expected_lowering_plan.as_bytes() {
             return Err(format!(
                 "domain payload blob `{}` lowering plan content mismatch for `{}`",
-                blob_label,
-                unit.domain_family
+                blob_label, unit.domain_family
             ));
         }
         domain_payload_lowering_plans_checked += 1;
@@ -2887,8 +2886,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         if backend_section.bytes != expected_backend_stub.as_bytes() {
             return Err(format!(
                 "domain payload blob `{}` backend stub content mismatch for `{}`",
-                blob_label,
-                unit.domain_family
+                blob_label, unit.domain_family
             ));
         }
         domain_payload_backend_stubs_checked += 1;
@@ -2904,8 +2902,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         if bridge_section.bytes != expected_bridge_plan.as_bytes() {
             return Err(format!(
                 "domain payload blob `{}` bridge plan content mismatch for `{}`",
-                blob_label,
-                unit.domain_family
+                blob_label, unit.domain_family
             ));
         }
         domain_payload_bridge_plans_checked += 1;
@@ -2915,8 +2912,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         if bridge_stub != expected_bridge_stub {
             return Err(format!(
                 "domain bridge stub `{}` content mismatch for `{}`",
-                bridge_stub_path,
-                unit.domain_family
+                bridge_stub_path, unit.domain_family
             ));
         }
         domain_bridge_stubs_checked += 1;
@@ -2949,11 +2945,8 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 bridge_registry_path.clone(),
             )
         };
-        let registry_schema = parse_required_toml_string(
-            &registry_source,
-            "schema",
-            Path::new(&registry_label),
-        )?;
+        let registry_schema =
+            parse_required_toml_string(&registry_source, "schema", Path::new(&registry_label))?;
         if registry_schema != "nuis-bridge-registry-v1" {
             return Err(format!(
                 "bridge registry `{}` has unsupported schema `{}`",
@@ -2989,8 +2982,14 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 bridge_registry_units
             ));
         }
-        for unit in domain_build_units.iter().filter(|unit| unit.domain_family != "cpu") {
-            let expected_bridge_stub = unit.artifact_bridge_stub_path.as_deref().unwrap_or("<none>");
+        for unit in domain_build_units
+            .iter()
+            .filter(|unit| unit.domain_family != "cpu")
+        {
+            let expected_bridge_stub = unit
+                .artifact_bridge_stub_path
+                .as_deref()
+                .unwrap_or("<none>");
             if !registry_source.contains(&format!(
                 "bridge_stub_path = \"{}\"",
                 escape_toml_string(expected_bridge_stub)
@@ -3013,36 +3012,35 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let mut host_bridge_plan_checked = 0usize;
     let mut host_bridge_plan_entries_checked = 0usize;
     if host_bridge_plan_index_path.is_some() || host_bridge_plan_index_inline.is_some() {
-        if host_bridge_plan_index_schema.as_deref()
-            != Some("nuis-host-bridge-plan-index-v1")
-        {
+        if host_bridge_plan_index_schema.as_deref() != Some("nuis-host-bridge-plan-index-v1") {
             return Err(format!(
                 "`{}` has unsupported host bridge plan index schema `{:?}`; expected `nuis-host-bridge-plan-index-v1`",
                 path.display(),
                 host_bridge_plan_index_schema
             ));
         }
-        let (plan_index_source, plan_index_label) =
-            if let Some(source) = &host_bridge_plan_index_inline {
-                (source.clone(), "<embedded-host-bridge-plan-index>".to_owned())
-            } else {
-                let host_bridge_plan_index_path = host_bridge_plan_index_path.as_ref().unwrap();
-                (
-                    fs::read_to_string(host_bridge_plan_index_path).map_err(|error| {
-                        format!(
-                            "failed to read host bridge plan index `{}` referenced by `{}`: {error}",
-                            host_bridge_plan_index_path,
-                            path.display()
-                        )
-                    })?,
-                    host_bridge_plan_index_path.clone(),
-                )
-            };
-        let index_schema = parse_required_toml_string(
-            &plan_index_source,
-            "schema",
-            Path::new(&plan_index_label),
-        )?;
+        let (plan_index_source, plan_index_label) = if let Some(source) =
+            &host_bridge_plan_index_inline
+        {
+            (
+                source.clone(),
+                "<embedded-host-bridge-plan-index>".to_owned(),
+            )
+        } else {
+            let host_bridge_plan_index_path = host_bridge_plan_index_path.as_ref().unwrap();
+            (
+                fs::read_to_string(host_bridge_plan_index_path).map_err(|error| {
+                    format!(
+                        "failed to read host bridge plan index `{}` referenced by `{}`: {error}",
+                        host_bridge_plan_index_path,
+                        path.display()
+                    )
+                })?,
+                host_bridge_plan_index_path.clone(),
+            )
+        };
+        let index_schema =
+            parse_required_toml_string(&plan_index_source, "schema", Path::new(&plan_index_label))?;
         if index_schema != "nuis-host-bridge-plan-index-v1" {
             return Err(format!(
                 "host bridge plan index `{}` has unsupported schema `{}`",
@@ -3078,8 +3076,14 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 host_bridge_plan_units
             ));
         }
-        for unit in domain_build_units.iter().filter(|unit| unit.domain_family != "cpu") {
-            let expected_bridge_stub = unit.artifact_bridge_stub_path.as_deref().unwrap_or("<none>");
+        for unit in domain_build_units
+            .iter()
+            .filter(|unit| unit.domain_family != "cpu")
+        {
+            let expected_bridge_stub = unit
+                .artifact_bridge_stub_path
+                .as_deref()
+                .unwrap_or("<none>");
             if !plan_index_source.contains(&format!(
                 "bridge_stub_path = \"{}\"",
                 escape_toml_string(expected_bridge_stub)
@@ -6300,7 +6304,10 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
     } else if symbol == "host_env_get" {
         format!("    return nuis_host_env_get({});", arg_name(0, &function))
     } else if symbol == "host_text_handle" {
-        format!("    return nuis_host_text_handle({});", arg_name(0, &function))
+        format!(
+            "    return nuis_host_text_handle({});",
+            arg_name(0, &function)
+        )
     } else if symbol == "host_text_len" {
         format!(
             "    return nuis_host_text_len_value({});",
@@ -7287,11 +7294,19 @@ mod tests {
         assert_eq!(report.domain_build_units[0].artifact_stub_path, None);
         assert_eq!(report.domain_build_units[0].artifact_payload_path, None);
         assert_eq!(report.domain_build_units[0].artifact_bridge_stub_path, None);
-        assert_eq!(report.domain_build_units[0].artifact_payload_blob_path, None);
-        assert_eq!(report.domain_build_units[0].artifact_payload_blob_bytes, None);
+        assert_eq!(
+            report.domain_build_units[0].artifact_payload_blob_path,
+            None
+        );
+        assert_eq!(
+            report.domain_build_units[0].artifact_payload_blob_bytes,
+            None
+        );
         assert_eq!(report.domain_build_units[0].artifact_payload_format, None);
         assert_eq!(
-            report.domain_build_units[0].selected_lowering_target.as_deref(),
+            report.domain_build_units[0]
+                .selected_lowering_target
+                .as_deref(),
             Some("llvm")
         );
         assert_eq!(report.cpu_target_abi, cpu_target.abi);
@@ -7354,7 +7369,10 @@ mod tests {
                     abi_entries: vec![
                         ("cpu".to_owned(), cpu_target.abi.clone()),
                         ("kernel".to_owned(), "kernel.apple_ane.coreml.v1".to_owned()),
-                        ("network".to_owned(), "network.socket.macos.arm64.v1".to_owned()),
+                        (
+                            "network".to_owned(),
+                            "network.socket.macos.arm64.v1".to_owned(),
+                        ),
                     ],
                     plan_summary: None,
                     effective_input: None,
@@ -7437,14 +7455,14 @@ mod tests {
         assert!(host_bridge_plan_index_text.contains("[[plan]]"));
         assert!(host_bridge_plan_index_text.contains("domain_family = \"kernel\""));
         assert!(host_bridge_plan_index_text.contains("domain_family = \"network\""));
-        assert!(host_bridge_plan_index_text.contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
+        assert!(host_bridge_plan_index_text
+            .contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
         let kernel_blob =
             super::decode_domain_build_unit_payload_blob(&fs::read(&kernel_payload_blob).unwrap())
                 .unwrap();
-        let network_blob = super::decode_domain_build_unit_payload_blob(
-            &fs::read(&network_payload_blob).unwrap(),
-        )
-        .unwrap();
+        let network_blob =
+            super::decode_domain_build_unit_payload_blob(&fs::read(&network_payload_blob).unwrap())
+                .unwrap();
         let kernel_lowering_plan = super::render_domain_build_unit_lowering_plan(
             report
                 .domain_build_units
@@ -7509,20 +7527,34 @@ mod tests {
         assert_eq!(kernel_blob.payload_format, "toml");
         assert_eq!(kernel_blob.sections.len(), 4);
         assert_eq!(kernel_blob.sections[0].name, "contract_toml");
-        assert_eq!(kernel_blob.sections[0].bytes, kernel_payload_text.as_bytes());
+        assert_eq!(
+            kernel_blob.sections[0].bytes,
+            kernel_payload_text.as_bytes()
+        );
         assert_eq!(kernel_blob.sections[1].name, "lowering_plan");
-        assert_eq!(kernel_blob.sections[1].bytes, kernel_lowering_plan.as_bytes());
+        assert_eq!(
+            kernel_blob.sections[1].bytes,
+            kernel_lowering_plan.as_bytes()
+        );
         assert_eq!(kernel_blob.sections[2].name, "backend_stub");
-        assert_eq!(kernel_blob.sections[2].bytes, kernel_backend_stub.as_bytes());
+        assert_eq!(
+            kernel_blob.sections[2].bytes,
+            kernel_backend_stub.as_bytes()
+        );
         assert_eq!(kernel_blob.sections[3].name, "bridge_plan");
         assert_eq!(kernel_blob.sections[3].bytes, kernel_bridge_plan.as_bytes());
         let kernel_backend_text = std::str::from_utf8(&kernel_blob.sections[2].bytes).unwrap();
         let kernel_bridge_text = std::str::from_utf8(&kernel_blob.sections[3].bytes).unwrap();
         assert!(kernel_bridge_stub_text.contains("schema = \"nuis-host-bridge-spec-v1\""));
-        assert!(kernel_bridge_stub_text.contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
+        assert!(kernel_bridge_stub_text
+            .contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
         assert!(kernel_bridge_stub_text.contains("host_ffi_surface = \"buffer,queue,fence\""));
-        assert!(kernel_bridge_stub_text.contains("handle_family = \"kernel.buffer,kernel.dispatch\""));
-        assert!(kernel_bridge_stub_text.contains("phase_submit_inputs = [\"dispatch.handle\", \"bound.buffer.table\", \"queue.slot\"]"));
+        assert!(
+            kernel_bridge_stub_text.contains("handle_family = \"kernel.buffer,kernel.dispatch\"")
+        );
+        assert!(kernel_bridge_stub_text.contains(
+            "phase_submit_inputs = [\"dispatch.handle\", \"bound.buffer.table\", \"queue.slot\"]"
+        ));
         assert!(kernel_bridge_stub_text.contains("phase_wait_wake = \"completion-fence\""));
         assert!(kernel_bridge_stub_text.contains("bridge_plan_begin = true"));
         assert!(kernel_bridge_stub_text.contains("bridge_plan_end = true"));
@@ -7554,7 +7586,10 @@ mod tests {
         assert_eq!(network_blob.payload_format, "toml");
         assert_eq!(network_blob.sections.len(), 4);
         assert_eq!(network_blob.sections[0].name, "contract_toml");
-        assert_eq!(network_blob.sections[0].bytes, network_payload_text.as_bytes());
+        assert_eq!(
+            network_blob.sections[0].bytes,
+            network_payload_text.as_bytes()
+        );
         assert_eq!(network_blob.sections[1].name, "lowering_plan");
         assert_eq!(
             network_blob.sections[1].bytes,
@@ -7573,10 +7608,14 @@ mod tests {
         let network_backend_text = std::str::from_utf8(&network_blob.sections[2].bytes).unwrap();
         let network_bridge_text = std::str::from_utf8(&network_blob.sections[3].bytes).unwrap();
         assert!(network_bridge_stub_text.contains("schema = \"nuis-host-bridge-spec-v1\""));
-        assert!(network_bridge_stub_text.contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
+        assert!(network_bridge_stub_text
+            .contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
         assert!(network_bridge_stub_text.contains("host_ffi_surface = \"socket,urlsession\""));
-        assert!(network_bridge_stub_text.contains("handle_family = \"network.request,network.response\""));
-        assert!(network_bridge_stub_text.contains("phase_submit_inputs = [\"session.handle\", \"request.handle\", \"request.packet\"]"));
+        assert!(network_bridge_stub_text
+            .contains("handle_family = \"network.request,network.response\""));
+        assert!(network_bridge_stub_text.contains(
+            "phase_submit_inputs = [\"session.handle\", \"request.handle\", \"request.packet\"]"
+        ));
         assert!(network_bridge_stub_text.contains("phase_wait_wake = \"io-ready\""));
         assert!(network_bridge_stub_text.contains("bridge_plan_begin = true"));
         assert!(network_bridge_stub_text.contains("bridge_plan_end = true"));
@@ -7622,7 +7661,9 @@ mod tests {
                     .artifact_payload_blob_path
                     .as_deref()
                     .is_some_and(|path| path.ends_with("nuis.domain.kernel.payload.bin"))
-                && unit.artifact_payload_blob_bytes.is_some_and(|bytes| bytes > 0)
+                && unit
+                    .artifact_payload_blob_bytes
+                    .is_some_and(|bytes| bytes > 0)
                 && unit.artifact_payload_format.as_deref() == Some("ndpb-v2")
                 && unit.backend_family.as_deref() == Some("coreml")
                 && unit.selected_lowering_target.as_deref() == Some("coreml")));
@@ -7646,7 +7687,9 @@ mod tests {
                     .artifact_payload_blob_path
                     .as_deref()
                     .is_some_and(|path| path.ends_with("nuis.domain.network.payload.bin"))
-                && unit.artifact_payload_blob_bytes.is_some_and(|bytes| bytes > 0)
+                && unit
+                    .artifact_payload_blob_bytes
+                    .is_some_and(|bytes| bytes > 0)
                 && unit.artifact_payload_format.as_deref() == Some("ndpb-v2")
                 && unit.backend_family.as_deref() == Some("urlsession")
                 && unit.selected_lowering_target.as_deref() == Some("urlsession")));
@@ -7702,7 +7745,10 @@ mod tests {
                     abi_entries: vec![
                         ("cpu".to_owned(), cpu_target.abi.clone()),
                         ("kernel".to_owned(), "kernel.apple_ane.coreml.v1".to_owned()),
-                        ("network".to_owned(), "network.socket.macos.arm64.v1".to_owned()),
+                        (
+                            "network".to_owned(),
+                            "network.socket.macos.arm64.v1".to_owned(),
+                        ),
                     ],
                     plan_summary: None,
                     effective_input: None,
@@ -7733,9 +7779,10 @@ mod tests {
         fs::remove_file(dir.join("nuis.domain.network.payload.bin")).unwrap();
         fs::remove_file(dir.join("nuis.domain.network.bridge.stub.txt")).unwrap();
 
-        let artifact_report =
-            verify_nuis_compiled_artifact(PathBuf::from(&dir).join("nuis.compiled.artifact").as_path())
-                .unwrap();
+        let artifact_report = verify_nuis_compiled_artifact(
+            PathBuf::from(&dir).join("nuis.compiled.artifact").as_path(),
+        )
+        .unwrap();
         assert!(artifact_report.lifecycle_contract_consistent);
         assert!(artifact_report.lifecycle_runtime_capability_flags_consistent);
         assert!(artifact_report.artifact_roundtrip_verified);

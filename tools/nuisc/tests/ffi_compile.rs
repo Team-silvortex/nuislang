@@ -16,9 +16,7 @@ fn compiles_task_runtime_ffi_frontdoor_sources() {
     compiled_source(
         "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_runtime_facades.ns",
     );
-    compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns",
-    );
+    compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns");
     compiled_source(
         "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns",
     );
@@ -26,8 +24,12 @@ fn compiles_task_runtime_ffi_frontdoor_sources() {
 
 #[test]
 fn compiles_path_runtime_ffi_frontdoor_sources() {
-    compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns");
-    compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_file_runtime_facades.ns");
+    compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns",
+    );
+    compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_file_runtime_facades.ns",
+    );
     compiled_source(
         "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_runtime_facades.ns",
     );

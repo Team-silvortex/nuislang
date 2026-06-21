@@ -5,8 +5,8 @@ use yir_core::{SemanticOp, YirModule};
 
 use super::profile_apply::{resolve_registered_abi_target, target_config_tokens_for_domain};
 use super::support_contracts::{
-    require_declared_support_surface, shader_profile_slot_targets, support_profile_slots_for_domain,
-    support_surface_for_domain,
+    require_declared_support_surface, shader_profile_slot_targets,
+    support_profile_slots_for_domain, support_surface_for_domain,
 };
 use super::{
     collect_profile_int_bindings, require_declared_profile_slot, resolve_project_abi,
@@ -414,7 +414,11 @@ pub(super) fn validate_shader_target_projection(
     if node.op.module != "shader"
         || node.op.instruction != "target_config"
         || node.op.args
-            != vec![expected_arch.clone(), expected_runtime.clone(), expected_lane.clone()]
+            != vec![
+                expected_arch.clone(),
+                expected_runtime.clone(),
+                expected_lane.clone(),
+            ]
     {
         return Err(format!(
             "project shader unit `shader.{}` requires `{}` to materialize shader.target_config({}, {}, {}) for selected ABI `{}`",
@@ -426,10 +430,8 @@ pub(super) fn validate_shader_target_projection(
         .nodes
         .iter()
         .any(|node| node.op.is_shader_semantic_op(SemanticOp::ShaderInlineWgsl));
-    let abi_allows_inline_wgsl = matches!(
-        expected_backend.as_str(),
-        "metal" | "vulkan" | "directx"
-    );
+    let abi_allows_inline_wgsl =
+        matches!(expected_backend.as_str(), "metal" | "vulkan" | "directx");
     if uses_inline_wgsl && !abi_allows_inline_wgsl {
         return Err(format!(
             "project shader unit `shader.{}` uses shader_inline_wgsl, but selected ABI `{}` does not declare inline WGSL capability for backend `{}`",

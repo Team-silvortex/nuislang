@@ -689,8 +689,7 @@ fn lowers_result_zip3_with_direct_ok_constructors_and_generic_named_fn3_callable
         .functions
         .iter()
         .find(|function| {
-            function.name
-                == "__hof_result_zip3_with_choose_first__i64__i64__i64__i64__CoreError"
+            function.name == "__hof_result_zip3_with_choose_first__i64__i64__i64__i64__CoreError"
         })
         .expect("expected monomorphized result_zip3_with helper for generic Fn3 callable");
     assert!(helper.generic_params.is_empty());
@@ -854,8 +853,7 @@ fn lowers_result_zip3_with_direct_ok_constructors_and_generic_named_fn3_alias_ca
         .functions
         .iter()
         .find(|function| {
-            function.name
-                == "__hof_result_zip3_with_choose_first__i64__i64__i64__i64__CoreError"
+            function.name == "__hof_result_zip3_with_choose_first__i64__i64__i64__i64__CoreError"
         })
         .expect("expected monomorphized alias result_zip3_with helper for generic Fn3 callable");
     assert!(helper.generic_params.is_empty());
@@ -982,9 +980,7 @@ fn lowers_result_and_then_with_direct_ok_constructor_and_generic_named_result_ta
     let helper = module
         .functions
         .iter()
-        .find(|function| {
-            function.name == "__hof_result_and_then_spawn_wrap__i64__Task_i64___Error"
-        })
+        .find(|function| function.name == "__hof_result_and_then_spawn_wrap__i64__Task_i64___Error")
         .expect("expected monomorphized result_and_then helper for result-task callable");
     assert!(helper.generic_params.is_empty());
     assert!(matches!(
@@ -1133,13 +1129,17 @@ fn lowers_result_and_then_with_direct_ok_constructor_and_alias_chain_result_task
         .functions
         .iter()
         .find(|function| {
-            function.name.starts_with("__hof_result_and_then_spawn_wrap_alias__")
+            function
+                .name
+                .starts_with("__hof_result_and_then_spawn_wrap_alias__")
                 && matches!(
                     function.return_type.as_ref().map(|ty| ty.render()),
                     Some(rendered) if rendered == "Result<Task<i64>, Error>"
                 )
         })
-        .expect("expected monomorphized result_and_then helper for alias-chain result-task callable");
+        .expect(
+            "expected monomorphized result_and_then helper for alias-chain result-task callable",
+        );
     assert!(helper.generic_params.is_empty());
 
     let specialized = module

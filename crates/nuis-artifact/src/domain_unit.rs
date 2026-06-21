@@ -80,8 +80,18 @@ fn parse_domain_build_unit_row(
     path: &Path,
 ) -> Result<BuildManifestDomainBuildUnit, ArtifactError> {
     Ok(BuildManifestDomainBuildUnit {
-        package_id: parse_required_map_string_in_block(values, "package_id", path, "domain_build_unit")?,
-        domain_family: parse_required_map_string_in_block(values, "domain_family", path, "domain_build_unit")?,
+        package_id: parse_required_map_string_in_block(
+            values,
+            "package_id",
+            path,
+            "domain_build_unit",
+        )?,
+        domain_family: parse_required_map_string_in_block(
+            values,
+            "domain_family",
+            path,
+            "domain_build_unit",
+        )?,
         abi: parse_optional_map_string(values, "abi"),
         machine_arch: parse_optional_map_string(values, "machine_arch"),
         machine_os: parse_optional_map_string(values, "machine_os"),
@@ -91,12 +101,33 @@ fn parse_domain_build_unit_row(
         artifact_stub_inline: parse_optional_map_string(values, "artifact_stub_inline"),
         artifact_payload_path: parse_optional_map_string(values, "artifact_payload_path"),
         artifact_bridge_stub_path: parse_optional_map_string(values, "artifact_bridge_stub_path"),
-        artifact_bridge_stub_inline: parse_optional_map_string(values, "artifact_bridge_stub_inline"),
+        artifact_bridge_stub_inline: parse_optional_map_string(
+            values,
+            "artifact_bridge_stub_inline",
+        ),
         artifact_payload_blob_path: parse_optional_map_string(values, "artifact_payload_blob_path"),
-        artifact_payload_blob_bytes: parse_optional_map_usize(values, "artifact_payload_blob_bytes", path, "domain_build_unit")?,
+        artifact_payload_blob_bytes: parse_optional_map_usize(
+            values,
+            "artifact_payload_blob_bytes",
+            path,
+            "domain_build_unit",
+        )?,
         artifact_payload_format: parse_optional_map_string(values, "artifact_payload_format"),
-        artifact_payload_blob_inline: parse_optional_map_string(values, "artifact_payload_blob_inline"),
-        contract_family: parse_required_map_string_in_block(values, "contract_family", path, "domain_build_unit")?,
-        packaging_role: parse_required_map_string_in_block(values, "packaging_role", path, "domain_build_unit")?,
+        artifact_payload_blob_inline: parse_optional_map_string(
+            values,
+            "artifact_payload_blob_inline",
+        ),
+        contract_family: parse_required_map_string_in_block(
+            values,
+            "contract_family",
+            path,
+            "domain_build_unit",
+        )?,
+        packaging_role: parse_required_map_string_in_block(
+            values,
+            "packaging_role",
+            path,
+            "domain_build_unit",
+        )?,
     })
 }

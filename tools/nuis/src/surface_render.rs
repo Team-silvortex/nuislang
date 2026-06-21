@@ -17,7 +17,10 @@ fn append_link_plan_text_fields(
         crate::yes_no(link_plan.is_some())
     ));
     if let Some(plan) = link_plan {
-        lines.push(format!("  link_plan_final_stage: {}", plan.final_stage.kind));
+        lines.push(format!(
+            "  link_plan_final_stage: {}",
+            plan.final_stage.kind
+        ));
         lines.push(format!(
             "  link_plan_final_driver: {}",
             plan.final_stage.driver
@@ -117,7 +120,10 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
         format!("  frontdoor.source_kind: {}", frontdoor.source_kind),
         format!("  frontdoor.workflow_kind: {}", frontdoor.workflow_kind),
         format!("  frontdoor.workflow_brief: {}", frontdoor.workflow_brief),
-        format!("  frontdoor.workflow_samples: {}", frontdoor.workflow_samples),
+        format!(
+            "  frontdoor.workflow_samples: {}",
+            frontdoor.workflow_samples
+        ),
         format!(
             "  frontdoor.recommended_next_step: {}",
             frontdoor.recommended_next_step
@@ -130,11 +136,17 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
             "  frontdoor.recommended_reason: {}",
             frontdoor.recommended_reason
         ),
-        format!("  recommended_next_step: {}", frontdoor.recommended_next_step),
+        format!(
+            "  recommended_next_step: {}",
+            frontdoor.recommended_next_step
+        ),
         format!("  recommended_command: {}", frontdoor.recommended_command),
         format!("  recommended_reason: {}", frontdoor.recommended_reason),
         format!("  artifact_output_dir: {}", artifact_output_dir.display()),
-        format!("  artifact_ready_to_run: {}", crate::yes_no(artifact_report.ready_to_run)),
+        format!(
+            "  artifact_ready_to_run: {}",
+            crate::yes_no(artifact_report.ready_to_run)
+        ),
         format!(
             "  artifact_recommended_next_step: {}",
             artifact_report.recommended_next_step
@@ -176,7 +188,12 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
             } else {
                 plan.dependencies
                     .iter()
-                    .map(|item| format!("{}:{}={} ({})", item.category, item.name, item.version, item.source))
+                    .map(|item| {
+                        format!(
+                            "{}:{}={} ({})",
+                            item.category, item.name, item.version, item.source
+                        )
+                    })
                     .collect::<Vec<_>>()
                     .join(", ")
             }
@@ -205,18 +222,34 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
     ];
     append_link_plan_text_fields(&mut lines, link_plan.as_ref());
     for path in &declared_tests {
-        lines.push(format!("  test: {} exists={}", path.display(), crate::yes_no(path.exists())));
+        lines.push(format!(
+            "  test: {} exists={}",
+            path.display(),
+            crate::yes_no(path.exists())
+        ));
     }
-    lines.push(format!("  project_compile_workflow: {}", nuisc::project_compile_workflow_brief()));
-    lines.push(format!("  project_compile_samples: {}", nuisc::project_compile_samples_brief()));
-    lines.push(format!("  project_test_workflow: {}", nuisc::project_test_workflow_brief()));
+    lines.push(format!(
+        "  project_compile_workflow: {}",
+        nuisc::project_compile_workflow_brief()
+    ));
+    lines.push(format!(
+        "  project_compile_samples: {}",
+        nuisc::project_compile_samples_brief()
+    ));
+    lines.push(format!(
+        "  project_test_workflow: {}",
+        nuisc::project_test_workflow_brief()
+    ));
     if include_galaxy_flow {
         lines.push(format!(
             "  project_galaxy_workflow: {}",
             nuisc::project_galaxy_workflow_brief()
         ));
     }
-    lines.push(format!("  domains: {}", plan.organization.domains.join(", ")));
+    lines.push(format!(
+        "  domains: {}",
+        plan.organization.domains.join(", ")
+    ));
     lines.push(format!(
         "  abi_mode: {}",
         if plan.abi_resolution.explicit {
@@ -243,14 +276,20 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
         hidden_manual_only_library_modules.len()
     ));
     for item in &hidden_manual_only_library_modules {
-        lines.push(format!("  galaxy_hidden_manual_only_library_module: {}", item));
+        lines.push(format!(
+            "  galaxy_hidden_manual_only_library_module: {}",
+            item
+        ));
     }
     let lock_path = project.root.join("nuis.galaxy.lock");
     match galaxy_lock_status {
         Ok(lock) => {
             lines.push("  galaxy_lock: ok".to_owned());
             lines.push(format!("  galaxy_lock_path: {}", lock.path.display()));
-            lines.push(format!("  galaxy_lock_dependencies: {}", lock.entries.len()));
+            lines.push(format!(
+                "  galaxy_lock_dependencies: {}",
+                lock.entries.len()
+            ));
             let declared = project
                 .manifest
                 .galaxy_dependencies
@@ -356,7 +395,10 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
         format!("  frontdoor.source_kind: {}", frontdoor.source_kind),
         format!("  frontdoor.workflow_kind: {}", frontdoor.workflow_kind),
         format!("  frontdoor.workflow_brief: {}", frontdoor.workflow_brief),
-        format!("  frontdoor.workflow_samples: {}", frontdoor.workflow_samples),
+        format!(
+            "  frontdoor.workflow_samples: {}",
+            frontdoor.workflow_samples
+        ),
         format!(
             "  frontdoor.recommended_next_step: {}",
             frontdoor.recommended_next_step
@@ -369,11 +411,17 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
             "  frontdoor.recommended_reason: {}",
             frontdoor.recommended_reason
         ),
-        format!("  recommended_next_step: {}", frontdoor.recommended_next_step),
+        format!(
+            "  recommended_next_step: {}",
+            frontdoor.recommended_next_step
+        ),
         format!("  recommended_command: {}", frontdoor.recommended_command),
         format!("  recommended_reason: {}", frontdoor.recommended_reason),
         format!("  artifact_output_dir: {}", artifact_output_dir.display()),
-        format!("  artifact_ready_to_run: {}", crate::yes_no(artifact_report.ready_to_run)),
+        format!(
+            "  artifact_ready_to_run: {}",
+            crate::yes_no(artifact_report.ready_to_run)
+        ),
         format!(
             "  artifact_recommended_next_step: {}",
             artifact_report.recommended_next_step
@@ -413,11 +461,24 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
     ];
     append_link_plan_text_fields(&mut lines, link_plan.as_ref());
     for path in &declared_tests {
-        lines.push(format!("  test: {} exists={}", path.display(), crate::yes_no(path.exists())));
+        lines.push(format!(
+            "  test: {} exists={}",
+            path.display(),
+            crate::yes_no(path.exists())
+        ));
     }
-    lines.push(format!("  project_compile_workflow: {}", nuisc::project_compile_workflow_brief()));
-    lines.push(format!("  project_compile_samples: {}", nuisc::project_compile_samples_brief()));
-    lines.push(format!("  project_test_workflow: {}", nuisc::project_test_workflow_brief()));
+    lines.push(format!(
+        "  project_compile_workflow: {}",
+        nuisc::project_compile_workflow_brief()
+    ));
+    lines.push(format!(
+        "  project_compile_samples: {}",
+        nuisc::project_compile_samples_brief()
+    ));
+    lines.push(format!(
+        "  project_test_workflow: {}",
+        nuisc::project_test_workflow_brief()
+    ));
     if include_galaxy_flow {
         lines.push(format!(
             "  project_galaxy_workflow: {}",
@@ -446,12 +507,18 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
     match galaxy_check {
         Some(Ok(checked)) => {
             lines.push("  galaxy_check: ok".to_owned());
-            lines.push(format!("  galaxy_package_kind: {}", checked.manifest.package_kind));
+            lines.push(format!(
+                "  galaxy_package_kind: {}",
+                checked.manifest.package_kind
+            ));
             lines.push(format!(
                 "  galaxy_framework: {}",
                 checked.manifest.framework.as_deref().unwrap_or("<none>")
             ));
-            lines.push(format!("  galaxy_include_files: {}", checked.include_files.len()));
+            lines.push(format!(
+                "  galaxy_include_files: {}",
+                checked.include_files.len()
+            ));
         }
         Some(Err(error)) => {
             lines.push("  galaxy_check: invalid".to_owned());
@@ -460,16 +527,25 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
         None => lines.push("  galaxy_check: skipped".to_owned()),
     }
     lines.push(format!("  galaxy_lock: {}", galaxy_doctor.lock_status));
-    lines.push(format!("  galaxy_lock_path: {}", galaxy_doctor.lock_path.display()));
+    lines.push(format!(
+        "  galaxy_lock_path: {}",
+        galaxy_doctor.lock_path.display()
+    ));
     if let Some(error) = galaxy_doctor.lock_error.clone() {
         lines.push(format!("  galaxy_lock_error: {}", error));
     }
-    lines.push(format!("  galaxy_deps_root: {}", galaxy_doctor.deps_root.display()));
+    lines.push(format!(
+        "  galaxy_deps_root: {}",
+        galaxy_doctor.deps_root.display()
+    ));
     lines.push(format!(
         "  galaxy_local_registry: {}",
         galaxy_doctor.local_registry_root.display()
     ));
-    lines.push(format!("  galaxy_dependencies: {}", galaxy_doctor.dependencies.len()));
+    lines.push(format!(
+        "  galaxy_dependencies: {}",
+        galaxy_doctor.dependencies.len()
+    ));
     for dependency in &galaxy_doctor.dependencies {
         lines.push(format!(
             "  dep: {}={} local={} lock={} installed={}",
@@ -495,20 +571,32 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
         hidden_manual_only_library_modules.len()
     ));
     for item in &hidden_manual_only_library_modules {
-        lines.push(format!("  galaxy_hidden_manual_only_library_module: {}", item));
+        lines.push(format!(
+            "  galaxy_hidden_manual_only_library_module: {}",
+            item
+        ));
     }
     match nova_profile.as_ref() {
         Some(profile) => {
             lines.push(format!("  ns_nova_profile: {}", profile.path.display()));
             lines.push(format!("  ns_nova_framework: {}", profile.framework));
-            lines.push(format!("  ns_nova_framework_schema: {}", profile.framework_schema));
+            lines.push(format!(
+                "  ns_nova_framework_schema: {}",
+                profile.framework_schema
+            ));
         }
         None => lines.push("  ns_nova_profile: <missing>".to_owned()),
     }
     match nova_stdlib.as_ref() {
         Some(summary) => {
-            lines.push(format!("  ns_nova_stdlib_manifest: {}", summary.path.display()));
-            lines.push(format!("  ns_nova_stdlib_sources: {}", summary.source_modules.len()));
+            lines.push(format!(
+                "  ns_nova_stdlib_manifest: {}",
+                summary.path.display()
+            ));
+            lines.push(format!(
+                "  ns_nova_stdlib_sources: {}",
+                summary.source_modules.len()
+            ));
             lines.push(format!(
                 "  ns_nova_stdlib_missing_sources: {}",
                 summary.missing_modules.len()
@@ -682,14 +770,14 @@ pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String>
             ),
         ];
         fields.extend(crate::json_surface::workflow_contract_json_fields(
-            &frontdoor,
-            false,
-            false,
-            false,
-            false,
+            &frontdoor, false, false, false, false,
         ));
         fields.extend(crate::json_surface::project_plan_json_fields(&plan));
-        return Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json));
+        return Ok(format!(
+            "{{{},\"domains\":[{}]}}",
+            fields.join(","),
+            domain_json
+        ));
     }
 
     let artifacts = nuisc::pipeline::compile_source_path(&input)?;
@@ -727,7 +815,11 @@ pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String>
         crate::json_field("recommended_command", frontdoor.recommended_command),
         crate::json_field("recommended_reason", frontdoor.recommended_reason),
     ];
-    Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json))
+    Ok(format!(
+        "{{{},\"domains\":[{}]}}",
+        fields.join(","),
+        domain_json
+    ))
 }
 
 pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String> {
@@ -828,7 +920,10 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
         &public_surface,
     ));
     fields.extend(crate::json_surface::project_plan_json_fields(&plan));
-    fields.push(crate::json_usize_field("tests_declared", declared_tests.len()));
+    fields.push(crate::json_usize_field(
+        "tests_declared",
+        declared_tests.len(),
+    ));
     fields.push(crate::json_field(
         "artifact_output_dir",
         &artifact_output_dir.display().to_string(),
@@ -917,7 +1012,11 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
         "public_surface_records",
         &public_surface_json,
     ));
-    Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json))
+    Ok(format!(
+        "{{{},\"domains\":[{}]}}",
+        fields.join(","),
+        domain_json
+    ))
 }
 
 pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String> {
@@ -1183,8 +1282,14 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
         &public_surface,
     ));
     fields.extend(crate::json_surface::project_plan_json_fields(&plan));
-    fields.push(crate::json_usize_field("tests_declared", declared_tests.len()));
-    fields.push(crate::json_usize_field("tests_missing", missing_tests.len()));
+    fields.push(crate::json_usize_field(
+        "tests_declared",
+        declared_tests.len(),
+    ));
+    fields.push(crate::json_usize_field(
+        "tests_missing",
+        missing_tests.len(),
+    ));
     fields.push(crate::json_field(
         "artifact_output_dir",
         &artifact_output_dir.display().to_string(),
@@ -1219,7 +1324,10 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
         &registry_checks,
         &lowering_checks,
     ));
-    fields.push(crate::json_field("galaxy_manifest", &galaxy_manifest_display));
+    fields.push(crate::json_field(
+        "galaxy_manifest",
+        &galaxy_manifest_display,
+    ));
     match galaxy_check {
         Some(Ok(checked)) => {
             fields.push(crate::json_field("galaxy_check_status", "ok"));
@@ -1244,7 +1352,10 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
             fields.push(crate::json_field("galaxy_check_status", "skipped"));
         }
     }
-    fields.push(crate::json_field("galaxy_lock_status", &galaxy_doctor.lock_status));
+    fields.push(crate::json_field(
+        "galaxy_lock_status",
+        &galaxy_doctor.lock_status,
+    ));
     fields.push(crate::json_field(
         "galaxy_lock_path",
         &galaxy_doctor.lock_path.display().to_string(),
@@ -1336,5 +1447,9 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
         "galaxy_dependencies",
         &dependency_json,
     ));
-    Ok(format!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json))
+    Ok(format!(
+        "{{{},\"domains\":[{}]}}",
+        fields.join(","),
+        domain_json
+    ))
 }

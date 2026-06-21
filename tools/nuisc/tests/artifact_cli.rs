@@ -45,8 +45,16 @@ fn cli_artifact_commands_report_benchmark_tooling_outputs() {
 
     let manifest_path = output_dir.join("nuis.build.manifest.toml");
     let artifact_path = output_dir.join("nuis.compiled.artifact");
-    assert!(manifest_path.exists(), "expected {}", manifest_path.display());
-    assert!(artifact_path.exists(), "expected {}", artifact_path.display());
+    assert!(
+        manifest_path.exists(),
+        "expected {}",
+        manifest_path.display()
+    );
+    assert!(
+        artifact_path.exists(),
+        "expected {}",
+        artifact_path.display()
+    );
 
     let inspect = run_nuisc(&[
         "inspect-artifact",
@@ -81,7 +89,9 @@ fn cli_artifact_commands_report_benchmark_tooling_outputs() {
     assert_success(&verify_manifest, "nuisc verify-build-manifest --json");
     let verify_manifest_stdout = String::from_utf8_lossy(&verify_manifest.stdout);
     assert!(verify_manifest_stdout.contains("\"kind\":\"nuis_build_manifest_verify\""));
-    assert!(verify_manifest_stdout.contains("\"artifact_binary_name\":\"benchmark_report_file_demo\""));
+    assert!(
+        verify_manifest_stdout.contains("\"artifact_binary_name\":\"benchmark_report_file_demo\"")
+    );
     assert!(verify_manifest_stdout.contains("\"domain_build_verification_summary\":{"));
 
     let verify_artifact = run_nuisc(&[

@@ -420,7 +420,11 @@ fn carry_source_payload_len(kind: &str) -> Option<usize> {
             | "add_read_at_fixed_plus_invariant"
             | "mul_read_at_fixed_plus_invariant"
     ) {
-        Some(if kind.ends_with("_plus_invariant") { 3 } else { 2 })
+        Some(if kind.ends_with("_plus_invariant") {
+            3
+        } else {
+            2
+        })
     } else if matches!(
         kind,
         "add_read_at_dynamic_current_plus_invariant"

@@ -660,10 +660,9 @@ mod tests {
 
     #[test]
     fn parse_inspect_benchmarks_command() {
-        let command = parse_args(
-            vec!["inspect-benchmarks".to_owned(), "main.ns".to_owned()].into_iter(),
-        )
-        .unwrap();
+        let command =
+            parse_args(vec!["inspect-benchmarks".to_owned(), "main.ns".to_owned()].into_iter())
+                .unwrap();
         assert_eq!(
             command,
             CommandKind::InspectBenchmarks {

@@ -27,10 +27,7 @@ fn json_escape(value: &str) -> String {
     out
 }
 
-fn selected_lowering_target_for_domain(
-    domain: &str,
-    abi: &str,
-) -> Result<Option<String>, String> {
+fn selected_lowering_target_for_domain(domain: &str, abi: &str) -> Result<Option<String>, String> {
     match domain {
         "cpu" => {
             crate::aot::resolve_cpu_build_target_from_abi(Path::new("nustar-packages"), abi)?;
@@ -475,21 +472,14 @@ pub fn render_project_import_index(project: &LoadedProject) -> String {
     let local_units = project
         .modules
         .iter()
-        .map(|module| {
-            (
-                (module.ast.domain.clone(), module.ast.unit.clone()),
-                module,
-            )
-        })
+        .map(|module| ((module.ast.domain.clone(), module.ast.unit.clone()), module))
         .collect::<BTreeMap<_, _>>();
     let visible_library_paths = project
         .modules
         .iter()
         .filter_map(|module| match &module.origin {
             super::ProjectModuleOrigin::AutoInjectedGalaxy { .. }
-            | super::ProjectModuleOrigin::ExplicitGalaxyImport { .. } => {
-                Some(module.path.clone())
-            }
+            | super::ProjectModuleOrigin::ExplicitGalaxyImport { .. } => Some(module.path.clone()),
             _ => None,
         })
         .collect::<std::collections::BTreeSet<_>>();
@@ -505,7 +495,11 @@ pub fn render_project_import_index(project: &LoadedProject) -> String {
                 dependency.name,
                 library_module,
                 dependency.library_import_policy.as_str(),
-                if dependency.auto_injectable { "true" } else { "false" },
+                if dependency.auto_injectable {
+                    "true"
+                } else {
+                    "false"
+                },
                 if visible_library_paths.contains(library_path) {
                     "true"
                 } else {
@@ -529,18 +523,20 @@ pub fn render_project_import_index(project: &LoadedProject) -> String {
         let owner = format!("{}.{}", module.ast.domain, module.ast.unit);
         for item in &module.ast.uses {
             let target = format!("{}.{}", item.domain, item.unit);
-            let resolution = if let Some(local) =
-                local_units.get(&(item.domain.clone(), item.unit.clone()))
-            {
-                format!(
-                    "local-visible:{}:{}",
-                    local.origin.source_kind(),
-                    local.origin.source_detail()
-                )
-            } else {
-                "registered-domain-unit".to_owned()
-            };
-            lines.push(format!("use\t{}\t{}\tresolution={}", owner, target, resolution));
+            let resolution =
+                if let Some(local) = local_units.get(&(item.domain.clone(), item.unit.clone())) {
+                    format!(
+                        "local-visible:{}:{}",
+                        local.origin.source_kind(),
+                        local.origin.source_detail()
+                    )
+                } else {
+                    "registered-domain-unit".to_owned()
+                };
+            lines.push(format!(
+                "use\t{}\t{}\tresolution={}",
+                owner, target, resolution
+            ));
         }
     }
 

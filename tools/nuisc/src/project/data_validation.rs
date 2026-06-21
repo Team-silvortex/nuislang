@@ -7,11 +7,11 @@ use super::data_bridge_directions::data_bridge_directions;
 use super::support_contracts::{require_declared_support_surface, support_surface_for_domain};
 use super::{
     build_project_link_bridge_contract, data_profile_required_slots_for_link,
-    find_profile_call_declared_type, has_edge_to,
-    payload_class_marker_name, payload_shape_marker_name, require_declared_profile_slot,
-    require_marker_semantic_payload_name, require_profile_semantic_type,
-    required_project_link_stage_contract, resolve_project_profile_target_name, split_domain_unit,
-    support_profile_slots_for_domain, LoadedProject,
+    find_profile_call_declared_type, has_edge_to, payload_class_marker_name,
+    payload_shape_marker_name, require_declared_profile_slot, require_marker_semantic_payload_name,
+    require_profile_semantic_type, required_project_link_stage_contract,
+    resolve_project_profile_target_name, split_domain_unit, support_profile_slots_for_domain,
+    LoadedProject,
 };
 
 pub(super) fn validate_data_profile_for_link(

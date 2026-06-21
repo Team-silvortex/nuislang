@@ -72,10 +72,14 @@ pub fn decode_nuis_executable_envelope_binary(
     bytes: &[u8],
 ) -> Result<NuisExecutableEnvelope, ArtifactError> {
     if bytes.len() < 10 {
-        return Err(ArtifactError::new("nuis executable envelope binary is too short"));
+        return Err(ArtifactError::new(
+            "nuis executable envelope binary is too short",
+        ));
     }
     if &bytes[..4] != NUIS_ENVELOPE_BINARY_MAGIC {
-        return Err(ArtifactError::new("nuis executable envelope binary has invalid magic"));
+        return Err(ArtifactError::new(
+            "nuis executable envelope binary has invalid magic",
+        ));
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
     if version != NUIS_ENVELOPE_BINARY_VERSION {
@@ -103,13 +107,17 @@ pub fn write_nuis_executable_envelope(
     envelope: &NuisExecutableEnvelope,
 ) -> Result<(), ArtifactError> {
     let out = render_nuis_executable_envelope(envelope);
-    fs::write(path, out)
-        .map_err(|error| ArtifactError::new(format!("failed to write `{}`: {error}", path.display())))
+    fs::write(path, out).map_err(|error| {
+        ArtifactError::new(format!("failed to write `{}`: {error}", path.display()))
+    })
 }
 
-pub fn parse_nuis_executable_envelope(path: &Path) -> Result<NuisExecutableEnvelope, ArtifactError> {
-    let source = fs::read_to_string(path)
-        .map_err(|error| ArtifactError::new(format!("failed to read `{}`: {error}", path.display())))?;
+pub fn parse_nuis_executable_envelope(
+    path: &Path,
+) -> Result<NuisExecutableEnvelope, ArtifactError> {
+    let source = fs::read_to_string(path).map_err(|error| {
+        ArtifactError::new(format!("failed to read `{}`: {error}", path.display()))
+    })?;
     parse_nuis_executable_envelope_from_source(&source, path)
 }
 
@@ -119,7 +127,12 @@ pub fn parse_nuis_executable_envelope_from_source(
 ) -> Result<NuisExecutableEnvelope, ArtifactError> {
     let schema = parse_optional_toml_string(source, "envelope_schema")
         .or_else(|| parse_optional_toml_string(source, "schema"))
-        .ok_or_else(|| ArtifactError::new(format!("`{}` is missing required key `schema`", path.display())))?;
+        .ok_or_else(|| {
+            ArtifactError::new(format!(
+                "`{}` is missing required key `schema`",
+                path.display()
+            ))
+        })?;
     let executable_kind = parse_required_toml_string(source, "executable_kind", path)?;
     let package_count = parse_required_toml_usize(source, "package_count", path)?;
     let domain_families = parse_required_toml_string_array(source, "domain_families", path)?;

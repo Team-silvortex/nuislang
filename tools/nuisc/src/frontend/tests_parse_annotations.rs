@@ -887,11 +887,11 @@ fn lowers_non_network_host_symbol_bridge_stub_calls_into_cpu_extern_calls() {
     assert_eq!(
         main.body,
         vec![NirStmt::Return(Some(NirExpr::CpuExternCall {
-                abi: "c".to_owned(),
-                interface: None,
-                callee: "host_path_is_absolute".to_owned(),
-                args: vec![NirExpr::Int(41)],
-            }))]
+            abi: "c".to_owned(),
+            interface: None,
+            callee: "host_path_is_absolute".to_owned(),
+            args: vec![NirExpr::Int(41)],
+        }))]
     );
 }
 
@@ -1087,7 +1087,6 @@ fn lowers_host_symbol_bridge_stub_calls_into_cpu_extern_calls() {
         }))]
     );
 }
-
 
 #[test]
 fn parses_generic_impl_headers() {

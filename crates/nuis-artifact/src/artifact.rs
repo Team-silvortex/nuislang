@@ -1,8 +1,12 @@
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::{
-    decode_domain_payload_blob, parse_build_manifest_from_source,
+    decode_domain_payload_blob,
     envelope::{decode_nuis_executable_envelope_binary, encode_nuis_executable_envelope_binary},
+    parse_build_manifest_from_source,
     toml::{parse_optional_toml_string_array, render_string_array},
     ArtifactError, BuildManifestDomainBuildUnit, NuisExecutableEnvelope,
 };
@@ -63,7 +67,8 @@ pub fn encode_nuis_compiled_artifact_binary(
     let lifecycle_shutdown_policy = artifact.lifecycle.shutdown_policy.as_bytes();
     let lifecycle_yalivia_rpc = artifact.lifecycle.yalivia_rpc.as_bytes();
     let lifecycle_hook_surface = render_string_array(&artifact.lifecycle.hook_surface).into_bytes();
-    let lifecycle_export_surface = render_string_array(&artifact.lifecycle.export_surface).into_bytes();
+    let lifecycle_export_surface =
+        render_string_array(&artifact.lifecycle.export_surface).into_bytes();
     let lifecycle_runtime_capability_flags =
         render_string_array(&artifact.lifecycle.runtime_capability_flags).into_bytes();
     let build_manifest_source = artifact.build_manifest_source.as_bytes();
@@ -71,9 +76,18 @@ pub fn encode_nuis_compiled_artifact_binary(
     let mut out = Vec::new();
     out.extend_from_slice(NUIS_COMPILED_ARTIFACT_MAGIC);
     out.extend_from_slice(&NUIS_COMPILED_ARTIFACT_VERSION.to_le_bytes());
-    out.extend_from_slice(&encode_u32_len(envelope.len(), "compiled artifact envelope")?);
-    out.extend_from_slice(&encode_u32_len(packaging_mode.len(), "compiled artifact packaging_mode")?);
-    out.extend_from_slice(&encode_u32_len(cpu_target_abi.len(), "compiled artifact cpu_target_abi")?);
+    out.extend_from_slice(&encode_u32_len(
+        envelope.len(),
+        "compiled artifact envelope",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        packaging_mode.len(),
+        "compiled artifact packaging_mode",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        cpu_target_abi.len(),
+        "compiled artifact cpu_target_abi",
+    )?);
     out.extend_from_slice(&encode_u32_len(
         cpu_target_machine_arch.len(),
         "compiled artifact cpu_target_machine_arch",
@@ -90,7 +104,10 @@ pub fn encode_nuis_compiled_artifact_binary(
         cpu_target_calling_abi.len(),
         "compiled artifact cpu_target_calling_abi",
     )?);
-    out.extend_from_slice(&encode_u32_len(binary_name.len(), "compiled artifact binary_name")?);
+    out.extend_from_slice(&encode_u32_len(
+        binary_name.len(),
+        "compiled artifact binary_name",
+    )?);
     out.extend_from_slice(&encode_u32_len(
         lifecycle_schema.len(),
         "compiled artifact lifecycle_schema",
@@ -127,7 +144,10 @@ pub fn encode_nuis_compiled_artifact_binary(
         build_manifest_source.len(),
         "compiled artifact build_manifest_source",
     )?);
-    out.extend_from_slice(&encode_u32_len(binary_blob.len(), "compiled artifact binary_blob")?);
+    out.extend_from_slice(&encode_u32_len(
+        binary_blob.len(),
+        "compiled artifact binary_blob",
+    )?);
     out.extend_from_slice(envelope.as_slice());
     out.extend_from_slice(packaging_mode);
     out.extend_from_slice(cpu_target_abi);
@@ -153,10 +173,14 @@ pub fn decode_nuis_compiled_artifact_binary(
     bytes: &[u8],
 ) -> Result<NuisCompiledArtifact, ArtifactError> {
     if bytes.len() < 78 {
-        return Err(ArtifactError::new("nuis compiled artifact binary is too short"));
+        return Err(ArtifactError::new(
+            "nuis compiled artifact binary is too short",
+        ));
     }
     if &bytes[..4] != NUIS_COMPILED_ARTIFACT_MAGIC {
-        return Err(ArtifactError::new("nuis compiled artifact binary has invalid magic"));
+        return Err(ArtifactError::new(
+            "nuis compiled artifact binary has invalid magic",
+        ));
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
     if version != NUIS_COMPILED_ARTIFACT_VERSION {
@@ -167,7 +191,9 @@ pub fn decode_nuis_compiled_artifact_binary(
     let mut offset = 6usize;
     let next_len = |bytes: &[u8], offset: &mut usize| -> Result<usize, ArtifactError> {
         if *offset + 4 > bytes.len() {
-            return Err(ArtifactError::new("nuis compiled artifact binary header is truncated"));
+            return Err(ArtifactError::new(
+                "nuis compiled artifact binary header is truncated",
+            ));
         }
         let value = u32::from_le_bytes([
             bytes[*offset],
@@ -220,96 +246,149 @@ pub fn decode_nuis_compiled_artifact_binary(
             bytes.len().saturating_sub(offset)
         )));
     }
-    let take_bytes = |bytes: &[u8], offset: &mut usize, len: usize| -> Result<Vec<u8>, ArtifactError> {
-        if *offset + len > bytes.len() {
-            return Err(ArtifactError::new("nuis compiled artifact binary payload is truncated"));
-        }
-        let value = bytes[*offset..*offset + len].to_vec();
-        *offset += len;
-        Ok(value)
-    };
+    let take_bytes =
+        |bytes: &[u8], offset: &mut usize, len: usize| -> Result<Vec<u8>, ArtifactError> {
+            if *offset + len > bytes.len() {
+                return Err(ArtifactError::new(
+                    "nuis compiled artifact binary payload is truncated",
+                ));
+            }
+            let value = bytes[*offset..*offset + len].to_vec();
+            *offset += len;
+            Ok(value)
+        };
     let envelope =
         decode_nuis_executable_envelope_binary(&take_bytes(bytes, &mut offset, envelope_len)?)?;
     let packaging_mode = String::from_utf8(take_bytes(bytes, &mut offset, packaging_mode_len)?)
-        .map_err(|error| ArtifactError::new(format!("compiled artifact packaging_mode is not valid UTF-8: {error}")))?;
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "compiled artifact packaging_mode is not valid UTF-8: {error}"
+            ))
+        })?;
     let cpu_target_abi = String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_abi_len)?)
-        .map_err(|error| ArtifactError::new(format!("compiled artifact cpu_target_abi is not valid UTF-8: {error}")))?;
-    let cpu_target_machine_arch = String::from_utf8(
-        take_bytes(bytes, &mut offset, cpu_target_machine_arch_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact cpu_target_machine_arch is not valid UTF-8: {error}"
-    )))?;
-    let cpu_target_machine_os = String::from_utf8(
-        take_bytes(bytes, &mut offset, cpu_target_machine_os_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact cpu_target_machine_os is not valid UTF-8: {error}"
-    )))?;
-    let cpu_target_object_format = String::from_utf8(
-        take_bytes(bytes, &mut offset, cpu_target_object_format_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact cpu_target_object_format is not valid UTF-8: {error}"
-    )))?;
-    let cpu_target_calling_abi = String::from_utf8(
-        take_bytes(bytes, &mut offset, cpu_target_calling_abi_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact cpu_target_calling_abi is not valid UTF-8: {error}"
-    )))?;
-    let binary_name = String::from_utf8(take_bytes(bytes, &mut offset, binary_name_len)?)
-        .map_err(|error| ArtifactError::new(format!("compiled artifact binary_name is not valid UTF-8: {error}")))?;
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "compiled artifact cpu_target_abi is not valid UTF-8: {error}"
+            ))
+        })?;
+    let cpu_target_machine_arch =
+        String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_machine_arch_len)?).map_err(
+            |error| {
+                ArtifactError::new(format!(
+                    "compiled artifact cpu_target_machine_arch is not valid UTF-8: {error}"
+                ))
+            },
+        )?;
+    let cpu_target_machine_os =
+        String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_machine_os_len)?).map_err(
+            |error| {
+                ArtifactError::new(format!(
+                    "compiled artifact cpu_target_machine_os is not valid UTF-8: {error}"
+                ))
+            },
+        )?;
+    let cpu_target_object_format = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        cpu_target_object_format_len,
+    )?)
+    .map_err(|error| {
+        ArtifactError::new(format!(
+            "compiled artifact cpu_target_object_format is not valid UTF-8: {error}"
+        ))
+    })?;
+    let cpu_target_calling_abi =
+        String::from_utf8(take_bytes(bytes, &mut offset, cpu_target_calling_abi_len)?).map_err(
+            |error| {
+                ArtifactError::new(format!(
+                    "compiled artifact cpu_target_calling_abi is not valid UTF-8: {error}"
+                ))
+            },
+        )?;
+    let binary_name =
+        String::from_utf8(take_bytes(bytes, &mut offset, binary_name_len)?).map_err(|error| {
+            ArtifactError::new(format!(
+                "compiled artifact binary_name is not valid UTF-8: {error}"
+            ))
+        })?;
     let lifecycle_schema = String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_schema_len)?)
-        .map_err(|error| ArtifactError::new(format!("compiled artifact lifecycle_schema is not valid UTF-8: {error}")))?;
-    let lifecycle_bootstrap_entry = String::from_utf8(
-        take_bytes(bytes, &mut offset, lifecycle_bootstrap_entry_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact lifecycle_bootstrap_entry is not valid UTF-8: {error}"
-    )))?;
-    let lifecycle_tick_policy = String::from_utf8(
-        take_bytes(bytes, &mut offset, lifecycle_tick_policy_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact lifecycle_tick_policy is not valid UTF-8: {error}"
-    )))?;
-    let lifecycle_shutdown_policy = String::from_utf8(
-        take_bytes(bytes, &mut offset, lifecycle_shutdown_policy_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact lifecycle_shutdown_policy is not valid UTF-8: {error}"
-    )))?;
-    let lifecycle_yalivia_rpc = String::from_utf8(
-        take_bytes(bytes, &mut offset, lifecycle_yalivia_rpc_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact lifecycle_yalivia_rpc is not valid UTF-8: {error}"
-    )))?;
-    let lifecycle_hook_surface_source = String::from_utf8(
-        take_bytes(bytes, &mut offset, lifecycle_hook_surface_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact lifecycle_hook_surface is not valid UTF-8: {error}"
-    )))?;
-    let lifecycle_export_surface_source = String::from_utf8(
-        take_bytes(bytes, &mut offset, lifecycle_export_surface_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact lifecycle_export_surface is not valid UTF-8: {error}"
-    )))?;
-    let lifecycle_runtime_capability_flags_source = String::from_utf8(
-        take_bytes(bytes, &mut offset, lifecycle_runtime_capability_flags_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact lifecycle_runtime_capability_flags is not valid UTF-8: {error}"
-    )))?;
-    let build_manifest_source = String::from_utf8(
-        take_bytes(bytes, &mut offset, build_manifest_source_len)?,
-    )
-    .map_err(|error| ArtifactError::new(format!(
-        "compiled artifact build_manifest_source is not valid UTF-8: {error}"
-    )))?;
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "compiled artifact lifecycle_schema is not valid UTF-8: {error}"
+            ))
+        })?;
+    let lifecycle_bootstrap_entry = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        lifecycle_bootstrap_entry_len,
+    )?)
+    .map_err(|error| {
+        ArtifactError::new(format!(
+            "compiled artifact lifecycle_bootstrap_entry is not valid UTF-8: {error}"
+        ))
+    })?;
+    let lifecycle_tick_policy =
+        String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_tick_policy_len)?).map_err(
+            |error| {
+                ArtifactError::new(format!(
+                    "compiled artifact lifecycle_tick_policy is not valid UTF-8: {error}"
+                ))
+            },
+        )?;
+    let lifecycle_shutdown_policy = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        lifecycle_shutdown_policy_len,
+    )?)
+    .map_err(|error| {
+        ArtifactError::new(format!(
+            "compiled artifact lifecycle_shutdown_policy is not valid UTF-8: {error}"
+        ))
+    })?;
+    let lifecycle_yalivia_rpc =
+        String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_yalivia_rpc_len)?).map_err(
+            |error| {
+                ArtifactError::new(format!(
+                    "compiled artifact lifecycle_yalivia_rpc is not valid UTF-8: {error}"
+                ))
+            },
+        )?;
+    let lifecycle_hook_surface_source =
+        String::from_utf8(take_bytes(bytes, &mut offset, lifecycle_hook_surface_len)?).map_err(
+            |error| {
+                ArtifactError::new(format!(
+                    "compiled artifact lifecycle_hook_surface is not valid UTF-8: {error}"
+                ))
+            },
+        )?;
+    let lifecycle_export_surface_source = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        lifecycle_export_surface_len,
+    )?)
+    .map_err(|error| {
+        ArtifactError::new(format!(
+            "compiled artifact lifecycle_export_surface is not valid UTF-8: {error}"
+        ))
+    })?;
+    let lifecycle_runtime_capability_flags_source = String::from_utf8(take_bytes(
+        bytes,
+        &mut offset,
+        lifecycle_runtime_capability_flags_len,
+    )?)
+    .map_err(|error| {
+        ArtifactError::new(format!(
+            "compiled artifact lifecycle_runtime_capability_flags is not valid UTF-8: {error}"
+        ))
+    })?;
+    let build_manifest_source =
+        String::from_utf8(take_bytes(bytes, &mut offset, build_manifest_source_len)?).map_err(
+            |error| {
+                ArtifactError::new(format!(
+                    "compiled artifact build_manifest_source is not valid UTF-8: {error}"
+                ))
+            },
+        )?;
     let binary_blob = take_bytes(bytes, &mut offset, binary_blob_len)?;
     Ok(NuisCompiledArtifact {
         schema: "nuis-compiled-artifact-v1".to_owned(),
@@ -355,13 +434,15 @@ pub fn write_nuis_compiled_artifact(
     artifact: &NuisCompiledArtifact,
 ) -> Result<(), ArtifactError> {
     let out = encode_nuis_compiled_artifact_binary(artifact)?;
-    fs::write(path, out)
-        .map_err(|error| ArtifactError::new(format!("failed to write `{}`: {error}", path.display())))
+    fs::write(path, out).map_err(|error| {
+        ArtifactError::new(format!("failed to write `{}`: {error}", path.display()))
+    })
 }
 
 pub fn parse_nuis_compiled_artifact(path: &Path) -> Result<NuisCompiledArtifact, ArtifactError> {
-    let bytes =
-        fs::read(path).map_err(|error| ArtifactError::new(format!("failed to read `{}`: {error}", path.display())))?;
+    let bytes = fs::read(path).map_err(|error| {
+        ArtifactError::new(format!("failed to read `{}`: {error}", path.display()))
+    })?;
     decode_nuis_compiled_artifact_binary(&bytes)
 }
 
@@ -375,8 +456,10 @@ pub fn materialize_embedded_artifact_support(
             output_dir.display()
         ))
     })?;
-    let manifest =
-        parse_build_manifest_from_source(&artifact.build_manifest_source, Path::new("<embedded-build-manifest>"))?;
+    let manifest = parse_build_manifest_from_source(
+        &artifact.build_manifest_source,
+        Path::new("<embedded-build-manifest>"),
+    )?;
     let mut written = Vec::new();
 
     if let Some(source) = &manifest.bridge_registry_inline {
@@ -394,7 +477,11 @@ pub fn materialize_embedded_artifact_support(
         written.push(path);
     }
 
-    for unit in manifest.domain_build_units.iter().filter(|unit| unit.is_heterogeneous()) {
+    for unit in manifest
+        .domain_build_units
+        .iter()
+        .filter(|unit| unit.is_heterogeneous())
+    {
         materialize_domain_unit_support(output_dir, unit, &mut written)?;
     }
 
@@ -418,12 +505,19 @@ fn materialize_domain_unit_support(
         let blob = decode_hex_bytes(hex_blob)?;
         let blob_path = output_dir.join(format!("nuis.domain.{}.payload.bin", unit.domain_family));
         fs::write(&blob_path, &blob).map_err(|error| {
-            ArtifactError::new(format!("failed to write `{}`: {error}", blob_path.display()))
+            ArtifactError::new(format!(
+                "failed to write `{}`: {error}",
+                blob_path.display()
+            ))
         })?;
         written.push(blob_path);
 
         let decoded = decode_domain_payload_blob(&blob)?;
-        if let Some(contract_section) = decoded.sections.iter().find(|section| section.name == "contract_toml") {
+        if let Some(contract_section) = decoded
+            .sections
+            .iter()
+            .find(|section| section.name == "contract_toml")
+        {
             let path = output_dir.join(format!("nuis.domain.{}.payload.toml", unit.domain_family));
             fs::write(&path, &contract_section.bytes).map_err(|error| {
                 ArtifactError::new(format!("failed to write `{}`: {error}", path.display()))
@@ -433,7 +527,10 @@ fn materialize_domain_unit_support(
     }
 
     if let Some(source) = &unit.artifact_bridge_stub_inline {
-        let path = output_dir.join(format!("nuis.domain.{}.bridge.stub.txt", unit.domain_family));
+        let path = output_dir.join(format!(
+            "nuis.domain.{}.bridge.stub.txt",
+            unit.domain_family
+        ));
         fs::write(&path, source).map_err(|error| {
             ArtifactError::new(format!("failed to write `{}`: {error}", path.display()))
         })?;
@@ -470,9 +567,9 @@ mod tests {
     };
 
     use crate::{
-        encode_domain_payload_blob, materialize_embedded_artifact_support, DomainBuildUnitPayloadBlob,
-        DomainBuildUnitPayloadBlobSection, NuisCompiledArtifact, NuisExecutableEnvelope,
-        NuisLifecycleContract,
+        encode_domain_payload_blob, materialize_embedded_artifact_support,
+        DomainBuildUnitPayloadBlob, DomainBuildUnitPayloadBlobSection, NuisCompiledArtifact,
+        NuisExecutableEnvelope, NuisLifecycleContract,
     };
 
     fn temp_dir(label: &str) -> PathBuf {
@@ -643,12 +740,24 @@ packaging_role = "hetero-contract"
         let out = temp_dir("materialize_support");
         let written = materialize_embedded_artifact_support(&artifact, &out).unwrap();
 
-        assert!(written.iter().any(|path| path.ends_with("nuis.bridge.registry.toml")));
-        assert!(written.iter().any(|path| path.ends_with("nuis.host-bridge.plan-index.toml")));
-        assert!(written.iter().any(|path| path.ends_with("nuis.domain.network.artifact.toml")));
-        assert!(written.iter().any(|path| path.ends_with("nuis.domain.network.payload.toml")));
-        assert!(written.iter().any(|path| path.ends_with("nuis.domain.network.payload.bin")));
-        assert!(written.iter().any(|path| path.ends_with("nuis.domain.network.bridge.stub.txt")));
+        assert!(written
+            .iter()
+            .any(|path| path.ends_with("nuis.bridge.registry.toml")));
+        assert!(written
+            .iter()
+            .any(|path| path.ends_with("nuis.host-bridge.plan-index.toml")));
+        assert!(written
+            .iter()
+            .any(|path| path.ends_with("nuis.domain.network.artifact.toml")));
+        assert!(written
+            .iter()
+            .any(|path| path.ends_with("nuis.domain.network.payload.toml")));
+        assert!(written
+            .iter()
+            .any(|path| path.ends_with("nuis.domain.network.payload.bin")));
+        assert!(written
+            .iter()
+            .any(|path| path.ends_with("nuis.domain.network.bridge.stub.txt")));
         assert_eq!(
             fs::read(out.join("nuis.domain.network.payload.bin")).unwrap(),
             encoded_blob

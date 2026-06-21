@@ -45,7 +45,9 @@ pub(super) fn lower_match_stmt_with_async(
         return Err("could not infer scrutinee type for `match`".to_owned());
     };
     let (match_value, hoisted_scrutinee) = match nir_expr_effect_class(&lowered_value) {
-        NirExprEffectClass::Pure | NirExprEffectClass::LocalReadOnly => (lowered_value.clone(), None),
+        NirExprEffectClass::Pure | NirExprEffectClass::LocalReadOnly => {
+            (lowered_value.clone(), None)
+        }
         _ => {
             let temp_name = "__nuis_match_scrutinee".to_owned();
             (

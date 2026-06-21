@@ -112,12 +112,14 @@ impl RegisteredMod for NetworkMod {
         require_network_resource(node, resource)?;
 
         match node.op.instruction.as_str() {
-            "const_i64" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(|_| {
-                format!(
-                    "node `{}` has invalid i64 literal `{}`",
-                    node.name, node.op.args[0]
-                )
-            })?)),
+            "const_i64" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid i64 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
             "target_config" => Ok(Value::Tuple(vec![
                 Value::Symbol(node.op.args[0].clone()),
                 Value::Symbol(node.op.args[1].clone()),

@@ -21,12 +21,9 @@ fn project_link_stage_contract_accepts_cpu_to_shader_over_data() {
 
 #[test]
 fn project_link_stage_contract_accepts_cpu_to_network_over_data() {
-    let contract = required_project_link_stage_contract(
-        "cpu.Main",
-        "network.NetworkUnit",
-        "data.FabricPlane",
-    )
-    .unwrap();
+    let contract =
+        required_project_link_stage_contract("cpu.Main", "network.NetworkUnit", "data.FabricPlane")
+            .unwrap();
 
     assert_eq!(
         contract.uplink,
@@ -472,9 +469,18 @@ fn project_lowering_selections_resolve_shader_kernel_and_network_targets() {
     let resolution = resolve_project_abi(&project).unwrap();
     let lowering = validate_project_lowering_selections(&resolution);
 
-    let shader = lowering.iter().find(|item| item.domain == "shader").unwrap();
-    let kernel = lowering.iter().find(|item| item.domain == "kernel").unwrap();
-    let network = lowering.iter().find(|item| item.domain == "network").unwrap();
+    let shader = lowering
+        .iter()
+        .find(|item| item.domain == "shader")
+        .unwrap();
+    let kernel = lowering
+        .iter()
+        .find(|item| item.domain == "kernel")
+        .unwrap();
+    let network = lowering
+        .iter()
+        .find(|item| item.domain == "network")
+        .unwrap();
 
     assert_eq!(shader.selected_lowering_target.as_deref(), Some("metal"));
     assert!(shader
@@ -486,7 +492,10 @@ fn project_lowering_selections_resolve_shader_kernel_and_network_targets() {
         .registered_lowering_targets
         .iter()
         .any(|target| target == "coreml"));
-    assert_eq!(network.selected_lowering_target.as_deref(), Some("urlsession"));
+    assert_eq!(
+        network.selected_lowering_target.as_deref(),
+        Some("urlsession")
+    );
     assert!(network
         .registered_lowering_targets
         .iter()

@@ -680,19 +680,7 @@ impl Parser {
             )
         } else {
             (
-                None,
-                false,
-                false,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                None, false, false, None, None, None, None, None, None, None, None, None, None,
             )
         };
         let is_async = if self.peek_word("async") {
@@ -703,14 +691,12 @@ impl Parser {
         };
         if declared_test_name.is_some() && self.peek_word("benchmark") {
             return Err(
-                "function cannot be both a test and a benchmark in the current MVP"
-                    .to_owned(),
+                "function cannot be both a test and a benchmark in the current MVP".to_owned(),
             );
         }
         if declared_benchmark_name.is_some() && self.peek_word("test") {
             return Err(
-                "function cannot be both a test and a benchmark in the current MVP"
-                    .to_owned(),
+                "function cannot be both a test and a benchmark in the current MVP".to_owned(),
             );
         }
         self.expect_word("fn")?;
@@ -1441,12 +1427,8 @@ impl Parser {
                             "warmup_iters" => warmup_iters = Some(self.parse_test_meta_int()?),
                             "measure_iters" => measure_iters = Some(self.parse_test_meta_int()?),
                             "timeout_ms" => timeout_ms = Some(self.parse_test_meta_int()?),
-                            "clock_domain" => {
-                                clock_domain = Some(self.parse_test_clock_domain()?)
-                            }
-                            "clock_policy" => {
-                                clock_policy = Some(self.parse_test_clock_policy()?)
-                            }
+                            "clock_domain" => clock_domain = Some(self.parse_test_clock_domain()?),
+                            "clock_policy" => clock_policy = Some(self.parse_test_clock_policy()?),
                             _ => {
                                 return Err(format!(
                                     "unknown benchmark metadata key `{word}` in `benchmark(...)`"
@@ -1518,9 +1500,9 @@ impl Parser {
                     "expected integer literal in test metadata, found {}",
                     describe_token(&other)
                 )),
-                None => Err(
-                    "expected integer literal in test metadata, found end of input".to_owned(),
-                ),
+                None => {
+                    Err("expected integer literal in test metadata, found end of input".to_owned())
+                }
             };
         }
         match self.next() {
