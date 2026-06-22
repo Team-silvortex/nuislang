@@ -413,6 +413,12 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileSliderColorSlotRef { .. }
+        | NirExpr::ShaderProfileSliderSpeedSlotRef { .. }
+        | NirExpr::ShaderProfileSliderRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileHeaderAccentSlotRef { .. }
+        | NirExpr::ShaderProfileToggleLiveSlotRef { .. }
+        | NirExpr::ShaderProfileFocusSlotRef { .. }
         | NirExpr::ShaderProfilePacketTagRef { .. }
         | NirExpr::ShaderProfileMaterialModeRef { .. }
         | NirExpr::ShaderProfilePassKindRef { .. }
@@ -448,6 +454,9 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
+        | NirExpr::ShaderTexture2d { .. }
+        | NirExpr::ShaderSampler { .. }
+        | NirExpr::ShaderUv { .. }
         | NirExpr::ShaderInlineWgsl { .. } => {}
         NirExpr::ShaderProfileColorSeed { base, delta, .. } => {
             collect_instantiated_units_expr(base, units);
@@ -463,6 +472,40 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
             collect_instantiated_units_expr(base, units);
             collect_instantiated_units_expr(delta, units);
+        }
+        NirExpr::ShaderSample {
+            texture,
+            sampler,
+            x,
+            y,
+            ..
+        } => {
+            collect_instantiated_units_expr(texture, units);
+            collect_instantiated_units_expr(sampler, units);
+            collect_instantiated_units_expr(x, units);
+            collect_instantiated_units_expr(y, units);
+        }
+        NirExpr::ShaderSampleUv {
+            texture,
+            sampler,
+            uv,
+            ..
+        } => {
+            collect_instantiated_units_expr(texture, units);
+            collect_instantiated_units_expr(sampler, units);
+            collect_instantiated_units_expr(uv, units);
+        }
+        NirExpr::ShaderBinding { value, .. } => {
+            collect_instantiated_units_expr(value, units);
+        }
+        NirExpr::ShaderBindSet {
+            pipeline,
+            bindings,
+        } => {
+            collect_instantiated_units_expr(pipeline, units);
+            for binding in bindings {
+                collect_instantiated_units_expr(binding, units);
+            }
         }
         NirExpr::ShaderProfilePacket {
             color,

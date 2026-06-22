@@ -1025,6 +1025,9 @@ fn verify_expr(
         | NirExpr::CpuWindow { .. }
         | NirExpr::CpuInputI64 { .. }
         | NirExpr::CpuTickI64 { .. }
+        | NirExpr::ShaderTexture2d { .. }
+        | NirExpr::ShaderSampler { .. }
+        | NirExpr::ShaderUv { .. }
         | NirExpr::ShaderProfileTargetRef { .. }
         | NirExpr::ShaderProfileViewportRef { .. }
         | NirExpr::ShaderProfilePipelineRef { .. }
@@ -1033,6 +1036,12 @@ fn verify_expr(
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileSliderColorSlotRef { .. }
+        | NirExpr::ShaderProfileSliderSpeedSlotRef { .. }
+        | NirExpr::ShaderProfileSliderRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileHeaderAccentSlotRef { .. }
+        | NirExpr::ShaderProfileToggleLiveSlotRef { .. }
+        | NirExpr::ShaderProfileFocusSlotRef { .. }
         | NirExpr::ShaderProfilePacketTagRef { .. }
         | NirExpr::ShaderProfileMaterialModeRef { .. }
         | NirExpr::ShaderProfilePassKindRef { .. }
@@ -1327,6 +1336,110 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
+        }
+        NirExpr::ShaderSample {
+            texture,
+            sampler,
+            x,
+            y,
+            ..
+        } => {
+            verify_expr(
+                texture,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+            verify_expr(
+                sampler,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+            verify_expr(
+                x,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+            verify_expr(
+                y,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+        }
+        NirExpr::ShaderSampleUv {
+            texture,
+            sampler,
+            uv,
+            ..
+        } => {
+            verify_expr(
+                texture,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+            verify_expr(
+                sampler,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+            verify_expr(
+                uv,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+        }
+        NirExpr::ShaderBinding { value, .. } => {
+            verify_expr(
+                value,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+        }
+        NirExpr::ShaderBindSet {
+            pipeline,
+            bindings,
+        } => {
+            verify_expr(
+                pipeline,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+            for binding in bindings {
+                verify_expr(
+                    binding,
+                    moved,
+                    borrows,
+                    borrow_bindings,
+                    data_bindings,
+                    task_result_facts,
+                )?;
+            }
         }
         NirExpr::ShaderProfilePacket {
             color,
@@ -1977,6 +2090,9 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::CpuWindow { .. }
         | NirExpr::CpuInputI64 { .. }
         | NirExpr::CpuTickI64 { .. }
+        | NirExpr::ShaderTexture2d { .. }
+        | NirExpr::ShaderSampler { .. }
+        | NirExpr::ShaderUv { .. }
         | NirExpr::ShaderProfileTargetRef { .. }
         | NirExpr::ShaderProfileViewportRef { .. }
         | NirExpr::ShaderProfilePipelineRef { .. }
@@ -1985,6 +2101,12 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileSliderColorSlotRef { .. }
+        | NirExpr::ShaderProfileSliderSpeedSlotRef { .. }
+        | NirExpr::ShaderProfileSliderRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileHeaderAccentSlotRef { .. }
+        | NirExpr::ShaderProfileToggleLiveSlotRef { .. }
+        | NirExpr::ShaderProfileFocusSlotRef { .. }
         | NirExpr::ShaderProfilePacketTagRef { .. }
         | NirExpr::ShaderProfileMaterialModeRef { .. }
         | NirExpr::ShaderProfilePassKindRef { .. }
@@ -2107,6 +2229,38 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
             verify_expr_uses(base, moved)?;
             verify_expr_uses(delta, moved)?;
+        }
+        NirExpr::ShaderSample {
+            texture,
+            sampler,
+            x,
+            y,
+            ..
+        } => {
+            verify_expr_uses(texture, moved)?;
+            verify_expr_uses(sampler, moved)?;
+            verify_expr_uses(x, moved)?;
+            verify_expr_uses(y, moved)?;
+        }
+        NirExpr::ShaderSampleUv {
+            texture,
+            sampler,
+            uv,
+            ..
+        } => {
+            verify_expr_uses(texture, moved)?;
+            verify_expr_uses(sampler, moved)?;
+            verify_expr_uses(uv, moved)?;
+        }
+        NirExpr::ShaderBinding { value, .. } => verify_expr_uses(value, moved)?,
+        NirExpr::ShaderBindSet {
+            pipeline,
+            bindings,
+        } => {
+            verify_expr_uses(pipeline, moved)?;
+            for binding in bindings {
+                verify_expr_uses(binding, moved)?;
+            }
         }
         NirExpr::ShaderProfilePacket {
             color,

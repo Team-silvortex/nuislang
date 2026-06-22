@@ -801,6 +801,39 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 escape_debug(unit)
             )
         }
+        NirExpr::ShaderProfileSliderColorSlotRef { unit } => {
+            format!(
+                "shader_profile_slider_color_slot(\"{}\")",
+                escape_debug(unit)
+            )
+        }
+        NirExpr::ShaderProfileSliderSpeedSlotRef { unit } => {
+            format!(
+                "shader_profile_slider_speed_slot(\"{}\")",
+                escape_debug(unit)
+            )
+        }
+        NirExpr::ShaderProfileSliderRadiusSlotRef { unit } => {
+            format!(
+                "shader_profile_slider_radius_slot(\"{}\")",
+                escape_debug(unit)
+            )
+        }
+        NirExpr::ShaderProfileHeaderAccentSlotRef { unit } => {
+            format!(
+                "shader_profile_header_accent_slot(\"{}\")",
+                escape_debug(unit)
+            )
+        }
+        NirExpr::ShaderProfileToggleLiveSlotRef { unit } => {
+            format!(
+                "shader_profile_toggle_live_slot(\"{}\")",
+                escape_debug(unit)
+            )
+        }
+        NirExpr::ShaderProfileFocusSlotRef { unit } => {
+            format!("shader_profile_focus_slot(\"{}\")", escape_debug(unit))
+        }
         NirExpr::ShaderProfilePacketTagRef { unit } => {
             format!("shader_profile_packet_tag(\"{}\")", escape_debug(unit))
         }
@@ -1190,6 +1223,112 @@ fn render_nir_expr(value: &NirExpr) -> String {
             escape_debug(name),
             escape_debug(topology)
         ),
+        NirExpr::ShaderTexture2d {
+            format,
+            width,
+            height,
+            texels,
+        } => format!(
+            "shader_texture2d(\"{}\", {}, {}, \"{}\")",
+            escape_debug(format),
+            width,
+            height,
+            escape_debug(texels)
+        ),
+        NirExpr::ShaderSampler {
+            filter,
+            address_mode,
+        } => format!(
+            "shader_sampler(\"{}\", \"{}\")",
+            escape_debug(filter),
+            escape_debug(address_mode)
+        ),
+        NirExpr::ShaderUv { u, v } => format!("shader_uv({}, {})", u, v),
+        NirExpr::ShaderSample {
+            texture,
+            sampler,
+            x,
+            y,
+            mode,
+        } => format!(
+            "shader_{}({}, {}, {}, {})",
+            mode.render(),
+            render_nir_expr(texture),
+            render_nir_expr(sampler),
+            render_nir_expr(x),
+            render_nir_expr(y)
+        ),
+        NirExpr::ShaderSampleUv {
+            texture,
+            sampler,
+            uv,
+            mode,
+        } => format!(
+            "shader_{}({}, {}, {})",
+            mode.render(),
+            render_nir_expr(texture),
+            render_nir_expr(sampler),
+            render_nir_expr(uv)
+        ),
+        NirExpr::ShaderBinding {
+            kind,
+            slot,
+            layout,
+            profile_contract: _,
+            value,
+        } => {
+            let binding_callee = if kind == "uniform_binding" && layout.is_some() {
+                if matches!(value.as_ref(), NirExpr::ShaderProfilePacket { .. })
+                    && layout.as_deref() == Some("std140")
+                {
+                    "shader_packet_uniform_binding".to_owned()
+                } else {
+                    "shader_uniform_binding_layout".to_owned()
+                }
+            } else if kind == "storage_binding" && layout.is_some() {
+                if matches!(value.as_ref(), NirExpr::ShaderProfilePacket { .. })
+                    && layout.as_deref() == Some("std430")
+                {
+                    "shader_packet_storage_binding".to_owned()
+                } else {
+                    "shader_storage_binding_layout".to_owned()
+                }
+            } else {
+                format!("shader_{kind}")
+            };
+            if let Some(layout) = layout {
+                if matches!(
+                    binding_callee.as_str(),
+                    "shader_packet_uniform_binding" | "shader_packet_storage_binding"
+                ) {
+                    return format!(
+                        "{}({}, {})",
+                        binding_callee,
+                        slot,
+                        render_nir_expr(value)
+                    );
+                }
+                format!(
+                    "{}({}, \"{}\", {})",
+                    binding_callee,
+                    slot,
+                    escape_debug(layout),
+                    render_nir_expr(value)
+                )
+            } else {
+                format!(
+                    "{}({}, {})",
+                    binding_callee,
+                    slot,
+                    render_nir_expr(value)
+                )
+            }
+        }
+        NirExpr::ShaderBindSet { pipeline, bindings } => {
+            let mut args = vec![render_nir_expr(pipeline)];
+            args.extend(bindings.iter().map(render_nir_expr));
+            format!("shader_bind_set({})", args.join(", "))
+        }
         NirExpr::ShaderInlineWgsl { entry, source } => {
             render_shader_inline_wgsl_expr(entry, source)
         }

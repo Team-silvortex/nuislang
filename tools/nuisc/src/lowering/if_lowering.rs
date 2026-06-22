@@ -1028,6 +1028,12 @@ fn expr_contains_conditional_effect_primitive(expr: &NirExpr) -> bool {
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileSliderColorSlotRef { .. }
+        | NirExpr::ShaderProfileSliderSpeedSlotRef { .. }
+        | NirExpr::ShaderProfileSliderRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileHeaderAccentSlotRef { .. }
+        | NirExpr::ShaderProfileToggleLiveSlotRef { .. }
+        | NirExpr::ShaderProfileFocusSlotRef { .. }
         | NirExpr::ShaderProfilePacketTagRef { .. }
         | NirExpr::ShaderProfileMaterialModeRef { .. }
         | NirExpr::ShaderProfilePassKindRef { .. }

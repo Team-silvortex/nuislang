@@ -1,4 +1,5 @@
 use super::*;
+use nuis_semantics::model::{NirShaderSampleMode, NirShaderSampleUvMode};
 
 pub(super) fn lower_shader_expr(
     expr: &NirExpr,
@@ -62,6 +63,42 @@ pub(super) fn lower_shader_expr(
             unit,
             "packet_radius_slot",
         )),
+        NirExpr::ShaderProfileSliderColorSlotRef { unit } => Some(lower_project_profile_ref(
+            state,
+            "shader",
+            unit,
+            "slider_color_slot",
+        )),
+        NirExpr::ShaderProfileSliderSpeedSlotRef { unit } => Some(lower_project_profile_ref(
+            state,
+            "shader",
+            unit,
+            "slider_speed_slot",
+        )),
+        NirExpr::ShaderProfileSliderRadiusSlotRef { unit } => Some(lower_project_profile_ref(
+            state,
+            "shader",
+            unit,
+            "slider_radius_slot",
+        )),
+        NirExpr::ShaderProfileHeaderAccentSlotRef { unit } => Some(lower_project_profile_ref(
+            state,
+            "shader",
+            unit,
+            "header_accent_slot",
+        )),
+        NirExpr::ShaderProfileToggleLiveSlotRef { unit } => Some(lower_project_profile_ref(
+            state,
+            "shader",
+            unit,
+            "toggle_live_slot",
+        )),
+        NirExpr::ShaderProfileFocusSlotRef { unit } => Some(lower_project_profile_ref(
+            state,
+            "shader",
+            unit,
+            "focus_slot",
+        )),
         NirExpr::ShaderProfilePacketTagRef { unit } => Some(lower_project_profile_ref(
             state,
             "shader",
@@ -98,6 +135,50 @@ pub(super) fn lower_shader_expr(
             name: pipe_name,
             topology,
         } => Some(Ok(lower_shader_pipeline(pipe_name, topology, state))),
+        NirExpr::ShaderTexture2d {
+            format,
+            width,
+            height,
+            texels,
+        } => Some(Ok(lower_shader_texture2d(
+            format, *width, *height, texels, state,
+        ))),
+        NirExpr::ShaderSampler {
+            filter,
+            address_mode,
+        } => Some(Ok(lower_shader_sampler(filter, address_mode, state))),
+        NirExpr::ShaderUv { u, v } => Some(Ok(lower_shader_uv(*u, *v, state))),
+        NirExpr::ShaderSample {
+            texture,
+            sampler,
+            x,
+            y,
+            mode,
+        } => Some(lower_shader_sample(texture, sampler, x, y, *mode, state, bindings)),
+        NirExpr::ShaderSampleUv {
+            texture,
+            sampler,
+            uv,
+            mode,
+        } => Some(lower_shader_sample_uv(texture, sampler, uv, *mode, state, bindings)),
+        NirExpr::ShaderBinding {
+            kind,
+            slot,
+            layout,
+            profile_contract,
+            value,
+        } => Some(lower_shader_binding(
+            kind,
+            *slot,
+            layout.as_deref(),
+            profile_contract.as_deref(),
+            value,
+            state,
+            bindings,
+        )),
+        NirExpr::ShaderBindSet { pipeline, bindings: set_bindings } => {
+            Some(lower_shader_bind_set(pipeline, set_bindings, state, bindings))
+        }
         NirExpr::ShaderInlineWgsl { entry, source } => {
             Some(lower_shader_inline_wgsl(entry, source, state))
         }
@@ -340,6 +421,62 @@ fn lower_shader_pipeline(pipe_name: &str, topology: &str, state: &mut LoweringSt
     name
 }
 
+fn lower_shader_texture2d(
+    format: &str,
+    width: i64,
+    height: i64,
+    texels: &str,
+    state: &mut LoweringState<'_>,
+) -> String {
+    ensure_shader_resource(state.yir);
+    let name = next_name(state, "shader_texture2d");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "shader0".to_owned(),
+        op: Operation {
+            module: "shader".to_owned(),
+            instruction: "texture2d".to_owned(),
+            args: vec![
+                format.to_owned(),
+                width.to_string(),
+                height.to_string(),
+                texels.to_owned(),
+            ],
+        },
+    });
+    name
+}
+
+fn lower_shader_sampler(filter: &str, address_mode: &str, state: &mut LoweringState<'_>) -> String {
+    ensure_shader_resource(state.yir);
+    let name = next_name(state, "shader_sampler");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "shader0".to_owned(),
+        op: Operation {
+            module: "shader".to_owned(),
+            instruction: "sampler".to_owned(),
+            args: vec![filter.to_owned(), address_mode.to_owned()],
+        },
+    });
+    name
+}
+
+fn lower_shader_uv(u: i64, v: i64, state: &mut LoweringState<'_>) -> String {
+    ensure_shader_resource(state.yir);
+    let name = next_name(state, "shader_uv");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "shader0".to_owned(),
+        op: Operation {
+            module: "shader".to_owned(),
+            instruction: "uv".to_owned(),
+            args: vec![u.to_string(), v.to_string()],
+        },
+    });
+    name
+}
+
 fn lower_shader_inline_wgsl(
     entry: &str,
     source: &str,
@@ -388,6 +525,135 @@ fn lower_shader_begin_pass(
     push_dep_edges(state, &target_name, &name);
     push_dep_edges(state, &pipeline_name, &name);
     push_dep_edges(state, &viewport_name, &name);
+    Ok(name)
+}
+
+fn lower_shader_sample(
+    texture: &NirExpr,
+    sampler: &NirExpr,
+    x: &NirExpr,
+    y: &NirExpr,
+    mode: NirShaderSampleMode,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    ensure_shader_resource(state.yir);
+    let texture_name = lower_expr(texture, state, bindings)?;
+    let sampler_name = lower_expr(sampler, state, bindings)?;
+    let x_name = lower_expr(x, state, bindings)?;
+    let y_name = lower_expr(y, state, bindings)?;
+    let name = next_name(state, "shader_sample");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "shader0".to_owned(),
+        op: Operation {
+            module: "shader".to_owned(),
+            instruction: mode.render().to_owned(),
+            args: vec![
+                texture_name.clone(),
+                sampler_name.clone(),
+                x_name.clone(),
+                y_name.clone(),
+            ],
+        },
+    });
+    push_dep_edges(state, &texture_name, &name);
+    push_dep_edges(state, &sampler_name, &name);
+    push_dep_edges(state, &x_name, &name);
+    push_dep_edges(state, &y_name, &name);
+    Ok(name)
+}
+
+fn lower_shader_sample_uv(
+    texture: &NirExpr,
+    sampler: &NirExpr,
+    uv: &NirExpr,
+    mode: NirShaderSampleUvMode,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    ensure_shader_resource(state.yir);
+    let texture_name = lower_expr(texture, state, bindings)?;
+    let sampler_name = lower_expr(sampler, state, bindings)?;
+    let uv_name = lower_expr(uv, state, bindings)?;
+    let name = next_name(state, "shader_sample_uv");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "shader0".to_owned(),
+        op: Operation {
+            module: "shader".to_owned(),
+            instruction: mode.render().to_owned(),
+            args: vec![texture_name.clone(), sampler_name.clone(), uv_name.clone()],
+        },
+    });
+    push_dep_edges(state, &texture_name, &name);
+    push_dep_edges(state, &sampler_name, &name);
+    push_dep_edges(state, &uv_name, &name);
+    Ok(name)
+}
+
+fn lower_shader_binding(
+    kind: &str,
+    slot: i64,
+    layout: Option<&str>,
+    profile_contract: Option<&str>,
+    value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    ensure_shader_resource(state.yir);
+    let value_name = lower_expr(value, state, bindings)?;
+    let name = next_name(state, "shader_binding");
+    let mut args = vec![slot.to_string()];
+    if let Some(layout) = layout {
+        args.push(layout.to_owned());
+    }
+    if let Some(profile_contract) = profile_contract {
+        args.push(profile_contract.to_owned());
+    }
+    args.push(value_name.clone());
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "shader0".to_owned(),
+        op: Operation {
+            module: "shader".to_owned(),
+            instruction: kind.to_owned(),
+            args,
+        },
+    });
+    push_dep_edges(state, &value_name, &name);
+    Ok(name)
+}
+
+fn lower_shader_bind_set(
+    pipeline: &NirExpr,
+    set_bindings: &[NirExpr],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    ensure_shader_resource(state.yir);
+    let pipeline_name = lower_expr(pipeline, state, bindings)?;
+    let mut binding_names = Vec::with_capacity(set_bindings.len());
+    for binding in set_bindings {
+        let binding_name = lower_expr(binding, state, bindings)?;
+        binding_names.push(binding_name);
+    }
+    let name = next_name(state, "shader_bind_set");
+    let mut args = vec![pipeline_name.clone()];
+    args.extend(binding_names.iter().cloned());
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "shader0".to_owned(),
+        op: Operation {
+            module: "shader".to_owned(),
+            instruction: "bind_set".to_owned(),
+            args,
+        },
+    });
+    push_dep_edges(state, &pipeline_name, &name);
+    for binding_name in &binding_names {
+        push_dep_edges(state, binding_name, &name);
+    }
     Ok(name)
 }
 

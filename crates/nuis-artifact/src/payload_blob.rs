@@ -8,6 +8,8 @@ pub struct DomainBuildUnitPayloadBlob {
     pub domain_family: String,
     pub package_id: String,
     pub backend_family: Option<String>,
+    pub vendor: Option<String>,
+    pub device_class: Option<String>,
     pub selected_lowering_target: Option<String>,
     pub contract_family: String,
     pub packaging_role: String,
@@ -34,6 +36,8 @@ pub fn encode_domain_payload_blob(
     let domain_family = blob.domain_family.as_bytes();
     let package_id = blob.package_id.as_bytes();
     let backend_family = blob.backend_family.as_deref().unwrap_or("").as_bytes();
+    let vendor = blob.vendor.as_deref().unwrap_or("").as_bytes();
+    let device_class = blob.device_class.as_deref().unwrap_or("").as_bytes();
     let selected_lowering_target = blob
         .selected_lowering_target
         .as_deref()
@@ -58,6 +62,14 @@ pub fn encode_domain_payload_blob(
     out.extend_from_slice(&encode_u32_len(
         backend_family.len(),
         "domain payload blob backend_family",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        vendor.len(),
+        "domain payload blob vendor",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        device_class.len(),
+        "domain payload blob device_class",
     )?);
     out.extend_from_slice(&encode_u32_len(
         selected_lowering_target.len(),
@@ -96,6 +108,8 @@ pub fn encode_domain_payload_blob(
     out.extend_from_slice(domain_family);
     out.extend_from_slice(package_id);
     out.extend_from_slice(backend_family);
+    out.extend_from_slice(vendor);
+    out.extend_from_slice(device_class);
     out.extend_from_slice(selected_lowering_target);
     out.extend_from_slice(contract_family);
     out.extend_from_slice(packaging_role);
@@ -111,7 +125,7 @@ pub fn encode_domain_payload_blob(
 pub fn decode_domain_payload_blob(
     bytes: &[u8],
 ) -> Result<DomainBuildUnitPayloadBlob, ArtifactError> {
-    if bytes.len() < 46 {
+    if bytes.len() < 54 {
         return Err(ArtifactError::new("domain payload blob is too short"));
     }
     if &bytes[..4] != NUIS_DOMAIN_PAYLOAD_BLOB_MAGIC {
@@ -142,6 +156,8 @@ pub fn decode_domain_payload_blob(
     let domain_family_len = next_len(bytes, &mut offset)?;
     let package_id_len = next_len(bytes, &mut offset)?;
     let backend_family_len = next_len(bytes, &mut offset)?;
+    let vendor_len = next_len(bytes, &mut offset)?;
+    let device_class_len = next_len(bytes, &mut offset)?;
     let selected_lowering_target_len = next_len(bytes, &mut offset)?;
     let contract_family_len = next_len(bytes, &mut offset)?;
     let packaging_role_len = next_len(bytes, &mut offset)?;
@@ -159,6 +175,8 @@ pub fn decode_domain_payload_blob(
     let total_payload_len = domain_family_len
         + package_id_len
         + backend_family_len
+        + vendor_len
+        + device_class_len
         + selected_lowering_target_len
         + contract_family_len
         + packaging_role_len
@@ -198,6 +216,17 @@ pub fn decode_domain_payload_blob(
         .map_err(|error| {
             ArtifactError::new(format!(
                 "domain payload blob backend_family is not valid UTF-8: {error}"
+            ))
+        })?;
+    let vendor = String::from_utf8(take_bytes(bytes, &mut offset, vendor_len)?).map_err(
+        |error| ArtifactError::new(format!(
+            "domain payload blob vendor is not valid UTF-8: {error}"
+        )),
+    )?;
+    let device_class =
+        String::from_utf8(take_bytes(bytes, &mut offset, device_class_len)?).map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob device_class is not valid UTF-8: {error}"
             ))
         })?;
     let selected_lowering_target = String::from_utf8(take_bytes(
@@ -253,6 +282,8 @@ pub fn decode_domain_payload_blob(
         domain_family,
         package_id,
         backend_family: (!backend_family.is_empty()).then_some(backend_family),
+        vendor: (!vendor.is_empty()).then_some(vendor),
+        device_class: (!device_class.is_empty()).then_some(device_class),
         selected_lowering_target: (!selected_lowering_target.is_empty())
             .then_some(selected_lowering_target),
         contract_family,
@@ -272,6 +303,8 @@ impl DomainBuildUnitPayloadBlob {
             domain_family: unit.domain_family.clone(),
             package_id: unit.package_id.clone(),
             backend_family: unit.backend_family.clone(),
+            vendor: unit.vendor.clone(),
+            device_class: unit.device_class.clone(),
             selected_lowering_target: unit.selected_lowering_target.clone(),
             contract_family: unit.contract_family.clone(),
             packaging_role: unit.packaging_role.clone(),
@@ -295,6 +328,8 @@ mod tests {
             domain_family: "shader".to_owned(),
             package_id: "official.shader".to_owned(),
             backend_family: Some("metal".to_owned()),
+            vendor: Some("apple".to_owned()),
+            device_class: Some("apple-silicon-gpu".to_owned()),
             selected_lowering_target: Some("metal".to_owned()),
             contract_family: "nustar.shader".to_owned(),
             packaging_role: "hetero-contract".to_owned(),

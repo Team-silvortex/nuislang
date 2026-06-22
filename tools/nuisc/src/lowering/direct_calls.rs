@@ -383,6 +383,12 @@ fn expr_collect_called_functions(
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileSliderColorSlotRef { .. }
+        | NirExpr::ShaderProfileSliderSpeedSlotRef { .. }
+        | NirExpr::ShaderProfileSliderRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileHeaderAccentSlotRef { .. }
+        | NirExpr::ShaderProfileToggleLiveSlotRef { .. }
+        | NirExpr::ShaderProfileFocusSlotRef { .. }
         | NirExpr::ShaderProfilePacketTagRef { .. }
         | NirExpr::ShaderProfileMaterialModeRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }

@@ -54,6 +54,17 @@ pub(crate) fn nir_uses_shader_profile_radius_seed(module: &NirModule, unit: &str
     })
 }
 
+pub(crate) fn nir_uses_shader_binding_profile_contract(
+    module: &NirModule,
+    profile_contract: &str,
+) -> bool {
+    module.functions.iter().any(|function| {
+        function.body.iter().any(|stmt| {
+            stmt_uses_shader_binding_profile_contract(stmt, profile_contract)
+        })
+    })
+}
+
 pub(crate) fn nir_uses_data_profile_handle_table(module: &NirModule, unit: &str) -> bool {
     module.functions.iter().any(|function| {
         function
@@ -146,6 +157,12 @@ fn stmt_uses_shader_profile_speed_seed(stmt: &NirStmt, unit: &str) -> bool {
 fn stmt_uses_shader_profile_radius_seed(stmt: &NirStmt, unit: &str) -> bool {
     stmt_uses_expr_predicate(stmt, &|value| {
         expr_uses_shader_profile_radius_seed(value, unit)
+    })
+}
+
+fn stmt_uses_shader_binding_profile_contract(stmt: &NirStmt, profile_contract: &str) -> bool {
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_shader_binding_profile_contract(value, profile_contract)
     })
 }
 
@@ -405,6 +422,18 @@ fn expr_uses_shader_profile_radius_seed(expr: &NirExpr, unit: &str) -> bool {
         } => shader_unit == unit,
         _ => expr_walk_any(expr, &|inner| {
             expr_uses_shader_profile_radius_seed(inner, unit)
+        }),
+    }
+}
+
+fn expr_uses_shader_binding_profile_contract(expr: &NirExpr, profile_contract: &str) -> bool {
+    match expr {
+        NirExpr::ShaderBinding {
+            profile_contract: Some(value_profile_contract),
+            ..
+        } => value_profile_contract == profile_contract,
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_shader_binding_profile_contract(inner, profile_contract)
         }),
     }
 }

@@ -174,6 +174,8 @@ pub struct RegisteredAbiTarget {
     pub calling_abi: String,
     pub clang_target: String,
     pub backend_family: Option<String>,
+    pub vendor: Option<String>,
+    pub device_class: Option<String>,
     pub host_adaptive: bool,
 }
 
@@ -2629,7 +2631,7 @@ pub fn plan_bindings(
             .cloned()
             .collect::<Vec<_>>();
 
-        let matched_resources = module
+        let mut matched_resources = module
             .resources
             .iter()
             .filter(|resource| {
@@ -2639,7 +2641,9 @@ pub fn plan_bindings(
                     .any(|family| family == resource.kind.family())
             })
             .map(|resource| resource.name.clone())
-            .collect::<Vec<_>>();
+            .collect::<BTreeSet<_>>();
+        collect_resource_usage_hints(&nir, &manifest.domain_family, &mut matched_resources);
+        let matched_resources = matched_resources.into_iter().collect::<Vec<_>>();
 
         let matched_ops = module
             .nodes
@@ -2718,6 +2722,94 @@ fn covered_profile_slots(
     covered.into_iter().collect::<Vec<_>>()
 }
 
+fn collect_resource_usage_hints(
+    module: &NirModule,
+    domain_family: &str,
+    resources: &mut BTreeSet<String>,
+) {
+    for function in &module.functions {
+        for stmt in &function.body {
+            collect_resource_usage_hints_stmt(stmt, domain_family, resources);
+        }
+    }
+}
+
+fn collect_resource_usage_hints_stmt(
+    stmt: &NirStmt,
+    domain_family: &str,
+    resources: &mut BTreeSet<String>,
+) {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Await(value)
+        | NirStmt::Expr(value) => collect_resource_usage_hints_expr(value, domain_family, resources),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            collect_resource_usage_hints_expr(condition, domain_family, resources);
+            for stmt in then_body {
+                collect_resource_usage_hints_stmt(stmt, domain_family, resources);
+            }
+            for stmt in else_body {
+                collect_resource_usage_hints_stmt(stmt, domain_family, resources);
+            }
+        }
+        NirStmt::While { condition, body } => {
+            collect_resource_usage_hints_expr(condition, domain_family, resources);
+            for stmt in body {
+                collect_resource_usage_hints_stmt(stmt, domain_family, resources);
+            }
+        }
+        NirStmt::Return(Some(value)) => {
+            collect_resource_usage_hints_expr(value, domain_family, resources);
+        }
+        NirStmt::Return(None) | NirStmt::Break | NirStmt::Continue => {}
+    }
+}
+
+fn collect_resource_usage_hints_expr(
+    expr: &NirExpr,
+    domain_family: &str,
+    resources: &mut BTreeSet<String>,
+) {
+    if domain_family == "shader" {
+        match expr {
+            NirExpr::ShaderBinding {
+                kind,
+                layout,
+                profile_contract,
+                ..
+            } => {
+                resources.insert(format!("shader.binding.{kind}"));
+                if let Some(layout) = layout {
+                    resources.insert(format!("shader.binding.layout.{layout}"));
+                }
+                if let Some(profile_contract) = profile_contract {
+                    resources.insert(format!("shader.binding.contract.{profile_contract}"));
+                }
+            }
+            NirExpr::ShaderBindSet { .. } => {
+                resources.insert("shader.binding.set".to_owned());
+            }
+            NirExpr::ShaderTexture2d { .. } => {
+                resources.insert("shader.resource.texture2d".to_owned());
+            }
+            NirExpr::ShaderSampler { .. } => {
+                resources.insert("shader.resource.sampler".to_owned());
+            }
+            _ => {}
+        }
+    }
+
+    walk_child_exprs(expr, &mut |child| {
+        collect_resource_usage_hints_expr(child, domain_family, resources);
+    });
+}
+
 fn implied_slots_for_surface(domain_family: &str, surface: &str) -> Vec<String> {
     let slots: &[&str] = match (domain_family, surface) {
         ("shader", "shader.profile.render.v1") => &[
@@ -2753,6 +2845,14 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> Vec<String> 
             "packet_color_slot",
             "packet_speed_slot",
             "packet_radius_slot",
+            "slider_color_slot",
+            "slider_speed_slot",
+            "slider_radius_slot",
+            "header_accent_slot",
+            "toggle_live_slot",
+            "focus_slot",
+        ],
+        ("shader", "shader.profile.packet.nova.v1") => &[
             "slider_color_slot",
             "slider_speed_slot",
             "slider_radius_slot",
@@ -2948,6 +3048,36 @@ fn collect_support_usage_expr(
             surfaces.insert("shader.profile.packet-slots.v1".to_owned());
             slots.insert("packet_radius_slot".to_owned());
         }
+        NirExpr::ShaderProfileSliderColorSlotRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-slots.v1".to_owned());
+            surfaces.insert("shader.profile.packet.nova.v1".to_owned());
+            slots.insert("slider_color_slot".to_owned());
+        }
+        NirExpr::ShaderProfileSliderSpeedSlotRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-slots.v1".to_owned());
+            surfaces.insert("shader.profile.packet.nova.v1".to_owned());
+            slots.insert("slider_speed_slot".to_owned());
+        }
+        NirExpr::ShaderProfileSliderRadiusSlotRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-slots.v1".to_owned());
+            surfaces.insert("shader.profile.packet.nova.v1".to_owned());
+            slots.insert("slider_radius_slot".to_owned());
+        }
+        NirExpr::ShaderProfileHeaderAccentSlotRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-slots.v1".to_owned());
+            surfaces.insert("shader.profile.packet.nova.v1".to_owned());
+            slots.insert("header_accent_slot".to_owned());
+        }
+        NirExpr::ShaderProfileToggleLiveSlotRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-slots.v1".to_owned());
+            surfaces.insert("shader.profile.packet.nova.v1".to_owned());
+            slots.insert("toggle_live_slot".to_owned());
+        }
+        NirExpr::ShaderProfileFocusSlotRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-slots.v1".to_owned());
+            surfaces.insert("shader.profile.packet.nova.v1".to_owned());
+            slots.insert("focus_slot".to_owned());
+        }
         NirExpr::ShaderProfilePacketTagRef { .. } if domain_family == "shader" => {
             surfaces.insert("shader.profile.packet-tag.v1".to_owned());
             slots.insert("packet_tag".to_owned());
@@ -2973,8 +3103,27 @@ fn collect_support_usage_expr(
         NirExpr::ShaderProfileRadiusSeed { .. } if domain_family == "shader" => {
             surfaces.insert("shader.profile.seed.radius.v1".to_owned());
         }
-        NirExpr::ShaderProfilePacket { .. } if domain_family == "shader" => {
+        NirExpr::ShaderProfilePacket {
+            packet_type_name,
+            accent,
+            toggle_state,
+            focus_index,
+            ..
+        } if domain_family == "shader" => {
             surfaces.insert("shader.profile.packet.v1".to_owned());
+            let is_nova_panel = packet_type_name.as_deref() == Some("NovaPanelPacket")
+                || accent.is_some()
+                || toggle_state.is_some()
+                || focus_index.is_some();
+            if is_nova_panel {
+                surfaces.insert("shader.profile.packet.nova.v1".to_owned());
+            }
+        }
+        NirExpr::ShaderBinding {
+            profile_contract: Some(profile_contract),
+            ..
+        } if domain_family == "shader" => {
+            surfaces.insert(profile_contract.clone());
         }
         NirExpr::ShaderProfileRender { .. } if domain_family == "shader" => {
             surfaces.insert("shader.profile.render.v1".to_owned());
@@ -3767,6 +3916,8 @@ fn parse_registered_abi_target(
     let mut calling_abi = None::<String>;
     let mut clang_target = None::<String>;
     let mut backend_family = None::<String>;
+    let mut vendor = None::<String>;
+    let mut device_class = None::<String>;
     for field in fields
         .split('|')
         .map(str::trim)
@@ -3789,9 +3940,11 @@ fn parse_registered_abi_target(
             "calling" => calling_abi = Some(resolve_host_adaptive_calling(value).to_owned()),
             "clang" => clang_target = Some(resolve_host_adaptive_clang(value).to_owned()),
             "backend" => backend_family = Some(value.to_owned()),
+            "vendor" => vendor = Some(value.to_owned()),
+            "device" => device_class = Some(value.to_owned()),
             other => {
                 return Err(format!(
-                    "nustar package `{}` has invalid abi_targets key `{}` in `{}`; expected `arch`, `os`, `object`, `calling`, `clang`, or `backend`",
+                    "nustar package `{}` has invalid abi_targets key `{}` in `{}`; expected `arch`, `os`, `object`, `calling`, `clang`, `backend`, `vendor`, or `device`",
                     manifest.package_id, other, raw
                 ));
             }
@@ -3830,6 +3983,8 @@ fn parse_registered_abi_target(
             )
         })?,
         backend_family,
+        vendor,
+        device_class,
         host_adaptive,
     })
 }
@@ -4466,10 +4621,12 @@ mod cpu Main {
         manifest.abi_profiles = vec!["cpu.backend.v1".to_owned()];
         manifest.abi_capabilities = vec!["cpu.backend.v1:op:cpu.*".to_owned()];
         manifest.abi_targets = vec![
-            "cpu.backend.v1:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin|backend=metal".to_owned(),
+            "cpu.backend.v1:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin|backend=metal|vendor=apple|device=apple-silicon-gpu".to_owned(),
         ];
         let target = registered_abi_target(&manifest, "cpu.backend.v1").unwrap();
         assert_eq!(target.backend_family.as_deref(), Some("metal"));
+        assert_eq!(target.vendor.as_deref(), Some("apple"));
+        assert_eq!(target.device_class.as_deref(), Some("apple-silicon-gpu"));
         assert!(!target.host_adaptive);
     }
 
@@ -5052,6 +5209,11 @@ mod cpu Main {
         assert_eq!(shader_target.machine_os, "darwin");
         assert_eq!(shader_target.clang_target, "x86_64-apple-darwin");
         assert_eq!(shader_target.backend_family.as_deref(), Some("metal"));
+        assert_eq!(shader_target.vendor.as_deref(), Some("apple"));
+        assert_eq!(
+            shader_target.device_class.as_deref(),
+            Some("mac-discrete-or-integrated-gpu")
+        );
     }
 
     #[test]
@@ -5260,6 +5422,178 @@ mod cpu Main {
                     .iter()
                     .any(|candidate| candidate == slot),
                 "expected matched shader slot `{slot}`"
+            );
+        }
+    }
+
+    #[test]
+    fn shader_binding_plan_detects_nova_packet_surface_and_covered_slots() {
+        let source = r#"
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    let packet: NovaPanelPacket =
+      shader_profile_panel_packet("SurfaceShader", 1, 2, 3, 4, 5, 6);
+    let _ = packet;
+    print(0);
+  }
+}
+"#;
+        let plan = binding_plan_from_source(source);
+        let binding = plan
+            .bindings
+            .iter()
+            .find(|binding| binding.domain_family == "shader")
+            .expect("shader binding should be present");
+        assert!(binding
+            .matched_support_surface
+            .iter()
+            .any(|surface| surface == "shader.profile.packet.nova.v1"));
+        for slot in [
+            "slider_color_slot",
+            "slider_speed_slot",
+            "slider_radius_slot",
+            "header_accent_slot",
+            "toggle_live_slot",
+            "focus_slot",
+        ] {
+            assert!(
+                binding
+                    .covered_support_profile_slots
+                    .iter()
+                    .any(|candidate| candidate == slot),
+                "expected covered shader slot `{slot}`"
+            );
+        }
+    }
+
+    #[test]
+    fn shader_binding_plan_detects_nova_profile_slot_accessors() {
+        let source = r#"
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn capture_shader_nova_profile_summary() -> i64 {
+    let slider_color: i64 = shader_profile_slider_color_slot("SurfaceShader");
+    let slider_speed: i64 = shader_profile_slider_speed_slot("SurfaceShader");
+    let slider_radius: i64 = shader_profile_slider_radius_slot("SurfaceShader");
+    let header_accent: i64 = shader_profile_header_accent_slot("SurfaceShader");
+    let toggle_live: i64 = shader_profile_toggle_live_slot("SurfaceShader");
+    let focus: i64 = shader_profile_focus_slot("SurfaceShader");
+    return slider_color + slider_speed + slider_radius + header_accent + toggle_live + focus;
+  }
+
+  fn main() {
+    print(capture_shader_nova_profile_summary());
+  }
+}
+"#;
+        let plan = binding_plan_from_source(source);
+        let binding = plan
+            .bindings
+            .iter()
+            .find(|binding| binding.domain_family == "shader")
+            .expect("shader binding should be present");
+        for surface in ["shader.profile.packet-slots.v1", "shader.profile.packet.nova.v1"] {
+            assert!(
+                binding
+                    .matched_support_surface
+                    .iter()
+                    .any(|candidate| candidate == surface),
+                "expected matched shader surface `{surface}`"
+            );
+        }
+        for slot in [
+            "slider_color_slot",
+            "slider_speed_slot",
+            "slider_radius_slot",
+            "header_accent_slot",
+            "toggle_live_slot",
+            "focus_slot",
+        ] {
+            assert!(
+                binding
+                    .matched_support_profile_slots
+                    .iter()
+                    .any(|candidate| candidate == slot),
+                "expected matched shader slot `{slot}`"
+            );
+        }
+    }
+
+    #[test]
+    fn shader_binding_plan_detects_packet_binding_profile_contract_surface() {
+        let source = r#"
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    let packet: NovaPanelPacket =
+      shader_profile_panel_packet("SurfaceShader", 1, 2, 3, 4, 5, 6);
+    let binding: Binding = shader_packet_uniform_binding(4, packet);
+    print(binding);
+  }
+}
+"#;
+        let nir = crate::frontend::parse_nuis_module(source).expect("source should lower to nir");
+        let (matched_support_surface, matched_support_profile_slots) =
+            detect_matched_support_usage(&nir, "shader");
+        let covered_support_profile_slots = covered_profile_slots(
+            "shader",
+            &matched_support_surface,
+            &matched_support_profile_slots,
+        );
+        assert!(matched_support_surface
+            .iter()
+            .any(|surface| surface == "shader.profile.packet.nova.v1"));
+        for slot in [
+            "slider_color_slot",
+            "slider_speed_slot",
+            "slider_radius_slot",
+            "header_accent_slot",
+            "toggle_live_slot",
+            "focus_slot",
+        ] {
+            assert!(
+                covered_support_profile_slots
+                    .iter()
+                    .any(|candidate| candidate == slot),
+                "expected covered shader slot `{slot}`"
+            );
+        }
+    }
+
+    #[test]
+    fn shader_binding_plan_collects_packet_binding_resource_hints() {
+        let source = r#"
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    let packet: NovaPanelPacket =
+      shader_profile_panel_packet("SurfaceShader", 1, 2, 3, 4, 5, 6);
+    let binding: Binding = shader_packet_uniform_binding(4, packet);
+    let pipeline: Pipeline = shader_profile_pipeline("SurfaceShader");
+    let bindings: BindingSet = shader_bind_set(pipeline, binding);
+    print(bindings);
+  }
+}
+"#;
+        let nir = crate::frontend::parse_nuis_module(source).expect("source should lower to nir");
+        let mut resources = BTreeSet::new();
+        collect_resource_usage_hints(&nir, "shader", &mut resources);
+        for resource in [
+            "shader.binding.uniform_binding",
+            "shader.binding.layout.std140",
+            "shader.binding.contract.shader.profile.packet.nova.v1",
+            "shader.binding.set",
+        ] {
+            assert!(
+                resources
+                    .iter()
+                    .any(|candidate| candidate == resource),
+                "expected matched shader resource hint `{resource}`"
             );
         }
     }

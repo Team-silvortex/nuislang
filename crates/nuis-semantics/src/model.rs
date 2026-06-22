@@ -1445,6 +1445,24 @@ pub enum NirExpr {
     ShaderProfilePacketRadiusSlotRef {
         unit: String,
     },
+    ShaderProfileSliderColorSlotRef {
+        unit: String,
+    },
+    ShaderProfileSliderSpeedSlotRef {
+        unit: String,
+    },
+    ShaderProfileSliderRadiusSlotRef {
+        unit: String,
+    },
+    ShaderProfileHeaderAccentSlotRef {
+        unit: String,
+    },
+    ShaderProfileToggleLiveSlotRef {
+        unit: String,
+    },
+    ShaderProfileFocusSlotRef {
+        unit: String,
+    },
     ShaderProfilePacketTagRef {
         unit: String,
     },
@@ -1683,6 +1701,44 @@ pub enum NirExpr {
     ShaderPipeline {
         name: String,
         topology: String,
+    },
+    ShaderTexture2d {
+        format: String,
+        width: i64,
+        height: i64,
+        texels: String,
+    },
+    ShaderSampler {
+        filter: String,
+        address_mode: String,
+    },
+    ShaderUv {
+        u: i64,
+        v: i64,
+    },
+    ShaderSample {
+        texture: Box<NirExpr>,
+        sampler: Box<NirExpr>,
+        x: Box<NirExpr>,
+        y: Box<NirExpr>,
+        mode: NirShaderSampleMode,
+    },
+    ShaderSampleUv {
+        texture: Box<NirExpr>,
+        sampler: Box<NirExpr>,
+        uv: Box<NirExpr>,
+        mode: NirShaderSampleUvMode,
+    },
+    ShaderBinding {
+        kind: String,
+        slot: i64,
+        layout: Option<String>,
+        profile_contract: Option<String>,
+        value: Box<NirExpr>,
+    },
+    ShaderBindSet {
+        pipeline: Box<NirExpr>,
+        bindings: Vec<NirExpr>,
     },
     ShaderInlineWgsl {
         entry: String,
@@ -1929,6 +1985,38 @@ pub enum NirKernelFlowState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirShaderSampleMode {
+    Dynamic,
+    Nearest,
+}
+
+impl NirShaderSampleMode {
+    pub fn render(self) -> &'static str {
+        match self {
+            Self::Dynamic => "sample",
+            Self::Nearest => "sample_nearest",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirShaderSampleUvMode {
+    Dynamic,
+    Nearest,
+    Linear,
+}
+
+impl NirShaderSampleUvMode {
+    pub fn render(self) -> &'static str {
+        match self {
+            Self::Dynamic => "sample_uv",
+            Self::Nearest => "sample_uv_nearest",
+            Self::Linear => "sample_uv_linear",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NirNetworkFlowState {
     ConfigReady,
     SendReady,
@@ -2088,6 +2176,10 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
+        | NirExpr::ShaderTexture2d { .. }
+        | NirExpr::ShaderSampler { .. }
+        | NirExpr::ShaderUv { .. }
+        | NirExpr::ShaderBinding { .. }
         | NirExpr::ShaderInlineWgsl { .. } => NirExprEffectClass::HostReadOnly,
         NirExpr::DataBindCore(_)
         | NirExpr::DataMarker(_)
@@ -2110,6 +2202,12 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileSliderColorSlotRef { .. }
+        | NirExpr::ShaderProfileSliderSpeedSlotRef { .. }
+        | NirExpr::ShaderProfileSliderRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileHeaderAccentSlotRef { .. }
+        | NirExpr::ShaderProfileToggleLiveSlotRef { .. }
+        | NirExpr::ShaderProfileFocusSlotRef { .. }
         | NirExpr::ShaderProfilePacketTagRef { .. }
         | NirExpr::ShaderProfileMaterialModeRef { .. }
         | NirExpr::ShaderProfilePassKindRef { .. }
@@ -2206,6 +2304,9 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::ShaderBeginPass { .. }
         | NirExpr::ShaderDrawInstanced { .. }
         | NirExpr::ShaderProfileRender { .. } => NirExprEffectClass::Stateful,
+        NirExpr::ShaderSample { .. } | NirExpr::ShaderSampleUv { .. } | NirExpr::ShaderBindSet { .. } => {
+            NirExprEffectClass::DomainReadOnly
+        }
         NirExpr::Move(_)
         | NirExpr::AllocNode { .. }
         | NirExpr::AllocBuffer { .. }

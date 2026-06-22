@@ -371,7 +371,9 @@ fn evaluate_domain_build_contract_drift(
                 unit.backend_family.as_deref(),
                 unit.selected_lowering_target.as_deref(),
             ) {
-                if backend_family != target {
+                if backend_family != target
+                    && !target.starts_with(&format!("{backend_family}."))
+                {
                     issues.push(format!(
                         "backend_family={} diverges from selected_lowering_target={}",
                         backend_family, target
@@ -592,6 +594,12 @@ fn link_plan_domain_unit_json(unit: &linker::LinkPlanDomainUnit) -> String {
     }
     if let Some(value) = unit.backend_family.as_deref() {
         fields.push(json_string_field("backend_family", value));
+    }
+    if let Some(value) = unit.vendor.as_deref() {
+        fields.push(json_string_field("vendor", value));
+    }
+    if let Some(value) = unit.device_class.as_deref() {
+        fields.push(json_string_field("device_class", value));
     }
     if let Some(value) = unit.selected_lowering_target.as_deref() {
         fields.push(json_string_field("selected_lowering_target", value));
@@ -3474,6 +3482,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                                 if let Some(backend) = target.backend_family {
                                     println!("  abi_target_backend: {}", backend);
                                 }
+                                if let Some(vendor) = target.vendor {
+                                    println!("  abi_target_vendor: {}", vendor);
+                                }
+                                if let Some(device_class) = target.device_class {
+                                    println!("  abi_target_device: {}", device_class);
+                                }
                                 println!(
                                     "  abi_target_host_adaptive: {}",
                                     if target.host_adaptive {
@@ -3634,11 +3648,14 @@ mod tests {
             machine_arch: Some("arm64".to_owned()),
             machine_os: Some("darwin".to_owned()),
             backend_family: Some("urlsession".to_owned()),
-            selected_lowering_target: Some("urlsession".to_owned()),
+            vendor: Some("apple".to_owned()),
+            device_class: Some("socket-io".to_owned()),
+            selected_lowering_target: Some("urlsession.socket-io".to_owned()),
             artifact_stub_path: None,
             artifact_stub_inline: None,
             artifact_payload_path: None,
             artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: None,
             artifact_bridge_stub_inline: None,
             artifact_payload_blob_path: None,
             artifact_payload_blob_bytes: None,
@@ -3665,11 +3682,14 @@ mod tests {
             machine_arch: Some("arm64".to_owned()),
             machine_os: Some("darwin".to_owned()),
             backend_family: Some("urlsession".to_owned()),
-            selected_lowering_target: Some("urlsession".to_owned()),
+            vendor: Some("apple".to_owned()),
+            device_class: Some("socket-io".to_owned()),
+            selected_lowering_target: Some("urlsession.socket-io".to_owned()),
             artifact_stub_path: None,
             artifact_stub_inline: None,
             artifact_payload_path: None,
             artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: None,
             artifact_bridge_stub_inline: None,
             artifact_payload_blob_path: None,
             artifact_payload_blob_bytes: None,
@@ -3693,11 +3713,14 @@ mod tests {
             machine_arch: Some("arm64".to_owned()),
             machine_os: Some("darwin".to_owned()),
             backend_family: Some("imaginary-backend".to_owned()),
+            vendor: None,
+            device_class: None,
             selected_lowering_target: Some("imaginary-target".to_owned()),
             artifact_stub_path: None,
             artifact_stub_inline: None,
             artifact_payload_path: None,
             artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: None,
             artifact_bridge_stub_inline: None,
             artifact_payload_blob_path: None,
             artifact_payload_blob_bytes: None,
@@ -3732,11 +3755,14 @@ mod tests {
             machine_arch: Some("arm64".to_owned()),
             machine_os: Some("darwin".to_owned()),
             backend_family: Some("llvm".to_owned()),
+            vendor: None,
+            device_class: None,
             selected_lowering_target: Some("llvm".to_owned()),
             artifact_stub_path: None,
             artifact_stub_inline: None,
             artifact_payload_path: None,
             artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: None,
             artifact_bridge_stub_inline: None,
             artifact_payload_blob_path: None,
             artifact_payload_blob_bytes: None,
@@ -4150,6 +4176,8 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
                 machine_arch: Some("arm64".to_owned()),
                 machine_os: Some("darwin".to_owned()),
                 backend_family: Some("llvm".to_owned()),
+                vendor: None,
+                device_class: None,
                 selected_lowering_target: Some("llvm".to_owned()),
                 contract_family: "nustar.cpu".to_owned(),
                 packaging_role: "host-binary".to_owned(),

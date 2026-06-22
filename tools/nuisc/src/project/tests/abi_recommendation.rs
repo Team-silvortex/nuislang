@@ -96,14 +96,14 @@ fn materializes_shader_and_network_resources_from_project_abi_targets() {
             && node.op.module == "cpu"
             && node.op.instruction == "text"
             && node.op.args
-                == vec!["mode=symbol:explicit;abi=symbol:shader.metal.msl2_4;arch=symbol:arm64;runtime=symbol:metal;lane_width=i64:1".to_owned()]
+                == vec!["mode=symbol:explicit;abi=symbol:shader.metal.msl2_4;arch=symbol:arm64;runtime=symbol:metal;vendor=symbol:apple;device=symbol:apple-silicon-gpu;lane_width=i64:1".to_owned()]
     }));
     assert!(yir.nodes.iter().any(|node| {
         node.name == "project_profile_network_NetworkUnit_abi_selection_contract_type"
             && node.op.module == "cpu"
             && node.op.instruction == "text"
             && node.op.args
-                == vec!["mode=symbol:explicit;abi=symbol:network.socket.macos.arm64.v1;arch=symbol:arm64;runtime=symbol:urlsession;lane_width=i64:1".to_owned()]
+                == vec!["mode=symbol:explicit;abi=symbol:network.socket.macos.arm64.v1;arch=symbol:arm64;runtime=symbol:urlsession;vendor=symbol:apple;device=symbol:socket-io;lane_width=i64:1".to_owned()]
     }));
 }
 
@@ -297,6 +297,8 @@ fn project_abi_selection_views_expose_registered_targets() {
     assert_eq!(views[0].domain, "network");
     assert_eq!(views[0].machine_arch.as_deref(), Some("arm64"));
     assert_eq!(views[0].machine_os.as_deref(), Some("darwin"));
+    assert_eq!(views[0].vendor.as_deref(), Some("apple"));
+    assert_eq!(views[0].device_class.as_deref(), Some("socket-io"));
 
     let lines = render_project_abi_selection_lines(&resolution);
     assert!(lines
@@ -305,11 +307,21 @@ fn project_abi_selection_views_expose_registered_targets() {
     assert!(lines
         .iter()
         .any(|line| line == "  abi_target_machine: arm64-darwin"));
+    assert!(lines
+        .iter()
+        .any(|line| line == "  abi_target_vendor: apple"));
+    assert!(lines
+        .iter()
+        .any(|line| line == "  abi_target_device: socket-io"));
     let mut written = String::new();
     write_project_abi_selection_lines(&mut written, &resolution).unwrap();
     assert_eq!(written.lines().collect::<Vec<_>>(), lines);
     assert!(
         project_abi_selection_view_json(&views[0]).contains("\"abi_target_host_adaptive\":false")
+    );
+    assert!(project_abi_selection_view_json(&views[0]).contains("\"abi_target_vendor\":\"apple\""));
+    assert!(
+        project_abi_selection_view_json(&views[0]).contains("\"abi_target_device\":\"socket-io\"")
     );
 }
 
@@ -491,19 +503,25 @@ fn project_lowering_selections_resolve_shader_kernel_and_network_targets() {
         .find(|item| item.domain == "network")
         .unwrap();
 
-    assert_eq!(shader.selected_lowering_target.as_deref(), Some("metal"));
+    assert_eq!(
+        shader.selected_lowering_target.as_deref(),
+        Some("metal.apple-silicon-gpu")
+    );
     assert!(shader
         .registered_lowering_targets
         .iter()
         .any(|target| target == "metal"));
-    assert_eq!(kernel.selected_lowering_target.as_deref(), Some("coreml"));
+    assert_eq!(
+        kernel.selected_lowering_target.as_deref(),
+        Some("coreml.apple-ane")
+    );
     assert!(kernel
         .registered_lowering_targets
         .iter()
         .any(|target| target == "coreml"));
     assert_eq!(
         network.selected_lowering_target.as_deref(),
-        Some("urlsession")
+        Some("urlsession.socket-io")
     );
     assert!(network
         .registered_lowering_targets
@@ -1646,6 +1664,132 @@ fn recommend_shader_abi_profile_prefers_registered_host_target() {
 
     let selected = recommend_abi_profile_for_host(&manifest).unwrap();
     assert_eq!(selected, "shader.host-match.v1");
+}
+
+#[test]
+fn recommend_shader_abi_profile_prefers_vendor_device_host_trait() {
+    let host_arch = match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        other => other,
+    };
+    let host_os = match std::env::consts::OS {
+        "macos" => "darwin",
+        other => other,
+    };
+    let Some((preferred_vendor, preferred_device)) = (match (host_os, host_arch) {
+        ("darwin", "arm64") => Some(("apple", "apple-silicon-gpu")),
+        ("darwin", "x86_64") => Some(("apple", "mac-discrete-or-integrated-gpu")),
+        ("linux", _) => Some(("cross-vendor", "discrete-or-integrated-gpu")),
+        ("windows", _) => Some(("microsoft-runtime", "discrete-or-integrated-gpu")),
+        _ => None,
+    }) else {
+        return;
+    };
+    let host_object = host_object_format();
+    let host_calling = host_calling_abi(host_arch, host_os);
+    let host_clang = match (host_arch, host_os) {
+        ("arm64", "darwin") => "aarch64-apple-darwin",
+        ("arm64", "linux") => "aarch64-unknown-linux-gnu",
+        ("x86_64", "darwin") => "x86_64-apple-darwin",
+        ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
+        ("x86_64", "windows") => "x86_64-pc-windows-msvc",
+        _ => "x86_64-unknown-linux-gnu",
+    };
+    let manifest = crate::registry::NustarPackageManifest {
+        manifest_schema: "nustar-manifest-v1".to_owned(),
+        package_id: "official.shader".to_owned(),
+        domain_family: "shader".to_owned(),
+        frontend: "nustar-shader".to_owned(),
+        entry_crate: "crates/yir-domain-shader".to_owned(),
+        ast_entry: "shader.ast.bootstrap.v1".to_owned(),
+        nir_entry: "shader.nir.bootstrap.v1".to_owned(),
+        yir_lowering_entry: "shader.yir.lowering.v1".to_owned(),
+        part_verify_entry: "shader.verify.partial.v1".to_owned(),
+        ast_surface: vec!["shader.mod-ast.v1".to_owned()],
+        nir_surface: vec!["nir.shader.surface.v1".to_owned()],
+        yir_lowering: vec!["yir.shader.lowering.v1".to_owned()],
+        part_verify: vec!["verify.shader.contract.v1".to_owned()],
+        binary_extension: "nustar".to_owned(),
+        package_layout: "single-envelope".to_owned(),
+        machine_abi_policy: "exact-match".to_owned(),
+        abi_profiles: vec![
+            "shader.generic-host.v1".to_owned(),
+            "shader.trait-host.v1".to_owned(),
+        ],
+        abi_capabilities: vec![
+            "shader.generic-host.v1:surface:shader.profile.*|op:shader.*".to_owned(),
+            "shader.trait-host.v1:surface:shader.profile.*|op:shader.*".to_owned(),
+        ],
+        abi_targets: vec![
+            format!(
+                "shader.generic-host.v1:arch={}|os={}|object={}|calling={}|clang={}|backend=metal|vendor=generic|device=generic-gpu",
+                host_arch, host_os, host_object, host_calling, host_clang
+            ),
+            format!(
+                "shader.trait-host.v1:arch={}|os={}|object={}|calling={}|clang={}|backend=metal|vendor={}|device={}",
+                host_arch, host_os, host_object, host_calling, host_clang, preferred_vendor, preferred_device
+            ),
+        ],
+        implementation_kinds: vec!["native-stub".to_owned()],
+        loader_entry: "nustar.bootstrap.v1".to_owned(),
+        loader_abi: "nustar-loader-v1".to_owned(),
+        host_ffi_surface: Vec::new(),
+        host_ffi_abis: Vec::new(),
+        host_ffi_bridge: "none".to_owned(),
+        bridge_lane_policy: None,
+        bridge_surface: None,
+        bridge_emission_kind: None,
+        bridge_entry: None,
+        bridge_kind: None,
+        bridge_scheduler_binding: None,
+        backend_stub_kind: None,
+        backend_submission_mode: None,
+        backend_wake_policy: None,
+        backend_transport_model: None,
+        backend_request_shape: None,
+        backend_response_shape: None,
+        backend_dispatch_shape: None,
+        backend_memory_binding: None,
+        backend_resource_binding: None,
+        backend_completion_model: None,
+        phase_bind: None,
+        phase_submit: None,
+        phase_wait: None,
+        phase_finalize: None,
+        host_bridge_host_ffi_surface: None,
+        host_bridge_handle_family: None,
+        host_bridge_phase_order: None,
+        host_bridge_phase_bind_inputs: None,
+        host_bridge_phase_bind_outputs: None,
+        host_bridge_phase_submit_inputs: None,
+        host_bridge_phase_submit_outputs: None,
+        host_bridge_phase_wait_inputs: None,
+        host_bridge_phase_wait_outputs: None,
+        host_bridge_phase_finalize_inputs: None,
+        host_bridge_phase_finalize_outputs: None,
+        host_bridge_phase_bind_wake: None,
+        host_bridge_phase_submit_wake: None,
+        host_bridge_phase_wait_wake: None,
+        host_bridge_phase_finalize_wake: None,
+        host_bridge_plan_begin: None,
+        host_bridge_plan_end: None,
+        support_surface: Vec::new(),
+        support_profile_slots: Vec::new(),
+        default_lanes: Vec::new(),
+        clock_domain_id: "shader.clock.frame.v1".to_owned(),
+        clock_kind: "frame-monotonic".to_owned(),
+        clock_epoch_kind: "frame-epoch".to_owned(),
+        clock_resolution: "render-pass-step".to_owned(),
+        clock_bridge_default: "global->frame:bridge".to_owned(),
+        profiles: vec!["aot".to_owned()],
+        resource_families: vec!["shader".to_owned()],
+        unit_types: vec!["SurfaceShader".to_owned()],
+        lowering_targets: vec!["metal".to_owned()],
+        ops: vec!["shader.target".to_owned()],
+    };
+
+    let selected = recommend_abi_profile_for_host(&manifest).unwrap();
+    assert_eq!(selected, "shader.trait-host.v1");
 }
 
 #[test]

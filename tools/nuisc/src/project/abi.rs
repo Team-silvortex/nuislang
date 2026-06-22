@@ -9,6 +9,51 @@ use super::{
     ProjectAbiResolution, ProjectAbiSelectionCheck,
 };
 
+pub(crate) fn backend_family_for_registered_abi_target(
+    domain: &str,
+    target: &crate::registry::RegisteredAbiTarget,
+) -> Option<String> {
+    match domain {
+        "shader" | "kernel" => target.backend_family.clone(),
+        "network" => Some(match target.machine_os.as_str() {
+            "darwin" => "urlsession".to_owned(),
+            "windows" => "winsock".to_owned(),
+            _ => "socket".to_owned(),
+        }),
+        _ => None,
+    }
+}
+
+pub(crate) fn selected_lowering_target_for_registered_abi_target(
+    domain: &str,
+    target: &crate::registry::RegisteredAbiTarget,
+    registered_lowering_targets: &[String],
+) -> Option<String> {
+    let base = match domain {
+        "shader" | "kernel" => target.backend_family.clone()?,
+        "network" => Some(match target.machine_os.as_str() {
+            "darwin" => "urlsession".to_owned(),
+            "windows" => "winsock".to_owned(),
+            _ => "socket-abi".to_owned(),
+        })?,
+        _ => return None,
+    };
+    let mut candidates = Vec::new();
+    if let Some(device_class) = target.device_class.as_deref() {
+        candidates.push(format!("{base}.{device_class}"));
+    }
+    if let Some(vendor) = target.vendor.as_deref() {
+        candidates.push(format!("{base}.{vendor}"));
+    }
+    candidates.push(base.clone());
+    for candidate in &candidates {
+        if registered_lowering_targets.iter().any(|item| item == candidate) {
+            return Some(candidate.clone());
+        }
+    }
+    candidates.into_iter().next()
+}
+
 fn json_escape(value: &str) -> String {
     let mut out = String::new();
     for ch in value.chars() {
@@ -309,6 +354,20 @@ fn recommend_registered_abi_profile_for_host(
         if !target.host_adaptive {
             score += 15;
         }
+        if let Some(preferred_vendor) =
+            preferred_host_vendor_hint(&manifest.domain_family, host_arch, host_os)
+        {
+            if target.vendor.as_deref() == Some(preferred_vendor) {
+                score += 25;
+            }
+        }
+        if let Some(preferred_device) =
+            preferred_host_device_hint(&manifest.domain_family, host_arch, host_os)
+        {
+            if target.device_class.as_deref() == Some(preferred_device) {
+                score += 25;
+            }
+        }
         if manifest.domain_family == "shader" {
             let backend = target
                 .backend_family
@@ -347,6 +406,39 @@ fn recommend_registered_abi_profile_for_host(
         }
     }
     best.map(|(_, profile)| profile)
+}
+
+fn preferred_host_vendor_hint(
+    domain_family: &str,
+    host_arch: &str,
+    host_os: &str,
+) -> Option<&'static str> {
+    match (domain_family, host_os, host_arch) {
+        ("shader", "darwin", _) => Some("apple"),
+        ("shader", "linux", _) => Some("cross-vendor"),
+        ("shader", "windows", _) => Some("microsoft-runtime"),
+        ("kernel", "darwin", _) => Some("apple"),
+        ("network", "darwin", _) => Some("apple"),
+        ("network", "linux", _) => Some("posix"),
+        ("network", "windows", _) => Some("microsoft"),
+        _ => None,
+    }
+}
+
+fn preferred_host_device_hint(
+    domain_family: &str,
+    host_arch: &str,
+    host_os: &str,
+) -> Option<&'static str> {
+    match (domain_family, host_os, host_arch) {
+        ("shader", "darwin", "arm64") => Some("apple-silicon-gpu"),
+        ("shader", "darwin", "x86_64") => Some("mac-discrete-or-integrated-gpu"),
+        ("shader", "linux", _) => Some("discrete-or-integrated-gpu"),
+        ("shader", "windows", _) => Some("discrete-or-integrated-gpu"),
+        ("kernel", "darwin", "arm64") => Some("apple-ane"),
+        ("network", _, _) => Some("socket-io"),
+        _ => None,
+    }
 }
 
 pub(super) fn host_object_format() -> &'static str {

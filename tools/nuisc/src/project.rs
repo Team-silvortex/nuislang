@@ -32,6 +32,9 @@ pub use abi::{
     render_project_abi_selection_check_lines, resolve_project_abi, validate_project_abi_selections,
     write_project_abi_selection_check_lines,
 };
+pub(crate) use abi::{
+    backend_family_for_registered_abi_target, selected_lowering_target_for_registered_abi_target,
+};
 #[cfg(test)]
 use abi::{host_calling_abi, host_object_format, recommend_abi_profile_for_host};
 use bridge_contracts::{
@@ -332,6 +335,8 @@ pub struct ProjectAbiSelectionView {
     pub calling_abi: Option<String>,
     pub clang_target: Option<String>,
     pub backend_family: Option<String>,
+    pub vendor: Option<String>,
+    pub device_class: Option<String>,
     pub host_adaptive: Option<bool>,
 }
 

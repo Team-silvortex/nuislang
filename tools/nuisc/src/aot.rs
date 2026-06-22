@@ -731,6 +731,15 @@ pub fn write_build_manifest(
                 escape_toml_string(value)
             ));
         }
+        if let Some(value) = &unit.vendor {
+            out.push_str(&format!("vendor = \"{}\"\n", escape_toml_string(value)));
+        }
+        if let Some(value) = &unit.device_class {
+            out.push_str(&format!(
+                "device_class = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
         if let Some(value) = &unit.selected_lowering_target {
             out.push_str(&format!(
                 "selected_lowering_target = \"{}\"\n",
@@ -758,6 +767,12 @@ pub fn write_build_manifest(
         if let Some(value) = &unit.artifact_bridge_stub_path {
             out.push_str(&format!(
                 "artifact_bridge_stub_path = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &unit.artifact_ir_sidecar_path {
+            out.push_str(&format!(
+                "artifact_ir_sidecar_path = \"{}\"\n",
                 escape_toml_string(value)
             ));
         }
@@ -1176,7 +1191,7 @@ fn build_manifest_domain_units(
         .iter()
         .map(|contract| {
             let abi = abi_by_domain.get(&contract.domain_family).cloned();
-            let (machine_arch, machine_os, backend_family, selected_lowering_target) =
+            let (machine_arch, machine_os, backend_family, vendor, device_class, selected_lowering_target) =
                 resolve_domain_build_unit_target(&contract.domain_family, abi.as_deref())?;
             Ok(BuildManifestDomainBuildUnit {
                 package_id: contract.package_id.clone(),
@@ -1185,11 +1200,14 @@ fn build_manifest_domain_units(
                 machine_arch,
                 machine_os,
                 backend_family,
+                vendor,
+                device_class,
                 selected_lowering_target,
                 artifact_stub_path: None,
                 artifact_stub_inline: None,
                 artifact_payload_path: None,
                 artifact_bridge_stub_path: None,
+                artifact_ir_sidecar_path: None,
                 artifact_bridge_stub_inline: None,
                 artifact_payload_blob_path: None,
                 artifact_payload_blob_bytes: None,
@@ -1240,9 +1258,31 @@ fn write_domain_build_unit_stubs(
         fs::write(&bridge_stub_path, &bridge_stub).map_err(|error| {
             format!("failed to write `{}`: {error}", bridge_stub_path.display())
         })?;
+        let ir_sidecar_path = if unit.domain_family == "shader"
+            || unit.domain_family == "kernel"
+            || unit.domain_family == "network"
+        {
+            let path = output_dir.join(format!(
+                "nuis.domain.{}.lowering.ir.txt",
+                unit.domain_family
+            ));
+            let sidecar = match unit.domain_family.as_str() {
+                "shader" => render_domain_build_unit_shader_ir_sidecar(unit),
+                "kernel" => render_domain_build_unit_kernel_ir_sidecar(unit),
+                "network" => render_domain_build_unit_network_ir_sidecar(unit),
+                _ => unreachable!(),
+            };
+            fs::write(&path, sidecar)
+                .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
+            Some(path)
+        } else {
+            None
+        };
         let path = output_dir.join(format!("nuis.domain.{}.artifact.toml", unit.domain_family));
         unit.artifact_payload_path = Some(payload_path.display().to_string());
         unit.artifact_bridge_stub_path = Some(bridge_stub_path.display().to_string());
+        unit.artifact_ir_sidecar_path =
+            ir_sidecar_path.as_ref().map(|path| path.display().to_string());
         unit.artifact_bridge_stub_inline = Some(bridge_stub.clone());
         unit.artifact_payload_blob_path = Some(payload_blob_path.display().to_string());
         unit.artifact_payload_blob_bytes = Some(payload_blob.len());
@@ -1266,6 +1306,12 @@ fn write_domain_build_unit_stubs(
             format!("domain_bridge_stub_{}", unit.domain_family),
             bridge_stub_path,
         ));
+        if let Some(ir_sidecar_path) = ir_sidecar_path {
+            artifacts.push((
+                format!("domain_ir_sidecar_{}", unit.domain_family),
+                ir_sidecar_path,
+            ));
+        }
     }
     Ok(artifacts)
 }
@@ -1311,6 +1357,14 @@ fn render_domain_bridge_registry(units: &[&BuildManifestDomainBuildUnit]) -> Str
         out.push_str(&format!(
             "backend_family = \"{}\"\n",
             escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
+        ));
+        out.push_str(&format!(
+            "vendor = \"{}\"\n",
+            escape_toml_string(unit.vendor.as_deref().unwrap_or("none"))
+        ));
+        out.push_str(&format!(
+            "device_class = \"{}\"\n",
+            escape_toml_string(unit.device_class.as_deref().unwrap_or("none"))
         ));
         out.push_str(&format!(
             "selected_lowering_target = \"{}\"\n",
@@ -1377,6 +1431,22 @@ fn render_host_bridge_plan_index(units: &[&BuildManifestDomainBuildUnit]) -> Str
             escape_toml_string(&unit.package_id)
         ));
         out.push_str(&format!(
+            "backend_family = \"{}\"\n",
+            escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
+        ));
+        out.push_str(&format!(
+            "vendor = \"{}\"\n",
+            escape_toml_string(unit.vendor.as_deref().unwrap_or("none"))
+        ));
+        out.push_str(&format!(
+            "device_class = \"{}\"\n",
+            escape_toml_string(unit.device_class.as_deref().unwrap_or("none"))
+        ));
+        out.push_str(&format!(
+            "selected_lowering_target = \"{}\"\n",
+            escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
+        ));
+        out.push_str(&format!(
             "bridge_stub_path = \"{}\"\n",
             escape_toml_string(
                 unit.artifact_bridge_stub_path
@@ -1427,17 +1497,26 @@ fn render_domain_build_unit_stub(unit: &BuildManifestDomainBuildUnit) -> String 
     if let Some(value) = &unit.machine_os {
         out.push_str(&format!("machine_os = \"{}\"\n", escape_toml_string(value)));
     }
-    if let Some(value) = &unit.backend_family {
-        out.push_str(&format!(
-            "backend_family = \"{}\"\n",
-            escape_toml_string(value)
-        ));
-    }
-    if let Some(value) = &unit.selected_lowering_target {
-        out.push_str(&format!(
-            "selected_lowering_target = \"{}\"\n",
-            escape_toml_string(value)
-        ));
+        if let Some(value) = &unit.backend_family {
+            out.push_str(&format!(
+                "backend_family = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &unit.vendor {
+            out.push_str(&format!("vendor = \"{}\"\n", escape_toml_string(value)));
+        }
+        if let Some(value) = &unit.device_class {
+            out.push_str(&format!(
+                "device_class = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &unit.selected_lowering_target {
+            out.push_str(&format!(
+                "selected_lowering_target = \"{}\"\n",
+                escape_toml_string(value)
+            ));
     }
     if let Some(value) = &unit.artifact_stub_inline {
         out.push_str(&format!(
@@ -1454,6 +1533,12 @@ fn render_domain_build_unit_stub(unit: &BuildManifestDomainBuildUnit) -> String 
     if let Some(value) = &unit.artifact_bridge_stub_path {
         out.push_str(&format!(
             "artifact_bridge_stub_path = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.artifact_ir_sidecar_path {
+        out.push_str(&format!(
+            "artifact_ir_sidecar_path = \"{}\"\n",
             escape_toml_string(value)
         ));
     }
@@ -1518,6 +1603,15 @@ fn render_domain_build_unit_payload(unit: &BuildManifestDomainBuildUnit) -> Resu
     if let Some(value) = &unit.backend_family {
         out.push_str(&format!(
             "backend_family = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.vendor {
+        out.push_str(&format!("vendor = \"{}\"\n", escape_toml_string(value)));
+    }
+    if let Some(value) = &unit.device_class {
+        out.push_str(&format!(
+            "device_class = \"{}\"\n",
             escape_toml_string(value)
         ));
     }
@@ -1637,27 +1731,41 @@ fn encode_domain_build_unit_payload_blob(
 ) -> Result<Vec<u8>, String> {
     let payload = fs::read(payload_path)
         .map_err(|error| format!("failed to read `{}`: {error}", payload_path.display()))?;
-    let blob = DomainBuildUnitPayloadBlob::from_domain_unit_and_sections(
-        unit,
-        vec![
-            DomainBuildUnitPayloadBlobSection {
-                name: "contract_toml".to_owned(),
-                bytes: payload,
-            },
-            DomainBuildUnitPayloadBlobSection {
-                name: "lowering_plan".to_owned(),
-                bytes: render_domain_build_unit_lowering_plan(unit).into_bytes(),
-            },
-            DomainBuildUnitPayloadBlobSection {
-                name: "backend_stub".to_owned(),
-                bytes: render_domain_build_unit_backend_stub(unit).into_bytes(),
-            },
-            DomainBuildUnitPayloadBlobSection {
-                name: "bridge_plan".to_owned(),
-                bytes: render_domain_build_unit_bridge_plan(unit).into_bytes(),
-            },
-        ],
-    );
+    let mut sections = vec![
+        DomainBuildUnitPayloadBlobSection {
+            name: "contract_toml".to_owned(),
+            bytes: payload,
+        },
+        DomainBuildUnitPayloadBlobSection {
+            name: "lowering_plan".to_owned(),
+            bytes: render_domain_build_unit_lowering_plan(unit).into_bytes(),
+        },
+        DomainBuildUnitPayloadBlobSection {
+            name: "backend_stub".to_owned(),
+            bytes: render_domain_build_unit_backend_stub(unit).into_bytes(),
+        },
+        DomainBuildUnitPayloadBlobSection {
+            name: "bridge_plan".to_owned(),
+            bytes: render_domain_build_unit_bridge_plan(unit).into_bytes(),
+        },
+    ];
+    if unit.domain_family == "shader" {
+        sections.push(DomainBuildUnitPayloadBlobSection {
+            name: "shader_ir_sidecar".to_owned(),
+            bytes: render_domain_build_unit_shader_ir_sidecar(unit).into_bytes(),
+        });
+    } else if unit.domain_family == "kernel" {
+        sections.push(DomainBuildUnitPayloadBlobSection {
+            name: "kernel_ir_sidecar".to_owned(),
+            bytes: render_domain_build_unit_kernel_ir_sidecar(unit).into_bytes(),
+        });
+    } else if unit.domain_family == "network" {
+        sections.push(DomainBuildUnitPayloadBlobSection {
+            name: "network_ir_sidecar".to_owned(),
+            bytes: render_domain_build_unit_network_ir_sidecar(unit).into_bytes(),
+        });
+    }
+    let blob = DomainBuildUnitPayloadBlob::from_domain_unit_and_sections(unit, sections);
     shared_encode_domain_payload_blob(&blob).map_err(|error| error.to_string())
 }
 
@@ -1676,8 +1784,702 @@ fn domain_build_contract_summary_for_unit(
     }
 }
 
+struct DerivedLoweringProfile<'a> {
+    profile_key: &'a str,
+    execution_route: &'static str,
+    submission_adapter: &'static str,
+    wake_adapter: &'static str,
+}
+
+fn derived_lowering_profile_for_unit<'a>(
+    unit: &'a BuildManifestDomainBuildUnit,
+) -> DerivedLoweringProfile<'a> {
+    let profile_key = unit
+        .selected_lowering_target
+        .as_deref()
+        .or(unit.backend_family.as_deref())
+        .unwrap_or("none");
+    let (execution_route, submission_adapter, wake_adapter) =
+        match (unit.domain_family.as_str(), profile_key) {
+            ("shader", "metal.apple-silicon-gpu") => (
+                "unified-render-graph",
+                "metal-command-encoder",
+                "metal-shared-event",
+            ),
+            ("shader", "metal.mac-discrete-or-integrated-gpu") => (
+                "render-graph-device-queue",
+                "metal-command-buffer",
+                "metal-frame-fence",
+            ),
+            ("shader", "vulkan.discrete-or-integrated-gpu") => (
+                "spirv-render-queue",
+                "vulkan-command-buffer",
+                "vulkan-timeline-semaphore",
+            ),
+            ("shader", "directx.discrete-or-integrated-gpu") => (
+                "dxil-render-queue",
+                "directx-command-list",
+                "directx-fence",
+            ),
+            ("shader", "opengl.discrete-or-integrated-gpu") => (
+                "driver-managed-render-pipeline",
+                "opengl-driver-submit",
+                "gl-sync-object",
+            ),
+            ("shader", "cpu-fallback.cpu-host") => (
+                "host-render-fallback",
+                "cpu-raster-dispatch",
+                "host-frame-complete",
+            ),
+            ("kernel", "coreml.apple-ane") => (
+                "ane-graph-execution",
+                "coreml-graph-submit",
+                "coreml-completion-callback",
+            ),
+            ("kernel", "vulkan.discrete-or-integrated-gpu") => (
+                "spirv-compute-queue",
+                "vulkan-compute-submit",
+                "vulkan-timeline-semaphore",
+            ),
+            ("kernel", "cpu-fallback.cpu-host") => (
+                "host-kernel-fallback",
+                "cpu-threadpool-dispatch",
+                "host-join-wake",
+            ),
+            ("network", "urlsession.socket-io") => (
+                "foundation-session-reactor",
+                "urlsession-task-submit",
+                "urlsession-callback",
+            ),
+            ("network", "winsock.socket-io") => (
+                "windows-socket-reactor",
+                "winsock-overlapped-submit",
+                "iocp-ready",
+            ),
+            ("network", "socket-abi.socket-io") => (
+                "posix-socket-reactor",
+                "socket-send-recv-submit",
+                "poll-ready",
+            ),
+            ("shader", _) => (
+                "generic-render-dispatch",
+                "render-submit-bridge",
+                "frame-present",
+            ),
+            ("kernel", _) => (
+                "generic-accelerator-dispatch",
+                "hetero-submit-bridge",
+                "completion-fence",
+            ),
+            ("network", _) => ("generic-io-reactor", "network-poll-bridge", "io-ready"),
+            ("cpu", _) | ("host", _) => ("host-inline-call", "direct-call", "immediate"),
+            _ => ("generic-dispatch", "generic-submit", "generic-wake"),
+        };
+    DerivedLoweringProfile {
+        profile_key,
+        execution_route,
+        submission_adapter,
+        wake_adapter,
+    }
+}
+
+fn render_target_specific_backend_fields(
+    unit: &BuildManifestDomainBuildUnit,
+    profile: &DerivedLoweringProfile<'_>,
+) -> String {
+    let mut out = String::new();
+    match (unit.domain_family.as_str(), profile.profile_key) {
+        ("shader", "metal.apple-silicon-gpu") => {
+            out.push_str("shader_ir = \"msl2.4\"\n");
+            out.push_str("shader_entry_model = \"metal-function-constant-specialized\"\n");
+            out.push_str("queue_binding_model = \"unified-command-queue\"\n");
+            out.push_str("resource_binding_model = \"argument-buffer-table\"\n");
+        }
+        ("shader", "metal.mac-discrete-or-integrated-gpu") => {
+            out.push_str("shader_ir = \"msl2.4\"\n");
+            out.push_str("shader_entry_model = \"metal-pipeline-state\"\n");
+            out.push_str("queue_binding_model = \"device-command-queue\"\n");
+            out.push_str("resource_binding_model = \"descriptor-table-emulated\"\n");
+        }
+        ("shader", "vulkan.discrete-or-integrated-gpu") => {
+            out.push_str("shader_ir = \"spirv1.6\"\n");
+            out.push_str("shader_entry_model = \"vulkan-pipeline\"\n");
+            out.push_str("queue_binding_model = \"explicit-device-queue\"\n");
+            out.push_str("resource_binding_model = \"descriptor-set-layout\"\n");
+        }
+        ("shader", "directx.discrete-or-integrated-gpu") => {
+            out.push_str("shader_ir = \"dxil6.8\"\n");
+            out.push_str("shader_entry_model = \"directx-pipeline-state\"\n");
+            out.push_str("queue_binding_model = \"command-queue\"\n");
+            out.push_str("resource_binding_model = \"root-signature\"\n");
+        }
+        ("shader", "opengl.discrete-or-integrated-gpu") => {
+            out.push_str("shader_ir = \"glsl460\"\n");
+            out.push_str("shader_entry_model = \"driver-linked-program\"\n");
+            out.push_str("queue_binding_model = \"driver-managed\"\n");
+            out.push_str("resource_binding_model = \"uniform-slot-table\"\n");
+        }
+        ("shader", "cpu-fallback.cpu-host") => {
+            out.push_str("shader_ir = \"host-simd\"\n");
+            out.push_str("shader_entry_model = \"cpu-raster-kernel\"\n");
+            out.push_str("queue_binding_model = \"threadpool-work-queue\"\n");
+            out.push_str("resource_binding_model = \"host-buffer-slices\"\n");
+        }
+        ("kernel", "coreml.apple-ane") => {
+            out.push_str("kernel_ir = \"coreml-program\"\n");
+            out.push_str("kernel_entry_model = \"mlmodelc-function\"\n");
+            out.push_str("queue_binding_model = \"ane-submission-service\"\n");
+            out.push_str("resource_binding_model = \"tensor-argument-table\"\n");
+        }
+        ("kernel", "vulkan.discrete-or-integrated-gpu") => {
+            out.push_str("kernel_ir = \"spirv1.6\"\n");
+            out.push_str("kernel_entry_model = \"compute-pipeline\"\n");
+            out.push_str("queue_binding_model = \"compute-queue\"\n");
+            out.push_str("resource_binding_model = \"descriptor-set-layout\"\n");
+        }
+        ("kernel", "cpu-fallback.cpu-host") => {
+            out.push_str("kernel_ir = \"host-simd\"\n");
+            out.push_str("kernel_entry_model = \"threadpool-kernel\"\n");
+            out.push_str("queue_binding_model = \"host-work-queue\"\n");
+            out.push_str("resource_binding_model = \"host-buffer-slices\"\n");
+        }
+        ("network", "urlsession.socket-io") => {
+            out.push_str("transport_ir = \"foundation-url-request\"\n");
+            out.push_str("transport_entry_model = \"urlsession-task\"\n");
+            out.push_str("socket_binding_model = \"session-owned-socket\"\n");
+            out.push_str("completion_binding_model = \"delegate-callback\"\n");
+        }
+        ("network", "winsock.socket-io") => {
+            out.push_str("transport_ir = \"winsock-overlapped\"\n");
+            out.push_str("transport_entry_model = \"iocp-request\"\n");
+            out.push_str("socket_binding_model = \"overlapped-socket-handle\"\n");
+            out.push_str("completion_binding_model = \"iocp-completion-port\"\n");
+        }
+        ("network", "socket-abi.socket-io") => {
+            out.push_str("transport_ir = \"posix-socket\"\n");
+            out.push_str("transport_entry_model = \"poll-reactor-request\"\n");
+            out.push_str("socket_binding_model = \"fd-owned-session\"\n");
+            out.push_str("completion_binding_model = \"poll-ready-token\"\n");
+        }
+        _ => {}
+    }
+    out
+}
+
+fn render_target_specific_lowering_fields(
+    unit: &BuildManifestDomainBuildUnit,
+    profile: &DerivedLoweringProfile<'_>,
+) -> String {
+    let mut out = String::new();
+    match (unit.domain_family.as_str(), profile.profile_key) {
+        ("shader", "metal.apple-silicon-gpu") => {
+            out.push_str("lowering_ir = \"msl2.4\"\n");
+            out.push_str("shader_stage_model = \"metal-render-pipeline\"\n");
+            out.push_str("stage_binding_model = \"argument-buffer-specialized\"\n");
+            out.push_str("dispatch_encoding_model = \"tile-and-threadgroup\"\n");
+        }
+        ("shader", "metal.mac-discrete-or-integrated-gpu") => {
+            out.push_str("lowering_ir = \"msl2.4\"\n");
+            out.push_str("shader_stage_model = \"metal-render-pipeline\"\n");
+            out.push_str("stage_binding_model = \"descriptor-table-emulated\"\n");
+            out.push_str("dispatch_encoding_model = \"device-queue-encoder\"\n");
+        }
+        ("shader", "vulkan.discrete-or-integrated-gpu") => {
+            out.push_str("lowering_ir = \"spirv1.6\"\n");
+            out.push_str("shader_stage_model = \"spirv-graphics-pipeline\"\n");
+            out.push_str("stage_binding_model = \"descriptor-set-layout\"\n");
+            out.push_str("dispatch_encoding_model = \"renderpass-command-buffer\"\n");
+        }
+        ("shader", "directx.discrete-or-integrated-gpu") => {
+            out.push_str("lowering_ir = \"dxil6.8\"\n");
+            out.push_str("shader_stage_model = \"dxil-pso\"\n");
+            out.push_str("stage_binding_model = \"root-signature\"\n");
+            out.push_str("dispatch_encoding_model = \"command-list-recording\"\n");
+        }
+        ("shader", "opengl.discrete-or-integrated-gpu") => {
+            out.push_str("lowering_ir = \"glsl460\"\n");
+            out.push_str("shader_stage_model = \"linked-program-pipeline\"\n");
+            out.push_str("stage_binding_model = \"uniform-slot-table\"\n");
+            out.push_str("dispatch_encoding_model = \"driver-issued-draw\"\n");
+        }
+        ("shader", "cpu-fallback.cpu-host") => {
+            out.push_str("lowering_ir = \"host-simd\"\n");
+            out.push_str("shader_stage_model = \"cpu-raster-pipeline\"\n");
+            out.push_str("stage_binding_model = \"host-buffer-slices\"\n");
+            out.push_str("dispatch_encoding_model = \"threadpool-tile-dispatch\"\n");
+        }
+        ("network", "urlsession.socket-io") => {
+            out.push_str("lowering_ir = \"foundation-url-request\"\n");
+            out.push_str("transport_binding_model = \"session-task-packet\"\n");
+            out.push_str("completion_encoding_model = \"delegate-callback-lifecycle\"\n");
+        }
+        ("network", "winsock.socket-io") => {
+            out.push_str("lowering_ir = \"winsock-overlapped\"\n");
+            out.push_str("transport_binding_model = \"overlapped-packet-reactor\"\n");
+            out.push_str("completion_encoding_model = \"iocp-completion-lifecycle\"\n");
+        }
+        ("network", "socket-abi.socket-io") => {
+            out.push_str("lowering_ir = \"posix-socket\"\n");
+            out.push_str("transport_binding_model = \"packet-poll-reactor\"\n");
+            out.push_str("completion_encoding_model = \"poll-ready-lifecycle\"\n");
+        }
+        _ => {}
+    }
+    out
+}
+
+fn shader_supported_stages_for_profile(
+    unit: &BuildManifestDomainBuildUnit,
+    profile: &DerivedLoweringProfile<'_>,
+) -> Option<&'static [&'static str]> {
+    match (unit.domain_family.as_str(), profile.profile_key) {
+        (
+            "shader",
+            "metal.apple-silicon-gpu"
+            | "metal.mac-discrete-or-integrated-gpu"
+            | "vulkan.discrete-or-integrated-gpu"
+            | "directx.discrete-or-integrated-gpu"
+            | "opengl.discrete-or-integrated-gpu"
+            | "cpu-fallback.cpu-host",
+        ) => Some(&["vertex", "fragment", "compute"]),
+        ("shader", _) => Some(&["fragment"]),
+        _ => None,
+    }
+}
+
+fn kernel_supported_dispatch_kinds_for_profile(
+    unit: &BuildManifestDomainBuildUnit,
+    profile: &DerivedLoweringProfile<'_>,
+) -> Option<&'static [&'static str]> {
+    match (unit.domain_family.as_str(), profile.profile_key) {
+        ("kernel", "coreml.apple-ane") => Some(&["graph", "batch", "tile"]),
+        ("kernel", "vulkan.discrete-or-integrated-gpu") => {
+            Some(&["grid", "indirect", "batch"])
+        }
+        ("kernel", "cpu-fallback.cpu-host") => Some(&["range", "tile", "batch"]),
+        ("kernel", _) => Some(&["graph"]),
+        _ => None,
+    }
+}
+
+fn render_domain_build_unit_shader_ir_sidecar(unit: &BuildManifestDomainBuildUnit) -> String {
+    let profile = derived_lowering_profile_for_unit(unit);
+    let supported_stages = shader_supported_stages_for_profile(unit, &profile).unwrap_or(&[]);
+    let has_stage = |stage: &str| supported_stages.contains(&stage);
+    let mut out = String::new();
+    out.push_str("schema = \"nuis-shader-ir-sidecar-v1\"\n");
+    out.push_str(&format!(
+        "domain_family = \"{}\"\n",
+        escape_toml_string(&unit.domain_family)
+    ));
+    out.push_str(&format!(
+        "package_id = \"{}\"\n",
+        escape_toml_string(&unit.package_id)
+    ));
+    out.push_str(&format!(
+        "backend_family = \"{}\"\n",
+        escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "selected_lowering_target = \"{}\"\n",
+        escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "lowering_profile = \"{}\"\n",
+        escape_toml_string(profile.profile_key)
+    ));
+    if !supported_stages.is_empty() {
+        out.push_str(&format!(
+            "supported_stages = {}\n",
+            render_string_array(
+                &supported_stages
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
+    out.push_str(&render_target_specific_lowering_fields(unit, &profile));
+    match profile.profile_key {
+        "metal.apple-silicon-gpu" | "metal.mac-discrete-or-integrated-gpu" => {
+            out.push_str("ir_container = \"text.msl\"\n");
+            out.push_str("entry_symbol = \"main0\"\n");
+            out.push_str("stage_kind = \"fragment\"\n");
+            out.push_str("resource_layout = \"argument-buffer\"\n");
+            out.push_str("[pipeline_layout]\n");
+            out.push_str("color_targets = [\"rgba8unorm\"]\n");
+            out.push_str("threadgroup_topology = \"tile\"\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"material.uniforms, frame.texture0\"\n");
+            out.push_str("push_constants = \"fragment.params\"\n");
+            out.push_str("[entry_points]\n");
+            if has_stage("vertex") {
+                out.push_str("vertex = \"vs_main\"\n");
+            }
+            if has_stage("fragment") {
+                out.push_str("fragment = \"main0\"\n");
+            }
+            if has_stage("compute") {
+                out.push_str("compute = \"cs_main\"\n");
+            }
+            out.push_str("[source_stub]\n");
+            out.push_str("header = \"#include <metal_stdlib>\\nusing namespace metal;\"\n");
+            if has_stage("vertex") {
+                out.push_str(
+                    "vertex_body = \"vertex float4 vs_main(uint vid [[vertex_id]]) {\\n    return float4(float(vid & 1), float((vid >> 1) & 1), 0.0, 1.0);\\n}\"\n",
+                );
+            }
+            if has_stage("fragment") {
+                out.push_str(
+                    "body = \"fragment float4 main0(float2 uv [[stage_in]]) {\\n    return float4(uv.x, uv.y, 0.0, 1.0);\\n}\"\n",
+                );
+            }
+            if has_stage("compute") {
+                out.push_str(
+                    "compute_body = \"kernel void cs_main(uint2 gid [[thread_position_in_grid]]) {\\n    (void)gid;\\n}\"\n",
+                );
+            }
+        }
+        "vulkan.discrete-or-integrated-gpu" => {
+            out.push_str("ir_container = \"text.spirv\"\n");
+            out.push_str("entry_symbol = \"main\"\n");
+            out.push_str("stage_kind = \"fragment\"\n");
+            out.push_str("resource_layout = \"descriptor-set\"\n");
+            out.push_str("[pipeline_layout]\n");
+            out.push_str("color_targets = [\"rgba8unorm\"]\n");
+            out.push_str("threadgroup_topology = \"quad-fragment\"\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"set0.binding0.texture, set0.binding1.sampler\"\n");
+            out.push_str("push_constants = \"fragment.params\"\n");
+            out.push_str("[entry_points]\n");
+            if has_stage("vertex") {
+                out.push_str("vertex = \"vs_main\"\n");
+            }
+            if has_stage("fragment") {
+                out.push_str("fragment = \"main\"\n");
+            }
+            if has_stage("compute") {
+                out.push_str("compute = \"cs_main\"\n");
+            }
+            out.push_str("[source_stub]\n");
+            out.push_str("capabilities = \"OpCapability Shader\"\n");
+            if has_stage("vertex") {
+                out.push_str(
+                    "vertex_body = \"OpEntryPoint Vertex %vs_main \\\"vs_main\\\"\"\n",
+                );
+            }
+            if has_stage("fragment") {
+                out.push_str(
+                    "body = \"OpMemoryModel Logical GLSL450\\nOpEntryPoint Fragment %main \\\"main\\\"\\n%main = OpFunction %void None %fn\\nOpFunctionEnd\"\n",
+                );
+            }
+            if has_stage("compute") {
+                out.push_str(
+                    "compute_body = \"OpEntryPoint GLCompute %cs_main \\\"cs_main\\\"\"\n",
+                );
+            }
+        }
+        "directx.discrete-or-integrated-gpu" => {
+            out.push_str("ir_container = \"text.dxil\"\n");
+            out.push_str("entry_symbol = \"main\"\n");
+            out.push_str("stage_kind = \"fragment\"\n");
+            out.push_str("resource_layout = \"root-signature\"\n");
+            out.push_str("[pipeline_layout]\n");
+            out.push_str("color_targets = [\"rgba8unorm\"]\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"t0.texture, s0.sampler\"\n");
+            out.push_str("[entry_points]\n");
+            if has_stage("vertex") {
+                out.push_str("vertex = \"vs_main\"\n");
+            }
+            if has_stage("fragment") {
+                out.push_str("fragment = \"main\"\n");
+            }
+            if has_stage("compute") {
+                out.push_str("compute = \"cs_main\"\n");
+            }
+            out.push_str("[source_stub]\n");
+            if has_stage("vertex") {
+                out.push_str("vertex_body = \"float4 vs_main(uint vid : SV_VertexID) : SV_Position { return float4(0, 0, 0, 1); }\"\n");
+            }
+            if has_stage("fragment") {
+                out.push_str("body = \"float4 main() : SV_Target0 { return float4(0, 0, 0, 1); }\"\n");
+            }
+            if has_stage("compute") {
+                out.push_str("compute_body = \"[numthreads(8,8,1)] void cs_main(uint3 tid : SV_DispatchThreadID) { }\"\n");
+            }
+        }
+        "opengl.discrete-or-integrated-gpu" => {
+            out.push_str("ir_container = \"text.glsl\"\n");
+            out.push_str("entry_symbol = \"main\"\n");
+            out.push_str("stage_kind = \"fragment\"\n");
+            out.push_str("resource_layout = \"uniform-slots\"\n");
+            out.push_str("[pipeline_layout]\n");
+            out.push_str("color_targets = [\"rgba8unorm\"]\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"sampler0, uniform0\"\n");
+            out.push_str("[entry_points]\n");
+            if has_stage("vertex") {
+                out.push_str("vertex = \"vs_main\"\n");
+            }
+            if has_stage("fragment") {
+                out.push_str("fragment = \"main\"\n");
+            }
+            if has_stage("compute") {
+                out.push_str("compute = \"cs_main\"\n");
+            }
+            out.push_str("[source_stub]\n");
+            out.push_str("header = \"#version 460 core\"\n");
+            if has_stage("vertex") {
+                out.push_str("vertex_body = \"void vs_main() { gl_Position = vec4(0.0, 0.0, 0.0, 1.0); }\"\n");
+            }
+            if has_stage("fragment") {
+                out.push_str("body = \"out vec4 fragColor;\\nvoid main() { fragColor = vec4(0.0, 0.0, 0.0, 1.0); }\"\n");
+            }
+            if has_stage("compute") {
+                out.push_str("compute_body = \"layout(local_size_x = 8, local_size_y = 8) in;\\nvoid cs_main() { }\"\n");
+            }
+        }
+        "cpu-fallback.cpu-host" => {
+            out.push_str("ir_container = \"text.host-simd\"\n");
+            out.push_str("entry_symbol = \"shade_stub\"\n");
+            out.push_str("stage_kind = \"fragment\"\n");
+            out.push_str("resource_layout = \"host-slices\"\n");
+            out.push_str("[pipeline_layout]\n");
+            out.push_str("color_targets = [\"host-rgba8\"]\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"tile.buffer, material.slice\"\n");
+            out.push_str("[entry_points]\n");
+            if has_stage("vertex") {
+                out.push_str("vertex = \"vs_stub\"\n");
+            }
+            if has_stage("fragment") {
+                out.push_str("fragment = \"shade_stub\"\n");
+            }
+            if has_stage("compute") {
+                out.push_str("compute = \"cs_stub\"\n");
+            }
+            out.push_str("[source_stub]\n");
+            if has_stage("vertex") {
+                out.push_str("vertex_body = \"fn vs_stub(vid: u32) -> (f32, f32) { (vid as f32, 0.0) }\"\n");
+            }
+            if has_stage("fragment") {
+                out.push_str("body = \"fn shade_stub(tile: u32) -> u32 { tile }\"\n");
+            }
+            if has_stage("compute") {
+                out.push_str("compute_body = \"fn cs_stub(group: u32) -> u32 { group }\"\n");
+            }
+        }
+        _ => {
+            out.push_str("ir_container = \"text.unknown\"\n");
+            out.push_str("entry_symbol = \"unimplemented\"\n");
+            out.push_str("[entry_points]\n");
+            if has_stage("vertex") {
+                out.push_str("vertex = \"unimplemented\"\n");
+            }
+            if has_stage("fragment") {
+                out.push_str("fragment = \"unimplemented\"\n");
+            }
+            if has_stage("compute") {
+                out.push_str("compute = \"unimplemented\"\n");
+            }
+            out.push_str("[source_stub]\n");
+            if has_stage("fragment") {
+                out.push_str("body = \"unimplemented\"\n");
+            }
+        }
+    }
+    out
+}
+
+fn render_domain_build_unit_kernel_ir_sidecar(unit: &BuildManifestDomainBuildUnit) -> String {
+    let profile = derived_lowering_profile_for_unit(unit);
+    let dispatch_kinds = kernel_supported_dispatch_kinds_for_profile(unit, &profile).unwrap_or(&[]);
+    let mut out = String::new();
+    out.push_str("schema = \"nuis-kernel-ir-sidecar-v1\"\n");
+    out.push_str(&format!(
+        "domain_family = \"{}\"\n",
+        escape_toml_string(&unit.domain_family)
+    ));
+    out.push_str(&format!(
+        "package_id = \"{}\"\n",
+        escape_toml_string(&unit.package_id)
+    ));
+    out.push_str(&format!(
+        "backend_family = \"{}\"\n",
+        escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "selected_lowering_target = \"{}\"\n",
+        escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "lowering_profile = \"{}\"\n",
+        escape_toml_string(profile.profile_key)
+    ));
+    if !dispatch_kinds.is_empty() {
+        out.push_str(&format!(
+            "supported_dispatch_kinds = {}\n",
+            render_string_array(
+                &dispatch_kinds
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
+    out.push_str(&render_target_specific_backend_fields(unit, &profile));
+    out.push_str("[dispatch_shapes]\n");
+    match profile.profile_key {
+        "coreml.apple-ane" => {
+            out.push_str("primary = \"graph\"\n");
+            out.push_str("fallback = \"batch\"\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"tensor.input0, tensor.output0\"\n");
+            out.push_str("argument_model = \"tensor-argument-table\"\n");
+            out.push_str("[entry_points]\n");
+            out.push_str("graph = \"infer_main\"\n");
+            out.push_str("batch = \"infer_batch\"\n");
+            out.push_str("[source_stub]\n");
+            out.push_str("graph_body = \"program infer_main(tensor<1x4xf32> input) -> tensor<1x4xf32> { return input; }\"\n");
+            out.push_str("batch_body = \"batch infer_batch(count: i32) { /* coreml batch stub */ }\"\n");
+        }
+        "vulkan.discrete-or-integrated-gpu" => {
+            out.push_str("primary = \"grid\"\n");
+            out.push_str("fallback = \"indirect\"\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"set0.buffer0, set0.buffer1\"\n");
+            out.push_str("argument_model = \"descriptor-set-layout\"\n");
+            out.push_str("[entry_points]\n");
+            out.push_str("grid = \"main\"\n");
+            out.push_str("indirect = \"main_indirect\"\n");
+            out.push_str("[source_stub]\n");
+            out.push_str("grid_body = \"OpEntryPoint GLCompute %main \\\"main\\\"\"\n");
+            out.push_str("indirect_body = \"OpEntryPoint GLCompute %main_indirect \\\"main_indirect\\\"\"\n");
+        }
+        "cpu-fallback.cpu-host" => {
+            out.push_str("primary = \"range\"\n");
+            out.push_str("fallback = \"tile\"\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"slice.input, slice.output\"\n");
+            out.push_str("argument_model = \"host-buffer-slices\"\n");
+            out.push_str("[entry_points]\n");
+            out.push_str("range = \"run_range\"\n");
+            out.push_str("tile = \"run_tile\"\n");
+            out.push_str("[source_stub]\n");
+            out.push_str("range_body = \"fn run_range(start: u32, end: u32) { }\"\n");
+            out.push_str("tile_body = \"fn run_tile(tile: u32) { }\"\n");
+        }
+        _ => {
+            out.push_str("primary = \"graph\"\n");
+            out.push_str("[entry_points]\n");
+            out.push_str("graph = \"unimplemented\"\n");
+            out.push_str("[source_stub]\n");
+            out.push_str("graph_body = \"unimplemented\"\n");
+        }
+    }
+    out
+}
+
+fn render_domain_build_unit_network_ir_sidecar(unit: &BuildManifestDomainBuildUnit) -> String {
+    let profile = derived_lowering_profile_for_unit(unit);
+    let mut out = String::new();
+    out.push_str("schema = \"nuis-network-ir-sidecar-v1\"\n");
+    out.push_str(&format!(
+        "domain_family = \"{}\"\n",
+        escape_toml_string(&unit.domain_family)
+    ));
+    out.push_str(&format!(
+        "package_id = \"{}\"\n",
+        escape_toml_string(&unit.package_id)
+    ));
+    out.push_str(&format!(
+        "backend_family = \"{}\"\n",
+        escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "selected_lowering_target = \"{}\"\n",
+        escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "lowering_profile = \"{}\"\n",
+        escape_toml_string(profile.profile_key)
+    ));
+    out.push_str(&render_target_specific_lowering_fields(unit, &profile));
+    out.push_str(&render_target_specific_backend_fields(unit, &profile));
+    out.push_str("[session_shapes]\n");
+    match profile.profile_key {
+        "urlsession.socket-io" => {
+            out.push_str("request = \"http-client-session\"\n");
+            out.push_str("response = \"completion-callback\"\n");
+            out.push_str("streaming = \"delegate-push-stream\"\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"session.handle, request.packet, response.slot\"\n");
+            out.push_str("argument_model = \"foundation-request-bundle\"\n");
+            out.push_str("[entry_points]\n");
+            out.push_str("connect = \"open_session\"\n");
+            out.push_str("send = \"submit_request\"\n");
+            out.push_str("recv = \"on_response\"\n");
+            out.push_str("finalize = \"finish_exchange\"\n");
+            out.push_str("[source_stub]\n");
+            out.push_str("connect_body = \"fn open_session(authority: text) -> session { session(authority) }\"\n");
+            out.push_str("send_body = \"fn submit_request(session: session, request: packet) -> task { task(session, request) }\"\n");
+            out.push_str("recv_body = \"fn on_response(task: task) -> response { response(task) }\"\n");
+            out.push_str("finalize_body = \"fn finish_exchange(response: response) -> status { commit(response) }\"\n");
+        }
+        "winsock.socket-io" => {
+            out.push_str("request = \"overlapped-client-session\"\n");
+            out.push_str("response = \"iocp-completion\"\n");
+            out.push_str("streaming = \"completion-port-stream\"\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"socket.handle, overlapped.packet, completion.port\"\n");
+            out.push_str("argument_model = \"iocp-request-bundle\"\n");
+            out.push_str("[entry_points]\n");
+            out.push_str("connect = \"connect_overlapped\"\n");
+            out.push_str("send = \"submit_overlapped_send\"\n");
+            out.push_str("recv = \"await_iocp_completion\"\n");
+            out.push_str("finalize = \"finish_iocp_exchange\"\n");
+            out.push_str("[source_stub]\n");
+            out.push_str("connect_body = \"fn connect_overlapped(addr: text) -> socket { socket(addr) }\"\n");
+            out.push_str("send_body = \"fn submit_overlapped_send(socket: socket, packet: packet) -> overlapped { overlapped(socket, packet) }\"\n");
+            out.push_str("recv_body = \"fn await_iocp_completion(op: overlapped) -> response { response(op) }\"\n");
+            out.push_str("finalize_body = \"fn finish_iocp_exchange(response: response) -> status { finalize(response) }\"\n");
+        }
+        "socket-abi.socket-io" => {
+            out.push_str("request = \"socket-reactor-session\"\n");
+            out.push_str("response = \"poll-ready-response\"\n");
+            out.push_str("streaming = \"fd-edge-stream\"\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"fd.handle, packet.buffer, ready.token\"\n");
+            out.push_str("argument_model = \"socket-poll-bundle\"\n");
+            out.push_str("[entry_points]\n");
+            out.push_str("connect = \"open_fd_session\"\n");
+            out.push_str("send = \"submit_send_recv\"\n");
+            out.push_str("recv = \"poll_ready_response\"\n");
+            out.push_str("finalize = \"finish_poll_exchange\"\n");
+            out.push_str("[source_stub]\n");
+            out.push_str("connect_body = \"fn open_fd_session(addr: text) -> fd { fd(addr) }\"\n");
+            out.push_str("send_body = \"fn submit_send_recv(fd: fd, packet: packet) -> token { token(fd, packet) }\"\n");
+            out.push_str("recv_body = \"fn poll_ready_response(token: token) -> response { response(token) }\"\n");
+            out.push_str("finalize_body = \"fn finish_poll_exchange(response: response) -> status { release(response) }\"\n");
+        }
+        _ => {
+            out.push_str("request = \"generic-session\"\n");
+            out.push_str("response = \"generic-response\"\n");
+            out.push_str("[entry_points]\n");
+            out.push_str("connect = \"unimplemented\"\n");
+            out.push_str("send = \"unimplemented\"\n");
+            out.push_str("recv = \"unimplemented\"\n");
+            out.push_str("[source_stub]\n");
+            out.push_str("connect_body = \"unimplemented\"\n");
+        }
+    }
+    out
+}
+
 fn render_domain_build_unit_lowering_plan(unit: &BuildManifestDomainBuildUnit) -> String {
     let contract = domain_build_contract_summary_for_unit(unit);
+    let profile = derived_lowering_profile_for_unit(unit);
     let mut out = String::new();
     out.push_str("schema = \"nuis-domain-lowering-plan-v1\"\n");
     out.push_str(&format!(
@@ -1701,8 +2503,20 @@ fn render_domain_build_unit_lowering_plan(unit: &BuildManifestDomainBuildUnit) -
         escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
     ));
     out.push_str(&format!(
+        "vendor = \"{}\"\n",
+        escape_toml_string(unit.vendor.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "device_class = \"{}\"\n",
+        escape_toml_string(unit.device_class.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
         "selected_lowering_target = \"{}\"\n",
         escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "lowering_profile = \"{}\"\n",
+        escape_toml_string(profile.profile_key)
     ));
     out.push_str(&format!(
         "machine_arch = \"{}\"\n",
@@ -1724,12 +2538,43 @@ fn render_domain_build_unit_lowering_plan(unit: &BuildManifestDomainBuildUnit) -
         "emission_kind = \"{}\"\n",
         escape_toml_string(&contract.lowering.emission_kind)
     ));
+    out.push_str(&format!(
+        "execution_route = \"{}\"\n",
+        escape_toml_string(profile.execution_route)
+    ));
+    out.push_str(&format!(
+        "submission_adapter = \"{}\"\n",
+        escape_toml_string(profile.submission_adapter)
+    ));
+    out.push_str(&format!(
+        "wake_adapter = \"{}\"\n",
+        escape_toml_string(profile.wake_adapter)
+    ));
+    if let Some(dispatch_kinds) = kernel_supported_dispatch_kinds_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "supported_dispatch_kinds = {}\n",
+            render_string_array(
+                &dispatch_kinds
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
+    if let Some(stages) = shader_supported_stages_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "supported_stages = {}\n",
+            render_string_array(&stages.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>())
+        ));
+    }
+    out.push_str(&render_target_specific_lowering_fields(unit, &profile));
     out
 }
 
 fn render_domain_build_unit_backend_stub(unit: &BuildManifestDomainBuildUnit) -> String {
     let contract = domain_build_contract_summary_for_unit(unit);
     let backend = contract.backend;
+    let profile = derived_lowering_profile_for_unit(unit);
     let mut out = String::new();
     out.push_str("schema = \"nuis-domain-backend-stub-v1\"\n");
     out.push_str(&format!(
@@ -1745,8 +2590,20 @@ fn render_domain_build_unit_backend_stub(unit: &BuildManifestDomainBuildUnit) ->
         escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
     ));
     out.push_str(&format!(
+        "vendor = \"{}\"\n",
+        escape_toml_string(unit.vendor.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "device_class = \"{}\"\n",
+        escape_toml_string(unit.device_class.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
         "selected_lowering_target = \"{}\"\n",
         escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "backend_profile = \"{}\"\n",
+        escape_toml_string(profile.profile_key)
     ));
     out.push_str(&format!(
         "contract_family = \"{}\"\n",
@@ -1826,6 +2683,30 @@ fn render_domain_build_unit_backend_stub(unit: &BuildManifestDomainBuildUnit) ->
         "scheduler_binding = \"{}\"\n",
         escape_toml_string(&backend.scheduler_binding)
     ));
+    out.push_str(&format!(
+        "execution_route = \"{}\"\n",
+        escape_toml_string(profile.execution_route)
+    ));
+    out.push_str(&format!(
+        "submission_adapter = \"{}\"\n",
+        escape_toml_string(profile.submission_adapter)
+    ));
+    out.push_str(&format!(
+        "wake_adapter = \"{}\"\n",
+        escape_toml_string(profile.wake_adapter)
+    ));
+    if let Some(dispatch_kinds) = kernel_supported_dispatch_kinds_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "supported_dispatch_kinds = {}\n",
+            render_string_array(
+                &dispatch_kinds
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
+    out.push_str(&render_target_specific_backend_fields(unit, &profile));
     if let Some(value) = backend.phase_bind {
         let key = if unit.domain_family == "network" {
             "connect_phase"
@@ -1911,6 +2792,7 @@ fn render_domain_build_unit_host_bridge_stub(unit: &BuildManifestDomainBuildUnit
     let contract = domain_build_contract_summary_for_unit(unit);
     let bridge = &contract.bridge;
     let host_bridge = &contract.host_bridge;
+    let profile = derived_lowering_profile_for_unit(unit);
     let bridge_plan = render_domain_build_unit_bridge_plan(unit);
     let mut out = String::new();
     out.push_str("schema = \"nuis-host-bridge-spec-v1\"\n");
@@ -1927,8 +2809,20 @@ fn render_domain_build_unit_host_bridge_stub(unit: &BuildManifestDomainBuildUnit
         escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
     ));
     out.push_str(&format!(
+        "vendor = \"{}\"\n",
+        escape_toml_string(unit.vendor.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "device_class = \"{}\"\n",
+        escape_toml_string(unit.device_class.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
         "selected_lowering_target = \"{}\"\n",
         escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "bridge_profile = \"{}\"\n",
+        escape_toml_string(profile.profile_key)
     ));
     out.push_str(&format!(
         "bridge_surface = \"{}\"\n",
@@ -1941,6 +2835,18 @@ fn render_domain_build_unit_host_bridge_stub(unit: &BuildManifestDomainBuildUnit
     out.push_str(&format!(
         "scheduler_binding = \"{}\"\n",
         escape_toml_string(&bridge.scheduler_binding)
+    ));
+    out.push_str(&format!(
+        "execution_route = \"{}\"\n",
+        escape_toml_string(profile.execution_route)
+    ));
+    out.push_str(&format!(
+        "submission_adapter = \"{}\"\n",
+        escape_toml_string(profile.submission_adapter)
+    ));
+    out.push_str(&format!(
+        "wake_adapter = \"{}\"\n",
+        escape_toml_string(profile.wake_adapter)
     ));
     out.push_str(&format!(
         "host_ffi_surface = \"{}\"\n",
@@ -2034,11 +2940,13 @@ fn resolve_domain_build_unit_target(
         Option<String>,
         Option<String>,
         Option<String>,
+        Option<String>,
+        Option<String>,
     ),
     String,
 > {
     let Some(abi) = abi else {
-        return Ok((None, None, None, None));
+        return Ok((None, None, None, None, None, None));
     };
     match domain_family {
         "cpu" => {
@@ -2047,6 +2955,8 @@ fn resolve_domain_build_unit_target(
                 Some(target.machine_arch),
                 Some(target.machine_os),
                 Some("llvm".to_owned()),
+                None,
+                None,
                 Some("llvm".to_owned()),
             ))
         }
@@ -2056,30 +2966,24 @@ fn resolve_domain_build_unit_target(
                 domain_family,
             )?;
             let target = crate::registry::registered_abi_target(&manifest, abi)?;
-            let selected_lowering_target = match domain_family {
-                "shader" | "kernel" => target.backend_family.clone(),
-                "network" => Some(match target.machine_os.as_str() {
-                    "darwin" => "urlsession".to_owned(),
-                    "windows" => "winsock".to_owned(),
-                    _ => "socket-abi".to_owned(),
-                }),
-                _ => None,
-            };
-            let backend_family = target.backend_family.clone().or_else(|| {
-                (domain_family == "network").then(|| match target.machine_os.as_str() {
-                    "darwin" => "urlsession".to_owned(),
-                    "windows" => "winsock".to_owned(),
-                    _ => "socket".to_owned(),
-                })
-            });
+            let selected_lowering_target =
+                crate::project::selected_lowering_target_for_registered_abi_target(
+                    domain_family,
+                    &target,
+                    &manifest.lowering_targets,
+                );
+            let backend_family =
+                crate::project::backend_family_for_registered_abi_target(domain_family, &target);
             Ok((
                 Some(target.machine_arch),
                 Some(target.machine_os),
                 backend_family,
+                target.vendor,
+                target.device_class,
                 selected_lowering_target,
             ))
         }
-        _ => Ok((None, None, None, None)),
+        _ => Ok((None, None, None, None, None, None)),
     }
 }
 
@@ -2862,10 +3766,19 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 unit.domain_family
             )
         })?;
-        if decoded_blob.sections.len() != 4 {
+        let expected_section_count = if unit.domain_family == "shader"
+            || unit.domain_family == "kernel"
+            || unit.domain_family == "network"
+        {
+            5
+        } else {
+            4
+        };
+        if decoded_blob.sections.len() != expected_section_count {
             return Err(format!(
-                "domain payload blob `{}` section count mismatch: expected 4, found {}",
+                "domain payload blob `{}` section count mismatch: expected {}, found {}",
                 blob_label,
+                expected_section_count,
                 decoded_blob.sections.len()
             ));
         }
@@ -2943,6 +3856,100 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
             ));
         }
         domain_bridge_stubs_checked += 1;
+        if unit.domain_family == "shader" {
+            let ir_sidecar_path = unit.artifact_ir_sidecar_path.as_ref().ok_or_else(|| {
+                format!(
+                    "`{}` domain_build_unit `{}` is missing `artifact_ir_sidecar_path`",
+                    path.display(),
+                    unit.domain_family
+                )
+            })?;
+            let shader_ir_section = &decoded_blob.sections[4];
+            if shader_ir_section.name != "shader_ir_sidecar" {
+                return Err(format!(
+                    "domain payload blob `{}` shader section name mismatch: expected `shader_ir_sidecar`, found `{}`",
+                    blob_label,
+                    shader_ir_section.name
+                ));
+            }
+            let expected_shader_ir_sidecar = render_domain_build_unit_shader_ir_sidecar(unit);
+            if shader_ir_section.bytes != expected_shader_ir_sidecar.as_bytes() {
+                return Err(format!(
+                    "domain payload blob `{}` shader ir sidecar content mismatch for `{}`",
+                    blob_label, unit.domain_family
+                ));
+            }
+            let shader_ir_sidecar = fs::read_to_string(ir_sidecar_path)
+                .unwrap_or_else(|_| expected_shader_ir_sidecar.clone());
+            if shader_ir_sidecar != expected_shader_ir_sidecar {
+                return Err(format!(
+                    "domain shader ir sidecar `{}` content mismatch for `{}`",
+                    ir_sidecar_path, unit.domain_family
+                ));
+            }
+        } else if unit.domain_family == "kernel" {
+            let ir_sidecar_path = unit.artifact_ir_sidecar_path.as_ref().ok_or_else(|| {
+                format!(
+                    "`{}` domain_build_unit `{}` is missing `artifact_ir_sidecar_path`",
+                    path.display(),
+                    unit.domain_family
+                )
+            })?;
+            let kernel_ir_section = &decoded_blob.sections[4];
+            if kernel_ir_section.name != "kernel_ir_sidecar" {
+                return Err(format!(
+                    "domain payload blob `{}` kernel section name mismatch: expected `kernel_ir_sidecar`, found `{}`",
+                    blob_label,
+                    kernel_ir_section.name
+                ));
+            }
+            let expected_kernel_ir_sidecar = render_domain_build_unit_kernel_ir_sidecar(unit);
+            if kernel_ir_section.bytes != expected_kernel_ir_sidecar.as_bytes() {
+                return Err(format!(
+                    "domain payload blob `{}` kernel ir sidecar content mismatch for `{}`",
+                    blob_label, unit.domain_family
+                ));
+            }
+            let kernel_ir_sidecar = fs::read_to_string(ir_sidecar_path)
+                .unwrap_or_else(|_| expected_kernel_ir_sidecar.clone());
+            if kernel_ir_sidecar != expected_kernel_ir_sidecar {
+                return Err(format!(
+                    "domain kernel ir sidecar `{}` content mismatch for `{}`",
+                    ir_sidecar_path, unit.domain_family
+                ));
+            }
+        } else if unit.domain_family == "network" {
+            let ir_sidecar_path = unit.artifact_ir_sidecar_path.as_ref().ok_or_else(|| {
+                format!(
+                    "`{}` domain_build_unit `{}` is missing `artifact_ir_sidecar_path`",
+                    path.display(),
+                    unit.domain_family
+                )
+            })?;
+            let network_ir_section = &decoded_blob.sections[4];
+            if network_ir_section.name != "network_ir_sidecar" {
+                return Err(format!(
+                    "domain payload blob `{}` network section name mismatch: expected `network_ir_sidecar`, found `{}`",
+                    blob_label,
+                    network_ir_section.name
+                ));
+            }
+            let expected_network_ir_sidecar = render_domain_build_unit_network_ir_sidecar(unit);
+            if network_ir_section.bytes != expected_network_ir_sidecar.as_bytes() {
+                return Err(format!(
+                    "domain payload blob `{}` network ir sidecar content mismatch for `{}`",
+                    blob_label, unit.domain_family
+                ));
+            }
+            let network_ir_sidecar = fs::read_to_string(ir_sidecar_path)
+                .unwrap_or_else(|_| expected_network_ir_sidecar.clone());
+            if network_ir_sidecar != expected_network_ir_sidecar {
+                return Err(format!(
+                    "domain network ir sidecar `{}` content mismatch for `{}`",
+                    ir_sidecar_path, unit.domain_family
+                ));
+            }
+        }
         domain_payload_blob_sections_checked += decoded_blob.sections.len();
         domain_payload_blobs_checked += 1;
     }
@@ -7035,8 +8042,8 @@ mod tests {
         encode_nuis_executable_envelope_binary, parse_nuis_compiled_artifact,
         parse_nuis_executable_envelope, render_nuis_executable_envelope,
         resolve_cpu_build_target_from_abi, verify_build_manifest, verify_nuis_compiled_artifact,
-        BuildManifestCacheInfo, BuildManifestContext, BuildManifestProjectInfo, CompileArtifacts,
-        CpuBuildTarget, NuisExecutableEnvelope,
+        BuildManifestCacheInfo, BuildManifestContext, BuildManifestDomainBuildUnit,
+        BuildManifestProjectInfo, CompileArtifacts, CpuBuildTarget, NuisExecutableEnvelope,
     };
     use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef, AstVisibility};
     use std::{
@@ -7070,6 +8077,39 @@ mod tests {
         root
     }
 
+    fn sample_domain_unit(
+        domain_family: &str,
+        package_id: &str,
+        backend_family: &str,
+        vendor: &str,
+        device_class: &str,
+        selected_lowering_target: &str,
+    ) -> BuildManifestDomainBuildUnit {
+        BuildManifestDomainBuildUnit {
+            package_id: package_id.to_owned(),
+            domain_family: domain_family.to_owned(),
+            abi: None,
+            machine_arch: Some("arm64".to_owned()),
+            machine_os: Some("darwin".to_owned()),
+            backend_family: Some(backend_family.to_owned()),
+            vendor: Some(vendor.to_owned()),
+            device_class: Some(device_class.to_owned()),
+            selected_lowering_target: Some(selected_lowering_target.to_owned()),
+            artifact_stub_path: None,
+            artifact_stub_inline: None,
+            artifact_payload_path: None,
+            artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: None,
+            artifact_bridge_stub_inline: None,
+            artifact_payload_blob_path: None,
+            artifact_payload_blob_bytes: None,
+            artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
+            contract_family: format!("nustar.{domain_family}"),
+            packaging_role: "hetero-contract".to_owned(),
+        }
+    }
+
     #[test]
     fn resolve_cpu_build_target_for_known_abis() {
         let registry_root = registry_root();
@@ -7097,6 +8137,411 @@ mod tests {
             resolve_cpu_build_target_from_abi(&registry_root, "cpu.x86_64.win64").unwrap();
         assert_eq!(windows.machine_os, "windows");
         assert_eq!(windows.clang_target, "x86_64-pc-windows-msvc");
+    }
+
+    #[test]
+    fn shader_lowering_and_stub_include_profile_aware_fields() {
+        let shader_unit = sample_domain_unit(
+            "shader",
+            "official.shader",
+            "metal",
+            "apple",
+            "apple-silicon-gpu",
+            "metal.apple-silicon-gpu",
+        );
+        let lowering_plan = super::render_domain_build_unit_lowering_plan(&shader_unit);
+        let backend_stub = super::render_domain_build_unit_backend_stub(&shader_unit);
+        let host_bridge_stub = super::render_domain_build_unit_host_bridge_stub(&shader_unit);
+
+        assert!(lowering_plan.contains("lowering_profile = \"metal.apple-silicon-gpu\""));
+        assert!(lowering_plan.contains("execution_route = \"unified-render-graph\""));
+        assert!(lowering_plan.contains("submission_adapter = \"metal-command-encoder\""));
+        assert!(lowering_plan.contains("wake_adapter = \"metal-shared-event\""));
+        assert!(lowering_plan.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]"));
+        assert!(lowering_plan.contains("lowering_ir = \"msl2.4\""));
+        assert!(lowering_plan.contains("shader_stage_model = \"metal-render-pipeline\""));
+        assert!(
+            lowering_plan.contains("stage_binding_model = \"argument-buffer-specialized\"")
+        );
+        assert!(
+            lowering_plan.contains("dispatch_encoding_model = \"tile-and-threadgroup\"")
+        );
+
+        assert!(backend_stub.contains("backend_profile = \"metal.apple-silicon-gpu\""));
+        assert!(backend_stub.contains("execution_route = \"unified-render-graph\""));
+        assert!(backend_stub.contains("submission_adapter = \"metal-command-encoder\""));
+        assert!(backend_stub.contains("wake_adapter = \"metal-shared-event\""));
+        assert!(backend_stub.contains("shader_ir = \"msl2.4\""));
+        assert!(
+            backend_stub.contains("shader_entry_model = \"metal-function-constant-specialized\"")
+        );
+        assert!(backend_stub.contains("queue_binding_model = \"unified-command-queue\""));
+        assert!(backend_stub.contains("resource_binding_model = \"argument-buffer-table\""));
+
+        assert!(host_bridge_stub.contains("bridge_profile = \"metal.apple-silicon-gpu\""));
+        assert!(host_bridge_stub.contains("execution_route = \"unified-render-graph\""));
+        assert!(host_bridge_stub.contains("submission_adapter = \"metal-command-encoder\""));
+        assert!(host_bridge_stub.contains("wake_adapter = \"metal-shared-event\""));
+        let sidecar = super::render_domain_build_unit_shader_ir_sidecar(&shader_unit);
+        assert!(sidecar.contains("ir_container = \"text.msl\""));
+        assert!(sidecar.contains("entry_symbol = \"main0\""));
+        assert!(sidecar.contains("stage_kind = \"fragment\""));
+        assert!(sidecar.contains("resource_layout = \"argument-buffer\""));
+        assert!(sidecar.contains("[pipeline_layout]"));
+        assert!(sidecar.contains("color_targets = [\"rgba8unorm\"]"));
+        assert!(sidecar.contains("threadgroup_topology = \"tile\""));
+        assert!(sidecar.contains("[resource_bindings]"));
+        assert!(sidecar.contains("binding_table = \"material.uniforms, frame.texture0\""));
+        assert!(sidecar.contains("[entry_points]"));
+        assert!(sidecar.contains("vertex = \"vs_main\""));
+        assert!(sidecar.contains("fragment = \"main0\""));
+        assert!(sidecar.contains("compute = \"cs_main\""));
+        assert!(sidecar.contains("#include <metal_stdlib>"));
+        assert!(sidecar.contains("vertex float4 vs_main"));
+        assert!(sidecar.contains("fragment float4 main0"));
+        assert!(sidecar.contains("kernel void cs_main"));
+    }
+
+    #[test]
+    fn shader_vulkan_lowering_plan_switches_to_spirv_pipeline_profile() {
+        let shader_unit = sample_domain_unit(
+            "shader",
+            "official.shader",
+            "vulkan",
+            "cross-vendor",
+            "discrete-or-integrated-gpu",
+            "vulkan.discrete-or-integrated-gpu",
+        );
+        let lowering_plan = super::render_domain_build_unit_lowering_plan(&shader_unit);
+        let backend_stub = super::render_domain_build_unit_backend_stub(&shader_unit);
+
+        assert!(
+            lowering_plan.contains("lowering_profile = \"vulkan.discrete-or-integrated-gpu\"")
+        );
+        assert!(lowering_plan.contains("execution_route = \"spirv-render-queue\""));
+        assert!(lowering_plan.contains("submission_adapter = \"vulkan-command-buffer\""));
+        assert!(lowering_plan.contains("wake_adapter = \"vulkan-timeline-semaphore\""));
+        assert!(lowering_plan.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]"));
+        assert!(lowering_plan.contains("lowering_ir = \"spirv1.6\""));
+        assert!(
+            lowering_plan.contains("shader_stage_model = \"spirv-graphics-pipeline\"")
+        );
+        assert!(lowering_plan.contains("stage_binding_model = \"descriptor-set-layout\""));
+        assert!(
+            lowering_plan.contains("dispatch_encoding_model = \"renderpass-command-buffer\"")
+        );
+
+        assert!(
+            backend_stub.contains("backend_profile = \"vulkan.discrete-or-integrated-gpu\"")
+        );
+        assert!(backend_stub.contains("shader_ir = \"spirv1.6\""));
+        assert!(backend_stub.contains("shader_entry_model = \"vulkan-pipeline\""));
+        assert!(
+            backend_stub.contains("queue_binding_model = \"explicit-device-queue\"")
+        );
+        assert!(
+            backend_stub.contains("resource_binding_model = \"descriptor-set-layout\"")
+        );
+        let sidecar = super::render_domain_build_unit_shader_ir_sidecar(&shader_unit);
+        assert!(sidecar.contains("ir_container = \"text.spirv\""));
+        assert!(sidecar.contains("entry_symbol = \"main\""));
+        assert!(sidecar.contains("stage_kind = \"fragment\""));
+        assert!(sidecar.contains("resource_layout = \"descriptor-set\""));
+        assert!(sidecar.contains("[pipeline_layout]"));
+        assert!(sidecar.contains("threadgroup_topology = \"quad-fragment\""));
+        assert!(sidecar.contains("[resource_bindings]"));
+        assert!(
+            sidecar.contains("binding_table = \"set0.binding0.texture, set0.binding1.sampler\"")
+        );
+        assert!(sidecar.contains("[entry_points]"));
+        assert!(sidecar.contains("vertex = \"vs_main\""));
+        assert!(sidecar.contains("fragment = \"main\""));
+        assert!(sidecar.contains("compute = \"cs_main\""));
+        assert!(sidecar.contains("OpCapability Shader"));
+        assert!(sidecar.contains("OpEntryPoint Vertex %vs_main"));
+        assert!(sidecar.contains("OpEntryPoint Fragment %main"));
+        assert!(sidecar.contains("OpEntryPoint GLCompute %cs_main"));
+    }
+
+    #[test]
+    fn shader_unknown_profile_falls_back_to_fragment_only_stage_set() {
+        let shader_unit = sample_domain_unit(
+            "shader",
+            "official.shader",
+            "experimental",
+            "generic",
+            "fragment-only-lab",
+            "experimental.fragment-only-lab",
+        );
+        let lowering_plan = super::render_domain_build_unit_lowering_plan(&shader_unit);
+        let sidecar = super::render_domain_build_unit_shader_ir_sidecar(&shader_unit);
+
+        assert!(lowering_plan.contains("supported_stages = [\"fragment\"]"));
+        assert!(sidecar.contains("supported_stages = [\"fragment\"]"));
+        assert!(sidecar.contains("entry_symbol = \"unimplemented\""));
+        assert!(sidecar.contains("fragment = \"unimplemented\""));
+        assert!(!sidecar.contains("vertex = "));
+        assert!(!sidecar.contains("compute = "));
+    }
+
+    #[test]
+    fn kernel_coreml_profile_reports_dispatch_kinds() {
+        let kernel_unit = sample_domain_unit(
+            "kernel",
+            "official.kernel",
+            "coreml",
+            "apple",
+            "apple-ane",
+            "coreml.apple-ane",
+        );
+        let lowering_plan = super::render_domain_build_unit_lowering_plan(&kernel_unit);
+        let backend_stub = super::render_domain_build_unit_backend_stub(&kernel_unit);
+
+        assert!(lowering_plan.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]"));
+        assert!(backend_stub.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]"));
+    }
+
+    #[test]
+    fn kernel_coreml_sidecar_emits_dispatch_templates() {
+        let kernel_unit = sample_domain_unit(
+            "kernel",
+            "official.kernel",
+            "coreml",
+            "apple",
+            "apple-ane",
+            "coreml.apple-ane",
+        );
+        let sidecar = super::render_domain_build_unit_kernel_ir_sidecar(&kernel_unit);
+
+        assert!(sidecar.contains("schema = \"nuis-kernel-ir-sidecar-v1\""));
+        assert!(sidecar.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]"));
+        assert!(sidecar.contains("[dispatch_shapes]"));
+        assert!(sidecar.contains("primary = \"graph\""));
+        assert!(sidecar.contains("[entry_points]"));
+        assert!(sidecar.contains("graph = \"infer_main\""));
+        assert!(sidecar.contains("batch = \"infer_batch\""));
+        assert!(sidecar.contains("graph_body = \"program infer_main"));
+    }
+
+    #[test]
+    fn kernel_vulkan_sidecar_emits_grid_and_indirect_dispatch_templates() {
+        let kernel_unit = sample_domain_unit(
+            "kernel",
+            "official.kernel",
+            "vulkan",
+            "cross-vendor",
+            "discrete-or-integrated-gpu",
+            "vulkan.discrete-or-integrated-gpu",
+        );
+        let sidecar = super::render_domain_build_unit_kernel_ir_sidecar(&kernel_unit);
+
+        assert!(sidecar.contains("schema = \"nuis-kernel-ir-sidecar-v1\""));
+        assert!(sidecar.contains("supported_dispatch_kinds = [\"grid\", \"indirect\", \"batch\"]"));
+        assert!(sidecar.contains("primary = \"grid\""));
+        assert!(sidecar.contains("fallback = \"indirect\""));
+        assert!(sidecar.contains("binding_table = \"set0.buffer0, set0.buffer1\""));
+        assert!(sidecar.contains("grid = \"main\""));
+        assert!(sidecar.contains("indirect = \"main_indirect\""));
+        assert!(sidecar.contains("OpEntryPoint GLCompute %main"));
+    }
+
+    #[test]
+    fn kernel_cpu_fallback_sidecar_emits_range_and_tile_dispatch_templates() {
+        let kernel_unit = sample_domain_unit(
+            "kernel",
+            "official.kernel",
+            "cpu-fallback",
+            "generic",
+            "cpu-host",
+            "cpu-fallback.cpu-host",
+        );
+        let sidecar = super::render_domain_build_unit_kernel_ir_sidecar(&kernel_unit);
+
+        assert!(sidecar.contains("schema = \"nuis-kernel-ir-sidecar-v1\""));
+        assert!(sidecar.contains("supported_dispatch_kinds = [\"range\", \"tile\", \"batch\"]"));
+        assert!(sidecar.contains("primary = \"range\""));
+        assert!(sidecar.contains("fallback = \"tile\""));
+        assert!(sidecar.contains("binding_table = \"slice.input, slice.output\""));
+        assert!(sidecar.contains("range = \"run_range\""));
+        assert!(sidecar.contains("tile = \"run_tile\""));
+        assert!(sidecar.contains("range_body = \"fn run_range"));
+    }
+
+    #[test]
+    fn network_urlsession_sidecar_emits_foundation_session_templates() {
+        let network_unit = sample_domain_unit(
+            "network",
+            "official.network",
+            "urlsession",
+            "apple",
+            "socket-io",
+            "urlsession.socket-io",
+        );
+        let sidecar = super::render_domain_build_unit_network_ir_sidecar(&network_unit);
+
+        assert!(sidecar.contains("schema = \"nuis-network-ir-sidecar-v1\""));
+        assert!(sidecar.contains("transport_ir = \"foundation-url-request\""));
+        assert!(sidecar.contains("transport_binding_model = \"session-task-packet\""));
+        assert!(sidecar.contains("[session_shapes]"));
+        assert!(sidecar.contains("request = \"http-client-session\""));
+        assert!(sidecar.contains("response = \"completion-callback\""));
+        assert!(sidecar.contains("streaming = \"delegate-push-stream\""));
+        assert!(sidecar.contains("binding_table = \"session.handle, request.packet, response.slot\""));
+        assert!(sidecar.contains("connect = \"open_session\""));
+        assert!(sidecar.contains("send = \"submit_request\""));
+        assert!(sidecar.contains("recv = \"on_response\""));
+        assert!(sidecar.contains("finalize = \"finish_exchange\""));
+    }
+
+    #[test]
+    fn network_socket_abi_sidecar_emits_poll_reactor_templates() {
+        let network_unit = sample_domain_unit(
+            "network",
+            "official.network",
+            "socket-abi",
+            "cross-vendor",
+            "socket-io",
+            "socket-abi.socket-io",
+        );
+        let sidecar = super::render_domain_build_unit_network_ir_sidecar(&network_unit);
+
+        assert!(sidecar.contains("schema = \"nuis-network-ir-sidecar-v1\""));
+        assert!(sidecar.contains("transport_ir = \"posix-socket\""));
+        assert!(sidecar.contains("transport_binding_model = \"packet-poll-reactor\""));
+        assert!(sidecar.contains("request = \"socket-reactor-session\""));
+        assert!(sidecar.contains("response = \"poll-ready-response\""));
+        assert!(sidecar.contains("streaming = \"fd-edge-stream\""));
+        assert!(sidecar.contains("binding_table = \"fd.handle, packet.buffer, ready.token\""));
+        assert!(sidecar.contains("connect = \"open_fd_session\""));
+        assert!(sidecar.contains("recv = \"poll_ready_response\""));
+        assert!(sidecar.contains("finalize = \"finish_poll_exchange\""));
+    }
+
+    #[test]
+    fn network_winsock_sidecar_emits_iocp_templates() {
+        let network_unit = sample_domain_unit(
+            "network",
+            "official.network",
+            "winsock",
+            "microsoft",
+            "socket-io",
+            "winsock.socket-io",
+        );
+        let sidecar = super::render_domain_build_unit_network_ir_sidecar(&network_unit);
+
+        assert!(sidecar.contains("schema = \"nuis-network-ir-sidecar-v1\""));
+        assert!(sidecar.contains("transport_ir = \"winsock-overlapped\""));
+        assert!(sidecar.contains("transport_binding_model = \"overlapped-packet-reactor\""));
+        assert!(sidecar.contains("request = \"overlapped-client-session\""));
+        assert!(sidecar.contains("response = \"iocp-completion\""));
+        assert!(sidecar.contains("streaming = \"completion-port-stream\""));
+        assert!(sidecar.contains("binding_table = \"socket.handle, overlapped.packet, completion.port\""));
+        assert!(sidecar.contains("connect = \"connect_overlapped\""));
+        assert!(sidecar.contains("recv = \"await_iocp_completion\""));
+        assert!(sidecar.contains("finalize = \"finish_iocp_exchange\""));
+    }
+
+    #[test]
+    fn build_manifest_emits_shader_ir_sidecar() {
+        let dir = temp_dir("build_manifest_shader_sidecar");
+        let ast = dir.join("demo.ast.txt");
+        let nir = dir.join("demo.nir.txt");
+        let yir = dir.join("demo.yir");
+        let ll = dir.join("demo.ll");
+        let bin = dir.join("demo.bin");
+        fs::write(&ast, "ast").unwrap();
+        fs::write(&nir, "nir").unwrap();
+        fs::write(&yir, "yir").unwrap();
+        fs::write(&ll, "llvm").unwrap();
+        fs::write(&bin, "bin").unwrap();
+
+        let written = CompileArtifacts {
+            ast_path: ast.display().to_string(),
+            nir_path: nir.display().to_string(),
+            yir_path: yir.display().to_string(),
+            llvm_ir_path: ll.display().to_string(),
+            binary_path: bin.display().to_string(),
+            packaging_mode: "native-cpu-llvm".to_owned(),
+        };
+        let cpu_target = CpuBuildTarget {
+            abi: "cpu.arm64.apple_aapcs64".to_owned(),
+            machine_arch: "arm64".to_owned(),
+            machine_os: "darwin".to_owned(),
+            object_format: "macho".to_owned(),
+            calling_abi: "apple_aapcs64".to_owned(),
+            clang_target: "arm64-apple-darwin".to_owned(),
+            cross_compile: false,
+        };
+        let manifest = super::write_build_manifest(
+            &dir,
+            &written,
+            &BuildManifestContext {
+                input_path: "/tmp/shader.ns".to_owned(),
+                output_dir: dir.display().to_string(),
+                loaded_nustar: vec!["official.cpu".to_owned(), "official.shader".to_owned()],
+                compile_cache: None,
+                project: Some(BuildManifestProjectInfo {
+                    name: "shader".to_owned(),
+                    abi_mode: "explicit".to_owned(),
+                    abi_graph_summary: None,
+                    abi_entries: vec![
+                        ("cpu".to_owned(), cpu_target.abi.clone()),
+                        ("shader".to_owned(), "shader.metal.msl2_4".to_owned()),
+                    ],
+                    plan_summary: None,
+                    effective_input: None,
+                    text_handle_rewrite_helper_hits: 0,
+                    text_handle_rewrite_local_hits: 0,
+                    manifest_copy_path: None,
+                    plan_index_path: None,
+                    organization_index_path: None,
+                    exchange_index_path: None,
+                    modules_index_path: None,
+                    galaxy_index_path: None,
+                    links_index_path: None,
+                    packet_index_path: None,
+                    host_ffi_index_path: None,
+                    abi_index_path: None,
+                }),
+                cpu_target,
+            },
+        )
+        .unwrap();
+
+        let report = verify_build_manifest(PathBuf::from(&manifest).as_path()).unwrap();
+        let shader_unit = report
+            .domain_build_units
+            .iter()
+            .find(|unit| unit.domain_family == "shader")
+            .unwrap();
+        let shader_sidecar_path = dir.join("nuis.domain.shader.lowering.ir.txt");
+        let shader_sidecar_path_text = shader_sidecar_path.display().to_string();
+        let shader_payload_blob = dir.join("nuis.domain.shader.payload.bin");
+        assert!(shader_sidecar_path.exists());
+        assert_eq!(
+            shader_unit.artifact_ir_sidecar_path.as_deref(),
+            Some(shader_sidecar_path_text.as_str())
+        );
+        let shader_sidecar_text = fs::read_to_string(&shader_sidecar_path).unwrap();
+        assert!(shader_sidecar_text.contains("schema = \"nuis-shader-ir-sidecar-v1\""));
+        assert!(shader_sidecar_text.contains("lowering_profile = \"metal.apple-silicon-gpu\""));
+        assert!(shader_sidecar_text.contains("lowering_ir = \"msl2.4\""));
+        assert!(shader_sidecar_text.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]"));
+        assert!(shader_sidecar_text.contains("ir_container = \"text.msl\""));
+        assert!(shader_sidecar_text.contains("entry_symbol = \"main0\""));
+        assert!(shader_sidecar_text.contains("[pipeline_layout]"));
+        assert!(shader_sidecar_text.contains("[resource_bindings]"));
+        assert!(shader_sidecar_text.contains("[entry_points]"));
+        assert!(shader_sidecar_text.contains("vertex = \"vs_main\""));
+        assert!(shader_sidecar_text.contains("compute = \"cs_main\""));
+        assert!(shader_sidecar_text.contains("fragment float4 main0"));
+
+        let shader_blob =
+            super::decode_domain_build_unit_payload_blob(&fs::read(&shader_payload_blob).unwrap())
+                .unwrap();
+        assert_eq!(shader_blob.sections.len(), 5);
+        assert_eq!(shader_blob.sections[4].name, "shader_ir_sidecar");
+        assert_eq!(shader_blob.sections[4].bytes, shader_sidecar_text.as_bytes());
     }
 
     #[test]
@@ -7452,7 +8897,7 @@ mod tests {
         assert_eq!(report.domain_build_unit_count, 3);
         assert_eq!(report.heterogeneous_domain_count, 2);
         assert_eq!(report.domain_payload_blobs_checked, 2);
-        assert_eq!(report.domain_payload_blob_sections_checked, 8);
+        assert_eq!(report.domain_payload_blob_sections_checked, 10);
         assert_eq!(report.domain_payload_contract_sections_checked, 2);
         assert_eq!(report.domain_payload_lowering_plans_checked, 2);
         assert_eq!(report.domain_payload_backend_stubs_checked, 2);
@@ -7501,12 +8946,33 @@ mod tests {
         assert!(bridge_registry_text.contains("[[bridge]]"));
         assert!(bridge_registry_text.contains("domain_family = \"kernel\""));
         assert!(bridge_registry_text.contains("domain_family = \"network\""));
+        assert!(bridge_registry_text.contains("backend_family = \"coreml\""));
+        assert!(bridge_registry_text.contains("vendor = \"apple\""));
+        assert!(bridge_registry_text.contains("device_class = \"apple-ane\""));
+        assert!(bridge_registry_text.contains("selected_lowering_target = \"coreml.apple-ane\""));
+        assert!(bridge_registry_text.contains("backend_family = \"urlsession\""));
+        assert!(bridge_registry_text.contains("device_class = \"socket-io\""));
+        assert!(
+            bridge_registry_text.contains("selected_lowering_target = \"urlsession.socket-io\"")
+        );
         assert!(bridge_registry_text.contains("bridge_stub_path = "));
         assert!(host_bridge_plan_index_text.contains("schema = \"nuis-host-bridge-plan-index-v1\""));
         assert!(host_bridge_plan_index_text.contains("plan_count = 2"));
         assert!(host_bridge_plan_index_text.contains("[[plan]]"));
         assert!(host_bridge_plan_index_text.contains("domain_family = \"kernel\""));
         assert!(host_bridge_plan_index_text.contains("domain_family = \"network\""));
+        assert!(host_bridge_plan_index_text.contains("backend_family = \"coreml\""));
+        assert!(host_bridge_plan_index_text.contains("vendor = \"apple\""));
+        assert!(host_bridge_plan_index_text.contains("device_class = \"apple-ane\""));
+        assert!(
+            host_bridge_plan_index_text.contains("selected_lowering_target = \"coreml.apple-ane\"")
+        );
+        assert!(host_bridge_plan_index_text.contains("backend_family = \"urlsession\""));
+        assert!(host_bridge_plan_index_text.contains("device_class = \"socket-io\""));
+        assert!(
+            host_bridge_plan_index_text
+                .contains("selected_lowering_target = \"urlsession.socket-io\"")
+        );
         assert!(host_bridge_plan_index_text
             .contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
         let kernel_blob =
@@ -7523,6 +8989,13 @@ mod tests {
                 .unwrap(),
         );
         let kernel_backend_stub = super::render_domain_build_unit_backend_stub(
+            report
+                .domain_build_units
+                .iter()
+                .find(|unit| unit.domain_family == "kernel")
+                .unwrap(),
+        );
+        let kernel_ir_sidecar = super::render_domain_build_unit_kernel_ir_sidecar(
             report
                 .domain_build_units
                 .iter()
@@ -7550,6 +9023,13 @@ mod tests {
                 .find(|unit| unit.domain_family == "network")
                 .unwrap(),
         );
+        let network_ir_sidecar = super::render_domain_build_unit_network_ir_sidecar(
+            report
+                .domain_build_units
+                .iter()
+                .find(|unit| unit.domain_family == "network")
+                .unwrap(),
+        );
         let network_bridge_plan = super::render_domain_build_unit_bridge_plan(
             report
                 .domain_build_units
@@ -7571,13 +9051,13 @@ mod tests {
         assert_eq!(kernel_blob.backend_family.as_deref(), Some("coreml"));
         assert_eq!(
             kernel_blob.selected_lowering_target.as_deref(),
-            Some("coreml")
+            Some("coreml.apple-ane")
         );
         assert_eq!(kernel_blob.contract_family, "nustar.kernel");
         assert_eq!(kernel_blob.packaging_role, "hetero-contract");
         assert_eq!(kernel_blob.payload_kind, "contract-sidecar");
         assert_eq!(kernel_blob.payload_format, "toml");
-        assert_eq!(kernel_blob.sections.len(), 4);
+        assert_eq!(kernel_blob.sections.len(), 5);
         assert_eq!(kernel_blob.sections[0].name, "contract_toml");
         assert_eq!(
             kernel_blob.sections[0].bytes,
@@ -7595,9 +9075,17 @@ mod tests {
         );
         assert_eq!(kernel_blob.sections[3].name, "bridge_plan");
         assert_eq!(kernel_blob.sections[3].bytes, kernel_bridge_plan.as_bytes());
+        assert_eq!(kernel_blob.sections[4].name, "kernel_ir_sidecar");
+        assert_eq!(kernel_blob.sections[4].bytes, kernel_ir_sidecar.as_bytes());
         let kernel_backend_text = std::str::from_utf8(&kernel_blob.sections[2].bytes).unwrap();
         let kernel_bridge_text = std::str::from_utf8(&kernel_blob.sections[3].bytes).unwrap();
+        let kernel_sidecar_text = std::str::from_utf8(&kernel_blob.sections[4].bytes).unwrap();
         assert!(kernel_bridge_stub_text.contains("schema = \"nuis-host-bridge-spec-v1\""));
+        assert!(kernel_bridge_stub_text.contains("vendor = \"apple\""));
+        assert!(kernel_bridge_stub_text.contains("device_class = \"apple-ane\""));
+        assert!(
+            kernel_bridge_stub_text.contains("selected_lowering_target = \"coreml.apple-ane\"")
+        );
         assert!(kernel_bridge_stub_text
             .contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
         assert!(kernel_bridge_stub_text.contains("host_ffi_surface = \"buffer,queue,fence\""));
@@ -7616,6 +9104,24 @@ mod tests {
         assert!(kernel_backend_text.contains("memory_binding = \"buffer-table\""));
         assert!(kernel_backend_text.contains("completion_model = \"device-fence\""));
         assert!(kernel_backend_text.contains("scheduler_binding = \"hetero-submit-bridge\""));
+        assert!(kernel_backend_text.contains("backend_profile = \"coreml.apple-ane\""));
+        assert!(kernel_backend_text.contains("execution_route = \"ane-graph-execution\""));
+        assert!(kernel_backend_text.contains("submission_adapter = \"coreml-graph-submit\""));
+        assert!(kernel_backend_text.contains("wake_adapter = \"coreml-completion-callback\""));
+        assert!(
+            kernel_backend_text.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]")
+        );
+        assert!(kernel_backend_text.contains("kernel_ir = \"coreml-program\""));
+        assert!(kernel_backend_text.contains("kernel_entry_model = \"mlmodelc-function\""));
+        assert!(kernel_backend_text.contains("queue_binding_model = \"ane-submission-service\""));
+        assert!(
+            kernel_backend_text.contains("resource_binding_model = \"tensor-argument-table\"")
+        );
+        assert!(kernel_sidecar_text.contains("schema = \"nuis-kernel-ir-sidecar-v1\""));
+        assert!(
+            kernel_sidecar_text.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]")
+        );
+        assert!(kernel_sidecar_text.contains("graph = \"infer_main\""));
         assert!(kernel_backend_text.contains("bind_phase = \"buffer-and-argument-bind\""));
         assert!(kernel_backend_text.contains("launch_phase = \"queue-dispatch-submit\""));
         assert!(kernel_backend_text.contains("wait_phase = \"fence-await-or-poll\""));
@@ -7630,13 +9136,13 @@ mod tests {
         assert_eq!(network_blob.backend_family.as_deref(), Some("urlsession"));
         assert_eq!(
             network_blob.selected_lowering_target.as_deref(),
-            Some("urlsession")
+            Some("urlsession.socket-io")
         );
         assert_eq!(network_blob.contract_family, "nustar.network");
         assert_eq!(network_blob.packaging_role, "hetero-contract");
         assert_eq!(network_blob.payload_kind, "contract-sidecar");
         assert_eq!(network_blob.payload_format, "toml");
-        assert_eq!(network_blob.sections.len(), 4);
+        assert_eq!(network_blob.sections.len(), 5);
         assert_eq!(network_blob.sections[0].name, "contract_toml");
         assert_eq!(
             network_blob.sections[0].bytes,
@@ -7657,9 +9163,18 @@ mod tests {
             network_blob.sections[3].bytes,
             network_bridge_plan.as_bytes()
         );
+        assert_eq!(network_blob.sections[4].name, "network_ir_sidecar");
+        assert_eq!(network_blob.sections[4].bytes, network_ir_sidecar.as_bytes());
         let network_backend_text = std::str::from_utf8(&network_blob.sections[2].bytes).unwrap();
         let network_bridge_text = std::str::from_utf8(&network_blob.sections[3].bytes).unwrap();
+        let network_sidecar_text = std::str::from_utf8(&network_blob.sections[4].bytes).unwrap();
         assert!(network_bridge_stub_text.contains("schema = \"nuis-host-bridge-spec-v1\""));
+        assert!(network_bridge_stub_text.contains("vendor = \"apple\""));
+        assert!(network_bridge_stub_text.contains("device_class = \"socket-io\""));
+        assert!(
+            network_bridge_stub_text
+                .contains("selected_lowering_target = \"urlsession.socket-io\"")
+        );
         assert!(network_bridge_stub_text
             .contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
         assert!(network_bridge_stub_text.contains("host_ffi_surface = \"socket,urlsession\""));
@@ -7677,6 +9192,18 @@ mod tests {
         assert!(network_backend_text.contains("request_shape = \"packetized-exchange\""));
         assert!(network_backend_text.contains("response_shape = \"completion-callback\""));
         assert!(network_backend_text.contains("scheduler_binding = \"network-poll-bridge\""));
+        assert!(network_backend_text.contains("backend_profile = \"urlsession.socket-io\""));
+        assert!(network_backend_text.contains("execution_route = \"foundation-session-reactor\""));
+        assert!(network_backend_text.contains("submission_adapter = \"urlsession-task-submit\""));
+        assert!(network_backend_text.contains("wake_adapter = \"urlsession-callback\""));
+        assert!(network_backend_text.contains("transport_ir = \"foundation-url-request\""));
+        assert!(network_backend_text.contains("transport_entry_model = \"urlsession-task\""));
+        assert!(
+            network_backend_text.contains("socket_binding_model = \"session-owned-socket\"")
+        );
+        assert!(
+            network_backend_text.contains("completion_binding_model = \"delegate-callback\"")
+        );
         assert!(network_backend_text.contains("connect_phase = \"socket-bind-or-session-open\""));
         assert!(network_backend_text.contains("send_phase = \"packet-write-dispatch\""));
         assert!(network_backend_text.contains("recv_phase = \"callback-or-read-ready\""));
@@ -7686,6 +9213,12 @@ mod tests {
         assert!(network_bridge_text.contains("phase_submit = \"packet-write-dispatch\""));
         assert!(network_bridge_text.contains("phase_wait = \"callback-or-read-ready\""));
         assert!(network_bridge_text.contains("phase_finalize = \"response-commit-and-wake\""));
+        assert!(network_sidecar_text.contains("schema = \"nuis-network-ir-sidecar-v1\""));
+        assert!(network_sidecar_text.contains("request = \"http-client-session\""));
+        assert!(network_sidecar_text.contains("response = \"completion-callback\""));
+        assert!(network_sidecar_text.contains("streaming = \"delegate-push-stream\""));
+        assert!(network_sidecar_text.contains("connect = \"open_session\""));
+        assert!(network_sidecar_text.contains("finalize = \"finish_exchange\""));
         assert!(report
             .domain_build_units
             .iter()
@@ -7710,6 +9243,10 @@ mod tests {
                     .as_deref()
                     .is_some_and(|path| path.ends_with("nuis.domain.kernel.bridge.stub.txt"))
                 && unit
+                    .artifact_ir_sidecar_path
+                    .as_deref()
+                    .is_some_and(|path| path.ends_with("nuis.domain.kernel.lowering.ir.txt"))
+                && unit
                     .artifact_payload_blob_path
                     .as_deref()
                     .is_some_and(|path| path.ends_with("nuis.domain.kernel.payload.bin"))
@@ -7718,7 +9255,7 @@ mod tests {
                     .is_some_and(|bytes| bytes > 0)
                 && unit.artifact_payload_format.as_deref() == Some("ndpb-v2")
                 && unit.backend_family.as_deref() == Some("coreml")
-                && unit.selected_lowering_target.as_deref() == Some("coreml")));
+                && unit.selected_lowering_target.as_deref() == Some("coreml.apple-ane")));
         assert!(report
             .domain_build_units
             .iter()
@@ -7736,6 +9273,10 @@ mod tests {
                     .as_deref()
                     .is_some_and(|path| path.ends_with("nuis.domain.network.bridge.stub.txt"))
                 && unit
+                    .artifact_ir_sidecar_path
+                    .as_deref()
+                    .is_some_and(|path| path.ends_with("nuis.domain.network.lowering.ir.txt"))
+                && unit
                     .artifact_payload_blob_path
                     .as_deref()
                     .is_some_and(|path| path.ends_with("nuis.domain.network.payload.bin"))
@@ -7744,7 +9285,7 @@ mod tests {
                     .is_some_and(|bytes| bytes > 0)
                 && unit.artifact_payload_format.as_deref() == Some("ndpb-v2")
                 && unit.backend_family.as_deref() == Some("urlsession")
-                && unit.selected_lowering_target.as_deref() == Some("urlsession")));
+                && unit.selected_lowering_target.as_deref() == Some("urlsession.socket-io")));
     }
 
     #[test]

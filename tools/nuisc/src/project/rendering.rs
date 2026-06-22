@@ -5,7 +5,8 @@ use std::path::Path;
 use nuis_semantics::model::{AstExternFunction, AstTypeRef};
 
 use super::{
-    profile_apply::resolve_registered_abi_target, resolve_project_abi, LoadedProject,
+    profile_apply::resolve_registered_abi_target, resolve_project_abi,
+    selected_lowering_target_for_registered_abi_target, LoadedProject,
     ProjectAbiResolution, ProjectAbiSelectionView, ProjectExchangeOrganization,
     ProjectExchangeRoute, ProjectLoweringIssue, ProjectLoweringIssueKind,
     ProjectLoweringSelectionView, ProjectOrganization, ProjectOrganizationLink,
@@ -28,13 +29,17 @@ fn json_escape(value: &str) -> String {
     out
 }
 
-fn selected_lowering_target_for_domain(domain: &str, abi: &str) -> Result<Option<String>, String> {
+fn selected_lowering_target_for_domain(
+    domain: &str,
+    abi: &str,
+    registered_lowering_targets: &[String],
+) -> Result<Option<String>, String> {
     match domain {
         "cpu" => {
             crate::aot::resolve_cpu_build_target_from_abi(Path::new("nustar-packages"), abi)?;
             Ok(Some("llvm".to_owned()))
         }
-        "shader" | "kernel" => Ok(resolve_registered_abi_target(
+        "shader" | "kernel" | "network" => Ok(resolve_registered_abi_target(
             domain,
             Some(&ProjectAbiResolution {
                 requirements: vec![super::ProjectAbiRequirement {
@@ -44,21 +49,12 @@ fn selected_lowering_target_for_domain(domain: &str, abi: &str) -> Result<Option
                 explicit: true,
             }),
         )?
-        .and_then(|target| target.backend_family)),
-        "network" => Ok(resolve_registered_abi_target(
-            domain,
-            Some(&ProjectAbiResolution {
-                requirements: vec![super::ProjectAbiRequirement {
-                    domain: domain.to_owned(),
-                    abi: abi.to_owned(),
-                }],
-                explicit: true,
-            }),
-        )?
-        .map(|target| match target.machine_os.as_str() {
-            "darwin" => "urlsession".to_owned(),
-            "windows" => "winsock".to_owned(),
-            _ => "socket-abi".to_owned(),
+        .and_then(|target| {
+            selected_lowering_target_for_registered_abi_target(
+                domain,
+                &target,
+                registered_lowering_targets,
+            )
         })),
         _ => Ok(None),
     }
@@ -85,6 +81,10 @@ pub fn project_abi_selection_views(
                 backend_family: target
                     .as_ref()
                     .and_then(|target| target.backend_family.clone()),
+                vendor: target.as_ref().and_then(|target| target.vendor.clone()),
+                device_class: target
+                    .as_ref()
+                    .and_then(|target| target.device_class.clone()),
                 host_adaptive: target.as_ref().map(|target| target.host_adaptive),
             }
         })
@@ -95,7 +95,7 @@ pub fn project_abi_selection_views(
 
 pub fn project_abi_selection_view_json(item: &ProjectAbiSelectionView) -> String {
     format!(
-        "{{\"domain\":\"{}\",\"abi\":\"{}\",\"abi_target_machine\":{},\"abi_target_object\":{},\"abi_target_calling\":{},\"abi_target_clang\":{},\"abi_target_backend\":{},\"abi_target_host_adaptive\":{}}}",
+        "{{\"domain\":\"{}\",\"abi\":\"{}\",\"abi_target_machine\":{},\"abi_target_object\":{},\"abi_target_calling\":{},\"abi_target_clang\":{},\"abi_target_backend\":{},\"abi_target_vendor\":{},\"abi_target_device\":{},\"abi_target_host_adaptive\":{}}}",
         json_escape(&item.domain),
         json_escape(&item.abi),
         item.machine_arch
@@ -116,6 +116,14 @@ pub fn project_abi_selection_view_json(item: &ProjectAbiSelectionView) -> String
             .map(|value| format!("\"{}\"", json_escape(value)))
             .unwrap_or_else(|| "null".to_owned()),
         item.backend_family
+            .as_deref()
+            .map(|value| format!("\"{}\"", json_escape(value)))
+            .unwrap_or_else(|| "null".to_owned()),
+        item.vendor
+            .as_deref()
+            .map(|value| format!("\"{}\"", json_escape(value)))
+            .unwrap_or_else(|| "null".to_owned()),
+        item.device_class
             .as_deref()
             .map(|value| format!("\"{}\"", json_escape(value)))
             .unwrap_or_else(|| "null".to_owned()),
@@ -171,6 +179,12 @@ pub fn write_project_abi_selection_view_lines<W: fmt::Write>(
     if let Some(backend_family) = item.backend_family.as_deref() {
         writeln!(out, "  abi_target_backend: {}", backend_family)?;
     }
+    if let Some(vendor) = item.vendor.as_deref() {
+        writeln!(out, "  abi_target_vendor: {}", vendor)?;
+    }
+    if let Some(device_class) = item.device_class.as_deref() {
+        writeln!(out, "  abi_target_device: {}", device_class)?;
+    }
     if let Some(host_adaptive) = item.host_adaptive {
         writeln!(
             out,
@@ -206,7 +220,11 @@ pub fn validate_project_lowering_selections(
                             ),
                         });
                     }
-                    match selected_lowering_target_for_domain(&item.domain, &item.abi) {
+                    match selected_lowering_target_for_domain(
+                        &item.domain,
+                        &item.abi,
+                        &registered_lowering_targets,
+                    ) {
                         Ok(selected) => {
                             selected_lowering_target = selected;
                         }

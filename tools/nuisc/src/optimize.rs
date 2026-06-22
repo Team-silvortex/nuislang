@@ -1084,7 +1084,10 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         NirExpr::Var(name) => {
             out.insert(name.clone());
         }
-        NirExpr::KernelTensor { .. } => {}
+        NirExpr::KernelTensor { .. }
+        | NirExpr::ShaderTexture2d { .. }
+        | NirExpr::ShaderSampler { .. }
+        | NirExpr::ShaderUv { .. } => {}
         NirExpr::Await(inner)
         | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
@@ -1191,6 +1194,40 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         NirExpr::KernelAddBias { input, bias } => {
             collect_used_vars_expr(input, out);
             collect_used_vars_expr(bias, out);
+        }
+        NirExpr::ShaderSample {
+            texture,
+            sampler,
+            x,
+            y,
+            ..
+        } => {
+            collect_used_vars_expr(texture, out);
+            collect_used_vars_expr(sampler, out);
+            collect_used_vars_expr(x, out);
+            collect_used_vars_expr(y, out);
+        }
+        NirExpr::ShaderSampleUv {
+            texture,
+            sampler,
+            uv,
+            ..
+        } => {
+            collect_used_vars_expr(texture, out);
+            collect_used_vars_expr(sampler, out);
+            collect_used_vars_expr(uv, out);
+        }
+        NirExpr::ShaderBinding { value, .. } => {
+            collect_used_vars_expr(value, out);
+        }
+        NirExpr::ShaderBindSet {
+            pipeline,
+            bindings,
+        } => {
+            collect_used_vars_expr(pipeline, out);
+            for binding in bindings {
+                collect_used_vars_expr(binding, out);
+            }
         }
         NirExpr::AllocNode { value, next } => {
             collect_used_vars_expr(value, out);
@@ -1345,6 +1382,12 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileSliderColorSlotRef { .. }
+        | NirExpr::ShaderProfileSliderSpeedSlotRef { .. }
+        | NirExpr::ShaderProfileSliderRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileHeaderAccentSlotRef { .. }
+        | NirExpr::ShaderProfileToggleLiveSlotRef { .. }
+        | NirExpr::ShaderProfileFocusSlotRef { .. }
         | NirExpr::ShaderProfilePacketTagRef { .. }
         | NirExpr::ShaderProfileMaterialModeRef { .. }
         | NirExpr::ShaderProfilePassKindRef { .. }

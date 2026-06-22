@@ -317,6 +317,12 @@ fn lower_expr(
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileSliderColorSlotRef { .. }
+        | NirExpr::ShaderProfileSliderSpeedSlotRef { .. }
+        | NirExpr::ShaderProfileSliderRadiusSlotRef { .. }
+        | NirExpr::ShaderProfileHeaderAccentSlotRef { .. }
+        | NirExpr::ShaderProfileToggleLiveSlotRef { .. }
+        | NirExpr::ShaderProfileFocusSlotRef { .. }
         | NirExpr::ShaderProfilePacketTagRef { .. }
         | NirExpr::ShaderProfileMaterialModeRef { .. }
         | NirExpr::ShaderProfilePassKindRef { .. }
@@ -324,6 +330,13 @@ fn lower_expr(
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
+        | NirExpr::ShaderTexture2d { .. }
+        | NirExpr::ShaderSampler { .. }
+        | NirExpr::ShaderUv { .. }
+        | NirExpr::ShaderSample { .. }
+        | NirExpr::ShaderSampleUv { .. }
+        | NirExpr::ShaderBinding { .. }
+        | NirExpr::ShaderBindSet { .. }
         | NirExpr::ShaderInlineWgsl { .. }
         | NirExpr::ShaderResult { .. }
         | NirExpr::ShaderPassReady(_)

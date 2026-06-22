@@ -77,6 +77,7 @@ mod tests {
             artifact_stub_inline: None,
             artifact_payload_path: None,
             artifact_bridge_stub_path: Some("/tmp/network.bridge.stub.txt".to_owned()),
+            artifact_ir_sidecar_path: None,
             artifact_bridge_stub_inline: None,
             artifact_payload_blob_path: Some("/tmp/network.payload.bin".to_owned()),
             artifact_payload_blob_bytes: None,

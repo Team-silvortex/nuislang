@@ -4,6 +4,32 @@ use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 
 use super::super::{i64_type, lower_expr, named_type, FunctionSignature, ModuleConstValue};
 
+fn shader_packet_contract_for_type(packet_type_name: Option<&str>) -> String {
+    match packet_type_name {
+        Some("NovaPanelPacket") => "shader.profile.packet.nova.v1".to_owned(),
+        _ => "shader.profile.packet.v1".to_owned(),
+    }
+}
+
+fn infer_shader_packet_profile_contract(
+    source_expr: &AstExpr,
+    lowered_value: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+) -> String {
+    if let NirExpr::ShaderProfilePacket {
+        packet_type_name, ..
+    } = lowered_value
+    {
+        return shader_packet_contract_for_type(packet_type_name.as_deref());
+    }
+    if let AstExpr::Var(name) = source_expr {
+        if let Some(ty) = bindings.get(name) {
+            return shader_packet_contract_for_type(Some(ty.name.as_str()));
+        }
+    }
+    shader_packet_contract_for_type(None)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_shader_runtime_builtin_call(
     callee: &str,
@@ -63,6 +89,272 @@ pub(super) fn lower_shader_runtime_builtin_call(
             NirExpr::ShaderPipeline {
                 name: name.clone(),
                 topology: topology.clone(),
+            }
+        }
+        "shader_texture2d" => {
+            let [format, width, height, texels] = args else {
+                return Err("shader_texture2d(...) expects 4 args".to_owned());
+            };
+            let AstExpr::Text(format) = format else {
+                return Err("shader_texture2d(...) format must be a string literal".to_owned());
+            };
+            let AstExpr::Int(width) = width else {
+                return Err("shader_texture2d(...) width must be an integer literal".to_owned());
+            };
+            let AstExpr::Int(height) = height else {
+                return Err("shader_texture2d(...) height must be an integer literal".to_owned());
+            };
+            let AstExpr::Text(texels) = texels else {
+                return Err("shader_texture2d(...) texels must be a string literal".to_owned());
+            };
+            NirExpr::ShaderTexture2d {
+                format: format.clone(),
+                width: *width,
+                height: *height,
+                texels: texels.clone(),
+            }
+        }
+        "shader_sampler" => {
+            let [filter, address_mode] = args else {
+                return Err("shader_sampler(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Text(filter) = filter else {
+                return Err("shader_sampler(...) filter must be a string literal".to_owned());
+            };
+            let AstExpr::Text(address_mode) = address_mode else {
+                return Err(
+                    "shader_sampler(...) address_mode must be a string literal".to_owned(),
+                );
+            };
+            NirExpr::ShaderSampler {
+                filter: filter.clone(),
+                address_mode: address_mode.clone(),
+            }
+        }
+        "shader_uv" => {
+            let [u, v] = args else {
+                return Err("shader_uv(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Int(u) = u else {
+                return Err("shader_uv(...) u must be an integer literal".to_owned());
+            };
+            let AstExpr::Int(v) = v else {
+                return Err("shader_uv(...) v must be an integer literal".to_owned());
+            };
+            NirExpr::ShaderUv { u: *u, v: *v }
+        }
+        "shader_sample" | "shader_sample_nearest" => {
+            let [texture, sampler, x, y] = args else {
+                return Err(format!("{callee}(...) expects 4 args"));
+            };
+            NirExpr::ShaderSample {
+                texture: Box::new(lower_expr(
+                    texture,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                sampler: Box::new(lower_expr(
+                    sampler,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                x: Box::new(lower_expr(
+                    x,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&i64_type()),
+                )?),
+                y: Box::new(lower_expr(
+                    y,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&i64_type()),
+                )?),
+                mode: if callee == "shader_sample_nearest" {
+                    nuis_semantics::model::NirShaderSampleMode::Nearest
+                } else {
+                    nuis_semantics::model::NirShaderSampleMode::Dynamic
+                },
+            }
+        }
+        "shader_sample_uv" | "shader_sample_uv_nearest" | "shader_sample_uv_linear" => {
+            let [texture, sampler, uv] = args else {
+                return Err(format!("{callee}(...) expects 3 args"));
+            };
+            NirExpr::ShaderSampleUv {
+                texture: Box::new(lower_expr(
+                    texture,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                sampler: Box::new(lower_expr(
+                    sampler,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                uv: Box::new(lower_expr(
+                    uv,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                mode: match callee {
+                    "shader_sample_uv_nearest" => {
+                        nuis_semantics::model::NirShaderSampleUvMode::Nearest
+                    }
+                    "shader_sample_uv_linear" => {
+                        nuis_semantics::model::NirShaderSampleUvMode::Linear
+                    }
+                    _ => nuis_semantics::model::NirShaderSampleUvMode::Dynamic,
+                },
+            }
+        }
+        "shader_texture_binding"
+        | "shader_sampler_binding"
+        | "shader_uniform_binding"
+        | "shader_storage_binding"
+        | "shader_uniform_binding_layout"
+        | "shader_storage_binding_layout" => {
+            let (slot, layout, value) = match args {
+                [slot, value] => (slot, None, value),
+                [slot, layout, value]
+                    if matches!(
+                        callee,
+                        "shader_uniform_binding_layout" | "shader_storage_binding_layout"
+                    ) =>
+                {
+                    (slot, Some(layout), value)
+                }
+                _ => {
+                    return Err(format!(
+                        "{callee}(...) expects {} args",
+                        if matches!(
+                            callee,
+                            "shader_uniform_binding_layout" | "shader_storage_binding_layout"
+                        ) {
+                            3
+                        } else {
+                            2
+                        }
+                    ))
+                }
+            };
+            let AstExpr::Int(slot) = slot else {
+                return Err(format!("{callee}(...) slot must be an integer literal"));
+            };
+            let layout = match layout {
+                Some(AstExpr::Text(layout)) => Some(layout.clone()),
+                Some(_) => {
+                    return Err(format!(
+                        "{callee}(...) layout must be a string literal"
+                    ))
+                }
+                None => None,
+            };
+            NirExpr::ShaderBinding {
+                kind: if callee == "shader_texture_binding" {
+                    "texture_binding".to_owned()
+                } else if callee == "shader_sampler_binding" {
+                    "sampler_binding".to_owned()
+                } else if matches!(
+                    callee,
+                    "shader_uniform_binding" | "shader_uniform_binding_layout"
+                ) {
+                    "uniform_binding".to_owned()
+                } else {
+                    "storage_binding".to_owned()
+                },
+                slot: *slot,
+                layout,
+                profile_contract: None,
+                value: Box::new(lower_expr(
+                    value,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+            }
+        }
+        "shader_packet_uniform_binding" | "shader_packet_storage_binding" => {
+            let [slot, value] = args else {
+                return Err(format!("{callee}(...) expects 2 args"));
+            };
+            let AstExpr::Int(slot) = slot else {
+                return Err(format!("{callee}(...) slot must be an integer literal"));
+            };
+            let lowered_value = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            NirExpr::ShaderBinding {
+                kind: if callee == "shader_packet_uniform_binding" {
+                    "uniform_binding".to_owned()
+                } else {
+                    "storage_binding".to_owned()
+                },
+                slot: *slot,
+                layout: Some(if callee == "shader_packet_uniform_binding" {
+                    "std140".to_owned()
+                } else {
+                    "std430".to_owned()
+                }),
+                profile_contract: Some(infer_shader_packet_profile_contract(
+                    value,
+                    &lowered_value,
+                    bindings,
+                )),
+                value: Box::new(lowered_value),
+            }
+        }
+        "shader_bind_set" => {
+            let [pipeline, binding_args @ ..] = args else {
+                return Err("shader_bind_set(...) expects at least 1 arg".to_owned());
+            };
+            let mut lowered_bindings = Vec::with_capacity(binding_args.len());
+            for binding in binding_args {
+                lowered_bindings.push(lower_expr(
+                    binding,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?);
+            }
+            NirExpr::ShaderBindSet {
+                pipeline: Box::new(lower_expr(
+                    pipeline,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                bindings: lowered_bindings,
             }
         }
         "shader_inline_wgsl" => {

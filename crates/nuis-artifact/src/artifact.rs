@@ -597,6 +597,8 @@ mod tests {
             domain_family: "network".to_owned(),
             package_id: "official.network".to_owned(),
             backend_family: Some("urlsession".to_owned()),
+            vendor: Some("apple".to_owned()),
+            device_class: Some("socket-io".to_owned()),
             selected_lowering_target: Some("urlsession".to_owned()),
             contract_family: "nustar.network".to_owned(),
             packaging_role: "hetero-contract".to_owned(),

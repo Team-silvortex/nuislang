@@ -509,6 +509,114 @@ pub(super) fn lower_shader_profile_builtin_call(
             };
             NirExpr::ShaderProfilePacketRadiusSlotRef { unit: unit.clone() }
         }
+        "shader_profile_slider_color_slot" => {
+            let [unit] = args else {
+                return Err("shader_profile_slider_color_slot(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_slider_color_slot(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_slider_color_slot(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            NirExpr::ShaderProfileSliderColorSlotRef { unit: unit.clone() }
+        }
+        "shader_profile_slider_speed_slot" => {
+            let [unit] = args else {
+                return Err("shader_profile_slider_speed_slot(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_slider_speed_slot(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_slider_speed_slot(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            NirExpr::ShaderProfileSliderSpeedSlotRef { unit: unit.clone() }
+        }
+        "shader_profile_slider_radius_slot" => {
+            let [unit] = args else {
+                return Err("shader_profile_slider_radius_slot(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_slider_radius_slot(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_slider_radius_slot(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            NirExpr::ShaderProfileSliderRadiusSlotRef { unit: unit.clone() }
+        }
+        "shader_profile_header_accent_slot" => {
+            let [unit] = args else {
+                return Err("shader_profile_header_accent_slot(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_header_accent_slot(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_header_accent_slot(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            NirExpr::ShaderProfileHeaderAccentSlotRef { unit: unit.clone() }
+        }
+        "shader_profile_toggle_live_slot" => {
+            let [unit] = args else {
+                return Err("shader_profile_toggle_live_slot(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_toggle_live_slot(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_toggle_live_slot(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            NirExpr::ShaderProfileToggleLiveSlotRef { unit: unit.clone() }
+        }
+        "shader_profile_focus_slot" => {
+            let [unit] = args else {
+                return Err("shader_profile_focus_slot(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_focus_slot(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_focus_slot(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            NirExpr::ShaderProfileFocusSlotRef { unit: unit.clone() }
+        }
         "shader_profile_packet_tag" => {
             let [unit] = args else {
                 return Err("shader_profile_packet_tag(...) expects 1 arg".to_owned());

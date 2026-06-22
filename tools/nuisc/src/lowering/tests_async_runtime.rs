@@ -2557,6 +2557,218 @@ fn lowers_shader_result_primitives_into_shader_nodes() {
 }
 
 #[test]
+fn lowers_shader_texture_sampling_into_shader_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let texture: Texture = shader_texture2d("r8", 2, 2, "1,2,3,4");
+            let sampler: Sampler = shader_sampler("nearest", "clamp");
+            return shader_sample_nearest(texture, sampler, 1, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "texture2d"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "sampler"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "sample_nearest"));
+}
+
+#[test]
+fn lowers_shader_uv_sampling_into_shader_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let texture: Texture = shader_texture2d("r8", 2, 2, "1,2,3,4");
+            let sampler: Sampler = shader_sampler("linear", "clamp");
+            let uv: UV = shader_uv(512, 256);
+            return shader_sample_uv_linear(texture, sampler, uv);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "uv"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "sample_uv_linear"));
+}
+
+#[test]
+fn lowers_shader_binding_set_into_shader_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let pipeline: Pipeline = shader_pipeline("blit", "triangle-strip");
+            let texture: Texture = shader_texture2d("r8", 2, 2, "1,2,3,4");
+            let sampler: Sampler = shader_sampler("linear", "clamp");
+            let texture_binding: Binding = shader_texture_binding(0, texture);
+            let sampler_binding: Binding = shader_sampler_binding(1, sampler);
+            let bindings: BindingSet =
+              shader_bind_set(pipeline, texture_binding, sampler_binding);
+            print(bindings);
+            return 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "texture_binding"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "sampler_binding"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "bind_set"));
+}
+
+#[test]
+fn lowers_shader_buffer_bindings_into_shader_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let pipeline: Pipeline = shader_pipeline("blit", "triangle-strip");
+            let uniform_buffer: ref Buffer = alloc_buffer(64, 0);
+            let storage_buffer: ref Buffer = alloc_buffer(128, 1);
+            let uniform_binding: Binding = shader_uniform_binding(2, uniform_buffer);
+            let storage_binding: Binding = shader_storage_binding(3, storage_buffer);
+            let bindings: BindingSet =
+              shader_bind_set(pipeline, uniform_binding, storage_binding);
+            print(bindings);
+            return 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "uniform_binding"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "storage_binding"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "bind_set"));
+}
+
+#[test]
+fn lowers_shader_buffer_binding_layouts_into_shader_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let pipeline: Pipeline = shader_pipeline("blit", "triangle-strip");
+            let uniform_buffer: ref Buffer = alloc_buffer(64, 0);
+            let storage_buffer: ref Buffer = alloc_buffer(128, 1);
+            let uniform_binding: Binding =
+              shader_uniform_binding_layout(2, "std140", uniform_buffer);
+            let storage_binding: Binding =
+              shader_storage_binding_layout(3, "std430", storage_buffer);
+            let bindings: BindingSet =
+              shader_bind_set(pipeline, uniform_binding, storage_binding);
+            print(bindings);
+            return 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir.nodes.iter().any(|node| {
+        node.op.module == "shader"
+            && node.op.instruction == "uniform_binding"
+            && node.op.args.len() == 3
+            && node.op.args[0] == "2"
+            && node.op.args[1] == "std140"
+    }));
+    assert!(yir.nodes.iter().any(|node| {
+        node.op.module == "shader"
+            && node.op.instruction == "storage_binding"
+            && node.op.args.len() == 3
+            && node.op.args[0] == "3"
+            && node.op.args[1] == "std430"
+    }));
+}
+
+#[test]
+fn lowers_shader_packet_bindings_into_shader_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let pipeline: Pipeline = shader_pipeline("blit", "triangle-strip");
+            let packet: NovaPanelPacket = nova_panel_packet(1, 2, 3, 4, 5, 6);
+            let uniform_binding: Binding = shader_packet_uniform_binding(4, packet);
+            let storage_binding: Binding = shader_packet_storage_binding(5, packet);
+            let bindings: BindingSet =
+              shader_bind_set(pipeline, uniform_binding, storage_binding);
+            print(bindings);
+            return 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir.nodes.iter().any(|node| {
+        node.op.module == "shader"
+            && node.op.instruction == "uniform_binding"
+            && node.op.args.len() == 4
+            && node.op.args[0] == "4"
+            && node.op.args[1] == "std140"
+            && node.op.args[2] == "shader.profile.packet.nova.v1"
+    }));
+    assert!(yir.nodes.iter().any(|node| {
+        node.op.module == "shader"
+            && node.op.instruction == "storage_binding"
+            && node.op.args.len() == 4
+            && node.op.args[0] == "5"
+            && node.op.args[1] == "std430"
+            && node.op.args[2] == "shader.profile.packet.nova.v1"
+    }));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "shader" && node.op.instruction == "bind_set"));
+}
+
+#[test]
 fn lowers_kernel_result_primitives_into_kernel_nodes() {
     let module = parse_nuis_module(
         r#"

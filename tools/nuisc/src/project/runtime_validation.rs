@@ -25,6 +25,7 @@ use super::profile_usage::{
     nir_uses_data_profile_send_downlink, nir_uses_data_profile_send_uplink,
     nir_uses_network_profile_bind_core, nir_uses_network_profile_endpoint_kind,
     nir_uses_network_profile_slot, nir_uses_shader_profile_color_seed,
+    nir_uses_shader_binding_profile_contract,
     nir_uses_shader_profile_draw_instanced, nir_uses_shader_profile_packet,
     nir_uses_shader_profile_radius_seed, nir_uses_shader_profile_render,
     nir_uses_shader_profile_speed_seed,
@@ -490,6 +491,14 @@ fn validate_shader_profile_nir_usage(
         return Err(format!(
             "project link `{from}` -> `{to}` requires CPU entry to use shader_profile_packet(\"{shader_unit}\", ...) at NIR level"
         ));
+    }
+    if nir_uses_shader_binding_profile_contract(module, "shader.profile.packet.nova.v1") {
+        require_declared_support_surface(
+            &shader_support,
+            "shader",
+            shader_unit,
+            "shader.profile.packet.nova.v1",
+        )?;
     }
 
     let uses_shader_render = nir_uses_shader_profile_render(module, shader_unit);
