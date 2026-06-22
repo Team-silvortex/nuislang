@@ -25,6 +25,23 @@ fn compiled_domain_project(path: &str) -> crate::pipeline::PipelineArtifacts {
     crate::pipeline::compile_source_path(&root).unwrap()
 }
 
+fn inline_wgsl_source_named<'a>(
+    artifacts: &'a crate::pipeline::PipelineArtifacts,
+    shader_name: &str,
+) -> &'a str {
+    artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "shader"
+                && node.op.instruction == "inline_wgsl"
+                && node.op.args.first().map(String::as_str) == Some(shader_name)
+        })
+        .and_then(|node| node.op.args.get(1).map(String::as_str))
+        .unwrap_or_else(|| panic!("missing inline_wgsl source for {shader_name}"))
+}
+
 fn write_temp_shader_data_project(
     name: &str,
     entry_source: &str,
@@ -979,6 +996,12 @@ fn lowers_real_pixelmagic_packet_bridge_project_with_expected_bridge_shape() {
         .body
         .iter()
         .any(|stmt| matches!(stmt, NirStmt::Expr(NirExpr::CpuPresentFrame(_)))));
+
+    let source = inline_wgsl_source_named(&artifacts, "pixelmagic_packet_bridge");
+    assert!(source.contains("@vertex"), "{source}");
+    assert!(source.contains("@fragment"), "{source}");
+    assert!(!source.contains("stage vertex"), "{source}");
+    assert!(!source.contains("stage fragment"), "{source}");
 }
 
 #[test]
@@ -1033,6 +1056,12 @@ fn lowers_real_pixelmagic_render_project_with_expected_render_shape() {
         .body
         .iter()
         .any(|stmt| matches!(stmt, NirStmt::Expr(NirExpr::CpuPresentFrame(_)))));
+
+    let source = inline_wgsl_source_named(&artifacts, "pixelmagic_render_demo");
+    assert!(source.contains("@vertex"), "{source}");
+    assert!(source.contains("@fragment"), "{source}");
+    assert!(!source.contains("stage vertex"), "{source}");
+    assert!(!source.contains("stage fragment"), "{source}");
 }
 
 #[test]
@@ -1087,6 +1116,12 @@ fn lowers_real_pixelmagic_texture_resource_project_with_expected_resource_shape(
         .body
         .iter()
         .any(|stmt| matches!(stmt, NirStmt::Expr(NirExpr::CpuPresentFrame(_)))));
+
+    let source = inline_wgsl_source_named(&artifacts, "pixelmagic_texture_resource_demo");
+    assert!(source.contains("@vertex"), "{source}");
+    assert!(source.contains("@fragment"), "{source}");
+    assert!(!source.contains("stage vertex"), "{source}");
+    assert!(!source.contains("stage fragment"), "{source}");
 }
 
 #[test]
@@ -1155,6 +1190,12 @@ fn lowers_real_pixelmagic_pipeline_project_with_expected_pipeline_shape() {
         .body
         .iter()
         .any(|stmt| matches!(stmt, NirStmt::Expr(NirExpr::CpuPresentFrame(_)))));
+
+    let source = inline_wgsl_source_named(&artifacts, "pixelmagic_pipeline_demo");
+    assert!(source.contains("@vertex"), "{source}");
+    assert!(source.contains("@fragment"), "{source}");
+    assert!(!source.contains("stage vertex"), "{source}");
+    assert!(!source.contains("stage fragment"), "{source}");
 }
 
 #[test]

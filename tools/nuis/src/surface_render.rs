@@ -1,7 +1,10 @@
 use std::fmt;
 use std::path::Path;
 
-fn append_json_field_strings(out: &mut String, fields: impl IntoIterator<Item = String>) {
+pub(crate) fn append_json_field_strings(
+    out: &mut String,
+    fields: impl IntoIterator<Item = String>,
+) {
     for field in fields {
         if !out.ends_with('{') {
             out.push(',');
@@ -84,6 +87,10 @@ fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<Str
             link_plan.map(|plan| plan.domain_units.len()).unwrap_or(0),
         ),
     ]
+}
+
+fn append_link_plan_json_fields(out: &mut String, link_plan: Option<&nuisc::linker::LinkPlan>) {
+    append_json_field_strings(out, link_plan_json_fields(link_plan));
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -987,16 +994,10 @@ pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String>
                 ),
             ],
         );
-        append_json_field_strings(
-            &mut out,
-            crate::json_surface::workflow_contract_json_fields(
-                &frontdoor, false, false, false, false,
-            ),
+        crate::json_surface::append_workflow_contract_json_fields(
+            &mut out, &frontdoor, false, false, false, false,
         );
-        append_json_field_strings(
-            &mut out,
-            crate::json_surface::project_plan_json_fields(&plan),
-        );
+        crate::json_surface::append_project_plan_json_fields(&mut out, &plan);
         out.push_str(",\"domains\":[");
         append_json_object_strings(
             &mut out,
@@ -1031,10 +1032,7 @@ pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String>
             crate::json_field("input", &input.display().to_string()),
             crate::json_field("ast_domain", &artifacts.ast.domain),
             crate::json_field("ast_unit", &artifacts.ast.unit),
-            crate::json_object_field(
-                "frontdoor",
-                &crate::workflow_frontdoor_json_fields(&frontdoor),
-            ),
+            crate::workflow_frontdoor_json_object_field(&frontdoor),
             crate::json_field("workflow_kind", frontdoor.workflow_kind),
             crate::json_field("workflow_brief", frontdoor.workflow_brief),
             crate::json_field("workflow_samples", frontdoor.workflow_samples),
@@ -1153,14 +1151,8 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
             ),
         ],
     );
-    append_json_field_strings(
-        &mut out,
-        crate::json_surface::public_surface_summary_json_fields(&public_surface),
-    );
-    append_json_field_strings(
-        &mut out,
-        crate::json_surface::project_plan_json_fields(&plan),
-    );
+    crate::json_surface::append_public_surface_summary_json_fields(&mut out, &public_surface);
+    crate::json_surface::append_project_plan_json_fields(&mut out, &plan);
     append_json_field_strings(
         &mut out,
         vec![
@@ -1180,11 +1172,8 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
             ),
         ],
     );
-    append_json_field_strings(&mut out, link_plan_json_fields(link_plan.as_ref()));
-    append_json_field_strings(
-        &mut out,
-        crate::project_workflow_json_fields(&frontdoor, include_galaxy_flow),
-    );
+    append_link_plan_json_fields(&mut out, link_plan.as_ref());
+    crate::append_project_workflow_json_fields(&mut out, &frontdoor, include_galaxy_flow);
     append_json_field_strings(
         &mut out,
         vec![
@@ -1238,13 +1227,11 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
         .iter()
         .map(|item| format!("{}={}", item.name, item.version))
         .collect::<Vec<_>>();
-    append_json_field_strings(
+    crate::json_surface::append_galaxy_lock_json_fields(
         &mut out,
-        crate::json_surface::galaxy_lock_json_fields(
-            galaxy_lock_status,
-            &lock_path,
-            &declared_galaxy_dependencies,
-        ),
+        galaxy_lock_status,
+        &lock_path,
+        &declared_galaxy_dependencies,
     );
     append_json_field_strings(
         &mut out,
@@ -1522,14 +1509,8 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
             ),
         ],
     );
-    append_json_field_strings(
-        &mut out,
-        crate::json_surface::public_surface_summary_json_fields(&public_surface),
-    );
-    append_json_field_strings(
-        &mut out,
-        crate::json_surface::project_plan_json_fields(&plan),
-    );
+    crate::json_surface::append_public_surface_summary_json_fields(&mut out, &public_surface);
+    crate::json_surface::append_project_plan_json_fields(&mut out, &plan);
     append_json_field_strings(
         &mut out,
         vec![
@@ -1550,11 +1531,8 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
             ),
         ],
     );
-    append_json_field_strings(&mut out, link_plan_json_fields(link_plan.as_ref()));
-    append_json_field_strings(
-        &mut out,
-        crate::project_workflow_json_fields(&frontdoor, include_galaxy_flow),
-    );
+    append_link_plan_json_fields(&mut out, link_plan.as_ref());
+    crate::append_project_workflow_json_fields(&mut out, &frontdoor, include_galaxy_flow);
     append_json_field_strings(
         &mut out,
         vec![crate::json_field(
@@ -1566,13 +1544,11 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
             },
         )],
     );
-    append_json_field_strings(
+    crate::json_surface::append_project_check_summary_json_fields(
         &mut out,
-        crate::json_surface::project_check_summary_json_fields(
-            &abi_checks,
-            &registry_checks,
-            &lowering_checks,
-        ),
+        &abi_checks,
+        &registry_checks,
+        &lowering_checks,
     );
     append_json_field_strings(
         &mut out,

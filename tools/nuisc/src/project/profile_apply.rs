@@ -324,7 +324,11 @@ fn apply_shader_profile_stmt(
             instruction: "inline_wgsl".to_owned(),
             args: vec![
                 expect_text_arg(args, 0, "shader_inline_wgsl")?,
-                expect_text_arg(args, 1, "shader_inline_wgsl")?,
+                crate::shader_source::normalize_inline_wgsl_source(&expect_text_arg(
+                    args,
+                    1,
+                    "shader_inline_wgsl",
+                )?)?,
             ],
         },
         _ => return Ok(()),

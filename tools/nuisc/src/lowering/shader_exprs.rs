@@ -99,7 +99,7 @@ pub(super) fn lower_shader_expr(
             topology,
         } => Some(Ok(lower_shader_pipeline(pipe_name, topology, state))),
         NirExpr::ShaderInlineWgsl { entry, source } => {
-            Some(Ok(lower_shader_inline_wgsl(entry, source, state)))
+            Some(lower_shader_inline_wgsl(entry, source, state))
         }
         NirExpr::ShaderResult { value, state: flow } => Some(lower_result_observe_node(
             state,
@@ -340,19 +340,24 @@ fn lower_shader_pipeline(pipe_name: &str, topology: &str, state: &mut LoweringSt
     name
 }
 
-fn lower_shader_inline_wgsl(entry: &str, source: &str, state: &mut LoweringState<'_>) -> String {
+fn lower_shader_inline_wgsl(
+    entry: &str,
+    source: &str,
+    state: &mut LoweringState<'_>,
+) -> Result<String, String> {
     ensure_shader_resource(state.yir);
     let name = next_name(state, "shader_inline_wgsl");
+    let normalized = crate::shader_source::normalize_inline_wgsl_source(source)?;
     state.yir.nodes.push(Node {
         name: name.clone(),
         resource: "shader0".to_owned(),
         op: Operation {
             module: "shader".to_owned(),
             instruction: "inline_wgsl".to_owned(),
-            args: vec![entry.to_owned(), source.to_owned()],
+            args: vec![entry.to_owned(), normalized],
         },
     });
-    name
+    Ok(name)
 }
 
 fn lower_shader_begin_pass(

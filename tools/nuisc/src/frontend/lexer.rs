@@ -166,7 +166,35 @@ fn consume_wgsl_block(
     let mut out = String::new();
     let mut in_string = false;
     let mut escape = false;
+    let mut in_line_comment = false;
+    let mut block_comment_depth = 0usize;
     while let Some(ch) = chars.next() {
+        if in_line_comment {
+            out.push(ch);
+            if ch == '\n' {
+                in_line_comment = false;
+            }
+            continue;
+        }
+
+        if block_comment_depth > 0 {
+            out.push(ch);
+            match ch {
+                '/' if chars.peek().copied() == Some('*') => {
+                    out.push('*');
+                    chars.next();
+                    block_comment_depth += 1;
+                }
+                '*' if chars.peek().copied() == Some('/') => {
+                    out.push('/');
+                    chars.next();
+                    block_comment_depth = block_comment_depth.saturating_sub(1);
+                }
+                _ => {}
+            }
+            continue;
+        }
+
         if in_string {
             out.push(ch);
             if escape {
@@ -186,6 +214,18 @@ fn consume_wgsl_block(
                 in_string = true;
                 out.push(ch);
             }
+            '/' if chars.peek().copied() == Some('/') => {
+                out.push(ch);
+                out.push('/');
+                chars.next();
+                in_line_comment = true;
+            }
+            '/' if chars.peek().copied() == Some('*') => {
+                out.push(ch);
+                out.push('*');
+                chars.next();
+                block_comment_depth = 1;
+            }
             '{' => {
                 depth += 1;
                 out.push(ch);
@@ -202,4 +242,42 @@ fn consume_wgsl_block(
     }
 
     Err("unterminated wgsl block".to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{tokenize, Token};
+
+    #[test]
+    fn tokenizes_wgsl_block_with_comments_without_breaking_brace_depth() {
+        let tokens = tokenize(
+            r#"
+shader_inline_wgsl("demo", wgsl {
+  // this comment mentions { braces } that should be ignored
+  /* block comment { also } ignored */
+  struct VsOut {
+    @builtin(position) pos: vec4<f32>,
+  };
+
+  @vertex
+  fn vs_main() -> VsOut {
+    var out: VsOut;
+    return out;
+  }
+})
+"#,
+        )
+        .expect("wgsl block tokenizes");
+
+        assert!(tokens
+            .iter()
+            .any(|token| matches!(token, Token::String(source) if source.contains("@vertex"))));
+        assert_eq!(
+            tokens
+                .iter()
+                .filter(|token| matches!(token, Token::String(_)))
+                .count(),
+            2
+        );
+    }
 }

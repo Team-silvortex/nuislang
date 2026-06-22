@@ -18,6 +18,7 @@ use nuis_semantics::model::{
     AstExpr, AstExternFunction, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef,
     AstVisibility,
 };
+use surface_render::append_json_field_strings;
 
 fn main() {
     let result = thread::Builder::new()
@@ -639,12 +640,13 @@ fn benchmark_run_report_json(
     filter: Option<&str>,
     report: &LanguageBenchmarkRunReport,
 ) -> String {
-    let record_json = report
+    let benchmarks = report
         .records
         .iter()
         .map(benchmark_run_record_json)
         .collect::<Vec<_>>();
-    let mut fields = vec![
+    let mut out = String::from("{");
+    for field in [
         json_field("kind", "nuis_benchmark_run"),
         json_field("source_kind", source_kind),
         json_field("input", &input.display().to_string()),
@@ -667,23 +669,30 @@ fn benchmark_run_report_json(
             "text_handle_rewrite_total_hits",
             report.text_handle_rewrite_helper_hits + report.text_handle_rewrite_local_hits,
         ),
-        json_object_array_field("benchmarks", &record_json),
-    ];
-    fields.push(json_field(
-        "result",
-        if list_only {
-            "listed"
-        } else if report.failed > 0 || report.timed_out > 0 {
-            "failed"
-        } else {
-            "passed"
-        },
-    ));
-    format!("{{{}}}", fields.join(","))
+        json_object_array_field("benchmarks", &benchmarks),
+        json_field(
+            "result",
+            if list_only {
+                "listed"
+            } else if report.failed > 0 || report.timed_out > 0 {
+                "failed"
+            } else {
+                "passed"
+            },
+        ),
+    ] {
+        if !out.ends_with('{') {
+            out.push(',');
+        }
+        out.push_str(&field);
+    }
+    out.push('}');
+    out
 }
 
 fn benchmark_run_record_json(record: &BenchmarkRunRecord) -> String {
-    let mut fields = vec![
+    let mut out = String::from("{");
+    for field in [
         json_field("source", &record.source),
         json_field("function", &record.function_name),
         json_field("label", &record.label),
@@ -705,23 +714,39 @@ fn benchmark_run_record_json(record: &BenchmarkRunRecord) -> String {
             record.resolved_clock_domain_code,
         ),
         json_optional_string_field("resolved_clock_source", record.resolved_clock_source),
-    ];
-    if let Some(measurement) = record.measurement {
-        fields.push(json_field("run_mode", measurement.run_mode));
-        fields.push(json_usize_field("sample_count", measurement.sample_count));
-        fields.push(json_optional_u128_field("min_ns", measurement.min_ns));
-        fields.push(json_u128_field("avg_ns", measurement.avg_ns));
-        fields.push(json_optional_u128_field("max_ns", measurement.max_ns));
-        fields.push(json_u128_field("total_ns", measurement.total_ns));
-    } else {
-        fields.push("\"run_mode\":null".to_owned());
-        fields.push("\"sample_count\":null".to_owned());
-        fields.push("\"min_ns\":null".to_owned());
-        fields.push("\"avg_ns\":null".to_owned());
-        fields.push("\"max_ns\":null".to_owned());
-        fields.push("\"total_ns\":null".to_owned());
+    ] {
+        if !out.ends_with('{') {
+            out.push(',');
+        }
+        out.push_str(&field);
     }
-    format!("{{{}}}", fields.join(","))
+    if let Some(measurement) = record.measurement {
+        for field in [
+            json_field("run_mode", measurement.run_mode),
+            json_usize_field("sample_count", measurement.sample_count),
+            json_optional_u128_field("min_ns", measurement.min_ns),
+            json_u128_field("avg_ns", measurement.avg_ns),
+            json_optional_u128_field("max_ns", measurement.max_ns),
+            json_u128_field("total_ns", measurement.total_ns),
+        ] {
+            out.push(',');
+            out.push_str(&field);
+        }
+    } else {
+        for field in [
+            "\"run_mode\":null",
+            "\"sample_count\":null",
+            "\"min_ns\":null",
+            "\"avg_ns\":null",
+            "\"max_ns\":null",
+            "\"total_ns\":null",
+        ] {
+            out.push(',');
+            out.push_str(field);
+        }
+    }
+    out.push('}');
+    out
 }
 
 struct TestVerdict {
@@ -2384,26 +2409,31 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
         .output_dir
         .as_ref()
         .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
-    let mut fields = vec![
-        json_field("kind", "run_artifact"),
-        json_field("input", &input.display().to_string()),
-        json_field("source_kind", &doctor.source_kind),
-        json_bool_field("ready_to_run", doctor.ready_to_run),
-        json_field("recommended_next_step", &doctor.recommended_next_step),
-        json_field("recommended_command", &doctor.recommended_command),
-        json_field("recommended_reason", &doctor.recommended_reason),
-        json_optional_string_field(
-            "binary_path",
-            resolved_binary
-                .as_ref()
-                .map(|path| path.display().to_string())
-                .as_deref(),
-        ),
-        json_bool_field("binary_resolved", resolved_binary.is_some()),
-    ];
-    fields.extend(runtime_session_json_fields(manifest_verify.as_ref()));
-    fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
-    format!("{{{}}}", fields.join(","))
+    let mut out = String::from("{");
+    append_json_field_strings(
+        &mut out,
+        vec![
+            json_field("kind", "run_artifact"),
+            json_field("input", &input.display().to_string()),
+            json_field("source_kind", &doctor.source_kind),
+            json_bool_field("ready_to_run", doctor.ready_to_run),
+            json_field("recommended_next_step", &doctor.recommended_next_step),
+            json_field("recommended_command", &doctor.recommended_command),
+            json_field("recommended_reason", &doctor.recommended_reason),
+            json_optional_string_field(
+                "binary_path",
+                resolved_binary
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .as_deref(),
+            ),
+            json_bool_field("binary_resolved", resolved_binary.is_some()),
+        ],
+    );
+    append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
+    append_workflow_link_plan_json_fields(&mut out, link_plan.as_ref());
+    out.push('}');
+    out
 }
 
 fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), String> {
@@ -2645,35 +2675,39 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
         .binary_path
         .as_ref()
         .map(|path| path.display().to_string());
-    let fields = vec![
-        json_field("kind", "artifact_doctor"),
-        json_field("source_kind", &report.source_kind),
-        json_field("input", &report.input.display().to_string()),
-        json_optional_string_field("output_dir", output_dir.as_deref()),
-        json_optional_string_field("manifest_path", manifest_path.as_deref()),
-        json_optional_string_field("artifact_path", artifact_path.as_deref()),
-        json_optional_string_field("binary_path", binary_path.as_deref()),
-        json_bool_field("manifest_exists", report.manifest_exists),
-        json_bool_field("artifact_exists", report.artifact_exists),
-        json_bool_field("binary_exists", report.binary_exists),
-        json_bool_field("manifest_verified", report.manifest_verified),
-        json_bool_field("artifact_verified", report.artifact_verified),
-        json_bool_field("ready_to_run", report.ready_to_run),
-        json_field("recommended_next_step", &report.recommended_next_step),
-        json_field("recommended_command", &report.recommended_command),
-        json_field("recommended_reason", &report.recommended_reason),
-        json_optional_string_field(
-            "manifest_verify_error",
-            report.manifest_verify_error.as_deref(),
-        ),
-        json_optional_string_field(
-            "artifact_verify_error",
-            report.artifact_verify_error.as_deref(),
-        ),
-    ];
-    let mut fields = fields;
-    fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
-    format!("{{{}}}", fields.join(","))
+    let mut out = String::from("{");
+    append_json_field_strings(
+        &mut out,
+        vec![
+            json_field("kind", "artifact_doctor"),
+            json_field("source_kind", &report.source_kind),
+            json_field("input", &report.input.display().to_string()),
+            json_optional_string_field("output_dir", output_dir.as_deref()),
+            json_optional_string_field("manifest_path", manifest_path.as_deref()),
+            json_optional_string_field("artifact_path", artifact_path.as_deref()),
+            json_optional_string_field("binary_path", binary_path.as_deref()),
+            json_bool_field("manifest_exists", report.manifest_exists),
+            json_bool_field("artifact_exists", report.artifact_exists),
+            json_bool_field("binary_exists", report.binary_exists),
+            json_bool_field("manifest_verified", report.manifest_verified),
+            json_bool_field("artifact_verified", report.artifact_verified),
+            json_bool_field("ready_to_run", report.ready_to_run),
+            json_field("recommended_next_step", &report.recommended_next_step),
+            json_field("recommended_command", &report.recommended_command),
+            json_field("recommended_reason", &report.recommended_reason),
+            json_optional_string_field(
+                "manifest_verify_error",
+                report.manifest_verify_error.as_deref(),
+            ),
+            json_optional_string_field(
+                "artifact_verify_error",
+                report.artifact_verify_error.as_deref(),
+            ),
+        ],
+    );
+    append_workflow_link_plan_json_fields(&mut out, link_plan.as_ref());
+    out.push('}');
+    out
 }
 
 fn build_report_domain_unit_record(unit: &nuisc::aot::BuildManifestDomainBuildUnit) -> String {
@@ -2787,6 +2821,13 @@ fn runtime_session_json_fields(
     ]
 }
 
+fn append_runtime_session_json_fields(
+    out: &mut String,
+    manifest_verify: Option<&nuisc::aot::BuildManifestVerifyReport>,
+) {
+    append_json_field_strings(out, runtime_session_json_fields(manifest_verify));
+}
+
 pub(crate) fn render_build_report_json(input: &Path) -> String {
     let doctor = probe_artifact_doctor(input);
     let manifest_verify = doctor
@@ -2813,127 +2854,124 @@ pub(crate) fn render_build_report_json(input: &Path) -> String {
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    let mut fields = vec![
-        json_field("kind", "build_report"),
-        json_field("source_kind", &doctor.source_kind),
-        json_field("input", &doctor.input.display().to_string()),
-        json_optional_string_field(
-            "output_dir",
-            doctor
-                .output_dir
-                .as_ref()
-                .map(|path| path.display().to_string())
-                .as_deref(),
-        ),
-        json_optional_string_field(
-            "manifest_path",
-            doctor
-                .manifest_path
-                .as_ref()
-                .map(|path| path.display().to_string())
-                .as_deref(),
-        ),
-        json_optional_string_field(
-            "artifact_path",
-            doctor
-                .artifact_path
-                .as_ref()
-                .map(|path| path.display().to_string())
-                .as_deref(),
-        ),
-        json_optional_string_field(
-            "binary_path",
-            doctor
-                .binary_path
-                .as_ref()
-                .map(|path| path.display().to_string())
-                .as_deref(),
-        ),
-        json_bool_field("manifest_verified", doctor.manifest_verified),
-        json_bool_field("artifact_verified", doctor.artifact_verified),
-        json_bool_field("ready_to_run", doctor.ready_to_run),
-        json_field("recommended_next_step", &doctor.recommended_next_step),
-        json_field("recommended_command", &doctor.recommended_command),
-        json_field("recommended_reason", &doctor.recommended_reason),
-        json_usize_field("domain_units_count", domain_unit_records.len()),
-        json_object_array_field("domain_units", &domain_unit_records),
-    ];
+    let mut out = String::from("{");
+    append_json_field_strings(
+        &mut out,
+        vec![
+            json_field("kind", "build_report"),
+            json_field("source_kind", &doctor.source_kind),
+            json_field("input", &doctor.input.display().to_string()),
+            json_optional_string_field(
+                "output_dir",
+                doctor
+                    .output_dir
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .as_deref(),
+            ),
+            json_optional_string_field(
+                "manifest_path",
+                doctor
+                    .manifest_path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .as_deref(),
+            ),
+            json_optional_string_field(
+                "artifact_path",
+                doctor
+                    .artifact_path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .as_deref(),
+            ),
+            json_optional_string_field(
+                "binary_path",
+                doctor
+                    .binary_path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .as_deref(),
+            ),
+            json_bool_field("manifest_verified", doctor.manifest_verified),
+            json_bool_field("artifact_verified", doctor.artifact_verified),
+            json_bool_field("ready_to_run", doctor.ready_to_run),
+            json_field("recommended_next_step", &doctor.recommended_next_step),
+            json_field("recommended_command", &doctor.recommended_command),
+            json_field("recommended_reason", &doctor.recommended_reason),
+            json_usize_field("domain_units_count", domain_unit_records.len()),
+            json_object_array_field("domain_units", &domain_unit_records),
+        ],
+    );
     if let Some(report) = manifest_verify.as_ref() {
-        fields.push(json_usize_field(
-            "text_handle_rewrite_helper_hits",
-            report.project_text_handle_rewrite_helper_hits,
-        ));
-        fields.push(json_usize_field(
-            "text_handle_rewrite_local_hits",
-            report.project_text_handle_rewrite_local_hits,
-        ));
-        fields.push(json_usize_field(
-            "text_handle_rewrite_total_hits",
-            report.project_text_handle_rewrite_helper_hits
-                + report.project_text_handle_rewrite_local_hits,
-        ));
-        fields.push(json_field("packaging_mode", &report.packaging_mode));
-        fields.push(json_field("binary_name", &report.artifact_binary_name));
-        fields.push(json_usize_field(
-            "binary_bytes",
-            report.artifact_binary_bytes,
-        ));
-        fields.push(json_field("lifecycle_schema", &report.lifecycle_schema));
-        fields.push(json_field(
-            "lifecycle_bootstrap_entry",
-            &report.lifecycle_bootstrap_entry,
-        ));
-        fields.push(json_field(
-            "lifecycle_tick_policy",
-            &report.lifecycle_tick_policy,
-        ));
-        fields.push(json_field(
-            "lifecycle_shutdown_policy",
-            &report.lifecycle_shutdown_policy,
-        ));
-        fields.push(json_field(
-            "lifecycle_yalivia_rpc",
-            &report.lifecycle_yalivia_rpc,
-        ));
-        fields.push(json_string_array_field(
-            "lifecycle_hook_surface",
-            &report.lifecycle_hook_surface,
-        ));
-        fields.push(json_string_array_field(
-            "lifecycle_export_surface",
-            &report.lifecycle_export_surface,
-        ));
-        fields.push(json_string_array_field(
-            "lifecycle_runtime_capability_flags",
-            &report.lifecycle_runtime_capability_flags,
-        ));
-        fields.push(json_field("cpu_target_abi", &report.cpu_target_abi));
-        fields.push(json_field(
-            "cpu_target_machine_arch",
-            &report.cpu_target_machine_arch,
-        ));
-        fields.push(json_field(
-            "cpu_target_machine_os",
-            &report.cpu_target_machine_os,
-        ));
+        append_json_field_strings(
+            &mut out,
+            vec![
+                json_usize_field(
+                    "text_handle_rewrite_helper_hits",
+                    report.project_text_handle_rewrite_helper_hits,
+                ),
+                json_usize_field(
+                    "text_handle_rewrite_local_hits",
+                    report.project_text_handle_rewrite_local_hits,
+                ),
+                json_usize_field(
+                    "text_handle_rewrite_total_hits",
+                    report.project_text_handle_rewrite_helper_hits
+                        + report.project_text_handle_rewrite_local_hits,
+                ),
+                json_field("packaging_mode", &report.packaging_mode),
+                json_field("binary_name", &report.artifact_binary_name),
+                json_usize_field("binary_bytes", report.artifact_binary_bytes),
+                json_field("lifecycle_schema", &report.lifecycle_schema),
+                json_field(
+                    "lifecycle_bootstrap_entry",
+                    &report.lifecycle_bootstrap_entry,
+                ),
+                json_field("lifecycle_tick_policy", &report.lifecycle_tick_policy),
+                json_field(
+                    "lifecycle_shutdown_policy",
+                    &report.lifecycle_shutdown_policy,
+                ),
+                json_field("lifecycle_yalivia_rpc", &report.lifecycle_yalivia_rpc),
+                json_string_array_field("lifecycle_hook_surface", &report.lifecycle_hook_surface),
+                json_string_array_field(
+                    "lifecycle_export_surface",
+                    &report.lifecycle_export_surface,
+                ),
+                json_string_array_field(
+                    "lifecycle_runtime_capability_flags",
+                    &report.lifecycle_runtime_capability_flags,
+                ),
+                json_field("cpu_target_abi", &report.cpu_target_abi),
+                json_field("cpu_target_machine_arch", &report.cpu_target_machine_arch),
+                json_field("cpu_target_machine_os", &report.cpu_target_machine_os),
+            ],
+        );
     }
     if let Some(report) = artifact_verify.as_ref() {
-        fields.push(json_bool_field(
-            "artifact_roundtrip_verified",
-            report.artifact_roundtrip_verified,
-        ));
-        fields.push(json_bool_field(
-            "lifecycle_contract_consistent",
-            report.lifecycle_contract_consistent,
-        ));
-        fields.push(json_bool_field(
-            "lifecycle_runtime_capability_flags_consistent",
-            report.lifecycle_runtime_capability_flags_consistent,
-        ));
+        append_json_field_strings(
+            &mut out,
+            vec![
+                json_bool_field(
+                    "artifact_roundtrip_verified",
+                    report.artifact_roundtrip_verified,
+                ),
+                json_bool_field(
+                    "lifecycle_contract_consistent",
+                    report.lifecycle_contract_consistent,
+                ),
+                json_bool_field(
+                    "lifecycle_runtime_capability_flags_consistent",
+                    report.lifecycle_runtime_capability_flags_consistent,
+                ),
+            ],
+        );
     }
-    fields.extend(runtime_session_json_fields(manifest_verify.as_ref()));
-    fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
-    format!("{{{}}}", fields.join(","))
+    append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
+    append_workflow_link_plan_json_fields(&mut out, link_plan.as_ref());
+    out.push('}');
+    out
 }
 
 fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
@@ -3218,29 +3256,37 @@ fn load_link_plan_for_output_dir(output_dir: &Path) -> Option<nuisc::linker::Lin
 }
 
 fn workflow_link_plan_domain_unit_record(unit: &nuisc::linker::LinkPlanDomainUnit) -> String {
-    let mut fields = vec![
-        json_field("kind", &unit.kind),
-        json_field("package_id", &unit.package_id),
-        json_field("domain_family", &unit.domain_family),
-        json_field("contract_family", &unit.contract_family),
-        json_field("packaging_role", &unit.packaging_role),
-    ];
+    let mut out = String::from("{");
+    append_json_field_strings(
+        &mut out,
+        vec![
+            json_field("kind", &unit.kind),
+            json_field("package_id", &unit.package_id),
+            json_field("domain_family", &unit.domain_family),
+            json_field("contract_family", &unit.contract_family),
+            json_field("packaging_role", &unit.packaging_role),
+        ],
+    );
     if let Some(value) = unit.abi.as_deref() {
-        fields.push(json_field("abi", value));
+        append_json_field_strings(&mut out, vec![json_field("abi", value)]);
     }
     if let Some(value) = unit.backend_family.as_deref() {
-        fields.push(json_field("backend_family", value));
+        append_json_field_strings(&mut out, vec![json_field("backend_family", value)]);
     }
     if let Some(value) = unit.selected_lowering_target.as_deref() {
-        fields.push(json_field("selected_lowering_target", value));
+        append_json_field_strings(
+            &mut out,
+            vec![json_field("selected_lowering_target", value)],
+        );
     }
     if let Some(value) = unit.machine_arch.as_deref() {
-        fields.push(json_field("machine_arch", value));
+        append_json_field_strings(&mut out, vec![json_field("machine_arch", value)]);
     }
     if let Some(value) = unit.machine_os.as_deref() {
-        fields.push(json_field("machine_os", value));
+        append_json_field_strings(&mut out, vec![json_field("machine_os", value)]);
     }
-    format!("{{{}}}", fields.join(","))
+    out.push('}');
+    out
 }
 
 fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<String> {
@@ -3276,6 +3322,13 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
         ),
         json_object_array_field("link_plan_domain_unit_records", &domain_unit_records),
     ]
+}
+
+fn append_workflow_link_plan_json_fields(
+    out: &mut String,
+    link_plan: Option<&nuisc::linker::LinkPlan>,
+) {
+    append_json_field_strings(out, workflow_link_plan_json_fields(link_plan));
 }
 
 fn render_workflow_json(input: &Path) -> Result<String, String> {
@@ -3316,12 +3369,69 @@ fn render_workflow_json(input: &Path) -> Result<String, String> {
         let output_dir = default_build_output_dir(input);
         let artifact_report = probe_artifact_doctor(&output_dir);
         let link_plan = load_link_plan_for_output_dir(&output_dir);
-        let mut fields = vec![
+        let mut out = String::from("{");
+        append_json_field_strings(
+            &mut out,
+            vec![
+                json_field("source_kind", frontdoor.source_kind),
+                json_field("input", &input.display().to_string()),
+                json_field("project", &project.manifest.name),
+                json_field("root", &project.root.display().to_string()),
+                json_field("entry", &project.manifest.entry),
+                json_field(
+                    "default_build_output_dir",
+                    &output_dir.display().to_string(),
+                ),
+                json_field(
+                    "default_release_output_dir",
+                    &default_release_check_output_dir(input)
+                        .display()
+                        .to_string(),
+                ),
+                json_field("artifact_workflow", artifact_workflow_brief()),
+                json_field(
+                    "artifact_doctor_command",
+                    &artifact_doctor_command_for_output_dir(&output_dir),
+                ),
+                json_field(
+                    "run_artifact_command",
+                    &run_artifact_command_for_output_dir(&output_dir),
+                ),
+                json_bool_field("artifact_ready_to_run", artifact_report.ready_to_run),
+                json_field(
+                    "artifact_recommended_next_step",
+                    &artifact_report.recommended_next_step,
+                ),
+            ],
+        );
+        append_workflow_link_plan_json_fields(&mut out, link_plan.as_ref());
+        append_json_field_strings(
+            &mut out,
+            workflow_contract_json_fields(&frontdoor, true, true, include_galaxy_flow, true),
+        );
+        out.push('}');
+        return Ok(out);
+    }
+
+    let frontdoor = build_workflow_frontdoor_surface(
+        single_source_workflow_source_profile(),
+        WorkflowRecommendation {
+            label: single_source_workflow_next_step_label(),
+            command: recommended_single_source_workflow_command(),
+            reason: "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
+        },
+    );
+    let output_dir = default_build_output_dir(input);
+    let artifact_report = probe_artifact_doctor(&output_dir);
+    let link_plan = load_link_plan_for_output_dir(&output_dir);
+    let mut out = String::from("{");
+    append_json_field_strings(
+        &mut out,
+        vec![
             json_field("source_kind", frontdoor.source_kind),
             json_field("input", &input.display().to_string()),
-            json_field("project", &project.manifest.name),
-            json_field("root", &project.root.display().to_string()),
-            json_field("entry", &project.manifest.entry),
+            json_field("single_source_compile_workflow", frontdoor.workflow_brief),
+            json_field("single_source_compile_samples", frontdoor.workflow_samples),
             json_field(
                 "default_build_output_dir",
                 &output_dir.display().to_string(),
@@ -3346,64 +3456,15 @@ fn render_workflow_json(input: &Path) -> Result<String, String> {
                 "artifact_recommended_next_step",
                 &artifact_report.recommended_next_step,
             ),
-        ];
-        fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
-        fields.extend(workflow_contract_json_fields(
-            &frontdoor,
-            true,
-            true,
-            include_galaxy_flow,
-            true,
-        ));
-        return Ok(format!("{{{}}}", fields.join(",")));
-    }
-
-    let frontdoor = build_workflow_frontdoor_surface(
-        single_source_workflow_source_profile(),
-        WorkflowRecommendation {
-            label: single_source_workflow_next_step_label(),
-            command: recommended_single_source_workflow_command(),
-            reason: "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
-        },
+        ],
     );
-    let output_dir = default_build_output_dir(input);
-    let artifact_report = probe_artifact_doctor(&output_dir);
-    let link_plan = load_link_plan_for_output_dir(&output_dir);
-    let mut fields = vec![
-        json_field("source_kind", frontdoor.source_kind),
-        json_field("input", &input.display().to_string()),
-        json_field("single_source_compile_workflow", frontdoor.workflow_brief),
-        json_field("single_source_compile_samples", frontdoor.workflow_samples),
-        json_field(
-            "default_build_output_dir",
-            &output_dir.display().to_string(),
-        ),
-        json_field(
-            "default_release_output_dir",
-            &default_release_check_output_dir(input)
-                .display()
-                .to_string(),
-        ),
-        json_field("artifact_workflow", artifact_workflow_brief()),
-        json_field(
-            "artifact_doctor_command",
-            &artifact_doctor_command_for_output_dir(&output_dir),
-        ),
-        json_field(
-            "run_artifact_command",
-            &run_artifact_command_for_output_dir(&output_dir),
-        ),
-        json_bool_field("artifact_ready_to_run", artifact_report.ready_to_run),
-        json_field(
-            "artifact_recommended_next_step",
-            &artifact_report.recommended_next_step,
-        ),
-    ];
-    fields.extend(workflow_link_plan_json_fields(link_plan.as_ref()));
-    fields.extend(workflow_contract_json_fields(
-        &frontdoor, false, false, false, true,
-    ));
-    Ok(format!("{{{}}}", fields.join(",")))
+    append_workflow_link_plan_json_fields(&mut out, link_plan.as_ref());
+    append_json_field_strings(
+        &mut out,
+        workflow_contract_json_fields(&frontdoor, false, false, false, true),
+    );
+    out.push('}');
+    Ok(out)
 }
 
 fn single_source_workflow_next_step_label() -> &'static str {
@@ -3472,6 +3533,7 @@ fn build_workflow_frontdoor_surface(
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn workflow_frontdoor_json_fields(surface: &WorkflowFrontdoorSurface) -> Vec<String> {
     vec![
         json_field("source_kind", surface.source_kind),
@@ -3482,6 +3544,31 @@ pub(crate) fn workflow_frontdoor_json_fields(surface: &WorkflowFrontdoorSurface)
         json_field("recommended_command", surface.recommended_command),
         json_field("recommended_reason", surface.recommended_reason),
     ]
+}
+
+pub(crate) fn append_workflow_frontdoor_json_fields(
+    out: &mut String,
+    surface: &WorkflowFrontdoorSurface,
+) {
+    append_json_field_strings(
+        out,
+        vec![
+            json_field("source_kind", surface.source_kind),
+            json_field("workflow_kind", surface.workflow_kind),
+            json_field("workflow_brief", surface.workflow_brief),
+            json_field("workflow_samples", surface.workflow_samples),
+            json_field("recommended_next_step", surface.recommended_next_step),
+            json_field("recommended_command", surface.recommended_command),
+            json_field("recommended_reason", surface.recommended_reason),
+        ],
+    );
+}
+
+pub(crate) fn workflow_frontdoor_json_object_field(surface: &WorkflowFrontdoorSurface) -> String {
+    let mut out = String::from("\"frontdoor\":{");
+    append_workflow_frontdoor_json_fields(&mut out, surface);
+    out.push('}');
+    out
 }
 
 fn print_workflow_frontdoor_surface(surface: &WorkflowFrontdoorSurface) {
@@ -3937,6 +4024,7 @@ pub(crate) fn json_string_array_field(name: &str, values: &[String]) -> String {
     out
 }
 
+#[allow(dead_code)]
 pub(crate) fn json_object_field(name: &str, fields: &[String]) -> String {
     let mut out = String::new();
     out.push('"');
@@ -4234,11 +4322,27 @@ pub(crate) fn project_plan_domains_json(
         .join(","))
 }
 
+#[allow(dead_code)]
 pub(crate) fn project_workflow_json_fields(
     frontdoor: &WorkflowFrontdoorSurface,
     include_galaxy_flow: bool,
 ) -> Vec<String> {
     workflow_contract_json_fields(frontdoor, true, true, include_galaxy_flow, false)
+}
+
+pub(crate) fn append_project_workflow_json_fields(
+    out: &mut String,
+    frontdoor: &WorkflowFrontdoorSurface,
+    include_galaxy_flow: bool,
+) {
+    crate::json_surface::append_workflow_contract_json_fields(
+        out,
+        frontdoor,
+        true,
+        true,
+        include_galaxy_flow,
+        false,
+    );
 }
 
 pub(crate) fn scheduler_view_domain_record(
@@ -4907,7 +5011,17 @@ pub(crate) fn render_project_imports_json(input: &Path) -> Result<String, String
             format!("{{{}}}", fields.join(","))
         })
         .collect::<Vec<_>>();
-    let fields = vec![
+    let suggested_manifest_snippet = format!(
+        "galaxy_imports = [{}]",
+        report
+            .suggested_galaxy_imports
+            .iter()
+            .map(|item| format!("\"{}\"", item))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    let mut out = String::from("{");
+    for field in [
         json_field("source_kind", "project"),
         json_field("input", &input.display().to_string()),
         json_field("project", &report.project_name),
@@ -4941,21 +5055,16 @@ pub(crate) fn render_project_imports_json(input: &Path) -> Result<String, String
             report.suggested_galaxy_imports.len(),
         ),
         json_string_array_field("suggested_galaxy_imports", &report.suggested_galaxy_imports),
-        json_field(
-            "suggested_manifest_snippet",
-            &format!(
-                "galaxy_imports = [{}]",
-                report
-                    .suggested_galaxy_imports
-                    .iter()
-                    .map(|item| format!("\"{}\"", item))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-        ),
+        json_field("suggested_manifest_snippet", &suggested_manifest_snippet),
         json_object_array_field("library_records", &records),
-    ];
-    Ok(format!("{{{}}}", fields.join(",")))
+    ] {
+        if !out.ends_with('{') {
+            out.push(',');
+        }
+        out.push_str(&field);
+    }
+    out.push('}');
+    Ok(out)
 }
 
 pub(crate) fn render_project_imports_apply_json(
@@ -4966,7 +5075,8 @@ pub(crate) fn render_project_imports_apply_json(
     let Some(prefix) = base.strip_suffix('}') else {
         return Err("project imports json renderer returned malformed object".to_owned());
     };
-    let mut fields = vec![
+    let mut out = String::from("{");
+    for field in [
         json_field("kind", "project_imports_apply"),
         json_field("action", "apply_suggested"),
         json_field(
@@ -4980,9 +5090,18 @@ pub(crate) fn render_project_imports_apply_json(
             "total_explicit_galaxy_imports",
             applied.total_explicit_galaxy_imports,
         ),
-    ];
-    fields.push(prefix.trim_start_matches('{').to_owned());
-    Ok(format!("{{{}}}", fields.join(",")))
+    ] {
+        if !out.ends_with('{') {
+            out.push(',');
+        }
+        out.push_str(&field);
+    }
+    if !prefix.trim_start_matches('{').is_empty() {
+        out.push(',');
+        out.push_str(prefix.trim_start_matches('{'));
+    }
+    out.push('}');
+    Ok(out)
 }
 
 fn print_domain_contract_group(contract: &nuisc::registry::NustarDomainContract, group: &str) {

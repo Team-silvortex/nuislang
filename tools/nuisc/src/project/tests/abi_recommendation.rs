@@ -597,7 +597,25 @@ fn validates_shader_target_projection_against_selected_abi() {
             let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
             let profile_view: Viewport = shader_viewport(160, 120);
             let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
-            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, }; @vertex fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut { var out: VsOut; out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0); out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0); return out; } @fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32> { return in.color; }");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+              struct VsOut {
+                @builtin(position) pos: vec4<f32>,
+                @location(0) color: vec4<f32>,
+              };
+
+              @vertex
+              fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut {
+                var out: VsOut;
+                out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+                out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+                return out;
+              }
+
+              @fragment
+              fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+                return in.color;
+              }
+            });
           }
         }
         "#,
@@ -610,6 +628,329 @@ fn validates_shader_target_projection_against_selected_abi() {
     let mut yir = YirModule::new("0.1");
     apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
     validate_shader_target_projection(&project, &yir, "SurfaceShader").unwrap();
+}
+
+#[test]
+fn normalizes_structured_wgsl_stage_blocks_before_project_yir_emission() {
+    let mut project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            const vertex_count: i64 = 3;
+            const instance_count: i64 = 1;
+            const packet_field_count: i64 = 3;
+            const pass_kind: i64 = 1;
+            const packet_color_slot: i64 = 0;
+            const packet_speed_slot: i64 = 1;
+            const packet_radius_slot: i64 = 2;
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+            let profile_view: Viewport = shader_viewport(160, 120);
+            let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+              struct VsOut {
+                @builtin(position) pos: vec4<f32>,
+                @location(0) color: vec4<f32>,
+              };
+
+              stage vertex {
+                fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut {
+                  var out: VsOut;
+                  out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+                  out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+                  return out;
+                }
+              }
+
+              stage fragment {
+                fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+                  return in.color;
+                }
+              }
+            });
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "shader".to_owned(),
+        abi: "shader.metal.msl2_4".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    let inline_wgsl = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "shader" && node.op.instruction == "inline_wgsl")
+        .expect("inline_wgsl node");
+    let source = inline_wgsl.op.args.get(1).expect("inline_wgsl source");
+    assert!(source.contains("@vertex"), "{source}");
+    assert!(source.contains("@fragment"), "{source}");
+    assert!(!source.contains("stage vertex"), "{source}");
+    assert!(!source.contains("stage fragment"), "{source}");
+}
+
+#[test]
+fn normalizes_compute_stage_workgroup_metadata_before_project_yir_emission() {
+    let mut project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+            let profile_view: Viewport = shader_viewport(160, 120);
+            let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+              stage compute(workgroup_size(8, 4, 1)) {
+                fn cs_main() {
+                }
+              }
+            });
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "shader".to_owned(),
+        abi: "shader.metal.msl2_4".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    let inline_wgsl = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "shader" && node.op.instruction == "inline_wgsl")
+        .expect("inline_wgsl node");
+    let source = inline_wgsl.op.args.get(1).expect("inline_wgsl source");
+    assert!(source.contains("@compute"), "{source}");
+    assert!(source.contains("@workgroup_size(8, 4, 1)"), "{source}");
+    assert!(!source.contains("stage compute"), "{source}");
+}
+
+#[test]
+fn normalizes_fragment_stage_metadata_before_project_yir_emission() {
+    let mut project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+            let profile_view: Viewport = shader_viewport(160, 120);
+            let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+              stage fragment(early_depth_test) {
+                fn fs_main() -> @location(0) vec4<f32> {
+                  return vec4<f32>(1.0, 1.0, 1.0, 1.0);
+                }
+              }
+            });
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "shader".to_owned(),
+        abi: "shader.metal.msl2_4".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    let inline_wgsl = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "shader" && node.op.instruction == "inline_wgsl")
+        .expect("inline_wgsl node");
+    let source = inline_wgsl.op.args.get(1).expect("inline_wgsl source");
+    assert!(source.contains("@fragment"), "{source}");
+    assert!(source.contains("@early_depth_test"), "{source}");
+    assert!(!source.contains("stage fragment"), "{source}");
+}
+
+#[test]
+fn normalizes_binding_declarations_before_project_yir_emission() {
+    let mut project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+            let profile_view: Viewport = shader_viewport(160, 120);
+            let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+              struct Globals {
+                exposure: f32,
+              };
+
+              binding(0, 0) var color_sampler: sampler;
+              binding(0, 1) var color_tex: texture_2d<f32>;
+              binding(0, 2) var<uniform> globals: Globals;
+
+              stage fragment {
+                fn fs_main() -> @location(0) vec4<f32> {
+                  return vec4<f32>(globals.exposure, 1.0, 1.0, 1.0);
+                }
+              }
+            });
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "shader".to_owned(),
+        abi: "shader.metal.msl2_4".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    let inline_wgsl = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "shader" && node.op.instruction == "inline_wgsl")
+        .expect("inline_wgsl node");
+    let source = inline_wgsl.op.args.get(1).expect("inline_wgsl source");
+    assert!(source.contains("@group(0)"), "{source}");
+    assert!(source.contains("@binding(0)"), "{source}");
+    assert!(source.contains("@binding(1)"), "{source}");
+    assert!(source.contains("@binding(2)"), "{source}");
+    assert!(
+        source.contains("var<uniform> globals: Globals;"),
+        "{source}"
+    );
+    assert!(!source.contains("binding(0, 0)"), "{source}");
+}
+
+#[test]
+fn normalizes_bare_builtin_and_location_attributes_before_project_yir_emission() {
+    let mut project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+            let profile_view: Viewport = shader_viewport(160, 120);
+            let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+              struct VsOut {
+                builtin(position) pos: vec4<f32>,
+                location(0) uv: vec2<f32>,
+              };
+
+              stage vertex {
+                fn vs_main(builtin(vertex_index) vid: u32) -> VsOut {
+                  var out: VsOut;
+                  out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+                  out.uv = vec2<f32>(f32(vid), 0.0);
+                  return out;
+                }
+              }
+
+              stage fragment {
+                fn fs_main(location(0) uv: vec2<f32>) -> location(0) vec4<f32> {
+                  return vec4<f32>(uv.x, uv.y, 1.0, 1.0);
+                }
+              }
+            });
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "shader".to_owned(),
+        abi: "shader.metal.msl2_4".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    let inline_wgsl = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "shader" && node.op.instruction == "inline_wgsl")
+        .expect("inline_wgsl node");
+    let source = inline_wgsl.op.args.get(1).expect("inline_wgsl source");
+    assert!(
+        source.contains("@builtin(position) pos: vec4<f32>,"),
+        "{source}"
+    );
+    assert!(source.contains("@location(0) uv: vec2<f32>,"), "{source}");
+    assert!(
+        source.contains("fn vs_main(@builtin(vertex_index) vid: u32)"),
+        "{source}"
+    );
+    assert!(
+        source.contains("fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32>"),
+        "{source}"
+    );
+    assert!(
+        !source.contains("\n                builtin(position)"),
+        "{source}"
+    );
+}
+
+#[test]
+fn normalizes_bare_interpolate_and_invariant_attributes_before_project_yir_emission() {
+    let mut project = project_with_modules(vec![(
+        "surface_shader.ns",
+        r#"
+        mod shader SurfaceShader {
+          fn profile() {
+            let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+            let profile_view: Viewport = shader_viewport(160, 120);
+            let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+              struct VsOut {
+                invariant builtin(position) pos: vec4<f32>,
+                interpolate(flat) location(0) uv: vec2<f32>,
+              };
+
+              stage fragment {
+                fn fs_main(interpolate(flat) location(0) uv: vec2<f32>) -> location(0) vec4<f32> {
+                  return vec4<f32>(uv.x, uv.y, 1.0, 1.0);
+                }
+              }
+            });
+          }
+        }
+        "#,
+    )]);
+    project.manifest.abi_requirements = vec![ProjectAbiRequirement {
+        domain: "shader".to_owned(),
+        abi: "shader.metal.msl2_4".to_owned(),
+    }];
+
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    let inline_wgsl = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "shader" && node.op.instruction == "inline_wgsl")
+        .expect("inline_wgsl node");
+    let source = inline_wgsl.op.args.get(1).expect("inline_wgsl source");
+    assert!(
+        source.contains("@invariant @builtin(position) pos: vec4<f32>,"),
+        "{source}"
+    );
+    assert!(
+        source.contains("@interpolate(flat) @location(0) uv: vec2<f32>,"),
+        "{source}"
+    );
+    assert!(
+        source.contains(
+            "fn fs_main(@interpolate(flat) @location(0) uv: vec2<f32>) -> @location(0) vec4<f32>"
+        ),
+        "{source}"
+    );
+    assert!(
+        !source.contains("\n                invariant builtin(position)"),
+        "{source}"
+    );
 }
 
 #[test]
@@ -629,7 +970,25 @@ fn rejects_shader_target_projection_that_disagrees_with_selected_abi() {
             let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
             let profile_view: Viewport = shader_viewport(160, 120);
             let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
-            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, }; @vertex fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut { var out: VsOut; out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0); out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0); return out; } @fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32> { return in.color; }");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+              struct VsOut {
+                @builtin(position) pos: vec4<f32>,
+                @location(0) color: vec4<f32>,
+              };
+
+              @vertex
+              fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut {
+                var out: VsOut;
+                out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+                out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+                return out;
+              }
+
+              @fragment
+              fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+                return in.color;
+              }
+            });
           }
         }
         "#,
@@ -703,7 +1062,25 @@ fn rejects_shader_inline_wgsl_for_cpu_fallback_abi() {
             let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
             let profile_view: Viewport = shader_viewport(160, 120);
             let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
-            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) color: vec4<f32>, }; @vertex fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut { var out: VsOut; out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0); out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0); return out; } @fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32> { return in.color; }");
+            let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+              struct VsOut {
+                @builtin(position) pos: vec4<f32>,
+                @location(0) color: vec4<f32>,
+              };
+
+              @vertex
+              fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut {
+                var out: VsOut;
+                out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+                out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+                return out;
+              }
+
+              @fragment
+              fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+                return in.color;
+              }
+            });
           }
         }
         "#,

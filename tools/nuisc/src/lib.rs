@@ -16,6 +16,7 @@ pub mod pipeline;
 pub mod project;
 pub mod registry;
 pub mod render;
+pub mod shader_source;
 pub mod stdlib_registry;
 
 use std::path::{Path, PathBuf};

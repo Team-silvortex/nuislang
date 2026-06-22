@@ -264,7 +264,23 @@ fn accepts_typed_data_profile_tokens_for_project_link() {
                 let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
                 let profile_view: Viewport = shader_viewport(160, 120);
                 let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
-                let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+                  struct VsOut {
+                    @builtin(position) pos: vec4<f32>,
+                  };
+
+                  @vertex
+                  fn vs_main() -> VsOut {
+                    var out: VsOut;
+                    out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+                    return out;
+                  }
+
+                  @fragment
+                  fn fs_main() -> @location(0) vec4<f32> {
+                    return vec4<f32>(1.0, 1.0, 1.0, 1.0);
+                  }
+                });
               }
             }
             "#,
@@ -427,7 +443,23 @@ fn validates_data_profile_token_types_through_local_type_aliases() {
                 let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
                 let profile_view: Viewport = shader_viewport(160, 120);
                 let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
-                let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+                  struct VsOut {
+                    @builtin(position) pos: vec4<f32>,
+                  };
+
+                  @vertex
+                  fn vs_main() -> VsOut {
+                    var out: VsOut;
+                    out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+                    return out;
+                  }
+
+                  @fragment
+                  fn fs_main() -> @location(0) vec4<f32> {
+                    return vec4<f32>(1.0, 1.0, 1.0, 1.0);
+                  }
+                });
               }
             }
             "#,
@@ -516,7 +548,23 @@ fn rejects_untyped_data_profile_marker_for_project_link() {
                 let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
                 let profile_view: Viewport = shader_viewport(160, 120);
                 let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
-                let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+                  struct VsOut {
+                    @builtin(position) pos: vec4<f32>,
+                  };
+
+                  @vertex
+                  fn vs_main() -> VsOut {
+                    var out: VsOut;
+                    out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+                    return out;
+                  }
+
+                  @fragment
+                  fn fs_main() -> @location(0) vec4<f32> {
+                    return vec4<f32>(1.0, 1.0, 1.0, 1.0);
+                  }
+                });
               }
             }
             "#,
@@ -594,7 +642,23 @@ fn rejects_missing_window_policy_marker_for_windowed_bridge() {
                 let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
                 let profile_view: Viewport = shader_viewport(160, 120);
                 let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
-                let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+                  struct VsOut {
+                    @builtin(position) pos: vec4<f32>,
+                  };
+
+                  @vertex
+                  fn vs_main() -> VsOut {
+                    var out: VsOut;
+                    out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+                    return out;
+                  }
+
+                  @fragment
+                  fn fs_main() -> @location(0) vec4<f32> {
+                    return vec4<f32>(1.0, 1.0, 1.0, 1.0);
+                  }
+                });
               }
             }
             "#,

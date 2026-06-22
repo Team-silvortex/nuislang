@@ -1190,11 +1190,9 @@ fn render_nir_expr(value: &NirExpr) -> String {
             escape_debug(name),
             escape_debug(topology)
         ),
-        NirExpr::ShaderInlineWgsl { entry, source } => format!(
-            "shader_inline_wgsl(\"{}\", \"{}\")",
-            escape_debug(entry),
-            escape_debug(source)
-        ),
+        NirExpr::ShaderInlineWgsl { entry, source } => {
+            render_shader_inline_wgsl_expr(entry, source)
+        }
         NirExpr::ShaderResult { value, .. } => {
             format!("shader_result({})", render_nir_expr(value))
         }
@@ -1971,6 +1969,30 @@ fn escape_debug(value: &str) -> String {
         .replace('\t', "\\t")
 }
 
+fn render_shader_inline_wgsl_expr(entry: &str, source: &str) -> String {
+    if !source.contains('\n') {
+        return format!(
+            "shader_inline_wgsl(\"{}\", \"{}\")",
+            escape_debug(entry),
+            escape_debug(source)
+        );
+    }
+
+    let trimmed = source.trim();
+    let mut out = String::new();
+    out.push_str(&format!(
+        "shader_inline_wgsl(\"{}\", wgsl {{\n",
+        escape_debug(entry)
+    ));
+    for line in trimmed.lines() {
+        out.push_str("  ");
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.push_str("})");
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2092,5 +2114,43 @@ mod tests {
         assert!(rendered.contains("pub enum Option<T>"), "{rendered}");
         assert!(rendered.contains("variant None"), "{rendered}");
         assert!(rendered.contains("variant Some(T)"), "{rendered}");
+    }
+
+    #[test]
+    fn renders_multiline_shader_inline_wgsl_as_wgsl_block() {
+        let rendered = render_nir_expr(&NirExpr::ShaderInlineWgsl {
+            entry: "demo_shader".to_owned(),
+            source: r#"
+struct VsOut {
+  @builtin(position) pos: vec4<f32>,
+};
+
+@vertex
+fn vs_main() -> VsOut {
+  var out: VsOut;
+  return out;
+}
+"#
+            .trim()
+            .to_owned(),
+        });
+
+        assert!(
+            rendered.contains("shader_inline_wgsl(\"demo_shader\", wgsl {"),
+            "{rendered}"
+        );
+        assert!(rendered.contains("@vertex"), "{rendered}");
+        assert!(rendered.contains("\n})"), "{rendered}");
+        assert!(!rendered.contains("\\n"), "{rendered}");
+    }
+
+    #[test]
+    fn keeps_single_line_shader_inline_wgsl_as_string_literal() {
+        let rendered = render_nir_expr(&NirExpr::ShaderInlineWgsl {
+            entry: "demo_shader".to_owned(),
+            source: "stub".to_owned(),
+        });
+
+        assert_eq!(rendered, "shader_inline_wgsl(\"demo_shader\", \"stub\")");
     }
 }
