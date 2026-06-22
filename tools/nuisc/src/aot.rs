@@ -120,6 +120,21 @@ pub fn host_cpu_build_target() -> CpuBuildTarget {
     }
 }
 
+fn canonical_machine_arch(machine_arch: &str) -> &str {
+    match machine_arch {
+        "amd64" => "x86_64",
+        other => other,
+    }
+}
+
+fn canonical_target_triple(target: &str) -> String {
+    if let Some(rest) = target.strip_prefix("amd64-") {
+        format!("x86_64-{rest}")
+    } else {
+        target.to_owned()
+    }
+}
+
 pub fn resolve_cpu_build_target_from_project_abi(
     registry_root: &Path,
     resolution: Option<&crate::project::ProjectAbiResolution>,
@@ -200,7 +215,9 @@ pub fn resolve_cpu_build_target_from_target(
     target: &str,
 ) -> Result<CpuBuildTarget, String> {
     let manifest = crate::registry::load_manifest_for_domain(registry_root, "cpu")?;
-    let registered = crate::registry::registered_abi_target_for_clang(&manifest, target)?;
+    let canonical_target = canonical_target_triple(target);
+    let registered =
+        crate::registry::registered_abi_target_for_clang(&manifest, &canonical_target)?;
     Ok(CpuBuildTarget {
         abi: registered.abi,
         machine_arch: registered.machine_arch.clone(),
@@ -266,25 +283,33 @@ pub fn compile_artifacts_for_output_dir(
     output_dir: &Path,
     yir: &YirModule,
 ) -> Result<CompileArtifacts, String> {
-    let layout = output_layout(input, output_dir);
-    let (binary_path, packaging_mode) = if requires_window_bundle(yir) {
-        (
-            layout.binary_stub_path.display().to_string(),
-            "window-aot-bundle".to_owned(),
-        )
+    let packaging_mode = if requires_window_bundle(yir) {
+        "window-aot-bundle"
     } else {
-        (
-            layout.binary_stub_path.display().to_string(),
-            "native-cpu-llvm".to_owned(),
-        )
+        "native-cpu-llvm"
     };
+    compile_artifacts_for_output_dir_with_packaging_mode(input, output_dir, packaging_mode)
+}
+
+pub fn compile_artifacts_for_output_dir_with_packaging_mode(
+    input: &Path,
+    output_dir: &Path,
+    packaging_mode: &str,
+) -> Result<CompileArtifacts, String> {
+    let layout = output_layout(input, output_dir);
+    if packaging_mode != "window-aot-bundle" && packaging_mode != "native-cpu-llvm" {
+        return Err(format!(
+            "unsupported cached packaging_mode `{packaging_mode}` for `{}`",
+            output_dir.display()
+        ));
+    }
     Ok(CompileArtifacts {
         ast_path: layout.ast_path.display().to_string(),
         nir_path: layout.nir_path.display().to_string(),
         yir_path: layout.yir_path.display().to_string(),
         llvm_ir_path: layout.llvm_ir_path.display().to_string(),
-        binary_path,
-        packaging_mode,
+        binary_path: layout.binary_stub_path.display().to_string(),
+        packaging_mode: packaging_mode.to_owned(),
     })
 }
 
@@ -2381,6 +2406,7 @@ pub struct BuildManifestVerifyReport {
     pub cpu_target_calling_abi: String,
     pub cpu_target_clang: String,
     pub cpu_target_cross: bool,
+    pub loaded_nustar: Vec<String>,
     pub compile_cache_status: Option<String>,
     pub compile_cache_key: Option<String>,
     pub compile_cache_root: Option<String>,
@@ -2517,6 +2543,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         parse_required_toml_string(&source, "cpu_target_calling_abi", path)?;
     let cpu_target_clang = parse_required_toml_string(&source, "cpu_target_clang", path)?;
     let cpu_target_cross = parse_required_toml_bool(&source, "cpu_target_cross", path)?;
+    let loaded_nustar = parse_required_toml_string_array(&source, "loaded_nustar", path)?;
     let compile_cache_status = parse_optional_toml_string(&source, "compile_cache_status");
     let compile_cache_key = parse_optional_toml_string(&source, "compile_cache_key");
     let compile_cache_root = parse_optional_toml_string(&source, "compile_cache_root");
@@ -3019,26 +3046,25 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 host_bridge_plan_index_schema
             ));
         }
-        let (plan_index_source, plan_index_label) = if let Some(source) =
-            &host_bridge_plan_index_inline
-        {
-            (
-                source.clone(),
-                "<embedded-host-bridge-plan-index>".to_owned(),
-            )
-        } else {
-            let host_bridge_plan_index_path = host_bridge_plan_index_path.as_ref().unwrap();
-            (
-                fs::read_to_string(host_bridge_plan_index_path).map_err(|error| {
-                    format!(
+        let (plan_index_source, plan_index_label) =
+            if let Some(source) = &host_bridge_plan_index_inline {
+                (
+                    source.clone(),
+                    "<embedded-host-bridge-plan-index>".to_owned(),
+                )
+            } else {
+                let host_bridge_plan_index_path = host_bridge_plan_index_path.as_ref().unwrap();
+                (
+                    fs::read_to_string(host_bridge_plan_index_path).map_err(|error| {
+                        format!(
                         "failed to read host bridge plan index `{}` referenced by `{}`: {error}",
                         host_bridge_plan_index_path,
                         path.display()
                     )
-                })?,
-                host_bridge_plan_index_path.clone(),
-            )
-        };
+                    })?,
+                    host_bridge_plan_index_path.clone(),
+                )
+            };
         let index_schema =
             parse_required_toml_string(&plan_index_source, "schema", Path::new(&plan_index_label))?;
         if index_schema != "nuis-host-bridge-plan-index-v1" {
@@ -3174,6 +3200,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         cpu_target_calling_abi,
         cpu_target_clang,
         cpu_target_cross,
+        loaded_nustar,
         compile_cache_status,
         compile_cache_key,
         compile_cache_root,
@@ -3547,7 +3574,7 @@ fn requires_window_bundle(yir: &YirModule) -> bool {
 }
 
 fn host_machine_arch() -> &'static str {
-    match std::env::consts::ARCH {
+    match canonical_machine_arch(std::env::consts::ARCH) {
         "aarch64" => "arm64",
         other => other,
     }
@@ -3570,7 +3597,7 @@ fn object_format_for_os(os: &str) -> &'static str {
 }
 
 fn calling_abi_for_machine(machine_arch: &str, machine_os: &str) -> &'static str {
-    match (machine_arch, machine_os) {
+    match (canonical_machine_arch(machine_arch), machine_os) {
         ("arm64", "darwin") => "aapcs64-darwin",
         ("arm64", _) => "aapcs64",
         ("x86_64", "windows") => "win64",
@@ -3588,9 +3615,10 @@ fn host_calling_abi() -> &'static str {
 }
 
 fn clang_target_triple(machine_arch: &str, machine_os: &str) -> String {
-    match (machine_arch, machine_os) {
+    match (canonical_machine_arch(machine_arch), machine_os) {
         ("arm64", "darwin") => "aarch64-apple-darwin".to_owned(),
         ("arm64", "linux") => "aarch64-unknown-linux-gnu".to_owned(),
+        ("x86_64", "darwin") => "x86_64-apple-darwin".to_owned(),
         ("x86_64", "linux") => "x86_64-unknown-linux-gnu".to_owned(),
         ("x86_64", "windows") => "x86_64-pc-windows-msvc".to_owned(),
         _ => format!("{machine_arch}-unknown-{machine_os}"),
@@ -7036,7 +7064,7 @@ mod tests {
         .unwrap();
         fs::write(
             root.join("cpu.toml"),
-            "manifest_schema = \"nustar-manifest-v1\"\npackage_id = \"official.cpu\"\ndomain_family = \"cpu\"\nfrontend = \"nustar-cpu\"\nentry_crate = \"crates/yir-domain-cpu\"\nast_entry = \"cpu.ast.bootstrap.v1\"\nnir_entry = \"cpu.nir.bootstrap.v1\"\nyir_lowering_entry = \"cpu.yir.lowering.v1\"\npart_verify_entry = \"cpu.verify.partial.v1\"\nast_surface = [\"cpu.mod-ast.v1\"]\nnir_surface = [\"nir.cpu.surface.v1\"]\nyir_lowering = [\"yir.cpu.lowering.v1\"]\npart_verify = [\"verify.cpu.contract.v1\"]\nbinary_extension = \"nustar\"\npackage_layout = \"single-envelope\"\nmachine_abi_policy = \"exact-match\"\nabi_profiles = [\"cpu.arm64.apple_aapcs64\", \"cpu.x86_64.sysv64\", \"cpu.x86_64.win64\"]\nabi_capabilities = [\"cpu.arm64.apple_aapcs64:op:cpu.*\", \"cpu.x86_64.sysv64:op:cpu.*\", \"cpu.x86_64.win64:op:cpu.*\"]\nabi_targets = [\"cpu.arm64.apple_aapcs64:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin\", \"cpu.x86_64.sysv64:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu\", \"cpu.x86_64.win64:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc\"]\nimplementation_kinds = [\"native-stub\"]\nloader_entry = \"nustar.bootstrap.v1\"\nloader_abi = \"nustar-loader-v1\"\nhost_ffi_surface = []\nhost_ffi_abis = []\nhost_ffi_bridge = \"none\"\nsupport_surface = []\nsupport_profile_slots = []\ndefault_lanes = []\nprofiles = [\"aot\"]\nresource_families = [\"cpu\", \"cpu.arm64\"]\nunit_types = [\"Main\"]\nlowering_targets = [\"llvm\"]\nops = [\"cpu.const\"]\n",
+            "manifest_schema = \"nustar-manifest-v1\"\npackage_id = \"official.cpu\"\ndomain_family = \"cpu\"\nfrontend = \"nustar-cpu\"\nentry_crate = \"crates/yir-domain-cpu\"\nast_entry = \"cpu.ast.bootstrap.v1\"\nnir_entry = \"cpu.nir.bootstrap.v1\"\nyir_lowering_entry = \"cpu.yir.lowering.v1\"\npart_verify_entry = \"cpu.verify.partial.v1\"\nast_surface = [\"cpu.mod-ast.v1\"]\nnir_surface = [\"nir.cpu.surface.v1\"]\nyir_lowering = [\"yir.cpu.lowering.v1\"]\npart_verify = [\"verify.cpu.contract.v1\"]\nbinary_extension = \"nustar\"\npackage_layout = \"single-envelope\"\nmachine_abi_policy = \"exact-match\"\nabi_profiles = [\"cpu.arm64.apple_aapcs64\", \"cpu.x86_64.apple_sysv64\", \"cpu.x86_64.sysv64\", \"cpu.x86_64.win64\"]\nabi_capabilities = [\"cpu.arm64.apple_aapcs64:op:cpu.*\", \"cpu.x86_64.apple_sysv64:op:cpu.*\", \"cpu.x86_64.sysv64:op:cpu.*\", \"cpu.x86_64.win64:op:cpu.*\"]\nabi_targets = [\"cpu.arm64.apple_aapcs64:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin\", \"cpu.x86_64.apple_sysv64:arch=x86_64|os=darwin|object=mach-o|calling=sysv64|clang=x86_64-apple-darwin\", \"cpu.x86_64.sysv64:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu\", \"cpu.x86_64.win64:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc\"]\nimplementation_kinds = [\"native-stub\"]\nloader_entry = \"nustar.bootstrap.v1\"\nloader_abi = \"nustar-loader-v1\"\nhost_ffi_surface = []\nhost_ffi_abis = []\nhost_ffi_bridge = \"none\"\nsupport_surface = []\nsupport_profile_slots = []\ndefault_lanes = []\nprofiles = [\"aot\"]\nresource_families = [\"cpu\", \"cpu.arm64\", \"cpu.x86_64\"]\nunit_types = [\"Main\"]\nlowering_targets = [\"llvm\", \"x86_64\"]\nops = [\"cpu.const\"]\n",
         )
         .unwrap();
         root
@@ -7050,6 +7078,14 @@ mod tests {
         assert_eq!(apple.machine_arch, "arm64");
         assert_eq!(apple.machine_os, "darwin");
         assert_eq!(apple.clang_target, "aarch64-apple-darwin");
+
+        let apple_amd64 =
+            resolve_cpu_build_target_from_abi(&registry_root, "cpu.x86_64.apple_sysv64").unwrap();
+        assert_eq!(apple_amd64.machine_arch, "x86_64");
+        assert_eq!(apple_amd64.machine_os, "darwin");
+        assert_eq!(apple_amd64.object_format, "mach-o");
+        assert_eq!(apple_amd64.calling_abi, "sysv64");
+        assert_eq!(apple_amd64.clang_target, "x86_64-apple-darwin");
 
         let linux = resolve_cpu_build_target_from_abi(&registry_root, "cpu.x86_64.sysv64").unwrap();
         assert_eq!(linux.machine_arch, "x86_64");
@@ -7075,6 +7111,22 @@ mod tests {
         assert_eq!(target.machine_os, "linux");
         assert_eq!(target.object_format, "elf");
         assert_eq!(target.calling_abi, "sysv64");
+    }
+
+    #[test]
+    fn resolve_cpu_build_target_from_darwin_amd64_alias_triple() {
+        let registry_root = registry_root();
+        let target = super::resolve_cpu_build_target_from_target(
+            registry_root.as_path(),
+            "amd64-apple-darwin",
+        )
+        .unwrap();
+        assert_eq!(target.abi, "cpu.x86_64.apple_sysv64");
+        assert_eq!(target.machine_arch, "x86_64");
+        assert_eq!(target.machine_os, "darwin");
+        assert_eq!(target.object_format, "mach-o");
+        assert_eq!(target.calling_abi, "sysv64");
+        assert_eq!(target.clang_target, "x86_64-apple-darwin");
     }
 
     #[test]

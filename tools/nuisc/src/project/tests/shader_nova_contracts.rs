@@ -3,6 +3,23 @@ use nuis_semantics::model::{NirExpr, NirStmt};
 use std::{collections::BTreeMap, fs, path::PathBuf};
 use yir_core::EdgeKind;
 
+fn darwin_x86_64_shader_project_abis() -> Vec<ProjectAbiRequirement> {
+    vec![
+        ProjectAbiRequirement {
+            domain: "cpu".to_owned(),
+            abi: "cpu.x86_64.apple_sysv64".to_owned(),
+        },
+        ProjectAbiRequirement {
+            domain: "shader".to_owned(),
+            abi: "shader.metal.x86_64.msl2_4".to_owned(),
+        },
+        ProjectAbiRequirement {
+            domain: "data".to_owned(),
+            abi: "data.fabric.macos.x86_64.v1".to_owned(),
+        },
+    ]
+}
+
 fn compiled_domain_project(path: &str) -> crate::pipeline::PipelineArtifacts {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(path);
     crate::pipeline::compile_source_path(&root).unwrap()
@@ -2013,4 +2030,38 @@ fn rejects_reverse_shader_project_links_against_yir_when_shader_to_data_xfer_is_
 
     let err = validate_project_links_against_yir(&project, &yir).unwrap_err();
     assert!(err.contains("requires a `shader` -> `data` xfer segment"));
+}
+
+#[test]
+fn project_support_modules_accept_darwin_x86_64_shader_and_data_abis() {
+    let surface_shader = standard_surface_shader_profile_module(true);
+    let fabric_plane = shader_fabric_plane_module(true);
+    let project = test_support::loaded_project_fixture(
+        "shader_data_darwin_x86_64",
+        darwin_x86_64_shader_project_abis(),
+        reverse_shader_data_bridge_entry(),
+        vec![
+            ("surface_shader.ns", surface_shader.as_str()),
+            ("fabric_plane.ns", fabric_plane.as_str()),
+        ],
+    );
+
+    let plan = build_project_compilation_plan(&project).unwrap();
+    let checks = validate_project_abi_selections(&project, &plan.abi_resolution).unwrap();
+    let mut yir = YirModule::new("0.1");
+    apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+    assert!(checks.iter().all(|check| check.ok));
+    assert!(checks.iter().any(|check| {
+        check.domain == "shader" && check.abi.as_deref() == Some("shader.metal.x86_64.msl2_4")
+    }));
+    assert!(checks.iter().any(|check| {
+        check.domain == "data" && check.abi.as_deref() == Some("data.fabric.macos.x86_64.v1")
+    }));
+    assert!(yir.nodes.iter().any(|node| {
+        node.name == "project_profile_shader_SurfaceShader_shader_target_config_auto"
+            && node.op.module == "shader"
+            && node.op.instruction == "target_config"
+            && node.op.args == vec!["x86_64".to_owned(), "metal".to_owned(), "1".to_owned()]
+    }));
 }

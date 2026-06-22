@@ -4,5 +4,3 @@ version = 1
 name = "task_async_struct_field_match_demo"
 entry = "main.ns"
 
-[abi]
-cpu = "cpu.arm64.apple_aapcs64"

@@ -203,7 +203,10 @@ fn handle_release_check(
         }
         for check in &abi_checks {
             if success_logs_enabled() {
-                for line in nuisc::project::render_project_abi_selection_check_lines(check) {
+                let mut rendered = String::new();
+                nuisc::project::write_project_abi_selection_check_lines(&mut rendered, check)
+                    .expect("writing project abi selection check lines should not fail");
+                for line in rendered.lines() {
                     println!("  {}", line);
                 }
             }
@@ -219,7 +222,10 @@ fn handle_release_check(
         }
         for check in &registry_checks {
             if success_logs_enabled() {
-                for line in nuisc::registry::render_project_domain_registry_check_lines(check) {
+                let mut rendered = String::new();
+                nuisc::registry::write_project_domain_registry_check_lines(&mut rendered, check)
+                    .expect("writing project domain registry check lines should not fail");
+                for line in rendered.lines() {
                     println!("  {}", line);
                 }
             }
@@ -3915,16 +3921,35 @@ fn json_optional_i64_field(name: &str, value: Option<i64>) -> String {
 }
 
 pub(crate) fn json_string_array_field(name: &str, values: &[String]) -> String {
-    let entries = values
-        .iter()
-        .map(|value| format!("\"{}\"", json_escape_local(value)))
-        .collect::<Vec<_>>()
-        .join(",");
-    format!("\"{}\":[{}]", name, entries)
+    let mut out = String::new();
+    out.push('"');
+    out.push_str(name);
+    out.push_str("\":[");
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        out.push('"');
+        out.push_str(&json_escape_local(value));
+        out.push('"');
+    }
+    out.push(']');
+    out
 }
 
 pub(crate) fn json_object_field(name: &str, fields: &[String]) -> String {
-    format!("\"{}\":{{{}}}", name, fields.join(","))
+    let mut out = String::new();
+    out.push('"');
+    out.push_str(name);
+    out.push_str("\":{");
+    for (index, field) in fields.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        out.push_str(field);
+    }
+    out.push('}');
+    out
 }
 
 fn append_json_object_fields(base_json: &str, fields: &[String]) -> String {
@@ -3933,7 +3958,12 @@ fn append_json_object_fields(base_json: &str, fields: &[String]) -> String {
         out.pop();
         if !fields.is_empty() {
             out.push(',');
-            out.push_str(&fields.join(","));
+            for (index, field) in fields.iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                out.push_str(field);
+            }
         }
         out.push('}');
     }
@@ -3941,7 +3971,18 @@ fn append_json_object_fields(base_json: &str, fields: &[String]) -> String {
 }
 
 fn json_object_array_field(name: &str, values: &[String]) -> String {
-    format!("\"{}\":[{}]", name, values.join(","))
+    let mut out = String::new();
+    out.push('"');
+    out.push_str(name);
+    out.push_str("\":[");
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        out.push_str(value);
+    }
+    out.push(']');
+    out
 }
 
 fn project_domain_registry_checks_json(
@@ -4368,9 +4409,9 @@ fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), St
     if json {
         return handle_project_status_json(input);
     }
-    for line in surface_render::render_project_status_text_summary(&input)? {
-        println!("{line}");
-    }
+    let mut rendered = String::new();
+    surface_render::write_project_status_text_summary(&mut rendered, &input)?;
+    print!("{rendered}");
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     for item in nuisc::project::project_abi_selection_views(&plan.abi_resolution) {
@@ -4400,9 +4441,9 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
     if json {
         return handle_project_doctor_json(input);
     }
-    for line in surface_render::render_project_doctor_text_summary(&input)? {
-        println!("{line}");
-    }
+    let mut rendered = String::new();
+    surface_render::write_project_doctor_text_summary(&mut rendered, &input)?;
+    print!("{rendered}");
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let nova_profile = galaxy::inspect_ns_nova_profile(&project.root)?;
@@ -4412,12 +4453,18 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
     let lowering_checks =
         nuisc::project::validate_project_lowering_selections(&plan.abi_resolution);
     for check in &abi_checks {
-        for line in nuisc::project::render_project_abi_selection_check_lines(check) {
+        let mut rendered = String::new();
+        nuisc::project::write_project_abi_selection_check_lines(&mut rendered, check)
+            .expect("writing project abi selection check lines should not fail");
+        for line in rendered.lines() {
             println!("  {}", line);
         }
     }
     for check in &registry_checks {
-        for line in nuisc::registry::render_project_domain_registry_check_lines(check) {
+        let mut rendered = String::new();
+        nuisc::registry::write_project_domain_registry_check_lines(&mut rendered, check)
+            .expect("writing project domain registry check lines should not fail");
+        for line in rendered.lines() {
             println!("  {}", line);
         }
     }
@@ -5617,18 +5664,19 @@ mod tests {
     use super::{
         apply_suggested_project_imports, artifact_doctor_command_for_output_dir,
         artifact_workflow_brief, benchmark_run_report_json, build_workflow_frontdoor_surface,
-        default_build_output_dir, handle_build, handle_check, handle_materialize_artifact,
-        handle_release_check, handle_run_artifact, handle_test, handle_unpack_artifact_support,
-        project_abi_checks_json, project_compile_workflow_source_profile,
-        project_domain_registry_checks_json, project_workflow_json_fields,
-        recommend_project_workflow_step, render_artifact_doctor_json, render_build_report_json,
-        render_project_doctor_json, render_project_imports_apply_json, render_project_imports_json,
-        render_project_status_json, render_run_artifact_json, render_scheduler_view_json,
-        render_workflow_json, resolve_run_artifact_binary_path, resolve_runner_clock_domain,
-        run_artifact_command_for_output_dir, run_language_benchmarks_for_source_file,
-        run_language_tests_for_source_file, scheduler_view_domain_record,
-        scheduler_view_domain_record_json, single_source_workflow_source_profile,
-        wait_for_test_child, PublicSurfaceModuleRecord, RawTestOutcome, WorkflowRecommendation,
+        default_build_output_dir, find_abi_block_span, handle_build, handle_check,
+        handle_materialize_artifact, handle_release_check, handle_run_artifact, handle_test,
+        handle_unpack_artifact_support, project_abi_checks_json,
+        project_compile_workflow_source_profile, project_domain_registry_checks_json,
+        project_workflow_json_fields, recommend_project_workflow_step, render_artifact_doctor_json,
+        render_build_report_json, render_project_doctor_json, render_project_imports_apply_json,
+        render_project_imports_json, render_project_status_json, render_run_artifact_json,
+        render_scheduler_view_json, render_workflow_json, resolve_run_artifact_binary_path,
+        resolve_runner_clock_domain, run_artifact_command_for_output_dir,
+        run_language_benchmarks_for_source_file, run_language_tests_for_source_file,
+        scheduler_view_domain_record, scheduler_view_domain_record_json,
+        single_source_workflow_source_profile, upsert_abi_block, wait_for_test_child,
+        PublicSurfaceModuleRecord, RawTestOutcome, WorkflowRecommendation,
     };
     use crate::galaxy;
     use crate::json_surface::{
@@ -7037,6 +7085,11 @@ mod cpu Main {
         assert!(lines
             .iter()
             .any(|line| line == "  text_handle_rewrite_total_hits: 2"));
+
+        let mut written = String::new();
+        surface_render::write_project_status_text_summary(&mut written, &project_root)
+            .expect("write status text summary");
+        assert_eq!(written.lines().collect::<Vec<_>>(), lines);
     }
 
     #[test]
@@ -7146,6 +7199,11 @@ mod cpu Main {
         assert!(lines
             .iter()
             .any(|line| line == "  text_handle_rewrite_total_hits: 2"));
+
+        let mut written = String::new();
+        surface_render::write_project_doctor_text_summary(&mut written, &project_root)
+            .expect("write doctor text summary");
+        assert_eq!(written.lines().collect::<Vec<_>>(), lines);
     }
 
     #[test]
@@ -8116,6 +8174,82 @@ mod cpu Main {
         assert!(json.contains("\"source\":\"recommended\""));
         assert!(json.contains("\"abi_registered\":true"));
         assert!(json.contains("\"issues\":[]"));
+    }
+
+    #[test]
+    fn upsert_abi_block_appends_sorted_block_when_missing() {
+        let source = "[package]\nname = \"demo\"\n";
+        let requirements = vec![
+            nuisc::project::ProjectAbiRequirement {
+                domain: "shader".to_owned(),
+                abi: "shader.metal.msl2_4".to_owned(),
+            },
+            nuisc::project::ProjectAbiRequirement {
+                domain: "cpu".to_owned(),
+                abi: "cpu.arm64.apple_aapcs64".to_owned(),
+            },
+        ];
+
+        let updated = upsert_abi_block(source, &requirements);
+
+        assert_eq!(
+            updated,
+            "[package]\nname = \"demo\"\n\nabi = [\n  \"cpu=cpu.arm64.apple_aapcs64\",\n  \"shader=shader.metal.msl2_4\",\n]\n"
+        );
+    }
+
+    #[test]
+    fn upsert_abi_block_replaces_existing_block_with_normalized_sorted_entries() {
+        let source = "[package]\nname = \"demo\"\nabi = [\n  \"shader=shader.cpu-fallback.v1\",\n]\nversion = \"0.1.0\"\n";
+        let requirements = vec![
+            nuisc::project::ProjectAbiRequirement {
+                domain: "network".to_owned(),
+                abi: "network.socket.macos.arm64.v1".to_owned(),
+            },
+            nuisc::project::ProjectAbiRequirement {
+                domain: "cpu".to_owned(),
+                abi: "cpu.arm64.apple_aapcs64".to_owned(),
+            },
+        ];
+
+        let updated = upsert_abi_block(source, &requirements);
+
+        assert_eq!(
+            updated,
+            "[package]\nname = \"demo\"\nabi = [\n  \"cpu=cpu.arm64.apple_aapcs64\",\n  \"network=network.socket.macos.arm64.v1\",\n]\nversion = \"0.1.0\"\n"
+        );
+    }
+
+    #[test]
+    fn upsert_abi_block_is_idempotent_for_matching_normalized_block() {
+        let source = "[package]\nname = \"demo\"\nabi = [\n  \"cpu=cpu.arm64.apple_aapcs64\",\n  \"network=network.socket.macos.arm64.v1\",\n]\n";
+        let requirements = vec![
+            nuisc::project::ProjectAbiRequirement {
+                domain: "network".to_owned(),
+                abi: "network.socket.macos.arm64.v1".to_owned(),
+            },
+            nuisc::project::ProjectAbiRequirement {
+                domain: "cpu".to_owned(),
+                abi: "cpu.arm64.apple_aapcs64".to_owned(),
+            },
+        ];
+
+        let updated = upsert_abi_block(source, &requirements);
+
+        assert_eq!(updated, source);
+    }
+
+    #[test]
+    fn find_abi_block_span_stops_at_closing_bracket_before_following_fields() {
+        let source = "[package]\nname = \"demo\"\nabi = [\n  \"cpu=cpu.arm64.apple_aapcs64\",\n]\nsummary = \"kept\"\n";
+
+        let (start, end) = find_abi_block_span(source).expect("abi block span");
+
+        assert_eq!(
+            &source[start..end],
+            "abi = [\n  \"cpu=cpu.arm64.apple_aapcs64\",\n]\n"
+        );
+        assert_eq!(&source[end..], "summary = \"kept\"\n");
     }
 
     #[test]

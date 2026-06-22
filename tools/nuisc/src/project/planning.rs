@@ -1,17 +1,56 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fmt;
 use std::fs;
 use std::path::Path;
 
 use super::{
     organize_project, organize_project_exchanges, packet, parse_project_manifest,
-    render_project_abi_graph_line, render_project_abi_index, render_project_exchange_index,
-    render_project_host_ffi_index, render_project_import_index, render_project_organization_index,
-    resolve_project_abi, validate_project_abi_requirements, validate_project_links,
-    validate_project_modules, validate_project_unit_bindings, validate_project_uses, LoadedProject,
-    ProjectBuildMetadata, ProjectCompilationDependency, ProjectCompilationPlan, ProjectModule,
-    ProjectModuleOrigin, ProjectOutputIntent, ProjectSyntheticInput,
+    render_project_abi_graph_line, resolve_project_abi, validate_project_abi_requirements,
+    validate_project_links, validate_project_modules, validate_project_unit_bindings,
+    validate_project_uses, LoadedProject, ProjectBuildMetadata, ProjectCompilationDependency,
+    ProjectCompilationPlan, ProjectModule, ProjectModuleOrigin, ProjectOutputIntent,
+    ProjectSyntheticInput,
 };
+use super::{
+    write_project_abi_index, write_project_exchange_index, write_project_host_ffi_index,
+    write_project_import_index, write_project_organization_index,
+};
+
+fn write_project_modules_index<W: fmt::Write>(
+    out: &mut W,
+    organization: &super::ProjectOrganization,
+) -> fmt::Result {
+    for module in &organization.modules {
+        writeln!(
+            out,
+            "{}\tmod {} {}\tentry={}\tsource_kind={}\t{}",
+            module.path,
+            module.domain,
+            module.unit,
+            module.is_entry,
+            module.source_kind,
+            module.source_detail
+        )?;
+    }
+    Ok(())
+}
+
+fn write_project_links_index<W: fmt::Write>(
+    out: &mut W,
+    organization: &super::ProjectOrganization,
+) -> fmt::Result {
+    for link in &organization.links {
+        writeln!(
+            out,
+            "{}\t{}\t{}",
+            link.from,
+            link.to,
+            link.via.as_deref().unwrap_or("<direct>")
+        )?;
+    }
+    Ok(())
+}
 
 pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
     let manifest_path = if input.is_dir() {
@@ -398,60 +437,94 @@ pub fn describe_project_exchange_route_classes(plan: &ProjectCompilationPlan) ->
 }
 
 pub fn render_project_compilation_plan_index(plan: &ProjectCompilationPlan) -> String {
+    let mut out = String::new();
+    write_project_compilation_plan_index(&mut out, plan)
+        .expect("writing project compilation plan index to String should not fail");
+    out
+}
+
+pub fn write_project_compilation_plan_index<W: fmt::Write>(
+    out: &mut W,
+    plan: &ProjectCompilationPlan,
+) -> fmt::Result {
     let abi_mode = if plan.abi_resolution.explicit {
         "explicit"
     } else {
         "auto-recommended"
     };
-    let abi_entries = if plan.abi_resolution.requirements.is_empty() {
-        "<none>".to_owned()
+    writeln!(out, "project {}", plan.project_name)?;
+    writeln!(out, "entry {}", plan.entry)?;
+    write!(out, "domains ")?;
+    write_joined(out, &plan.organization.domains, ", ", |out, domain| {
+        write!(out, "{domain}")
+    })?;
+    writeln!(out)?;
+    writeln!(out, "exchanges {}", plan.exchanges.routes.len())?;
+    writeln!(out, "abi_mode {}", abi_mode)?;
+    writeln!(
+        out,
+        "abi_graph {}",
+        render_project_abi_graph_line(&plan.abi_resolution)
+    )?;
+    write!(out, "abi ")?;
+    if plan.abi_resolution.requirements.is_empty() {
+        writeln!(out, "<none>")?;
     } else {
-        plan.abi_resolution
-            .requirements
-            .iter()
-            .map(|item| format!("{}={}", item.domain, item.abi))
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
-    let dependencies = if plan.dependencies.is_empty() {
-        "<none>".to_owned()
+        write_joined(out, &plan.abi_resolution.requirements, ", ", |out, item| {
+            write!(out, "{}={}", item.domain, item.abi)
+        })?;
+        writeln!(out)?;
+    }
+    write!(out, "dependencies ")?;
+    if plan.dependencies.is_empty() {
+        writeln!(out, "<none>")?;
     } else {
-        plan.dependencies
-            .iter()
-            .map(|item| {
-                format!(
-                    "{}:{}={} ({})",
-                    item.category, item.name, item.version, item.source
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
-    let output_intents = if plan.output_intents.is_empty() {
-        "<none>".to_owned()
+        write_joined(out, &plan.dependencies, ", ", |out, item| {
+            write!(
+                out,
+                "{}:{}={} ({})",
+                item.category, item.name, item.version, item.source
+            )
+        })?;
+        writeln!(out)?;
+    }
+    writeln!(out, "synthetic_input_kind {}", plan.synthetic_input.kind)?;
+    writeln!(
+        out,
+        "synthetic_input {}",
+        plan.synthetic_input.path.display()
+    )?;
+    write!(out, "output_intents ")?;
+    if plan.output_intents.is_empty() {
+        writeln!(out, "<none>")?;
     } else {
-        plan.output_intents
-            .iter()
-            .map(|item| format!("{}:{}={}", item.category, item.kind, item.path_hint))
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
-    format!(
-        "project {}\nentry {}\ndomains {}\nexchanges {}\nabi_mode {}\nabi_graph {}\nabi {}\ndependencies {}\nsynthetic_input_kind {}\nsynthetic_input {}\noutput_intents {}\neffective_input {}\nsummary {}\n",
-        plan.project_name,
-        plan.entry,
-        plan.organization.domains.join(", "),
-        plan.exchanges.routes.len(),
-        abi_mode,
-        render_project_abi_graph_line(&plan.abi_resolution),
-        abi_entries,
-        dependencies,
-        plan.synthetic_input.kind,
-        plan.synthetic_input.path.display(),
-        output_intents,
-        plan.effective_input_path.display(),
-        describe_project_compilation_plan(plan)
-    )
+        write_joined(out, &plan.output_intents, ", ", |out, item| {
+            write!(out, "{}:{}={}", item.category, item.kind, item.path_hint)
+        })?;
+        writeln!(out)?;
+    }
+    writeln!(
+        out,
+        "effective_input {}",
+        plan.effective_input_path.display()
+    )?;
+    writeln!(out, "summary {}", describe_project_compilation_plan(plan))
+}
+
+fn write_joined<W, T, F>(out: &mut W, items: &[T], sep: &str, mut write_item: F) -> fmt::Result
+where
+    W: fmt::Write,
+    F: FnMut(&mut W, &T) -> fmt::Result,
+{
+    let mut first = true;
+    for item in items {
+        if !first {
+            out.write_str(sep)?;
+        }
+        first = false;
+        write_item(out, item)?;
+    }
+    Ok(())
 }
 
 pub fn write_project_metadata(
@@ -486,14 +559,18 @@ pub fn write_project_metadata(
             plan_index_path.display()
         )
     })?;
-    let organization_index = render_project_organization_index(project);
+    let mut organization_index = String::new();
+    write_project_organization_index(&mut organization_index, project)
+        .expect("writing project organization index to String should not fail");
     fs::write(&organization_index_path, organization_index).map_err(|error| {
         format!(
             "failed to write project organization index `{}`: {error}",
             organization_index_path.display()
         )
     })?;
-    let exchange_index = render_project_exchange_index(project);
+    let mut exchange_index = String::new();
+    write_project_exchange_index(&mut exchange_index, project)
+        .expect("writing project exchange index to String should not fail");
     fs::write(&exchange_index_path, exchange_index).map_err(|error| {
         format!(
             "failed to write project exchange index `{}`: {error}",
@@ -501,78 +578,65 @@ pub fn write_project_metadata(
         )
     })?;
     let organization = organize_project(project);
-    let modules_index = organization
-        .modules
-        .iter()
-        .map(|module| {
-            format!(
-                "{}\tmod {} {}\tentry={}\tsource_kind={}\t{}\n",
-                module.path,
-                module.domain,
-                module.unit,
-                module.is_entry,
-                module.source_kind,
-                module.source_detail
-            )
-        })
-        .collect::<String>();
+    let mut modules_index = String::new();
+    write_project_modules_index(&mut modules_index, &organization)
+        .expect("writing project modules index to String should not fail");
     fs::write(&modules_index_path, modules_index).map_err(|error| {
         format!(
             "failed to write project modules index `{}`: {error}",
             modules_index_path.display()
         )
     })?;
-    let imports_index = render_project_import_index(project);
+    let mut imports_index = String::new();
+    write_project_import_index(&mut imports_index, project)
+        .expect("writing project imports index to String should not fail");
     fs::write(&imports_index_path, imports_index).map_err(|error| {
         format!(
             "failed to write project imports index `{}`: {error}",
             imports_index_path.display()
         )
     })?;
-    let galaxy_index =
-        crate::stdlib_registry::render_resolved_galaxy_index(&project.resolved_galaxies);
+    let mut galaxy_index = String::new();
+    crate::stdlib_registry::write_resolved_galaxy_index(
+        &mut galaxy_index,
+        &project.resolved_galaxies,
+    )
+    .expect("writing resolved galaxy index to String should not fail");
     fs::write(&galaxy_index_path, galaxy_index).map_err(|error| {
         format!(
             "failed to write project galaxy index `{}`: {error}",
             galaxy_index_path.display()
         )
     })?;
-    let links_index = if organization.links.is_empty() {
-        String::new()
-    } else {
-        organization
-            .links
-            .iter()
-            .map(|link| {
-                if let Some(via) = &link.via {
-                    format!("{}\t{}\t{}\n", link.from, link.to, via)
-                } else {
-                    format!("{}\t{}\t<direct>\n", link.from, link.to)
-                }
-            })
-            .collect::<String>()
-    };
+    let mut links_index = String::new();
+    write_project_links_index(&mut links_index, &organization)
+        .expect("writing project links index to String should not fail");
     fs::write(&links_index_path, links_index).map_err(|error| {
         format!(
             "failed to write project links index `{}`: {error}",
             links_index_path.display()
         )
     })?;
-    let packet_index = packet::render_project_packet_index(project);
+    let mut packet_index = String::new();
+    packet::write_project_packet_index(&mut packet_index, project)
+        .expect("writing project packet index to String should not fail");
     fs::write(&packet_index_path, packet_index).map_err(|error| {
         format!(
             "failed to write project packet index `{}`: {error}",
             packet_index_path.display()
         )
     })?;
-    let host_ffi_index = render_project_host_ffi_index(project);
+    let mut host_ffi_index = String::new();
+    write_project_host_ffi_index(&mut host_ffi_index, project)
+        .expect("writing project host ffi index to String should not fail");
     fs::write(&host_ffi_index_path, host_ffi_index).map_err(|error| {
         format!(
             "failed to write project host ffi index `{}`: {error}",
             host_ffi_index_path.display()
         )
     })?;
-    let abi_index = render_project_abi_index(project)?;
+    let mut abi_index = String::new();
+    write_project_abi_index(&mut abi_index, project)?;
     fs::write(&abi_index_path, abi_index).map_err(|error| {
         format!(
             "failed to write project abi index `{}`: {error}",

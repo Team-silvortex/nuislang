@@ -1,12 +1,14 @@
 use std::{
-    fs,
+    fmt, fs,
+    fs::File,
+    io::Read,
     path::{Path, PathBuf},
     time::SystemTime,
 };
 
 use crate::project::{LoadedProject, ProjectCompilationPlan};
 
-const COMPILE_CACHE_EPOCH: &str = "2026-06-20-aot-file-read-buffer-v1";
+const COMPILE_CACHE_EPOCH: &str = "2026-06-22-aot-streaming-cache-fingerprint-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompileCacheKey {
@@ -104,40 +106,32 @@ pub fn compute_compile_cache_key_with_plan(
     plan: Option<&ProjectCompilationPlan>,
 ) -> Result<CompileCacheKey, String> {
     let root = cache_root(input, project);
-    let mut records = Vec::<(String, Vec<u8>)>::new();
+    let mut records = Vec::<CacheFingerprintRecord<'_>>::new();
 
-    records.push((
-        "toolchain.nuisc.version".to_owned(),
+    records.push(CacheFingerprintRecord::inline_bytes(
+        "toolchain.nuisc.version",
         env!("CARGO_PKG_VERSION").as_bytes().to_vec(),
     ));
-    records.push((
-        "toolchain.nuisc.cache_epoch".to_owned(),
+    records.push(CacheFingerprintRecord::inline_bytes(
+        "toolchain.nuisc.cache_epoch",
         COMPILE_CACHE_EPOCH.as_bytes().to_vec(),
     ));
-    records.push((
-        "toolchain.engine.version".to_owned(),
+    records.push(CacheFingerprintRecord::inline_bytes(
+        "toolchain.engine.version",
         crate::engine::default_engine().version.as_bytes().to_vec(),
     ));
-    records.push((
-        "toolchain.engine.profile".to_owned(),
+    records.push(CacheFingerprintRecord::inline_bytes(
+        "toolchain.engine.profile",
         crate::engine::default_engine().profile.as_bytes().to_vec(),
     ));
 
     if let Some(project) = project {
         if let Some(plan) = plan {
-            records.push((
-                "project.plan".to_owned(),
-                crate::project::render_project_compilation_plan_index(plan).into_bytes(),
-            ));
+            records.push(CacheFingerprintRecord::project_plan("project.plan", plan));
         }
-        records.push((
-            "project.manifest".to_owned(),
-            fs::read(&project.manifest_path).map_err(|error| {
-                format!(
-                    "failed to read `{}` for compile cache: {error}",
-                    project.manifest_path.display()
-                )
-            })?,
+        records.push(CacheFingerprintRecord::file_path(
+            "project.manifest",
+            project.manifest_path.clone(),
         ));
         for module in &project.modules {
             let relative = module
@@ -146,56 +140,36 @@ pub fn compute_compile_cache_key_with_plan(
                 .unwrap_or(module.path.as_path())
                 .display()
                 .to_string();
-            records.push((
+            records.push(CacheFingerprintRecord::file_path(
                 format!("project.module:{relative}"),
-                fs::read(&module.path).map_err(|error| {
-                    format!(
-                        "failed to read `{}` for compile cache: {error}",
-                        module.path.display()
-                    )
-                })?,
+                module.path.clone(),
             ));
         }
         let lock_path = project.root.join("nuis.galaxy.lock");
         if lock_path.exists() {
-            records.push((
-                "project.galaxy_lock".to_owned(),
-                fs::read(&lock_path).map_err(|error| {
-                    format!(
-                        "failed to read `{}` for compile cache: {error}",
-                        lock_path.display()
-                    )
-                })?,
+            records.push(CacheFingerprintRecord::file_path(
+                "project.galaxy_lock",
+                lock_path,
             ));
         }
     } else {
-        records.push((
+        records.push(CacheFingerprintRecord::file_path(
             format!("source:{}", input.display()),
-            fs::read(input).map_err(|error| {
-                format!(
-                    "failed to read `{}` for compile cache: {error}",
-                    input.display()
-                )
-            })?,
+            input.to_path_buf(),
         ));
     }
 
     for registry_path in collect_registry_manifest_paths(Path::new("nustar-packages"))? {
         let relative = registry_path.display().to_string();
-        records.push((
+        records.push(CacheFingerprintRecord::file_path(
             format!("registry:{relative}"),
-            fs::read(&registry_path).map_err(|error| {
-                format!(
-                    "failed to read `{}` for compile cache: {error}",
-                    registry_path.display()
-                )
-            })?,
+            registry_path,
         ));
     }
 
-    records.sort_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
-    let input_labels = records.iter().map(|(label, _)| label.clone()).collect();
-    let key = fingerprint_records(&records);
+    records.sort_by(|lhs, rhs| lhs.label.cmp(&rhs.label));
+    let input_labels = records.iter().map(|record| record.label.clone()).collect();
+    let key = fingerprint_records(&records)?;
     Ok(CompileCacheKey {
         root,
         key,
@@ -538,25 +512,132 @@ fn collect_registry_manifest_paths(root: &Path) -> Result<Vec<PathBuf>, String> 
     Ok(paths)
 }
 
-fn fingerprint_records(records: &[(String, Vec<u8>)]) -> String {
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CacheFingerprintRecord<'a> {
+    label: String,
+    source: CacheFingerprintSource<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CacheFingerprintSource<'a> {
+    Inline(Vec<u8>),
+    File(PathBuf),
+    ProjectPlan(&'a ProjectCompilationPlan),
+}
+
+impl<'a> CacheFingerprintRecord<'a> {
+    fn inline_bytes(label: impl Into<String>, bytes: Vec<u8>) -> Self {
+        Self {
+            label: label.into(),
+            source: CacheFingerprintSource::Inline(bytes),
+        }
+    }
+
+    fn file_path(label: impl Into<String>, path: PathBuf) -> Self {
+        Self {
+            label: label.into(),
+            source: CacheFingerprintSource::File(path),
+        }
+    }
+
+    fn project_plan(label: impl Into<String>, plan: &'a ProjectCompilationPlan) -> Self {
+        Self {
+            label: label.into(),
+            source: CacheFingerprintSource::ProjectPlan(plan),
+        }
+    }
+}
+
+struct FingerprintState {
+    hash: u64,
+}
+
+impl FingerprintState {
     const OFFSET: u64 = 0xcbf29ce484222325;
     const PRIME: u64 = 0x100000001b3;
-    let mut hash = OFFSET;
-    for (label, bytes) in records {
-        for byte in label.as_bytes() {
-            hash ^= u64::from(*byte);
-            hash = hash.wrapping_mul(PRIME);
-        }
-        hash ^= 0xff;
-        hash = hash.wrapping_mul(PRIME);
-        for byte in bytes {
-            hash ^= u64::from(*byte);
-            hash = hash.wrapping_mul(PRIME);
-        }
-        hash ^= 0x00;
-        hash = hash.wrapping_mul(PRIME);
+
+    fn new() -> Self {
+        Self { hash: Self::OFFSET }
     }
-    format!("{hash:016x}")
+
+    fn update_byte(&mut self, byte: u8) {
+        self.hash ^= u64::from(byte);
+        self.hash = self.hash.wrapping_mul(Self::PRIME);
+    }
+
+    fn update_bytes(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.update_byte(*byte);
+        }
+    }
+
+    fn update_record_boundary(&mut self, byte: u8) {
+        self.update_byte(byte);
+    }
+
+    fn finish(self) -> String {
+        format!("{:016x}", self.hash)
+    }
+}
+
+fn fingerprint_records(records: &[CacheFingerprintRecord<'_>]) -> Result<String, String> {
+    let mut state = FingerprintState::new();
+    for record in records {
+        state.update_bytes(record.label.as_bytes());
+        state.update_record_boundary(0xff);
+        match &record.source {
+            CacheFingerprintSource::Inline(bytes) => state.update_bytes(bytes),
+            CacheFingerprintSource::File(path) => fingerprint_file(path, &mut state)?,
+            CacheFingerprintSource::ProjectPlan(plan) => {
+                fingerprint_project_plan(plan, &mut state)?
+            }
+        }
+        state.update_record_boundary(0x00);
+    }
+    Ok(state.finish())
+}
+
+fn fingerprint_file(path: &Path, state: &mut FingerprintState) -> Result<(), String> {
+    let mut file = File::open(path).map_err(|error| {
+        format!(
+            "failed to read `{}` for compile cache: {error}",
+            path.display()
+        )
+    })?;
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer).map_err(|error| {
+            format!(
+                "failed to read `{}` for compile cache: {error}",
+                path.display()
+            )
+        })?;
+        if read == 0 {
+            break;
+        }
+        state.update_bytes(&buffer[..read]);
+    }
+    Ok(())
+}
+
+struct FingerprintFmtWriter<'a> {
+    state: &'a mut FingerprintState,
+}
+
+impl fmt::Write for FingerprintFmtWriter<'_> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.state.update_bytes(s.as_bytes());
+        Ok(())
+    }
+}
+
+fn fingerprint_project_plan(
+    plan: &ProjectCompilationPlan,
+    state: &mut FingerprintState,
+) -> Result<(), String> {
+    let mut writer = FingerprintFmtWriter { state };
+    crate::project::write_project_compilation_plan_index(&mut writer, plan)
+        .map_err(|error| format!("failed to fingerprint project plan index: {error}"))
 }
 
 fn copy_directory_recursive(source: &Path, target: &Path) -> Result<(), String> {
@@ -719,4 +800,47 @@ fn discover_project_cache_roots(root: &Path, out: &mut Vec<PathBuf>) -> Result<(
         discover_project_cache_roots(&path, out)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_path(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("nuisc_cache_{label}_{nonce}"))
+    }
+
+    #[test]
+    fn fingerprint_records_is_stable_across_record_order_after_sorting() {
+        let temp_dir = temp_path("fingerprint_order");
+        fs::create_dir_all(&temp_dir).unwrap();
+        let alpha = temp_dir.join("alpha.txt");
+        let beta = temp_dir.join("beta.txt");
+        fs::write(&alpha, "alpha-file").unwrap();
+        fs::write(&beta, "beta-file").unwrap();
+
+        let mut left = vec![
+            CacheFingerprintRecord::file_path("b.file", beta.clone()),
+            CacheFingerprintRecord::inline_bytes("a.inline", b"inline".to_vec()),
+            CacheFingerprintRecord::file_path("c.file", alpha.clone()),
+        ];
+        let mut right = vec![
+            CacheFingerprintRecord::file_path("c.file", alpha),
+            CacheFingerprintRecord::file_path("b.file", beta),
+            CacheFingerprintRecord::inline_bytes("a.inline", b"inline".to_vec()),
+        ];
+        left.sort_by(|lhs, rhs| lhs.label.cmp(&rhs.label));
+        right.sort_by(|lhs, rhs| lhs.label.cmp(&rhs.label));
+
+        let left_hash = fingerprint_records(&left).unwrap();
+        let right_hash = fingerprint_records(&right).unwrap();
+        assert_eq!(left_hash, right_hash);
+
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
 }

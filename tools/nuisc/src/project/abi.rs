@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::fmt;
 use std::path::Path;
 
 use super::support_contracts::support_surface_for_domain;
@@ -139,7 +140,18 @@ pub fn validate_project_abi_selections(
 }
 
 pub fn render_project_abi_selection_check_lines(check: &ProjectAbiSelectionCheck) -> Vec<String> {
-    let mut lines = vec![format!(
+    let mut out = String::new();
+    write_project_abi_selection_check_lines(&mut out, check)
+        .expect("writing project abi selection check lines to String should not fail");
+    out.lines().map(str::to_owned).collect()
+}
+
+pub fn write_project_abi_selection_check_lines<W: fmt::Write>(
+    out: &mut W,
+    check: &ProjectAbiSelectionCheck,
+) -> fmt::Result {
+    writeln!(
+        out,
         "abi_check: {} source={} abi={} ok={} abi_registered={} issues={}",
         check.domain,
         check.source,
@@ -147,11 +159,11 @@ pub fn render_project_abi_selection_check_lines(check: &ProjectAbiSelectionCheck
         if check.ok { "yes" } else { "no" },
         if check.abi_registered { "yes" } else { "no" },
         check.issue_count()
-    )];
+    )?;
     for issue in &check.issues {
-        lines.push(format!("abi_issue: {}", issue.summary().replace(": ", " ")));
+        writeln!(out, "abi_issue: {}", issue.summary().replace(": ", " "))?;
     }
-    lines
+    Ok(())
 }
 
 pub fn project_abi_selection_check_json(check: &ProjectAbiSelectionCheck) -> String {

@@ -305,6 +305,9 @@ fn project_abi_selection_views_expose_registered_targets() {
     assert!(lines
         .iter()
         .any(|line| line == "  abi_target_machine: arm64-darwin"));
+    let mut written = String::new();
+    write_project_abi_selection_lines(&mut written, &resolution).unwrap();
+    assert_eq!(written.lines().collect::<Vec<_>>(), lines);
     assert!(
         project_abi_selection_view_json(&views[0]).contains("\"abi_target_host_adaptive\":false")
     );
@@ -331,6 +334,9 @@ fn project_abi_selection_checks_report_registered_recommended_abis() {
     assert!(checks[0].summary_line().contains("source=recommended"));
     let lines = render_project_abi_selection_check_lines(&checks[0]);
     assert!(lines.iter().any(|line| line.contains("abi_registered=yes")));
+    let mut written = String::new();
+    write_project_abi_selection_check_lines(&mut written, &checks[0]).unwrap();
+    assert_eq!(written.lines().collect::<Vec<_>>(), lines);
     assert!(project_abi_selection_check_json(&checks[0]).contains("\"source\":\"recommended\""));
 }
 
@@ -413,6 +419,9 @@ fn project_lowering_selections_expose_registered_targets_and_selected_backend() 
     let lines = render_project_lowering_selection_lines(&lowering[0]);
     assert!(lines.iter().any(|line| line.contains("selected=llvm")));
     assert!(lines.iter().any(|line| line.contains("issues=0")));
+    let mut written = String::new();
+    write_project_lowering_selection_lines(&mut written, &lowering[0]).unwrap();
+    assert_eq!(written.lines().collect::<Vec<_>>(), lines);
     assert!(lowering[0].summary_line().contains("selected=llvm"));
     assert!(project_lowering_selection_json(&lowering[0])
         .contains("\"selected_lowering_target\":\"llvm\""));
@@ -791,6 +800,7 @@ fn recommend_cpu_abi_profile_prefers_registered_host_target() {
     let host_clang = match (host_arch, host_os) {
         ("arm64", "darwin") => "aarch64-apple-darwin",
         ("arm64", "linux") => "aarch64-unknown-linux-gnu",
+        ("x86_64", "darwin") => "x86_64-apple-darwin",
         ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
         ("x86_64", "windows") => "x86_64-pc-windows-msvc",
         _ => "x86_64-unknown-linux-gnu",
@@ -923,6 +933,7 @@ fn recommend_data_abi_profile_prefers_registered_host_target() {
     let host_clang = match (host_arch, host_os) {
         ("arm64", "darwin") => "aarch64-apple-darwin",
         ("arm64", "linux") => "aarch64-unknown-linux-gnu",
+        ("x86_64", "darwin") => "x86_64-apple-darwin",
         ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
         ("x86_64", "windows") => "x86_64-pc-windows-msvc",
         _ => "x86_64-unknown-linux-gnu",
@@ -1039,6 +1050,7 @@ fn recommend_kernel_abi_profile_prefers_registered_host_target() {
     let host_clang = match (host_arch, host_os) {
         ("arm64", "darwin") => "aarch64-apple-darwin",
         ("arm64", "linux") => "aarch64-unknown-linux-gnu",
+        ("x86_64", "darwin") => "x86_64-apple-darwin",
         ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
         ("x86_64", "windows") => "x86_64-pc-windows-msvc",
         _ => "x86_64-unknown-linux-gnu",
@@ -1156,6 +1168,7 @@ fn recommend_shader_abi_profile_prefers_registered_host_target() {
     let host_clang = match (host_arch, host_os) {
         ("arm64", "darwin") => "aarch64-apple-darwin",
         ("arm64", "linux") => "aarch64-unknown-linux-gnu",
+        ("x86_64", "darwin") => "x86_64-apple-darwin",
         ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
         ("x86_64", "windows") => "x86_64-pc-windows-msvc",
         _ => "x86_64-unknown-linux-gnu",

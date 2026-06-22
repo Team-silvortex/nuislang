@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+use std::fmt;
+use std::fmt::Write as _;
 
 use nuis_semantics::model::{AstAttribute, AstStructDef, AstStructField, AstTypeRef};
 
@@ -63,6 +65,21 @@ fn classify_packet_field_role(kind: &str) -> &'static str {
     }
 }
 
+fn write_packet_count_map<W: fmt::Write>(
+    out: &mut W,
+    counts: BTreeMap<&'static str, usize>,
+) -> fmt::Result {
+    let mut first = true;
+    for (kind, count) in counts {
+        if !first {
+            out.write_str(", ")?;
+        }
+        first = false;
+        write!(out, "{kind}={count}")?;
+    }
+    Ok(())
+}
+
 fn describe_packet_field_kind_counts(definition: &AstStructDef) -> String {
     let mut counts = BTreeMap::<&'static str, usize>::new();
     for field in &definition.fields {
@@ -70,11 +87,10 @@ fn describe_packet_field_kind_counts(definition: &AstStructDef) -> String {
             .entry(classify_packet_field_kind(&field.ty))
             .or_insert(0) += 1;
     }
-    counts
-        .into_iter()
-        .map(|(kind, count)| format!("{kind}={count}"))
-        .collect::<Vec<_>>()
-        .join(", ")
+    let mut out = String::new();
+    write_packet_count_map(&mut out, counts)
+        .expect("writing packet field kind counts to String should not fail");
+    out
 }
 
 fn describe_packet_field_role_counts(definition: &AstStructDef) -> String {
@@ -83,11 +99,10 @@ fn describe_packet_field_role_counts(definition: &AstStructDef) -> String {
         let kind = classify_packet_field_kind(&field.ty);
         *counts.entry(classify_packet_field_role(kind)).or_insert(0) += 1;
     }
-    counts
-        .into_iter()
-        .map(|(role, count)| format!("{role}={count}"))
-        .collect::<Vec<_>>()
-        .join(", ")
+    let mut out = String::new();
+    write_packet_count_map(&mut out, counts)
+        .expect("writing packet field role counts to String should not fail");
+    out
 }
 
 fn classify_packet_field_slot(field: &AstStructField) -> &'static str {
@@ -179,11 +194,16 @@ fn describe_packet_payload_layout(definition: &AstStructDef) -> (String, String,
         .last()
         .map(|(offset, _, _, width)| offset + width)
         .unwrap_or(0);
-    let layout_description = layout
-        .into_iter()
-        .map(|(offset, name, wire_kind, width)| format!("{name}:{wire_kind}@{offset}+{width}"))
-        .collect::<Vec<_>>()
-        .join(", ");
+    let mut layout_description = String::new();
+    let mut first = true;
+    for (offset, name, wire_kind, width) in layout {
+        if !first {
+            layout_description.push_str(", ");
+        }
+        first = false;
+        write!(layout_description, "{name}:{wire_kind}@{offset}+{width}")
+            .expect("writing packet payload layout to String should not fail");
+    }
     (
         payload_bytes.to_string(),
         layout_description,
@@ -338,6 +358,15 @@ pub(super) fn validate_project_packet_contracts(module: &ProjectModule) -> Resul
 
 pub fn render_project_packet_index(project: &LoadedProject) -> String {
     let mut out = String::new();
+    write_project_packet_index(&mut out, project)
+        .expect("writing project packet index to String should not fail");
+    out
+}
+
+pub fn write_project_packet_index<W: fmt::Write>(
+    out: &mut W,
+    project: &LoadedProject,
+) -> fmt::Result {
     for project_module in &project.modules {
         let relative = project_module
             .path
@@ -363,8 +392,9 @@ pub fn render_project_packet_index(project: &LoadedProject) -> String {
             let field_roles = describe_packet_field_role_counts(definition);
             let (payload_bytes, payload_layout, encode_shape) =
                 describe_packet_payload_layout(definition);
-            out.push_str(&format!(
-                "{}\t{}.{}.{}\tfields={}\tpacket_fields={}\tpacket_control_fields={}\tpacket_shape={}\tfield_kinds={}\tfield_roles={}\tpacket_encode_shape={}\tpayload_bytes={}\tpayload_layout={}\n",
+            writeln!(
+                out,
+                "{}\t{}.{}.{}\tfields={}\tpacket_fields={}\tpacket_control_fields={}\tpacket_shape={}\tfield_kinds={}\tfield_roles={}\tpacket_encode_shape={}\tpayload_bytes={}\tpayload_layout={}",
                 relative,
                 project_module.ast.domain,
                 project_module.ast.unit,
@@ -378,14 +408,15 @@ pub fn render_project_packet_index(project: &LoadedProject) -> String {
                 encode_shape,
                 payload_bytes,
                 payload_layout
-            ));
+            )?;
             for (index, field) in definition.fields.iter().enumerate() {
                 let kind = classify_packet_field_kind(&field.ty);
                 let fixed_width = packet_fixed_scalar_width(&field.ty)
                     .map(|width| width.to_string())
                     .unwrap_or_else(|| "dynamic".to_owned());
-                out.push_str(&format!(
-                    "\tindex={}\t{}\t{}\tkind={}\trole={}\tpacket_slot={}\twire_kind={}\tfixed_width={}\tpacket_field={}\tpacket_control_field={}\n",
+                writeln!(
+                    out,
+                    "\tindex={}\t{}\t{}\tkind={}\trole={}\tpacket_slot={}\twire_kind={}\tfixed_width={}\tpacket_field={}\tpacket_control_field={}",
                     index,
                     field.name,
                     render_ast_type_ref(&field.ty),
@@ -396,9 +427,9 @@ pub fn render_project_packet_index(project: &LoadedProject) -> String {
                     fixed_width,
                     has_ast_attribute(&field.attributes, "packet_field"),
                     has_ast_attribute(&field.attributes, "packet_control_field")
-                ));
+                )?;
             }
         }
     }
-    out
+    Ok(())
 }

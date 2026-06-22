@@ -4,5 +4,3 @@ version = 1
 name = "task_generic_mutual_recursive_async_demo"
 entry = "main.ns"
 
-[abi]
-cpu = "cpu.arm64.apple_aapcs64"

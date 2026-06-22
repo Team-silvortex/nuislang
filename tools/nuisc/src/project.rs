@@ -30,6 +30,7 @@ mod validation_core;
 pub use abi::{
     ensure_project_abi_selections_valid, project_abi_selection_check_json,
     render_project_abi_selection_check_lines, resolve_project_abi, validate_project_abi_selections,
+    write_project_abi_selection_check_lines,
 };
 #[cfg(test)]
 use abi::{host_calling_abi, host_object_format, recommend_abi_profile_for_host};
@@ -56,7 +57,7 @@ pub use planning::{
     build_project_compilation_plan, describe_project, describe_project_compilation_plan,
     describe_project_dependency_categories, describe_project_exchange_route_classes,
     describe_project_output_intent_categories, load_project, render_project_compilation_plan_index,
-    write_project_metadata,
+    write_project_compilation_plan_index, write_project_metadata,
 };
 use profile_apply::{
     apply_support_module_profile, collect_profile_int_bindings, ensure_project_resource,
@@ -70,11 +71,17 @@ pub use rendering::{
     project_lowering_selection_json, render_project_abi_graph_line,
     render_project_abi_selection_lines, render_project_abi_selection_view_lines,
     render_project_import_index, render_project_lowering_selection_lines,
-    validate_project_lowering_selections,
+    validate_project_lowering_selections, write_project_abi_selection_lines,
+    write_project_abi_selection_view_lines, write_project_lowering_selection_lines,
 };
+#[cfg(test)]
 use rendering::{
     render_project_abi_index, render_project_exchange_index, render_project_host_ffi_index,
     render_project_organization_index,
+};
+use rendering::{
+    write_project_abi_index, write_project_exchange_index, write_project_host_ffi_index,
+    write_project_import_index, write_project_organization_index,
 };
 pub use runtime_validation::{
     apply_project_links_to_yir, apply_project_support_modules_to_yir,

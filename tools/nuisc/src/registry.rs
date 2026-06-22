@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeSet,
-    fs,
+    fmt, fs,
     path::{Path, PathBuf},
 };
 
@@ -1155,7 +1155,18 @@ pub fn project_domain_registry_check_json(check: &ProjectDomainRegistryCheck) ->
 pub fn render_project_domain_registry_check_lines(
     check: &ProjectDomainRegistryCheck,
 ) -> Vec<String> {
-    let mut lines = vec![format!(
+    let mut out = String::new();
+    write_project_domain_registry_check_lines(&mut out, check)
+        .expect("writing project domain registry check lines to String should not fail");
+    out.lines().map(str::to_owned).collect()
+}
+
+pub fn write_project_domain_registry_check_lines<W: fmt::Write>(
+    out: &mut W,
+    check: &ProjectDomainRegistryCheck,
+) -> fmt::Result {
+    writeln!(
+        out,
         "registry: {} package={} schema={} abi={} ok={} abi_registered={} issues={}",
         check.domain,
         check.package.as_deref().unwrap_or("<missing>"),
@@ -1164,16 +1175,17 @@ pub fn render_project_domain_registry_check_lines(
         if check.ok { "yes" } else { "no" },
         if check.abi_registered { "yes" } else { "no" },
         check.issue_count()
-    )];
+    )?;
     for issue in &check.issues {
-        lines.push(format!(
+        writeln!(
+            out,
             "registry_issue: {} {} {}",
             issue.kind.code(),
             issue.kind.as_str(),
             issue.message
-        ));
+        )?;
     }
-    lines
+    Ok(())
 }
 
 pub fn domain_contract(manifest: &NustarPackageManifest) -> NustarDomainContract {
@@ -3828,6 +3840,7 @@ fn resolve_host_adaptive_arch(value: &str) -> &'static str {
     } else {
         match value {
             "arm64" => "arm64",
+            "amd64" => "x86_64",
             "x86_64" => "x86_64",
             other => Box::leak(other.to_owned().into_boxed_str()),
         }
@@ -3885,6 +3898,7 @@ fn resolve_host_adaptive_clang(value: &str) -> String {
 fn host_arch() -> &'static str {
     match std::env::consts::ARCH {
         "aarch64" => "arm64",
+        "amd64" => "x86_64",
         other => Box::leak(other.to_owned().into_boxed_str()),
     }
 }
@@ -3919,6 +3933,7 @@ fn host_clang_target() -> String {
     match (host_arch(), host_os()) {
         ("arm64", "darwin") => "aarch64-apple-darwin".to_owned(),
         ("arm64", "linux") => "aarch64-unknown-linux-gnu".to_owned(),
+        ("x86_64", "darwin") => "x86_64-apple-darwin".to_owned(),
         ("x86_64", "linux") => "x86_64-unknown-linux-gnu".to_owned(),
         ("x86_64", "windows") => "x86_64-pc-windows-msvc".to_owned(),
         (arch, os) => format!("{arch}-unknown-{os}"),
@@ -5010,6 +5025,33 @@ mod cpu Main {
         assert!(lines
             .iter()
             .any(|line| line.contains("NRG003 abi_not_registered")));
+        let mut written = String::new();
+        write_project_domain_registry_check_lines(&mut written, &check).unwrap();
+        assert_eq!(written.lines().collect::<Vec<_>>(), lines);
+    }
+
+    #[test]
+    fn registered_abi_target_accepts_darwin_x86_64_domain_profiles() {
+        let network = load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
+        let data = load_manifest_for_domain(Path::new("nustar-packages"), "data").unwrap();
+        let shader = load_manifest_for_domain(Path::new("nustar-packages"), "shader").unwrap();
+
+        let network_target =
+            registered_abi_target(&network, "network.socket.macos.x86_64.v1").unwrap();
+        assert_eq!(network_target.machine_arch, "x86_64");
+        assert_eq!(network_target.machine_os, "darwin");
+        assert_eq!(network_target.clang_target, "x86_64-apple-darwin");
+
+        let data_target = registered_abi_target(&data, "data.fabric.macos.x86_64.v1").unwrap();
+        assert_eq!(data_target.machine_arch, "x86_64");
+        assert_eq!(data_target.machine_os, "darwin");
+        assert_eq!(data_target.clang_target, "x86_64-apple-darwin");
+
+        let shader_target = registered_abi_target(&shader, "shader.metal.x86_64.msl2_4").unwrap();
+        assert_eq!(shader_target.machine_arch, "x86_64");
+        assert_eq!(shader_target.machine_os, "darwin");
+        assert_eq!(shader_target.clang_target, "x86_64-apple-darwin");
+        assert_eq!(shader_target.backend_family.as_deref(), Some("metal"));
     }
 
     #[test]

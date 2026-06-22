@@ -344,6 +344,7 @@ mod tests {
             cpu_target_calling_abi: "aapcs64-darwin".to_owned(),
             cpu_target_clang: "aarch64-apple-darwin".to_owned(),
             cpu_target_cross: false,
+            loaded_nustar: vec!["official.cpu".to_owned()],
             compile_cache_status: None,
             compile_cache_key: None,
             compile_cache_root: None,

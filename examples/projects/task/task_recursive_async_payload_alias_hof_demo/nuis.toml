@@ -4,5 +4,3 @@ version = 1
 name = "task_recursive_async_payload_alias_hof_demo"
 entry = "main.ns"
 
-[abi]
-cpu = "cpu.arm64.apple_aapcs64"

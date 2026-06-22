@@ -3284,19 +3284,23 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 resolved.project_plan.as_ref(),
             )?;
             let cache_hit = cache::lookup_compile_cache(&cache_key)?;
-            let artifacts = resolved.compile_with_options(&pipeline::PipelineCompileOptions {
-                lowering_target: Some(lowering::LoweringTargetConfig::from_cpu_build_target(
-                    &cpu_target,
-                )),
-            })?;
-            let written = if let Some(entry) = &cache_hit {
+            let (written, loaded_nustar) = if let Some(entry) = &cache_hit {
                 cache::restore_compile_cache(entry, &output_dir)?;
-                aot::compile_artifacts_for_output_dir(
+                let restored_manifest =
+                    aot::verify_build_manifest(&output_dir.join("nuis.build.manifest.toml"))?;
+                let written = aot::compile_artifacts_for_output_dir_with_packaging_mode(
                     &resolved.effective_input_path,
                     &output_dir,
-                    &artifacts.yir,
-                )?
+                    &restored_manifest.packaging_mode,
+                )?;
+                (written, restored_manifest.loaded_nustar)
             } else {
+                let artifacts =
+                    resolved.compile_with_options(&pipeline::PipelineCompileOptions {
+                        lowering_target: Some(
+                            lowering::LoweringTargetConfig::from_cpu_build_target(&cpu_target),
+                        ),
+                    })?;
                 let written = aot::write_and_link(
                     &resolved.effective_input_path,
                     &output_dir,
@@ -3307,7 +3311,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     &cpu_target,
                 )?;
                 let _ = cache::store_compile_cache(&cache_key, &output_dir)?;
-                written
+                (written, artifacts.loaded_nustar)
             };
             let project_metadata =
                 if let (Some(project), Some(plan)) = (&resolved.project, &resolved.project_plan) {
@@ -3326,7 +3330,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 &aot::BuildManifestContext {
                     input_path: input.display().to_string(),
                     output_dir: output_dir.display().to_string(),
-                    loaded_nustar: artifacts.loaded_nustar.clone(),
+                    loaded_nustar: loaded_nustar.clone(),
                     compile_cache: Some(aot::BuildManifestCacheInfo {
                         status: if cache_hit.is_some() {
                             "hit".to_owned()
@@ -3429,8 +3433,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 }
                 println!(
                     "loaded_nustar: {}",
-                    artifacts
-                        .loaded_nustar
+                    loaded_nustar
                         .iter()
                         .map(String::as_str)
                         .collect::<Vec<_>>()
@@ -3781,6 +3784,7 @@ mod tests {
             cpu_target_calling_abi: "aapcs64-darwin".to_owned(),
             cpu_target_clang: "aarch64-apple-darwin".to_owned(),
             cpu_target_cross: false,
+            loaded_nustar: vec!["official.cpu".to_owned()],
             compile_cache_status: None,
             compile_cache_key: None,
             compile_cache_root: None,
@@ -4277,6 +4281,58 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert_eq!(artifact_report.packaging_mode, "native-cpu-llvm");
         assert!(artifact_report.lifecycle_contract_consistent);
         assert!(artifact_report.artifact_roundtrip_verified);
+    }
+
+    #[test]
+    fn compile_command_reuses_cached_project_outputs_without_recompiling() {
+        let project_name = "compile_command_cache_hit_smoke";
+        let project_root = write_temp_project_fixture(
+            project_name,
+            r#"
+name = "compile_command_cache_hit_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return 7;
+              }
+            }
+            "#,
+        );
+        let output_dir = temp_dir("compile_command_cache_hit_outputs");
+
+        run(CommandKind::Compile {
+            input: project_root.clone(),
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let first_report = aot::verify_build_manifest(&manifest_path).unwrap();
+        assert_eq!(first_report.compile_cache_status.as_deref(), Some("miss"));
+        assert_eq!(first_report.loaded_nustar, vec!["official.cpu".to_owned()]);
+
+        run(CommandKind::Compile {
+            input: project_root,
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        let second_report = aot::verify_build_manifest(&manifest_path).unwrap();
+        assert_eq!(second_report.compile_cache_status.as_deref(), Some("hit"));
+        assert_eq!(second_report.loaded_nustar, vec!["official.cpu".to_owned()]);
+        assert_eq!(second_report.packaging_mode, "native-cpu-llvm");
+        assert!(Path::new(&second_report.artifact_path).exists());
     }
 
     #[test]

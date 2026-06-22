@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -470,65 +471,94 @@ fn parse_quoted(raw: &str) -> Option<String> {
     Some(inner.to_owned())
 }
 
+fn write_joined_items<W: fmt::Write>(out: &mut W, items: &[String], sep: &str) -> fmt::Result {
+    let mut first = true;
+    for item in items {
+        if !first {
+            out.write_str(sep)?;
+        }
+        first = false;
+        out.write_str(item)?;
+    }
+    Ok(())
+}
+
 pub fn render_resolved_galaxy_index(dependencies: &[ResolvedGalaxyDependency]) -> String {
     if dependencies.is_empty() {
         return String::new();
     }
     let mut out = String::new();
+    write_resolved_galaxy_index(&mut out, dependencies)
+        .expect("writing resolved galaxy index to String should not fail");
+    out
+}
+
+pub fn write_resolved_galaxy_index<W: fmt::Write>(
+    out: &mut W,
+    dependencies: &[ResolvedGalaxyDependency],
+) -> fmt::Result {
     for item in dependencies {
-        let requested_by = if item.requested_by.is_empty() {
-            "<none>".to_owned()
-        } else {
-            item.requested_by.join(",")
-        };
-        let blockers = if item.auto_inject_blockers.is_empty() {
-            "<none>".to_owned()
-        } else {
-            item.auto_inject_blockers.join(" | ")
-        };
-        out.push_str(&format!(
-            "{}\tpackage={}\tdirect={}\trequested_by={}\tsource_modules={}\tauto_injectable={}\n",
+        write!(
+            out,
+            "{}\tpackage={}\tdirect={}\trequested_by=",
             item.name,
             item.package_id,
             if item.direct { "true" } else { "false" },
-            requested_by,
+        )?;
+        if item.requested_by.is_empty() {
+            out.write_str("<none>")?;
+        } else {
+            write_joined_items(out, &item.requested_by, ",")?;
+        }
+        writeln!(
+            out,
+            "\tsource_modules={}\tauto_injectable={}",
             item.source_modules.len(),
             if item.auto_injectable {
                 "true"
             } else {
                 "false"
             }
-        ));
-        out.push_str(&format!(
-            "  library_modules={}\n",
-            if item.library_modules.is_empty() {
-                "<none>".to_owned()
-            } else {
-                item.library_modules.join(", ")
-            }
-        ));
-        out.push_str(&format!(
-            "  surfaces={}\n",
-            if item.surfaces.is_empty() {
-                "<none>".to_owned()
-            } else {
-                item.surfaces.join(", ")
-            }
-        ));
-        out.push_str(&format!(
-            "  library_import_policy={}\n",
+        )?;
+
+        out.write_str("  library_modules=")?;
+        if item.library_modules.is_empty() {
+            out.write_str("<none>")?;
+        } else {
+            write_joined_items(out, &item.library_modules, ", ")?;
+        }
+        out.write_str("\n")?;
+
+        out.write_str("  surfaces=")?;
+        if item.surfaces.is_empty() {
+            out.write_str("<none>")?;
+        } else {
+            write_joined_items(out, &item.surfaces, ", ")?;
+        }
+        out.write_str("\n")?;
+
+        writeln!(
+            out,
+            "  library_import_policy={}",
             item.library_import_policy.as_str()
-        ));
-        out.push_str(&format!("  manifest={}\n", item.manifest_path.display()));
-        out.push_str(&format!(
-            "  depends_on={}\n",
-            if item.depends_on.is_empty() {
-                "<none>".to_owned()
-            } else {
-                item.depends_on.join(", ")
-            }
-        ));
-        out.push_str(&format!("  blockers={}\n", blockers));
+        )?;
+        writeln!(out, "  manifest={}", item.manifest_path.display())?;
+
+        out.write_str("  depends_on=")?;
+        if item.depends_on.is_empty() {
+            out.write_str("<none>")?;
+        } else {
+            write_joined_items(out, &item.depends_on, ", ")?;
+        }
+        out.write_str("\n")?;
+
+        out.write_str("  blockers=")?;
+        if item.auto_inject_blockers.is_empty() {
+            out.write_str("<none>")?;
+        } else {
+            write_joined_items(out, &item.auto_inject_blockers, " | ")?;
+        }
+        out.write_str("\n")?;
     }
-    out
+    Ok(())
 }

@@ -1,4 +1,23 @@
+use std::fmt;
 use std::path::Path;
+
+fn append_json_field_strings(out: &mut String, fields: impl IntoIterator<Item = String>) {
+    for field in fields {
+        if !out.ends_with('{') {
+            out.push(',');
+        }
+        out.push_str(&field);
+    }
+}
+
+fn append_json_object_strings(out: &mut String, values: &[String]) {
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        out.push_str(value);
+    }
+}
 
 fn load_link_plan(output_dir: &Path) -> Option<nuisc::linker::LinkPlan> {
     let manifest = output_dir.join("nuis.build.manifest.toml");
@@ -8,42 +27,37 @@ fn load_link_plan(output_dir: &Path) -> Option<nuisc::linker::LinkPlan> {
     nuisc::linker::build_link_plan_from_manifest(&manifest).ok()
 }
 
-fn append_link_plan_text_fields(
-    lines: &mut Vec<String>,
+fn write_link_plan_text_fields<W: fmt::Write>(
+    out: &mut W,
     link_plan: Option<&nuisc::linker::LinkPlan>,
-) {
-    lines.push(format!(
+) -> fmt::Result {
+    writeln!(
+        out,
         "  link_plan_available: {}",
         crate::yes_no(link_plan.is_some())
-    ));
+    )?;
     if let Some(plan) = link_plan {
-        lines.push(format!(
-            "  link_plan_final_stage: {}",
-            plan.final_stage.kind
-        ));
-        lines.push(format!(
-            "  link_plan_final_driver: {}",
-            plan.final_stage.driver
-        ));
-        lines.push(format!(
+        writeln!(out, "  link_plan_final_stage: {}", plan.final_stage.kind)?;
+        writeln!(out, "  link_plan_final_driver: {}", plan.final_stage.driver)?;
+        writeln!(
+            out,
             "  link_plan_final_link_mode: {}",
             plan.final_stage.link_mode
-        ));
-        lines.push(format!(
+        )?;
+        writeln!(
+            out,
             "  link_plan_final_output: {}",
             plan.final_stage.output_path
-        ));
-        lines.push(format!(
-            "  link_plan_domain_units: {}",
-            plan.domain_units.len()
-        ));
+        )?;
+        writeln!(out, "  link_plan_domain_units: {}", plan.domain_units.len())?;
     } else {
-        lines.push("  link_plan_final_stage: <unavailable>".to_owned());
-        lines.push("  link_plan_final_driver: <unavailable>".to_owned());
-        lines.push("  link_plan_final_link_mode: <unavailable>".to_owned());
-        lines.push("  link_plan_final_output: <unavailable>".to_owned());
-        lines.push("  link_plan_domain_units: 0".to_owned());
+        writeln!(out, "  link_plan_final_stage: <unavailable>")?;
+        writeln!(out, "  link_plan_final_driver: <unavailable>")?;
+        writeln!(out, "  link_plan_final_link_mode: <unavailable>")?;
+        writeln!(out, "  link_plan_final_output: <unavailable>")?;
+        writeln!(out, "  link_plan_domain_units: 0")?;
     }
+    Ok(())
 }
 
 fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<String> {
@@ -72,7 +86,17 @@ fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<Str
     ]
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<String>, String> {
+    let mut out = String::new();
+    write_project_status_text_summary(&mut out, input)?;
+    Ok(out.lines().map(str::to_owned).collect())
+}
+
+pub(crate) fn write_project_status_text_summary<W: fmt::Write>(
+    out: &mut W,
+    input: &Path,
+) -> Result<(), String> {
     let project = nuisc::project::load_project(input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let text_handle_rewrite = nuisc::project::summarize_project_text_handle_rewrites(&project)?;
@@ -112,184 +136,268 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
-    let mut lines = vec![
-        format!("project status: {}", project.manifest.name),
-        format!("  root: {}", project.root.display()),
-        format!("  manifest: {}", project.manifest_path.display()),
-        format!("  entry: {}", project.manifest.entry),
-        format!("  frontdoor.source_kind: {}", frontdoor.source_kind),
-        format!("  frontdoor.workflow_kind: {}", frontdoor.workflow_kind),
-        format!("  frontdoor.workflow_brief: {}", frontdoor.workflow_brief),
-        format!(
-            "  frontdoor.workflow_samples: {}",
-            frontdoor.workflow_samples
-        ),
-        format!(
-            "  frontdoor.recommended_next_step: {}",
-            frontdoor.recommended_next_step
-        ),
-        format!(
-            "  frontdoor.recommended_command: {}",
-            frontdoor.recommended_command
-        ),
-        format!(
-            "  frontdoor.recommended_reason: {}",
-            frontdoor.recommended_reason
-        ),
-        format!(
-            "  recommended_next_step: {}",
-            frontdoor.recommended_next_step
-        ),
-        format!("  recommended_command: {}", frontdoor.recommended_command),
-        format!("  recommended_reason: {}", frontdoor.recommended_reason),
-        format!("  artifact_output_dir: {}", artifact_output_dir.display()),
-        format!(
-            "  artifact_ready_to_run: {}",
-            crate::yes_no(artifact_report.ready_to_run)
-        ),
-        format!(
-            "  artifact_recommended_next_step: {}",
-            artifact_report.recommended_next_step
-        ),
-        format!(
-            "  artifact_recommended_command: {}",
-            artifact_report.recommended_command
-        ),
-        format!("  modules: {}", project.modules.len()),
-        format!(
-            "  text_handle_rewrite_helper_hits: {}",
-            text_handle_rewrite.helper_hits
-        ),
-        format!(
-            "  text_handle_rewrite_local_hits: {}",
-            text_handle_rewrite.local_hits
-        ),
-        format!(
-            "  text_handle_rewrite_total_hits: {}",
-            text_handle_rewrite.total_hits()
-        ),
-        format!(
-            "  public_surface: {}",
-            crate::describe_public_surface(&public_surface)
-        ),
-        format!(
-            "  public_surface_modules: {}",
-            crate::describe_public_surface_modules(&public_surface)
-        ),
-        format!("  links: {}", project.manifest.links.len()),
-        format!(
-            "  project_plan: {}",
-            nuisc::project::describe_project_compilation_plan(&plan)
-        ),
-        format!(
-            "  project_plan_dependencies: {}",
-            if plan.dependencies.is_empty() {
-                "<none>".to_owned()
-            } else {
-                plan.dependencies
-                    .iter()
-                    .map(|item| {
-                        format!(
-                            "{}:{}={} ({})",
-                            item.category, item.name, item.version, item.source
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ")
+    writeln!(out, "project status: {}", project.manifest.name).map_err(|e| e.to_string())?;
+    writeln!(out, "  root: {}", project.root.display()).map_err(|e| e.to_string())?;
+    writeln!(out, "  manifest: {}", project.manifest_path.display()).map_err(|e| e.to_string())?;
+    writeln!(out, "  entry: {}", project.manifest.entry).map_err(|e| e.to_string())?;
+    writeln!(out, "  frontdoor.source_kind: {}", frontdoor.source_kind)
+        .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.workflow_kind: {}",
+        frontdoor.workflow_kind
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.workflow_brief: {}",
+        frontdoor.workflow_brief
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.workflow_samples: {}",
+        frontdoor.workflow_samples
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.recommended_next_step: {}",
+        frontdoor.recommended_next_step
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.recommended_command: {}",
+        frontdoor.recommended_command
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.recommended_reason: {}",
+        frontdoor.recommended_reason
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  recommended_next_step: {}",
+        frontdoor.recommended_next_step
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  recommended_command: {}",
+        frontdoor.recommended_command
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  recommended_reason: {}",
+        frontdoor.recommended_reason
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_output_dir: {}",
+        artifact_output_dir.display()
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_ready_to_run: {}",
+        crate::yes_no(artifact_report.ready_to_run)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_recommended_next_step: {}",
+        artifact_report.recommended_next_step
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_recommended_command: {}",
+        artifact_report.recommended_command
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(out, "  modules: {}", project.modules.len()).map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  text_handle_rewrite_helper_hits: {}",
+        text_handle_rewrite.helper_hits
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  text_handle_rewrite_local_hits: {}",
+        text_handle_rewrite.local_hits
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  text_handle_rewrite_total_hits: {}",
+        text_handle_rewrite.total_hits()
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  public_surface: {}",
+        crate::describe_public_surface(&public_surface)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  public_surface_modules: {}",
+        crate::describe_public_surface_modules(&public_surface)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(out, "  links: {}", project.manifest.links.len()).map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  project_plan: {}",
+        nuisc::project::describe_project_compilation_plan(&plan)
+    )
+    .map_err(|e| e.to_string())?;
+    write!(out, "  project_plan_dependencies: ").map_err(|e| e.to_string())?;
+    if plan.dependencies.is_empty() {
+        writeln!(out, "<none>").map_err(|e| e.to_string())?;
+    } else {
+        for (index, item) in plan.dependencies.iter().enumerate() {
+            if index > 0 {
+                write!(out, ", ").map_err(|e| e.to_string())?;
             }
-        ),
-        format!(
-            "  project_plan_dependency_categories: {}",
-            nuisc::project::describe_project_dependency_categories(&plan)
-        ),
-        format!(
-            "  project_plan_synthetic_input: {} ({})",
-            plan.synthetic_input.path.display(),
-            plan.synthetic_input.kind
-        ),
-        format!("  project_plan_outputs: {}", plan.output_intents.len()),
-        format!(
-            "  project_plan_output_categories: {}",
-            nuisc::project::describe_project_output_intent_categories(&plan)
-        ),
-        format!("  project_organization_entry: {}", plan.organization.entry),
-        format!("  project_exchange_routes: {}", plan.exchanges.routes.len()),
-        format!(
-            "  project_exchange_route_classes: {}",
-            nuisc::project::describe_project_exchange_route_classes(&plan)
-        ),
-        format!("  tests: {}", declared_tests.len()),
-    ];
-    append_link_plan_text_fields(&mut lines, link_plan.as_ref());
+            write!(
+                out,
+                "{}:{}={} ({})",
+                item.category, item.name, item.version, item.source
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        writeln!(out).map_err(|e| e.to_string())?;
+    }
+    writeln!(
+        out,
+        "  project_plan_dependency_categories: {}",
+        nuisc::project::describe_project_dependency_categories(&plan)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  project_plan_synthetic_input: {} ({})",
+        plan.synthetic_input.path.display(),
+        plan.synthetic_input.kind
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(out, "  project_plan_outputs: {}", plan.output_intents.len())
+        .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  project_plan_output_categories: {}",
+        nuisc::project::describe_project_output_intent_categories(&plan)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  project_organization_entry: {}",
+        plan.organization.entry
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  project_exchange_routes: {}",
+        plan.exchanges.routes.len()
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  project_exchange_route_classes: {}",
+        nuisc::project::describe_project_exchange_route_classes(&plan)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(out, "  tests: {}", declared_tests.len()).map_err(|e| e.to_string())?;
+    write_link_plan_text_fields(out, link_plan.as_ref()).map_err(|e| e.to_string())?;
     for path in &declared_tests {
-        lines.push(format!(
+        writeln!(
+            out,
             "  test: {} exists={}",
             path.display(),
             crate::yes_no(path.exists())
-        ));
+        )
+        .map_err(|e| e.to_string())?;
     }
-    lines.push(format!(
+    writeln!(
+        out,
         "  project_compile_workflow: {}",
         nuisc::project_compile_workflow_brief()
-    ));
-    lines.push(format!(
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
         "  project_compile_samples: {}",
         nuisc::project_compile_samples_brief()
-    ));
-    lines.push(format!(
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
         "  project_test_workflow: {}",
         nuisc::project_test_workflow_brief()
-    ));
+    )
+    .map_err(|e| e.to_string())?;
     if include_galaxy_flow {
-        lines.push(format!(
+        writeln!(
+            out,
             "  project_galaxy_workflow: {}",
             nuisc::project_galaxy_workflow_brief()
-        ));
+        )
+        .map_err(|e| e.to_string())?;
     }
-    lines.push(format!(
-        "  domains: {}",
-        plan.organization.domains.join(", ")
-    ));
-    lines.push(format!(
+    writeln!(out, "  domains: {}", plan.organization.domains.join(", "))
+        .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
         "  abi_mode: {}",
         if plan.abi_resolution.explicit {
             "explicit"
         } else {
             "auto-recommended"
         }
-    ));
+    )
+    .map_err(|e| e.to_string())?;
     for item in &project.manifest.galaxy_dependencies {
-        lines.push(format!("  galaxy: {}={}", item.name, item.version));
+        writeln!(out, "  galaxy: {}={}", item.name, item.version).map_err(|e| e.to_string())?;
     }
-    lines.push(format!(
+    writeln!(
+        out,
         "  galaxy_imports: {}",
         project.manifest.galaxy_imports.len()
-    ));
+    )
+    .map_err(|e| e.to_string())?;
     for item in &project.manifest.galaxy_imports {
-        lines.push(format!(
+        writeln!(
+            out,
             "  galaxy_import: {}:{}",
             item.galaxy, item.library_module
-        ));
+        )
+        .map_err(|e| e.to_string())?;
     }
-    lines.push(format!(
+    writeln!(
+        out,
         "  galaxy_hidden_manual_only_library_modules: {}",
         hidden_manual_only_library_modules.len()
-    ));
+    )
+    .map_err(|e| e.to_string())?;
     for item in &hidden_manual_only_library_modules {
-        lines.push(format!(
-            "  galaxy_hidden_manual_only_library_module: {}",
-            item
-        ));
+        writeln!(out, "  galaxy_hidden_manual_only_library_module: {}", item)
+            .map_err(|e| e.to_string())?;
     }
     let lock_path = project.root.join("nuis.galaxy.lock");
     match galaxy_lock_status {
         Ok(lock) => {
-            lines.push("  galaxy_lock: ok".to_owned());
-            lines.push(format!("  galaxy_lock_path: {}", lock.path.display()));
-            lines.push(format!(
-                "  galaxy_lock_dependencies: {}",
-                lock.entries.len()
-            ));
+            writeln!(out, "  galaxy_lock: ok").map_err(|e| e.to_string())?;
+            writeln!(out, "  galaxy_lock_path: {}", lock.path.display())
+                .map_err(|e| e.to_string())?;
+            writeln!(out, "  galaxy_lock_dependencies: {}", lock.entries.len())
+                .map_err(|e| e.to_string())?;
             let declared = project
                 .manifest
                 .galaxy_dependencies
@@ -301,31 +409,47 @@ pub(crate) fn render_project_status_text_summary(input: &Path) -> Result<Vec<Str
                 .iter()
                 .map(|item| format!("{}={}", item.name, item.version))
                 .collect::<std::collections::BTreeSet<_>>();
-            lines.push(format!(
+            writeln!(
+                out,
                 "  galaxy_lock_matches_manifest: {}",
                 if declared == locked { "yes" } else { "no" }
-            ));
+            )
+            .map_err(|e| e.to_string())?;
             for item in lock.entries {
-                lines.push(format!(
+                writeln!(
+                    out,
                     "  galaxy_lock_entry: {}={} {}",
                     item.name, item.version, item.bundle_fnv1a64
-                ));
+                )
+                .map_err(|e| e.to_string())?;
             }
         }
         Err(error) if lock_path.exists() => {
-            lines.push("  galaxy_lock: invalid".to_owned());
-            lines.push(format!("  galaxy_lock_path: {}", lock_path.display()));
-            lines.push(format!("  galaxy_lock_error: {}", error));
+            writeln!(out, "  galaxy_lock: invalid").map_err(|e| e.to_string())?;
+            writeln!(out, "  galaxy_lock_path: {}", lock_path.display())
+                .map_err(|e| e.to_string())?;
+            writeln!(out, "  galaxy_lock_error: {}", error).map_err(|e| e.to_string())?;
         }
         Err(_) => {
-            lines.push("  galaxy_lock: missing".to_owned());
-            lines.push(format!("  galaxy_lock_path: {}", lock_path.display()));
+            writeln!(out, "  galaxy_lock: missing").map_err(|e| e.to_string())?;
+            writeln!(out, "  galaxy_lock_path: {}", lock_path.display())
+                .map_err(|e| e.to_string())?;
         }
     }
-    Ok(lines)
+    Ok(())
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<String>, String> {
+    let mut out = String::new();
+    write_project_doctor_text_summary(&mut out, input)?;
+    Ok(out.lines().map(str::to_owned).collect())
+}
+
+pub(crate) fn write_project_doctor_text_summary<W: fmt::Write>(
+    out: &mut W,
+    input: &Path,
+) -> Result<(), String> {
     let project = nuisc::project::load_project(input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let text_handle_rewrite = nuisc::project::summarize_project_text_handle_rewrites(&project)?;
@@ -387,225 +511,318 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
-    let mut lines = vec![
-        format!("project doctor: {}", project.manifest.name),
-        format!("  root: {}", project.root.display()),
-        format!("  manifest: {}", project.manifest_path.display()),
-        format!("  entry: {}", project.manifest.entry),
-        format!("  frontdoor.source_kind: {}", frontdoor.source_kind),
-        format!("  frontdoor.workflow_kind: {}", frontdoor.workflow_kind),
-        format!("  frontdoor.workflow_brief: {}", frontdoor.workflow_brief),
-        format!(
-            "  frontdoor.workflow_samples: {}",
-            frontdoor.workflow_samples
-        ),
-        format!(
-            "  frontdoor.recommended_next_step: {}",
-            frontdoor.recommended_next_step
-        ),
-        format!(
-            "  frontdoor.recommended_command: {}",
-            frontdoor.recommended_command
-        ),
-        format!(
-            "  frontdoor.recommended_reason: {}",
-            frontdoor.recommended_reason
-        ),
-        format!(
-            "  recommended_next_step: {}",
-            frontdoor.recommended_next_step
-        ),
-        format!("  recommended_command: {}", frontdoor.recommended_command),
-        format!("  recommended_reason: {}", frontdoor.recommended_reason),
-        format!("  artifact_output_dir: {}", artifact_output_dir.display()),
-        format!(
-            "  artifact_ready_to_run: {}",
-            crate::yes_no(artifact_report.ready_to_run)
-        ),
-        format!(
-            "  artifact_recommended_next_step: {}",
-            artifact_report.recommended_next_step
-        ),
-        format!(
-            "  artifact_recommended_command: {}",
-            artifact_report.recommended_command
-        ),
-        format!("  modules: {}", project.modules.len()),
-        format!(
-            "  text_handle_rewrite_helper_hits: {}",
-            text_handle_rewrite.helper_hits
-        ),
-        format!(
-            "  text_handle_rewrite_local_hits: {}",
-            text_handle_rewrite.local_hits
-        ),
-        format!(
-            "  text_handle_rewrite_total_hits: {}",
-            text_handle_rewrite.total_hits()
-        ),
-        format!(
-            "  public_surface: {}",
-            crate::describe_public_surface(&public_surface)
-        ),
-        format!(
-            "  public_surface_modules: {}",
-            crate::describe_public_surface_modules(&public_surface)
-        ),
-        format!("  links: {}", project.manifest.links.len()),
-        format!(
-            "  project_plan: {}",
-            nuisc::project::describe_project_compilation_plan(&plan)
-        ),
-        format!("  tests_declared: {}", declared_tests.len()),
-        format!("  tests_missing: {}", missing_tests.len()),
-    ];
-    append_link_plan_text_fields(&mut lines, link_plan.as_ref());
+    writeln!(out, "project doctor: {}", project.manifest.name).map_err(|e| e.to_string())?;
+    writeln!(out, "  root: {}", project.root.display()).map_err(|e| e.to_string())?;
+    writeln!(out, "  manifest: {}", project.manifest_path.display()).map_err(|e| e.to_string())?;
+    writeln!(out, "  entry: {}", project.manifest.entry).map_err(|e| e.to_string())?;
+    writeln!(out, "  frontdoor.source_kind: {}", frontdoor.source_kind)
+        .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.workflow_kind: {}",
+        frontdoor.workflow_kind
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.workflow_brief: {}",
+        frontdoor.workflow_brief
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.workflow_samples: {}",
+        frontdoor.workflow_samples
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.recommended_next_step: {}",
+        frontdoor.recommended_next_step
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.recommended_command: {}",
+        frontdoor.recommended_command
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.recommended_reason: {}",
+        frontdoor.recommended_reason
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  recommended_next_step: {}",
+        frontdoor.recommended_next_step
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  recommended_command: {}",
+        frontdoor.recommended_command
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  recommended_reason: {}",
+        frontdoor.recommended_reason
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_output_dir: {}",
+        artifact_output_dir.display()
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_ready_to_run: {}",
+        crate::yes_no(artifact_report.ready_to_run)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_recommended_next_step: {}",
+        artifact_report.recommended_next_step
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_recommended_command: {}",
+        artifact_report.recommended_command
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(out, "  modules: {}", project.modules.len()).map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  text_handle_rewrite_helper_hits: {}",
+        text_handle_rewrite.helper_hits
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  text_handle_rewrite_local_hits: {}",
+        text_handle_rewrite.local_hits
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  text_handle_rewrite_total_hits: {}",
+        text_handle_rewrite.total_hits()
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  public_surface: {}",
+        crate::describe_public_surface(&public_surface)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  public_surface_modules: {}",
+        crate::describe_public_surface_modules(&public_surface)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(out, "  links: {}", project.manifest.links.len()).map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  project_plan: {}",
+        nuisc::project::describe_project_compilation_plan(&plan)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(out, "  tests_declared: {}", declared_tests.len()).map_err(|e| e.to_string())?;
+    writeln!(out, "  tests_missing: {}", missing_tests.len()).map_err(|e| e.to_string())?;
+    write_link_plan_text_fields(out, link_plan.as_ref()).map_err(|e| e.to_string())?;
     for path in &declared_tests {
-        lines.push(format!(
+        writeln!(
+            out,
             "  test: {} exists={}",
             path.display(),
             crate::yes_no(path.exists())
-        ));
+        )
+        .map_err(|e| e.to_string())?;
     }
-    lines.push(format!(
+    writeln!(
+        out,
         "  project_compile_workflow: {}",
         nuisc::project_compile_workflow_brief()
-    ));
-    lines.push(format!(
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
         "  project_compile_samples: {}",
         nuisc::project_compile_samples_brief()
-    ));
-    lines.push(format!(
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
         "  project_test_workflow: {}",
         nuisc::project_test_workflow_brief()
-    ));
+    )
+    .map_err(|e| e.to_string())?;
     if include_galaxy_flow {
-        lines.push(format!(
+        writeln!(
+            out,
             "  project_galaxy_workflow: {}",
             nuisc::project_galaxy_workflow_brief()
-        ));
+        )
+        .map_err(|e| e.to_string())?;
     }
-    lines.push(format!(
+    writeln!(
+        out,
         "  abi_mode: {}",
         if plan.abi_resolution.explicit {
             "explicit"
         } else {
             "auto-recommended"
         }
-    ));
-    lines.push(format!("  abi_checks: {}", abi_checks.len()));
-    lines.push(format!("  registry_checks: {}", registry_checks.len()));
-    lines.push(format!("  lowering_checks: {}", lowering_checks.len()));
-    lines.push(format!(
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(out, "  abi_checks: {}", abi_checks.len()).map_err(|e| e.to_string())?;
+    writeln!(out, "  registry_checks: {}", registry_checks.len()).map_err(|e| e.to_string())?;
+    writeln!(out, "  lowering_checks: {}", lowering_checks.len()).map_err(|e| e.to_string())?;
+    writeln!(
+        out,
         "  galaxy_manifest: {}",
         if galaxy_manifest_exists {
             galaxy_manifest_path.display().to_string()
         } else {
             "<missing>".to_owned()
         }
-    ));
+    )
+    .map_err(|e| e.to_string())?;
     match galaxy_check {
         Some(Ok(checked)) => {
-            lines.push("  galaxy_check: ok".to_owned());
-            lines.push(format!(
+            writeln!(out, "  galaxy_check: ok").map_err(|e| e.to_string())?;
+            writeln!(
+                out,
                 "  galaxy_package_kind: {}",
                 checked.manifest.package_kind
-            ));
-            lines.push(format!(
+            )
+            .map_err(|e| e.to_string())?;
+            writeln!(
+                out,
                 "  galaxy_framework: {}",
                 checked.manifest.framework.as_deref().unwrap_or("<none>")
-            ));
-            lines.push(format!(
+            )
+            .map_err(|e| e.to_string())?;
+            writeln!(
+                out,
                 "  galaxy_include_files: {}",
                 checked.include_files.len()
-            ));
+            )
+            .map_err(|e| e.to_string())?;
         }
         Some(Err(error)) => {
-            lines.push("  galaxy_check: invalid".to_owned());
-            lines.push(format!("  galaxy_error: {}", error));
+            writeln!(out, "  galaxy_check: invalid").map_err(|e| e.to_string())?;
+            writeln!(out, "  galaxy_error: {}", error).map_err(|e| e.to_string())?;
         }
-        None => lines.push("  galaxy_check: skipped".to_owned()),
+        None => writeln!(out, "  galaxy_check: skipped").map_err(|e| e.to_string())?,
     }
-    lines.push(format!("  galaxy_lock: {}", galaxy_doctor.lock_status));
-    lines.push(format!(
+    writeln!(out, "  galaxy_lock: {}", galaxy_doctor.lock_status).map_err(|e| e.to_string())?;
+    writeln!(
+        out,
         "  galaxy_lock_path: {}",
         galaxy_doctor.lock_path.display()
-    ));
+    )
+    .map_err(|e| e.to_string())?;
     if let Some(error) = galaxy_doctor.lock_error.clone() {
-        lines.push(format!("  galaxy_lock_error: {}", error));
+        writeln!(out, "  galaxy_lock_error: {}", error).map_err(|e| e.to_string())?;
     }
-    lines.push(format!(
+    writeln!(
+        out,
         "  galaxy_deps_root: {}",
         galaxy_doctor.deps_root.display()
-    ));
-    lines.push(format!(
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
         "  galaxy_local_registry: {}",
         galaxy_doctor.local_registry_root.display()
-    ));
-    lines.push(format!(
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
         "  galaxy_dependencies: {}",
         galaxy_doctor.dependencies.len()
-    ));
+    )
+    .map_err(|e| e.to_string())?;
     for dependency in &galaxy_doctor.dependencies {
-        lines.push(format!(
+        writeln!(
+            out,
             "  dep: {}={} local={} lock={} installed={}",
             dependency.name,
             dependency.version,
             crate::yes_no(dependency.local_available),
             crate::yes_no(dependency.locked),
             crate::yes_no(dependency.installed)
-        ));
+        )
+        .map_err(|e| e.to_string())?;
     }
-    lines.push(format!(
+    writeln!(
+        out,
         "  galaxy_imports: {}",
         project.manifest.galaxy_imports.len()
-    ));
+    )
+    .map_err(|e| e.to_string())?;
     for item in &project.manifest.galaxy_imports {
-        lines.push(format!(
+        writeln!(
+            out,
             "  galaxy_import: {}:{}",
             item.galaxy, item.library_module
-        ));
+        )
+        .map_err(|e| e.to_string())?;
     }
-    lines.push(format!(
+    writeln!(
+        out,
         "  galaxy_hidden_manual_only_library_modules: {}",
         hidden_manual_only_library_modules.len()
-    ));
+    )
+    .map_err(|e| e.to_string())?;
     for item in &hidden_manual_only_library_modules {
-        lines.push(format!(
-            "  galaxy_hidden_manual_only_library_module: {}",
-            item
-        ));
+        writeln!(out, "  galaxy_hidden_manual_only_library_module: {}", item)
+            .map_err(|e| e.to_string())?;
     }
     match nova_profile.as_ref() {
         Some(profile) => {
-            lines.push(format!("  ns_nova_profile: {}", profile.path.display()));
-            lines.push(format!("  ns_nova_framework: {}", profile.framework));
-            lines.push(format!(
+            writeln!(out, "  ns_nova_profile: {}", profile.path.display())
+                .map_err(|e| e.to_string())?;
+            writeln!(out, "  ns_nova_framework: {}", profile.framework)
+                .map_err(|e| e.to_string())?;
+            writeln!(
+                out,
                 "  ns_nova_framework_schema: {}",
                 profile.framework_schema
-            ));
+            )
+            .map_err(|e| e.to_string())?;
         }
-        None => lines.push("  ns_nova_profile: <missing>".to_owned()),
+        None => writeln!(out, "  ns_nova_profile: <missing>").map_err(|e| e.to_string())?,
     }
     match nova_stdlib.as_ref() {
         Some(summary) => {
-            lines.push(format!(
-                "  ns_nova_stdlib_manifest: {}",
-                summary.path.display()
-            ));
-            lines.push(format!(
+            writeln!(out, "  ns_nova_stdlib_manifest: {}", summary.path.display())
+                .map_err(|e| e.to_string())?;
+            writeln!(
+                out,
                 "  ns_nova_stdlib_sources: {}",
                 summary.source_modules.len()
-            ));
-            lines.push(format!(
+            )
+            .map_err(|e| e.to_string())?;
+            writeln!(
+                out,
                 "  ns_nova_stdlib_missing_sources: {}",
                 summary.missing_modules.len()
-            ));
+            )
+            .map_err(|e| e.to_string())?;
             for path in &summary.missing_modules {
-                lines.push(format!("  ns_nova_stdlib_missing: {}", path.display()));
+                writeln!(out, "  ns_nova_stdlib_missing: {}", path.display())
+                    .map_err(|e| e.to_string())?;
             }
         }
-        None => lines.push("  ns_nova_stdlib_manifest: <missing>".to_owned()),
+        None => writeln!(out, "  ns_nova_stdlib_manifest: <missing>").map_err(|e| e.to_string())?,
     }
     let mut next_steps = Vec::new();
     if !galaxy_manifest_exists {
@@ -695,20 +912,22 @@ pub(crate) fn render_project_doctor_text_summary(input: &Path) -> Result<Vec<Str
         );
     }
     if next_steps.is_empty() {
-        lines.push("  next_steps: none".to_owned());
+        writeln!(out, "  next_steps: none").map_err(|e| e.to_string())?;
     } else {
-        lines.push(format!("  next_steps: {}", next_steps.len()));
+        writeln!(out, "  next_steps: {}", next_steps.len()).map_err(|e| e.to_string())?;
         for step in next_steps {
-            lines.push(format!("  next: {}", step));
+            writeln!(out, "  next: {}", step).map_err(|e| e.to_string())?;
         }
     }
     if let Some(error) = lock_error {
-        lines.push(format!(
+        writeln!(
+            out,
             "  note: lock verification failed before suggestions were computed: {}",
             error
-        ));
+        )
+        .map_err(|e| e.to_string())?;
     }
-    Ok(lines)
+    Ok(())
 }
 pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String> {
     if nuisc::project::is_project_input(&input) {
@@ -751,33 +970,43 @@ pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String>
                 Some(item.abi.clone()),
             )?);
         }
-        let domain_json = domains
-            .iter()
-            .map(crate::scheduler_view_domain_record_json)
-            .collect::<Vec<_>>()
-            .join(",");
-        let mut fields = vec![
-            crate::json_field("source_kind", "project"),
-            crate::json_field("input", &input.display().to_string()),
-            crate::json_field("project", &project.manifest.name),
-            crate::json_field(
-                "abi_mode",
-                if plan.abi_resolution.explicit {
-                    "explicit"
-                } else {
-                    "auto-recommended"
-                },
+        let mut out = String::from("{");
+        append_json_field_strings(
+            &mut out,
+            vec![
+                crate::json_field("source_kind", "project"),
+                crate::json_field("input", &input.display().to_string()),
+                crate::json_field("project", &project.manifest.name),
+                crate::json_field(
+                    "abi_mode",
+                    if plan.abi_resolution.explicit {
+                        "explicit"
+                    } else {
+                        "auto-recommended"
+                    },
+                ),
+            ],
+        );
+        append_json_field_strings(
+            &mut out,
+            crate::json_surface::workflow_contract_json_fields(
+                &frontdoor, false, false, false, false,
             ),
-        ];
-        fields.extend(crate::json_surface::workflow_contract_json_fields(
-            &frontdoor, false, false, false, false,
-        ));
-        fields.extend(crate::json_surface::project_plan_json_fields(&plan));
-        return Ok(format!(
-            "{{{},\"domains\":[{}]}}",
-            fields.join(","),
-            domain_json
-        ));
+        );
+        append_json_field_strings(
+            &mut out,
+            crate::json_surface::project_plan_json_fields(&plan),
+        );
+        out.push_str(",\"domains\":[");
+        append_json_object_strings(
+            &mut out,
+            &domains
+                .iter()
+                .map(crate::scheduler_view_domain_record_json)
+                .collect::<Vec<_>>(),
+        );
+        out.push_str("]}");
+        return Ok(out);
     }
 
     let artifacts = nuisc::pipeline::compile_source_path(&input)?;
@@ -794,32 +1023,36 @@ pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String>
             None,
         )?);
     }
-    let domain_json = domains
-        .iter()
-        .map(crate::scheduler_view_domain_record_json)
-        .collect::<Vec<_>>()
-        .join(",");
-    let fields = vec![
-        crate::json_field("source_kind", "single-file"),
-        crate::json_field("input", &input.display().to_string()),
-        crate::json_field("ast_domain", &artifacts.ast.domain),
-        crate::json_field("ast_unit", &artifacts.ast.unit),
-        crate::json_object_field(
-            "frontdoor",
-            &crate::workflow_frontdoor_json_fields(&frontdoor),
-        ),
-        crate::json_field("workflow_kind", frontdoor.workflow_kind),
-        crate::json_field("workflow_brief", frontdoor.workflow_brief),
-        crate::json_field("workflow_samples", frontdoor.workflow_samples),
-        crate::json_field("recommended_next_step", frontdoor.recommended_next_step),
-        crate::json_field("recommended_command", frontdoor.recommended_command),
-        crate::json_field("recommended_reason", frontdoor.recommended_reason),
-    ];
-    Ok(format!(
-        "{{{},\"domains\":[{}]}}",
-        fields.join(","),
-        domain_json
-    ))
+    let mut out = String::from("{");
+    append_json_field_strings(
+        &mut out,
+        vec![
+            crate::json_field("source_kind", "single-file"),
+            crate::json_field("input", &input.display().to_string()),
+            crate::json_field("ast_domain", &artifacts.ast.domain),
+            crate::json_field("ast_unit", &artifacts.ast.unit),
+            crate::json_object_field(
+                "frontdoor",
+                &crate::workflow_frontdoor_json_fields(&frontdoor),
+            ),
+            crate::json_field("workflow_kind", frontdoor.workflow_kind),
+            crate::json_field("workflow_brief", frontdoor.workflow_brief),
+            crate::json_field("workflow_samples", frontdoor.workflow_samples),
+            crate::json_field("recommended_next_step", frontdoor.recommended_next_step),
+            crate::json_field("recommended_command", frontdoor.recommended_command),
+            crate::json_field("recommended_reason", frontdoor.recommended_reason),
+        ],
+    );
+    out.push_str(",\"domains\":[");
+    append_json_object_strings(
+        &mut out,
+        &domains
+            .iter()
+            .map(crate::scheduler_view_domain_record_json)
+            .collect::<Vec<_>>(),
+    );
+    out.push_str("]}");
+    Ok(out)
 }
 
 pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String> {
@@ -894,107 +1127,110 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
             )
         })
         .collect::<Vec<_>>();
-    let mut fields = vec![
-        crate::json_field("source_kind", "project"),
-        crate::json_field("input", &input.display().to_string()),
-        crate::json_field("project", &project.manifest.name),
-        crate::json_field("root", &project.root.display().to_string()),
-        crate::json_field("manifest", &project.manifest_path.display().to_string()),
-        crate::json_field("entry", &project.manifest.entry),
-        crate::json_usize_field("modules", project.modules.len()),
-        crate::json_usize_field("links", project.manifest.links.len()),
-        crate::json_usize_field(
-            "text_handle_rewrite_helper_hits",
-            text_handle_rewrite.helper_hits,
-        ),
-        crate::json_usize_field(
-            "text_handle_rewrite_local_hits",
-            text_handle_rewrite.local_hits,
-        ),
-        crate::json_usize_field(
-            "text_handle_rewrite_total_hits",
-            text_handle_rewrite.total_hits(),
-        ),
-    ];
-    fields.extend(crate::json_surface::public_surface_summary_json_fields(
-        &public_surface,
-    ));
-    fields.extend(crate::json_surface::project_plan_json_fields(&plan));
-    fields.push(crate::json_usize_field(
-        "tests_declared",
-        declared_tests.len(),
-    ));
-    fields.push(crate::json_field(
-        "artifact_output_dir",
-        &artifact_output_dir.display().to_string(),
-    ));
-    fields.push(crate::json_bool_field(
-        "artifact_ready_to_run",
-        artifact_report.ready_to_run,
-    ));
-    fields.push(crate::json_field(
-        "artifact_recommended_next_step",
-        &artifact_report.recommended_next_step,
-    ));
-    fields.push(crate::json_field(
-        "artifact_recommended_command",
-        &artifact_report.recommended_command,
-    ));
-    fields.extend(link_plan_json_fields(link_plan.as_ref()));
-    fields.extend(crate::project_workflow_json_fields(
-        &frontdoor,
-        include_galaxy_flow,
-    ));
-    fields.push(crate::json_field(
-        "abi_mode",
-        if plan.abi_resolution.explicit {
-            "explicit"
-        } else {
-            "auto-recommended"
-        },
-    ));
-    fields.push(crate::json_string_array_field(
-        "galaxy_dependencies",
-        &project
-            .manifest
-            .galaxy_dependencies
-            .iter()
-            .map(|item| format!("{}={}", item.name, item.version))
-            .collect::<Vec<_>>(),
-    ));
-    fields.push(crate::json_usize_field(
-        "galaxy_surface_ids_count",
-        galaxy_surface_ids.len(),
-    ));
-    fields.push(crate::json_string_array_field(
-        "galaxy_surface_ids",
-        &galaxy_surface_ids,
-    ));
-    fields.push(crate::json_object_array_field(
-        "galaxy_records",
-        &galaxy_records,
-    ));
-    fields.push(crate::json_usize_field(
-        "galaxy_imports_count",
-        project.manifest.galaxy_imports.len(),
-    ));
-    fields.push(crate::json_string_array_field(
-        "galaxy_imports",
-        &project
-            .manifest
-            .galaxy_imports
-            .iter()
-            .map(|item| format!("{}:{}", item.galaxy, item.library_module))
-            .collect::<Vec<_>>(),
-    ));
-    fields.push(crate::json_usize_field(
-        "galaxy_hidden_manual_only_library_modules_count",
-        hidden_manual_only_library_modules.len(),
-    ));
-    fields.push(crate::json_string_array_field(
-        "galaxy_hidden_manual_only_library_modules",
-        &hidden_manual_only_library_modules,
-    ));
+    let mut out = String::from("{");
+    append_json_field_strings(
+        &mut out,
+        vec![
+            crate::json_field("source_kind", "project"),
+            crate::json_field("input", &input.display().to_string()),
+            crate::json_field("project", &project.manifest.name),
+            crate::json_field("root", &project.root.display().to_string()),
+            crate::json_field("manifest", &project.manifest_path.display().to_string()),
+            crate::json_field("entry", &project.manifest.entry),
+            crate::json_usize_field("modules", project.modules.len()),
+            crate::json_usize_field("links", project.manifest.links.len()),
+            crate::json_usize_field(
+                "text_handle_rewrite_helper_hits",
+                text_handle_rewrite.helper_hits,
+            ),
+            crate::json_usize_field(
+                "text_handle_rewrite_local_hits",
+                text_handle_rewrite.local_hits,
+            ),
+            crate::json_usize_field(
+                "text_handle_rewrite_total_hits",
+                text_handle_rewrite.total_hits(),
+            ),
+        ],
+    );
+    append_json_field_strings(
+        &mut out,
+        crate::json_surface::public_surface_summary_json_fields(&public_surface),
+    );
+    append_json_field_strings(
+        &mut out,
+        crate::json_surface::project_plan_json_fields(&plan),
+    );
+    append_json_field_strings(
+        &mut out,
+        vec![
+            crate::json_usize_field("tests_declared", declared_tests.len()),
+            crate::json_field(
+                "artifact_output_dir",
+                &artifact_output_dir.display().to_string(),
+            ),
+            crate::json_bool_field("artifact_ready_to_run", artifact_report.ready_to_run),
+            crate::json_field(
+                "artifact_recommended_next_step",
+                &artifact_report.recommended_next_step,
+            ),
+            crate::json_field(
+                "artifact_recommended_command",
+                &artifact_report.recommended_command,
+            ),
+        ],
+    );
+    append_json_field_strings(&mut out, link_plan_json_fields(link_plan.as_ref()));
+    append_json_field_strings(
+        &mut out,
+        crate::project_workflow_json_fields(&frontdoor, include_galaxy_flow),
+    );
+    append_json_field_strings(
+        &mut out,
+        vec![
+            crate::json_field(
+                "abi_mode",
+                if plan.abi_resolution.explicit {
+                    "explicit"
+                } else {
+                    "auto-recommended"
+                },
+            ),
+            crate::json_string_array_field(
+                "galaxy_dependencies",
+                &project
+                    .manifest
+                    .galaxy_dependencies
+                    .iter()
+                    .map(|item| format!("{}={}", item.name, item.version))
+                    .collect::<Vec<_>>(),
+            ),
+            crate::json_usize_field("galaxy_surface_ids_count", galaxy_surface_ids.len()),
+            crate::json_string_array_field("galaxy_surface_ids", &galaxy_surface_ids),
+            crate::json_object_array_field("galaxy_records", &galaxy_records),
+            crate::json_usize_field(
+                "galaxy_imports_count",
+                project.manifest.galaxy_imports.len(),
+            ),
+            crate::json_string_array_field(
+                "galaxy_imports",
+                &project
+                    .manifest
+                    .galaxy_imports
+                    .iter()
+                    .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+                    .collect::<Vec<_>>(),
+            ),
+            crate::json_usize_field(
+                "galaxy_hidden_manual_only_library_modules_count",
+                hidden_manual_only_library_modules.len(),
+            ),
+            crate::json_string_array_field(
+                "galaxy_hidden_manual_only_library_modules",
+                &hidden_manual_only_library_modules,
+            ),
+        ],
+    );
     let lock_path = project.root.join("nuis.galaxy.lock");
     let declared_galaxy_dependencies = project
         .manifest
@@ -1002,21 +1238,25 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
         .iter()
         .map(|item| format!("{}={}", item.name, item.version))
         .collect::<Vec<_>>();
-    fields.extend(crate::json_surface::galaxy_lock_json_fields(
-        galaxy_lock_status,
-        &lock_path,
-        &declared_galaxy_dependencies,
-    ));
-    fields.push(crate::json_object_array_field("tests", &test_json));
-    fields.push(crate::json_object_array_field(
-        "public_surface_records",
-        &public_surface_json,
-    ));
-    Ok(format!(
-        "{{{},\"domains\":[{}]}}",
-        fields.join(","),
-        domain_json
-    ))
+    append_json_field_strings(
+        &mut out,
+        crate::json_surface::galaxy_lock_json_fields(
+            galaxy_lock_status,
+            &lock_path,
+            &declared_galaxy_dependencies,
+        ),
+    );
+    append_json_field_strings(
+        &mut out,
+        vec![
+            crate::json_object_array_field("tests", &test_json),
+            crate::json_object_array_field("public_surface_records", &public_surface_json),
+        ],
+    );
+    out.push_str(",\"domains\":[");
+    out.push_str(&domain_json);
+    out.push_str("]}");
+    Ok(out)
 }
 
 pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String> {
@@ -1256,200 +1496,219 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     } else {
         "<missing>".to_owned()
     };
-    let mut fields = vec![
-        crate::json_field("source_kind", "project"),
-        crate::json_field("input", &input.display().to_string()),
-        crate::json_field("project", &project.manifest.name),
-        crate::json_field("root", &project.root.display().to_string()),
-        crate::json_field("manifest", &project.manifest_path.display().to_string()),
-        crate::json_field("entry", &project.manifest.entry),
-        crate::json_usize_field("modules", project.modules.len()),
-        crate::json_usize_field("links", project.manifest.links.len()),
-        crate::json_usize_field(
-            "text_handle_rewrite_helper_hits",
-            text_handle_rewrite.helper_hits,
+    let mut out = String::from("{");
+    append_json_field_strings(
+        &mut out,
+        vec![
+            crate::json_field("source_kind", "project"),
+            crate::json_field("input", &input.display().to_string()),
+            crate::json_field("project", &project.manifest.name),
+            crate::json_field("root", &project.root.display().to_string()),
+            crate::json_field("manifest", &project.manifest_path.display().to_string()),
+            crate::json_field("entry", &project.manifest.entry),
+            crate::json_usize_field("modules", project.modules.len()),
+            crate::json_usize_field("links", project.manifest.links.len()),
+            crate::json_usize_field(
+                "text_handle_rewrite_helper_hits",
+                text_handle_rewrite.helper_hits,
+            ),
+            crate::json_usize_field(
+                "text_handle_rewrite_local_hits",
+                text_handle_rewrite.local_hits,
+            ),
+            crate::json_usize_field(
+                "text_handle_rewrite_total_hits",
+                text_handle_rewrite.total_hits(),
+            ),
+        ],
+    );
+    append_json_field_strings(
+        &mut out,
+        crate::json_surface::public_surface_summary_json_fields(&public_surface),
+    );
+    append_json_field_strings(
+        &mut out,
+        crate::json_surface::project_plan_json_fields(&plan),
+    );
+    append_json_field_strings(
+        &mut out,
+        vec![
+            crate::json_usize_field("tests_declared", declared_tests.len()),
+            crate::json_usize_field("tests_missing", missing_tests.len()),
+            crate::json_field(
+                "artifact_output_dir",
+                &artifact_output_dir.display().to_string(),
+            ),
+            crate::json_bool_field("artifact_ready_to_run", artifact_report.ready_to_run),
+            crate::json_field(
+                "artifact_recommended_next_step",
+                &artifact_report.recommended_next_step,
+            ),
+            crate::json_field(
+                "artifact_recommended_command",
+                &artifact_report.recommended_command,
+            ),
+        ],
+    );
+    append_json_field_strings(&mut out, link_plan_json_fields(link_plan.as_ref()));
+    append_json_field_strings(
+        &mut out,
+        crate::project_workflow_json_fields(&frontdoor, include_galaxy_flow),
+    );
+    append_json_field_strings(
+        &mut out,
+        vec![crate::json_field(
+            "abi_mode",
+            if plan.abi_resolution.explicit {
+                "explicit"
+            } else {
+                "auto-recommended"
+            },
+        )],
+    );
+    append_json_field_strings(
+        &mut out,
+        crate::json_surface::project_check_summary_json_fields(
+            &abi_checks,
+            &registry_checks,
+            &lowering_checks,
         ),
-        crate::json_usize_field(
-            "text_handle_rewrite_local_hits",
-            text_handle_rewrite.local_hits,
-        ),
-        crate::json_usize_field(
-            "text_handle_rewrite_total_hits",
-            text_handle_rewrite.total_hits(),
-        ),
-    ];
-    fields.extend(crate::json_surface::public_surface_summary_json_fields(
-        &public_surface,
-    ));
-    fields.extend(crate::json_surface::project_plan_json_fields(&plan));
-    fields.push(crate::json_usize_field(
-        "tests_declared",
-        declared_tests.len(),
-    ));
-    fields.push(crate::json_usize_field(
-        "tests_missing",
-        missing_tests.len(),
-    ));
-    fields.push(crate::json_field(
-        "artifact_output_dir",
-        &artifact_output_dir.display().to_string(),
-    ));
-    fields.push(crate::json_bool_field(
-        "artifact_ready_to_run",
-        artifact_report.ready_to_run,
-    ));
-    fields.push(crate::json_field(
-        "artifact_recommended_next_step",
-        &artifact_report.recommended_next_step,
-    ));
-    fields.push(crate::json_field(
-        "artifact_recommended_command",
-        &artifact_report.recommended_command,
-    ));
-    fields.extend(link_plan_json_fields(link_plan.as_ref()));
-    fields.extend(crate::project_workflow_json_fields(
-        &frontdoor,
-        include_galaxy_flow,
-    ));
-    fields.push(crate::json_field(
-        "abi_mode",
-        if plan.abi_resolution.explicit {
-            "explicit"
-        } else {
-            "auto-recommended"
-        },
-    ));
-    fields.extend(crate::json_surface::project_check_summary_json_fields(
-        &abi_checks,
-        &registry_checks,
-        &lowering_checks,
-    ));
-    fields.push(crate::json_field(
-        "galaxy_manifest",
-        &galaxy_manifest_display,
-    ));
+    );
+    append_json_field_strings(
+        &mut out,
+        vec![crate::json_field(
+            "galaxy_manifest",
+            &galaxy_manifest_display,
+        )],
+    );
     match galaxy_check {
         Some(Ok(checked)) => {
-            fields.push(crate::json_field("galaxy_check_status", "ok"));
-            fields.push(crate::json_field(
-                "galaxy_package_kind",
-                &checked.manifest.package_kind,
-            ));
-            fields.push(crate::json_field(
-                "galaxy_framework",
-                checked.manifest.framework.as_deref().unwrap_or("<none>"),
-            ));
-            fields.push(crate::json_usize_field(
-                "galaxy_include_files",
-                checked.include_files.len(),
-            ));
+            append_json_field_strings(
+                &mut out,
+                vec![
+                    crate::json_field("galaxy_check_status", "ok"),
+                    crate::json_field("galaxy_package_kind", &checked.manifest.package_kind),
+                    crate::json_field(
+                        "galaxy_framework",
+                        checked.manifest.framework.as_deref().unwrap_or("<none>"),
+                    ),
+                    crate::json_usize_field("galaxy_include_files", checked.include_files.len()),
+                ],
+            );
         }
         Some(Err(error)) => {
-            fields.push(crate::json_field("galaxy_check_status", "invalid"));
-            fields.push(crate::json_field("galaxy_error", &error));
+            append_json_field_strings(
+                &mut out,
+                vec![
+                    crate::json_field("galaxy_check_status", "invalid"),
+                    crate::json_field("galaxy_error", &error),
+                ],
+            );
         }
         None => {
-            fields.push(crate::json_field("galaxy_check_status", "skipped"));
+            append_json_field_strings(
+                &mut out,
+                vec![crate::json_field("galaxy_check_status", "skipped")],
+            );
         }
     }
-    fields.push(crate::json_field(
-        "galaxy_lock_status",
-        &galaxy_doctor.lock_status,
-    ));
-    fields.push(crate::json_field(
-        "galaxy_lock_path",
-        &galaxy_doctor.lock_path.display().to_string(),
-    ));
+    append_json_field_strings(
+        &mut out,
+        vec![
+            crate::json_field("galaxy_lock_status", &galaxy_doctor.lock_status),
+            crate::json_field(
+                "galaxy_lock_path",
+                &galaxy_doctor.lock_path.display().to_string(),
+            ),
+        ],
+    );
     if let Some(error) = galaxy_doctor.lock_error.as_deref() {
-        fields.push(crate::json_field("galaxy_lock_error", error));
+        append_json_field_strings(
+            &mut out,
+            vec![crate::json_field("galaxy_lock_error", error)],
+        );
     }
-    fields.push(crate::json_field(
-        "galaxy_deps_root",
-        &galaxy_doctor.deps_root.display().to_string(),
-    ));
-    fields.push(crate::json_field(
-        "galaxy_local_registry",
-        &galaxy_doctor.local_registry_root.display().to_string(),
-    ));
-    fields.push(crate::json_usize_field(
-        "galaxy_dependencies_count",
-        galaxy_doctor.dependencies.len(),
-    ));
-    fields.push(crate::json_usize_field(
-        "galaxy_imports_count",
-        project.manifest.galaxy_imports.len(),
-    ));
-    fields.push(crate::json_usize_field(
-        "galaxy_surface_ids_count",
-        galaxy_surface_ids.len(),
-    ));
-    fields.push(crate::json_string_array_field(
-        "galaxy_surface_ids",
-        &galaxy_surface_ids,
-    ));
-    fields.push(crate::json_object_array_field(
-        "galaxy_records",
-        &galaxy_records,
-    ));
-    fields.push(crate::json_string_array_field(
-        "galaxy_imports",
-        &project
-            .manifest
-            .galaxy_imports
-            .iter()
-            .map(|item| format!("{}:{}", item.galaxy, item.library_module))
-            .collect::<Vec<_>>(),
-    ));
-    fields.push(crate::json_usize_field(
-        "galaxy_hidden_manual_only_library_modules_count",
-        hidden_manual_only_library_modules.len(),
-    ));
-    fields.push(crate::json_string_array_field(
-        "galaxy_hidden_manual_only_library_modules",
-        &hidden_manual_only_library_modules,
-    ));
-    fields.push(crate::json_optional_string_field(
-        "ns_nova_profile",
-        nova_profile
-            .as_ref()
-            .map(|profile| profile.path.display().to_string())
-            .as_deref(),
-    ));
-    fields.push(crate::json_optional_string_field(
-        "ns_nova_stdlib_manifest",
-        nova_stdlib
-            .as_ref()
-            .map(|summary| summary.path.display().to_string())
-            .as_deref(),
-    ));
+    append_json_field_strings(
+        &mut out,
+        vec![
+            crate::json_field(
+                "galaxy_deps_root",
+                &galaxy_doctor.deps_root.display().to_string(),
+            ),
+            crate::json_field(
+                "galaxy_local_registry",
+                &galaxy_doctor.local_registry_root.display().to_string(),
+            ),
+            crate::json_usize_field(
+                "galaxy_dependencies_count",
+                galaxy_doctor.dependencies.len(),
+            ),
+            crate::json_usize_field(
+                "galaxy_imports_count",
+                project.manifest.galaxy_imports.len(),
+            ),
+            crate::json_usize_field("galaxy_surface_ids_count", galaxy_surface_ids.len()),
+            crate::json_string_array_field("galaxy_surface_ids", &galaxy_surface_ids),
+            crate::json_object_array_field("galaxy_records", &galaxy_records),
+            crate::json_string_array_field(
+                "galaxy_imports",
+                &project
+                    .manifest
+                    .galaxy_imports
+                    .iter()
+                    .map(|item| format!("{}:{}", item.galaxy, item.library_module))
+                    .collect::<Vec<_>>(),
+            ),
+            crate::json_usize_field(
+                "galaxy_hidden_manual_only_library_modules_count",
+                hidden_manual_only_library_modules.len(),
+            ),
+            crate::json_string_array_field(
+                "galaxy_hidden_manual_only_library_modules",
+                &hidden_manual_only_library_modules,
+            ),
+            crate::json_optional_string_field(
+                "ns_nova_profile",
+                nova_profile
+                    .as_ref()
+                    .map(|profile| profile.path.display().to_string())
+                    .as_deref(),
+            ),
+            crate::json_optional_string_field(
+                "ns_nova_stdlib_manifest",
+                nova_stdlib
+                    .as_ref()
+                    .map(|summary| summary.path.display().to_string())
+                    .as_deref(),
+            ),
+        ],
+    );
     if let Some(error) = lock_error.as_deref() {
-        fields.push(crate::json_field("note", error));
+        append_json_field_strings(&mut out, vec![crate::json_field("note", error)]);
     }
-    fields.push(crate::json_string_array_field("next_steps", &next_steps));
-    fields.push(crate::json_object_array_field("tests", &tests_json));
-    fields.push(crate::json_object_array_field(
-        "public_surface_records",
-        &public_surface_json,
-    ));
-    fields.push(crate::json_object_array_field(
-        "abi_checks",
-        &crate::project_abi_checks_json(&abi_checks),
-    ));
-    fields.push(crate::json_object_array_field(
-        "registry_checks",
-        &crate::project_domain_registry_checks_json(&registry_checks),
-    ));
-    fields.push(crate::json_object_array_field(
-        "lowering_checks",
-        &crate::project_lowering_checks_json(&lowering_checks),
-    ));
-    fields.push(crate::json_object_array_field(
-        "galaxy_dependencies",
-        &dependency_json,
-    ));
-    Ok(format!(
-        "{{{},\"domains\":[{}]}}",
-        fields.join(","),
-        domain_json
-    ))
+    append_json_field_strings(
+        &mut out,
+        vec![
+            crate::json_string_array_field("next_steps", &next_steps),
+            crate::json_object_array_field("tests", &tests_json),
+            crate::json_object_array_field("public_surface_records", &public_surface_json),
+            crate::json_object_array_field(
+                "abi_checks",
+                &crate::project_abi_checks_json(&abi_checks),
+            ),
+            crate::json_object_array_field(
+                "registry_checks",
+                &crate::project_domain_registry_checks_json(&registry_checks),
+            ),
+            crate::json_object_array_field(
+                "lowering_checks",
+                &crate::project_lowering_checks_json(&lowering_checks),
+            ),
+            crate::json_object_array_field("galaxy_dependencies", &dependency_json),
+        ],
+    );
+    out.push_str(",\"domains\":[");
+    out.push_str(&domain_json);
+    out.push_str("]}");
+    Ok(out)
 }

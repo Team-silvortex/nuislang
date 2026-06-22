@@ -1,4 +1,5 @@
 use super::*;
+use std::fs;
 
 #[test]
 fn accepts_local_auxiliary_cpu_units_in_projects() {
@@ -231,6 +232,146 @@ fn renders_project_compilation_plan_index() {
     assert!(rendered.contains("effective_input ./demo.ns"));
     assert!(rendered
         .contains("summary entry=main.ns domains=cpu exchanges=0 abi_mode=auto-recommended"));
+}
+
+#[test]
+fn writes_project_compilation_plan_index_matching_rendered_output() {
+    let mut project = project_with_modules(vec![(
+        "main.ns",
+        r#"
+        mod cpu Main {
+          fn main() -> i64 { return 1; }
+        }
+        "#,
+    )]);
+    project.manifest.name = "demo".to_owned();
+    let plan = build_project_compilation_plan(&project).unwrap();
+
+    let rendered = render_project_compilation_plan_index(&plan);
+    let mut written = String::new();
+    write_project_compilation_plan_index(&mut written, &plan).unwrap();
+
+    assert_eq!(written, rendered);
+}
+
+#[test]
+fn writer_renderers_match_project_index_strings() {
+    let project = test_support::loaded_project_fixture(
+        "render_writer_match",
+        vec![ProjectAbiRequirement {
+            domain: "cpu".to_owned(),
+            abi: "cpu.arm64.apple_aapcs64".to_owned(),
+        }],
+        r#"
+        use cpu Helpers;
+
+        mod cpu Main {
+          extern "c" fn host_clock_now() -> i64;
+
+          fn main() -> i64 {
+            return Helpers.tick() + host_clock_now();
+          }
+        }
+        "#,
+        vec![(
+            "helpers.ns",
+            r#"
+            mod cpu Helpers {
+              fn tick() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )],
+    );
+
+    let rendered_org = render_project_organization_index(&project);
+    let mut written_org = String::new();
+    write_project_organization_index(&mut written_org, &project).unwrap();
+    assert_eq!(written_org, rendered_org);
+
+    let rendered_exchange = render_project_exchange_index(&project);
+    let mut written_exchange = String::new();
+    write_project_exchange_index(&mut written_exchange, &project).unwrap();
+    assert_eq!(written_exchange, rendered_exchange);
+
+    let rendered_imports = render_project_import_index(&project);
+    let mut written_imports = String::new();
+    write_project_import_index(&mut written_imports, &project).unwrap();
+    assert_eq!(written_imports, rendered_imports);
+
+    let rendered_host_ffi = render_project_host_ffi_index(&project);
+    let mut written_host_ffi = String::new();
+    write_project_host_ffi_index(&mut written_host_ffi, &project).unwrap();
+    assert_eq!(written_host_ffi, rendered_host_ffi);
+
+    let rendered_abi = render_project_abi_index(&project).unwrap();
+    let mut written_abi = String::new();
+    write_project_abi_index(&mut written_abi, &project).unwrap();
+    assert_eq!(written_abi, rendered_abi);
+
+    let rendered_packet = crate::project::packet::render_project_packet_index(&project);
+    let mut written_packet = String::new();
+    crate::project::packet::write_project_packet_index(&mut written_packet, &project).unwrap();
+    assert_eq!(written_packet, rendered_packet);
+
+    let rendered_galaxy =
+        crate::stdlib_registry::render_resolved_galaxy_index(&project.resolved_galaxies);
+    let mut written_galaxy = String::new();
+    crate::stdlib_registry::write_resolved_galaxy_index(
+        &mut written_galaxy,
+        &project.resolved_galaxies,
+    )
+    .unwrap();
+    assert_eq!(written_galaxy, rendered_galaxy);
+}
+
+#[test]
+fn write_project_metadata_preserves_modules_and_links_index_output() {
+    let root = test_support::write_temp_project_fixture(
+        "metadata_writer_match",
+        r#"
+name = "metadata_writer_match"
+entry = "main.ns"
+modules = ["main.ns", "helpers.ns"]
+links = [
+  "cpu.Main -> cpu.Helpers",
+]
+"#
+        .trim_start(),
+        r#"
+        use cpu Helpers;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return Helpers.tick();
+          }
+        }
+        "#,
+        vec![(
+            "helpers.ns",
+            r#"
+            mod cpu Helpers {
+              fn tick() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )],
+    );
+    let project = load_project(root.as_path()).unwrap();
+    let plan = build_project_compilation_plan(&project).unwrap();
+    let output_dir = root.join("build");
+
+    let metadata = write_project_metadata(&output_dir, &project, &plan).unwrap();
+    let modules_index = fs::read_to_string(&metadata.modules_index_path).unwrap();
+    let links_index = fs::read_to_string(&metadata.links_index_path).unwrap();
+
+    assert!(modules_index.contains("main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local"));
+    assert!(modules_index
+        .contains("helpers.ns\tmod cpu Helpers\tentry=false\tsource_kind=project-local"));
+    assert_eq!(links_index, "cpu.Main\tcpu.Helpers\t<direct>\n");
+    fs::remove_dir_all(&root).unwrap();
 }
 
 #[test]
