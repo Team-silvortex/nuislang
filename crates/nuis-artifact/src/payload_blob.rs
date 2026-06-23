@@ -313,6 +313,29 @@ impl DomainBuildUnitPayloadBlob {
             sections,
         }
     }
+
+    pub fn section(&self, name: &str) -> Option<&DomainBuildUnitPayloadBlobSection> {
+        self.sections.iter().find(|section| section.name == name)
+    }
+
+    pub fn section_bytes(&self, name: &str) -> Option<&[u8]> {
+        self.section(name).map(|section| section.bytes.as_slice())
+    }
+
+    pub fn section_text(&self, name: &str) -> Option<Result<&str, std::str::Utf8Error>> {
+        self.section_bytes(name).map(std::str::from_utf8)
+    }
+
+    pub fn ir_sidecar_section(&self) -> Option<&DomainBuildUnitPayloadBlobSection> {
+        self.sections
+            .iter()
+            .find(|section| section.name.ends_with("_ir_sidecar"))
+    }
+
+    pub fn ir_sidecar_text(&self) -> Option<Result<&str, std::str::Utf8Error>> {
+        self.ir_sidecar_section()
+            .map(|section| std::str::from_utf8(&section.bytes))
+    }
 }
 
 #[cfg(test)]
@@ -349,5 +372,8 @@ mod tests {
         let encoded = encode_domain_payload_blob(&blob).unwrap();
         let decoded = decode_domain_payload_blob(&encoded).unwrap();
         assert_eq!(decoded, blob);
+        assert_eq!(decoded.section("contract_toml").unwrap().bytes, b"a".to_vec());
+        assert_eq!(decoded.section_text("lowering_plan").unwrap().unwrap(), "b");
+        assert!(decoded.ir_sidecar_section().is_none());
     }
 }

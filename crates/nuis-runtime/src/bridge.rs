@@ -1,12 +1,42 @@
-use nuis_artifact::{BridgeRegistryEntry, BuildManifestDomainBuildUnit, HostBridgePlanEntry};
+use nuis_artifact::{
+    BridgeRegistryEntry, BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob,
+    HostBridgePlanEntry,
+};
 
 use crate::{AdapterRegistry, DomainAdapter, LoadedExecutable, RuntimeError};
 
 pub struct PreparedDomainExecution<'a> {
     pub unit: &'a BuildManifestDomainBuildUnit,
+    pub payload_blob: Option<&'a DomainBuildUnitPayloadBlob>,
     pub adapter: &'a dyn DomainAdapter,
     pub bridge_registry_entry: Option<&'a BridgeRegistryEntry>,
     pub host_bridge_plan_entry: Option<&'a HostBridgePlanEntry>,
+}
+
+impl<'a> PreparedDomainExecution<'a> {
+    pub fn phase_order(&self) -> Option<&[String]> {
+        self.host_bridge_plan_entry
+            .map(|entry| entry.phase_order.as_slice())
+    }
+
+    pub fn lowering_plan_text(&self) -> Option<Result<&str, std::str::Utf8Error>> {
+        self.payload_blob
+            .and_then(|blob| blob.section_text("lowering_plan"))
+    }
+
+    pub fn backend_stub_text(&self) -> Option<Result<&str, std::str::Utf8Error>> {
+        self.payload_blob
+            .and_then(|blob| blob.section_text("backend_stub"))
+    }
+
+    pub fn bridge_plan_text(&self) -> Option<Result<&str, std::str::Utf8Error>> {
+        self.payload_blob
+            .and_then(|blob| blob.section_text("bridge_plan"))
+    }
+
+    pub fn ir_sidecar_text(&self) -> Option<Result<&str, std::str::Utf8Error>> {
+        self.payload_blob.and_then(|blob| blob.ir_sidecar_text())
+    }
 }
 
 #[derive(Debug, Default)]
@@ -26,6 +56,7 @@ impl BridgeExecutor {
             .ok_or_else(|| RuntimeError::new(format!("unknown domain `{domain_family}`")))?;
 
         let adapter = adapters.resolve(unit)?;
+        let payload_blob = executable.payload_blob_for_domain(domain_family);
         let bridge_registry_entry = executable
             .bridge_registry
             .as_ref()
@@ -36,6 +67,11 @@ impl BridgeExecutor {
             .and_then(|index| index.find_by_domain_family(domain_family));
 
         if unit.is_heterogeneous() {
+            if payload_blob.is_none() {
+                return Err(RuntimeError::new(format!(
+                    "missing domain payload blob for heterogeneous domain `{domain_family}`"
+                )));
+            }
             if bridge_registry_entry.is_none() {
                 return Err(RuntimeError::new(format!(
                     "missing bridge registry entry for heterogeneous domain `{domain_family}`"
@@ -50,6 +86,7 @@ impl BridgeExecutor {
 
         Ok(PreparedDomainExecution {
             unit,
+            payload_blob,
             adapter,
             bridge_registry_entry,
             host_bridge_plan_entry,
@@ -61,8 +98,8 @@ impl BridgeExecutor {
 mod tests {
     use nuis_artifact::{
         BridgeRegistry, BridgeRegistryEntry, BuildManifest, BuildManifestDomainBuildUnit,
-        HostBridgePlanEntry, HostBridgePlanIndex, NuisCompiledArtifact, NuisExecutableEnvelope,
-        NuisLifecycleContract,
+        DomainBuildUnitPayloadBlob, HostBridgePlanEntry, HostBridgePlanIndex,
+        NuisCompiledArtifact, NuisExecutableEnvelope, NuisLifecycleContract,
     };
 
     use crate::{AdapterRegistry, DomainAdapter, LoadedExecutable};
@@ -89,6 +126,8 @@ mod tests {
             machine_arch: None,
             machine_os: None,
             backend_family: Some("urlsession".to_owned()),
+            vendor: None,
+            device_class: None,
             selected_lowering_target: Some("urlsession".to_owned()),
             artifact_stub_path: None,
             artifact_stub_inline: None,
@@ -197,6 +236,36 @@ mod tests {
                 domain_build_units: vec![unit.clone()],
             },
             domain_units: vec![unit],
+            domain_payload_blobs: vec![DomainBuildUnitPayloadBlob {
+                domain_family: "network".to_owned(),
+                package_id: "official.network".to_owned(),
+                backend_family: Some("urlsession".to_owned()),
+                vendor: None,
+                device_class: None,
+                selected_lowering_target: Some("urlsession".to_owned()),
+                contract_family: "nustar.network".to_owned(),
+                packaging_role: "hetero-contract".to_owned(),
+                payload_kind: "contract-sidecar".to_owned(),
+                payload_format: "toml".to_owned(),
+                sections: vec![
+                    nuis_artifact::DomainBuildUnitPayloadBlobSection {
+                        name: "lowering_plan".to_owned(),
+                        bytes: b"execution_route = \"foundation-session-reactor\"".to_vec(),
+                    },
+                    nuis_artifact::DomainBuildUnitPayloadBlobSection {
+                        name: "backend_stub".to_owned(),
+                        bytes: b"transport_ir = \"foundation-url-request\"".to_vec(),
+                    },
+                    nuis_artifact::DomainBuildUnitPayloadBlobSection {
+                        name: "bridge_plan".to_owned(),
+                        bytes: b"phase_submit = \"packet-write-dispatch\"".to_vec(),
+                    },
+                    nuis_artifact::DomainBuildUnitPayloadBlobSection {
+                        name: "network_ir_sidecar".to_owned(),
+                        bytes: b"schema = \"nuis-network-ir-sidecar-v1\"".to_vec(),
+                    },
+                ],
+            }],
             bridge_registry: Some(BridgeRegistry {
                 schema: "nuis-bridge-registry-v1".to_owned(),
                 bridge_count: 1,
@@ -243,6 +312,35 @@ mod tests {
             .unwrap();
         assert_eq!(prepared.adapter.adapter_id(), "network-test-adapter");
         assert_eq!(prepared.unit.domain_family, "network");
+        assert_eq!(prepared.payload_blob.unwrap().domain_family, "network");
+        assert_eq!(
+            prepared.phase_order().unwrap(),
+            &[
+                "bind".to_owned(),
+                "submit".to_owned(),
+                "wait".to_owned(),
+                "finalize".to_owned()
+            ]
+        );
+        assert_eq!(
+            prepared
+                .lowering_plan_text()
+                .unwrap()
+                .unwrap(),
+            "execution_route = \"foundation-session-reactor\""
+        );
+        assert_eq!(
+            prepared.backend_stub_text().unwrap().unwrap(),
+            "transport_ir = \"foundation-url-request\""
+        );
+        assert_eq!(
+            prepared.bridge_plan_text().unwrap().unwrap(),
+            "phase_submit = \"packet-write-dispatch\""
+        );
+        assert_eq!(
+            prepared.ir_sidecar_text().unwrap().unwrap(),
+            "schema = \"nuis-network-ir-sidecar-v1\""
+        );
         assert_eq!(
             prepared.bridge_registry_entry.unwrap().backend_family,
             "urlsession"

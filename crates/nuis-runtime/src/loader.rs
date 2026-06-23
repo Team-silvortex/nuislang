@@ -1,9 +1,9 @@
 use std::path::Path;
 
 use nuis_artifact::{
-    parse_bridge_registry, parse_build_manifest_from_source, parse_host_bridge_plan_index,
-    parse_nuis_compiled_artifact, BridgeRegistry, BuildManifest, HostBridgePlanIndex,
-    NuisCompiledArtifact,
+    decode_domain_payload_blob, parse_bridge_registry, parse_build_manifest_from_source,
+    parse_host_bridge_plan_index, parse_nuis_compiled_artifact, BridgeRegistry, BuildManifest,
+    DomainBuildUnitPayloadBlob, HostBridgePlanIndex, NuisCompiledArtifact,
 };
 
 use crate::{LoadedExecutable, RuntimeError};
@@ -27,11 +27,13 @@ impl RuntimeLoader {
         artifact: NuisCompiledArtifact,
     ) -> Result<LoadedExecutable, RuntimeError> {
         let manifest = self.load_embedded_manifest(&artifact)?;
+        let domain_payload_blobs = self.load_domain_payload_blobs(&manifest)?;
         let bridge_registry = self.load_bridge_registry(&manifest)?;
         let host_bridge_plan_index = self.load_host_bridge_plan_index(&manifest)?;
         Ok(LoadedExecutable {
             envelope: artifact.envelope.clone(),
             domain_units: manifest.domain_build_units.clone(),
+            domain_payload_blobs,
             bridge_registry,
             host_bridge_plan_index,
             artifact,
@@ -99,6 +101,85 @@ impl RuntimeLoader {
                 RuntimeError::new(format!("failed to parse host bridge plan index: {error}"))
             })
     }
+
+    fn load_domain_payload_blobs(
+        &self,
+        manifest: &BuildManifest,
+    ) -> Result<Vec<DomainBuildUnitPayloadBlob>, RuntimeError> {
+        let mut blobs = Vec::new();
+        for unit in manifest
+            .domain_build_units
+            .iter()
+            .filter(|unit| unit.is_heterogeneous())
+        {
+            let payload = if let Some(path) = &unit.artifact_payload_blob_path {
+                match std::fs::read(path) {
+                    Ok(bytes) => bytes,
+                    Err(path_error) => {
+                        if let Some(inline) = &unit.artifact_payload_blob_inline {
+                            decode_hex_bytes(inline).map_err(RuntimeError::new)?
+                        } else {
+                            return Err(RuntimeError::new(format!(
+                                "failed to read domain payload blob for `{}` from `{}`: {path_error}",
+                                unit.domain_family, path
+                            )));
+                        }
+                    }
+                }
+            } else if let Some(inline) = &unit.artifact_payload_blob_inline {
+                decode_hex_bytes(inline).map_err(RuntimeError::new)?
+            } else {
+                return Err(RuntimeError::new(format!(
+                    "missing domain payload blob for heterogeneous domain `{}`",
+                    unit.domain_family
+                )));
+            };
+            let blob = decode_domain_payload_blob(&payload).map_err(|error| {
+                RuntimeError::new(format!(
+                    "failed to decode domain payload blob for `{}`: {error}",
+                    unit.domain_family
+                ))
+            })?;
+            if blob.domain_family != unit.domain_family {
+                return Err(RuntimeError::new(format!(
+                    "domain payload blob family mismatch for `{}`: blob reports `{}`",
+                    unit.domain_family, blob.domain_family
+                )));
+            }
+            if blob.package_id != unit.package_id {
+                return Err(RuntimeError::new(format!(
+                    "domain payload blob package mismatch for `{}`: blob reports `{}`",
+                    unit.domain_family, blob.package_id
+                )));
+            }
+            if blob.selected_lowering_target != unit.selected_lowering_target {
+                return Err(RuntimeError::new(format!(
+                    "domain payload blob lowering target mismatch for `{}`",
+                    unit.domain_family
+                )));
+            }
+            blobs.push(blob);
+        }
+        Ok(blobs)
+    }
+}
+
+fn decode_hex_bytes(value: &str) -> Result<Vec<u8>, String> {
+    if value.len() % 2 != 0 {
+        return Err("hex payload length must be even".to_owned());
+    }
+    let mut out = Vec::with_capacity(value.len() / 2);
+    let bytes = value.as_bytes();
+    let mut index = 0usize;
+    while index < bytes.len() {
+        let chunk = std::str::from_utf8(&bytes[index..index + 2])
+            .map_err(|_| "hex payload is not valid UTF-8".to_owned())?;
+        let byte = u8::from_str_radix(chunk, 16)
+            .map_err(|_| format!("invalid hex byte `{chunk}`"))?;
+        out.push(byte);
+        index += 2;
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -108,7 +189,10 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use nuis_artifact::{NuisCompiledArtifact, NuisExecutableEnvelope, NuisLifecycleContract};
+    use nuis_artifact::{
+        encode_domain_payload_blob, DomainBuildUnitPayloadBlob, DomainBuildUnitPayloadBlobSection,
+        NuisCompiledArtifact, NuisExecutableEnvelope, NuisLifecycleContract,
+    };
 
     use super::RuntimeLoader;
 
@@ -214,6 +298,7 @@ packaging_role = "host-binary"
         assert_eq!(loaded.envelope, envelope);
         assert_eq!(loaded.manifest.schema, "nuis-build-manifest-v1");
         assert_eq!(loaded.domain_units.len(), 1);
+        assert_eq!(loaded.domain_payload_blobs.len(), 0);
         assert_eq!(loaded.bridge_registry, None);
         assert_eq!(loaded.host_bridge_plan_index, None);
         assert_eq!(loaded.domain_units[0].domain_family, "cpu");
@@ -253,6 +338,38 @@ scheduler_binding = "network-poll-bridge"
 phase_order = ["bind", "submit", "wait", "finalize"]
 plan_inline = "bridge_kind = \"managed-lifecycle-bridge\""
 "#;
+        let payload_blob = DomainBuildUnitPayloadBlob {
+            domain_family: "network".to_owned(),
+            package_id: "official.network".to_owned(),
+            backend_family: Some("urlsession".to_owned()),
+            vendor: Some("apple".to_owned()),
+            device_class: Some("socket-io".to_owned()),
+            selected_lowering_target: Some("urlsession".to_owned()),
+            contract_family: "nustar.network".to_owned(),
+            packaging_role: "hetero-contract".to_owned(),
+            payload_kind: "contract-sidecar".to_owned(),
+            payload_format: "toml".to_owned(),
+            sections: vec![
+                DomainBuildUnitPayloadBlobSection {
+                    name: "contract_toml".to_owned(),
+                    bytes: br#"schema = "nuis-domain-build-payload-v1""#.to_vec(),
+                },
+                DomainBuildUnitPayloadBlobSection {
+                    name: "lowering_plan".to_owned(),
+                    bytes: b"lowering".to_vec(),
+                },
+                DomainBuildUnitPayloadBlobSection {
+                    name: "backend_stub".to_owned(),
+                    bytes: b"backend".to_vec(),
+                },
+                DomainBuildUnitPayloadBlobSection {
+                    name: "bridge_plan".to_owned(),
+                    bytes: b"bridge".to_vec(),
+                },
+            ],
+        };
+        let payload_blob_hex =
+            hex_encode_bytes(&encode_domain_payload_blob(&payload_blob).unwrap());
         let manifest = format!(
             r#"manifest_schema = "nuis-build-manifest-v1"
 input = "/tmp/demo.ns"
@@ -320,6 +437,7 @@ backend_family = "urlsession"
 selected_lowering_target = "urlsession"
 artifact_bridge_stub_path = "/tmp/network.bridge.stub.txt"
 artifact_payload_blob_path = "/tmp/network.payload.bin"
+artifact_payload_blob_inline = "{payload_blob_hex}"
 contract_family = "nustar.network"
 packaging_role = "hetero-contract"
 "#,
@@ -332,6 +450,7 @@ packaging_role = "hetero-contract"
                 .replace('\\', "\\\\")
                 .replace('"', "\\\"")
                 .replace('\n', "\\n"),
+            payload_blob_hex = payload_blob_hex,
         );
         let envelope = NuisExecutableEnvelope {
             schema: "nuis-executable-envelope-v1".to_owned(),
@@ -373,6 +492,15 @@ packaging_role = "hetero-contract"
             .load_from_compiled_artifact(artifact)
             .expect("runtime loader should load bridge metadata");
         assert_eq!(loaded.domain_units.len(), 2);
+        assert_eq!(loaded.domain_payload_blobs.len(), 1);
+        assert_eq!(
+            loaded
+                .payload_blob_for_domain("network")
+                .unwrap()
+                .backend_family
+                .as_deref(),
+            Some("urlsession")
+        );
         assert_eq!(
             loaded
                 .bridge_registry
@@ -399,5 +527,14 @@ packaging_role = "hetero-contract"
                 "finalize".to_owned()
             ]
         );
+    }
+
+    fn hex_encode_bytes(bytes: &[u8]) -> String {
+        let mut out = String::with_capacity(bytes.len() * 2);
+        for byte in bytes {
+            use std::fmt::Write as _;
+            let _ = write!(&mut out, "{byte:02x}");
+        }
+        out
     }
 }

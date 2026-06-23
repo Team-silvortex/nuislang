@@ -524,6 +524,21 @@ fn materialize_domain_unit_support(
             })?;
             written.push(path);
         }
+        if let Some(ir_sidecar_section) = decoded
+            .sections
+            .iter()
+            .find(|section| section.name.ends_with("_ir_sidecar"))
+        {
+            let path = materialized_support_path(
+                output_dir,
+                unit.artifact_ir_sidecar_path.as_deref(),
+                &format!("nuis.domain.{}.lowering.ir.txt", unit.domain_family),
+            );
+            fs::write(&path, &ir_sidecar_section.bytes).map_err(|error| {
+                ArtifactError::new(format!("failed to write `{}`: {error}", path.display()))
+            })?;
+            written.push(path);
+        }
     }
 
     if let Some(source) = &unit.artifact_bridge_stub_inline {
@@ -538,6 +553,16 @@ fn materialize_domain_unit_support(
     }
 
     Ok(())
+}
+
+fn materialized_support_path(output_dir: &Path, original: Option<&str>, fallback_name: &str) -> PathBuf {
+    if let Some(original) = original {
+        let candidate = Path::new(original);
+        if let Some(file_name) = candidate.file_name() {
+            return output_dir.join(file_name);
+        }
+    }
+    output_dir.join(fallback_name)
 }
 
 fn decode_hex_bytes(value: &str) -> Result<Vec<u8>, ArtifactError> {
@@ -621,6 +646,10 @@ mod tests {
                     name: "bridge_plan".to_owned(),
                     bytes: b"bridge-plan".to_vec(),
                 },
+                DomainBuildUnitPayloadBlobSection {
+                    name: "network_ir_sidecar".to_owned(),
+                    bytes: b"schema = \"nuis-network-ir-sidecar-v1\"".to_vec(),
+                },
             ],
         };
         let encoded_blob = encode_domain_payload_blob(&blob).unwrap();
@@ -693,6 +722,7 @@ artifact_stub_path = "/tmp/out/nuis.domain.network.artifact.toml"
 artifact_stub_inline = "schema = \"nuis-domain-build-unit-v1\""
 artifact_payload_path = "/tmp/out/nuis.domain.network.payload.toml"
 artifact_bridge_stub_path = "/tmp/out/nuis.domain.network.bridge.stub.txt"
+artifact_ir_sidecar_path = "/tmp/out/nuis.domain.network.lowering.ir.txt"
 artifact_bridge_stub_inline = "schema = \"nuis-host-bridge-spec-v1\""
 artifact_payload_blob_path = "/tmp/out/nuis.domain.network.payload.bin"
 artifact_payload_blob_bytes = {blob_bytes}
@@ -760,6 +790,9 @@ packaging_role = "hetero-contract"
         assert!(written
             .iter()
             .any(|path| path.ends_with("nuis.domain.network.bridge.stub.txt")));
+        assert!(written
+            .iter()
+            .any(|path| path.ends_with("nuis.domain.network.lowering.ir.txt")));
         assert_eq!(
             fs::read(out.join("nuis.domain.network.payload.bin")).unwrap(),
             encoded_blob
@@ -771,6 +804,10 @@ packaging_role = "hetero-contract"
         assert_eq!(
             fs::read_to_string(out.join("nuis.domain.network.bridge.stub.txt")).unwrap(),
             r#"schema = "nuis-host-bridge-spec-v1""#
+        );
+        assert_eq!(
+            fs::read_to_string(out.join("nuis.domain.network.lowering.ir.txt")).unwrap(),
+            r#"schema = "nuis-network-ir-sidecar-v1""#
         );
     }
 }

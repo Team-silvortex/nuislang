@@ -1,10 +1,37 @@
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
-use crate::RuntimeError;
+use crate::{
+    ExecutionPhaseAction, ExecutionPhaseContext, ExecutionPhaseOutcome, RuntimeError,
+};
 
 pub trait DomainAdapter: Send + Sync {
     fn adapter_id(&self) -> &'static str;
     fn supports(&self, unit: &BuildManifestDomainBuildUnit) -> bool;
+
+    fn phase_hint(&self, _ctx: &ExecutionPhaseContext<'_>) -> Option<String> {
+        None
+    }
+
+    fn phase_action(&self, ctx: &ExecutionPhaseContext<'_>) -> Option<ExecutionPhaseAction> {
+        self.phase_hint(ctx).map(|hint| ExecutionPhaseAction {
+            kind: format!("phase.{}", ctx.phase),
+            input_handles: Vec::new(),
+            resolved_inputs: Vec::new(),
+            output_handles: Vec::new(),
+            resource_bindings: Vec::new(),
+            resolved_resources: Vec::new(),
+            scheduler_keys: vec![ctx.scheduler_binding.to_owned(), ctx.phase.to_owned()],
+            adapter_hint: Some(hint),
+        })
+    }
+
+    fn phase_outcome(
+        &self,
+        _ctx: &ExecutionPhaseContext<'_>,
+        _action: &ExecutionPhaseAction,
+    ) -> Option<ExecutionPhaseOutcome> {
+        None
+    }
 }
 
 #[derive(Default)]
@@ -72,6 +99,8 @@ mod tests {
             machine_arch: None,
             machine_os: None,
             backend_family: Some("urlsession".to_owned()),
+            vendor: None,
+            device_class: None,
             selected_lowering_target: Some("urlsession".to_owned()),
             artifact_stub_path: None,
             artifact_stub_inline: None,

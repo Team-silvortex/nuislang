@@ -1,6 +1,6 @@
 use nuis_artifact::{
-    BridgeRegistry, BuildManifest, BuildManifestDomainBuildUnit, HostBridgePlanIndex,
-    NuisCompiledArtifact, NuisExecutableEnvelope,
+    BridgeRegistry, BuildManifest, BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob,
+    HostBridgePlanIndex, NuisCompiledArtifact, NuisExecutableEnvelope,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,6 +9,7 @@ pub struct LoadedExecutable {
     pub envelope: NuisExecutableEnvelope,
     pub manifest: BuildManifest,
     pub domain_units: Vec<BuildManifestDomainBuildUnit>,
+    pub domain_payload_blobs: Vec<DomainBuildUnitPayloadBlob>,
     pub bridge_registry: Option<BridgeRegistry>,
     pub host_bridge_plan_index: Option<HostBridgePlanIndex>,
 }
@@ -18,5 +19,11 @@ impl LoadedExecutable {
         self.domain_units
             .iter()
             .filter(|unit| unit.is_heterogeneous())
+    }
+
+    pub fn payload_blob_for_domain(&self, domain_family: &str) -> Option<&DomainBuildUnitPayloadBlob> {
+        self.domain_payload_blobs
+            .iter()
+            .find(|blob| blob.domain_family == domain_family)
     }
 }
