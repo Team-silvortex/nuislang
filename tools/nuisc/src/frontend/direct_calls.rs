@@ -4,7 +4,7 @@ use nuis_semantics::model::{AstExpr, NirBinaryOp, NirExpr, NirStructDef, NirType
 
 use super::call_helpers::{ensure_call_arg_matches_param, lower_extern_call_arg_for_param};
 use super::{
-    ensure_ref_like, i64_type, lower_expr, lower_nested_expr_with_async, ref_type,
+    ensure_ref_like, i32_type, i64_type, lower_expr, lower_nested_expr_with_async, ref_type,
     FunctionSignature, ModuleConstValue,
 };
 
@@ -1292,6 +1292,14 @@ fn lower_named_call(
             .zip(signature.params.iter())
             .map(|(arg, expected_param)| lower_extern_call_arg_for_param(arg, expected_param))
             .collect();
+        if signature.return_type.as_ref() == Some(&i32_type()) {
+            return Ok(Some(NirExpr::CpuExternCallI32 {
+                abi: signature.abi.clone(),
+                interface: None,
+                callee: signature.symbol_name.clone(),
+                args: lowered_args,
+            }));
+        }
         return Ok(Some(NirExpr::CpuExternCall {
             abi: signature.abi.clone(),
             interface: None,

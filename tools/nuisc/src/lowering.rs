@@ -249,7 +249,8 @@ fn lower_expr(
         | NirExpr::CpuMutexValue(_)
         | NirExpr::CpuTimeout { .. }
         | NirExpr::CpuPresentFrame(_)
-        | NirExpr::CpuExternCall { .. } => lower_cpu_expr(expr, state, bindings)
+        | NirExpr::CpuExternCall { .. }
+        | NirExpr::CpuExternCallI32 { .. } => lower_cpu_expr(expr, state, bindings)
             .expect("cpu expr family must be handled by lower_cpu_expr"),
         NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }

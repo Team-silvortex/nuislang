@@ -1779,6 +1779,12 @@ pub enum NirExpr {
         callee: String,
         args: Vec<NirExpr>,
     },
+    CpuExternCallI32 {
+        abi: String,
+        interface: Option<String>,
+        callee: String,
+        args: Vec<NirExpr>,
+    },
     HostBufferHandle(Box<NirExpr>),
     CastI64ToI32(Box<NirExpr>),
     CastI32ToI64(Box<NirExpr>),
@@ -2325,6 +2331,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::DataProfileSendUplink { .. }
         | NirExpr::DataProfileSendDownlink { .. }
         | NirExpr::CpuExternCall { .. }
+        | NirExpr::CpuExternCallI32 { .. }
         | NirExpr::Free(_) => NirExprEffectClass::Stateful,
     }
 }
@@ -2685,6 +2692,15 @@ mod tests {
                 abi: "c".to_owned(),
                 interface: None,
                 callee: "host_side_effect".to_owned(),
+                args: vec![],
+            }),
+            NirExprEffectClass::Stateful
+        );
+        assert_eq!(
+            nir_expr_effect_class(&NirExpr::CpuExternCallI32 {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_i32_side_effect".to_owned(),
                 args: vec![],
             }),
             NirExprEffectClass::Stateful

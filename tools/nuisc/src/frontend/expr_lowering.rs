@@ -7,8 +7,8 @@ use super::name_suggestions::suggest_similar_name;
 use super::unary_lowering::lower_unary_expr_with_async;
 use super::validation_helpers::render_type_name;
 use super::{
-    infer_nir_expr_type, instantiate_struct_field_type, lower_call_expr_with_async, named_type,
-    resolve_declared_or_inferred, struct_field_type, AstExpr, FunctionSignature, NirExpr,
+    i32_type, infer_nir_expr_type, instantiate_struct_field_type, lower_call_expr_with_async,
+    named_type, resolve_declared_or_inferred, struct_field_type, AstExpr, FunctionSignature, NirExpr,
     NirStructDef, NirTypeRef,
 };
 
@@ -276,6 +276,14 @@ pub(super) fn lower_expr_with_async(
                                 lower_extern_call_arg_for_param(arg, expected_param)
                             })
                             .collect();
+                        if signature.return_type.as_ref() == Some(&i32_type()) {
+                            return Ok(NirExpr::CpuExternCallI32 {
+                                abi: signature.abi.clone(),
+                                interface: signature.interface.clone(),
+                                callee: signature.symbol_name.clone(),
+                                args: lowered_args,
+                            });
+                        }
                         return Ok(NirExpr::CpuExternCall {
                             abi: signature.abi.clone(),
                             interface: signature.interface.clone(),

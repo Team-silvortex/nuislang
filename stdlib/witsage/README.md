@@ -32,6 +32,10 @@ Current source-asset status:
   [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/module.toml)
 * the first auto-injectable helper surface is
   [lib/ml_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/lib/ml_contracts.ns)
+* `WitSage` now also exposes a kernel-facing auto-injectable surface through
+  [lib/kernel_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/lib/kernel_surface.ns),
+  giving projects a stdlib-owned `WitSageKernelSurface` profile instead of
+  requiring every example to carry a local `KernelUnit`
 * the first canonical source assets are
   [core/dataset_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/dataset_recipe.ns),
   [core/feature_stats_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/feature_stats_recipe.ns),
@@ -53,7 +57,11 @@ Current first responsibility:
 * establish simple classical model-plan contracts
 * establish first classification evaluation contracts
 * establish a kernel-facing plan shape without coupling WitSage to one backend
+* establish compact classifier/kernel pipeline helper scores for usable
+  source-level examples
 * give examples a stable `WitSageContracts` module for `galaxy = ["witsage=workspace"]`
+* give kernel-backed examples a stable `WitSageKernelSurface` module for
+  `galaxy = ["witsage=workspace"]`
 
 Current official surface registry:
 

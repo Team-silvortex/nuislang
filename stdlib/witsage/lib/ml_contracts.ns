@@ -149,6 +149,44 @@ mod cpu WitSageContracts {
     return eval_kind + sample_count + primary_metric_seed + secondary_metric_seed;
   }
 
+  /// Produces a compact classical classifier pipeline score.
+  pub fn classifier_pipeline_total(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    train_rows: i64,
+    test_rows: i64,
+    preprocessing_kind: i64,
+    model_kind: i64,
+    metric_seed: i64
+  ) -> i64 {
+    let shape: i64 =
+      dataset_shape_total(dataset_handle, rows, columns, 1, labeled_dense_dataset_kind());
+    let prep: i64 =
+      preprocessing_total(dataset_handle, rows, columns, preprocessing_kind, metric_seed);
+    let split: i64 = train_test_split_total(dataset_handle, rows, train_rows, test_rows, 17);
+    let model: i64 = model_kind + columns + metric_seed + 1;
+    let eval: i64 =
+      evaluation_total(classification_eval_kind(), test_rows, metric_seed, model_kind);
+    return shape + prep + split + model + eval;
+  }
+
+  /// Produces a compact kernel-backed WitSage execution score.
+  pub fn kernel_pipeline_total(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    model_kind: i64,
+    plan_kind: i64,
+    work_items: i64,
+    feature_seed: i64
+  ) -> i64 {
+    let stats: i64 = feature_stats_total(dataset_handle, rows, columns, feature_seed, work_items);
+    let plan: i64 =
+      kernel_plan_total(dataset_handle, rows, columns, model_kind, plan_kind, work_items);
+    return stats + plan + feature_seed;
+  }
+
   /// Produces a compact kernel dispatch score for model plans.
   pub fn kernel_plan_total(
     dataset_handle: i64,

@@ -1,5 +1,5 @@
 use cpu WitSageContracts;
-use kernel KernelUnit;
+use kernel WitSageKernelSurface;
 
 mod cpu Main {
   fn main() {
@@ -11,28 +11,19 @@ mod cpu Main {
     let first_feature: i64 = kernel_element_at(top_features, 0, 0);
     let second_feature: i64 = kernel_element_at(top_features, 0, 1);
 
-    let dataset_score: i64 =
-      WitSageContracts.dataset_shape_total(
-        6201,
-        2,
-        4,
-        1,
-        WitSageContracts.labeled_dense_dataset_kind()
-      );
-    let stats_score: i64 =
-      WitSageContracts.feature_stats_total(6201, 2, 4, first_feature, second_feature);
     let model_score: i64 =
       WitSageContracts.linear_score_total(4, first_feature, 1, 1);
     let kernel_score: i64 =
-      WitSageContracts.kernel_plan_total(
+      WitSageContracts.kernel_pipeline_total(
         6201,
         2,
         4,
         WitSageContracts.linear_model_kind(),
         WitSageContracts.kernel_reduce_plan_kind(),
-        8
+        8,
+        second_feature
       );
 
-    print(dataset_score + stats_score + model_score + kernel_score);
+    print(model_score + kernel_score);
   }
 }

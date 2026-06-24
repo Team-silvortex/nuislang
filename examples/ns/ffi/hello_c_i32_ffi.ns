@@ -1,0 +1,9 @@
+mod cpu Main {
+  extern "c" fn host_speed_curve(value: i32) -> i32;
+
+  fn main() -> i32 {
+    let base: i32 = i32_from_i64(7);
+    let curved: i32 = host_speed_curve(base);
+    return curved;
+  }
+}

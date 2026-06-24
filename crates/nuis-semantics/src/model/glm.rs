@@ -20,6 +20,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::Await(_)
         | NirExpr::Instantiate { .. }
         | NirExpr::Call { .. }
+        | NirExpr::CpuExternCallI32 { .. }
         | NirExpr::MethodCall { .. }
         | NirExpr::StructLiteral { .. }
         | NirExpr::FieldAccess { .. }

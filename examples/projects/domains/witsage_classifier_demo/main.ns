@@ -1,5 +1,5 @@
 use cpu WitSageContracts;
-use kernel KernelUnit;
+use kernel WitSageKernelSurface;
 
 mod cpu Main {
   fn main() {
@@ -13,18 +13,17 @@ mod cpu Main {
     let predicted = kernel_argmax_axis(logits, "rows");
     let predicted_class: i64 = kernel_element_at(predicted, 0, 1);
 
-    let preprocessing_score: i64 =
-      WitSageContracts.preprocessing_total(
+    let pipeline_score: i64 =
+      WitSageContracts.classifier_pipeline_total(
         6401,
-        2,
+        160,
         3,
+        128,
+        32,
         WitSageContracts.zscore_normalization_kind(),
-        12
+        WitSageContracts.linear_model_kind(),
+        predicted_class
       );
-    let split_score: i64 =
-      WitSageContracts.train_test_split_total(6401, 160, 128, 32, 17);
-    let model_score: i64 =
-      WitSageContracts.linear_score_total(3, predicted_class, 2, 1);
     let matrix_score: i64 =
       WitSageContracts.confusion_matrix_total(71, 83, 5, 1);
     let eval_score: i64 =
@@ -35,6 +34,6 @@ mod cpu Main {
         predicted_class
       );
 
-    print(preprocessing_score + split_score + model_score + eval_score);
+    print(pipeline_score + eval_score);
   }
 }

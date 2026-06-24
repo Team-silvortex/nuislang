@@ -1275,11 +1275,11 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::effect(Vec::new()))
             }
-            "extern_call_i64" => {
+            "extern_call_i64" | "extern_call_i32" => {
                 if node.op.args.len() < 2 {
                     return Err(format!(
-                        "node `{}` expects `cpu.extern_call_i64 <name> <resource> <abi> <symbol> [args...]`",
-                        node.name
+                        "node `{}` expects `cpu.{} <name> <resource> <abi> <symbol> [args...]`",
+                        node.name, node.op.instruction
                     ));
                 }
                 Ok(InstructionSemantics::effect(node.op.args[2..].to_vec()))
@@ -3297,6 +3297,36 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Int(value))
             }
+            "extern_call_i32" => {
+                let abi = &node.op.args[0];
+                let symbol = &node.op.args[1];
+                let args = node.op.args[2..]
+                    .iter()
+                    .map(|arg| state.expect_int(arg))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let value = execute_extern_i32(abi, symbol, &args).map_err(|message| {
+                    format!(
+                        "node `{}` extern call `{symbol}` failed: {message}",
+                        node.name
+                    )
+                })?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.extern_call_i32 @{} [{}] {}::{}({}) -> {}",
+                        node.resource,
+                        resource.kind.raw,
+                        abi,
+                        symbol,
+                        args.iter()
+                            .map(|value| value.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        value
+                    ),
+                );
+                Ok(Value::I32(value))
+            }
             "input_i64" => {
                 let channel = &node.op.args[0];
                 let default_value = node.op.args[1].parse::<i64>().map_err(|_| {
@@ -4018,6 +4048,11 @@ fn execute_extern_i64(abi: &str, symbol: &str, args: &[i64]) -> Result<i64, Stri
         }
         _ => Err("unknown extern symbol".to_owned()),
     }
+}
+
+fn execute_extern_i32(abi: &str, symbol: &str, args: &[i64]) -> Result<i32, String> {
+    let value = execute_extern_i64(abi, symbol, args)?;
+    Ok(value as i32)
 }
 
 #[cfg(test)]

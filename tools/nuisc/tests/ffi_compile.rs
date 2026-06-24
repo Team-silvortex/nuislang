@@ -9,6 +9,21 @@ fn compiled_source(path: &str) {
 fn compiles_host_bridge_ffi_frontdoor_sources() {
     compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_ffi.ns");
     compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_ffi.ns");
+    compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_i32_ffi.ns");
+}
+
+#[test]
+fn lowers_i32_ffi_frontdoor_source_to_i32_extern_call() {
+    let artifacts = nuisc::pipeline::compile_source_path(Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_i32_ffi.ns",
+    ))
+    .unwrap_or_else(|error| panic!("i32 ffi source should compile: {error}"));
+
+    assert!(artifacts
+        .yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "extern_call_i32"));
 }
 
 #[test]

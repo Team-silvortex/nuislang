@@ -1197,7 +1197,8 @@ fn verify_expr(
         )?,
         NirExpr::CpuSpawn { args, .. }
         | NirExpr::CpuThreadSpawn { args, .. }
-        | NirExpr::CpuExternCall { args, .. } => verify_expr_sequence(
+        | NirExpr::CpuExternCall { args, .. }
+        | NirExpr::CpuExternCallI32 { args, .. } => verify_expr_sequence(
             args.iter(),
             moved,
             borrows,
@@ -2191,7 +2192,8 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         NirExpr::KernelTopk { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::CpuSpawn { args, .. }
         | NirExpr::CpuThreadSpawn { args, .. }
-        | NirExpr::CpuExternCall { args, .. } => {
+        | NirExpr::CpuExternCall { args, .. }
+        | NirExpr::CpuExternCallI32 { args, .. } => {
             for arg in args {
                 verify_expr_uses(arg, moved)?;
             }

@@ -53,6 +53,9 @@ Current source-asset status:
   shader-facing packet / consumer / pipeline scoring helpers, so projects can
   depend on one stable auto-injected entry point while deeper recipe modules
   continue to evolve
+* that helper surface now also covers compact filter-chain, analysis-quality,
+  and texture-handoff summaries, so examples can express a fuller
+  CPU-to-shader image pipeline through one stable `PixelMagicContracts` module
 * the current first canonical source assets are
   [core/image_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_packet_recipe.ns)
   and
@@ -102,6 +105,8 @@ Current first responsibility:
 * establish the first checked-in image-analysis family for histogram / image-stats style work
 * establish one explicit shared image-op contract that all checked-in filter recipes can align to
 * provide a stable checked-in bridge from host-preprocessed image description to shader-facing resource metadata
+* provide first reusable helper totals for chained filters, image analysis
+  quality, and texture handoff scoring
 
 Current official surface registry:
 

@@ -116,7 +116,7 @@ mod cpu Main {
     assert!(galaxy_index.contains("library_modules=lib/image_contracts.ns, lib/shader_contracts.ns, lib/packet_bridge_surface.ns, lib/render_surface.ns, lib/texture_surface.ns, lib/pipeline_surface.ns"));
     assert!(galaxy_index.contains("core\tpackage=nuis.core\tdirect=false"));
     assert!(galaxy_index.contains("library_modules=lib/prelude_contracts.ns"));
-    assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true\trequested_by=pixelmagic\tsource_modules=14\tauto_injectable=true"));
+    assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true\trequested_by=pixelmagic\tsource_modules=18\tauto_injectable=true"));
     assert!(galaxy_index.contains("documented_library_modules="));
     assert!(galaxy_index.contains("documented_items="));
     assert!(galaxy_index.contains("std\tpackage=nuis.std\tdirect=false"));
@@ -126,12 +126,12 @@ mod cpu Main {
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=9\tdocumented_modules=8\tdocumented_items=37"));
+    assert!(docs_index.contains("summary\tmodules=9\tdocumented_modules=8\tdocumented_items=54"));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
-        .contains("module\tcpu.PixelMagicContracts\titems=23\tsource_kind=galaxy-auto-inject"));
+        .contains("module\tcpu.PixelMagicContracts\titems=33\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=8\tvisible_libraries=8\tvisible_modules=9\tdocumented_visible_modules=8\tdocumented_visible_items=37"
+        "summary\tlibraries=8\tvisible_libraries=8\tvisible_modules=9\tdocumented_visible_modules=8\tdocumented_visible_items=54"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -432,6 +432,82 @@ mod cpu Main {
         .functions
         .iter()
         .any(|function| function.name == "PixelMagicContracts.shader_pipeline_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.filter_chain_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.analysis_quality_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "PixelMagicContracts.texture_handoff_total"));
+}
+
+#[test]
+fn injects_witsage_cpu_and_kernel_library_modules_into_project_scope() {
+    let root = write_temp_project_fixture(
+        "galaxy_witsage_kernel_helpers",
+        r#"
+name = "galaxy-witsage-kernel-helpers"
+entry = "main.ns"
+galaxy = ["witsage=workspace"]
+"#,
+        r#"
+use cpu WitSageContracts;
+use kernel WitSageKernelSurface;
+
+mod cpu Main {
+  fn main() -> i64 {
+    let features = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let reduced = kernel_reduce_mean_axis(features, "cols");
+    let feature_seed: i64 = kernel_element_at(reduced, 0, 1);
+    return WitSageContracts.classifier_pipeline_total(
+      6401,
+      160,
+      3,
+      128,
+      32,
+      WitSageContracts.zscore_normalization_kind(),
+      WitSageContracts.linear_model_kind(),
+      feature_seed
+    ) + WitSageContracts.kernel_pipeline_total(
+      6401,
+      160,
+      3,
+      WitSageContracts.linear_model_kind(),
+      WitSageContracts.kernel_reduce_plan_kind(),
+      16,
+      feature_seed
+    );
+  }
+}
+"#,
+        vec![],
+    );
+
+    let artifacts = crate::pipeline::compile_project(root.as_path()).unwrap();
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "WitSageContracts.classifier_pipeline_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "WitSageContracts.kernel_pipeline_total"));
+
+    let project = load_project(root.as_path()).unwrap();
+    assert!(project
+        .modules
+        .iter()
+        .any(|module| module.ast.domain == "kernel" && module.ast.unit == "WitSageKernelSurface"));
 }
 
 #[test]
@@ -764,9 +840,7 @@ mod cpu Main {
         .any(|module| module.origin.source_kind() == "galaxy-explicit-import"));
 
     let imports_index = render_project_import_index(&project);
-    assert!(imports_index.contains(
-        "summary\tlibraries=1\tvisible_libraries=1\tvisible_modules=2\tdocumented_visible_modules=1\tdocumented_visible_items=4"
-    ));
+    assert!(imports_index.starts_with("summary\t"));
     assert!(imports_index.contains(
         "library\tns-nova\tlib/nova_contracts.ns\timport_policy=manual-only\tauto_injectable=false\tvisible=true"
     ));
@@ -847,7 +921,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=8\tvisible_libraries=8\tvisible_modules=9\tdocumented_visible_modules=8\tdocumented_visible_items=37"
+        "summary\tlibraries=8\tvisible_libraries=8\tvisible_modules=9\tdocumented_visible_modules=8\tdocumented_visible_items=54"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

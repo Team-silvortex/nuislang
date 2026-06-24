@@ -1215,6 +1215,24 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        NirExpr::CpuExternCallI32 {
+            abi,
+            interface,
+            callee,
+            args,
+        } => format!(
+            "extern_i32 \"{}\" {}{}({})",
+            abi,
+            interface
+                .as_ref()
+                .map(|name| format!("{name}::"))
+                .unwrap_or_default(),
+            callee,
+            args.iter()
+                .map(render_nir_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         NirExpr::ShaderTarget {
             format,
             width,

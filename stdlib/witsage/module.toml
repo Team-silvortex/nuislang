@@ -15,7 +15,8 @@ surfaces = [
 ]
 
 library_modules = [
-  "lib/ml_contracts.ns"
+  "lib/ml_contracts.ns",
+  "lib/kernel_surface.ns"
 ]
 
 library_import_policy = "project-auto"

@@ -5,6 +5,7 @@ This folder contains source-level CPU host-bridge examples.
 Use it for:
 
 * narrow `extern "c"` and `extern "nurs"` host facade shapes
+* scalar host ABI width probes, currently `i64` and `i32`
 * std-owned `@host_symbol("...")` logical host bridge declarations
 * source-level mirrors of current `std` host/runtime recipes
 * small focused probes before moving to project-form examples
@@ -35,6 +36,7 @@ Host bridge ladder:
 
 * [hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_ffi.ns)
 * [hello_c_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_ffi.ns)
+* [hello_c_i32_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_i32_ffi.ns)
 
 Task/runtime ladder:
 

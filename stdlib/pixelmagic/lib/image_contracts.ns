@@ -136,6 +136,39 @@ mod cpu PixelMagicContracts {
       + channel_pick;
   }
 
+  /// Produces a compact score for a chained filter pass.
+  pub fn filter_chain_total(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    first_op_kind: i64,
+    second_op_kind: i64,
+    first_amount: i64,
+    second_amount: i64
+  ) -> i64 {
+    let first_pass: i64 =
+      filter_packet_total(source_handle, width, height, first_op_kind, first_amount);
+    let second_pass: i64 =
+      filter_packet_total(source_handle, width, height, second_op_kind, second_amount);
+    return first_pass + second_pass + width + height;
+  }
+
+  /// Produces a compact quality score for analysis-oriented image passes.
+  pub fn analysis_quality_total(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    bins: i64,
+    sample_stride: i64,
+    channel_pick: i64
+  ) -> i64 {
+    let histogram: i64 =
+      analysis_packet_total(source_handle, width, height, histogram_op_kind(), bins, channel_pick);
+    let stats: i64 =
+      analysis_packet_total(source_handle, width, height, image_stats_op_kind(), sample_stride, channel_pick);
+    return histogram + stats + bins + sample_stride;
+  }
+
   /// Produces a compact residency score for texture-like resources.
   pub fn resource_residency_total(
     source_handle: i64,
@@ -149,6 +182,26 @@ mod cpu PixelMagicContracts {
       texel_layout +
       sampler_filter +
       address_mode;
+  }
+
+  /// Produces a compact texture handoff score from packet, residency, and sampling metadata.
+  pub fn texture_handoff_total(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    format_kind: i64,
+    texel_layout: i64,
+    sampler_filter: i64,
+    address_mode: i64,
+    sample_kind: i64,
+    channel_pick: i64
+  ) -> i64 {
+    let packet: i64 =
+      image_packet_total(source_handle, width, height, sample_kind, channel_pick, 2);
+    let residency: i64 =
+      resource_residency_total(source_handle, format_kind, texel_layout, sampler_filter, address_mode);
+    let shader_seed: i64 = shader_color_seed_base(source_handle, sample_kind, channel_pick);
+    return packet + residency + shader_seed + width + height;
   }
 
   /// Produces the color-seed component used by shader packet shaping.

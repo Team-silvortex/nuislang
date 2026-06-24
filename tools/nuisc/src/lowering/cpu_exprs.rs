@@ -76,6 +76,12 @@ pub(super) fn lower_cpu_expr(
             callee,
             args,
         } => Some(lower_cpu_extern_call(abi, callee, args, state, bindings)),
+        NirExpr::CpuExternCallI32 {
+            abi,
+            interface: _,
+            callee,
+            args,
+        } => Some(lower_cpu_extern_call_i32(abi, callee, args, state, bindings)),
         NirExpr::HostBufferHandle(value) => Some(lower_expr(value, state, bindings)),
         _ => None,
     }
@@ -440,6 +446,43 @@ fn lower_cpu_extern_call(
         op: Operation {
             module: "cpu".to_owned(),
             instruction: "extern_call_i64".to_owned(),
+            args: op_args,
+        },
+    });
+    for arg in lowered_args {
+        push_dep_edges(state, &arg, &name);
+    }
+    Ok(name)
+}
+
+fn lower_cpu_extern_call_i32(
+    abi: &str,
+    callee: &str,
+    args: &[NirExpr],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    if let Some(target_config) = &state.target_config {
+        if !target_config.supports_host_ffi_abi(abi) {
+            return Err(format!(
+                "extern ABI `{abi}` is not supported by lowering target `{}`",
+                target_config.abi
+            ));
+        }
+    }
+    let lowered_args = args
+        .iter()
+        .map(|arg| lower_expr(arg, state, bindings))
+        .collect::<Result<Vec<_>, _>>()?;
+    let name = next_name(state, "cpu_extern_call_i32");
+    let mut op_args = vec![abi.to_owned(), callee.to_owned()];
+    op_args.extend(lowered_args.clone());
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "extern_call_i32".to_owned(),
             args: op_args,
         },
     });

@@ -359,15 +359,22 @@ fn validate_extern_host_symbol(
     if !function
         .params
         .iter()
-        .all(|param| is_i64_type_ref(&param.ty))
-        || !is_i64_type_ref(&function.return_type)
+        .all(|param| is_host_scalar_type_ref(&param.ty))
+        || !is_host_scalar_type_ref(&function.return_type)
     {
         return Err(format!(
-            "extern function `{}` uses `@host_symbol(\"{}\")`, but std-owned host symbol externs currently require only `i64` parameters and `-> i64`",
+            "extern function `{}` uses `@host_symbol(\"{}\")`, but std-owned host symbol externs currently require only scalar `i64`/`i32` parameters and scalar `i64`/`i32` returns",
             function.name, logical_symbol
         ));
     }
     Ok(())
+}
+
+fn is_host_scalar_type_ref(ty: &AstTypeRef) -> bool {
+    (ty.name == "i64" || ty.name == "i32")
+        && ty.generic_args.is_empty()
+        && !ty.is_optional
+        && !ty.is_ref
 }
 
 fn is_i64_type_ref(ty: &AstTypeRef) -> bool {
