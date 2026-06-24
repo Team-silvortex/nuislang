@@ -35,6 +35,7 @@ name = "nuisc"
 version = "0.1.0"
 dependencies = [
  "nuis-artifact",
+ "nuis-runtime",
  "nuis-semantics",
  "yir-core",
  "yir-lower-llvm",

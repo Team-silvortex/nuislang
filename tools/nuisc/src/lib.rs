@@ -21,6 +21,15 @@ pub mod stdlib_registry;
 
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::collections::BTreeSet;
+
+use nuis_artifact::BuildManifestDomainBuildUnit;
+use nuis_runtime::{
+    AdapterRegistry, BridgeExecutor, DomainAdapter, ExecutionPhaseContext,
+    ExecutionPhaseAction, ExecutionPhaseBinding, ExecutionPhaseOutcome, ExecutionPlan,
+    ExecutionResourceBinding, ExecutionStateSnapshot, ExecutionTrace, ExecutionTraceEvent,
+    Executor, RuntimeLoader, RuntimeRole,
+};
 
 pub use cli::CommandKind;
 
@@ -42,6 +51,38 @@ struct BenchmarkInventoryEntry {
     timeout_ms: Option<i64>,
     clock_domain: Option<String>,
     clock_policy: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DocIndexModuleSummary {
+    module_path: String,
+    item_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GalaxyDocModuleSummary {
+    library_module: String,
+    module_path: String,
+    documented_item_count: usize,
+    doc_index: frontend::AstDocIndex,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GalaxyDocSummary {
+    galaxy: String,
+    package_id: String,
+    library_module_count: usize,
+    documented_library_module_count: usize,
+    documented_item_count: usize,
+    modules: Vec<GalaxyDocModuleSummary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StdlibDocSummary {
+    galaxy_count: usize,
+    documented_galaxy_count: usize,
+    documented_item_count: usize,
+    galaxies: Vec<GalaxyDocSummary>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,6 +118,48 @@ struct DomainBuildVerificationSummary {
     hetero_units_checked: usize,
     registry_drift_units: usize,
     failing_units: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExecutionInspectDomainOverview {
+    domain_family: String,
+    selected_lowering_target: Option<String>,
+    phase_count: usize,
+    event_count: usize,
+    resource_keys: Vec<String>,
+    output_handles: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExecutionInspectOverview {
+    heterogeneous_domains: usize,
+    domains: Vec<ExecutionInspectDomainOverview>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExecutionInspectIssue {
+    domain_family: String,
+    issue: String,
+}
+
+struct InspectExecutionAdapter;
+
+impl DomainAdapter for InspectExecutionAdapter {
+    fn adapter_id(&self) -> &'static str {
+        "nuisc-inspect-adapter"
+    }
+
+    fn supports(&self, _unit: &BuildManifestDomainBuildUnit) -> bool {
+        true
+    }
+
+    fn phase_outcome(
+        &self,
+        _ctx: &ExecutionPhaseContext<'_>,
+        _action: &nuis_runtime::ExecutionPhaseAction,
+    ) -> Option<ExecutionPhaseOutcome> {
+        None
+    }
 }
 
 fn json_escape(value: &str) -> String {
@@ -640,6 +723,8 @@ fn artifact_report_summary_lines(
     verification_summary: &DomainBuildVerificationSummary,
     link_plan: Option<&linker::LinkPlan>,
     manifest_verify_reconstructed: bool,
+    execution_overview: Option<&ExecutionInspectOverview>,
+    doc_indexes: Option<&[frontend::AstDocIndex]>,
 ) -> Vec<String> {
     let mut lines = vec![
         format!(
@@ -695,7 +780,158 @@ fn artifact_report_summary_lines(
             plan.final_stage.output_path
         ));
     }
+    if let Some(overview) = execution_overview {
+        let issues = execution_inspect_issues(overview);
+        lines.push(format!(
+            "summary_execution: hetero_domains={} domains={}",
+            overview.heterogeneous_domains,
+            if overview.domains.is_empty() {
+                "<none>".to_owned()
+            } else {
+                overview
+                    .domains
+                    .iter()
+                    .map(|domain| {
+                        let target = domain
+                            .selected_lowering_target
+                            .as_deref()
+                            .unwrap_or("<none>");
+                        format!(
+                            "{}(target={} phases={} events={})",
+                            domain.domain_family, target, domain.phase_count, domain.event_count
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            }
+        ));
+        lines.push(format!(
+            "summary_execution_issues: {}",
+            if issues.is_empty() {
+                "<none>".to_owned()
+            } else {
+                issues
+                    .iter()
+                    .map(|issue| format!("{}:{}", issue.domain_family, issue.issue))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            }
+        ));
+    }
+    if let Some(indexes) = doc_indexes {
+        let module_count = indexes.len();
+        let item_count = indexes.iter().map(|index| index.items.len()).sum::<usize>();
+        lines.push(format!(
+            "summary_docs: modules={} documented_items={} documented_modules={}",
+            module_count,
+            item_count,
+            if indexes.is_empty() {
+                "<none>".to_owned()
+            } else {
+                indexes
+                    .iter()
+                    .map(|index| index.module_path.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            }
+        ));
+    }
     lines
+}
+
+fn execution_inspect_issues(
+    overview: &ExecutionInspectOverview,
+) -> Vec<ExecutionInspectIssue> {
+    let mut issues = Vec::new();
+    for domain in &overview.domains {
+        if domain.selected_lowering_target.is_none() {
+            issues.push(ExecutionInspectIssue {
+                domain_family: domain.domain_family.clone(),
+                issue: "missing_target".to_owned(),
+            });
+        }
+        if domain.phase_count == 0 {
+            issues.push(ExecutionInspectIssue {
+                domain_family: domain.domain_family.clone(),
+                issue: "zero_phases".to_owned(),
+            });
+        }
+        if domain.phase_count != domain.event_count {
+            issues.push(ExecutionInspectIssue {
+                domain_family: domain.domain_family.clone(),
+                issue: format!(
+                    "phase_event_mismatch({}->{})",
+                    domain.phase_count, domain.event_count
+                ),
+            });
+        }
+        let has_resource = |key: &str| domain.resource_keys.iter().any(|item| item == key);
+        let has_output = |key: &str| domain.output_handles.iter().any(|item| item == key);
+        match domain.domain_family.as_str() {
+            "network" => {
+                if !has_resource("request_packet") {
+                    issues.push(ExecutionInspectIssue {
+                        domain_family: domain.domain_family.clone(),
+                        issue: "missing_network_request_packet".to_owned(),
+                    });
+                }
+                if !has_resource("active_response") {
+                    issues.push(ExecutionInspectIssue {
+                        domain_family: domain.domain_family.clone(),
+                        issue: "missing_network_active_response".to_owned(),
+                    });
+                }
+                if !has_output("response.handle") {
+                    issues.push(ExecutionInspectIssue {
+                        domain_family: domain.domain_family.clone(),
+                        issue: "missing_network_response_handle".to_owned(),
+                    });
+                }
+            }
+            "shader" => {
+                if !has_resource("shader_buffer") {
+                    issues.push(ExecutionInspectIssue {
+                        domain_family: domain.domain_family.clone(),
+                        issue: "missing_shader_buffer".to_owned(),
+                    });
+                }
+                if !has_resource("frame_target") {
+                    issues.push(ExecutionInspectIssue {
+                        domain_family: domain.domain_family.clone(),
+                        issue: "missing_shader_frame_target".to_owned(),
+                    });
+                }
+                if !has_output("draw.handle") {
+                    issues.push(ExecutionInspectIssue {
+                        domain_family: domain.domain_family.clone(),
+                        issue: "missing_shader_draw_handle".to_owned(),
+                    });
+                }
+            }
+            "kernel" => {
+                if !has_resource("kernel_buffer") {
+                    issues.push(ExecutionInspectIssue {
+                        domain_family: domain.domain_family.clone(),
+                        issue: "missing_kernel_buffer".to_owned(),
+                    });
+                }
+                if !has_resource("dispatch_handle") {
+                    issues.push(ExecutionInspectIssue {
+                        domain_family: domain.domain_family.clone(),
+                        issue: "missing_kernel_dispatch_handle".to_owned(),
+                    });
+                }
+                if !has_resource("result_buffer") {
+                    issues.push(ExecutionInspectIssue {
+                        domain_family: domain.domain_family.clone(),
+                        issue: "missing_kernel_result_buffer".to_owned(),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+    issues
 }
 
 fn verdict_status(ok: bool, hetero_expected: bool) -> &'static str {
@@ -772,6 +1008,238 @@ fn inspect_benchmarks_json(input: &Path, artifacts: &pipeline::PipelineArtifacts
     format!("{{{}}}", fields.join(","))
 }
 
+fn collect_doc_indexes(input: &Path) -> Result<Vec<frontend::AstDocIndex>, String> {
+    if project::is_project_input(input) {
+        let project = project::load_project(input)?;
+        let mut indexes = project
+            .modules
+            .iter()
+            .map(|module| frontend::extract_ast_doc_index(&module.ast))
+            .collect::<Vec<_>>();
+        indexes.sort_by(|lhs, rhs| lhs.module_path.cmp(&rhs.module_path));
+        return Ok(indexes);
+    }
+
+    let source = std::fs::read_to_string(input)
+        .map_err(|error| format!("failed to read `{}`: {error}", input.display()))?;
+    let ast = frontend::parse_nuis_ast(&source)?;
+    Ok(vec![frontend::extract_ast_doc_index(&ast)])
+}
+
+fn summarize_doc_indexes(indexes: &[frontend::AstDocIndex]) -> Vec<DocIndexModuleSummary> {
+    indexes
+        .iter()
+        .map(|index| DocIndexModuleSummary {
+            module_path: index.module_path.clone(),
+            item_count: index.items.len(),
+        })
+        .collect()
+}
+
+fn inspect_docs_json(input: &Path, indexes: &[frontend::AstDocIndex]) -> String {
+    let modules = indexes
+        .iter()
+        .map(|index| {
+            let items = index
+                .items
+                .iter()
+                .map(|item| {
+                    let fields = vec![
+                        json_string_field("kind", &item.kind),
+                        json_string_field("path", &item.path),
+                        json_string_array_field("docs", &item.docs),
+                        json_optional_string_field("signature", item.signature.as_deref()),
+                    ];
+                    format!("{{{}}}", fields.join(","))
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            let fields = vec![
+                json_string_field("module_path", &index.module_path),
+                json_usize_field("item_count", index.items.len()),
+                format!("\"items\":[{}]", items),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let total_items = indexes.iter().map(|index| index.items.len()).sum::<usize>();
+    let fields = vec![
+        json_string_field("kind", "nuis_doc_index"),
+        json_string_field("input", &input.display().to_string()),
+        json_usize_field("module_count", indexes.len()),
+        json_usize_field("documented_item_count", total_items),
+        format!("\"modules\":[{}]", modules),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn write_json_output(path: &Path, payload: &str) -> Result<(), String> {
+    std::fs::write(path, payload)
+        .map_err(|error| format!("failed to write `{}`: {error}", path.display()))
+}
+
+fn inspect_galaxy_doc_summary(galaxy: &str) -> Result<GalaxyDocSummary, String> {
+    let stdlib_root = stdlib_registry::resolve_stdlib_root()?;
+    let manifest = stdlib_registry::load_stdlib_module_manifest(&stdlib_root, galaxy)?;
+    let module_root = stdlib_root.join(galaxy);
+    let mut modules = Vec::new();
+
+    for library_module in &manifest.library_modules {
+        let path = module_root.join(library_module);
+        let source = std::fs::read_to_string(&path)
+            .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+        let ast = frontend::parse_nuis_ast(&source)?;
+        let doc_index = frontend::extract_ast_doc_index(&ast);
+        let documented_item_count = doc_index.items.len();
+        modules.push(GalaxyDocModuleSummary {
+            library_module: library_module.clone(),
+            module_path: doc_index.module_path.clone(),
+            documented_item_count,
+            doc_index,
+        });
+    }
+
+    let documented_library_module_count = modules
+        .iter()
+        .filter(|module| module.documented_item_count > 0)
+        .count();
+    let documented_item_count = modules
+        .iter()
+        .map(|module| module.documented_item_count)
+        .sum::<usize>();
+
+    Ok(GalaxyDocSummary {
+        galaxy: manifest.name,
+        package_id: manifest.package_id,
+        library_module_count: modules.len(),
+        documented_library_module_count,
+        documented_item_count,
+        modules,
+    })
+}
+
+fn inspect_galaxy_docs_json(summary: &GalaxyDocSummary) -> String {
+    let modules = summary
+        .modules
+        .iter()
+        .map(|module| {
+            let items = module
+                .doc_index
+                .items
+                .iter()
+                .map(|item| {
+                    format!(
+                        "{{{},{},{},{}}}",
+                        json_string_field("kind", &item.kind),
+                        json_string_field("path", &item.path),
+                        json_string_array_field("docs", &item.docs),
+                        json_optional_string_field("signature", item.signature.as_deref()),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            format!(
+                "{{{},{},{},{}}}",
+                json_string_field("library_module", &module.library_module),
+                json_string_field("module_path", &module.module_path),
+                json_usize_field("documented_item_count", module.documented_item_count),
+                format!("\"items\":[{}]", items)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{{},{},{},{},{},{}}}",
+        json_string_field("kind", "nuis_galaxy_doc_index"),
+        json_string_field("galaxy", &summary.galaxy),
+        json_string_field("package_id", &summary.package_id),
+        json_usize_field("library_module_count", summary.library_module_count),
+        json_usize_field(
+            "documented_library_module_count",
+            summary.documented_library_module_count
+        ),
+        format!(
+            "{},\"modules\":[{}]",
+            json_usize_field("documented_item_count", summary.documented_item_count),
+            modules
+        )
+    )
+}
+
+fn inspect_stdlib_doc_summary() -> Result<StdlibDocSummary, String> {
+    let stdlib_root = stdlib_registry::resolve_stdlib_root()?;
+    let layout = stdlib_registry::load_stdlib_layout(&stdlib_root)?;
+    let mut galaxies = Vec::new();
+    for module in layout.modules {
+        galaxies.push(inspect_galaxy_doc_summary(&module.name)?);
+    }
+    let documented_galaxy_count = galaxies
+        .iter()
+        .filter(|galaxy| galaxy.documented_item_count > 0)
+        .count();
+    let documented_item_count = galaxies
+        .iter()
+        .map(|galaxy| galaxy.documented_item_count)
+        .sum::<usize>();
+    Ok(StdlibDocSummary {
+        galaxy_count: galaxies.len(),
+        documented_galaxy_count,
+        documented_item_count,
+        galaxies,
+    })
+}
+
+fn inspect_stdlib_docs_json(summary: &StdlibDocSummary) -> String {
+    let galaxies = summary
+        .galaxies
+        .iter()
+        .map(|galaxy| {
+            format!(
+                "{{{},{},{},{},{}}}",
+                json_string_field("galaxy", &galaxy.galaxy),
+                json_string_field("package_id", &galaxy.package_id),
+                json_usize_field("library_module_count", galaxy.library_module_count),
+                json_usize_field(
+                    "documented_library_module_count",
+                    galaxy.documented_library_module_count
+                ),
+                json_usize_field("documented_item_count", galaxy.documented_item_count)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{{},{},{},{},{}}}",
+        json_string_field("kind", "nuis_stdlib_doc_index"),
+        json_usize_field("galaxy_count", summary.galaxy_count),
+        json_usize_field("documented_galaxy_count", summary.documented_galaxy_count),
+        json_usize_field("documented_item_count", summary.documented_item_count),
+        format!("\"galaxies\":[{}]", galaxies)
+    )
+}
+
+fn collect_doc_indexes_from_manifest_input(
+    manifest_verify: &aot::BuildManifestVerifyReport,
+) -> Result<Vec<frontend::AstDocIndex>, String> {
+    collect_doc_indexes(Path::new(&manifest_verify.input))
+}
+
+fn write_compile_doc_index(
+    input: &Path,
+    output_dir: &Path,
+) -> Result<aot::BuildManifestDocIndexInfo, String> {
+    let indexes = collect_doc_indexes(input)?;
+    let payload = inspect_docs_json(input, &indexes);
+    let output_path = output_dir.join("nuis.doc-index.json");
+    write_json_output(&output_path, &payload)?;
+    Ok(aot::BuildManifestDocIndexInfo {
+        path: output_path.display().to_string(),
+        module_count: indexes.len(),
+        documented_item_count: indexes.iter().map(|index| index.items.len()).sum(),
+    })
+}
+
 pub fn project_compile_workflow_brief() -> &'static str {
     "health -> structure -> scheduler -> abi_lock -> check -> test -> build -> artifact_doctor -> run_artifact -> release_check"
 }
@@ -839,6 +1307,292 @@ fn load_nuis_compiled_artifact(input: &Path) -> Result<aot::NuisCompiledArtifact
     } else {
         aot::parse_nuis_compiled_artifact(input)
     }
+}
+
+fn inspect_execution_sections(
+    input: &Path,
+) -> Result<Vec<(String, ExecutionPlan, ExecutionTrace)>, String> {
+    let artifact = load_nuis_compiled_artifact(input)?;
+    let loaded = RuntimeLoader
+        .load_from_compiled_artifact(artifact)
+        .map_err(|error| error.to_string())?;
+    let mut adapters = AdapterRegistry::new();
+    adapters.register(Box::new(InspectExecutionAdapter));
+
+    let bridge = BridgeExecutor;
+    let executor = Executor;
+    let mut sections = Vec::new();
+
+    for unit in loaded.heterogeneous_units() {
+        let prepared = bridge
+            .prepare(&loaded, &adapters, &unit.domain_family)
+            .map_err(|error| error.to_string())?;
+        let plan = executor.plan(&prepared).map_err(|error| error.to_string())?;
+        let trace = executor
+            .execute_prepared_plan(prepared.adapter, &plan)
+            .map_err(|error| error.to_string())?;
+        sections.push((unit.domain_family.clone(), plan, trace));
+    }
+
+    Ok(sections)
+}
+
+fn execution_overview_from_sections(
+    sections: &[(String, ExecutionPlan, ExecutionTrace)],
+) -> ExecutionInspectOverview {
+    let domains = sections
+        .iter()
+        .map(|(domain_family, plan, trace)| {
+            let mut resource_keys = BTreeSet::new();
+            let mut output_handles = BTreeSet::new();
+            for phase in &plan.phases {
+                for binding in &phase.action.resource_bindings {
+                    resource_keys.insert(binding.key.clone());
+                }
+                for output in &phase.action.output_handles {
+                    output_handles.insert(output.clone());
+                }
+            }
+            ExecutionInspectDomainOverview {
+                domain_family: domain_family.clone(),
+                selected_lowering_target: plan.selected_lowering_target.clone(),
+                phase_count: plan.phases.len(),
+                event_count: trace.events.len(),
+                resource_keys: resource_keys.into_iter().collect(),
+                output_handles: output_handles.into_iter().collect(),
+            }
+        })
+        .collect::<Vec<_>>();
+    ExecutionInspectOverview {
+        heterogeneous_domains: domains.len(),
+        domains,
+    }
+}
+
+fn inspect_execution_overview(input: &Path) -> Result<ExecutionInspectOverview, String> {
+    let sections = inspect_execution_sections(input)?;
+    Ok(execution_overview_from_sections(&sections))
+}
+
+fn render_execution_report(input: &Path) -> Result<String, String> {
+    let artifact = load_nuis_compiled_artifact(input)?;
+    let sections = inspect_execution_sections(input)?;
+    let mut lines = vec![
+        format!("nuis execution: {}", input.display()),
+        format!("  packaging_mode: {}", artifact.packaging_mode),
+        format!("  binary_name: {}", artifact.binary_name),
+        format!("  domain_families: {}", artifact.envelope.domain_families.join(", ")),
+        format!("  heterogeneous_execution_domains: {}", sections.len()),
+    ];
+
+    if sections.is_empty() {
+        lines.push("  execution_plan: <no heterogeneous domains available>".to_owned());
+        return Ok(lines.join("\n"));
+    }
+
+    for (domain_family, plan, trace) in sections {
+        lines.push(format!("  domain: {domain_family}"));
+        for line in plan.render_summary().lines() {
+            lines.push(format!("    plan: {line}"));
+        }
+        for line in trace.render_summary().lines() {
+            lines.push(format!("    trace: {line}"));
+        }
+    }
+
+    Ok(lines.join("\n"))
+}
+
+fn runtime_role_json_value(role: RuntimeRole) -> String {
+    format!("{role:?}")
+}
+
+fn execution_resource_binding_json(binding: &ExecutionResourceBinding) -> String {
+    let fields = vec![
+        json_string_field("key", &binding.key),
+        json_string_field("kind", &format!("{:?}", binding.kind)),
+        json_optional_string_field("capability_label", binding.capability_label.as_deref()),
+        json_string_field("value", &binding.value),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn execution_state_snapshot_json(snapshot: &ExecutionStateSnapshot) -> String {
+    let handle_slots = snapshot
+        .handle_slots
+        .iter()
+        .map(execution_resource_binding_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = vec![
+        json_string_array_field("available_handles", &snapshot.available_handles),
+        format!("\"handle_slots\":[{}]", handle_slots),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn execution_phase_action_json(action: &ExecutionPhaseAction) -> String {
+    let resolved_inputs = action
+        .resolved_inputs
+        .iter()
+        .map(execution_resource_binding_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let resource_bindings = action
+        .resource_bindings
+        .iter()
+        .map(execution_resource_binding_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let resolved_resources = action
+        .resolved_resources
+        .iter()
+        .map(execution_resource_binding_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = vec![
+        json_string_field("kind", &action.kind),
+        json_string_array_field("input_handles", &action.input_handles),
+        format!("\"resolved_inputs\":[{}]", resolved_inputs),
+        json_string_array_field("output_handles", &action.output_handles),
+        format!("\"resource_bindings\":[{}]", resource_bindings),
+        format!("\"resolved_resources\":[{}]", resolved_resources),
+        json_string_array_field("scheduler_keys", &action.scheduler_keys),
+        json_optional_string_field("adapter_hint", action.adapter_hint.as_deref()),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn execution_phase_outcome_json(outcome: &ExecutionPhaseOutcome) -> String {
+    let produced_slots = outcome
+        .produced_slots
+        .iter()
+        .map(execution_resource_binding_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = vec![
+        json_string_field("status", &outcome.status),
+        json_string_array_field("produced_handles", &outcome.produced_handles),
+        format!("\"produced_slots\":[{}]", produced_slots),
+        json_string_array_field("notes", &outcome.notes),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn execution_phase_binding_json(phase: &ExecutionPhaseBinding) -> String {
+    let fields = vec![
+        json_string_field("phase", &phase.phase),
+        json_string_field("role", &runtime_role_json_value(phase.role)),
+        json_string_field("bridge_surface", &phase.bridge_surface),
+        json_string_field("scheduler_binding", &phase.scheduler_binding),
+        json_string_field("lowering_summary", &phase.lowering_summary),
+        json_string_field("backend_summary", &phase.backend_summary),
+        json_string_field("bridge_summary", &phase.bridge_summary),
+        json_optional_string_field("ir_sidecar_summary", phase.ir_sidecar_summary.as_deref()),
+        format!("\"action\":{}", execution_phase_action_json(&phase.action)),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn execution_trace_event_json(event: &ExecutionTraceEvent) -> String {
+    let fields = vec![
+        json_string_field("phase", &event.phase),
+        json_string_field("role", &runtime_role_json_value(event.role)),
+        json_string_field("adapter_id", &event.adapter_id),
+        json_string_field("bridge_surface", &event.bridge_surface),
+        json_string_field("scheduler_binding", &event.scheduler_binding),
+        format!("\"action\":{}", execution_phase_action_json(&event.action)),
+        format!("\"outcome\":{}", execution_phase_outcome_json(&event.outcome)),
+        format!(
+            "\"state_before\":{}",
+            execution_state_snapshot_json(&event.state_before)
+        ),
+        format!(
+            "\"state_after\":{}",
+            execution_state_snapshot_json(&event.state_after)
+        ),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn execution_inspect_issue_json(issue: &ExecutionInspectIssue) -> String {
+    let fields = vec![
+        json_string_field("domain_family", &issue.domain_family),
+        json_string_field("issue", &issue.issue),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn inspect_execution_json(input: &Path) -> Result<String, String> {
+    let artifact = load_nuis_compiled_artifact(input)?;
+    let sections = inspect_execution_sections(input)?;
+    let overview = execution_overview_from_sections(&sections);
+    let all_issues = execution_inspect_issues(&overview);
+    let section_json = sections
+        .iter()
+        .map(|(domain_family, plan, trace)| {
+            let section_issues = all_issues
+                .iter()
+                .filter(|issue| issue.domain_family == *domain_family)
+                .map(execution_inspect_issue_json)
+                .collect::<Vec<_>>()
+                .join(",");
+            let phases = plan
+                .phases
+                .iter()
+                .map(execution_phase_binding_json)
+                .collect::<Vec<_>>()
+                .join(",");
+            let events = trace
+                .events
+                .iter()
+                .map(execution_trace_event_json)
+                .collect::<Vec<_>>()
+                .join(",");
+            let fields = vec![
+                json_string_field("domain_family", domain_family),
+                json_usize_field("plan_phase_count", plan.phases.len()),
+                json_usize_field("trace_phase_count", trace.events.len()),
+                format!(
+                    "\"backend_family\":{}",
+                    match plan.backend_family.as_deref() {
+                        Some(value) => format!("\"{}\"", json_escape(value)),
+                        None => "null".to_owned(),
+                    }
+                ),
+                format!(
+                    "\"selected_lowering_target\":{}",
+                    match plan.selected_lowering_target.as_deref() {
+                        Some(value) => format!("\"{}\"", json_escape(value)),
+                        None => "null".to_owned(),
+                    }
+                ),
+                format!("\"phases\":[{}]", phases),
+                format!("\"events\":[{}]", events),
+                format!("\"issues\":[{}]", section_issues),
+                json_string_field("plan_summary", &plan.render_summary()),
+                json_string_field("trace_summary", &trace.render_summary()),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let issues_json = all_issues
+        .iter()
+        .map(execution_inspect_issue_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = vec![
+        json_string_field("kind", "nuis_execution_inspect"),
+        json_string_field("input", &input.display().to_string()),
+        json_string_field("packaging_mode", &artifact.packaging_mode),
+        json_string_field("binary_name", &artifact.binary_name),
+        json_string_array_field("domain_families", &artifact.envelope.domain_families),
+        json_usize_field("heterogeneous_execution_domains", sections.len()),
+        format!("\"issues\":[{}]", issues_json),
+        format!("\"sections\":[{}]", section_json),
+    ];
+    Ok(format!("{{{}}}", fields.join(",")))
 }
 
 fn inspect_artifact_json(
@@ -1179,6 +1933,64 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
             "host_bridge_plan_entries_checked",
             report.host_bridge_plan_entries_checked,
         ),
+        json_optional_string_field("doc_index_path", report.doc_index_path.as_deref()),
+        json_usize_field("doc_index_module_count", report.doc_index_module_count),
+        json_usize_field(
+            "doc_index_documented_item_count",
+            report.doc_index_documented_item_count,
+        ),
+        json_usize_field("doc_index_checked", report.doc_index_checked),
+        json_optional_string_field("project_docs_index", report.project_docs_index.as_deref()),
+        json_usize_field("project_docs_module_count", report.project_docs_module_count),
+        json_usize_field(
+            "project_docs_documented_module_count",
+            report.project_docs_documented_module_count,
+        ),
+        json_usize_field(
+            "project_docs_documented_item_count",
+            report.project_docs_documented_item_count,
+        ),
+        json_optional_string_field(
+            "project_imports_index",
+            report.project_imports_index.as_deref(),
+        ),
+        json_usize_field(
+            "project_imports_library_count",
+            report.project_imports_library_count,
+        ),
+        json_usize_field(
+            "project_imports_visible_library_count",
+            report.project_imports_visible_library_count,
+        ),
+        json_usize_field(
+            "project_imports_visible_module_count",
+            report.project_imports_visible_module_count,
+        ),
+        json_usize_field(
+            "project_imports_documented_visible_module_count",
+            report.project_imports_documented_visible_module_count,
+        ),
+        json_usize_field(
+            "project_imports_documented_visible_item_count",
+            report.project_imports_documented_visible_item_count,
+        ),
+        json_optional_string_field(
+            "project_galaxy_index",
+            report.project_galaxy_index.as_deref(),
+        ),
+        json_usize_field("project_galaxy_count", report.project_galaxy_count),
+        json_usize_field(
+            "project_documented_galaxy_count",
+            report.project_documented_galaxy_count,
+        ),
+        json_usize_field(
+            "project_documented_galaxy_library_module_count",
+            report.project_documented_galaxy_library_module_count,
+        ),
+        json_usize_field(
+            "project_documented_galaxy_item_count",
+            report.project_documented_galaxy_item_count,
+        ),
         format!(
             "\"domain_build_unit_verdicts\":[{}]",
             verdicts
@@ -1259,6 +2071,16 @@ fn artifact_report_json(
     let verdicts = collect_domain_build_unit_verdicts(manifest_verify);
     let summary = summarize_domain_build_verification(&verdicts);
     let link_plan = linker::build_link_plan(manifest_verify, artifact);
+    let doc_indexes =
+        collect_doc_indexes_from_manifest_input(manifest_verify).unwrap_or_else(|_| Vec::new());
+    let execution_inspect = inspect_execution_json(manifest_input).unwrap_or_else(|error| {
+        format!(
+            "{{{},{},{}}}",
+            json_string_field("kind", "nuis_execution_inspect_error"),
+            json_string_field("input", &manifest_input.display().to_string()),
+            json_string_field("error", &error)
+        )
+    });
     let fields = vec![
         json_string_field("kind", "nuis_artifact_report"),
         json_string_field("input", &input.display().to_string()),
@@ -1282,6 +2104,8 @@ fn artifact_report_json(
             "\"manifest_verify\":{}",
             verify_build_manifest_json(manifest_input, manifest_verify)
         ),
+        format!("\"doc_index\":{}", inspect_docs_json(Path::new(&manifest_verify.input), &doc_indexes)),
+        format!("\"execution_inspect\":{}", execution_inspect),
         format!("\"link_plan\":{}", link_plan_json(&link_plan)),
     ];
     format!("{{{}}}", fields.join(","))
@@ -2317,6 +3141,13 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 }
             }
         }
+        CommandKind::InspectExecution { input, json } => {
+            if json {
+                println!("{}", inspect_execution_json(&input)?);
+            } else {
+                println!("{}", render_execution_report(&input)?);
+            }
+        }
         CommandKind::ArtifactReport {
             input,
             json,
@@ -2361,6 +3192,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             }
             let verdicts = collect_domain_build_unit_verdicts(&manifest_verify);
             let summary_view = summarize_domain_build_verification(&verdicts);
+            let execution_overview = inspect_execution_overview(&manifest_input).ok();
+            let doc_indexes = collect_doc_indexes_from_manifest_input(&manifest_verify).ok();
             if summary {
                 println!("nuis artifact report summary: {}", input.display());
                 for line in artifact_report_summary_lines(
@@ -2368,6 +3201,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     &summary_view,
                     Some(&linker::build_link_plan(&manifest_verify, &artifact)),
                     manifest_verify_reconstructed,
+                    execution_overview.as_ref(),
+                    doc_indexes.as_deref(),
                 ) {
                     println!("  {}", line);
                 }
@@ -2415,6 +3250,13 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 "  manifest_artifact_path: {}",
                 manifest_verify.artifact_path
             );
+            if let Some(indexes) = &doc_indexes {
+                println!("  documented_modules: {}", indexes.len());
+                println!(
+                    "  documented_items: {}",
+                    indexes.iter().map(|index| index.items.len()).sum::<usize>()
+                );
+            }
             println!(
                 "  execution_contracts_checked: {}",
                 manifest_verify.execution_contracts_checked
@@ -2425,6 +3267,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 &summary,
                 Some(&linker::build_link_plan(&manifest_verify, &artifact)),
                 manifest_verify_reconstructed,
+                execution_overview.as_ref(),
+                doc_indexes.as_deref(),
             ) {
                 println!("  {}", line);
             }
@@ -2823,6 +3667,66 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "  host_bridge_plan_entries_checked: {}",
                     report.host_bridge_plan_entries_checked
                 );
+                if let Some(path) = &report.doc_index_path {
+                    println!("  doc_index_path: {}", path);
+                }
+                println!("  doc_index_module_count: {}", report.doc_index_module_count);
+                println!(
+                    "  doc_index_documented_item_count: {}",
+                    report.doc_index_documented_item_count
+                );
+                println!("  doc_index_checked: {}", report.doc_index_checked);
+                if let Some(path) = &report.project_docs_index {
+                    println!("  project_docs_index: {}", path);
+                }
+                println!("  project_docs_module_count: {}", report.project_docs_module_count);
+                println!(
+                    "  project_docs_documented_module_count: {}",
+                    report.project_docs_documented_module_count
+                );
+                println!(
+                    "  project_docs_documented_item_count: {}",
+                    report.project_docs_documented_item_count
+                );
+                if let Some(path) = &report.project_imports_index {
+                    println!("  project_imports_index: {}", path);
+                }
+                println!(
+                    "  project_imports_library_count: {}",
+                    report.project_imports_library_count
+                );
+                println!(
+                    "  project_imports_visible_library_count: {}",
+                    report.project_imports_visible_library_count
+                );
+                println!(
+                    "  project_imports_visible_module_count: {}",
+                    report.project_imports_visible_module_count
+                );
+                println!(
+                    "  project_imports_documented_visible_module_count: {}",
+                    report.project_imports_documented_visible_module_count
+                );
+                println!(
+                    "  project_imports_documented_visible_item_count: {}",
+                    report.project_imports_documented_visible_item_count
+                );
+                if let Some(path) = &report.project_galaxy_index {
+                    println!("  project_galaxy_index: {}", path);
+                }
+                println!("  project_galaxy_count: {}", report.project_galaxy_count);
+                println!(
+                    "  project_documented_galaxy_count: {}",
+                    report.project_documented_galaxy_count
+                );
+                println!(
+                    "  project_documented_galaxy_library_module_count: {}",
+                    report.project_documented_galaxy_library_module_count
+                );
+                println!(
+                    "  project_documented_galaxy_item_count: {}",
+                    report.project_documented_galaxy_item_count
+                );
                 for unit in &report.domain_build_units {
                     let payload_blob_bytes = unit
                         .artifact_payload_blob_bytes
@@ -2938,6 +3842,106 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!(
                     "    clock_policy: {}",
                     entry.clock_policy.as_deref().unwrap_or("-")
+                );
+            }
+        }
+        CommandKind::InspectDocs {
+            input,
+            json,
+            output,
+        } => {
+            let indexes = collect_doc_indexes(&input)?;
+            if json {
+                let payload = inspect_docs_json(&input, &indexes);
+                if let Some(path) = output {
+                    write_json_output(&path, &payload)?;
+                    println!("wrote doc index: {}", path.display());
+                    println!("  source: {}", input.display());
+                    println!("  bytes: {}", payload.len());
+                } else {
+                    println!("{payload}");
+                }
+                return Ok(());
+            }
+            if project::is_project_input(&input) {
+                let resolved = resolve_compile_input(&input)?;
+                print_project_context(&resolved);
+            }
+            let summaries = summarize_doc_indexes(&indexes);
+            let total_items = summaries.iter().map(|summary| summary.item_count).sum::<usize>();
+            println!("doc index: {}", input.display());
+            println!("  module_count: {}", summaries.len());
+            println!("  documented_item_count: {}", total_items);
+            for (index, summary) in indexes.iter().zip(summaries.iter()) {
+                println!("  module: {}", summary.module_path);
+                println!("    documented_items: {}", summary.item_count);
+                for item in &index.items {
+                    println!("    item: {} {}", item.kind, item.path);
+                    if let Some(signature) = &item.signature {
+                        println!("      signature: {}", signature);
+                    }
+                    for line in &item.docs {
+                        println!("      doc: {}", line);
+                    }
+                }
+            }
+        }
+        CommandKind::InspectGalaxyDocs { galaxy, json } => {
+            let summary = inspect_galaxy_doc_summary(&galaxy)?;
+            if json {
+                println!("{}", inspect_galaxy_docs_json(&summary));
+                return Ok(());
+            }
+            println!("galaxy doc index: {}", summary.galaxy);
+            println!("  package_id: {}", summary.package_id);
+            println!("  library_module_count: {}", summary.library_module_count);
+            println!(
+                "  documented_library_module_count: {}",
+                summary.documented_library_module_count
+            );
+            println!("  documented_item_count: {}", summary.documented_item_count);
+            for module in summary.modules {
+                println!("  library_module: {}", module.library_module);
+                println!("    module_path: {}", module.module_path);
+                println!(
+                    "    documented_items: {}",
+                    module.documented_item_count
+                );
+                for item in module.doc_index.items {
+                    println!("    item: {} {}", item.kind, item.path);
+                    if let Some(signature) = item.signature {
+                        println!("      signature: {}", signature);
+                    }
+                    for line in item.docs {
+                        println!("      doc: {}", line);
+                    }
+                }
+            }
+        }
+        CommandKind::InspectStdlibDocs { json } => {
+            let summary = inspect_stdlib_doc_summary()?;
+            if json {
+                println!("{}", inspect_stdlib_docs_json(&summary));
+                return Ok(());
+            }
+            println!("stdlib doc index");
+            println!("  galaxy_count: {}", summary.galaxy_count);
+            println!(
+                "  documented_galaxy_count: {}",
+                summary.documented_galaxy_count
+            );
+            println!("  documented_item_count: {}", summary.documented_item_count);
+            for galaxy in summary.galaxies {
+                println!("  galaxy: {}", galaxy.galaxy);
+                println!("    package_id: {}", galaxy.package_id);
+                println!("    library_module_count: {}", galaxy.library_module_count);
+                println!(
+                    "    documented_library_module_count: {}",
+                    galaxy.documented_library_module_count
+                );
+                println!(
+                    "    documented_item_count: {}",
+                    galaxy.documented_item_count
                 );
             }
         }
@@ -3333,6 +4337,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 .as_ref()
                 .map(project::summarize_project_text_handle_rewrites)
                 .transpose()?;
+            let doc_index = write_compile_doc_index(&input, &output_dir)?;
             let build_manifest = aot::write_build_manifest(
                 &output_dir,
                 &written,
@@ -3392,9 +4397,63 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                             modules_index_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.modules_index_path.clone()),
+                            docs_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.docs_index_path.clone()),
+                            docs_module_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.docs_summary.modules)
+                                .unwrap_or(0),
+                            docs_documented_module_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.docs_summary.documented_modules)
+                                .unwrap_or(0),
+                            docs_documented_item_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.docs_summary.documented_items)
+                                .unwrap_or(0),
+                            imports_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.imports_index_path.clone()),
+                            imports_library_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.imports_summary.libraries)
+                                .unwrap_or(0),
+                            imports_visible_library_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.imports_summary.visible_libraries)
+                                .unwrap_or(0),
+                            imports_visible_module_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.imports_summary.visible_modules)
+                                .unwrap_or(0),
+                            imports_documented_visible_module_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.imports_summary.documented_visible_modules)
+                                .unwrap_or(0),
+                            imports_documented_visible_item_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.imports_summary.documented_visible_items)
+                                .unwrap_or(0),
                             galaxy_index_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.galaxy_index_path.clone()),
+                            galaxy_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.galaxy_summary.galaxies)
+                                .unwrap_or(0),
+                            galaxy_documented_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.galaxy_summary.documented_galaxies)
+                                .unwrap_or(0),
+                            galaxy_documented_library_module_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.galaxy_summary.documented_library_modules)
+                                .unwrap_or(0),
+                            galaxy_documented_item_count: project_metadata
+                                .as_ref()
+                                .map(|item| item.galaxy_summary.documented_items)
+                                .unwrap_or(0),
                             links_index_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.links_index_path.clone()),
@@ -3408,6 +4467,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                                 .as_ref()
                                 .map(|item| item.abi_index_path.clone()),
                         }),
+                    doc_index: Some(doc_index.clone()),
                     cpu_target: cpu_target.clone(),
                 },
             )?;
@@ -3510,6 +4570,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "compiled_artifact: {}",
                     output_dir.join("nuis.compiled.artifact").display()
                 );
+                println!("doc_index: {}", doc_index.path);
+                println!("doc_index_modules: {}", doc_index.module_count);
+                println!(
+                    "doc_index_documented_items: {}",
+                    doc_index.documented_item_count
+                );
                 println!("build_manifest: {}", build_manifest);
                 if let Some(metadata) = &project_metadata {
                     println!("project_manifest: {}", metadata.manifest_copy_path);
@@ -3517,6 +4583,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     println!("project_organization: {}", metadata.organization_index_path);
                     println!("project_exchange: {}", metadata.exchange_index_path);
                     println!("project_modules: {}", metadata.modules_index_path);
+                    println!("project_docs: {}", metadata.docs_index_path);
+                    println!("project_imports: {}", metadata.imports_index_path);
                     println!("project_galaxy: {}", metadata.galaxy_index_path);
                     println!("project_links: {}", metadata.links_index_path);
                     println!("project_packet: {}", metadata.packet_index_path);
@@ -3815,9 +4883,28 @@ mod tests {
             compile_cache_status: None,
             compile_cache_key: None,
             compile_cache_root: None,
+            doc_index_path: None,
+            doc_index_module_count: 0,
+            doc_index_documented_item_count: 0,
+            doc_index_checked: 0,
             project_text_handle_rewrite_helper_hits: 0,
             project_text_handle_rewrite_local_hits: 0,
             project_plan_index: None,
+            project_docs_index: None,
+            project_docs_module_count: 0,
+            project_docs_documented_module_count: 0,
+            project_docs_documented_item_count: 0,
+            project_imports_index: None,
+            project_imports_library_count: 0,
+            project_imports_visible_library_count: 0,
+            project_imports_visible_module_count: 0,
+            project_imports_documented_visible_module_count: 0,
+            project_imports_documented_visible_item_count: 0,
+            project_galaxy_index: None,
+            project_galaxy_count: 0,
+            project_documented_galaxy_count: 0,
+            project_documented_galaxy_library_module_count: 0,
+            project_documented_galaxy_item_count: 0,
             project_packet_index: None,
             bridge_registry_path: None,
             bridge_registry_units: 0,
@@ -3886,6 +4973,10 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"domain_bridge_stubs_checked\":0"));
         assert!(json.contains("\"bridge_registry_entries_checked\":0"));
         assert!(json.contains("\"host_bridge_plan_entries_checked\":0"));
+        assert!(json.contains("\"doc_index_path\":"));
+        assert!(json.contains("\"doc_index_module_count\":1"));
+        assert!(json.contains("\"doc_index_documented_item_count\":0"));
+        assert!(json.contains("\"doc_index_checked\":1"));
         assert!(json.contains("\"domain_build_contract_drift_checked\":"));
         assert!(json.contains("\"domain_build_contract_drift_mismatches\":0"));
         assert!(json.contains("\"domain_build_contracts_consistent\":true"));
@@ -4020,6 +5111,15 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"host_units_checked\":1"));
         assert!(json.contains("\"hetero_units_checked\":0"));
         assert!(json.contains("\"failing_units\":[]"));
+        assert!(json.contains("\"execution_inspect\":{"));
+        assert!(json.contains("\"kind\":\"nuis_execution_inspect\""));
+        assert!(json.contains("\"heterogeneous_execution_domains\":0"));
+        assert!(json.contains("\"execution_inspect\":{\"kind\":\"nuis_execution_inspect\""));
+        assert!(json.contains("\"issues\":[]"));
+        assert!(json.contains("\"sections\":[]"));
+        assert!(json.contains("\"doc_index\":{"));
+        assert!(json.contains("\"kind\":\"nuis_doc_index\""));
+        assert!(json.contains("\"module_count\":1"));
         assert!(json.contains("\"link_plan\":{"));
         assert!(json.contains("\"final_stage_driver\":\"clang\""));
     }
@@ -4082,6 +5182,11 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         );
         assert!(artifact_report.contains("\"kind\":\"nuis_artifact_report\""));
         assert!(artifact_report.contains("\"manifest_verify_reconstructed\":false"));
+        assert!(artifact_report.contains("\"execution_inspect\":{"));
+        assert!(artifact_report.contains("\"kind\":\"nuis_execution_inspect\""));
+        assert!(artifact_report.contains("\"sections\":[]"));
+        assert!(artifact_report.contains("\"doc_index\":{"));
+        assert!(artifact_report.contains("\"kind\":\"nuis_doc_index\""));
         assert!(artifact_report.contains("\"artifact_inspect\":{"));
         assert!(artifact_report.contains("\"artifact_verify\":{"));
         assert!(artifact_report.contains("\"manifest_verify\":{"));
@@ -4203,10 +5308,44 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
                 notes: vec!["demo".to_owned()],
             },
         };
-        let lines =
-            artifact_report_summary_lines(&artifact_verify, &summary, Some(&link_plan), false);
+        let execution_overview = ExecutionInspectOverview {
+            heterogeneous_domains: 1,
+            domains: vec![ExecutionInspectDomainOverview {
+                domain_family: "network".to_owned(),
+                selected_lowering_target: Some("urlsession.socket-io".to_owned()),
+                phase_count: 4,
+                event_count: 4,
+                resource_keys: vec![
+                    "active_response".to_owned(),
+                    "active_session".to_owned(),
+                    "request_packet".to_owned(),
+                ],
+                output_handles: vec![
+                    "response.handle".to_owned(),
+                    "session.handle".to_owned(),
+                    "status.code".to_owned(),
+                    "task.handle".to_owned(),
+                ],
+            }],
+        };
+        let lines = artifact_report_summary_lines(
+            &artifact_verify,
+            &summary,
+            Some(&link_plan),
+            false,
+            Some(&execution_overview),
+            Some(&[frontend::AstDocIndex {
+                module_path: "cpu.Main".to_owned(),
+                items: vec![frontend::AstDocIndexItem {
+                    kind: "function".to_owned(),
+                    path: "cpu.Main::main".to_owned(),
+                    docs: vec!["entry docs".to_owned()],
+                    signature: Some("fn main() -> i64".to_owned()),
+                }],
+            }]),
+        );
 
-        assert_eq!(lines.len(), 4);
+        assert_eq!(lines.len(), 7);
         assert!(lines[0].contains("artifact_roundtrip=ok"));
         assert!(lines[0].contains("lifecycle=ok"));
         assert!(lines[0].contains("runtime_flags=ok"));
@@ -4219,6 +5358,78 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert_eq!(lines[2], "summary_manifest: reconstructed=false");
         assert!(lines[3].contains("final_stage=host-native-link"));
         assert!(lines[3].contains("driver=clang"));
+        assert!(lines[4].contains("summary_execution: hetero_domains=1"));
+        assert!(lines[4].contains("network(target=urlsession.socket-io phases=4 events=4)"));
+        assert_eq!(lines[5], "summary_execution_issues: <none>");
+        assert_eq!(
+            lines[6],
+            "summary_docs: modules=1 documented_items=1 documented_modules=cpu.Main"
+        );
+    }
+
+    #[test]
+    fn execution_inspect_issues_flag_missing_target_and_phase_mismatch() {
+        let overview = ExecutionInspectOverview {
+            heterogeneous_domains: 2,
+            domains: vec![
+                ExecutionInspectDomainOverview {
+                    domain_family: "network".to_owned(),
+                    selected_lowering_target: None,
+                    phase_count: 0,
+                    event_count: 0,
+                    resource_keys: vec![],
+                    output_handles: vec![],
+                },
+                ExecutionInspectDomainOverview {
+                    domain_family: "shader".to_owned(),
+                    selected_lowering_target: Some("metal.apple-silicon-gpu".to_owned()),
+                    phase_count: 4,
+                    event_count: 3,
+                    resource_keys: vec!["shader_buffer".to_owned()],
+                    output_handles: vec![],
+                },
+            ],
+        };
+
+        let issues = execution_inspect_issues(&overview);
+
+        assert_eq!(
+            issues,
+            vec![
+                ExecutionInspectIssue {
+                    domain_family: "network".to_owned(),
+                    issue: "missing_target".to_owned(),
+                },
+                ExecutionInspectIssue {
+                    domain_family: "network".to_owned(),
+                    issue: "zero_phases".to_owned(),
+                },
+                ExecutionInspectIssue {
+                    domain_family: "network".to_owned(),
+                    issue: "missing_network_request_packet".to_owned(),
+                },
+                ExecutionInspectIssue {
+                    domain_family: "network".to_owned(),
+                    issue: "missing_network_active_response".to_owned(),
+                },
+                ExecutionInspectIssue {
+                    domain_family: "network".to_owned(),
+                    issue: "missing_network_response_handle".to_owned(),
+                },
+                ExecutionInspectIssue {
+                    domain_family: "shader".to_owned(),
+                    issue: "phase_event_mismatch(4->3)".to_owned(),
+                },
+                ExecutionInspectIssue {
+                    domain_family: "shader".to_owned(),
+                    issue: "missing_shader_frame_target".to_owned(),
+                },
+                ExecutionInspectIssue {
+                    domain_family: "shader".to_owned(),
+                    issue: "missing_shader_draw_handle".to_owned(),
+                },
+            ]
+        );
     }
 
     #[test]
@@ -4259,6 +5470,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
             output_dir.join(format!("{output_stem}.yir")),
             output_dir.join(format!("{output_stem}.ll")),
             output_dir.join(&output_stem),
+            output_dir.join("nuis.doc-index.json"),
             output_dir.join("nuis.build.manifest.toml"),
             output_dir.join("nuis.executable.envelope.toml"),
             output_dir.join("nuis.compiled.artifact"),
@@ -4267,6 +5479,9 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
             output_dir.join("nuis.project.organization.txt"),
             output_dir.join("nuis.project.exchange.txt"),
             output_dir.join("nuis.project.modules.txt"),
+            output_dir.join("nuis.project.docs.txt"),
+            output_dir.join("nuis.project.imports.txt"),
+            output_dir.join("nuis.project.galaxy.txt"),
             output_dir.join("nuis.project.links.txt"),
             output_dir.join("nuis.project.packet.txt"),
             output_dir.join("nuis.project.host_ffi.txt"),
@@ -4280,6 +5495,9 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(manifest_text.contains("manifest_schema = \"nuis-build-manifest-v1\""));
         assert!(manifest_text.contains("packaging_mode = \"native-cpu-llvm\""));
         assert!(manifest_text.contains("loaded_nustar = [\"official.cpu\"]"));
+        assert!(manifest_text.contains("doc_index_path = "));
+        assert!(manifest_text.contains("doc_index_module_count = 1"));
+        assert!(manifest_text.contains("doc_index_documented_item_count = 0"));
         assert!(manifest_text.contains("[[domain_build_unit]]"));
         assert!(manifest_text.contains(&format!("name = \"{project_name}\"")));
         assert!(manifest_text.contains("manifest_copy = "));
@@ -4287,12 +5505,46 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(manifest_text.contains("organization_index = "));
         assert!(manifest_text.contains("exchange_index = "));
         assert!(manifest_text.contains("modules_index = "));
+        assert!(manifest_text.contains("docs_index = "));
+        assert!(manifest_text.contains("docs_module_count = 1"));
+        assert!(manifest_text.contains("docs_documented_module_count = 0"));
+        assert!(manifest_text.contains("docs_documented_item_count = 0"));
+        assert!(manifest_text.contains("imports_index = "));
+        assert!(manifest_text.contains("imports_library_count = 0"));
+        assert!(manifest_text.contains("imports_visible_library_count = 0"));
+        assert!(manifest_text.contains("imports_visible_module_count = 1"));
+        assert!(manifest_text.contains("imports_documented_visible_module_count = 0"));
+        assert!(manifest_text.contains("imports_documented_visible_item_count = 0"));
+        assert!(manifest_text.contains("galaxy_index = "));
+        assert!(manifest_text.contains("galaxy_count = 0"));
+        assert!(manifest_text.contains("documented_galaxy_count = 0"));
+        assert!(manifest_text.contains("documented_galaxy_library_module_count = 0"));
+        assert!(manifest_text.contains("documented_galaxy_item_count = 0"));
         assert!(manifest_text.contains("links_index = "));
         assert!(manifest_text.contains("packet_index = "));
         assert!(manifest_text.contains("host_ffi_index = "));
         assert!(manifest_text.contains("abi_index = "));
 
         let manifest_report = aot::verify_build_manifest(&manifest_path).unwrap();
+        assert!(manifest_report
+            .doc_index_path
+            .as_deref()
+            .is_some_and(|path| path.ends_with("nuis.doc-index.json")));
+        assert_eq!(manifest_report.doc_index_module_count, 1);
+        assert_eq!(manifest_report.doc_index_documented_item_count, 0);
+        assert_eq!(manifest_report.doc_index_checked, 1);
+        assert_eq!(manifest_report.project_docs_module_count, 1);
+        assert_eq!(manifest_report.project_docs_documented_module_count, 0);
+        assert_eq!(manifest_report.project_docs_documented_item_count, 0);
+        assert_eq!(manifest_report.project_imports_library_count, 0);
+        assert_eq!(manifest_report.project_imports_visible_library_count, 0);
+        assert_eq!(manifest_report.project_imports_visible_module_count, 1);
+        assert_eq!(manifest_report.project_imports_documented_visible_module_count, 0);
+        assert_eq!(manifest_report.project_imports_documented_visible_item_count, 0);
+        assert_eq!(manifest_report.project_galaxy_count, 0);
+        assert_eq!(manifest_report.project_documented_galaxy_count, 0);
+        assert_eq!(manifest_report.project_documented_galaxy_library_module_count, 0);
+        assert_eq!(manifest_report.project_documented_galaxy_item_count, 0);
         assert_eq!(
             manifest_report.envelope_schema,
             "nuis-executable-envelope-v1"
@@ -4571,5 +5823,99 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"symbol\":\"cpu::Main::sum_loop\""));
         assert!(json.contains("\"label\":\"sum_loop\""));
         assert!(json.contains("\"measure_iters\":32"));
+    }
+
+    #[test]
+    fn inspect_docs_json_exposes_documented_items() {
+        let ast = frontend::parse_nuis_ast(
+            r#"
+            mod cpu Docs {
+              /// function docs
+              fn answer() -> i32 {
+                42
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let indexes = vec![frontend::extract_ast_doc_index(&ast)];
+        let json = inspect_docs_json(Path::new("main.ns"), &indexes);
+        assert!(json.contains("\"kind\":\"nuis_doc_index\""));
+        assert!(json.contains("\"input\":\"main.ns\""));
+        assert!(json.contains("\"module_count\":1"));
+        assert!(json.contains("\"documented_item_count\":1"));
+        assert!(json.contains("\"module_path\":\"cpu.Docs\""));
+        assert!(json.contains("\"kind\":\"function\""));
+        assert!(json.contains("\"path\":\"cpu.Docs::answer\""));
+        assert!(json.contains("\"docs\":[\"function docs\"]"));
+        assert!(json.contains("\"signature\":\"fn answer() -> i32\""));
+    }
+
+    #[test]
+    fn collect_doc_indexes_reads_single_source_input() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("nuis_doc_index_{nonce}.ns"));
+        std::fs::write(
+            &path,
+            r#"
+            mod cpu Docs {
+              /// value docs
+              const ANSWER: i32 = 42;
+            }
+            "#,
+        )
+        .unwrap();
+
+        let indexes = collect_doc_indexes(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(indexes.len(), 1);
+        assert_eq!(indexes[0].module_path, "cpu.Docs");
+        assert_eq!(indexes[0].items.len(), 1);
+        assert_eq!(indexes[0].items[0].path, "cpu.Docs::ANSWER");
+    }
+
+    #[test]
+    fn write_json_output_persists_payload() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("nuis_doc_index_output_{nonce}.json"));
+        write_json_output(&path, "{\"kind\":\"nuis_doc_index\"}").unwrap();
+        let written = std::fs::read_to_string(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(written, "{\"kind\":\"nuis_doc_index\"}");
+    }
+
+    #[test]
+    fn inspect_galaxy_docs_json_reports_documented_library_modules() {
+        let summary = inspect_galaxy_doc_summary("pixelmagic").unwrap();
+        let json = inspect_galaxy_docs_json(&summary);
+
+        assert!(json.contains("\"kind\":\"nuis_galaxy_doc_index\""));
+        assert!(json.contains("\"galaxy\":\"pixelmagic\""));
+        assert!(json.contains("\"package_id\":\"nuis.pixelmagic\""));
+        assert!(json.contains("\"documented_library_module_count\":"));
+        assert!(json.contains("\"documented_item_count\":"));
+        assert!(json.contains("\"library_module\":\"lib/image_contracts.ns\""));
+        assert!(json.contains("\"module_path\":\"cpu.PixelMagicContracts\""));
+    }
+
+    #[test]
+    fn inspect_stdlib_docs_json_reports_all_official_galaxies() {
+        let summary = inspect_stdlib_doc_summary().unwrap();
+        let json = inspect_stdlib_docs_json(&summary);
+
+        assert!(json.contains("\"kind\":\"nuis_stdlib_doc_index\""));
+        assert!(json.contains("\"galaxy_count\":4"));
+        assert!(json.contains("\"galaxy\":\"core\""));
+        assert!(json.contains("\"galaxy\":\"std\""));
+        assert!(json.contains("\"galaxy\":\"pixelmagic\""));
+        assert!(json.contains("\"galaxy\":\"ns-nova\""));
     }
 }

@@ -44,6 +44,7 @@ pub struct AstModule {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstConstItem {
     pub visibility: AstVisibility,
+    pub attributes: Vec<AstAttribute>,
     pub name: String,
     pub ty: Option<AstTypeRef>,
     pub value: AstExpr,
@@ -52,6 +53,7 @@ pub struct AstConstItem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstTypeAlias {
     pub visibility: AstVisibility,
+    pub attributes: Vec<AstAttribute>,
     pub name: String,
     pub generic_params: Vec<AstGenericParam>,
     pub where_bounds: Vec<AstWherePredicate>,
@@ -107,6 +109,7 @@ pub struct AstEnumDef {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstEnumVariant {
+    pub attributes: Vec<AstAttribute>,
     pub name: String,
     pub kind: AstEnumVariantKind,
 }
@@ -152,6 +155,7 @@ pub struct AstWherePredicate {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstTraitMethodSig {
+    pub attributes: Vec<AstAttribute>,
     pub name: String,
     pub params: Vec<AstParam>,
     pub return_type: Option<AstTypeRef>,
@@ -161,6 +165,7 @@ pub struct AstTraitMethodSig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstTraitDef {
     pub visibility: AstVisibility,
+    pub attributes: Vec<AstAttribute>,
     pub name: String,
     pub methods: Vec<AstTraitMethodSig>,
 }

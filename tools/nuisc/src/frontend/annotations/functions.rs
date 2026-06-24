@@ -11,6 +11,7 @@ pub(crate) fn validate_function_annotations(function: &AstFunction) -> Result<()
 
     for attribute in &function.attributes {
         match attribute.name.as_str() {
+            "doc" => {}
             "__nuisc_text_handle_rewrite" => {}
             "test" => {}
             "benchmark" => {}
@@ -32,7 +33,7 @@ pub(crate) fn validate_function_annotations(function: &AstFunction) -> Result<()
             }
         }
 
-        if !seen.insert(attribute.name.as_str()) {
+        if attribute.name != "doc" && !seen.insert(attribute.name.as_str()) {
             return Err(format!(
                 "function `{}` repeats annotation `@{}`",
                 function.name, attribute.name

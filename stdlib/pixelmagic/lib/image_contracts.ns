@@ -1,48 +1,61 @@
+/// CPU-side PixelMagic helpers for image packet shaping and residency scoring.
 mod cpu PixelMagicContracts {
+  /// Encodes the output kind used for color-producing image passes.
   pub fn sample_output_kind_color() -> i64 {
     return 1;
   }
 
+  /// Encodes the output kind used for mask-producing image passes.
   pub fn sample_output_kind_mask() -> i64 {
     return 2;
   }
 
+  /// Encodes the shader target kind used for 2D texture outputs.
   pub fn shader_target_kind_texture2d() -> i64 {
     return 1;
   }
 
+  /// Encodes the shader pass kind used for sampling-based passes.
   pub fn shader_pass_kind_sample() -> i64 {
     return 1;
   }
 
+  /// Encodes the presentation mode used for frame-oriented outputs.
   pub fn shader_present_mode_frame() -> i64 {
     return 1;
   }
 
+  /// Encodes the operation kind for grayscale image processing.
   pub fn grayscale_op_kind() -> i64 {
     return 1;
   }
 
+  /// Encodes the operation kind for invert image processing.
   pub fn invert_op_kind() -> i64 {
     return 2;
   }
 
+  /// Encodes the operation kind for threshold image processing.
   pub fn threshold_op_kind() -> i64 {
     return 3;
   }
 
+  /// Encodes the operation kind for brightness adjustment.
   pub fn brightness_op_kind() -> i64 {
     return 4;
   }
 
+  /// Encodes the operation kind for contrast adjustment.
   pub fn contrast_op_kind() -> i64 {
     return 5;
   }
 
+  /// Encodes the operation kind for blur image processing.
   pub fn blur_op_kind() -> i64 {
     return 6;
   }
 
+  /// Produces a compact summary score for a generic image packet.
   pub fn image_packet_total(
     source_handle: i64,
     width: i64,
@@ -54,6 +67,7 @@ mod cpu PixelMagicContracts {
     return source_handle + width + height + op_kind + amount + flags;
   }
 
+  /// Produces the score for a grayscale packet specialization.
   pub fn grayscale_packet_total(source_handle: i64, width: i64, height: i64) -> i64 {
     return image_packet_total(
       source_handle,
@@ -65,6 +79,7 @@ mod cpu PixelMagicContracts {
     );
   }
 
+  /// Produces the score for a configurable filtered packet specialization.
   pub fn filter_packet_total(
     source_handle: i64,
     width: i64,
@@ -75,6 +90,7 @@ mod cpu PixelMagicContracts {
     return image_packet_total(source_handle, width, height, op_kind, amount, 1);
   }
 
+  /// Produces a compact residency score for texture-like resources.
   pub fn resource_residency_total(
     source_handle: i64,
     format_kind: i64,
@@ -89,6 +105,7 @@ mod cpu PixelMagicContracts {
       address_mode;
   }
 
+  /// Produces the color-seed component used by shader packet shaping.
   pub fn shader_color_seed_base(
     source_handle: i64,
     sample_kind: i64,
@@ -97,10 +114,12 @@ mod cpu PixelMagicContracts {
     return source_handle + sample_kind + channel_pick;
   }
 
+  /// Produces the speed-seed component used by shader packet shaping.
   pub fn shader_speed_seed_base(width: i64, sample_count: i64) -> i64 {
     return width + sample_count;
   }
 
+  /// Produces the radius-seed component used by shader packet shaping.
   pub fn shader_radius_seed_base(
     height: i64,
     edge_policy: i64,
@@ -109,6 +128,7 @@ mod cpu PixelMagicContracts {
     return height + edge_policy + uv_mode;
   }
 
+  /// Produces the aggregate score for a shader packet input set.
   pub fn shader_packet_total(
     source_handle: i64,
     width: i64,
@@ -125,6 +145,7 @@ mod cpu PixelMagicContracts {
     return color_seed + speed_seed + radius_seed;
   }
 
+  /// Produces the aggregate score for a shader consumer configuration.
   pub fn shader_consumer_total(
     color_seed: i64,
     speed_seed: i64,
@@ -142,6 +163,7 @@ mod cpu PixelMagicContracts {
     return packet_score + consumer_score + frame_budget;
   }
 
+  /// Produces the aggregate score for a full shader pipeline configuration.
   pub fn shader_pipeline_total(
     source_handle: i64,
     width: i64,
@@ -168,6 +190,7 @@ mod cpu PixelMagicContracts {
     );
   }
 
+  /// Summarizes the shader profile contract metadata exposed by PixelMagic.
   pub fn surface_contract_profile_total() -> i64 {
     let target: Target = shader_profile_target("PixelMagicSurfaceContracts");
     let view: Viewport = shader_profile_viewport("PixelMagicSurfaceContracts");
@@ -183,6 +206,7 @@ mod cpu PixelMagicContracts {
       + shader_profile_packet_radius_slot("PixelMagicSurfaceContracts");
   }
 
+  /// Materializes a typed packet using the shader profile contract slots.
   pub fn surface_contract_packet(
     source_handle: i64,
     width: i64,

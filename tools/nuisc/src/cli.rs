@@ -37,6 +37,10 @@ pub enum CommandKind {
         input: PathBuf,
         json: bool,
     },
+    InspectExecution {
+        input: PathBuf,
+        json: bool,
+    },
     ArtifactReport {
         input: PathBuf,
         json: bool,
@@ -56,6 +60,18 @@ pub enum CommandKind {
     },
     InspectBenchmarks {
         input: PathBuf,
+        json: bool,
+    },
+    InspectDocs {
+        input: PathBuf,
+        json: bool,
+        output: Option<PathBuf>,
+    },
+    InspectGalaxyDocs {
+        galaxy: String,
+        json: bool,
+    },
+    InspectStdlibDocs {
         json: bool,
     },
     CacheStatus {
@@ -190,6 +206,29 @@ where
                 json,
             })
         }
+        "inspect-execution" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc inspect-execution [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::InspectExecution {
+                input: input.ok_or_else(|| {
+                    "usage: nuisc inspect-execution [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
         "artifact-report" => {
             let mut json = false;
             let mut summary = false;
@@ -299,6 +338,74 @@ where
                 })?,
                 json,
             })
+        }
+        "inspect-docs" => {
+            let mut json = false;
+            let mut input = None;
+            let mut output = None;
+            while let Some(arg) = args.next() {
+                if arg == "--json" {
+                    json = true;
+                } else if arg == "--output" {
+                    output = Some(PathBuf::from(args.next().ok_or_else(|| {
+                        "usage: nuisc inspect-docs [--json] [--output <doc-index.json>] <input.ns|project-dir|nuis.toml>"
+                            .to_owned()
+                    })?));
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc inspect-docs [--json] [--output <doc-index.json>] <input.ns|project-dir|nuis.toml>"
+                            .to_owned(),
+                    );
+                }
+            }
+            if output.is_some() && !json {
+                return Err(
+                    "usage: nuisc inspect-docs [--json] [--output <doc-index.json>] <input.ns|project-dir|nuis.toml>"
+                        .to_owned(),
+                );
+            }
+            Ok(CommandKind::InspectDocs {
+                input: input.ok_or_else(|| {
+                    "usage: nuisc inspect-docs [--json] [--output <doc-index.json>] <input.ns|project-dir|nuis.toml>"
+                        .to_owned()
+                })?,
+                json,
+                output,
+            })
+        }
+        "inspect-galaxy-docs" => {
+            let mut json = false;
+            let mut galaxy = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if galaxy.is_none() {
+                    galaxy = Some(arg);
+                } else {
+                    return Err(
+                        "usage: nuisc inspect-galaxy-docs [--json] <galaxy-name>".to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::InspectGalaxyDocs {
+                galaxy: galaxy.ok_or_else(|| {
+                    "usage: nuisc inspect-galaxy-docs [--json] <galaxy-name>".to_owned()
+                })?,
+                json,
+            })
+        }
+        "inspect-stdlib-docs" => {
+            let mut json = false;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else {
+                    return Err("usage: nuisc inspect-stdlib-docs [--json]".to_owned());
+                }
+            }
+            Ok(CommandKind::InspectStdlibDocs { json })
         }
         "cache-status" => {
             let mut verbose_cache = false;
@@ -468,7 +575,7 @@ where
             })
         }
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `inspect-execution`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `inspect-docs`, `inspect-galaxy-docs`, `inspect-stdlib-docs`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
         )),
     }
 }
@@ -552,6 +659,45 @@ mod tests {
             CommandKind::VerifyArtifact {
                 input: PathBuf::from("nuis.compiled.artifact"),
                 json: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_execution_command() {
+        let command = parse_args(
+            vec![
+                "inspect-execution".to_owned(),
+                "nuis.compiled.artifact".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectExecution {
+                input: PathBuf::from("nuis.compiled.artifact"),
+                json: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_execution_json_command() {
+        let command = parse_args(
+            vec![
+                "inspect-execution".to_owned(),
+                "--json".to_owned(),
+                "nuis.compiled.artifact".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectExecution {
+                input: PathBuf::from("nuis.compiled.artifact"),
+                json: true,
             }
         );
     }
@@ -690,5 +836,113 @@ mod tests {
                 json: true,
             }
         );
+    }
+
+    #[test]
+    fn parse_inspect_docs_command() {
+        let command =
+            parse_args(vec!["inspect-docs".to_owned(), "main.ns".to_owned()].into_iter()).unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectDocs {
+                input: PathBuf::from("main.ns"),
+                json: false,
+                output: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_docs_json_command() {
+        let command = parse_args(
+            vec![
+                "inspect-docs".to_owned(),
+                "--json".to_owned(),
+                "nuis.toml".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectDocs {
+                input: PathBuf::from("nuis.toml"),
+                json: true,
+                output: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_docs_json_output_command() {
+        let command = parse_args(
+            vec![
+                "inspect-docs".to_owned(),
+                "--json".to_owned(),
+                "--output".to_owned(),
+                "docs.json".to_owned(),
+                "nuis.toml".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectDocs {
+                input: PathBuf::from("nuis.toml"),
+                json: true,
+                output: Some(PathBuf::from("docs.json")),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_galaxy_docs_command() {
+        let command = parse_args(
+            vec!["inspect-galaxy-docs".to_owned(), "pixelmagic".to_owned()].into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectGalaxyDocs {
+                galaxy: "pixelmagic".to_owned(),
+                json: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_galaxy_docs_json_command() {
+        let command = parse_args(
+            vec![
+                "inspect-galaxy-docs".to_owned(),
+                "--json".to_owned(),
+                "pixelmagic".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectGalaxyDocs {
+                galaxy: "pixelmagic".to_owned(),
+                json: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_stdlib_docs_command() {
+        let command = parse_args(vec!["inspect-stdlib-docs".to_owned()].into_iter()).unwrap();
+        assert_eq!(command, CommandKind::InspectStdlibDocs { json: false });
+    }
+
+    #[test]
+    fn parse_inspect_stdlib_docs_json_command() {
+        let command = parse_args(
+            vec!["inspect-stdlib-docs".to_owned(), "--json".to_owned()].into_iter(),
+        )
+        .unwrap();
+        assert_eq!(command, CommandKind::InspectStdlibDocs { json: true });
     }
 }

@@ -1,8 +1,11 @@
+/// Task result helpers exposed through the standard auto-injected contracts.
 mod cpu StdTaskContracts {
+  /// Adds a bias onto a base task-derived value.
   pub fn add_bias(base: i64, bias: i64) -> i64 {
     return base + bias;
   }
 
+  /// Encodes whether a task result completed successfully.
   pub fn encode_completed(result: TaskResult<i64>) -> i64 {
     if task_completed(result) {
       return 1;
@@ -10,6 +13,7 @@ mod cpu StdTaskContracts {
     return 0;
   }
 
+  /// Encodes whether a task result timed out.
   pub fn encode_timed_out(result: TaskResult<i64>) -> i64 {
     if task_timed_out(result) {
       return 1;
@@ -17,6 +21,7 @@ mod cpu StdTaskContracts {
     return 0;
   }
 
+  /// Returns the completed task value, or zero when the task is not complete.
   pub fn selected_task_value(result: TaskResult<i64>) -> i64 {
     if task_completed(result) {
       return task_value(result);
@@ -24,6 +29,7 @@ mod cpu StdTaskContracts {
     return 0;
   }
 
+  /// Aggregates several task status probes into one compact score.
   pub fn policy_total(
     primary_result: TaskResult<i64>,
     secondary_result: TaskResult<i64>,

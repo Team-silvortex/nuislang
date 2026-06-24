@@ -6,6 +6,7 @@ pub enum Token {
     Symbol(char),
     Arrow,
     String(String),
+    DocComment(String),
 }
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
@@ -15,6 +16,19 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
     while let Some(ch) = chars.next() {
         match ch {
             c if c.is_whitespace() => {}
+            '/' if chars.peek().copied() == Some('/') => {
+                chars.next();
+                if chars.peek().copied() == Some('/') {
+                    chars.next();
+                    tokens.push(Token::DocComment(consume_doc_comment(&mut chars)));
+                } else {
+                    skip_line_comment(&mut chars);
+                }
+            }
+            '/' if chars.peek().copied() == Some('*') => {
+                chars.next();
+                skip_block_comment(&mut chars)?;
+            }
             '{' | '}' | '(' | ')' | '[' | ']' | ';' | ',' | '=' | '!' | '+' | '*' | '/' | '%'
             | ':' | '.' | '<' | '>' | '?' | '@' | '|' | '&' => tokens.push(Token::Symbol(ch)),
             '-' => {
@@ -125,6 +139,7 @@ pub fn describe_token(token: &Token) -> String {
         Token::Symbol(value) => format!("symbol `{value}`"),
         Token::Arrow => "symbol `->`".to_owned(),
         Token::String(value) => format!("string \"{value}\""),
+        Token::DocComment(value) => format!("doc comment \"{value}\""),
     }
 }
 
@@ -143,9 +158,74 @@ fn next_non_whitespace_char(chars: &std::iter::Peekable<std::str::Chars<'_>>) ->
             clone.next();
             continue;
         }
+        if ch == '/' {
+            let mut lookahead = clone.clone();
+            lookahead.next();
+            match lookahead.peek().copied() {
+                Some('/') => {
+                    clone.next();
+                    clone.next();
+                    skip_line_comment(&mut clone);
+                    continue;
+                }
+                Some('*') => {
+                    clone.next();
+                    clone.next();
+                    if skip_block_comment(&mut clone).is_err() {
+                        return None;
+                    }
+                    continue;
+                }
+                _ => {}
+            }
+        }
         return Some(ch);
     }
     None
+}
+
+fn skip_line_comment(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) {
+    while let Some(ch) = chars.next() {
+        if ch == '\n' {
+            break;
+        }
+    }
+}
+
+fn consume_doc_comment(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {
+    let mut text = String::new();
+    while let Some(ch) = chars.next() {
+        if ch == '\n' {
+            break;
+        }
+        text.push(ch);
+    }
+    if let Some(stripped) = text.strip_prefix(' ') {
+        stripped.to_owned()
+    } else {
+        text
+    }
+}
+
+fn skip_block_comment(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Result<(), String> {
+    let mut depth = 1usize;
+    while let Some(ch) = chars.next() {
+        match ch {
+            '/' if chars.peek().copied() == Some('*') => {
+                chars.next();
+                depth += 1;
+            }
+            '*' if chars.peek().copied() == Some('/') => {
+                chars.next();
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Ok(());
+                }
+            }
+            _ => {}
+        }
+    }
+    Err("unterminated block comment".to_owned())
 }
 
 fn consume_wgsl_block(
@@ -279,5 +359,52 @@ shader_inline_wgsl("demo", wgsl {
                 .count(),
             2
         );
+    }
+
+    #[test]
+    fn tokenizes_nuis_source_with_line_and_block_comments() {
+        let tokens = tokenize(
+            r#"
+// module header
+mod cpu main {
+  /* comment before function */
+  fn add(a: i32, b: i32) -> i32 {
+    let sum = a + b; // trailing comment
+    sum
+  }
+}
+"#,
+        )
+        .expect("nuis source tokenizes");
+
+        assert!(tokens.contains(&Token::Word("mod".to_owned())));
+        assert!(tokens.contains(&Token::Word("add".to_owned())));
+        assert!(tokens.contains(&Token::Word("sum".to_owned())));
+        assert!(
+            !tokens.contains(&Token::Word("comment".to_owned())),
+            "comment text should not become normal tokens"
+        );
+    }
+
+    #[test]
+    fn rejects_unterminated_block_comment() {
+        let error = tokenize("mod cpu main { /* missing end ").expect_err("comment should fail");
+        assert!(error.contains("unterminated block comment"));
+    }
+
+    #[test]
+    fn tokenizes_doc_comments_as_dedicated_tokens() {
+        let tokens = tokenize(
+            r#"
+/// adds two values
+mod cpu main {}
+"#,
+        )
+        .expect("doc comments tokenize");
+
+        assert!(tokens.iter().any(|token| matches!(
+            token,
+            Token::DocComment(text) if text == "adds two values"
+        )));
     }
 }

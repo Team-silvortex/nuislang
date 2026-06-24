@@ -49,11 +49,32 @@ pub struct BuildManifestProjectInfo {
     pub organization_index_path: Option<String>,
     pub exchange_index_path: Option<String>,
     pub modules_index_path: Option<String>,
+    pub docs_index_path: Option<String>,
+    pub docs_module_count: usize,
+    pub docs_documented_module_count: usize,
+    pub docs_documented_item_count: usize,
+    pub imports_index_path: Option<String>,
+    pub imports_library_count: usize,
+    pub imports_visible_library_count: usize,
+    pub imports_visible_module_count: usize,
+    pub imports_documented_visible_module_count: usize,
+    pub imports_documented_visible_item_count: usize,
     pub galaxy_index_path: Option<String>,
+    pub galaxy_count: usize,
+    pub galaxy_documented_count: usize,
+    pub galaxy_documented_library_module_count: usize,
+    pub galaxy_documented_item_count: usize,
     pub links_index_path: Option<String>,
     pub packet_index_path: Option<String>,
     pub host_ffi_index_path: Option<String>,
     pub abi_index_path: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BuildManifestDocIndexInfo {
+    pub path: String,
+    pub module_count: usize,
+    pub documented_item_count: usize,
 }
 
 pub struct BuildManifestContext {
@@ -62,6 +83,7 @@ pub struct BuildManifestContext {
     pub loaded_nustar: Vec<String>,
     pub compile_cache: Option<BuildManifestCacheInfo>,
     pub project: Option<BuildManifestProjectInfo>,
+    pub doc_index: Option<BuildManifestDocIndexInfo>,
     pub cpu_target: CpuBuildTarget,
 }
 
@@ -589,6 +611,20 @@ pub fn write_build_manifest(
             escape_toml_string(&cache.root)
         ));
     }
+    if let Some(doc_index) = &context.doc_index {
+        out.push_str(&format!(
+            "doc_index_path = \"{}\"\n",
+            escape_toml_string(&doc_index.path)
+        ));
+        out.push_str(&format!(
+            "doc_index_module_count = {}\n",
+            doc_index.module_count
+        ));
+        out.push_str(&format!(
+            "doc_index_documented_item_count = {}\n",
+            doc_index.documented_item_count
+        ));
+    }
     out.push('\n');
     out.push_str("[artifacts]\n");
     for (kind, artifact_path) in &artifacts {
@@ -881,12 +917,66 @@ pub fn write_build_manifest(
                 escape_toml_string(value)
             ));
         }
+        if let Some(value) = &project.docs_index_path {
+            out.push_str(&format!(
+                "docs_index = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        out.push_str(&format!("docs_module_count = {}\n", project.docs_module_count));
+        out.push_str(&format!(
+            "docs_documented_module_count = {}\n",
+            project.docs_documented_module_count
+        ));
+        out.push_str(&format!(
+            "docs_documented_item_count = {}\n",
+            project.docs_documented_item_count
+        ));
+        if let Some(value) = &project.imports_index_path {
+            out.push_str(&format!(
+                "imports_index = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        out.push_str(&format!(
+            "imports_library_count = {}\n",
+            project.imports_library_count
+        ));
+        out.push_str(&format!(
+            "imports_visible_library_count = {}\n",
+            project.imports_visible_library_count
+        ));
+        out.push_str(&format!(
+            "imports_visible_module_count = {}\n",
+            project.imports_visible_module_count
+        ));
+        out.push_str(&format!(
+            "imports_documented_visible_module_count = {}\n",
+            project.imports_documented_visible_module_count
+        ));
+        out.push_str(&format!(
+            "imports_documented_visible_item_count = {}\n",
+            project.imports_documented_visible_item_count
+        ));
         if let Some(value) = &project.galaxy_index_path {
             out.push_str(&format!(
                 "galaxy_index = \"{}\"\n",
                 escape_toml_string(value)
             ));
         }
+        out.push_str(&format!("galaxy_count = {}\n", project.galaxy_count));
+        out.push_str(&format!(
+            "documented_galaxy_count = {}\n",
+            project.galaxy_documented_count
+        ));
+        out.push_str(&format!(
+            "documented_galaxy_library_module_count = {}\n",
+            project.galaxy_documented_library_module_count
+        ));
+        out.push_str(&format!(
+            "documented_galaxy_item_count = {}\n",
+            project.galaxy_documented_item_count
+        ));
         if let Some(value) = &project.links_index_path {
             out.push_str(&format!(
                 "links_index = \"{}\"\n",
@@ -3314,9 +3404,28 @@ pub struct BuildManifestVerifyReport {
     pub compile_cache_status: Option<String>,
     pub compile_cache_key: Option<String>,
     pub compile_cache_root: Option<String>,
+    pub doc_index_path: Option<String>,
+    pub doc_index_module_count: usize,
+    pub doc_index_documented_item_count: usize,
+    pub doc_index_checked: usize,
     pub project_text_handle_rewrite_helper_hits: usize,
     pub project_text_handle_rewrite_local_hits: usize,
     pub project_plan_index: Option<String>,
+    pub project_docs_index: Option<String>,
+    pub project_docs_module_count: usize,
+    pub project_docs_documented_module_count: usize,
+    pub project_docs_documented_item_count: usize,
+    pub project_imports_index: Option<String>,
+    pub project_imports_library_count: usize,
+    pub project_imports_visible_library_count: usize,
+    pub project_imports_visible_module_count: usize,
+    pub project_imports_documented_visible_module_count: usize,
+    pub project_imports_documented_visible_item_count: usize,
+    pub project_galaxy_index: Option<String>,
+    pub project_galaxy_count: usize,
+    pub project_documented_galaxy_count: usize,
+    pub project_documented_galaxy_library_module_count: usize,
+    pub project_documented_galaxy_item_count: usize,
     pub project_packet_index: Option<String>,
     pub bridge_registry_path: Option<String>,
     pub bridge_registry_units: usize,
@@ -3451,11 +3560,42 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let compile_cache_status = parse_optional_toml_string(&source, "compile_cache_status");
     let compile_cache_key = parse_optional_toml_string(&source, "compile_cache_key");
     let compile_cache_root = parse_optional_toml_string(&source, "compile_cache_root");
+    let doc_index_path = parse_optional_toml_string(&source, "doc_index_path");
+    let doc_index_module_count =
+        parse_optional_toml_usize(&source, "doc_index_module_count").unwrap_or(0);
+    let doc_index_documented_item_count =
+        parse_optional_toml_usize(&source, "doc_index_documented_item_count").unwrap_or(0);
     let project_text_handle_rewrite_helper_hits =
         parse_optional_toml_usize(&source, "text_handle_rewrite_helper_hits").unwrap_or(0);
     let project_text_handle_rewrite_local_hits =
         parse_optional_toml_usize(&source, "text_handle_rewrite_local_hits").unwrap_or(0);
     let project_plan_index = parse_optional_toml_string(&source, "plan_index");
+    let project_docs_index = parse_optional_toml_string(&source, "docs_index");
+    let project_docs_module_count =
+        parse_optional_toml_usize(&source, "docs_module_count").unwrap_or(0);
+    let project_docs_documented_module_count =
+        parse_optional_toml_usize(&source, "docs_documented_module_count").unwrap_or(0);
+    let project_docs_documented_item_count =
+        parse_optional_toml_usize(&source, "docs_documented_item_count").unwrap_or(0);
+    let project_imports_index = parse_optional_toml_string(&source, "imports_index");
+    let project_imports_library_count =
+        parse_optional_toml_usize(&source, "imports_library_count").unwrap_or(0);
+    let project_imports_visible_library_count =
+        parse_optional_toml_usize(&source, "imports_visible_library_count").unwrap_or(0);
+    let project_imports_visible_module_count =
+        parse_optional_toml_usize(&source, "imports_visible_module_count").unwrap_or(0);
+    let project_imports_documented_visible_module_count =
+        parse_optional_toml_usize(&source, "imports_documented_visible_module_count").unwrap_or(0);
+    let project_imports_documented_visible_item_count =
+        parse_optional_toml_usize(&source, "imports_documented_visible_item_count").unwrap_or(0);
+    let project_galaxy_index = parse_optional_toml_string(&source, "galaxy_index");
+    let project_galaxy_count = parse_optional_toml_usize(&source, "galaxy_count").unwrap_or(0);
+    let project_documented_galaxy_count =
+        parse_optional_toml_usize(&source, "documented_galaxy_count").unwrap_or(0);
+    let project_documented_galaxy_library_module_count =
+        parse_optional_toml_usize(&source, "documented_galaxy_library_module_count").unwrap_or(0);
+    let project_documented_galaxy_item_count =
+        parse_optional_toml_usize(&source, "documented_galaxy_item_count").unwrap_or(0);
     let project_packet_index = parse_optional_toml_string(&source, "packet_index");
     let bridge_registry_path = parse_optional_toml_string(&source, "bridge_registry_path");
     let bridge_registry_schema = parse_optional_toml_string(&source, "bridge_registry_schema");
@@ -4136,6 +4276,39 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         ));
     }
 
+    let mut doc_index_checked = 0usize;
+    if let Some(doc_index_path) = &doc_index_path {
+        let doc_index_source = fs::read_to_string(doc_index_path).map_err(|error| {
+            format!(
+                "failed to read doc index `{}` referenced by `{}`: {error}",
+                doc_index_path,
+                path.display()
+            )
+        })?;
+        if !doc_index_source.contains("\"kind\":\"nuis_doc_index\"") {
+            return Err(format!(
+                "doc index `{}` has unexpected kind; expected `nuis_doc_index`",
+                doc_index_path
+            ));
+        }
+        if !doc_index_source.contains(&format!("\"module_count\":{}", doc_index_module_count)) {
+            return Err(format!(
+                "doc index `{}` module_count mismatch: manifest={}, index payload differs",
+                doc_index_path, doc_index_module_count
+            ));
+        }
+        if !doc_index_source.contains(&format!(
+            "\"documented_item_count\":{}",
+            doc_index_documented_item_count
+        )) {
+            return Err(format!(
+                "doc index `{}` documented_item_count mismatch: manifest={}, index payload differs",
+                doc_index_path, doc_index_documented_item_count
+            ));
+        }
+        doc_index_checked = 1;
+    }
+
     let mut project_metadata_checked = 0usize;
     if let Some(plan_index) = &project_plan_index {
         let plan_source = fs::read_to_string(plan_index).map_err(|error| {
@@ -4153,6 +4326,75 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                     plan_index, expected
                 ));
             }
+        }
+        project_metadata_checked += 1;
+    }
+    if let Some(docs_index) = &project_docs_index {
+        let docs_source = fs::read_to_string(docs_index).map_err(|error| {
+            format!(
+                "failed to read project docs index `{}` referenced by `{}`: {error}",
+                docs_index,
+                path.display()
+            )
+        })?;
+        let expected = format!(
+            "summary\tmodules={}\tdocumented_modules={}\tdocumented_items={}",
+            project_docs_module_count,
+            project_docs_documented_module_count,
+            project_docs_documented_item_count
+        );
+        if !docs_source.lines().any(|line| line.trim() == expected) {
+            return Err(format!(
+                "project docs index `{}` summary mismatch: expected line `{}`",
+                docs_index, expected
+            ));
+        }
+        project_metadata_checked += 1;
+    }
+    if let Some(imports_index) = &project_imports_index {
+        let imports_source = fs::read_to_string(imports_index).map_err(|error| {
+            format!(
+                "failed to read project imports index `{}` referenced by `{}`: {error}",
+                imports_index,
+                path.display()
+            )
+        })?;
+        let expected = format!(
+            "summary\tlibraries={}\tvisible_libraries={}\tvisible_modules={}\tdocumented_visible_modules={}\tdocumented_visible_items={}",
+            project_imports_library_count,
+            project_imports_visible_library_count,
+            project_imports_visible_module_count,
+            project_imports_documented_visible_module_count,
+            project_imports_documented_visible_item_count
+        );
+        if !imports_source.lines().any(|line| line.trim() == expected) {
+            return Err(format!(
+                "project imports index `{}` summary mismatch: expected line `{}`",
+                imports_index, expected
+            ));
+        }
+        project_metadata_checked += 1;
+    }
+    if let Some(galaxy_index) = &project_galaxy_index {
+        let galaxy_source = fs::read_to_string(galaxy_index).map_err(|error| {
+            format!(
+                "failed to read project galaxy index `{}` referenced by `{}`: {error}",
+                galaxy_index,
+                path.display()
+            )
+        })?;
+        let expected = format!(
+            "summary\tgalaxies={}\tdocumented_galaxies={}\tdocumented_library_modules={}\tdocumented_items={}",
+            project_galaxy_count,
+            project_documented_galaxy_count,
+            project_documented_galaxy_library_module_count,
+            project_documented_galaxy_item_count
+        );
+        if !galaxy_source.lines().any(|line| line.trim() == expected) {
+            return Err(format!(
+                "project galaxy index `{}` summary mismatch: expected line `{}`",
+                galaxy_index, expected
+            ));
         }
         project_metadata_checked += 1;
     }
@@ -4211,9 +4453,28 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         compile_cache_status,
         compile_cache_key,
         compile_cache_root,
+        doc_index_path,
+        doc_index_module_count,
+        doc_index_documented_item_count,
+        doc_index_checked,
         project_text_handle_rewrite_helper_hits,
         project_text_handle_rewrite_local_hits,
         project_plan_index,
+        project_docs_index,
+        project_docs_module_count,
+        project_docs_documented_module_count,
+        project_docs_documented_item_count,
+        project_imports_index,
+        project_imports_library_count,
+        project_imports_visible_library_count,
+        project_imports_visible_module_count,
+        project_imports_documented_visible_module_count,
+        project_imports_documented_visible_item_count,
+        project_galaxy_index,
+        project_galaxy_count,
+        project_documented_galaxy_count,
+        project_documented_galaxy_library_module_count,
+        project_documented_galaxy_item_count,
         project_packet_index,
         bridge_registry_path,
         bridge_registry_units,
@@ -8497,12 +8758,27 @@ mod tests {
                     organization_index_path: None,
                     exchange_index_path: None,
                     modules_index_path: None,
+                    docs_index_path: None,
+                    docs_module_count: 0,
+                    docs_documented_module_count: 0,
+                    docs_documented_item_count: 0,
+                    imports_index_path: None,
+                    imports_library_count: 0,
+                    imports_visible_library_count: 0,
+                    imports_visible_module_count: 0,
+                    imports_documented_visible_module_count: 0,
+                    imports_documented_visible_item_count: 0,
                     galaxy_index_path: None,
+                    galaxy_count: 0,
+                    galaxy_documented_count: 0,
+                    galaxy_documented_library_module_count: 0,
+                    galaxy_documented_item_count: 0,
                     links_index_path: None,
                     packet_index_path: None,
                     host_ffi_index_path: None,
                     abi_index_path: None,
                 }),
+                doc_index: None,
                 cpu_target,
             },
         )
@@ -8648,12 +8924,27 @@ mod tests {
                     organization_index_path: None,
                     exchange_index_path: None,
                     modules_index_path: None,
+                    docs_index_path: None,
+                    docs_module_count: 0,
+                    docs_documented_module_count: 0,
+                    docs_documented_item_count: 0,
+                    imports_index_path: None,
+                    imports_library_count: 0,
+                    imports_visible_library_count: 0,
+                    imports_visible_module_count: 0,
+                    imports_documented_visible_module_count: 0,
+                    imports_documented_visible_item_count: 0,
                     galaxy_index_path: None,
+                    galaxy_count: 0,
+                    galaxy_documented_count: 0,
+                    galaxy_documented_library_module_count: 0,
+                    galaxy_documented_item_count: 0,
                     links_index_path: None,
                     packet_index_path: None,
                     host_ffi_index_path: None,
                     abi_index_path: None,
                 }),
+                doc_index: None,
                 cpu_target: cpu_target.clone(),
             },
         )
@@ -8786,6 +9077,10 @@ mod tests {
         assert_eq!(report.host_bridge_plan_index_path, None);
         assert_eq!(report.host_bridge_plan_units, 0);
         assert_eq!(report.host_bridge_plan_checked, 0);
+        assert_eq!(report.doc_index_path, None);
+        assert_eq!(report.doc_index_module_count, 0);
+        assert_eq!(report.doc_index_documented_item_count, 0);
+        assert_eq!(report.doc_index_checked, 0);
         assert_eq!(report.domain_build_units.len(), 1);
         assert_eq!(report.domain_build_units[0].domain_family, "cpu");
         assert_eq!(report.domain_build_units[0].artifact_stub_path, None);
@@ -8880,12 +9175,27 @@ mod tests {
                     organization_index_path: None,
                     exchange_index_path: None,
                     modules_index_path: None,
+                    docs_index_path: None,
+                    docs_module_count: 0,
+                    docs_documented_module_count: 0,
+                    docs_documented_item_count: 0,
+                    imports_index_path: None,
+                    imports_library_count: 0,
+                    imports_visible_library_count: 0,
+                    imports_visible_module_count: 0,
+                    imports_documented_visible_module_count: 0,
+                    imports_documented_visible_item_count: 0,
                     galaxy_index_path: None,
+                    galaxy_count: 0,
+                    galaxy_documented_count: 0,
+                    galaxy_documented_library_module_count: 0,
+                    galaxy_documented_item_count: 0,
                     links_index_path: None,
                     packet_index_path: None,
                     host_ffi_index_path: None,
                     abi_index_path: None,
                 }),
+                doc_index: None,
                 cpu_target,
             },
         )
@@ -9352,12 +9662,27 @@ mod tests {
                     organization_index_path: None,
                     exchange_index_path: None,
                     modules_index_path: None,
+                    docs_index_path: None,
+                    docs_module_count: 0,
+                    docs_documented_module_count: 0,
+                    docs_documented_item_count: 0,
+                    imports_index_path: None,
+                    imports_library_count: 0,
+                    imports_visible_library_count: 0,
+                    imports_visible_module_count: 0,
+                    imports_documented_visible_module_count: 0,
+                    imports_documented_visible_item_count: 0,
                     galaxy_index_path: None,
+                    galaxy_count: 0,
+                    galaxy_documented_count: 0,
+                    galaxy_documented_library_module_count: 0,
+                    galaxy_documented_item_count: 0,
                     links_index_path: None,
                     packet_index_path: None,
                     host_ffi_index_path: None,
                     abi_index_path: None,
                 }),
+                doc_index: None,
                 cpu_target,
             },
         )

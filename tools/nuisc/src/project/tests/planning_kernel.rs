@@ -365,11 +365,14 @@ links = [
 
     let metadata = write_project_metadata(&output_dir, &project, &plan).unwrap();
     let modules_index = fs::read_to_string(&metadata.modules_index_path).unwrap();
+    let docs_index = fs::read_to_string(&metadata.docs_index_path).unwrap();
     let links_index = fs::read_to_string(&metadata.links_index_path).unwrap();
 
     assert!(modules_index.contains("main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local"));
     assert!(modules_index
         .contains("helpers.ns\tmod cpu Helpers\tentry=false\tsource_kind=project-local"));
+    assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
+    assert!(docs_index.contains("module\tcpu.Helpers\titems=0\tsource_kind=project-local"));
     assert_eq!(links_index, "cpu.Main\tcpu.Helpers\t<direct>\n");
     fs::remove_dir_all(&root).unwrap();
 }

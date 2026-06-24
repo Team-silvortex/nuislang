@@ -39,12 +39,14 @@ impl Parser {
     }
 
     pub fn parse_module(&mut self) -> Result<AstModule, String> {
+        self.consume_module_leading_doc_comments()?;
         let mut uses = Vec::new();
         let mut externs = Vec::new();
         let mut extern_interfaces = Vec::new();
         while self.peek_word("use") {
             uses.push(self.parse_use_decl()?);
         }
+        self.consume_module_leading_doc_comments()?;
         while self.peek_item_keyword_after_attributes("extern") {
             let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
             if !attributes.is_empty() {
@@ -60,6 +62,7 @@ impl Parser {
                 externs.push(self.parse_extern_function_with_abi(visibility, abi, None)?);
             }
         }
+        self.consume_module_leading_doc_comments()?;
         self.expect_word("mod")?;
         let domain = self.expect_ident()?;
         let unit = self.expect_ident()?;
@@ -138,6 +141,10 @@ impl Parser {
         let mut index = self.cursor;
         let mut saw_pub = false;
         loop {
+            if matches!(self.tokens.get(index), Some(Token::DocComment(_))) {
+                index += 1;
+                continue;
+            }
             if matches!(self.tokens.get(index), Some(Token::Word(word)) if word == "pub") {
                 if saw_pub {
                     return false;
@@ -180,7 +187,7 @@ impl Parser {
         &mut self,
     ) -> Result<(AstVisibility, Vec<AstAttribute>), String> {
         let mut visibility = AstVisibility::Private;
-        let mut attributes = Vec::new();
+        let mut attributes = self.parse_leading_attribute_list()?;
         loop {
             if self.peek_word("pub") {
                 if visibility == AstVisibility::Public {
@@ -188,6 +195,19 @@ impl Parser {
                 }
                 self.expect_word("pub")?;
                 visibility = AstVisibility::Public;
+                attributes.extend(self.parse_leading_attribute_list()?);
+                continue;
+            }
+            break;
+        }
+        Ok((visibility, attributes))
+    }
+
+    fn parse_leading_attribute_list(&mut self) -> Result<Vec<AstAttribute>, String> {
+        let mut attributes = Vec::new();
+        loop {
+            if self.peek_doc_comment() {
+                attributes.push(self.parse_doc_comment_attribute()?);
                 continue;
             }
             if self.peek_symbol('@') {
@@ -196,7 +216,7 @@ impl Parser {
             }
             break;
         }
-        Ok((visibility, attributes))
+        Ok(attributes)
     }
 
     fn parse_struct_def(&mut self) -> Result<AstStructDef, String> {
@@ -246,19 +266,16 @@ impl Parser {
 
     fn parse_const_item(&mut self) -> Result<AstConstItem, String> {
         let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
-        if !attributes.is_empty() {
-            return Err(
-                "top-level const annotations are not supported in the current frontend".to_owned(),
-            );
-        }
         self.expect_word("const")?;
         let name = self.expect_ident()?;
+        self.ensure_doc_only_attributes("top-level const", &attributes)?;
         let ty = self.parse_optional_type_annotation()?;
         self.expect_symbol('=')?;
         let value = self.parse_expr()?;
         self.expect_symbol(';')?;
         Ok(AstConstItem {
             visibility,
+            attributes,
             name,
             ty,
             value,
@@ -282,7 +299,9 @@ impl Parser {
         self.expect_symbol('{')?;
         let mut variants = Vec::new();
         while !self.peek_symbol('}') {
+            let attributes = self.parse_leading_attribute_list()?;
             let variant_name = self.expect_ident()?;
+            self.ensure_doc_only_attributes("enum variant", &attributes)?;
             let kind = if self.peek_symbol('(') {
                 self.expect_symbol('(')?;
                 let mut fields = Vec::new();
@@ -323,6 +342,7 @@ impl Parser {
                 AstEnumVariantKind::Unit
             };
             variants.push(AstEnumVariant {
+                attributes,
                 name: variant_name,
                 kind,
             });
@@ -345,14 +365,9 @@ impl Parser {
 
     fn parse_type_alias_item(&mut self) -> Result<AstTypeAlias, String> {
         let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
-        if !attributes.is_empty() {
-            return Err(
-                "top-level type alias annotations are not supported in the current frontend"
-                    .to_owned(),
-            );
-        }
         self.expect_word("type")?;
         let name = self.expect_ident()?;
+        self.ensure_doc_only_attributes("top-level type alias", &attributes)?;
         let generic_params = if self.peek_symbol('<') {
             self.parse_generic_param_decl_list()?
         } else {
@@ -368,6 +383,7 @@ impl Parser {
         self.expect_symbol(';')?;
         Ok(AstTypeAlias {
             visibility,
+            attributes,
             name,
             generic_params,
             where_bounds,
@@ -377,11 +393,9 @@ impl Parser {
 
     fn parse_trait_def(&mut self) -> Result<AstTraitDef, String> {
         let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
-        if !attributes.is_empty() {
-            return Err("trait annotations are not supported in the current frontend".to_owned());
-        }
         self.expect_word("trait")?;
         let name = self.expect_ident()?;
+        self.ensure_doc_only_attributes("trait", &attributes)?;
         self.expect_symbol('{')?;
         let mut methods = Vec::new();
         while !self.peek_symbol('}') {
@@ -390,6 +404,7 @@ impl Parser {
         self.expect_symbol('}')?;
         Ok(AstTraitDef {
             visibility,
+            attributes,
             name,
             methods,
         })
@@ -403,11 +418,7 @@ impl Parser {
                     .to_owned(),
             );
         }
-        if !attributes.is_empty() {
-            return Err(
-                "trait method annotations are not supported in the current frontend".to_owned(),
-            );
-        }
+        self.ensure_doc_only_attributes("trait method", &attributes)?;
         self.expect_word("fn")?;
         let name = self.expect_ident()?;
         self.expect_symbol('(')?;
@@ -425,6 +436,7 @@ impl Parser {
             None
         };
         Ok(AstTraitMethodSig {
+            attributes,
             name,
             params,
             return_type,
@@ -1163,6 +1175,27 @@ impl Parser {
         Ok(attributes)
     }
 
+    fn parse_doc_comment_attribute(&mut self) -> Result<AstAttribute, String> {
+        match self.tokens.get(self.cursor) {
+            Some(Token::DocComment(text)) => {
+                let text = text.clone();
+                self.cursor += 1;
+                Ok(AstAttribute {
+                    name: "doc".to_owned(),
+                    args: vec![AstAttributeArg {
+                        name: None,
+                        value: AstAttributeValue::String(text),
+                    }],
+                })
+            }
+            Some(token) => Err(format!(
+                "expected doc comment, found {}",
+                describe_token(token)
+            )),
+            None => Err("expected doc comment, found end of file".to_owned()),
+        }
+    }
+
     fn parse_attribute(&mut self) -> Result<AstAttribute, String> {
         self.expect_symbol('@')?;
         let name = self.expect_ident()?;
@@ -1236,6 +1269,28 @@ impl Parser {
             )),
             None => Err("expected annotation attribute value, found end of file".to_owned()),
         }
+    }
+
+    fn ensure_doc_only_attributes(
+        &self,
+        context: &str,
+        attributes: &[AstAttribute],
+    ) -> Result<(), String> {
+        for attribute in attributes {
+            if attribute.name != "doc" {
+                return Err(format!(
+                    "{context} currently only supports doc comments or `@doc(...)` annotations"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn consume_module_leading_doc_comments(&mut self) -> Result<(), String> {
+        while self.peek_doc_comment() {
+            self.parse_doc_comment_attribute()?;
+        }
+        Ok(())
     }
 
     fn parse_generic_param_decl_list(&mut self) -> Result<Vec<AstGenericParam>, String> {
@@ -2609,6 +2664,10 @@ impl Parser {
 
     fn peek_word(&self, expected: &str) -> bool {
         matches!(self.tokens.get(self.cursor), Some(Token::Word(actual)) if actual == expected)
+    }
+
+    fn peek_doc_comment(&self) -> bool {
+        matches!(self.tokens.get(self.cursor), Some(Token::DocComment(_)))
     }
 
     fn peek_double_symbol(&self, expected: char) -> bool {

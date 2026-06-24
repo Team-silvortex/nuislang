@@ -5,6 +5,7 @@ use nuis_semantics::model::{
 
 pub(super) fn render_ast_struct(definition: &AstStructDef) -> String {
     let mut out = String::new();
+    out.push_str(&super::render_ast_doc_comments("  ", &definition.attributes));
     let attribute_prefix = super::render_ast_attributes(&definition.attributes);
     let visibility_prefix = super::render_ast_visibility(definition.visibility);
     out.push_str(&format!(
@@ -16,6 +17,7 @@ pub(super) fn render_ast_struct(definition: &AstStructDef) -> String {
         render_ast_where_clause(&definition.where_bounds)
     ));
     for field in &definition.fields {
+        out.push_str(&super::render_ast_doc_comments("    ", &field.attributes));
         let field_prefix = super::render_ast_attributes(&field.attributes);
         let field_visibility = super::render_ast_visibility(field.visibility);
         out.push_str(&format!(
@@ -57,6 +59,7 @@ pub(super) fn render_nir_struct(definition: &NirStructDef) -> String {
 
 pub(super) fn render_ast_enum(definition: &AstEnumDef) -> String {
     let mut out = String::new();
+    out.push_str(&super::render_ast_doc_comments("  ", &definition.attributes));
     let attribute_prefix = super::render_ast_attributes(&definition.attributes);
     let visibility_prefix = super::render_ast_visibility(definition.visibility);
     out.push_str(&format!(
@@ -68,6 +71,7 @@ pub(super) fn render_ast_enum(definition: &AstEnumDef) -> String {
         render_ast_where_clause(&definition.where_bounds)
     ));
     for variant in &definition.variants {
+        out.push_str(&super::render_ast_doc_comments("    ", &variant.attributes));
         match &variant.kind {
             AstEnumVariantKind::Unit => {
                 out.push_str(&format!("    variant {}\n", variant.name));
@@ -86,6 +90,7 @@ pub(super) fn render_ast_enum(definition: &AstEnumDef) -> String {
             AstEnumVariantKind::Struct(fields) => {
                 out.push_str(&format!("    variant {} {{\n", variant.name));
                 for field in fields {
+                    out.push_str(&super::render_ast_doc_comments("      ", &field.attributes));
                     let field_prefix = super::render_ast_attributes(&field.attributes);
                     let field_visibility = super::render_ast_visibility(field.visibility);
                     out.push_str(&format!(

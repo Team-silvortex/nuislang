@@ -68,6 +68,13 @@ pub struct ResolvedGalaxyDependency {
     pub auto_inject_blockers: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ResolvedGalaxyDocSummary {
+    pub(crate) documented_library_modules: usize,
+    pub(crate) documented_items: usize,
+    pub(crate) library_module_items: Vec<(String, usize)>,
+}
+
 pub fn load_stdlib_layout(stdlib_root: &Path) -> Result<StdlibLayout, String> {
     let path = stdlib_root.join("index.toml");
     let source = fs::read_to_string(&path)
@@ -498,6 +505,7 @@ pub fn write_resolved_galaxy_index<W: fmt::Write>(
     dependencies: &[ResolvedGalaxyDependency],
 ) -> fmt::Result {
     for item in dependencies {
+        let doc_summary = summarize_resolved_galaxy_docs(item);
         write!(
             out,
             "{}\tpackage={}\tdirect={}\trequested_by=",
@@ -512,13 +520,15 @@ pub fn write_resolved_galaxy_index<W: fmt::Write>(
         }
         writeln!(
             out,
-            "\tsource_modules={}\tauto_injectable={}",
+            "\tsource_modules={}\tauto_injectable={}\tdocumented_library_modules={}\tdocumented_items={}",
             item.source_modules.len(),
             if item.auto_injectable {
                 "true"
             } else {
                 "false"
-            }
+            },
+            doc_summary.documented_library_modules,
+            doc_summary.documented_items
         )?;
 
         out.write_str("  library_modules=")?;
@@ -528,6 +538,16 @@ pub fn write_resolved_galaxy_index<W: fmt::Write>(
             write_joined_items(out, &item.library_modules, ", ")?;
         }
         out.write_str("\n")?;
+        if !doc_summary.library_module_items.is_empty() {
+            out.write_str("  library_docs=")?;
+            for (index, (module, items)) in doc_summary.library_module_items.iter().enumerate() {
+                if index > 0 {
+                    out.write_str(", ")?;
+                }
+                write!(out, "{module}:{items}")?;
+            }
+            out.write_str("\n")?;
+        }
 
         out.write_str("  surfaces=")?;
         if item.surfaces.is_empty() {
@@ -561,4 +581,38 @@ pub fn write_resolved_galaxy_index<W: fmt::Write>(
         out.write_str("\n")?;
     }
     Ok(())
+}
+
+pub(crate) fn summarize_resolved_galaxy_docs(
+    item: &ResolvedGalaxyDependency,
+) -> ResolvedGalaxyDocSummary {
+    let mut documented_library_modules = 0usize;
+    let mut documented_items = 0usize;
+    let mut library_module_items = Vec::new();
+
+    for (library_module, path) in item
+        .library_modules
+        .iter()
+        .zip(item.resolved_library_paths.iter())
+    {
+        let Ok(source) = fs::read_to_string(path) else {
+            continue;
+        };
+        let Ok(ast) = crate::frontend::parse_nuis_ast(&source) else {
+            continue;
+        };
+        let index = crate::frontend::extract_ast_doc_index(&ast);
+        let item_count = index.items.len();
+        if item_count > 0 {
+            documented_library_modules += 1;
+            documented_items += item_count;
+            library_module_items.push((library_module.clone(), item_count));
+        }
+    }
+
+    ResolvedGalaxyDocSummary {
+        documented_library_modules,
+        documented_items,
+        library_module_items,
+    }
 }

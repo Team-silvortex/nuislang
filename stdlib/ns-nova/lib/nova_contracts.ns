@@ -1,16 +1,21 @@
+/// Manual-import NS Nova contracts for frame, panel, scene, and runtime scoring.
 mod cpu NovaContracts {
+  /// Aggregates frame budget and pass count into a frame score.
   pub fn frame_score(frame_budget: i64, pass_count: i64) -> i64 {
     return frame_budget + pass_count;
   }
 
+  /// Aggregates panel count and selection count into a panel score.
   pub fn panel_score(panel_count: i64, selection_count: i64) -> i64 {
     return panel_count + selection_count;
   }
 
+  /// Aggregates scene node count and layer count into a scene score.
   pub fn scene_score(node_count: i64, layer_count: i64) -> i64 {
     return node_count + layer_count;
   }
 
+  /// Combines frame, panel, and scene scores into one runtime score.
   pub fn runtime_score(
     frame_budget: i64,
     pass_count: i64,

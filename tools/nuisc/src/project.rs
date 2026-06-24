@@ -265,14 +265,42 @@ pub fn summarize_project_text_handle_rewrites(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectDocsSummary {
+    pub modules: usize,
+    pub documented_modules: usize,
+    pub documented_items: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectImportsSummary {
+    pub libraries: usize,
+    pub visible_libraries: usize,
+    pub visible_modules: usize,
+    pub documented_visible_modules: usize,
+    pub documented_visible_items: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectGalaxySummary {
+    pub galaxies: usize,
+    pub documented_galaxies: usize,
+    pub documented_library_modules: usize,
+    pub documented_items: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectBuildMetadata {
     pub manifest_copy_path: String,
     pub plan_index_path: String,
     pub organization_index_path: String,
     pub exchange_index_path: String,
     pub modules_index_path: String,
+    pub docs_index_path: String,
+    pub docs_summary: ProjectDocsSummary,
     pub imports_index_path: String,
+    pub imports_summary: ProjectImportsSummary,
     pub galaxy_index_path: String,
+    pub galaxy_summary: ProjectGalaxySummary,
     pub links_index_path: String,
     pub packet_index_path: String,
     pub host_ffi_index_path: String,

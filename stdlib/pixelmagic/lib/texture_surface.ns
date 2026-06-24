@@ -1,6 +1,8 @@
 use data FabricPlane;
 
+/// Shader-side texture surface profile for PixelMagic resource demos.
 mod shader PixelMagicTextureSurface {
+  /// Declares the texture-oriented surface profile used by PixelMagic resource demos.
   fn profile() {
     const vertex_count: i64 = 4;
     const instance_count: i64 = 1;

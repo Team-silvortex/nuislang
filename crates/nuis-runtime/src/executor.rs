@@ -83,6 +83,62 @@ pub struct ExecutionPlan {
     pub phases: Vec<ExecutionPhaseBinding>,
 }
 
+impl ExecutionPlan {
+    pub fn render_summary(&self) -> String {
+        let mut lines = vec![
+            format!("domain_family = {}", self.domain_family),
+            format!("package_id = {}", self.package_id),
+            format!("adapter_id = {}", self.adapter_id),
+        ];
+        if let Some(backend_family) = &self.backend_family {
+            lines.push(format!("backend_family = {backend_family}"));
+        }
+        if let Some(target) = &self.selected_lowering_target {
+            lines.push(format!("selected_lowering_target = {target}"));
+        }
+        lines.push(format!("phase_count = {}", self.phases.len()));
+
+        for phase in &self.phases {
+            lines.push(format!("phase {} role={:?}", phase.phase, phase.role));
+            lines.push(format!("  bridge_surface = {}", phase.bridge_surface));
+            lines.push(format!("  scheduler_binding = {}", phase.scheduler_binding));
+            lines.push(format!("  lowering_summary = {}", phase.lowering_summary));
+            lines.push(format!("  backend_summary = {}", phase.backend_summary));
+            lines.push(format!("  bridge_summary = {}", phase.bridge_summary));
+            if let Some(ir_sidecar_summary) = &phase.ir_sidecar_summary {
+                lines.push(format!("  ir_sidecar_summary = {ir_sidecar_summary}"));
+            }
+            lines.push(format!("  action_kind = {}", phase.action.kind));
+            lines.push(format!(
+                "  input_handles = {}",
+                join_or_dash(&phase.action.input_handles)
+            ));
+            lines.push(format!(
+                "  output_handles = {}",
+                join_or_dash(&phase.action.output_handles)
+            ));
+            lines.push(format!(
+                "  scheduler_keys = {}",
+                join_or_dash(&phase.action.scheduler_keys)
+            ));
+            if let Some(hint) = &phase.action.adapter_hint {
+                lines.push(format!("  adapter_hint = {hint}"));
+            }
+            for binding in &phase.action.resource_bindings {
+                lines.push(format!(
+                    "  resource {} kind={:?} capability={} value={}",
+                    binding.key,
+                    binding.kind,
+                    binding.capability_label.as_deref().unwrap_or("-"),
+                    binding.value
+                ));
+            }
+        }
+
+        lines.join("\n")
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExecutionPhaseContext<'a> {
     pub phase: &'a str,
@@ -90,6 +146,8 @@ pub struct ExecutionPhaseContext<'a> {
     pub domain_family: &'a str,
     pub package_id: &'a str,
     pub adapter_id: &'a str,
+    pub backend_family: Option<&'a str>,
+    pub selected_lowering_target: Option<&'a str>,
     pub bridge_surface: &'a str,
     pub scheduler_binding: &'a str,
     pub lowering_summary: &'a str,
@@ -118,6 +176,63 @@ pub struct ExecutionTrace {
     pub domain_family: String,
     pub phase_count: usize,
     pub events: Vec<ExecutionTraceEvent>,
+}
+
+impl ExecutionTrace {
+    pub fn render_summary(&self) -> String {
+        let mut lines = vec![
+            format!("domain_family = {}", self.domain_family),
+            format!("phase_count = {}", self.phase_count),
+        ];
+
+        for event in &self.events {
+            lines.push(format!(
+                "event {} role={:?} adapter={}",
+                event.phase, event.role, event.adapter_id
+            ));
+            lines.push(format!("  bridge_surface = {}", event.bridge_surface));
+            lines.push(format!("  scheduler_binding = {}", event.scheduler_binding));
+            lines.push(format!("  action_kind = {}", event.action.kind));
+            lines.push(format!("  outcome_status = {}", event.outcome.status));
+            lines.push(format!(
+                "  state_before_handles = {}",
+                join_or_dash(&event.state_before.available_handles)
+            ));
+            lines.push(format!(
+                "  state_after_handles = {}",
+                join_or_dash(&event.state_after.available_handles)
+            ));
+            for binding in &event.action.resolved_inputs {
+                lines.push(format!(
+                    "  resolved_input {} kind={:?} capability={} value={}",
+                    binding.key,
+                    binding.kind,
+                    binding.capability_label.as_deref().unwrap_or("-"),
+                    binding.value
+                ));
+            }
+            for binding in &event.action.resolved_resources {
+                lines.push(format!(
+                    "  resolved_resource {} kind={:?} capability={} value={}",
+                    binding.key,
+                    binding.kind,
+                    binding.capability_label.as_deref().unwrap_or("-"),
+                    binding.value
+                ));
+            }
+            for binding in &event.outcome.produced_slots {
+                lines.push(format!(
+                    "  produced_slot {} kind={:?} capability={} value={}",
+                    binding.key,
+                    binding.kind,
+                    binding.capability_label.as_deref().unwrap_or("-"),
+                    binding.value
+                ));
+            }
+        }
+
+        lines.join("\n")
+    }
 }
 
 #[derive(Debug, Default)]
@@ -166,6 +281,8 @@ impl Executor {
                     domain_family: &prepared.unit.domain_family,
                     package_id: &prepared.unit.package_id,
                     adapter_id: prepared.adapter.adapter_id(),
+                    backend_family: prepared.unit.backend_family.as_deref(),
+                    selected_lowering_target: prepared.unit.selected_lowering_target.as_deref(),
                     bridge_surface: &host_plan.bridge_surface,
                     scheduler_binding: &host_plan.scheduler_binding,
                     lowering_summary: &lowering_summary,
@@ -273,6 +390,8 @@ impl Executor {
                     domain_family: &plan.domain_family,
                     package_id: &plan.package_id,
                     adapter_id: &plan.adapter_id,
+                    backend_family: plan.backend_family.as_deref(),
+                    selected_lowering_target: plan.selected_lowering_target.as_deref(),
                     bridge_surface: &binding.bridge_surface,
                     scheduler_binding: &binding.scheduler_binding,
                     lowering_summary: &binding.lowering_summary,
@@ -347,6 +466,14 @@ fn normalize_summary(text: &str) -> String {
         .find(|line| !line.is_empty())
         .unwrap_or("")
         .to_owned()
+}
+
+fn join_or_dash(values: &[String]) -> String {
+    if values.is_empty() {
+        "-".to_owned()
+    } else {
+        values.join(", ")
+    }
 }
 
 fn default_phase_action(ctx: &ExecutionPhaseContext<'_>) -> ExecutionPhaseAction {
@@ -501,22 +628,33 @@ fn slot_resource_capability_label(key: &str) -> String {
 
 fn domain_resource_capability_label(
     domain_family: &str,
+    selected_lowering_target: Option<&str>,
     key: &str,
     kind: &ExecutionResourceKind,
 ) -> String {
+    let scope = capability_scope(domain_family, selected_lowering_target);
     match (domain_family, kind) {
-        ("network", ExecutionResourceKind::Packet) => format!("cap.network.packet.{key}"),
-        ("network", ExecutionResourceKind::Response) => format!("cap.network.response.{key}"),
-        ("network", ExecutionResourceKind::Handle) => format!("cap.network.handle.{key}"),
-        ("kernel", ExecutionResourceKind::Buffer) => format!("cap.kernel.buffer.{key}"),
-        ("kernel", ExecutionResourceKind::Handle) => format!("cap.kernel.dispatch.{key}"),
-        ("shader", ExecutionResourceKind::Buffer) => format!("cap.shader.buffer.{key}"),
-        ("shader", ExecutionResourceKind::Handle) => format!("cap.shader.draw.{key}"),
-        ("shader", ExecutionResourceKind::Response) => format!("cap.shader.frame.{key}"),
-        (_, ExecutionResourceKind::Bridge) => format!("cap.bridge.{key}"),
-        (_, ExecutionResourceKind::Scheduler) => format!("cap.scheduler.{key}"),
-        (_, ExecutionResourceKind::Metadata) => format!("cap.meta.{key}"),
-        _ => format!("cap.{domain_family}.{key}"),
+        ("network", ExecutionResourceKind::Packet) => format!("cap.{scope}.packet.{key}"),
+        ("network", ExecutionResourceKind::Response) => format!("cap.{scope}.response.{key}"),
+        ("network", ExecutionResourceKind::Handle) => format!("cap.{scope}.handle.{key}"),
+        ("kernel", ExecutionResourceKind::Buffer) => format!("cap.{scope}.buffer.{key}"),
+        ("kernel", ExecutionResourceKind::Handle) => format!("cap.{scope}.dispatch.{key}"),
+        ("shader", ExecutionResourceKind::Buffer) => format!("cap.{scope}.buffer.{key}"),
+        ("shader", ExecutionResourceKind::Handle) => format!("cap.{scope}.draw.{key}"),
+        ("shader", ExecutionResourceKind::Response) => format!("cap.{scope}.frame.{key}"),
+        (_, ExecutionResourceKind::Bridge) => format!("cap.{scope}.bridge.{key}"),
+        (_, ExecutionResourceKind::Scheduler) => format!("cap.{scope}.scheduler.{key}"),
+        (_, ExecutionResourceKind::Metadata) => format!("cap.{scope}.meta.{key}"),
+        _ => format!("cap.{scope}.{key}"),
+    }
+}
+
+fn capability_scope(domain_family: &str, selected_lowering_target: Option<&str>) -> String {
+    if let Some(target) = selected_lowering_target {
+        let slug = target.replace('.', "_").replace('-', "_");
+        format!("{domain_family}.{slug}")
+    } else {
+        domain_family.to_owned()
     }
 }
 
@@ -571,6 +709,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
             kind: ExecutionResourceKind::Bridge,
             capability_label: Some(domain_resource_capability_label(
                 ctx.domain_family,
+                ctx.selected_lowering_target,
                 "bridge_surface",
                 &ExecutionResourceKind::Bridge,
             )),
@@ -581,6 +720,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
             kind: ExecutionResourceKind::Scheduler,
             capability_label: Some(domain_resource_capability_label(
                 ctx.domain_family,
+                ctx.selected_lowering_target,
                 "scheduler_binding",
                 &ExecutionResourceKind::Scheduler,
             )),
@@ -591,6 +731,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
             kind: ExecutionResourceKind::Metadata,
             capability_label: Some(domain_resource_capability_label(
                 ctx.domain_family,
+                ctx.selected_lowering_target,
                 "backend_summary",
                 &ExecutionResourceKind::Metadata,
             )),
@@ -604,6 +745,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
                 kind: ExecutionResourceKind::Handle,
                 capability_label: Some(domain_resource_capability_label(
                     ctx.domain_family,
+                    ctx.selected_lowering_target,
                     "active_session",
                     &ExecutionResourceKind::Handle,
                 )),
@@ -614,6 +756,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
                 kind: ExecutionResourceKind::Packet,
                 capability_label: Some(domain_resource_capability_label(
                     ctx.domain_family,
+                    ctx.selected_lowering_target,
                     "request_packet",
                     &ExecutionResourceKind::Packet,
                 )),
@@ -624,6 +767,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
                 kind: ExecutionResourceKind::Response,
                 capability_label: Some(domain_resource_capability_label(
                     ctx.domain_family,
+                    ctx.selected_lowering_target,
                     "active_response",
                     &ExecutionResourceKind::Response,
                 )),
@@ -636,6 +780,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
                 kind: ExecutionResourceKind::Buffer,
                 capability_label: Some(domain_resource_capability_label(
                     ctx.domain_family,
+                    ctx.selected_lowering_target,
                     "kernel_buffer",
                     &ExecutionResourceKind::Buffer,
                 )),
@@ -646,6 +791,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
                 kind: ExecutionResourceKind::Handle,
                 capability_label: Some(domain_resource_capability_label(
                     ctx.domain_family,
+                    ctx.selected_lowering_target,
                     "dispatch_handle",
                     &ExecutionResourceKind::Handle,
                 )),
@@ -656,6 +802,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
                 kind: ExecutionResourceKind::Buffer,
                 capability_label: Some(domain_resource_capability_label(
                     ctx.domain_family,
+                    ctx.selected_lowering_target,
                     "result_buffer",
                     &ExecutionResourceKind::Buffer,
                 )),
@@ -668,6 +815,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
                 kind: ExecutionResourceKind::Buffer,
                 capability_label: Some(domain_resource_capability_label(
                     ctx.domain_family,
+                    ctx.selected_lowering_target,
                     "shader_buffer",
                     &ExecutionResourceKind::Buffer,
                 )),
@@ -678,6 +826,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
                 kind: ExecutionResourceKind::Handle,
                 capability_label: Some(domain_resource_capability_label(
                     ctx.domain_family,
+                    ctx.selected_lowering_target,
                     "draw_handle",
                     &ExecutionResourceKind::Handle,
                 )),
@@ -688,6 +837,7 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
                 kind: ExecutionResourceKind::Response,
                 capability_label: Some(domain_resource_capability_label(
                     ctx.domain_family,
+                    ctx.selected_lowering_target,
                     "frame_target",
                     &ExecutionResourceKind::Response,
                 )),
@@ -719,7 +869,10 @@ mod tests {
         ExecutionResourceBinding, PreparedDomainExecution,
     };
 
-    use super::{ExecutionContract, ExecutionProfile, ExecutionResourceKind, Executor};
+    use super::{
+        domain_resource_capability_label, slot_resource_capability_label, slot_resource_kind,
+        ExecutionContract, ExecutionProfile, ExecutionResourceKind, Executor,
+    };
 
     struct NetworkAdapter;
     struct PassiveAdapter;
@@ -755,37 +908,67 @@ mod tests {
                     ExecutionResourceBinding {
                         key: "bridge_surface".to_owned(),
                         kind: ExecutionResourceKind::Bridge,
-                        capability_label: Some("cap.bridge.bridge_surface".to_owned()),
+                        capability_label: Some(domain_resource_capability_label(
+                            ctx.domain_family,
+                            ctx.selected_lowering_target,
+                            "bridge_surface",
+                            &ExecutionResourceKind::Bridge,
+                        )),
                         value: ctx.bridge_surface.to_owned(),
                     },
                     ExecutionResourceBinding {
                         key: "scheduler_binding".to_owned(),
                         kind: ExecutionResourceKind::Scheduler,
-                        capability_label: Some("cap.scheduler.scheduler_binding".to_owned()),
+                        capability_label: Some(domain_resource_capability_label(
+                            ctx.domain_family,
+                            ctx.selected_lowering_target,
+                            "scheduler_binding",
+                            &ExecutionResourceKind::Scheduler,
+                        )),
                         value: ctx.scheduler_binding.to_owned(),
                     },
                     ExecutionResourceBinding {
                         key: "backend_summary".to_owned(),
                         kind: ExecutionResourceKind::Metadata,
-                        capability_label: Some("cap.meta.backend_summary".to_owned()),
+                        capability_label: Some(domain_resource_capability_label(
+                            ctx.domain_family,
+                            ctx.selected_lowering_target,
+                            "backend_summary",
+                            &ExecutionResourceKind::Metadata,
+                        )),
                         value: ctx.backend_summary.to_owned(),
                     },
                     ExecutionResourceBinding {
                         key: "active_session".to_owned(),
                         kind: ExecutionResourceKind::Handle,
-                        capability_label: Some("cap.network.handle.active_session".to_owned()),
+                        capability_label: Some(domain_resource_capability_label(
+                            ctx.domain_family,
+                            ctx.selected_lowering_target,
+                            "active_session",
+                            &ExecutionResourceKind::Handle,
+                        )),
                         value: "slot:session.handle".to_owned(),
                     },
                     ExecutionResourceBinding {
                         key: "active_task".to_owned(),
                         kind: ExecutionResourceKind::Handle,
-                        capability_label: Some("cap.network.handle.active_task".to_owned()),
+                        capability_label: Some(domain_resource_capability_label(
+                            ctx.domain_family,
+                            ctx.selected_lowering_target,
+                            "active_task",
+                            &ExecutionResourceKind::Handle,
+                        )),
                         value: "slot:task.handle".to_owned(),
                     },
                     ExecutionResourceBinding {
                         key: "active_response".to_owned(),
                         kind: ExecutionResourceKind::Response,
-                        capability_label: Some("cap.network.response.active_response".to_owned()),
+                        capability_label: Some(domain_resource_capability_label(
+                            ctx.domain_family,
+                            ctx.selected_lowering_target,
+                            "active_response",
+                            &ExecutionResourceKind::Response,
+                        )),
                         value: "slot:response.handle".to_owned(),
                     },
                 ],
@@ -818,8 +1001,8 @@ mod tests {
                     .iter()
                     .map(|key| ExecutionResourceBinding {
                         key: key.clone(),
-                        kind: ExecutionResourceKind::Handle,
-                        capability_label: Some(format!("cap.handle.{key}")),
+                        kind: slot_resource_kind(key),
+                        capability_label: Some(slot_resource_capability_label(key)),
                         value: format!("network://{}/{}", ctx.phase, key),
                     })
                     .collect(),
@@ -1169,6 +1352,16 @@ mod tests {
             plan.phases[2].action.adapter_hint.as_deref(),
             Some("adapter.wait.callback-poll")
         );
+
+        let summary = plan.render_summary();
+        assert!(summary.contains("selected_lowering_target = urlsession.socket-io"));
+        assert!(summary.contains("phase bind role=Bind"));
+        assert!(summary.contains(
+            "resource bridge_surface kind=Bridge capability=cap.network.urlsession_socket_io.bridge.bridge_surface"
+        ));
+        assert!(summary.contains(
+            "resource active_session kind=Handle capability=cap.network.urlsession_socket_io.handle.active_session"
+        ));
     }
 
     #[test]
@@ -1243,37 +1436,67 @@ mod tests {
                 ExecutionResourceBinding {
                     key: "bridge_surface".to_owned(),
                     kind: ExecutionResourceKind::Bridge,
-                    capability_label: Some("cap.bridge.bridge_surface".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "bridge_surface",
+                        &ExecutionResourceKind::Bridge,
+                    )),
                     value: "host-ffi.bridge.network".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "scheduler_binding".to_owned(),
                     kind: ExecutionResourceKind::Scheduler,
-                    capability_label: Some("cap.scheduler.scheduler_binding".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "scheduler_binding",
+                        &ExecutionResourceKind::Scheduler,
+                    )),
                     value: "network-poll-bridge".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "backend_summary".to_owned(),
                     kind: ExecutionResourceKind::Metadata,
-                    capability_label: Some("cap.meta.backend_summary".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "backend_summary",
+                        &ExecutionResourceKind::Metadata,
+                    )),
                     value: "transport_ir = \"foundation-url-request\"".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "active_session".to_owned(),
                     kind: ExecutionResourceKind::Handle,
-                    capability_label: Some("cap.network.handle.active_session".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "active_session",
+                        &ExecutionResourceKind::Handle,
+                    )),
                     value: "network://bind/session.handle".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "active_task".to_owned(),
                     kind: ExecutionResourceKind::Handle,
-                    capability_label: Some("cap.network.handle.active_task".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "active_task",
+                        &ExecutionResourceKind::Handle,
+                    )),
                     value: "unresolved:task.handle".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "active_response".to_owned(),
                     kind: ExecutionResourceKind::Response,
-                    capability_label: Some("cap.network.response.active_response".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "active_response",
+                        &ExecutionResourceKind::Response,
+                    )),
                     value: "unresolved:response.handle".to_owned()
                 }
             ]
@@ -1352,37 +1575,67 @@ mod tests {
                 ExecutionResourceBinding {
                     key: "bridge_surface".to_owned(),
                     kind: ExecutionResourceKind::Bridge,
-                    capability_label: Some("cap.bridge.bridge_surface".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "bridge_surface",
+                        &ExecutionResourceKind::Bridge,
+                    )),
                     value: "host-ffi.bridge.network".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "scheduler_binding".to_owned(),
                     kind: ExecutionResourceKind::Scheduler,
-                    capability_label: Some("cap.scheduler.scheduler_binding".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "scheduler_binding",
+                        &ExecutionResourceKind::Scheduler,
+                    )),
                     value: "network-poll-bridge".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "backend_summary".to_owned(),
                     kind: ExecutionResourceKind::Metadata,
-                    capability_label: Some("cap.meta.backend_summary".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "backend_summary",
+                        &ExecutionResourceKind::Metadata,
+                    )),
                     value: "transport_ir = \"foundation-url-request\"".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "active_session".to_owned(),
                     kind: ExecutionResourceKind::Handle,
-                    capability_label: Some("cap.network.handle.active_session".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "active_session",
+                        &ExecutionResourceKind::Handle,
+                    )),
                     value: "network://bind/session.handle".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "active_task".to_owned(),
                     kind: ExecutionResourceKind::Handle,
-                    capability_label: Some("cap.network.handle.active_task".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "active_task",
+                        &ExecutionResourceKind::Handle,
+                    )),
                     value: "network://submit/task.handle".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "active_response".to_owned(),
                     kind: ExecutionResourceKind::Response,
-                    capability_label: Some("cap.network.response.active_response".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "network",
+                        Some("urlsession.socket-io"),
+                        "active_response",
+                        &ExecutionResourceKind::Response,
+                    )),
                     value: "network://wait/response.handle".to_owned()
                 }
             ]
@@ -1425,6 +1678,15 @@ mod tests {
                 }
             ]
         );
+
+        let summary = trace.render_summary();
+        assert!(summary.contains("event submit role=Execute adapter=network-test-adapter"));
+        assert!(summary.contains(
+            "resolved_resource active_session kind=Handle capability=cap.network.urlsession_socket_io.handle.active_session value=network://bind/session.handle"
+        ));
+        assert!(summary.contains(
+            "produced_slot task.handle kind=Handle capability=cap.handle.task.handle value=network://submit/task.handle"
+        ));
     }
 
     #[test]
@@ -1452,37 +1714,67 @@ mod tests {
                 ExecutionResourceBinding {
                     key: "bridge_surface".to_owned(),
                     kind: ExecutionResourceKind::Bridge,
-                    capability_label: Some("cap.bridge.bridge_surface".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "kernel",
+                        Some("vulkan.discrete-or-integrated-gpu"),
+                        "bridge_surface",
+                        &ExecutionResourceKind::Bridge,
+                    )),
                     value: "host-ffi.bridge.kernel".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "scheduler_binding".to_owned(),
                     kind: ExecutionResourceKind::Scheduler,
-                    capability_label: Some("cap.scheduler.scheduler_binding".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "kernel",
+                        Some("vulkan.discrete-or-integrated-gpu"),
+                        "scheduler_binding",
+                        &ExecutionResourceKind::Scheduler,
+                    )),
                     value: "hetero-submit-bridge".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "backend_summary".to_owned(),
                     kind: ExecutionResourceKind::Metadata,
-                    capability_label: Some("cap.meta.backend_summary".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "kernel",
+                        Some("vulkan.discrete-or-integrated-gpu"),
+                        "backend_summary",
+                        &ExecutionResourceKind::Metadata,
+                    )),
                     value: "kernel_ir = \"spirv1.6\"".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "kernel_buffer".to_owned(),
                     kind: ExecutionResourceKind::Buffer,
-                    capability_label: Some("cap.kernel.buffer.kernel_buffer".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "kernel",
+                        Some("vulkan.discrete-or-integrated-gpu"),
+                        "kernel_buffer",
+                        &ExecutionResourceKind::Buffer,
+                    )),
                     value: "slot:kernel.buffer".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "dispatch_handle".to_owned(),
                     kind: ExecutionResourceKind::Handle,
-                    capability_label: Some("cap.kernel.dispatch.dispatch_handle".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "kernel",
+                        Some("vulkan.discrete-or-integrated-gpu"),
+                        "dispatch_handle",
+                        &ExecutionResourceKind::Handle,
+                    )),
                     value: "slot:dispatch.handle".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "result_buffer".to_owned(),
                     kind: ExecutionResourceKind::Buffer,
-                    capability_label: Some("cap.kernel.buffer.result_buffer".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "kernel",
+                        Some("vulkan.discrete-or-integrated-gpu"),
+                        "result_buffer",
+                        &ExecutionResourceKind::Buffer,
+                    )),
                     value: "slot:result.buffer".to_owned()
                 }
             ]
@@ -1514,40 +1806,79 @@ mod tests {
                 ExecutionResourceBinding {
                     key: "bridge_surface".to_owned(),
                     kind: ExecutionResourceKind::Bridge,
-                    capability_label: Some("cap.bridge.bridge_surface".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "shader",
+                        Some("metal.apple-silicon-gpu"),
+                        "bridge_surface",
+                        &ExecutionResourceKind::Bridge,
+                    )),
                     value: "host-ffi.bridge.shader".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "scheduler_binding".to_owned(),
                     kind: ExecutionResourceKind::Scheduler,
-                    capability_label: Some("cap.scheduler.scheduler_binding".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "shader",
+                        Some("metal.apple-silicon-gpu"),
+                        "scheduler_binding",
+                        &ExecutionResourceKind::Scheduler,
+                    )),
                     value: "render-submit-bridge".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "backend_summary".to_owned(),
                     kind: ExecutionResourceKind::Metadata,
-                    capability_label: Some("cap.meta.backend_summary".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "shader",
+                        Some("metal.apple-silicon-gpu"),
+                        "backend_summary",
+                        &ExecutionResourceKind::Metadata,
+                    )),
                     value: "shader_ir = \"msl2.4\"".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "shader_buffer".to_owned(),
                     kind: ExecutionResourceKind::Buffer,
-                    capability_label: Some("cap.shader.buffer.shader_buffer".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "shader",
+                        Some("metal.apple-silicon-gpu"),
+                        "shader_buffer",
+                        &ExecutionResourceKind::Buffer,
+                    )),
                     value: "mock://bind/shader.buffer".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "draw_handle".to_owned(),
                     kind: ExecutionResourceKind::Handle,
-                    capability_label: Some("cap.shader.draw.draw_handle".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "shader",
+                        Some("metal.apple-silicon-gpu"),
+                        "draw_handle",
+                        &ExecutionResourceKind::Handle,
+                    )),
                     value: "mock://submit/draw.handle".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "frame_target".to_owned(),
                     kind: ExecutionResourceKind::Response,
-                    capability_label: Some("cap.shader.frame.frame_target".to_owned()),
+                    capability_label: Some(domain_resource_capability_label(
+                        "shader",
+                        Some("metal.apple-silicon-gpu"),
+                        "frame_target",
+                        &ExecutionResourceKind::Response,
+                    )),
                     value: "mock://wait/frame.target".to_owned()
                 }
             ]
         );
+
+        let summary = trace.render_summary();
+        assert!(summary.contains("event finalize role=Execute adapter=passive-adapter"));
+        assert!(summary.contains(
+            "resolved_resource shader_buffer kind=Buffer capability=cap.shader.metal_apple_silicon_gpu.buffer.shader_buffer value=mock://bind/shader.buffer"
+        ));
+        assert!(summary.contains(
+            "resolved_resource frame_target kind=Response capability=cap.shader.metal_apple_silicon_gpu.frame.frame_target value=mock://wait/frame.target"
+        ));
     }
 }

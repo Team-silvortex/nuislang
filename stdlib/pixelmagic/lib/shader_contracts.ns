@@ -1,4 +1,6 @@
+/// Shader-facing PixelMagic contracts for the default sample surface.
 mod shader PixelMagicSurfaceContracts {
+  /// Declares the canonical shader-side profile used by PixelMagic examples.
   fn profile() {
     const vertex_count: i64 = 4;
     const instance_count: i64 = 1;

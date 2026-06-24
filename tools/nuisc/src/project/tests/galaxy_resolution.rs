@@ -104,22 +104,39 @@ mod cpu Main {
     let galaxy_index = fs::read_to_string(&metadata.galaxy_index_path).unwrap();
     let modules_index =
         fs::read_to_string(root.join("build").join("nuis.project.modules.txt")).unwrap();
+    let docs_index =
+        fs::read_to_string(root.join("build").join("nuis.project.docs.txt")).unwrap();
     let imports_index =
         fs::read_to_string(root.join("build").join("nuis.project.imports.txt")).unwrap();
     let organization_index =
         fs::read_to_string(root.join("build").join("nuis.project.organization.txt")).unwrap();
 
+    assert!(galaxy_index.contains(
+        "summary\tgalaxies=3\tdocumented_galaxies=3\tdocumented_library_modules="
+    ));
     assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true"));
     assert!(galaxy_index.contains("library_modules=lib/image_contracts.ns, lib/shader_contracts.ns, lib/packet_bridge_surface.ns, lib/render_surface.ns, lib/texture_surface.ns, lib/pipeline_surface.ns"));
     assert!(galaxy_index.contains("core\tpackage=nuis.core\tdirect=false"));
     assert!(galaxy_index.contains("library_modules=lib/prelude_contracts.ns"));
     assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true\trequested_by=pixelmagic\tsource_modules=14\tauto_injectable=true"));
+    assert!(galaxy_index.contains("documented_library_modules="));
+    assert!(galaxy_index.contains("documented_items="));
     assert!(galaxy_index.contains("std\tpackage=nuis.std\tdirect=false"));
     assert!(galaxy_index.contains("library_modules=lib/task_contracts.ns"));
     assert!(galaxy_index.contains("library_import_policy=project-auto"));
     assert!(galaxy_index.contains("blockers=<none>"));
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
+    ));
+    assert!(docs_index.contains(
+        "summary\tmodules=9\tdocumented_modules=8\tdocumented_items=37"
+    ));
+    assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
+    assert!(docs_index.contains(
+        "module\tcpu.PixelMagicContracts\titems=23\tsource_kind=galaxy-auto-inject"
+    ));
+    assert!(imports_index.contains(
+        "summary\tlibraries=8\tvisible_libraries=8\tvisible_modules=9\tdocumented_visible_modules=8\tdocumented_visible_items=37"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -142,16 +159,17 @@ mod cpu Main {
     assert!(imports_index.contains(
         "library\tcore\tlib/prelude_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
-    assert!(imports_index
-        .contains("visible\tcpu\tMain\tsource_kind=project-local\tmanifest_spec=main.ns"));
     assert!(imports_index.contains(
-        "visible\tcpu\tStdTaskContracts\tsource_kind=galaxy-auto-inject\tgalaxy=std\tpackage=nuis.std\tlibrary_module=lib/task_contracts.ns"
+        "visible\tcpu\tMain\tdoc_items=0\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
     assert!(imports_index.contains(
-        "visible\tcpu\tPixelMagicContracts\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/image_contracts.ns"
+        "visible\tcpu\tStdTaskContracts\tdoc_items="
     ));
     assert!(imports_index.contains(
-        "visible\tshader\tPixelMagicSurfaceContracts\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/shader_contracts.ns"
+        "visible\tcpu\tPixelMagicContracts\tdoc_items="
+    ));
+    assert!(imports_index.contains(
+        "visible\tshader\tPixelMagicSurfaceContracts\tdoc_items="
     ));
     assert!(imports_index.contains("import_policy=project-auto"));
     assert!(modules_index.contains(
@@ -758,10 +776,13 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
+        "summary\tlibraries=1\tvisible_libraries=1\tvisible_modules=2\tdocumented_visible_modules=1\tdocumented_visible_items=4"
+    ));
+    assert!(imports_index.contains(
         "library\tns-nova\tlib/nova_contracts.ns\timport_policy=manual-only\tauto_injectable=false\tvisible=true"
     ));
     assert!(imports_index.contains(
-        "visible\tcpu\tNovaContracts\tsource_kind=galaxy-explicit-import\tgalaxy=ns-nova\tpackage=nuis.ns-nova\tlibrary_module=lib/nova_contracts.ns\timport_policy=manual-only"
+        "visible\tcpu\tNovaContracts\tdoc_items="
     ));
     assert!(imports_index.contains(
         "use\tcpu.Main\tcpu.NovaContracts\tresolution=local-visible:galaxy-explicit-import:galaxy=ns-nova\tpackage=nuis.ns-nova\tlibrary_module=lib/nova_contracts.ns\timport_policy=manual-only"
@@ -839,6 +860,9 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
+        "summary\tlibraries=8\tvisible_libraries=8\tvisible_modules=9\tdocumented_visible_modules=8\tdocumented_visible_items=37"
+    ));
+    assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
@@ -857,10 +881,10 @@ mod cpu Main {
         "library\tpixelmagic\tlib/pipeline_surface.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
-        "visible\tcpu\tPixelMagicContracts\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/image_contracts.ns\timport_policy=project-auto"
+        "visible\tcpu\tPixelMagicContracts\tdoc_items="
     ));
     assert!(imports_index.contains(
-        "visible\tshader\tPixelMagicSurfaceContracts\tsource_kind=galaxy-auto-inject\tgalaxy=pixelmagic\tpackage=nuis.pixelmagic\tlibrary_module=lib/shader_contracts.ns\timport_policy=project-auto"
+        "visible\tshader\tPixelMagicSurfaceContracts\tdoc_items="
     ));
     assert!(!imports_index.contains("source_kind=galaxy-explicit-import\tgalaxy=pixelmagic"));
 }

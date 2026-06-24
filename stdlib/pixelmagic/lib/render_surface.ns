@@ -1,6 +1,8 @@
 use data FabricPlane;
 
+/// Shader-side render surface profile for PixelMagic presentation demos.
 mod shader PixelMagicRenderSurface {
+  /// Declares the default render surface profile used by PixelMagic demos.
   fn profile() {
     const vertex_count: i64 = 4;
     const instance_count: i64 = 1;

@@ -51,6 +51,8 @@ pub fn render_ast(module: &AstModule) -> String {
         out.push_str(&render_ast_extern_interface(interface));
     }
     for constant in &module.consts {
+        out.push_str(&render_ast_doc_comments("  ", &constant.attributes));
+        let attribute_prefix = render_ast_attributes(&constant.attributes);
         let visibility_prefix = render_ast_visibility(constant.visibility);
         let rendered_type = constant
             .ty
@@ -59,7 +61,8 @@ pub fn render_ast(module: &AstModule) -> String {
             .map(|ty| format!(": {ty}"))
             .unwrap_or_default();
         out.push_str(&format!(
-            "  {}const {}{} = {}\n",
+            "  {}{}const {}{} = {}\n",
+            attribute_prefix,
             visibility_prefix,
             constant.name,
             rendered_type,
@@ -67,6 +70,8 @@ pub fn render_ast(module: &AstModule) -> String {
         ));
     }
     for alias in &module.type_aliases {
+        out.push_str(&render_ast_doc_comments("  ", &alias.attributes));
+        let attribute_prefix = render_ast_attributes(&alias.attributes);
         let visibility_prefix = render_ast_visibility(alias.visibility);
         let generics = if alias.generic_params.is_empty() {
             String::new()
@@ -83,7 +88,8 @@ pub fn render_ast(module: &AstModule) -> String {
         };
         let where_suffix = render_ast_where_clause(&alias.where_bounds);
         out.push_str(&format!(
-            "  {}type {}{}{} = {}\n",
+            "  {}{}type {}{}{} = {}\n",
+            attribute_prefix,
             visibility_prefix,
             alias.name,
             generics,
@@ -550,11 +556,14 @@ fn render_ast_generic_args(args: &[AstTypeRef]) -> String {
 }
 
 fn render_ast_trait(definition: &AstTraitDef) -> String {
-    let mut out = format!(
-        "  {}trait {}\n",
+    let mut out = String::new();
+    out.push_str(&render_ast_doc_comments("  ", &definition.attributes));
+    out.push_str(&format!(
+        "  {}{}trait {}\n",
+        render_ast_attributes(&definition.attributes),
         render_ast_visibility(definition.visibility),
         definition.name
-    );
+    ));
     for method in &definition.methods {
         out.push_str(&render_ast_trait_method_sig(method));
     }
@@ -1645,6 +1654,7 @@ fn render_nir_generic_param(param: &NirGenericParam) -> String {
 }
 
 fn render_ast_function_header(function: &AstFunction) -> String {
+    let mut out = render_ast_doc_comments("  ", &function.attributes);
     let params = function
         .params
         .iter()
@@ -1709,7 +1719,7 @@ fn render_ast_function_header(function: &AstFunction) -> String {
     let attribute_prefix = render_ast_attributes(&function.attributes);
     let visibility_prefix = render_ast_visibility(function.visibility);
     let where_suffix = render_ast_where_clause(&function.where_bounds);
-    format!(
+    out.push_str(&format!(
         "  {}{}{}{}{}fn {}{}({}){}{}\n",
         attribute_prefix,
         visibility_prefix,
@@ -1721,7 +1731,8 @@ fn render_ast_function_header(function: &AstFunction) -> String {
         params,
         return_suffix,
         where_suffix
-    )
+    ));
+    out
 }
 
 fn render_nir_function_header(function: &NirFunction) -> String {
@@ -1873,17 +1884,45 @@ fn render_nir_visibility(visibility: NirVisibility) -> &'static str {
 }
 
 fn render_ast_attributes(attributes: &[AstAttribute]) -> String {
-    if attributes.is_empty() {
+    let rendered = attributes
+        .iter()
+        .filter(|attribute| !is_doc_attribute(attribute))
+        .map(render_ast_attribute)
+        .collect::<Vec<_>>();
+    if rendered.is_empty() {
         return String::new();
     }
-    format!(
-        "{} ",
-        attributes
-            .iter()
-            .map(render_ast_attribute)
-            .collect::<Vec<_>>()
-            .join(" ")
-    )
+    format!("{} ", rendered.join(" "))
+}
+
+pub(super) fn render_ast_doc_comments(indent: &str, attributes: &[AstAttribute]) -> String {
+    let mut out = String::new();
+    for attribute in attributes {
+        if !is_doc_attribute(attribute) {
+            continue;
+        }
+        let Some(AstAttributeArg {
+            name: None,
+            value: AstAttributeValue::String(value),
+        }) = attribute.args.first()
+        else {
+            continue;
+        };
+        out.push_str(&format!("{indent}/// {value}\n"));
+    }
+    out
+}
+
+fn is_doc_attribute(attribute: &AstAttribute) -> bool {
+    attribute.name == "doc"
+        && attribute.args.len() == 1
+        && matches!(
+            attribute.args.first(),
+            Some(AstAttributeArg {
+                name: None,
+                value: AstAttributeValue::String(_),
+            })
+        )
 }
 
 fn render_ast_attribute(attribute: &AstAttribute) -> String {
@@ -1959,6 +1998,7 @@ fn render_nir_annotation_arg(arg: &NirAttributeArg) -> String {
 }
 
 fn render_ast_trait_method_sig(method: &AstTraitMethodSig) -> String {
+    let mut out = render_ast_doc_comments("    ", &method.attributes);
     let params = method
         .params
         .iter()
@@ -1970,7 +2010,7 @@ fn render_ast_trait_method_sig(method: &AstTraitMethodSig) -> String {
         .as_ref()
         .map(|ty| format!(" -> {}", render_ast_type(ty)))
         .unwrap_or_default();
-    match &method.default_body {
+    out.push_str(&match &method.default_body {
         Some(body) => format!(
             "    fn {}({}){} {}\n",
             method.name,
@@ -1979,7 +2019,8 @@ fn render_ast_trait_method_sig(method: &AstTraitMethodSig) -> String {
             render_ast_stmt_block_inline(body)
         ),
         None => format!("    fn {}({}){};\n", method.name, params, return_suffix),
-    }
+    });
+    out
 }
 
 fn render_ast_stmt_block_inline(body: &[AstStmt]) -> String {
@@ -2230,10 +2271,12 @@ mod tests {
                 where_bounds: vec![],
                 variants: vec![
                     nuis_semantics::model::AstEnumVariant {
+                        attributes: vec![],
                         name: "None".to_owned(),
                         kind: nuis_semantics::model::AstEnumVariantKind::Unit,
                     },
                     nuis_semantics::model::AstEnumVariant {
+                        attributes: vec![],
                         name: "Some".to_owned(),
                         kind: nuis_semantics::model::AstEnumVariantKind::Tuple(vec![AstTypeRef {
                             name: "T".to_owned(),
@@ -2253,6 +2296,136 @@ mod tests {
         assert!(rendered.contains("pub enum Option<T>"), "{rendered}");
         assert!(rendered.contains("variant None"), "{rendered}");
         assert!(rendered.contains("variant Some(T)"), "{rendered}");
+    }
+
+    #[test]
+    fn renders_doc_comments_as_triple_slash_lines() {
+        let module = AstModule {
+            uses: vec![],
+            domain: "cpu".to_owned(),
+            unit: "Docs".to_owned(),
+            externs: vec![],
+            extern_interfaces: vec![],
+            consts: vec![nuis_semantics::model::AstConstItem {
+                visibility: AstVisibility::Private,
+                attributes: vec![AstAttribute {
+                    name: "doc".to_owned(),
+                    args: vec![AstAttributeArg {
+                        name: None,
+                        value: AstAttributeValue::String("const docs".to_owned()),
+                    }],
+                }],
+                name: "ANSWER".to_owned(),
+                ty: Some(AstTypeRef {
+                    name: "i32".to_owned(),
+                    generic_args: vec![],
+                    is_optional: false,
+                    is_ref: false,
+                }),
+                value: AstExpr::Int(42),
+            }],
+            type_aliases: vec![],
+            structs: vec![],
+            enums: vec![nuis_semantics::model::AstEnumDef {
+                visibility: AstVisibility::Private,
+                attributes: vec![],
+                name: "Maybe".to_owned(),
+                generic_params: vec![],
+                where_bounds: vec![],
+                variants: vec![nuis_semantics::model::AstEnumVariant {
+                    attributes: vec![AstAttribute {
+                        name: "doc".to_owned(),
+                        args: vec![AstAttributeArg {
+                            name: None,
+                            value: AstAttributeValue::String("empty docs".to_owned()),
+                        }],
+                    }],
+                    name: "None".to_owned(),
+                    kind: nuis_semantics::model::AstEnumVariantKind::Unit,
+                }],
+            }],
+            traits: vec![AstTraitDef {
+                visibility: AstVisibility::Private,
+                attributes: vec![AstAttribute {
+                    name: "doc".to_owned(),
+                    args: vec![AstAttributeArg {
+                        name: None,
+                        value: AstAttributeValue::String("trait docs".to_owned()),
+                    }],
+                }],
+                name: "Displayable".to_owned(),
+                methods: vec![AstTraitMethodSig {
+                    attributes: vec![AstAttribute {
+                        name: "doc".to_owned(),
+                        args: vec![AstAttributeArg {
+                            name: None,
+                            value: AstAttributeValue::String("render docs".to_owned()),
+                        }],
+                    }],
+                    name: "render".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "self".to_owned(),
+                        ty: AstTypeRef {
+                            name: "Self".to_owned(),
+                            generic_args: vec![],
+                            is_optional: false,
+                            is_ref: false,
+                        },
+                    }],
+                    return_type: Some(AstTypeRef {
+                        name: "Text".to_owned(),
+                        generic_args: vec![],
+                        is_optional: false,
+                        is_ref: false,
+                    }),
+                    default_body: None,
+                }],
+            }],
+            impls: vec![],
+            functions: vec![AstFunction {
+                visibility: AstVisibility::Private,
+                name: "answer".to_owned(),
+                attributes: vec![AstAttribute {
+                    name: "doc".to_owned(),
+                    args: vec![AstAttributeArg {
+                        name: None,
+                        value: AstAttributeValue::String("function docs".to_owned()),
+                    }],
+                }],
+                test_name: None,
+                test_ignored: false,
+                test_should_fail: false,
+                test_reason: None,
+                test_timeout_ms: None,
+                test_clock_domain: None,
+                test_clock_policy: None,
+                benchmark_name: None,
+                benchmark_warmup_iters: None,
+                benchmark_measure_iters: None,
+                benchmark_timeout_ms: None,
+                benchmark_clock_domain: None,
+                benchmark_clock_policy: None,
+                is_async: false,
+                generic_params: vec![],
+                where_bounds: vec![],
+                params: vec![],
+                return_type: Some(AstTypeRef {
+                    name: "i32".to_owned(),
+                    generic_args: vec![],
+                    is_optional: false,
+                    is_ref: false,
+                }),
+                body: vec![AstStmt::Return(Some(AstExpr::Int(42)))],
+            }],
+        };
+
+        let rendered = render_ast(&module);
+        assert!(rendered.contains("/// const docs\n  const ANSWER: i32 = 42"), "{rendered}");
+        assert!(rendered.contains("/// empty docs\n    variant None"), "{rendered}");
+        assert!(rendered.contains("/// trait docs\n  trait Displayable"), "{rendered}");
+        assert!(rendered.contains("/// render docs\n    fn render(self: Self) -> Text;"), "{rendered}");
+        assert!(rendered.contains("/// function docs\n  fn answer() -> i32"), "{rendered}");
+        assert!(!rendered.contains("@doc("), "{rendered}");
     }
 
     #[test]

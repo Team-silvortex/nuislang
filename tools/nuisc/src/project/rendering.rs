@@ -10,7 +10,7 @@ use super::{
     ProjectAbiResolution, ProjectAbiSelectionView, ProjectExchangeOrganization,
     ProjectExchangeRoute, ProjectLoweringIssue, ProjectLoweringIssueKind,
     ProjectLoweringSelectionView, ProjectOrganization, ProjectOrganizationLink,
-    ProjectOrganizationModule,
+    ProjectOrganizationModule, ProjectImportsSummary,
 };
 
 fn json_escape(value: &str) -> String {
@@ -558,14 +558,16 @@ pub fn render_project_import_index(project: &LoadedProject) -> String {
     out
 }
 
-pub fn write_project_import_index<W: fmt::Write>(
-    out: &mut W,
-    project: &LoadedProject,
-) -> fmt::Result {
-    let local_units = project
+pub fn project_imports_summary(project: &LoadedProject) -> ProjectImportsSummary {
+    let doc_item_counts = project
         .modules
         .iter()
-        .map(|module| ((module.ast.domain.clone(), module.ast.unit.clone()), module))
+        .map(|module| {
+            (
+                module.path.clone(),
+                crate::frontend::extract_ast_doc_index(&module.ast).items.len(),
+            )
+        })
         .collect::<BTreeMap<_, _>>();
     let visible_library_paths = project
         .modules
@@ -576,6 +578,66 @@ pub fn write_project_import_index<W: fmt::Write>(
             _ => None,
         })
         .collect::<std::collections::BTreeSet<_>>();
+    ProjectImportsSummary {
+        libraries: project
+            .resolved_galaxies
+            .iter()
+            .map(|dependency| dependency.library_modules.len())
+            .sum(),
+        visible_libraries: visible_library_paths.len(),
+        visible_modules: project.modules.len(),
+        documented_visible_modules: project
+            .modules
+            .iter()
+            .filter(|module| doc_item_counts.get(&module.path).copied().unwrap_or(0) > 0)
+            .count(),
+        documented_visible_items: project
+            .modules
+            .iter()
+            .map(|module| doc_item_counts.get(&module.path).copied().unwrap_or(0))
+            .sum(),
+    }
+}
+
+pub fn write_project_import_index<W: fmt::Write>(
+    out: &mut W,
+    project: &LoadedProject,
+) -> fmt::Result {
+    let local_units = project
+        .modules
+        .iter()
+        .map(|module| ((module.ast.domain.clone(), module.ast.unit.clone()), module))
+            .collect::<BTreeMap<_, _>>();
+    let doc_item_counts = project
+        .modules
+        .iter()
+        .map(|module| {
+            (
+                module.path.clone(),
+                crate::frontend::extract_ast_doc_index(&module.ast).items.len(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let visible_library_paths = project
+        .modules
+        .iter()
+        .filter_map(|module| match &module.origin {
+            super::ProjectModuleOrigin::AutoInjectedGalaxy { .. }
+            | super::ProjectModuleOrigin::ExplicitGalaxyImport { .. } => Some(module.path.clone()),
+            _ => None,
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    let summary = project_imports_summary(project);
+
+    writeln!(
+        out,
+        "summary\tlibraries={}\tvisible_libraries={}\tvisible_modules={}\tdocumented_visible_modules={}\tdocumented_visible_items={}",
+        summary.libraries,
+        summary.visible_libraries,
+        summary.visible_modules,
+        summary.documented_visible_modules,
+        summary.documented_visible_items
+    )?;
 
     for dependency in &project.resolved_galaxies {
         for (library_module, library_path) in dependency
@@ -585,7 +647,7 @@ pub fn write_project_import_index<W: fmt::Write>(
         {
             writeln!(
                 out,
-                "library\t{}\t{}\timport_policy={}\tauto_injectable={}\tvisible={}",
+                "library\t{}\t{}\timport_policy={}\tauto_injectable={}\tvisible={}\tdoc_items={}",
                 dependency.name,
                 library_module,
                 dependency.library_import_policy.as_str(),
@@ -598,7 +660,8 @@ pub fn write_project_import_index<W: fmt::Write>(
                     "true"
                 } else {
                     "false"
-                }
+                },
+                doc_item_counts.get(library_path).copied().unwrap_or(0)
             )?;
         }
     }
@@ -606,9 +669,10 @@ pub fn write_project_import_index<W: fmt::Write>(
     for module in &project.modules {
         writeln!(
             out,
-            "visible\t{}\t{}\tsource_kind={}\t{}",
+            "visible\t{}\t{}\tdoc_items={}\tsource_kind={}\t{}",
             module.ast.domain,
             module.ast.unit,
+            doc_item_counts.get(&module.path).copied().unwrap_or(0),
             module.origin.source_kind(),
             module.origin.source_detail()
         )?;

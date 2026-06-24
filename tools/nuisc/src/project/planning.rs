@@ -1,16 +1,17 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
 use super::{
     organize_project, organize_project_exchanges, packet, parse_project_manifest,
     render_project_abi_graph_line, resolve_project_abi, validate_project_abi_requirements,
-    validate_project_links, validate_project_modules, validate_project_unit_bindings,
-    validate_project_uses, LoadedProject, ProjectBuildMetadata, ProjectCompilationDependency,
-    ProjectCompilationPlan, ProjectModule, ProjectModuleOrigin, ProjectOutputIntent,
-    ProjectSyntheticInput,
+    validate_project_links, validate_project_modules, validate_project_unit_bindings, validate_project_uses,
+    LoadedProject, ProjectBuildMetadata, ProjectCompilationDependency, ProjectCompilationPlan,
+    ProjectDocsSummary, ProjectGalaxySummary, ProjectModule,
+    ProjectModuleOrigin, ProjectOutputIntent, ProjectSyntheticInput,
 };
 use super::{
     write_project_abi_index, write_project_exchange_index, write_project_host_ffi_index,
@@ -48,6 +49,77 @@ fn write_project_links_index<W: fmt::Write>(
             link.to,
             link.via.as_deref().unwrap_or("<direct>")
         )?;
+    }
+    Ok(())
+}
+
+fn project_docs_summary(project: &LoadedProject) -> ProjectDocsSummary {
+    let mut documented_modules = 0usize;
+    let mut documented_items = 0usize;
+    for module in &project.modules {
+        let index = crate::frontend::extract_ast_doc_index(&module.ast);
+        if !index.items.is_empty() {
+            documented_modules += 1;
+            documented_items += index.items.len();
+        }
+    }
+    ProjectDocsSummary {
+        modules: project.modules.len(),
+        documented_modules,
+        documented_items,
+    }
+}
+
+fn project_galaxy_summary(project: &LoadedProject) -> ProjectGalaxySummary {
+    let mut documented_galaxies = 0usize;
+    let mut documented_library_modules = 0usize;
+    let mut documented_items = 0usize;
+    for dependency in &project.resolved_galaxies {
+        let summary = crate::stdlib_registry::summarize_resolved_galaxy_docs(dependency);
+        if summary.documented_items > 0 {
+            documented_galaxies += 1;
+            documented_library_modules += summary.documented_library_modules;
+            documented_items += summary.documented_items;
+        }
+    }
+    ProjectGalaxySummary {
+        galaxies: project.resolved_galaxies.len(),
+        documented_galaxies,
+        documented_library_modules,
+        documented_items,
+    }
+}
+
+fn write_project_docs_index<W: fmt::Write>(
+    out: &mut W,
+    project: &LoadedProject,
+) -> fmt::Result {
+    let summary = project_docs_summary(project);
+    writeln!(
+        out,
+        "summary\tmodules={}\tdocumented_modules={}\tdocumented_items={}",
+        summary.modules, summary.documented_modules, summary.documented_items
+    )?;
+    for module in &project.modules {
+        let index = crate::frontend::extract_ast_doc_index(&module.ast);
+        writeln!(
+            out,
+            "module\t{}\titems={}\tsource_kind={}\t{}",
+            index.module_path,
+            index.items.len(),
+            module.origin.source_kind(),
+            module.origin.source_detail()
+        )?;
+        for item in &index.items {
+            writeln!(
+                out,
+                "item\t{}\t{}\tdoc_lines={}\tsignature={}",
+                item.kind,
+                item.path,
+                item.docs.len(),
+                item.signature.as_deref().unwrap_or("<none>")
+            )?;
+        }
     }
     Ok(())
 }
@@ -539,6 +611,7 @@ pub fn write_project_metadata(
     let organization_index_path = output_dir.join("nuis.project.organization.txt");
     let exchange_index_path = output_dir.join("nuis.project.exchange.txt");
     let modules_index_path = output_dir.join("nuis.project.modules.txt");
+    let docs_index_path = output_dir.join("nuis.project.docs.txt");
     let imports_index_path = output_dir.join("nuis.project.imports.txt");
     let galaxy_index_path = output_dir.join("nuis.project.galaxy.txt");
     let links_index_path = output_dir.join("nuis.project.links.txt");
@@ -587,6 +660,15 @@ pub fn write_project_metadata(
             modules_index_path.display()
         )
     })?;
+    let mut docs_index = String::new();
+    write_project_docs_index(&mut docs_index, project)
+        .expect("writing project docs index to String should not fail");
+    fs::write(&docs_index_path, docs_index).map_err(|error| {
+        format!(
+            "failed to write project docs index `{}`: {error}",
+            docs_index_path.display()
+        )
+    })?;
     let mut imports_index = String::new();
     write_project_import_index(&mut imports_index, project)
         .expect("writing project imports index to String should not fail");
@@ -597,6 +679,18 @@ pub fn write_project_metadata(
         )
     })?;
     let mut galaxy_index = String::new();
+    let docs_summary = project_docs_summary(project);
+    let imports_summary = super::rendering::project_imports_summary(project);
+    let galaxy_summary = project_galaxy_summary(project);
+    writeln!(
+        &mut galaxy_index,
+        "summary\tgalaxies={}\tdocumented_galaxies={}\tdocumented_library_modules={}\tdocumented_items={}",
+        galaxy_summary.galaxies,
+        galaxy_summary.documented_galaxies,
+        galaxy_summary.documented_library_modules,
+        galaxy_summary.documented_items
+    )
+    .expect("writing resolved galaxy index summary to String should not fail");
     crate::stdlib_registry::write_resolved_galaxy_index(
         &mut galaxy_index,
         &project.resolved_galaxies,
@@ -649,8 +743,12 @@ pub fn write_project_metadata(
         organization_index_path: organization_index_path.display().to_string(),
         exchange_index_path: exchange_index_path.display().to_string(),
         modules_index_path: modules_index_path.display().to_string(),
+        docs_index_path: docs_index_path.display().to_string(),
+        docs_summary,
         imports_index_path: imports_index_path.display().to_string(),
+        imports_summary,
         galaxy_index_path: galaxy_index_path.display().to_string(),
+        galaxy_summary,
         links_index_path: links_index_path.display().to_string(),
         packet_index_path: packet_index_path.display().to_string(),
         host_ffi_index_path: host_ffi_index_path.display().to_string(),
