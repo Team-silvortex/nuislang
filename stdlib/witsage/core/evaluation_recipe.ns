@@ -1,0 +1,34 @@
+mod cpu Main {
+  struct WitSageEvaluationSummary {
+    eval_kind: i64,
+    sample_count: i64,
+    primary_metric_seed: i64,
+    secondary_metric_seed: i64
+  }
+
+  fn build_evaluation_summary(
+    eval_kind: i64,
+    sample_count: i64,
+    primary_metric_seed: i64,
+    secondary_metric_seed: i64
+  ) -> WitSageEvaluationSummary {
+    return WitSageEvaluationSummary {
+      eval_kind: eval_kind,
+      sample_count: sample_count,
+      primary_metric_seed: primary_metric_seed,
+      secondary_metric_seed: secondary_metric_seed
+    };
+  }
+
+  fn summarize_evaluation(summary: WitSageEvaluationSummary) -> i64 {
+    return summary.eval_kind +
+      summary.sample_count +
+      summary.primary_metric_seed +
+      summary.secondary_metric_seed;
+  }
+
+  fn main() {
+    let summary: WitSageEvaluationSummary = build_evaluation_summary(1, 160, 95, 88);
+    print(summarize_evaluation(summary));
+  }
+}

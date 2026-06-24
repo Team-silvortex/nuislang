@@ -1,0 +1,40 @@
+use cpu WitSageContracts;
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn main() {
+    let features = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let weights = kernel_tensor(3, 2, "1,0,0,1,1,1");
+    let bias = kernel_tensor(1, 2, "1,2");
+    let projected = kernel_matmul(features, weights);
+    let shifted = kernel_add_bias(projected, bias);
+    let activated = kernel_relu(shifted);
+    let logits = kernel_reduce_sum_axis(activated, "rows");
+    let predicted = kernel_argmax_axis(logits, "rows");
+    let predicted_class: i64 = kernel_element_at(predicted, 0, 1);
+
+    let preprocessing_score: i64 =
+      WitSageContracts.preprocessing_total(
+        6401,
+        2,
+        3,
+        WitSageContracts.zscore_normalization_kind(),
+        12
+      );
+    let split_score: i64 =
+      WitSageContracts.train_test_split_total(6401, 160, 128, 32, 17);
+    let model_score: i64 =
+      WitSageContracts.linear_score_total(3, predicted_class, 2, 1);
+    let matrix_score: i64 =
+      WitSageContracts.confusion_matrix_total(71, 83, 5, 1);
+    let eval_score: i64 =
+      WitSageContracts.evaluation_total(
+        WitSageContracts.classification_eval_kind(),
+        160,
+        matrix_score,
+        predicted_class
+      );
+
+    print(preprocessing_score + split_score + model_score + eval_score);
+  }
+}

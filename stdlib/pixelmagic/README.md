@@ -76,7 +76,12 @@ Current source-asset status:
   and the next foundational filter family:
   [core/brightness_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/brightness_recipe.ns),
   [core/contrast_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/contrast_recipe.ns),
-  [core/blur_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/blur_recipe.ns)
+  [core/blur_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/blur_recipe.ns),
+  [core/edge_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/edge_recipe.ns),
+  [core/sharpen_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/sharpen_recipe.ns),
+  plus the first analysis family:
+  [core/histogram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/histogram_recipe.ns),
+  [core/image_stats_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_stats_recipe.ns)
 * this is still an early package skeleton, not yet a full crate-style auto-imported library
 
 Current first responsibility:
@@ -93,7 +98,8 @@ Current first responsibility:
 * establish a canonical `PixelMagicShaderConsumer` shape
 * establish a canonical `PixelMagic` project-shaped pipeline recipe
 * establish the first checked-in image-op family for grayscale / invert / threshold style work
-* establish the next checked-in filter family for brightness / contrast / blur style work
+* establish the next checked-in filter family for brightness / contrast / blur / edge / sharpen style work
+* establish the first checked-in image-analysis family for histogram / image-stats style work
 * establish one explicit shared image-op contract that all checked-in filter recipes can align to
 * provide a stable checked-in bridge from host-preprocessed image description to shader-facing resource metadata
 

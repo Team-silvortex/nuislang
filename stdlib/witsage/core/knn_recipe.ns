@@ -1,0 +1,38 @@
+mod cpu Main {
+  struct WitSageKnnPlan {
+    rows: i64,
+    columns: i64,
+    neighbor_count: i64,
+    distance_kind: i64,
+    query_seed: i64
+  }
+
+  fn build_knn_plan(
+    rows: i64,
+    columns: i64,
+    neighbor_count: i64,
+    distance_kind: i64,
+    query_seed: i64
+  ) -> WitSageKnnPlan {
+    return WitSageKnnPlan {
+      rows: rows,
+      columns: columns,
+      neighbor_count: neighbor_count,
+      distance_kind: distance_kind,
+      query_seed: query_seed
+    };
+  }
+
+  fn summarize_knn_plan(plan: WitSageKnnPlan) -> i64 {
+    return plan.rows +
+      plan.columns +
+      plan.neighbor_count +
+      plan.distance_kind +
+      plan.query_seed;
+  }
+
+  fn main() {
+    let plan: WitSageKnnPlan = build_knn_plan(128, 4, 5, 1, 91);
+    print(summarize_knn_plan(plan));
+  }
+}

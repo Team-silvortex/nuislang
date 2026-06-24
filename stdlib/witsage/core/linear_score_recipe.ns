@@ -1,0 +1,34 @@
+mod cpu Main {
+  struct WitSageLinearModel {
+    feature_count: i64,
+    weight_seed: i64,
+    bias_seed: i64,
+    activation_kind: i64
+  }
+
+  fn build_linear_model(
+    feature_count: i64,
+    weight_seed: i64,
+    bias_seed: i64,
+    activation_kind: i64
+  ) -> WitSageLinearModel {
+    return WitSageLinearModel {
+      feature_count: feature_count,
+      weight_seed: weight_seed,
+      bias_seed: bias_seed,
+      activation_kind: activation_kind
+    };
+  }
+
+  fn summarize_linear_model(model: WitSageLinearModel) -> i64 {
+    return model.feature_count +
+      model.weight_seed +
+      model.bias_seed +
+      model.activation_kind;
+  }
+
+  fn main() {
+    let model: WitSageLinearModel = build_linear_model(4, 17, 3, 1);
+    print(summarize_linear_model(model));
+  }
+}

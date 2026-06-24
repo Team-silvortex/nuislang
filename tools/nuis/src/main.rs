@@ -2255,7 +2255,10 @@ fn run_build_output_self_check(output_dir: &Path) -> Result<ArtifactDoctorReport
 
 fn build_output_self_check_status(output_dir: Option<&Path>) -> (bool, Option<String>) {
     let Some(output_dir) = output_dir else {
-        return (false, Some("no output_dir available for self-check".to_owned()));
+        return (
+            false,
+            Some("no output_dir available for self-check".to_owned()),
+        );
     };
     match run_build_output_self_check(output_dir) {
         Ok(_) => (true, None),
@@ -2286,7 +2289,9 @@ fn self_check_code(output_dir: Option<&Path>, self_check_error: Option<&str>) ->
         Some(error) if error.contains("does not contain `nuis.build.manifest.toml`") => {
             "missing_build_manifest"
         }
-        Some(error) if error.contains("expected an output directory or `nuis.build.manifest.toml`") => {
+        Some(error)
+            if error.contains("expected an output directory or `nuis.build.manifest.toml`") =>
+        {
             "invalid_artifact_input"
         }
         Some(error) if error.contains("could not verify manifest") => "manifest_verify_failed",
@@ -2360,14 +2365,38 @@ fn collect_project_validation_snapshot(
     None
 }
 
+struct SelfCheckSummary {
+    ready: bool,
+    error: Option<String>,
+    code: &'static str,
+}
+
+struct ProjectCheckSummary {
+    snapshot: Option<ProjectValidationSnapshot>,
+    code: &'static str,
+}
+
+impl ProjectCheckSummary {
+    fn available(&self) -> bool {
+        self.snapshot.is_some()
+    }
+}
+
+struct LinkPlanSummary {
+    plan: Option<nuisc::linker::LinkPlan>,
+}
+
+impl LinkPlanSummary {
+    fn as_ref(&self) -> Option<&nuisc::linker::LinkPlan> {
+        self.plan.as_ref()
+    }
+}
+
 struct ArtifactOutputDiagnostics {
     artifact_diagnostic_code: &'static str,
-    self_check_ready: bool,
-    self_check_error: Option<String>,
-    self_check_code: &'static str,
-    project_checks: Option<ProjectValidationSnapshot>,
-    project_checks_code: &'static str,
-    link_plan: Option<nuisc::linker::LinkPlan>,
+    self_check: SelfCheckSummary,
+    project_checks: ProjectCheckSummary,
+    link_plan: LinkPlanSummary,
 }
 
 fn collect_artifact_output_diagnostics(
@@ -2376,23 +2405,62 @@ fn collect_artifact_output_diagnostics(
 ) -> ArtifactOutputDiagnostics {
     let (self_check_ready, self_check_error) =
         build_output_self_check_status(report.output_dir.as_deref());
-    let project_checks = collect_project_validation_snapshot(input, Some(report));
-    let self_check_code =
-        self_check_code(report.output_dir.as_deref(), self_check_error.as_deref());
-    let project_checks_code = project_checks_code(project_checks.as_ref());
-    let link_plan = report
-        .output_dir
-        .as_ref()
-        .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
+    let project_snapshot = collect_project_validation_snapshot(input, Some(report));
     ArtifactOutputDiagnostics {
         artifact_diagnostic_code: artifact_diagnostic_code(report),
-        self_check_ready,
-        self_check_error,
-        self_check_code,
-        project_checks,
-        project_checks_code,
-        link_plan,
+        self_check: SelfCheckSummary {
+            ready: self_check_ready,
+            code: self_check_code(report.output_dir.as_deref(), self_check_error.as_deref()),
+            error: self_check_error,
+        },
+        project_checks: ProjectCheckSummary {
+            code: project_checks_code(project_snapshot.as_ref()),
+            snapshot: project_snapshot,
+        },
+        link_plan: LinkPlanSummary {
+            plan: report
+                .output_dir
+                .as_ref()
+                .and_then(|output_dir| load_link_plan_for_output_dir(output_dir)),
+        },
     }
+}
+
+fn append_artifact_output_diagnostic_json_fields(
+    out: &mut String,
+    diagnostics: &ArtifactOutputDiagnostics,
+    self_check_ready_key: &str,
+    self_check_code_key: &str,
+    self_check_error_key: &str,
+    include_project_details: bool,
+) {
+    append_json_field_strings(
+        out,
+        vec![
+            json_field(
+                "artifact_diagnostic_code",
+                diagnostics.artifact_diagnostic_code,
+            ),
+            json_bool_field(self_check_ready_key, diagnostics.self_check.ready),
+            json_field(self_check_code_key, diagnostics.self_check.code),
+            json_optional_string_field(
+                self_check_error_key,
+                diagnostics.self_check.error.as_deref(),
+            ),
+        ],
+    );
+    append_project_validation_summary_json_fields(
+        out,
+        diagnostics.project_checks.snapshot.as_ref(),
+        include_project_details,
+    );
+    append_json_field_strings(
+        out,
+        vec![json_field(
+            "project_checks_code",
+            diagnostics.project_checks.code,
+        )],
+    );
 }
 
 fn append_project_validation_summary_json_fields(
@@ -2427,7 +2495,10 @@ fn append_project_validation_summary_json_fields(
             append_json_field_strings(
                 out,
                 vec![
-                    json_object_array_field("abi_checks", &project_abi_checks_json(&snapshot.abi_checks)),
+                    json_object_array_field(
+                        "abi_checks",
+                        &project_abi_checks_json(&snapshot.abi_checks),
+                    ),
                     json_object_array_field(
                         "registry_checks",
                         &project_domain_registry_checks_json(&snapshot.registry_checks),
@@ -2443,11 +2514,7 @@ fn append_project_validation_summary_json_fields(
 }
 
 fn resolve_frontdoor_build_manifest_path(input: &Path) -> Result<PathBuf, String> {
-    if input
-        .file_name()
-        .and_then(|value| value.to_str())
-        == Some("nuis.build.manifest.toml")
-    {
+    if input.file_name().and_then(|value| value.to_str()) == Some("nuis.build.manifest.toml") {
         return Ok(input.to_path_buf());
     }
     if input.is_dir() {
@@ -2965,9 +3032,6 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
             json_bool_field("manifest_verified", report.manifest_verified),
             json_bool_field("artifact_verified", report.artifact_verified),
             json_bool_field("ready_to_run", report.ready_to_run),
-            json_field("artifact_diagnostic_code", diagnostics.artifact_diagnostic_code),
-            json_bool_field("self_check_ready", diagnostics.self_check_ready),
-            json_field("self_check_code", diagnostics.self_check_code),
             json_field("recommended_next_step", &report.recommended_next_step),
             json_field("recommended_command", &report.recommended_command),
             json_field("recommended_reason", &report.recommended_reason),
@@ -2979,15 +3043,17 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
                 "artifact_verify_error",
                 report.artifact_verify_error.as_deref(),
             ),
-            json_optional_string_field("self_check_error", diagnostics.self_check_error.as_deref()),
         ],
     );
-    append_project_validation_summary_json_fields(&mut out, diagnostics.project_checks.as_ref(), true);
-    append_json_field_strings(
+    append_artifact_output_diagnostic_json_fields(
         &mut out,
-        vec![json_field("project_checks_code", diagnostics.project_checks_code)],
+        &diagnostics,
+        "self_check_ready",
+        "self_check_code",
+        "self_check_error",
+        true,
     );
-    append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.as_ref());
+    append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.plan.as_ref());
     out.push('}');
     out
 }
@@ -3175,21 +3241,20 @@ pub(crate) fn render_build_report_json(input: &Path) -> String {
             json_bool_field("manifest_verified", doctor.manifest_verified),
             json_bool_field("artifact_verified", doctor.artifact_verified),
             json_bool_field("ready_to_run", doctor.ready_to_run),
-            json_field("artifact_diagnostic_code", diagnostics.artifact_diagnostic_code),
-            json_bool_field("self_check_ready", diagnostics.self_check_ready),
-            json_field("self_check_code", diagnostics.self_check_code),
             json_field("recommended_next_step", &doctor.recommended_next_step),
             json_field("recommended_command", &doctor.recommended_command),
             json_field("recommended_reason", &doctor.recommended_reason),
-            json_optional_string_field("self_check_error", diagnostics.self_check_error.as_deref()),
             json_usize_field("domain_units_count", domain_unit_records.len()),
             json_object_array_field("domain_units", &domain_unit_records),
         ],
     );
-    append_project_validation_summary_json_fields(&mut out, diagnostics.project_checks.as_ref(), true);
-    append_json_field_strings(
+    append_artifact_output_diagnostic_json_fields(
         &mut out,
-        vec![json_field("project_checks_code", diagnostics.project_checks_code)],
+        &diagnostics,
+        "self_check_ready",
+        "self_check_code",
+        "self_check_error",
+        true,
     );
     if let Some(report) = manifest_verify.as_ref() {
         append_json_field_strings(
@@ -3257,7 +3322,7 @@ pub(crate) fn render_build_report_json(input: &Path) -> String {
         );
     }
     append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
-    append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.as_ref());
+    append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.plan.as_ref());
     out.push('}');
     out
 }
@@ -3293,15 +3358,15 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
         "  artifact_diagnostic_code: {}",
         diagnostics.artifact_diagnostic_code
     );
-    println!("  self_check_ready: {}", diagnostics.self_check_ready);
-    println!("  self_check_code: {}", diagnostics.self_check_code);
+    println!("  self_check_ready: {}", diagnostics.self_check.ready);
+    println!("  self_check_code: {}", diagnostics.self_check.code);
     if let Some(error) = report.manifest_verify_error.as_deref() {
         println!("  manifest_verify_error: {}", error);
     }
     if let Some(error) = report.artifact_verify_error.as_deref() {
         println!("  artifact_verify_error: {}", error);
     }
-    if let Some(error) = diagnostics.self_check_error.as_deref() {
+    if let Some(error) = diagnostics.self_check.error.as_deref() {
         println!("  self_check_error: {}", error);
     }
     println!("  recommended_next_step: {}", report.recommended_next_step);
@@ -3309,10 +3374,10 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
     println!("  recommended_reason: {}", report.recommended_reason);
     println!(
         "  project_checks_available: {}",
-        diagnostics.project_checks.is_some()
+        diagnostics.project_checks.available()
     );
-    println!("  project_checks_code: {}", diagnostics.project_checks_code);
-    if let Some(snapshot) = diagnostics.project_checks.as_ref() {
+    println!("  project_checks_code: {}", diagnostics.project_checks.code);
+    if let Some(snapshot) = diagnostics.project_checks.snapshot.as_ref() {
         println!("  project_checks_root: {}", snapshot.project_root.display());
         println!(
             "  abi_checks_ok: {} ({})",
@@ -3330,7 +3395,10 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
             snapshot.lowering_checks.len()
         );
     }
-    println!("  link_plan_available: {}", diagnostics.link_plan.is_some());
+    println!(
+        "  link_plan_available: {}",
+        diagnostics.link_plan.plan.is_some()
+    );
     println!(
         "  link_plan_final_stage: {}",
         diagnostics
@@ -3371,7 +3439,7 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
             .map(|plan| plan.domain_units.len())
             .unwrap_or(0)
     );
-    if let Some(plan) = diagnostics.link_plan.as_ref() {
+    if let Some(plan) = diagnostics.link_plan.plan.as_ref() {
         for unit in &plan.domain_units {
             let abi = unit.abi.as_deref().unwrap_or("<none>");
             let lowering = unit.selected_lowering_target.as_deref().unwrap_or("<none>");
@@ -3409,19 +3477,19 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
         "  artifact_diagnostic_code: {}",
         diagnostics.artifact_diagnostic_code
     );
-    println!("  self_check_ready: {}", diagnostics.self_check_ready);
-    println!("  self_check_code: {}", diagnostics.self_check_code);
+    println!("  self_check_ready: {}", diagnostics.self_check.ready);
+    println!("  self_check_code: {}", diagnostics.self_check.code);
     println!("  recommended_next_step: {}", doctor.recommended_next_step);
     println!("  recommended_command: {}", doctor.recommended_command);
-    if let Some(error) = diagnostics.self_check_error.as_deref() {
+    if let Some(error) = diagnostics.self_check.error.as_deref() {
         println!("  self_check_error: {}", error);
     }
     println!(
         "  project_checks_available: {}",
-        diagnostics.project_checks.is_some()
+        diagnostics.project_checks.available()
     );
-    println!("  project_checks_code: {}", diagnostics.project_checks_code);
-    if let Some(snapshot) = diagnostics.project_checks.as_ref() {
+    println!("  project_checks_code: {}", diagnostics.project_checks.code);
+    if let Some(snapshot) = diagnostics.project_checks.snapshot.as_ref() {
         println!("  project_checks_root: {}", snapshot.project_root.display());
         println!(
             "  abi_checks_ok: {} ({})",
@@ -3539,8 +3607,11 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
             report.lifecycle_runtime_capability_flags_consistent
         );
     }
-    println!("  link_plan_available: {}", diagnostics.link_plan.is_some());
-    if let Some(plan) = diagnostics.link_plan.as_ref() {
+    println!(
+        "  link_plan_available: {}",
+        diagnostics.link_plan.plan.is_some()
+    );
+    if let Some(plan) = diagnostics.link_plan.plan.as_ref() {
         println!("  link_plan_final_stage: {}", plan.final_stage.kind);
         println!("  link_plan_final_driver: {}", plan.final_stage.driver);
         println!(
@@ -3747,31 +3818,20 @@ fn render_workflow_json(input: &Path) -> Result<String, String> {
                 ),
                 json_bool_field("artifact_ready_to_run", artifact_report.ready_to_run),
                 json_field(
-                    "artifact_diagnostic_code",
-                    diagnostics.artifact_diagnostic_code,
-                ),
-                json_bool_field("artifact_self_check_ready", diagnostics.self_check_ready),
-                json_field("artifact_self_check_code", diagnostics.self_check_code),
-                json_field(
                     "artifact_recommended_next_step",
                     &artifact_report.recommended_next_step,
                 ),
-                json_optional_string_field(
-                    "artifact_self_check_error",
-                    diagnostics.self_check_error.as_deref(),
-                ),
             ],
         );
-        append_project_validation_summary_json_fields(
+        append_artifact_output_diagnostic_json_fields(
             &mut out,
-            diagnostics.project_checks.as_ref(),
+            &diagnostics,
+            "artifact_self_check_ready",
+            "artifact_self_check_code",
+            "artifact_self_check_error",
             false,
         );
-        append_json_field_strings(
-            &mut out,
-            vec![json_field("project_checks_code", diagnostics.project_checks_code)],
-        );
-        append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.as_ref());
+        append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.plan.as_ref());
         append_json_field_strings(
             &mut out,
             workflow_contract_json_fields(&frontdoor, true, true, include_galaxy_flow, true),
@@ -3820,27 +3880,20 @@ fn render_workflow_json(input: &Path) -> Result<String, String> {
             ),
             json_bool_field("artifact_ready_to_run", artifact_report.ready_to_run),
             json_field(
-                "artifact_diagnostic_code",
-                diagnostics.artifact_diagnostic_code,
-            ),
-            json_bool_field("artifact_self_check_ready", diagnostics.self_check_ready),
-            json_field("artifact_self_check_code", diagnostics.self_check_code),
-            json_field(
                 "artifact_recommended_next_step",
                 &artifact_report.recommended_next_step,
             ),
-            json_optional_string_field(
-                "artifact_self_check_error",
-                diagnostics.self_check_error.as_deref(),
-            ),
         ],
     );
-    append_project_validation_summary_json_fields(&mut out, None, false);
-    append_json_field_strings(
+    append_artifact_output_diagnostic_json_fields(
         &mut out,
-        vec![json_field("project_checks_code", "unavailable")],
+        &diagnostics,
+        "artifact_self_check_ready",
+        "artifact_self_check_code",
+        "artifact_self_check_error",
+        false,
     );
-    append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.as_ref());
+    append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.plan.as_ref());
     append_json_field_strings(
         &mut out,
         workflow_contract_json_fields(&frontdoor, false, false, false, true),
@@ -4229,9 +4282,15 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
             "  artifact_diagnostic_code: {}",
             diagnostics.artifact_diagnostic_code
         );
-        println!("  artifact_self_check_ready: {}", diagnostics.self_check_ready);
-        println!("  artifact_self_check_code: {}", diagnostics.self_check_code);
-        if let Some(error) = diagnostics.self_check_error.as_deref() {
+        println!(
+            "  artifact_self_check_ready: {}",
+            diagnostics.self_check.ready
+        );
+        println!(
+            "  artifact_self_check_code: {}",
+            diagnostics.self_check.code
+        );
+        if let Some(error) = diagnostics.self_check.error.as_deref() {
             println!("  artifact_self_check_error: {}", error);
         }
         println!(
@@ -4240,9 +4299,9 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         );
         println!(
             "  project_checks_available: {}",
-            diagnostics.project_checks.is_some()
+            diagnostics.project_checks.available()
         );
-        if let Some(snapshot) = diagnostics.project_checks.as_ref() {
+        if let Some(snapshot) = diagnostics.project_checks.snapshot.as_ref() {
             println!(
                 "  abi_checks_ok: {} ({})",
                 snapshot.abi_checks.iter().all(|check| check.ok),
@@ -4259,8 +4318,11 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
                 snapshot.lowering_checks.len()
             );
         }
-        println!("  project_checks_code: {}", diagnostics.project_checks_code);
-        println!("  link_plan_available: {}", diagnostics.link_plan.is_some());
+        println!("  project_checks_code: {}", diagnostics.project_checks.code);
+        println!(
+            "  link_plan_available: {}",
+            diagnostics.link_plan.plan.is_some()
+        );
         println!(
             "  link_plan_final_stage: {}",
             diagnostics
@@ -4339,9 +4401,15 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         "  artifact_diagnostic_code: {}",
         diagnostics.artifact_diagnostic_code
     );
-    println!("  artifact_self_check_ready: {}", diagnostics.self_check_ready);
-    println!("  artifact_self_check_code: {}", diagnostics.self_check_code);
-    if let Some(error) = diagnostics.self_check_error.as_deref() {
+    println!(
+        "  artifact_self_check_ready: {}",
+        diagnostics.self_check.ready
+    );
+    println!(
+        "  artifact_self_check_code: {}",
+        diagnostics.self_check.code
+    );
+    if let Some(error) = diagnostics.self_check.error.as_deref() {
         println!("  artifact_self_check_error: {}", error);
     }
     println!(
@@ -4349,7 +4417,10 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         artifact_report.recommended_next_step
     );
     println!("  project_checks_code: unavailable");
-    println!("  link_plan_available: {}", diagnostics.link_plan.is_some());
+    println!(
+        "  link_plan_available: {}",
+        diagnostics.link_plan.plan.is_some()
+    );
     println!(
         "  link_plan_final_stage: {}",
         diagnostics
@@ -6221,11 +6292,10 @@ mod tests {
         render_project_imports_json, render_project_status_json, render_run_artifact_json,
         render_scheduler_view_json, render_workflow_json, resolve_run_artifact_binary_path,
         resolve_runner_clock_domain, run_artifact_command_for_output_dir,
-        run_build_output_self_check,
-        run_language_benchmarks_for_source_file, run_language_tests_for_source_file,
-        scheduler_view_domain_record, scheduler_view_domain_record_json,
-        single_source_workflow_source_profile, upsert_abi_block, wait_for_test_child,
-        PublicSurfaceModuleRecord, RawTestOutcome, WorkflowRecommendation,
+        run_build_output_self_check, run_language_benchmarks_for_source_file,
+        run_language_tests_for_source_file, scheduler_view_domain_record,
+        scheduler_view_domain_record_json, single_source_workflow_source_profile, upsert_abi_block,
+        wait_for_test_child, PublicSurfaceModuleRecord, RawTestOutcome, WorkflowRecommendation,
     };
     use crate::galaxy;
     use crate::json_surface::{
@@ -6297,7 +6367,7 @@ mod tests {
             .stack_size(64 * 1024 * 1024)
             .spawn(|| {
                 let root = repo_root();
-                for module_dir in ["core", "std", "ns-nova"] {
+                for module_dir in ["core", "std", "ns-nova", "pixelmagic", "witsage"] {
                     for relative in load_stdlib_source_modules(&root, module_dir) {
                         let input = root.join(relative);
                         handle_check(input.clone()).unwrap_or_else(|error| {

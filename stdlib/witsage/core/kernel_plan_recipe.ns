@@ -1,0 +1,42 @@
+mod cpu Main {
+  struct WitSageKernelPlan {
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    model_kind: i64,
+    plan_kind: i64,
+    work_items: i64
+  }
+
+  fn build_kernel_plan(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    model_kind: i64,
+    plan_kind: i64,
+    work_items: i64
+  ) -> WitSageKernelPlan {
+    return WitSageKernelPlan {
+      dataset_handle: dataset_handle,
+      rows: rows,
+      columns: columns,
+      model_kind: model_kind,
+      plan_kind: plan_kind,
+      work_items: work_items
+    };
+  }
+
+  fn summarize_kernel_plan(plan: WitSageKernelPlan) -> i64 {
+    return plan.dataset_handle +
+      plan.rows +
+      plan.columns +
+      plan.model_kind +
+      plan.plan_kind +
+      plan.work_items;
+  }
+
+  fn main() {
+    let plan: WitSageKernelPlan = build_kernel_plan(6103, 128, 4, 2, 2, 512);
+    print(summarize_kernel_plan(plan));
+  }
+}

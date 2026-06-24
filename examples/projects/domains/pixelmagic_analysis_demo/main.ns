@@ -1,0 +1,46 @@
+use cpu PixelMagicContracts;
+
+mod cpu Main {
+  fn summarize_pixelmagic_analysis_demo() -> i64 {
+    let source_handle: i64 = 5301;
+    let width: i64 = 128;
+    let height: i64 = 96;
+    let edge_score: i64 = PixelMagicContracts.kernel_packet_total(
+      source_handle,
+      width,
+      height,
+      PixelMagicContracts.edge_op_kind(),
+      12,
+      9
+    );
+    let sharpen_score: i64 = PixelMagicContracts.kernel_packet_total(
+      source_handle,
+      width,
+      height,
+      PixelMagicContracts.sharpen_op_kind(),
+      9,
+      9
+    );
+    let histogram_score: i64 = PixelMagicContracts.analysis_packet_total(
+      source_handle,
+      width,
+      height,
+      PixelMagicContracts.histogram_op_kind(),
+      256,
+      0
+    );
+    let stats_score: i64 = PixelMagicContracts.analysis_packet_total(
+      source_handle,
+      width,
+      height,
+      PixelMagicContracts.image_stats_op_kind(),
+      4,
+      1
+    );
+    return edge_score + sharpen_score + histogram_score + stats_score;
+  }
+
+  fn main() {
+    print(summarize_pixelmagic_analysis_demo());
+  }
+}

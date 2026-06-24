@@ -41,5 +41,9 @@ source_modules = [
   "core/threshold_recipe.ns",
   "core/brightness_recipe.ns",
   "core/contrast_recipe.ns",
-  "core/blur_recipe.ns"
+  "core/blur_recipe.ns",
+  "core/edge_recipe.ns",
+  "core/sharpen_recipe.ns",
+  "core/histogram_recipe.ns",
+  "core/image_stats_recipe.ns"
 ]

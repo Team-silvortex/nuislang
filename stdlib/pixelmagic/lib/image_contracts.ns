@@ -55,6 +55,26 @@ mod cpu PixelMagicContracts {
     return 6;
   }
 
+  /// Encodes the operation kind for edge detection image processing.
+  pub fn edge_op_kind() -> i64 {
+    return 7;
+  }
+
+  /// Encodes the operation kind for sharpen image processing.
+  pub fn sharpen_op_kind() -> i64 {
+    return 8;
+  }
+
+  /// Encodes the operation kind for histogram image analysis.
+  pub fn histogram_op_kind() -> i64 {
+    return 9;
+  }
+
+  /// Encodes the operation kind for sampled image statistics analysis.
+  pub fn image_stats_op_kind() -> i64 {
+    return 10;
+  }
+
   /// Produces a compact summary score for a generic image packet.
   pub fn image_packet_total(
     source_handle: i64,
@@ -88,6 +108,32 @@ mod cpu PixelMagicContracts {
     amount: i64
   ) -> i64 {
     return image_packet_total(source_handle, width, height, op_kind, amount, 1);
+  }
+
+  /// Produces the score for a kernel-style image operation packet.
+  pub fn kernel_packet_total(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    strength: i64,
+    sample_count: i64
+  ) -> i64 {
+    return image_packet_total(source_handle, width, height, op_kind, strength, 4)
+      + sample_count;
+  }
+
+  /// Produces the score for an image-analysis operation packet.
+  pub fn analysis_packet_total(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    bins_or_stride: i64,
+    channel_pick: i64
+  ) -> i64 {
+    return image_packet_total(source_handle, width, height, op_kind, bins_or_stride, 5)
+      + channel_pick;
   }
 
   /// Produces a compact residency score for texture-like resources.

@@ -1,0 +1,64 @@
+mod cpu Main {
+  struct PixelMagicHistogramPlan {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    bins: i64,
+    channel_pick: i64,
+    flags: i64
+  }
+
+  struct PixelMagicHistogramSummary {
+    pixel_count: i64,
+    bucket_count: i64,
+    channel_pick: i64,
+    residency_score: i64
+  }
+
+  fn build_pixelmagic_histogram_plan(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    bins: i64,
+    channel_pick: i64
+  ) -> PixelMagicHistogramPlan {
+    return PixelMagicHistogramPlan {
+      source_handle: source_handle,
+      width: width,
+      height: height,
+      bins: bins,
+      channel_pick: channel_pick,
+      flags: 5
+    };
+  }
+
+  fn summarize_histogram_plan(plan: PixelMagicHistogramPlan) -> PixelMagicHistogramSummary {
+    let pixel_count: i64 = plan.width * plan.height;
+    let residency_score: i64 =
+      plan.source_handle + plan.bins + plan.channel_pick + plan.flags;
+    return PixelMagicHistogramSummary {
+      pixel_count: pixel_count,
+      bucket_count: plan.bins,
+      channel_pick: plan.channel_pick,
+      residency_score: residency_score
+    };
+  }
+
+  fn histogram_dispatch_score(
+    plan: PixelMagicHistogramPlan,
+    summary: PixelMagicHistogramSummary
+  ) -> i64 {
+    return plan.source_handle +
+      summary.pixel_count +
+      summary.bucket_count +
+      summary.channel_pick +
+      summary.residency_score;
+  }
+
+  fn main() {
+    let plan: PixelMagicHistogramPlan =
+      build_pixelmagic_histogram_plan(5201, 128, 96, 256, 0);
+    let summary: PixelMagicHistogramSummary = summarize_histogram_plan(plan);
+    print(histogram_dispatch_score(plan, summary));
+  }
+}

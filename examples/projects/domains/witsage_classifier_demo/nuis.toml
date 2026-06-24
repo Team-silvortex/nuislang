@@ -1,0 +1,9 @@
+name = "witsage_classifier_demo"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "kernel_unit.ns"]
+galaxy = ["witsage=workspace"]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "kernel=kernel.apple_ane.coreml.v1",
+]

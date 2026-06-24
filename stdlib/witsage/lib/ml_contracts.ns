@@ -1,0 +1,163 @@
+/// CPU-side WitSage helpers for classical ML packet shaping and kernel plan scoring.
+mod cpu WitSageContracts {
+  /// Encodes the dataset kind used for dense feature matrices.
+  pub fn dense_dataset_kind() -> i64 {
+    return 1;
+  }
+
+  /// Encodes the dataset kind used for labeled dense feature matrices.
+  pub fn labeled_dense_dataset_kind() -> i64 {
+    return 2;
+  }
+
+  /// Encodes the model kind used for linear scoring.
+  pub fn linear_model_kind() -> i64 {
+    return 1;
+  }
+
+  /// Encodes the model kind used for k-means clustering.
+  pub fn kmeans_model_kind() -> i64 {
+    return 2;
+  }
+
+  /// Encodes the model kind used for k-nearest-neighbor scoring.
+  pub fn knn_model_kind() -> i64 {
+    return 3;
+  }
+
+  /// Encodes the preprocessing kind used for min-max normalization.
+  pub fn minmax_normalization_kind() -> i64 {
+    return 1;
+  }
+
+  /// Encodes the preprocessing kind used for z-score normalization.
+  pub fn zscore_normalization_kind() -> i64 {
+    return 2;
+  }
+
+  /// Encodes the evaluation kind used for classification metrics.
+  pub fn classification_eval_kind() -> i64 {
+    return 1;
+  }
+
+  /// Encodes the evaluation kind used for regression metrics.
+  pub fn regression_eval_kind() -> i64 {
+    return 2;
+  }
+
+  /// Encodes the kernel plan kind for map-style feature transforms.
+  pub fn kernel_map_plan_kind() -> i64 {
+    return 1;
+  }
+
+  /// Encodes the kernel plan kind for reduce-style feature statistics.
+  pub fn kernel_reduce_plan_kind() -> i64 {
+    return 2;
+  }
+
+  /// Produces a compact dataset shape score.
+  pub fn dataset_shape_total(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    label_columns: i64,
+    dataset_kind: i64
+  ) -> i64 {
+    return dataset_handle + rows + columns + label_columns + dataset_kind;
+  }
+
+  /// Produces a compact feature statistics score.
+  pub fn feature_stats_total(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    mean_seed: i64,
+    variance_seed: i64
+  ) -> i64 {
+    return dataset_handle + rows + columns + mean_seed + variance_seed;
+  }
+
+  /// Produces a compact preprocessing plan score.
+  pub fn preprocessing_total(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    preprocessing_kind: i64,
+    parameter_seed: i64
+  ) -> i64 {
+    return dataset_handle + rows + columns + preprocessing_kind + parameter_seed;
+  }
+
+  /// Produces a compact train/test split score.
+  pub fn train_test_split_total(
+    dataset_handle: i64,
+    rows: i64,
+    train_rows: i64,
+    test_rows: i64,
+    seed: i64
+  ) -> i64 {
+    return dataset_handle + rows + train_rows + test_rows + seed;
+  }
+
+  /// Produces a compact linear model score.
+  pub fn linear_score_total(
+    feature_count: i64,
+    weight_seed: i64,
+    bias_seed: i64,
+    activation_kind: i64
+  ) -> i64 {
+    return linear_model_kind() + feature_count + weight_seed + bias_seed + activation_kind;
+  }
+
+  /// Produces a compact clustering plan score.
+  pub fn kmeans_plan_total(
+    rows: i64,
+    columns: i64,
+    cluster_count: i64,
+    iteration_budget: i64
+  ) -> i64 {
+    return kmeans_model_kind() + rows + columns + cluster_count + iteration_budget;
+  }
+
+  /// Produces a compact nearest-neighbor plan score.
+  pub fn knn_plan_total(
+    rows: i64,
+    columns: i64,
+    neighbor_count: i64,
+    distance_kind: i64
+  ) -> i64 {
+    return knn_model_kind() + rows + columns + neighbor_count + distance_kind;
+  }
+
+  /// Produces a compact confusion matrix score for binary classifiers.
+  pub fn confusion_matrix_total(
+    true_positive: i64,
+    true_negative: i64,
+    false_positive: i64,
+    false_negative: i64
+  ) -> i64 {
+    return true_positive + true_negative + false_positive + false_negative;
+  }
+
+  /// Produces a compact evaluation score for model quality summaries.
+  pub fn evaluation_total(
+    eval_kind: i64,
+    sample_count: i64,
+    primary_metric_seed: i64,
+    secondary_metric_seed: i64
+  ) -> i64 {
+    return eval_kind + sample_count + primary_metric_seed + secondary_metric_seed;
+  }
+
+  /// Produces a compact kernel dispatch score for model plans.
+  pub fn kernel_plan_total(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    model_kind: i64,
+    plan_kind: i64,
+    work_items: i64
+  ) -> i64 {
+    return dataset_handle + rows + columns + model_kind + plan_kind + work_items;
+  }
+}

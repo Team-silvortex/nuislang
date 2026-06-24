@@ -1,0 +1,34 @@
+module_schema = "nuis-stdlib-module-v1"
+name = "witsage"
+package_id = "nuis.witsage"
+tier = "framework"
+depends_on = ["core", "std"]
+summary = "Classical machine-learning Galaxy for statistics, feature shaping, and kernel-backed model recipes."
+
+surfaces = [
+  "contract.witsage.dataset.v1",
+  "contract.witsage.feature-stats.v1",
+  "contract.witsage.classical-model.v1",
+  "contract.witsage.kernel-plan.v1",
+  "contract.witsage.preprocessing.v1",
+  "contract.witsage.evaluation.v1"
+]
+
+library_modules = [
+  "lib/ml_contracts.ns"
+]
+
+library_import_policy = "project-auto"
+
+source_modules = [
+  "core/dataset_recipe.ns",
+  "core/feature_stats_recipe.ns",
+  "core/normalization_recipe.ns",
+  "core/train_test_split_recipe.ns",
+  "core/linear_score_recipe.ns",
+  "core/kmeans_recipe.ns",
+  "core/knn_recipe.ns",
+  "core/kernel_plan_recipe.ns",
+  "core/confusion_matrix_recipe.ns",
+  "core/evaluation_recipe.ns"
+]

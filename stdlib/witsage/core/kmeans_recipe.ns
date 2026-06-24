@@ -1,0 +1,38 @@
+mod cpu Main {
+  struct WitSageKMeansPlan {
+    rows: i64,
+    columns: i64,
+    cluster_count: i64,
+    iteration_budget: i64,
+    centroid_seed: i64
+  }
+
+  fn build_kmeans_plan(
+    rows: i64,
+    columns: i64,
+    cluster_count: i64,
+    iteration_budget: i64,
+    centroid_seed: i64
+  ) -> WitSageKMeansPlan {
+    return WitSageKMeansPlan {
+      rows: rows,
+      columns: columns,
+      cluster_count: cluster_count,
+      iteration_budget: iteration_budget,
+      centroid_seed: centroid_seed
+    };
+  }
+
+  fn summarize_kmeans_plan(plan: WitSageKMeansPlan) -> i64 {
+    return plan.rows +
+      plan.columns +
+      plan.cluster_count +
+      plan.iteration_budget +
+      plan.centroid_seed;
+  }
+
+  fn main() {
+    let plan: WitSageKMeansPlan = build_kmeans_plan(128, 4, 3, 12, 71);
+    print(summarize_kmeans_plan(plan));
+  }
+}

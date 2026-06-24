@@ -1,0 +1,65 @@
+mod cpu Main {
+  struct PixelMagicImageStatsPlan {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    channel_pick: i64,
+    sample_stride: i64,
+    flags: i64
+  }
+
+  struct PixelMagicImageStatsSummary {
+    sample_budget: i64,
+    min_seed: i64,
+    max_seed: i64,
+    mean_seed: i64
+  }
+
+  fn build_pixelmagic_image_stats_plan(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    channel_pick: i64,
+    sample_stride: i64
+  ) -> PixelMagicImageStatsPlan {
+    return PixelMagicImageStatsPlan {
+      source_handle: source_handle,
+      width: width,
+      height: height,
+      channel_pick: channel_pick,
+      sample_stride: sample_stride,
+      flags: 6
+    };
+  }
+
+  fn summarize_image_stats_plan(plan: PixelMagicImageStatsPlan) -> PixelMagicImageStatsSummary {
+    let pixel_count: i64 = plan.width * plan.height;
+    let sample_budget: i64 = pixel_count / plan.sample_stride;
+    return PixelMagicImageStatsSummary {
+      sample_budget: sample_budget,
+      min_seed: plan.source_handle + plan.channel_pick,
+      max_seed: plan.source_handle + plan.flags + plan.sample_stride,
+      mean_seed: sample_budget + plan.channel_pick + plan.flags
+    };
+  }
+
+  fn image_stats_dispatch_score(
+    plan: PixelMagicImageStatsPlan,
+    summary: PixelMagicImageStatsSummary
+  ) -> i64 {
+    return plan.source_handle +
+      plan.width +
+      plan.height +
+      summary.sample_budget +
+      summary.min_seed +
+      summary.max_seed +
+      summary.mean_seed;
+  }
+
+  fn main() {
+    let plan: PixelMagicImageStatsPlan =
+      build_pixelmagic_image_stats_plan(5202, 128, 96, 1, 4);
+    let summary: PixelMagicImageStatsSummary = summarize_image_stats_plan(plan);
+    print(image_stats_dispatch_score(plan, summary));
+  }
+}

@@ -1,0 +1,37 @@
+mod cpu Main {
+  struct WitSageDataset {
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    label_columns: i64,
+    dataset_kind: i64
+  }
+
+  fn build_witsage_dataset(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    label_columns: i64
+  ) -> WitSageDataset {
+    return WitSageDataset {
+      dataset_handle: dataset_handle,
+      rows: rows,
+      columns: columns,
+      label_columns: label_columns,
+      dataset_kind: 2
+    };
+  }
+
+  fn summarize_witsage_dataset(dataset: WitSageDataset) -> i64 {
+    return dataset.dataset_handle +
+      dataset.rows +
+      dataset.columns +
+      dataset.label_columns +
+      dataset.dataset_kind;
+  }
+
+  fn main() {
+    let dataset: WitSageDataset = build_witsage_dataset(6101, 128, 4, 1);
+    print(summarize_witsage_dataset(dataset));
+  }
+}

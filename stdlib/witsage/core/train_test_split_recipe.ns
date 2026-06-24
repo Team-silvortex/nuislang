@@ -1,0 +1,38 @@
+mod cpu Main {
+  struct WitSageTrainTestSplit {
+    dataset_handle: i64,
+    rows: i64,
+    train_rows: i64,
+    test_rows: i64,
+    seed: i64
+  }
+
+  fn build_train_test_split(
+    dataset_handle: i64,
+    rows: i64,
+    train_rows: i64,
+    test_rows: i64,
+    seed: i64
+  ) -> WitSageTrainTestSplit {
+    return WitSageTrainTestSplit {
+      dataset_handle: dataset_handle,
+      rows: rows,
+      train_rows: train_rows,
+      test_rows: test_rows,
+      seed: seed
+    };
+  }
+
+  fn summarize_train_test_split(split: WitSageTrainTestSplit) -> i64 {
+    return split.dataset_handle +
+      split.rows +
+      split.train_rows +
+      split.test_rows +
+      split.seed;
+  }
+
+  fn main() {
+    let split: WitSageTrainTestSplit = build_train_test_split(6302, 160, 128, 32, 17);
+    print(summarize_train_test_split(split));
+  }
+}

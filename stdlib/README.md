@@ -14,6 +14,8 @@ The current top-level modules are:
   practical systems/helper layer built on `core`
 * [pixelmagic](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
   official image/resource Galaxy built on `core + std`
+* [witsage](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/README.md)
+  official classical ML Galaxy built on `core + std`
 * [ns-nova](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
   rendering/application framework layer and the first place where real checked-in
   `.ns` source modules are already accumulating
@@ -24,6 +26,7 @@ The intended dependency direction is:
 
 ```text
 core -> std -> pixelmagic
+core -> std -> witsage
 core -> std -> ns-nova
 ```
 
@@ -32,6 +35,7 @@ Read that as:
 * `core` should carry the smallest source-level semantic contracts
 * `std` should add practical systems helpers without hiding execution semantics
 * `pixelmagic` should hold image/resource contracts and shader-facing image prep on top of those lower layers
+* `witsage` should hold classical ML contracts and kernel-facing model plans on top of those lower layers
 * `ns-nova` should build a GPU-first application/rendering framework on top of those lower layers
 
 ## Current Reality
@@ -92,6 +96,13 @@ Asset view by layer:
     [stdlib/pixelmagic/module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/module.toml)
   - see
     [stdlib/pixelmagic/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
+* `witsage`
+  - official classical ML Galaxy
+  - first checked-in package skeleton for feature statistics and kernel-backed model plans
+  - declared through
+    [stdlib/witsage/module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/module.toml)
+  - see
+    [stdlib/witsage/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/README.md)
 * `ns-nova`
   - current framework/source-asset layer
   - currently the richest family-shaped stdlib surface
@@ -110,6 +121,8 @@ Current asset types:
   and early clock/test timing alignment
 * `pixelmagic`
   image/resource handoff modules and future shader-facing image prep contracts
+* `witsage`
+  dataset/statistics/model-plan modules and future kernel-facing classical ML contracts
 * `ns-nova`
   framework-oriented runtime/blueprint/recipe modules across `core`, `ui`, and `scene`
 
@@ -126,6 +139,7 @@ Current boundaries:
 * [core](/Users/Shared/chroot/dev/nuislang/stdlib/core/README.md)
 * [std](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
 * [pixelmagic](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
+* [witsage](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/README.md)
 * [ns-nova](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
 
 See also:

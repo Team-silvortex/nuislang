@@ -1,7 +1,7 @@
 layout_schema = "nuis-stdlib-layout-v1"
 name = "nuis-standard-library"
 default_entry = "core"
-modules = ["core", "std", "pixelmagic", "ns-nova"]
+modules = ["core", "std", "pixelmagic", "witsage", "ns-nova"]
 
 [[module]]
 name = "core"
@@ -26,6 +26,14 @@ path = "pixelmagic"
 package_id = "nuis.pixelmagic"
 depends_on = ["core", "std"]
 summary = "GPU-oriented image and texture processing Galaxy built on nuis heterogeneous execution."
+
+[[module]]
+name = "witsage"
+kind = "framework"
+path = "witsage"
+package_id = "nuis.witsage"
+depends_on = ["core", "std"]
+summary = "Classical machine-learning Galaxy for statistics, feature shaping, and kernel-backed model recipes."
 
 [[module]]
 name = "ns-nova"

@@ -37,6 +37,10 @@ Current source anchor:
 * [brightness_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/brightness_recipe.ns)
 * [contrast_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/contrast_recipe.ns)
 * [blur_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/blur_recipe.ns)
+* [edge_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/edge_recipe.ns)
+* [sharpen_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/sharpen_recipe.ns)
+* [histogram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/histogram_recipe.ns)
+* [image_stats_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_stats_recipe.ns)
 
 `image_packet_recipe.ns` currently provides:
 
@@ -94,8 +98,15 @@ Current source anchor:
 * narrow operation-specific packet/resource/sample/shader summaries
 * the first stdlib-side alignment with the current tooling `pgm` route
 
-`brightness_recipe.ns`, `contrast_recipe.ns`, and `blur_recipe.ns` currently provide:
+`brightness_recipe.ns`, `contrast_recipe.ns`, `blur_recipe.ns`, `edge_recipe.ns`,
+and `sharpen_recipe.ns` currently provide:
 
 * the next checked-in `PixelMagic` filter family
 * narrow operation-specific packet/resource/sample/shader summaries
 * a stable follow-up set for common image-adjust and image-kernel style work
+
+`histogram_recipe.ns` and `image_stats_recipe.ns` currently provide:
+
+* the first checked-in `PixelMagic` image-analysis family
+* narrow plan/summary shapes for histogram and sampled image statistics work
+* a CPU-visible contract that later shader/kernel lowering can share instead of inventing separate analysis packets

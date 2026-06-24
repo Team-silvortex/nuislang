@@ -1,0 +1,38 @@
+mod cpu Main {
+  struct WitSageFeatureStats {
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    mean_seed: i64,
+    variance_seed: i64
+  }
+
+  fn build_feature_stats(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    mean_seed: i64,
+    variance_seed: i64
+  ) -> WitSageFeatureStats {
+    return WitSageFeatureStats {
+      dataset_handle: dataset_handle,
+      rows: rows,
+      columns: columns,
+      mean_seed: mean_seed,
+      variance_seed: variance_seed
+    };
+  }
+
+  fn summarize_feature_stats(stats: WitSageFeatureStats) -> i64 {
+    return stats.dataset_handle +
+      stats.rows +
+      stats.columns +
+      stats.mean_seed +
+      stats.variance_seed;
+  }
+
+  fn main() {
+    let stats: WitSageFeatureStats = build_feature_stats(6102, 128, 4, 42, 9);
+    print(summarize_feature_stats(stats));
+  }
+}
