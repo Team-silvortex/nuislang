@@ -86,6 +86,31 @@ struct StdlibDocSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct ProjectMetadataSummary {
+    source_kind: String,
+    project_name: Option<String>,
+    project_root: Option<String>,
+    manifest_path: Option<String>,
+    build_manifest_path: Option<String>,
+    artifact_path: Option<String>,
+    docs_index_path: Option<String>,
+    docs_module_count: usize,
+    docs_documented_module_count: usize,
+    docs_documented_item_count: usize,
+    imports_index_path: Option<String>,
+    imports_library_count: usize,
+    imports_visible_library_count: usize,
+    imports_visible_module_count: usize,
+    imports_documented_visible_module_count: usize,
+    imports_documented_visible_item_count: usize,
+    galaxy_index_path: Option<String>,
+    galaxy_count: usize,
+    documented_galaxy_count: usize,
+    documented_galaxy_library_module_count: usize,
+    documented_galaxy_item_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct DomainBuildContractDriftCheck {
     package_id: String,
     domain_family: String,
@@ -725,6 +750,7 @@ fn artifact_report_summary_lines(
     manifest_verify_reconstructed: bool,
     execution_overview: Option<&ExecutionInspectOverview>,
     doc_indexes: Option<&[frontend::AstDocIndex]>,
+    project_metadata: Option<&ProjectMetadataSummary>,
 ) -> Vec<String> {
     let mut lines = vec![
         format!(
@@ -834,6 +860,23 @@ fn artifact_report_summary_lines(
                     .collect::<Vec<_>>()
                     .join(", ")
             }
+        ));
+    }
+    if let Some(project) = project_metadata {
+        lines.push(format!(
+            "summary_project: docs={}/{}/{} imports={}/{}/{}/{}/{} galaxies={}/{}/{}/{}",
+            project.docs_module_count,
+            project.docs_documented_module_count,
+            project.docs_documented_item_count,
+            project.imports_library_count,
+            project.imports_visible_library_count,
+            project.imports_visible_module_count,
+            project.imports_documented_visible_module_count,
+            project.imports_documented_visible_item_count,
+            project.galaxy_count,
+            project.documented_galaxy_count,
+            project.documented_galaxy_library_module_count,
+            project.documented_galaxy_item_count
         ));
     }
     lines
@@ -1219,6 +1262,420 @@ fn inspect_stdlib_docs_json(summary: &StdlibDocSummary) -> String {
     )
 }
 
+fn project_metadata_summary_from_manifest_report(
+    source_kind: &str,
+    manifest_path: Option<&Path>,
+    artifact_path: Option<&Path>,
+    report: &aot::BuildManifestVerifyReport,
+) -> ProjectMetadataSummary {
+    ProjectMetadataSummary {
+        source_kind: source_kind.to_owned(),
+        project_name: None,
+        project_root: Path::new(&report.input)
+            .parent()
+            .map(|path| path.display().to_string()),
+        manifest_path: manifest_path.map(|path| path.display().to_string()),
+        build_manifest_path: manifest_path.map(|path| path.display().to_string()),
+        artifact_path: artifact_path.map(|path| path.display().to_string()).or_else(|| {
+            if report.artifact_path.is_empty() {
+                None
+            } else {
+                Some(report.artifact_path.clone())
+            }
+        }),
+        docs_index_path: report.project_docs_index.clone(),
+        docs_module_count: report.project_docs_module_count,
+        docs_documented_module_count: report.project_docs_documented_module_count,
+        docs_documented_item_count: report.project_docs_documented_item_count,
+        imports_index_path: report.project_imports_index.clone(),
+        imports_library_count: report.project_imports_library_count,
+        imports_visible_library_count: report.project_imports_visible_library_count,
+        imports_visible_module_count: report.project_imports_visible_module_count,
+        imports_documented_visible_module_count:
+            report.project_imports_documented_visible_module_count,
+        imports_documented_visible_item_count: report.project_imports_documented_visible_item_count,
+        galaxy_index_path: report.project_galaxy_index.clone(),
+        galaxy_count: report.project_galaxy_count,
+        documented_galaxy_count: report.project_documented_galaxy_count,
+        documented_galaxy_library_module_count:
+            report.project_documented_galaxy_library_module_count,
+        documented_galaxy_item_count: report.project_documented_galaxy_item_count,
+    }
+}
+
+fn inspect_project_metadata_from_source(input: &Path) -> Result<ProjectMetadataSummary, String> {
+    let project = project::load_project(input)?;
+    let docs_summary = project::project_docs_summary(&project);
+    let imports_summary = project::project_imports_summary(&project);
+    let galaxy_summary = project::project_galaxy_summary(&project);
+    Ok(ProjectMetadataSummary {
+        source_kind: "project-source".to_owned(),
+        project_name: Some(project.manifest.name.clone()),
+        project_root: Some(project.root.display().to_string()),
+        manifest_path: Some(project.manifest_path.display().to_string()),
+        build_manifest_path: None,
+        artifact_path: None,
+        docs_index_path: None,
+        docs_module_count: docs_summary.modules,
+        docs_documented_module_count: docs_summary.documented_modules,
+        docs_documented_item_count: docs_summary.documented_items,
+        imports_index_path: None,
+        imports_library_count: imports_summary.libraries,
+        imports_visible_library_count: imports_summary.visible_libraries,
+        imports_visible_module_count: imports_summary.visible_modules,
+        imports_documented_visible_module_count: imports_summary.documented_visible_modules,
+        imports_documented_visible_item_count: imports_summary.documented_visible_items,
+        galaxy_index_path: None,
+        galaxy_count: galaxy_summary.galaxies,
+        documented_galaxy_count: galaxy_summary.documented_galaxies,
+        documented_galaxy_library_module_count: galaxy_summary.documented_library_modules,
+        documented_galaxy_item_count: galaxy_summary.documented_items,
+    })
+}
+
+fn inspect_project_metadata(input: &Path) -> Result<ProjectMetadataSummary, String> {
+    if input.is_dir() {
+        let manifest_path = input.join("nuis.build.manifest.toml");
+        if manifest_path.is_file() {
+            let report = aot::verify_build_manifest(&manifest_path)?;
+            let artifact_path = input.join("nuis.compiled.artifact");
+            return Ok(project_metadata_summary_from_manifest_report(
+                "build-output-dir",
+                Some(&manifest_path),
+                artifact_path.is_file().then_some(artifact_path.as_path()),
+                &report,
+            ));
+        }
+    }
+    let is_manifest = input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name == "nuis.build.manifest.toml")
+        .unwrap_or(false);
+    let is_artifact = input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name == "nuis.compiled.artifact")
+        .unwrap_or(false);
+    if is_manifest {
+        let report = aot::verify_build_manifest(input)?;
+        return Ok(project_metadata_summary_from_manifest_report(
+            "build-manifest",
+            Some(input),
+            None,
+            &report,
+        ));
+    }
+    if is_artifact {
+        let artifact = load_nuis_compiled_artifact(input)?;
+        let (manifest_path, report) = reconstruct_manifest_report_from_artifact(input, &artifact)?;
+        return Ok(project_metadata_summary_from_manifest_report(
+            "compiled-artifact",
+            Some(&manifest_path),
+            Some(input),
+            &report,
+        ));
+    }
+    inspect_project_metadata_from_source(input)
+}
+
+fn resolve_build_manifest_path(input: &Path) -> Result<PathBuf, String> {
+    if input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name == "nuis.build.manifest.toml")
+        .unwrap_or(false)
+    {
+        return Ok(input.to_path_buf());
+    }
+    if input.is_dir() {
+        let manifest_path = input.join("nuis.build.manifest.toml");
+        if manifest_path.is_file() {
+            return Ok(manifest_path);
+        }
+        return Err(format!(
+            "`{}` does not contain `nuis.build.manifest.toml`",
+            input.display()
+        ));
+    }
+    Err(format!(
+        "expected a build manifest path or output directory, got `{}`",
+        input.display()
+    ))
+}
+
+fn resolve_artifact_report_inputs(
+    input: &Path,
+) -> Result<
+    (
+        PathBuf,
+        aot::NuisCompiledArtifact,
+        PathBuf,
+        aot::BuildManifestVerifyReport,
+        bool,
+    ),
+    String,
+> {
+    let is_manifest_input = input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name == "nuis.build.manifest.toml")
+        .unwrap_or(false);
+    let is_output_dir_input = input.is_dir() && input.join("nuis.build.manifest.toml").is_file();
+    let artifact = load_nuis_compiled_artifact(input)?;
+    if is_manifest_input || is_output_dir_input {
+        let manifest_input = if is_manifest_input {
+            input.to_path_buf()
+        } else {
+            input.join("nuis.build.manifest.toml")
+        };
+        let report = aot::verify_build_manifest(&manifest_input)?;
+        return Ok((
+            manifest_input,
+            artifact,
+            PathBuf::from(&report.artifact_path),
+            report,
+            false,
+        ));
+    }
+    let (manifest_input, manifest_verify) = reconstruct_manifest_report_from_artifact(input, &artifact)?;
+    Ok((
+        manifest_input,
+        artifact,
+        input.to_path_buf(),
+        manifest_verify,
+        true,
+    ))
+}
+
+fn repair_project_metadata_target(input: &Path) -> Result<(PathBuf, PathBuf), String> {
+    if input.is_dir() {
+        let manifest_path = resolve_build_manifest_path(input)?;
+        let report = aot::verify_build_manifest(&manifest_path)?;
+        let project_input = PathBuf::from(&report.input);
+        if !project_input.exists() {
+            return Err(format!(
+                "cannot repair project metadata from `{}` because the original compile input `{}` no longer exists; try `nuisc inspect-project-metadata \"{}\"` or `nuisc verify-build-manifest \"{}\"` instead",
+                input.display(),
+                project_input.display(),
+                input.display(),
+                input.display()
+            ));
+        }
+        return Ok((project_input, PathBuf::from(report.output_dir)));
+    }
+    let is_manifest = input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name == "nuis.build.manifest.toml")
+        .unwrap_or(false);
+    let is_artifact = input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name == "nuis.compiled.artifact")
+        .unwrap_or(false);
+    if is_manifest {
+        let report = aot::verify_build_manifest(input)?;
+        let project_input = PathBuf::from(&report.input);
+        if !project_input.exists() {
+            return Err(format!(
+                "cannot repair project metadata from `{}` because the original compile input `{}` no longer exists; try `nuisc inspect-project-metadata \"{}\"` or `nuisc verify-build-manifest \"{}\"` instead",
+                input.display(),
+                project_input.display(),
+                input.display(),
+                input.display()
+            ));
+        }
+        return Ok((project_input, PathBuf::from(report.output_dir)));
+    }
+    if is_artifact {
+        let artifact = load_nuis_compiled_artifact(input)?;
+        let (_manifest_path, report) = reconstruct_manifest_report_from_artifact(input, &artifact)?;
+        let project_input = PathBuf::from(&report.input);
+        if !project_input.exists() {
+            return Err(format!(
+                "cannot repair project metadata from `{}` because the original compile input `{}` no longer exists; try `nuisc inspect-project-metadata \"{}\"` instead",
+                input.display(),
+                project_input.display(),
+                input.display()
+            ));
+        }
+        return Ok((project_input, PathBuf::from(report.output_dir)));
+    }
+    Err(
+        "usage: nuisc repair-project-metadata [--dry-run] <output-dir|nuis.build.manifest.toml|nuis.compiled.artifact>"
+            .to_owned(),
+    )
+}
+
+fn inspect_project_metadata_json(summary: &ProjectMetadataSummary) -> String {
+    let mut fields = vec![
+        json_string_field("kind", "nuis_project_metadata"),
+        json_string_field("source_kind", &summary.source_kind),
+        json_usize_field("docs_module_count", summary.docs_module_count),
+        json_usize_field(
+            "docs_documented_module_count",
+            summary.docs_documented_module_count,
+        ),
+        json_usize_field(
+            "docs_documented_item_count",
+            summary.docs_documented_item_count,
+        ),
+        json_usize_field("imports_library_count", summary.imports_library_count),
+        json_usize_field(
+            "imports_visible_library_count",
+            summary.imports_visible_library_count,
+        ),
+        json_usize_field(
+            "imports_visible_module_count",
+            summary.imports_visible_module_count,
+        ),
+        json_usize_field(
+            "imports_documented_visible_module_count",
+            summary.imports_documented_visible_module_count,
+        ),
+        json_usize_field(
+            "imports_documented_visible_item_count",
+            summary.imports_documented_visible_item_count,
+        ),
+        json_usize_field("galaxy_count", summary.galaxy_count),
+        json_usize_field(
+            "documented_galaxy_count",
+            summary.documented_galaxy_count,
+        ),
+        json_usize_field(
+            "documented_galaxy_library_module_count",
+            summary.documented_galaxy_library_module_count,
+        ),
+        json_usize_field(
+            "documented_galaxy_item_count",
+            summary.documented_galaxy_item_count,
+        ),
+    ];
+    if let Some(value) = &summary.project_name {
+        fields.push(json_string_field("project_name", value));
+    }
+    if let Some(value) = &summary.project_root {
+        fields.push(json_string_field("project_root", value));
+    }
+    if let Some(value) = &summary.manifest_path {
+        fields.push(json_string_field("manifest_path", value));
+    }
+    if let Some(value) = &summary.build_manifest_path {
+        fields.push(json_string_field("build_manifest_path", value));
+    }
+    if let Some(value) = &summary.artifact_path {
+        fields.push(json_string_field("artifact_path", value));
+    }
+    if let Some(value) = &summary.docs_index_path {
+        fields.push(json_string_field("docs_index_path", value));
+    }
+    if let Some(value) = &summary.imports_index_path {
+        fields.push(json_string_field("imports_index_path", value));
+    }
+    if let Some(value) = &summary.galaxy_index_path {
+        fields.push(json_string_field("galaxy_index_path", value));
+    }
+    format!("{{{}}}", fields.join(","))
+}
+
+fn render_project_metadata_summary(summary: &ProjectMetadataSummary) -> String {
+    let mut lines = vec!["project metadata".to_owned()];
+    lines.push(format!("  source_kind: {}", summary.source_kind));
+    if let Some(value) = &summary.project_name {
+        lines.push(format!("  project_name: {}", value));
+    }
+    if let Some(value) = &summary.project_root {
+        lines.push(format!("  project_root: {}", value));
+    }
+    if let Some(value) = &summary.manifest_path {
+        lines.push(format!("  manifest_path: {}", value));
+    }
+    if let Some(value) = &summary.build_manifest_path {
+        lines.push(format!("  build_manifest_path: {}", value));
+    }
+    if let Some(value) = &summary.artifact_path {
+        lines.push(format!("  artifact_path: {}", value));
+    }
+    lines.push(format!(
+        "  docs: modules={} documented_modules={} documented_items={}",
+        summary.docs_module_count,
+        summary.docs_documented_module_count,
+        summary.docs_documented_item_count
+    ));
+    if let Some(value) = &summary.docs_index_path {
+        lines.push(format!("  docs_index_path: {}", value));
+    }
+    lines.push(format!(
+        "  imports: libraries={} visible_libraries={} visible_modules={} documented_visible_modules={} documented_visible_items={}",
+        summary.imports_library_count,
+        summary.imports_visible_library_count,
+        summary.imports_visible_module_count,
+        summary.imports_documented_visible_module_count,
+        summary.imports_documented_visible_item_count
+    ));
+    if let Some(value) = &summary.imports_index_path {
+        lines.push(format!("  imports_index_path: {}", value));
+    }
+    lines.push(format!(
+        "  galaxies: total={} documented={} documented_library_modules={} documented_items={}",
+        summary.galaxy_count,
+        summary.documented_galaxy_count,
+        summary.documented_galaxy_library_module_count,
+        summary.documented_galaxy_item_count
+    ));
+    if let Some(value) = &summary.galaxy_index_path {
+        lines.push(format!("  galaxy_index_path: {}", value));
+    }
+    lines.join("\n")
+}
+
+fn render_project_metadata_compact_summary(summary: &ProjectMetadataSummary) -> String {
+    format!(
+        "project metadata summary: source_kind={} project={} docs={}/{}/{} imports={}/{}/{}/{}/{} galaxies={}/{}/{}/{}",
+        summary.source_kind,
+        summary.project_name.as_deref().unwrap_or("<none>"),
+        summary.docs_module_count,
+        summary.docs_documented_module_count,
+        summary.docs_documented_item_count,
+        summary.imports_library_count,
+        summary.imports_visible_library_count,
+        summary.imports_visible_module_count,
+        summary.imports_documented_visible_module_count,
+        summary.imports_documented_visible_item_count,
+        summary.galaxy_count,
+        summary.documented_galaxy_count,
+        summary.documented_galaxy_library_module_count,
+        summary.documented_galaxy_item_count
+    )
+}
+
+fn render_project_metadata_paths(summary: &ProjectMetadataSummary) -> String {
+    let mut lines = Vec::new();
+    if let Some(value) = &summary.project_root {
+        lines.push(format!("project_root={}", value));
+    }
+    if let Some(value) = &summary.manifest_path {
+        lines.push(format!("manifest_path={}", value));
+    }
+    if let Some(value) = &summary.build_manifest_path {
+        lines.push(format!("build_manifest_path={}", value));
+    }
+    if let Some(value) = &summary.artifact_path {
+        lines.push(format!("artifact_path={}", value));
+    }
+    if let Some(value) = &summary.docs_index_path {
+        lines.push(format!("docs_index_path={}", value));
+    }
+    if let Some(value) = &summary.imports_index_path {
+        lines.push(format!("imports_index_path={}", value));
+    }
+    if let Some(value) = &summary.galaxy_index_path {
+        lines.push(format!("galaxy_index_path={}", value));
+    }
+    lines.join("\n")
+}
+
 fn collect_doc_indexes_from_manifest_input(
     manifest_verify: &aot::BuildManifestVerifyReport,
 ) -> Result<Vec<frontend::AstDocIndex>, String> {
@@ -1241,7 +1698,7 @@ fn write_compile_doc_index(
 }
 
 pub fn project_compile_workflow_brief() -> &'static str {
-    "health -> structure -> scheduler -> abi_lock -> check -> test -> build -> artifact_doctor -> run_artifact -> release_check"
+    "health -> structure -> scheduler -> abi_lock -> check -> test -> build -> project_metadata_inspect -> artifact_doctor -> metadata_repair -> run_artifact -> release_check"
 }
 
 pub fn nuisc_compile_pipeline_brief() -> &'static str {
@@ -1249,7 +1706,7 @@ pub fn nuisc_compile_pipeline_brief() -> &'static str {
 }
 
 pub fn project_compile_samples_brief() -> &'static str {
-    "health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; compile=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir> <output-dir> -> nuis artifact-doctor <output-dir> -> nuis run-artifact <output-dir|nuis.build.manifest.toml> -> nuis release-check <project-dir> <output-dir>"
+    "health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; compile=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir> <output-dir> -> nuisc inspect-project-metadata --summary <output-dir> -> nuis artifact-doctor <output-dir> -> nuisc repair-project-metadata --dry-run <output-dir> -> nuis run-artifact <output-dir> -> nuis release-check <project-dir> <output-dir>"
 }
 
 pub fn project_test_workflow_brief() -> &'static str {
@@ -1257,7 +1714,7 @@ pub fn project_test_workflow_brief() -> &'static str {
 }
 
 pub fn project_galaxy_workflow_brief() -> &'static str {
-    "galaxy=nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir>"
+    "galaxy=nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir> -> nuisc inspect-project-metadata --summary <project-dir>"
 }
 
 fn resolve_compile_input(input: &Path) -> Result<pipeline::ResolvedCompileInput, String> {
@@ -1292,6 +1749,21 @@ fn load_nuis_executable_envelope(input: &Path) -> Result<aot::NuisExecutableEnve
 }
 
 fn load_nuis_compiled_artifact(input: &Path) -> Result<aot::NuisCompiledArtifact, String> {
+    if input.is_dir() {
+        let artifact_path = input.join("nuis.compiled.artifact");
+        if artifact_path.is_file() {
+            return aot::parse_nuis_compiled_artifact(&artifact_path);
+        }
+        let manifest_path = input.join("nuis.build.manifest.toml");
+        if manifest_path.is_file() {
+            let report = aot::verify_build_manifest(&manifest_path)?;
+            return aot::parse_nuis_compiled_artifact(Path::new(&report.artifact_path));
+        }
+        return Err(format!(
+            "`{}` does not contain `nuis.compiled.artifact` or `nuis.build.manifest.toml`",
+            input.display()
+        ));
+    }
     let bytes = std::fs::read(input)
         .map_err(|error| format!("failed to read `{}`: {error}", input.display()))?;
     if bytes.starts_with(b"NART") {
@@ -2081,6 +2553,14 @@ fn artifact_report_json(
             json_string_field("error", &error)
         )
     });
+    let project_metadata = inspect_project_metadata_json(
+        &project_metadata_summary_from_manifest_report(
+            "build-manifest",
+            Some(manifest_input),
+            Some(artifact_verify_input),
+            manifest_verify,
+        ),
+    );
     let fields = vec![
         json_string_field("kind", "nuis_artifact_report"),
         json_string_field("input", &input.display().to_string()),
@@ -2104,6 +2584,7 @@ fn artifact_report_json(
             "\"manifest_verify\":{}",
             verify_build_manifest_json(manifest_input, manifest_verify)
         ),
+        format!("\"project_metadata\":{}", project_metadata),
         format!("\"doc_index\":{}", inspect_docs_json(Path::new(&manifest_verify.input), &doc_indexes)),
         format!("\"execution_inspect\":{}", execution_inspect),
         format!("\"link_plan\":{}", link_plan_json(&link_plan)),
@@ -3153,28 +3634,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             json,
             summary,
         } => {
-            let is_manifest_input = input
-                .file_name()
-                .and_then(|name| name.to_str())
-                .map(|name| name == "nuis.build.manifest.toml")
-                .unwrap_or(false);
-            let artifact = load_nuis_compiled_artifact(&input)?;
-            let artifact_verify_input = if is_manifest_input {
-                let manifest_report = aot::verify_build_manifest(&input)?;
-                PathBuf::from(manifest_report.artifact_path)
-            } else {
-                input.clone()
-            };
+            let (
+                manifest_input,
+                artifact,
+                artifact_verify_input,
+                manifest_verify,
+                manifest_verify_reconstructed,
+            ) = resolve_artifact_report_inputs(&input)?;
             let artifact_verify = aot::verify_nuis_compiled_artifact(&artifact_verify_input)?;
-            let (manifest_input, manifest_verify, manifest_verify_reconstructed) =
-                if is_manifest_input {
-                    let report = aot::verify_build_manifest(&input)?;
-                    (input.clone(), report, false)
-                } else {
-                    let (manifest_input, manifest_verify) =
-                        reconstruct_manifest_report_from_artifact(&input, &artifact)?;
-                    (manifest_input, manifest_verify, true)
-                };
             if json {
                 println!(
                     "{}",
@@ -3194,6 +3661,13 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             let summary_view = summarize_domain_build_verification(&verdicts);
             let execution_overview = inspect_execution_overview(&manifest_input).ok();
             let doc_indexes = collect_doc_indexes_from_manifest_input(&manifest_verify).ok();
+            let project_metadata =
+                project_metadata_summary_from_manifest_report(
+                    "build-manifest",
+                    Some(&manifest_input),
+                    Some(&artifact_verify_input),
+                    &manifest_verify,
+                );
             if summary {
                 println!("nuis artifact report summary: {}", input.display());
                 for line in artifact_report_summary_lines(
@@ -3203,6 +3677,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     manifest_verify_reconstructed,
                     execution_overview.as_ref(),
                     doc_indexes.as_deref(),
+                    Some(&project_metadata),
                 ) {
                     println!("  {}", line);
                 }
@@ -3269,6 +3744,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 manifest_verify_reconstructed,
                 execution_overview.as_ref(),
                 doc_indexes.as_deref(),
+                Some(&project_metadata),
             ) {
                 println!("  {}", line);
             }
@@ -3332,12 +3808,24 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             );
         }
         CommandKind::VerifyArtifact { input, json } => {
-            let report = aot::verify_nuis_compiled_artifact(&input)?;
+            let artifact_input = if input.is_dir() {
+                let artifact_path = input.join("nuis.compiled.artifact");
+                if artifact_path.is_file() {
+                    artifact_path
+                } else {
+                    let manifest_path = resolve_build_manifest_path(&input)?;
+                    let report = aot::verify_build_manifest(&manifest_path)?;
+                    PathBuf::from(report.artifact_path)
+                }
+            } else {
+                input.clone()
+            };
+            let report = aot::verify_nuis_compiled_artifact(&artifact_input)?;
             if json {
-                println!("{}", verify_artifact_json(&input, &report));
+                println!("{}", verify_artifact_json(&artifact_input, &report));
                 return Ok(());
             }
-            println!("nuis artifact verified: {}", input.display());
+            println!("nuis artifact verified: {}", artifact_input.display());
             println!("  schema: {}", report.schema);
             println!("  packaging_mode: {}", report.packaging_mode);
             println!("  binary_name: {}", report.binary_name);
@@ -3452,6 +3940,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("  packaging_mode: {}", artifact.packaging_mode);
         }
         CommandKind::VerifyBuildManifest { manifest, json } => {
+            let manifest = resolve_build_manifest_path(&manifest)?;
             let report = aot::verify_build_manifest(&manifest)?;
             if json {
                 println!("{}", verify_build_manifest_json(&manifest, &report));
@@ -3945,6 +4434,57 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 );
             }
         }
+        CommandKind::InspectProjectMetadata {
+            input,
+            json,
+            summary,
+            paths_only,
+        } => {
+            let metadata = inspect_project_metadata(&input)?;
+            if json {
+                println!("{}", inspect_project_metadata_json(&metadata));
+                return Ok(());
+            }
+            if summary {
+                println!("{}", render_project_metadata_compact_summary(&metadata));
+                return Ok(());
+            }
+            if paths_only {
+                println!("{}", render_project_metadata_paths(&metadata));
+                return Ok(());
+            }
+            println!("{}", render_project_metadata_summary(&metadata));
+        }
+        CommandKind::RepairProjectMetadata { input, dry_run } => {
+            let (project_input, output_dir) = repair_project_metadata_target(&input)?;
+            if dry_run {
+                println!("project metadata repair plan");
+                println!("  source: {}", input.display());
+                println!("  input: {}", project_input.display());
+                println!("  output_dir: {}", output_dir.display());
+                println!(
+                    "  command: nuisc compile \"{}\" \"{}\"",
+                    project_input.display(),
+                    output_dir.display()
+                );
+                return Ok(());
+            }
+            run(CommandKind::Compile {
+                input: project_input.clone(),
+                output_dir: output_dir.clone(),
+                verbose_cache: false,
+                cpu_abi: None,
+                target: None,
+            })?;
+            let repaired_manifest = output_dir.join("nuis.build.manifest.toml");
+            let repaired_summary = inspect_project_metadata(&repaired_manifest)?;
+            println!(
+                "project metadata repaired: input={} output_dir={}",
+                project_input.display(),
+                output_dir.display()
+            );
+            println!("{}", render_project_metadata_compact_summary(&repaired_summary));
+        }
         CommandKind::CacheStatus {
             input,
             all,
@@ -4297,23 +4837,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 resolved.project_plan.as_ref(),
             )?;
             let cache_hit = cache::lookup_compile_cache(&cache_key)?;
-            let (written, loaded_nustar) = if let Some(entry) = &cache_hit {
-                cache::restore_compile_cache(entry, &output_dir)?;
-                let restored_manifest =
-                    aot::verify_build_manifest(&output_dir.join("nuis.build.manifest.toml"))?;
-                let written = aot::compile_artifacts_for_output_dir_with_packaging_mode(
-                    &resolved.effective_input_path,
-                    &output_dir,
-                    &restored_manifest.packaging_mode,
-                )?;
-                (written, restored_manifest.loaded_nustar)
-            } else {
-                let artifacts =
-                    resolved.compile_with_options(&pipeline::PipelineCompileOptions {
-                        lowering_target: Some(
-                            lowering::LoweringTargetConfig::from_cpu_build_target(&cpu_target),
-                        ),
-                    })?;
+            let compile_fresh = || -> Result<(aot::CompileArtifacts, Vec<String>), String> {
+                let artifacts = resolved.compile_with_options(&pipeline::PipelineCompileOptions {
+                    lowering_target: Some(
+                        lowering::LoweringTargetConfig::from_cpu_build_target(&cpu_target),
+                    ),
+                })?;
                 let written = aot::write_and_link(
                     &resolved.effective_input_path,
                     &output_dir,
@@ -4324,7 +4853,28 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     &cpu_target,
                 )?;
                 let _ = cache::store_compile_cache(&cache_key, &output_dir)?;
-                (written, artifacts.loaded_nustar)
+                Ok((written, artifacts.loaded_nustar))
+            };
+            let (written, loaded_nustar, used_cache_restore) = if let Some(entry) = &cache_hit {
+                match cache::restore_compile_cache(entry, &output_dir).and_then(|_| {
+                    aot::verify_build_manifest(&output_dir.join("nuis.build.manifest.toml"))
+                }) {
+                    Ok(restored_manifest) => {
+                        let written = aot::compile_artifacts_for_output_dir_with_packaging_mode(
+                            &resolved.effective_input_path,
+                            &output_dir,
+                            &restored_manifest.packaging_mode,
+                        )?;
+                        (written, restored_manifest.loaded_nustar, true)
+                    }
+                    Err(_) => {
+                        let (written, loaded_nustar) = compile_fresh()?;
+                        (written, loaded_nustar, false)
+                    }
+                }
+            } else {
+                let (written, loaded_nustar) = compile_fresh()?;
+                (written, loaded_nustar, false)
             };
             let project_metadata =
                 if let (Some(project), Some(plan)) = (&resolved.project, &resolved.project_plan) {
@@ -4346,7 +4896,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     output_dir: output_dir.display().to_string(),
                     loaded_nustar: loaded_nustar.clone(),
                     compile_cache: Some(aot::BuildManifestCacheInfo {
-                        status: if cache_hit.is_some() {
+                        status: if used_cache_restore {
                             "hit".to_owned()
                         } else {
                             "miss".to_owned()
@@ -4475,7 +5025,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("compiled nuis source: {}", input.display());
                 println!(
                     "compile_cache: {} ({})",
-                    if cache_hit.is_some() { "hit" } else { "miss" },
+                    if used_cache_restore { "hit" } else { "miss" },
                     cache_key.key
                 );
                 println!("compile_cache_inputs: {}", cache_key.input_labels.len());
@@ -5116,6 +5666,9 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"heterogeneous_execution_domains\":0"));
         assert!(json.contains("\"execution_inspect\":{\"kind\":\"nuis_execution_inspect\""));
         assert!(json.contains("\"issues\":[]"));
+        assert!(json.contains("\"project_metadata\":{"));
+        assert!(json.contains("\"kind\":\"nuis_project_metadata\""));
+        assert!(json.contains("\"source_kind\":\"build-manifest\""));
         assert!(json.contains("\"sections\":[]"));
         assert!(json.contains("\"doc_index\":{"));
         assert!(json.contains("\"kind\":\"nuis_doc_index\""));
@@ -5185,6 +5738,8 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(artifact_report.contains("\"execution_inspect\":{"));
         assert!(artifact_report.contains("\"kind\":\"nuis_execution_inspect\""));
         assert!(artifact_report.contains("\"sections\":[]"));
+        assert!(artifact_report.contains("\"project_metadata\":{"));
+        assert!(artifact_report.contains("\"kind\":\"nuis_project_metadata\""));
         assert!(artifact_report.contains("\"doc_index\":{"));
         assert!(artifact_report.contains("\"kind\":\"nuis_doc_index\""));
         assert!(artifact_report.contains("\"artifact_inspect\":{"));
@@ -5192,6 +5747,242 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(artifact_report.contains("\"manifest_verify\":{"));
         assert!(artifact_report.contains("\"binary_name\":\"benchmark_report_file_demo\""));
         assert!(artifact_report.contains("\"all_units_consistent\":true"));
+    }
+
+    #[test]
+    fn inspect_project_metadata_json_reports_source_project_summaries() {
+        let project_name = "inspect_project_metadata_source_json";
+        let project_root = write_temp_project_fixture(
+            project_name,
+            r#"
+name = "inspect_project_metadata_source_json"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["pixelmagic=workspace"]
+"#
+            .trim_start(),
+            r#"
+            use cpu PixelMagicContracts;
+
+            mod cpu Main {
+              fn main() -> i64 {
+                return PixelMagicContracts.blur_op_kind();
+              }
+            }
+            "#,
+        );
+        let summary = inspect_project_metadata(&project_root).unwrap();
+        let json = inspect_project_metadata_json(&summary);
+        assert!(json.contains("\"kind\":\"nuis_project_metadata\""));
+        assert!(json.contains("\"source_kind\":\"project-source\""));
+        assert!(json.contains("\"project_name\":\"inspect_project_metadata_source_json\""));
+        assert!(json.contains("\"imports_library_count\":8"));
+        assert!(json.contains("\"galaxy_count\":3"));
+    }
+
+    #[test]
+    fn inspect_project_metadata_output_dir_reports_build_output_summary() {
+        let project_root = write_temp_project_fixture(
+            "inspect_project_metadata_output_dir",
+            r#"
+name = "inspect_project_metadata_output_dir"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 7;
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("inspect_project_metadata_output_dir_outputs");
+        run(CommandKind::Compile {
+            input: project_root.clone(),
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        let summary = inspect_project_metadata(&output_dir).unwrap();
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let artifact_path = output_dir.join("nuis.compiled.artifact");
+        assert_eq!(summary.source_kind, "build-output-dir");
+        assert_eq!(
+            summary.build_manifest_path.as_deref(),
+            Some(manifest_path.to_string_lossy().as_ref())
+        );
+        assert_eq!(
+            summary.artifact_path.as_deref(),
+            Some(artifact_path.to_string_lossy().as_ref())
+        );
+    }
+
+    #[test]
+    fn project_metadata_render_helpers_expose_summary_and_paths() {
+        let summary = ProjectMetadataSummary {
+            source_kind: "build-manifest".to_owned(),
+            project_name: Some("demo".to_owned()),
+            project_root: Some("/tmp/demo".to_owned()),
+            manifest_path: Some("/tmp/demo/nuis.toml".to_owned()),
+            build_manifest_path: Some("/tmp/demo/build/nuis.build.manifest.toml".to_owned()),
+            artifact_path: Some("/tmp/demo/build/nuis.compiled.artifact".to_owned()),
+            docs_index_path: Some("/tmp/demo/build/nuis.project.docs.txt".to_owned()),
+            docs_module_count: 4,
+            docs_documented_module_count: 3,
+            docs_documented_item_count: 12,
+            imports_index_path: Some("/tmp/demo/build/nuis.project.imports.txt".to_owned()),
+            imports_library_count: 6,
+            imports_visible_library_count: 5,
+            imports_visible_module_count: 7,
+            imports_documented_visible_module_count: 4,
+            imports_documented_visible_item_count: 10,
+            galaxy_index_path: Some("/tmp/demo/build/nuis.project.galaxy.txt".to_owned()),
+            galaxy_count: 3,
+            documented_galaxy_count: 2,
+            documented_galaxy_library_module_count: 5,
+            documented_galaxy_item_count: 10,
+        };
+        let compact = render_project_metadata_compact_summary(&summary);
+        assert!(compact.contains("source_kind=build-manifest"));
+        assert!(compact.contains("project=demo"));
+        assert!(compact.contains("docs=4/3/12"));
+        assert!(compact.contains("imports=6/5/7/4/10"));
+        assert!(compact.contains("galaxies=3/2/5/10"));
+
+        let paths = render_project_metadata_paths(&summary);
+        assert!(paths.contains("project_root=/tmp/demo"));
+        assert!(paths.contains("manifest_path=/tmp/demo/nuis.toml"));
+        assert!(paths.contains("build_manifest_path=/tmp/demo/build/nuis.build.manifest.toml"));
+        assert!(paths.contains("artifact_path=/tmp/demo/build/nuis.compiled.artifact"));
+        assert!(paths.contains("docs_index_path=/tmp/demo/build/nuis.project.docs.txt"));
+        assert!(paths.contains("imports_index_path=/tmp/demo/build/nuis.project.imports.txt"));
+        assert!(paths.contains("galaxy_index_path=/tmp/demo/build/nuis.project.galaxy.txt"));
+    }
+
+    #[test]
+    fn repair_project_metadata_target_rejects_non_manifest_inputs() {
+        let error = repair_project_metadata_target(Path::new("examples/demo")).unwrap_err();
+        assert!(error.contains("usage: nuisc repair-project-metadata"));
+    }
+
+    #[test]
+    fn resolve_build_manifest_path_accepts_output_dir() {
+        let output_dir = temp_dir("resolve_build_manifest_path_accepts_output_dir");
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        fs::write(&manifest_path, "schema = \"demo\"\n").unwrap();
+        let resolved = resolve_build_manifest_path(&output_dir).unwrap();
+        assert_eq!(resolved, manifest_path);
+    }
+
+    #[test]
+    fn repair_project_metadata_target_reports_missing_original_input() {
+        let project_root = write_temp_project_fixture(
+            "repair_project_metadata_missing_input",
+            r#"
+name = "repair_project_metadata_missing_input"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("repair_project_metadata_missing_input_outputs");
+        run(CommandKind::Compile {
+            input: project_root.clone(),
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+        fs::remove_dir_all(&project_root).unwrap();
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let error = repair_project_metadata_target(&manifest_path).unwrap_err();
+        assert!(error.contains("cannot repair project metadata"));
+        assert!(error.contains("no longer exists"));
+        assert!(error.contains("inspect-project-metadata"));
+    }
+
+    #[test]
+    fn repair_project_metadata_target_resolves_manifest_to_input_and_output_dir() {
+        let project_root = write_temp_project_fixture(
+            "repair_project_metadata_target_resolves",
+            r#"
+name = "repair_project_metadata_target_resolves"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("repair_project_metadata_target_resolves_outputs");
+        run(CommandKind::Compile {
+            input: project_root.clone(),
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let (resolved_input, resolved_output_dir) =
+            repair_project_metadata_target(&manifest_path).unwrap();
+        assert_eq!(resolved_input, project_root);
+        assert_eq!(resolved_output_dir, output_dir);
+    }
+
+    #[test]
+    fn repair_project_metadata_target_accepts_output_dir() {
+        let project_root = write_temp_project_fixture(
+            "repair_project_metadata_target_output_dir",
+            r#"
+name = "repair_project_metadata_target_output_dir"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 1;
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("repair_project_metadata_target_output_dir_outputs");
+        run(CommandKind::Compile {
+            input: project_root.clone(),
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+        let (resolved_input, resolved_output_dir) =
+            repair_project_metadata_target(&output_dir).unwrap();
+        assert_eq!(resolved_input, project_root);
+        assert_eq!(resolved_output_dir, output_dir);
     }
 
     #[test]
@@ -5343,6 +6134,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
                     signature: Some("fn main() -> i64".to_owned()),
                 }],
             }]),
+            None,
         );
 
         assert_eq!(lines.len(), 7);

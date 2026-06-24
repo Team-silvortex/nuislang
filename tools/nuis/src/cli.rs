@@ -257,14 +257,14 @@ where
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuis inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        "usage: nuis inspect-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
                             .to_owned(),
                     );
                 }
             }
             Ok(CommandKind::InspectArtifact {
                 input: input.ok_or_else(|| {
-                    "usage: nuis inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                    "usage: nuis inspect-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
                         .to_owned()
                 })?,
                 json,
@@ -280,14 +280,15 @@ where
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuis verify-artifact [--json] <nuis.compiled.artifact>"
+                        "usage: nuis verify-artifact [--json] <output-dir|nuis.compiled.artifact>"
                             .to_owned(),
                     );
                 }
             }
             Ok(CommandKind::VerifyArtifact {
                 input: input.ok_or_else(|| {
-                    "usage: nuis verify-artifact [--json] <nuis.compiled.artifact>".to_owned()
+                    "usage: nuis verify-artifact [--json] <output-dir|nuis.compiled.artifact>"
+                        .to_owned()
                 })?,
                 json,
             })
@@ -305,18 +306,18 @@ where
                     output_dir = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuis unpack-artifact-support [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                        "usage: nuis unpack-artifact-support [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
                             .to_owned(),
                     );
                 }
             }
             Ok(CommandKind::UnpackArtifactSupport {
                 input: input.ok_or_else(|| {
-                    "usage: nuis unpack-artifact-support [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                    "usage: nuis unpack-artifact-support [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
                         .to_owned()
                 })?,
                 output_dir: output_dir.ok_or_else(|| {
-                    "usage: nuis unpack-artifact-support [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                    "usage: nuis unpack-artifact-support [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
                         .to_owned()
                 })?,
                 json,
@@ -335,18 +336,18 @@ where
                     output_dir = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuis materialize-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                        "usage: nuis materialize-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
                             .to_owned(),
                     );
                 }
             }
             Ok(CommandKind::MaterializeArtifact {
                 input: input.ok_or_else(|| {
-                    "usage: nuis materialize-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                    "usage: nuis materialize-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
                         .to_owned()
                 })?,
                 output_dir: output_dir.ok_or_else(|| {
-                    "usage: nuis materialize-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
+                    "usage: nuis materialize-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
                         .to_owned()
                 })?,
                 json,
@@ -400,7 +401,8 @@ where
         }
         "verify-build-manifest" => Ok(CommandKind::VerifyBuildManifest {
             manifest: PathBuf::from(args.next().ok_or_else(|| {
-                "usage: nuis verify-build-manifest <nuis.build.manifest.toml>".to_owned()
+                "usage: nuis verify-build-manifest <output-dir|nuis.build.manifest.toml>"
+                    .to_owned()
             })?),
         }),
         "cache-status" => {
@@ -669,14 +671,14 @@ where
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuis run-artifact [--json] <binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        "usage: nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
                             .to_owned(),
                     );
                 }
             }
             Ok(CommandKind::RunArtifact {
                 input: input.ok_or_else(|| {
-                    "usage: nuis run-artifact [--json] <binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
+                    "usage: nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
                         .to_owned()
                 })?,
                 json,

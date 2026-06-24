@@ -199,12 +199,22 @@ pub fn store_compile_cache(
     fs::create_dir_all(&key.root)
         .map_err(|error| format!("failed to create `{}`: {error}", key.root.display()))?;
     let entry_dir = key.root.join(&key.key);
-    if entry_dir.is_dir() {
-        return Ok(CompileCacheEntry {
-            root: key.root.clone(),
-            key: key.key.clone(),
-            entry_dir,
-        });
+    if entry_dir.exists() {
+        if entry_dir.is_dir() {
+            fs::remove_dir_all(&entry_dir).map_err(|error| {
+                format!(
+                    "failed to refresh compile cache entry `{}`: {error}",
+                    entry_dir.display()
+                )
+            })?;
+        } else {
+            fs::remove_file(&entry_dir).map_err(|error| {
+                format!(
+                    "failed to reset compile cache entry `{}`: {error}",
+                    entry_dir.display()
+                )
+            })?;
+        }
     }
     let temp_dir = key
         .root
@@ -840,6 +850,36 @@ mod tests {
         let left_hash = fingerprint_records(&left).unwrap();
         let right_hash = fingerprint_records(&right).unwrap();
         assert_eq!(left_hash, right_hash);
+
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn store_compile_cache_refreshes_existing_entry_contents() {
+        let temp_dir = temp_path("store_refresh");
+        let cache_root = temp_dir.join("cache");
+        let output_dir = temp_dir.join("out");
+        fs::create_dir_all(&output_dir).unwrap();
+        fs::write(output_dir.join("marker.txt"), "first").unwrap();
+
+        let key = CompileCacheKey {
+            root: cache_root,
+            key: "demo-key".to_owned(),
+            input_labels: vec!["demo".to_owned()],
+        };
+
+        let entry = store_compile_cache(&key, &output_dir).unwrap();
+        assert_eq!(
+            fs::read_to_string(entry.entry_dir.join("marker.txt")).unwrap(),
+            "first"
+        );
+
+        fs::write(output_dir.join("marker.txt"), "second").unwrap();
+        let entry = store_compile_cache(&key, &output_dir).unwrap();
+        assert_eq!(
+            fs::read_to_string(entry.entry_dir.join("marker.txt")).unwrap(),
+            "second"
+        );
 
         fs::remove_dir_all(&temp_dir).unwrap();
     }

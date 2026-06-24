@@ -53,7 +53,7 @@ fn write_project_links_index<W: fmt::Write>(
     Ok(())
 }
 
-fn project_docs_summary(project: &LoadedProject) -> ProjectDocsSummary {
+pub fn project_docs_summary(project: &LoadedProject) -> ProjectDocsSummary {
     let mut documented_modules = 0usize;
     let mut documented_items = 0usize;
     for module in &project.modules {
@@ -70,7 +70,7 @@ fn project_docs_summary(project: &LoadedProject) -> ProjectDocsSummary {
     }
 }
 
-fn project_galaxy_summary(project: &LoadedProject) -> ProjectGalaxySummary {
+pub fn project_galaxy_summary(project: &LoadedProject) -> ProjectGalaxySummary {
     let mut documented_galaxies = 0usize;
     let mut documented_library_modules = 0usize;
     let mut documented_items = 0usize;

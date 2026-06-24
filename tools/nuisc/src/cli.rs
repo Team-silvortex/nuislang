@@ -74,6 +74,16 @@ pub enum CommandKind {
     InspectStdlibDocs {
         json: bool,
     },
+    InspectProjectMetadata {
+        input: PathBuf,
+        json: bool,
+        summary: bool,
+        paths_only: bool,
+    },
+    RepairProjectMetadata {
+        input: PathBuf,
+        dry_run: bool,
+    },
     CacheStatus {
         input: Option<PathBuf>,
         all: bool,
@@ -193,14 +203,14 @@ where
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuisc inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        "usage: nuisc inspect-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
                             .to_owned(),
                     );
                 }
             }
             Ok(CommandKind::InspectArtifact {
                 input: input.ok_or_else(|| {
-                    "usage: nuisc inspect-artifact [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                    "usage: nuisc inspect-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
                         .to_owned()
                 })?,
                 json,
@@ -216,14 +226,14 @@ where
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuisc inspect-execution [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        "usage: nuisc inspect-execution [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
                             .to_owned(),
                     );
                 }
             }
             Ok(CommandKind::InspectExecution {
                 input: input.ok_or_else(|| {
-                    "usage: nuisc inspect-execution [--json] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                    "usage: nuisc inspect-execution [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
                         .to_owned()
                 })?,
                 json,
@@ -242,20 +252,20 @@ where
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuisc artifact-report [--json|--summary] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                        "usage: nuisc artifact-report [--json|--summary] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
                             .to_owned(),
                     );
                 }
             }
             if json && summary {
                 return Err(
-                    "usage: nuisc artifact-report [--json|--summary] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                    "usage: nuisc artifact-report [--json|--summary] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
                         .to_owned(),
                 );
             }
             Ok(CommandKind::ArtifactReport {
                 input: input.ok_or_else(|| {
-                    "usage: nuisc artifact-report [--json|--summary] <nuis.compiled.artifact|nuis.build.manifest.toml>"
+                    "usage: nuisc artifact-report [--json|--summary] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
                         .to_owned()
                 })?,
                 json,
@@ -272,14 +282,14 @@ where
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuisc verify-artifact [--json] <nuis.compiled.artifact>"
+                        "usage: nuisc verify-artifact [--json] <output-dir|nuis.compiled.artifact>"
                             .to_owned(),
                     );
                 }
             }
             Ok(CommandKind::VerifyArtifact {
                 input: input.ok_or_else(|| {
-                    "usage: nuisc verify-artifact [--json] <nuis.compiled.artifact>"
+                    "usage: nuisc verify-artifact [--json] <output-dir|nuis.compiled.artifact>"
                         .to_owned()
                 })?,
                 json,
@@ -303,14 +313,14 @@ where
                     manifest = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuisc verify-build-manifest [--json] <nuis.build.manifest.toml>"
+                        "usage: nuisc verify-build-manifest [--json] <output-dir|nuis.build.manifest.toml>"
                             .to_owned(),
                     );
                 }
             }
             Ok(CommandKind::VerifyBuildManifest {
                 manifest: manifest.ok_or_else(|| {
-                    "usage: nuisc verify-build-manifest [--json] <nuis.build.manifest.toml>"
+                    "usage: nuisc verify-build-manifest [--json] <output-dir|nuis.build.manifest.toml>"
                         .to_owned()
                 })?,
                 json,
@@ -406,6 +416,72 @@ where
                 }
             }
             Ok(CommandKind::InspectStdlibDocs { json })
+        }
+        "inspect-project-metadata" => {
+            let mut json = false;
+            let mut summary = false;
+            let mut paths_only = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if arg == "--summary" {
+                    summary = true;
+                } else if arg == "--paths-only" {
+                    paths_only = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc inspect-project-metadata [--json|--summary|--paths-only] <project-dir|nuis.toml|nuis.build.manifest.toml|nuis.compiled.artifact>"
+                            .to_owned(),
+                    );
+                }
+            }
+            if json && (summary || paths_only) {
+                return Err(
+                    "usage: nuisc inspect-project-metadata [--json|--summary|--paths-only] <project-dir|nuis.toml|nuis.build.manifest.toml|nuis.compiled.artifact>"
+                        .to_owned(),
+                );
+            }
+            if summary && paths_only {
+                return Err(
+                    "usage: nuisc inspect-project-metadata [--json|--summary|--paths-only] <project-dir|nuis.toml|nuis.build.manifest.toml|nuis.compiled.artifact>"
+                        .to_owned(),
+                );
+            }
+            Ok(CommandKind::InspectProjectMetadata {
+                input: input.ok_or_else(|| {
+                    "usage: nuisc inspect-project-metadata [--json|--summary|--paths-only] <project-dir|nuis.toml|nuis.build.manifest.toml|nuis.compiled.artifact>"
+                        .to_owned()
+                })?,
+                json,
+                summary,
+                paths_only,
+            })
+        }
+        "repair-project-metadata" => {
+            let mut dry_run = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--dry-run" {
+                    dry_run = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc repair-project-metadata [--dry-run] <output-dir|nuis.build.manifest.toml|nuis.compiled.artifact>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::RepairProjectMetadata {
+                input: input.ok_or_else(|| {
+                    "usage: nuisc repair-project-metadata [--dry-run] <output-dir|nuis.build.manifest.toml|nuis.compiled.artifact>"
+                        .to_owned()
+                })?,
+                dry_run,
+            })
         }
         "cache-status" => {
             let mut verbose_cache = false;
@@ -575,7 +651,7 @@ where
             })
         }
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `inspect-execution`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `inspect-docs`, `inspect-galaxy-docs`, `inspect-stdlib-docs`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `inspect-execution`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `inspect-docs`, `inspect-galaxy-docs`, `inspect-stdlib-docs`, `inspect-project-metadata`, `repair-project-metadata`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
         )),
     }
 }
@@ -944,5 +1020,131 @@ mod tests {
         )
         .unwrap();
         assert_eq!(command, CommandKind::InspectStdlibDocs { json: true });
+    }
+
+    #[test]
+    fn parse_inspect_project_metadata_command() {
+        let command = parse_args(
+            vec![
+                "inspect-project-metadata".to_owned(),
+                "examples/projects/tooling/benchmark_report_file_demo".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectProjectMetadata {
+                input: PathBuf::from("examples/projects/tooling/benchmark_report_file_demo"),
+                json: false,
+                summary: false,
+                paths_only: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_project_metadata_json_command() {
+        let command = parse_args(
+            vec![
+                "inspect-project-metadata".to_owned(),
+                "--json".to_owned(),
+                "build/nuis.build.manifest.toml".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectProjectMetadata {
+                input: PathBuf::from("build/nuis.build.manifest.toml"),
+                json: true,
+                summary: false,
+                paths_only: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_project_metadata_summary_command() {
+        let command = parse_args(
+            vec![
+                "inspect-project-metadata".to_owned(),
+                "--summary".to_owned(),
+                "examples/projects/tooling/benchmark_report_file_demo".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectProjectMetadata {
+                input: PathBuf::from("examples/projects/tooling/benchmark_report_file_demo"),
+                json: false,
+                summary: true,
+                paths_only: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_inspect_project_metadata_paths_only_command() {
+        let command = parse_args(
+            vec![
+                "inspect-project-metadata".to_owned(),
+                "--paths-only".to_owned(),
+                "build/nuis.build.manifest.toml".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::InspectProjectMetadata {
+                input: PathBuf::from("build/nuis.build.manifest.toml"),
+                json: false,
+                summary: false,
+                paths_only: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_repair_project_metadata_command() {
+        let command = parse_args(
+            vec![
+                "repair-project-metadata".to_owned(),
+                "build/nuis.build.manifest.toml".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::RepairProjectMetadata {
+                input: PathBuf::from("build/nuis.build.manifest.toml"),
+                dry_run: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_repair_project_metadata_dry_run_command() {
+        let command = parse_args(
+            vec![
+                "repair-project-metadata".to_owned(),
+                "--dry-run".to_owned(),
+                "build/nuis.build.manifest.toml".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            CommandKind::RepairProjectMetadata {
+                input: PathBuf::from("build/nuis.build.manifest.toml"),
+                dry_run: true,
+            }
+        );
     }
 }

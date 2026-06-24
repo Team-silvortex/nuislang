@@ -3468,6 +3468,45 @@ pub struct NuisCompiledArtifactVerifyReport {
     pub artifact_roundtrip_verified: bool,
 }
 
+fn project_metadata_summary_mismatch_error(
+    index_kind: &str,
+    index_path: &str,
+    expected: &str,
+    source: &str,
+    project_input: &str,
+    output_dir: &str,
+) -> String {
+    let actual = source
+        .lines()
+        .map(str::trim)
+        .find(|line| line.starts_with("summary\t"))
+        .unwrap_or("<missing summary line>");
+    let source_exists = Path::new(project_input).exists();
+    let build_manifest_path = Path::new(output_dir)
+        .join("nuis.build.manifest.toml")
+        .display()
+        .to_string();
+    let suggestions = if source_exists {
+        vec![
+            format!("nuisc compile \"{}\" \"{}\"", project_input, output_dir),
+            format!("nuisc inspect-project-metadata \"{}\"", project_input),
+        ]
+    } else {
+        vec![
+            format!("nuisc inspect-project-metadata \"{}\"", build_manifest_path),
+            format!("nuisc verify-build-manifest \"{}\"", build_manifest_path),
+        ]
+    };
+    format!(
+        "project {index_kind} index `{index_path}` summary mismatch: expected `{expected}`, found `{actual}`; this usually means the build artifact was produced by an older nuisc metadata format or the index file drifted after compilation. Rebuild the project with the current nuisc, or regenerate the build output before inspecting/verifying it. Suggested commands: {}.",
+        suggestions
+            .iter()
+            .map(|command| format!("`{command}`"))
+            .collect::<Vec<_>>()
+            .join(" or ")
+    )
+}
+
 pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, String> {
     let source = fs::read_to_string(path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
@@ -4321,9 +4360,13 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         if let Some(summary) = &project_plan_summary {
             let expected = format!("summary {summary}");
             if !plan_source.lines().any(|line| line.trim() == expected) {
-                return Err(format!(
-                    "project plan index `{}` summary mismatch: expected line `{}`",
-                    plan_index, expected
+                return Err(project_metadata_summary_mismatch_error(
+                    "plan",
+                    plan_index,
+                    &expected,
+                    &plan_source,
+                    &input,
+                    &output_dir,
                 ));
             }
         }
@@ -4344,9 +4387,13 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
             project_docs_documented_item_count
         );
         if !docs_source.lines().any(|line| line.trim() == expected) {
-            return Err(format!(
-                "project docs index `{}` summary mismatch: expected line `{}`",
-                docs_index, expected
+            return Err(project_metadata_summary_mismatch_error(
+                "docs",
+                docs_index,
+                &expected,
+                &docs_source,
+                &input,
+                &output_dir,
             ));
         }
         project_metadata_checked += 1;
@@ -4368,9 +4415,13 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
             project_imports_documented_visible_item_count
         );
         if !imports_source.lines().any(|line| line.trim() == expected) {
-            return Err(format!(
-                "project imports index `{}` summary mismatch: expected line `{}`",
-                imports_index, expected
+            return Err(project_metadata_summary_mismatch_error(
+                "imports",
+                imports_index,
+                &expected,
+                &imports_source,
+                &input,
+                &output_dir,
             ));
         }
         project_metadata_checked += 1;
@@ -4391,9 +4442,13 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
             project_documented_galaxy_item_count
         );
         if !galaxy_source.lines().any(|line| line.trim() == expected) {
-            return Err(format!(
-                "project galaxy index `{}` summary mismatch: expected line `{}`",
-                galaxy_index, expected
+            return Err(project_metadata_summary_mismatch_error(
+                "galaxy",
+                galaxy_index,
+                &expected,
+                &galaxy_source,
+                &input,
+                &output_dir,
             ));
         }
         project_metadata_checked += 1;
@@ -8336,6 +8391,51 @@ mod tests {
         )
         .unwrap();
         root
+    }
+
+    #[test]
+    fn project_metadata_summary_mismatch_error_suggests_rebuild_for_legacy_outputs() {
+        let source_root = temp_dir("metadata_mismatch_source_exists");
+        let message = super::project_metadata_summary_mismatch_error(
+            "galaxy",
+            "build/nuis.project.galaxy.txt",
+            "summary\tgalaxies=1",
+            "summary\tgalaxies=0\ncore\tpackage=nuis.core",
+            &source_root.display().to_string(),
+            "build",
+        );
+        assert!(message.contains("project galaxy index `build/nuis.project.galaxy.txt`"));
+        assert!(message.contains("expected `summary\tgalaxies=1`"));
+        assert!(message.contains("found `summary\tgalaxies=0`"));
+        assert!(message.contains("older nuisc metadata format"));
+        assert!(message.contains("Rebuild the project with the current nuisc"));
+        assert!(message.contains(&format!(
+            "nuisc compile \"{}\" \"build\"",
+            source_root.display()
+        )));
+        assert!(message.contains(&format!(
+            "nuisc inspect-project-metadata \"{}\"",
+            source_root.display()
+        )));
+    }
+
+    #[test]
+    fn project_metadata_summary_mismatch_error_falls_back_to_manifest_commands_when_source_missing() {
+        let message = super::project_metadata_summary_mismatch_error(
+            "galaxy",
+            "build/nuis.project.galaxy.txt",
+            "summary\tgalaxies=1",
+            "summary\tgalaxies=0\ncore\tpackage=nuis.core",
+            "/tmp/definitely-missing-nuis-project-input",
+            "build/out",
+        );
+        assert!(message.contains("older nuisc metadata format"));
+        assert!(message.contains(
+            "nuisc inspect-project-metadata \"build/out/nuis.build.manifest.toml\""
+        ));
+        assert!(message.contains(
+            "nuisc verify-build-manifest \"build/out/nuis.build.manifest.toml\""
+        ));
     }
 
     fn sample_domain_unit(

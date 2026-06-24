@@ -59,7 +59,8 @@ pub use packet::render_project_packet_index;
 pub use planning::{
     build_project_compilation_plan, describe_project, describe_project_compilation_plan,
     describe_project_dependency_categories, describe_project_exchange_route_classes,
-    describe_project_output_intent_categories, load_project, render_project_compilation_plan_index,
+    describe_project_output_intent_categories, load_project, project_docs_summary,
+    project_galaxy_summary, render_project_compilation_plan_index,
     write_project_compilation_plan_index, write_project_metadata,
 };
 use profile_apply::{
@@ -71,7 +72,7 @@ use profile_targets::resolve_project_profile_target_name;
 pub use rendering::{
     describe_project_abi_graph, ensure_project_lowering_selections_valid, organize_project,
     organize_project_exchanges, project_abi_selection_view_json, project_abi_selection_views,
-    project_lowering_selection_json, render_project_abi_graph_line,
+    project_imports_summary, project_lowering_selection_json, render_project_abi_graph_line,
     render_project_abi_selection_lines, render_project_abi_selection_view_lines,
     render_project_import_index, render_project_lowering_selection_lines,
     validate_project_lowering_selections, write_project_abi_selection_lines,
