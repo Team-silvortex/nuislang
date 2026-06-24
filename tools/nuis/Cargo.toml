@@ -11,4 +11,5 @@ description = "Front-door workflow tool for the Nuis toolchain."
 [dependencies]
 nuis-artifact = { path = "../../crates/nuis-artifact" }
 nuis-semantics = { path = "../../crates/nuis-semantics" }
+nuis-runtime = { path = "../../crates/nuis-runtime" }
 nuisc = { path = "../nuisc" }

@@ -20,6 +20,18 @@ use nuis_semantics::model::{
 };
 use surface_render::append_json_field_strings;
 
+struct BuildReportRuntimeAdapter;
+
+impl nuis_runtime::DomainAdapter for BuildReportRuntimeAdapter {
+    fn adapter_id(&self) -> &'static str {
+        "nuis-build-report-runtime-adapter"
+    }
+
+    fn supports(&self, _unit: &nuis_artifact::BuildManifestDomainBuildUnit) -> bool {
+        true
+    }
+}
+
 fn main() {
     let result = thread::Builder::new()
         .name("nuis-main".to_owned())
@@ -2640,6 +2652,7 @@ fn render_artifact_materialization_json(
 
 fn materialize_artifact_bundle(input: &Path, output_dir: &Path) -> Result<Vec<PathBuf>, String> {
     let artifact = load_frontdoor_compiled_artifact(input)?;
+    nuisc::aot::validate_nuis_compiled_artifact_layout(input, &artifact)?;
     fs::create_dir_all(output_dir)
         .map_err(|error| format!("failed to create `{}`: {error}", output_dir.display()))?;
     let envelope_path = output_dir.join("nuis.executable.envelope.toml");
@@ -2678,6 +2691,7 @@ fn handle_unpack_artifact_support(
     json: bool,
 ) -> Result<(), String> {
     let artifact = load_frontdoor_compiled_artifact(&input)?;
+    nuisc::aot::validate_nuis_compiled_artifact_layout(&input, &artifact)?;
     let mut written = nuis_artifact::materialize_embedded_artifact_support(&artifact, &output_dir)
         .map_err(|error| error.to_string())?;
     written.sort();
@@ -3176,6 +3190,133 @@ fn append_runtime_session_json_fields(
     append_json_field_strings(out, runtime_session_json_fields(manifest_verify));
 }
 
+fn runtime_load_json_fields(artifact_path: Option<&Path>, artifact_verified: bool) -> Vec<String> {
+    if !artifact_verified {
+        return vec![
+            json_bool_field("runtime_load_attempted", false),
+            json_bool_field("runtime_load_ok", false),
+            json_optional_string_field("runtime_load_error", None),
+            json_usize_field("runtime_loaded_domain_units", 0),
+            json_usize_field("runtime_loaded_heterogeneous_units", 0),
+            json_usize_field("runtime_loaded_payload_blobs", 0),
+            json_bool_field("runtime_loaded_bridge_registry", false),
+            json_bool_field("runtime_loaded_host_bridge_plan_index", false),
+        ];
+    }
+    let Some(path) = artifact_path else {
+        return vec![
+            json_bool_field("runtime_load_attempted", false),
+            json_bool_field("runtime_load_ok", false),
+            json_optional_string_field("runtime_load_error", None),
+            json_usize_field("runtime_loaded_domain_units", 0),
+            json_usize_field("runtime_loaded_heterogeneous_units", 0),
+            json_usize_field("runtime_loaded_payload_blobs", 0),
+            json_bool_field("runtime_loaded_bridge_registry", false),
+            json_bool_field("runtime_loaded_host_bridge_plan_index", false),
+        ];
+    };
+    match nuis_runtime::RuntimeLoader.load_from_artifact_path(path) {
+        Ok(loaded) => vec![
+            json_bool_field("runtime_load_attempted", true),
+            json_bool_field("runtime_load_ok", true),
+            json_optional_string_field("runtime_load_error", None),
+            json_field(
+                "runtime_loaded_lifecycle_entry",
+                &loaded.artifact.lifecycle.bootstrap_entry,
+            ),
+            json_usize_field("runtime_loaded_domain_units", loaded.domain_units.len()),
+            json_usize_field(
+                "runtime_loaded_heterogeneous_units",
+                loaded.heterogeneous_units().count(),
+            ),
+            json_usize_field(
+                "runtime_loaded_payload_blobs",
+                loaded.domain_payload_blobs.len(),
+            ),
+            json_bool_field(
+                "runtime_loaded_bridge_registry",
+                loaded.bridge_registry.is_some(),
+            ),
+            json_bool_field(
+                "runtime_loaded_host_bridge_plan_index",
+                loaded.host_bridge_plan_index.is_some(),
+            ),
+        ],
+        Err(error) => vec![
+            json_bool_field("runtime_load_attempted", true),
+            json_bool_field("runtime_load_ok", false),
+            json_optional_string_field("runtime_load_error", Some(&error.to_string())),
+            json_usize_field("runtime_loaded_domain_units", 0),
+            json_usize_field("runtime_loaded_heterogeneous_units", 0),
+            json_usize_field("runtime_loaded_payload_blobs", 0),
+            json_bool_field("runtime_loaded_bridge_registry", false),
+            json_bool_field("runtime_loaded_host_bridge_plan_index", false),
+        ],
+    }
+}
+
+fn runtime_execution_json_fields(
+    artifact_path: Option<&Path>,
+    artifact_verified: bool,
+) -> Vec<String> {
+    if !artifact_verified {
+        return runtime_execution_unavailable_fields(false, None);
+    }
+    let Some(path) = artifact_path else {
+        return runtime_execution_unavailable_fields(false, None);
+    };
+    match runtime_execution_summary(path) {
+        Ok((domains, plan_phases, trace_events)) => vec![
+            json_bool_field("runtime_execution_attempted", true),
+            json_bool_field("runtime_execution_ok", true),
+            json_optional_string_field("runtime_execution_error", None),
+            json_usize_field("runtime_execution_domains", domains),
+            json_usize_field("runtime_execution_plan_phases", plan_phases),
+            json_usize_field("runtime_execution_trace_events", trace_events),
+        ],
+        Err(error) => runtime_execution_unavailable_fields(true, Some(&error)),
+    }
+}
+
+fn runtime_execution_unavailable_fields(attempted: bool, error: Option<&str>) -> Vec<String> {
+    vec![
+        json_bool_field("runtime_execution_attempted", attempted),
+        json_bool_field("runtime_execution_ok", false),
+        json_optional_string_field("runtime_execution_error", error),
+        json_usize_field("runtime_execution_domains", 0),
+        json_usize_field("runtime_execution_plan_phases", 0),
+        json_usize_field("runtime_execution_trace_events", 0),
+    ]
+}
+
+fn runtime_execution_summary(path: &Path) -> Result<(usize, usize, usize), String> {
+    let loaded = nuis_runtime::RuntimeLoader
+        .load_from_artifact_path(path)
+        .map_err(|error| error.to_string())?;
+    let mut adapters = nuis_runtime::AdapterRegistry::new();
+    adapters.register(Box::new(BuildReportRuntimeAdapter));
+    let bridge = nuis_runtime::BridgeExecutor;
+    let executor = nuis_runtime::Executor;
+    let mut domains = 0usize;
+    let mut plan_phases = 0usize;
+    let mut trace_events = 0usize;
+    for unit in loaded.heterogeneous_units() {
+        let prepared = bridge
+            .prepare(&loaded, &adapters, &unit.domain_family)
+            .map_err(|error| error.to_string())?;
+        let plan = executor
+            .plan(&prepared)
+            .map_err(|error| error.to_string())?;
+        let trace = executor
+            .execute_prepared_plan(prepared.adapter, &plan)
+            .map_err(|error| error.to_string())?;
+        domains += 1;
+        plan_phases += plan.phases.len();
+        trace_events += trace.events.len();
+    }
+    Ok((domains, plan_phases, trace_events))
+}
+
 pub(crate) fn render_build_report_json(input: &Path) -> String {
     let doctor = probe_artifact_doctor(input);
     let diagnostics = collect_artifact_output_diagnostics(input, &doctor);
@@ -3322,6 +3463,14 @@ pub(crate) fn render_build_report_json(input: &Path) -> String {
         );
     }
     append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
+    append_json_field_strings(
+        &mut out,
+        runtime_load_json_fields(doctor.artifact_path.as_deref(), doctor.artifact_verified),
+    );
+    append_json_field_strings(
+        &mut out,
+        runtime_execution_json_fields(doctor.artifact_path.as_deref(), doctor.artifact_verified),
+    );
     append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.plan.as_ref());
     out.push('}');
     out
@@ -3607,6 +3756,64 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
             report.lifecycle_runtime_capability_flags_consistent
         );
     }
+    if doctor.artifact_verified {
+        if let Some(path) = doctor.artifact_path.as_ref() {
+            match nuis_runtime::RuntimeLoader.load_from_artifact_path(path) {
+                Ok(loaded) => {
+                    println!("  runtime_load_attempted: true");
+                    println!("  runtime_load_ok: true");
+                    println!(
+                        "  runtime_loaded_lifecycle_entry: {}",
+                        loaded.artifact.lifecycle.bootstrap_entry
+                    );
+                    println!(
+                        "  runtime_loaded_domain_units: {}",
+                        loaded.domain_units.len()
+                    );
+                    println!(
+                        "  runtime_loaded_heterogeneous_units: {}",
+                        loaded.heterogeneous_units().count()
+                    );
+                    println!(
+                        "  runtime_loaded_payload_blobs: {}",
+                        loaded.domain_payload_blobs.len()
+                    );
+                    println!(
+                        "  runtime_loaded_bridge_registry: {}",
+                        loaded.bridge_registry.is_some()
+                    );
+                    println!(
+                        "  runtime_loaded_host_bridge_plan_index: {}",
+                        loaded.host_bridge_plan_index.is_some()
+                    );
+                }
+                Err(error) => {
+                    println!("  runtime_load_attempted: true");
+                    println!("  runtime_load_ok: false");
+                    println!("  runtime_load_error: {}", error);
+                }
+            }
+            match runtime_execution_summary(path) {
+                Ok((domains, plan_phases, trace_events)) => {
+                    println!("  runtime_execution_attempted: true");
+                    println!("  runtime_execution_ok: true");
+                    println!("  runtime_execution_domains: {}", domains);
+                    println!("  runtime_execution_plan_phases: {}", plan_phases);
+                    println!("  runtime_execution_trace_events: {}", trace_events);
+                }
+                Err(error) => {
+                    println!("  runtime_execution_attempted: true");
+                    println!("  runtime_execution_ok: false");
+                    println!("  runtime_execution_error: {}", error);
+                }
+            }
+        }
+    } else {
+        println!("  runtime_load_attempted: false");
+        println!("  runtime_load_ok: false");
+        println!("  runtime_execution_attempted: false");
+        println!("  runtime_execution_ok: false");
+    }
     println!(
         "  link_plan_available: {}",
         diagnostics.link_plan.plan.is_some()
@@ -3743,6 +3950,78 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
     ]
 }
 
+fn compile_pipeline_stage_json(stage: &nuisc::pipeline::CompilePipelineStage) -> String {
+    let mut out = String::from("{");
+    append_json_field_strings(
+        &mut out,
+        vec![
+            json_field("id", stage.id),
+            json_field("status", stage.status),
+            json_field("detail", &stage.detail),
+        ],
+    );
+    out.push('}');
+    out
+}
+
+fn workflow_compile_pipeline_json_fields(input: &Path) -> Vec<String> {
+    match nuisc::pipeline::resolve_compile_input(input).and_then(|resolved| {
+        let artifacts = resolved.compile()?;
+        Ok(resolved.compile_report(&artifacts))
+    }) {
+        Ok(report) => {
+            let stage_records = report
+                .stages
+                .iter()
+                .map(compile_pipeline_stage_json)
+                .collect::<Vec<_>>();
+            vec![
+                json_bool_field("compile_pipeline_available", true),
+                json_field("compile_pipeline_source_kind", report.source_kind),
+                json_field("compile_pipeline_input", &report.input_path),
+                json_field(
+                    "compile_pipeline_effective_input",
+                    &report.effective_input_path,
+                ),
+                json_optional_string_field(
+                    "compile_pipeline_project",
+                    report.project_name.as_deref(),
+                ),
+                json_field("compile_pipeline_domain", &report.domain),
+                json_field("compile_pipeline_unit", &report.unit),
+                json_usize_field("compile_pipeline_stage_count", report.stage_count()),
+                json_usize_field("compile_pipeline_ok_stage_count", report.ok_stage_count()),
+                json_usize_field("compile_pipeline_ast_functions", report.ast_functions),
+                json_usize_field("compile_pipeline_nir_functions", report.nir_functions),
+                json_usize_field("compile_pipeline_yir_nodes", report.yir_nodes),
+                json_usize_field("compile_pipeline_yir_resources", report.yir_resources),
+                json_usize_field("compile_pipeline_yir_edges", report.yir_edges),
+                json_usize_field("compile_pipeline_llvm_ir_bytes", report.llvm_ir_bytes),
+                json_usize_field(
+                    "compile_pipeline_loaded_nustar_count",
+                    report.loaded_nustar.len(),
+                ),
+                json_string_array_field("compile_pipeline_loaded_nustar", &report.loaded_nustar),
+                json_object_array_field("compile_pipeline_stages", &stage_records),
+                json_bool_field("compile_pipeline_ready_for_aot", report.ready_for_aot),
+                json_field(
+                    "compile_pipeline_recommended_next_step",
+                    report.recommended_next_step,
+                ),
+                json_field(
+                    "compile_pipeline_recommended_reason",
+                    &report.recommended_reason,
+                ),
+                json_field("compile_pipeline_summary", &report.summary_line()),
+            ]
+        }
+        Err(error) => vec![
+            json_bool_field("compile_pipeline_available", false),
+            json_field("compile_pipeline_error", &error),
+        ],
+    }
+}
+
 fn append_workflow_link_plan_json_fields(
     out: &mut String,
     link_plan: Option<&nuisc::linker::LinkPlan>,
@@ -3832,6 +4111,7 @@ fn render_workflow_json(input: &Path) -> Result<String, String> {
             false,
         );
         append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.plan.as_ref());
+        append_json_field_strings(&mut out, workflow_compile_pipeline_json_fields(input));
         append_json_field_strings(
             &mut out,
             workflow_contract_json_fields(&frontdoor, true, true, include_galaxy_flow, true),
@@ -3894,6 +4174,7 @@ fn render_workflow_json(input: &Path) -> Result<String, String> {
         false,
     );
     append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.plan.as_ref());
+    append_json_field_strings(&mut out, workflow_compile_pipeline_json_fields(input));
     append_json_field_strings(
         &mut out,
         workflow_contract_json_fields(&frontdoor, false, false, false, true),
@@ -7064,6 +7345,17 @@ mod cpu Main {
         assert!(json.contains("\"heterogeneous_domain_count\":0"));
         assert!(json.contains("\"bridge_registry_units\":0"));
         assert!(json.contains("\"host_bridge_plan_units\":0"));
+        assert!(json.contains("\"runtime_load_attempted\":true"));
+        assert!(json.contains("\"runtime_load_ok\":true"));
+        assert!(json.contains("\"runtime_loaded_lifecycle_entry\":\"nuis.bootstrap.lifecycle.v1\""));
+        assert!(json.contains("\"runtime_loaded_domain_units\":1"));
+        assert!(json.contains("\"runtime_loaded_heterogeneous_units\":0"));
+        assert!(json.contains("\"runtime_loaded_payload_blobs\":0"));
+        assert!(json.contains("\"runtime_execution_attempted\":true"));
+        assert!(json.contains("\"runtime_execution_ok\":true"));
+        assert!(json.contains("\"runtime_execution_domains\":0"));
+        assert!(json.contains("\"runtime_execution_plan_phases\":0"));
+        assert!(json.contains("\"runtime_execution_trace_events\":0"));
         assert!(json.contains("\"link_plan_domain_unit_records\":[{"));
     }
 
@@ -7124,6 +7416,11 @@ mod cpu Main {
         assert!(json.contains("\"domain_payload_bridge_plans_checked\":1"));
         assert!(json.contains("\"domain_bridge_stubs_checked\":1"));
         assert!(json.contains("\"link_plan_domain_units\":2"));
+        assert!(json.contains("\"runtime_execution_attempted\":true"));
+        assert!(json.contains("\"runtime_execution_ok\":true"));
+        assert!(json.contains("\"runtime_execution_domains\":1"));
+        assert!(json.contains("\"runtime_execution_plan_phases\":"));
+        assert!(json.contains("\"runtime_execution_trace_events\":"));
     }
 
     #[test]
@@ -7322,6 +7619,14 @@ mod cpu Main {
         assert!(json.contains("\"lowering_checks_ok\":true"));
         assert!(json.contains("\"link_plan_available\":false"));
         assert!(json.contains("\"link_plan_final_stage\":null"));
+        assert!(json.contains("\"compile_pipeline_available\":true"));
+        assert!(json.contains("\"compile_pipeline_source_kind\":\"project\""));
+        assert!(json.contains("\"compile_pipeline_ready_for_aot\":true"));
+        assert!(json.contains("\"compile_pipeline_recommended_next_step\":\"build\""));
+        assert!(json.contains("\"compile_pipeline_stage_count\":"));
+        assert!(json.contains("\"compile_pipeline_ok_stage_count\":"));
+        assert!(json.contains("\"id\":\"yir_lower\""));
+        assert!(json.contains("\"id\":\"llvm_emit\""));
     }
 
     #[test]
@@ -7365,6 +7670,9 @@ mod cpu Main {
         assert!(json.contains("\"link_plan_final_stage\":\"host-native-link\""));
         assert!(json.contains("\"link_plan_final_driver\":\"clang\""));
         assert!(json.contains("\"link_plan_final_link_mode\":\"host-toolchain-finalize\""));
+        assert!(json.contains("\"compile_pipeline_available\":true"));
+        assert!(json.contains("\"compile_pipeline_ready_for_aot\":true"));
+        assert!(json.contains("\"compile_pipeline_summary\":\"source_kind=project"));
     }
 
     #[test]
@@ -7396,6 +7704,12 @@ mod cpu Main {
         assert!(json.contains("\"project_checks_code\":\"unavailable\""));
         assert!(json.contains("\"link_plan_available\":false"));
         assert!(json.contains("\"link_plan_final_stage\":null"));
+        assert!(json.contains("\"compile_pipeline_available\":true"));
+        assert!(json.contains("\"compile_pipeline_source_kind\":\"single_source\""));
+        assert!(json.contains("\"compile_pipeline_ready_for_aot\":true"));
+        assert!(json.contains("\"compile_pipeline_recommended_next_step\":\"build\""));
+        assert!(json.contains("\"compile_pipeline_stage_count\":"));
+        assert!(json.contains("\"compile_pipeline_ok_stage_count\":"));
     }
 
     #[test]

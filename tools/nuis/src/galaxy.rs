@@ -1,11 +1,120 @@
 use std::{
     collections::BTreeSet,
     env, fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 const GALAXY_MAGIC: &[u8; 8] = b"GALAXY01";
 const GALAXY_BUNDLE_VERSION: u16 = 1;
+
+fn validate_galaxy_token(field: &str, value: &str, context: &Path) -> Result<(), String> {
+    if value.is_empty() || value == "." || value == ".." || value.starts_with('.') {
+        return Err(format!(
+            "`{}` has unsafe galaxy {field} `{}`",
+            context.display(),
+            value
+        ));
+    }
+    if !value
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b'+'))
+    {
+        return Err(format!(
+            "`{}` has unsafe galaxy {field} `{}`; expected ascii alphanumeric, `.`, `_`, `-`, or `+`",
+            context.display(),
+            value
+        ));
+    }
+    if value.contains('/') || value.contains('\\') {
+        return Err(format!(
+            "`{}` has unsafe galaxy {field} `{}`; path separators are not allowed",
+            context.display(),
+            value
+        ));
+    }
+    Ok(())
+}
+
+fn validate_relative_bundle_path(
+    field: &str,
+    value: &str,
+    context: &Path,
+) -> Result<PathBuf, String> {
+    if value.is_empty() {
+        return Err(format!("`{}` has empty galaxy {field}", context.display()));
+    }
+    let path = Path::new(value);
+    if path.is_absolute() {
+        return Err(format!(
+            "`{}` has unsafe galaxy {field} `{}`; expected relative path",
+            context.display(),
+            value
+        ));
+    }
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(part) => normalized.push(part),
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err(format!(
+                    "`{}` has unsafe galaxy {field} `{}`; parent, root, and prefix components are not allowed",
+                    context.display(),
+                    value
+                ));
+            }
+        }
+    }
+    if normalized.as_os_str().is_empty() {
+        return Err(format!(
+            "`{}` has unsafe galaxy {field} `{}`; expected file path",
+            context.display(),
+            value
+        ));
+    }
+    Ok(normalized)
+}
+
+fn validate_path_under_root(
+    field: &str,
+    path: &Path,
+    root: &Path,
+    context: &Path,
+) -> Result<(), String> {
+    let normalized_path = normalize_existing_or_lexical_path(path)?;
+    let normalized_root = normalize_existing_or_lexical_path(root)?;
+    if !normalized_path.starts_with(&normalized_root) {
+        return Err(format!(
+            "`{}` has unsafe galaxy {field} `{}`; expected path under `{}`",
+            context.display(),
+            path.display(),
+            root.display()
+        ));
+    }
+    Ok(())
+}
+
+fn normalize_existing_or_lexical_path(path: &Path) -> Result<PathBuf, String> {
+    if let Ok(canonical) = path.canonicalize() {
+        return Ok(canonical);
+    }
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(part) => out.push(part),
+            Component::RootDir => out.push(component.as_os_str()),
+            Component::Prefix(prefix) => out.push(prefix.as_os_str()),
+            Component::ParentDir => {
+                return Err(format!(
+                    "path `{}` contains parent-directory traversal",
+                    path.display()
+                ));
+            }
+        }
+    }
+    Ok(out)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GalaxyManifest {
@@ -234,7 +343,9 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
     let source = fs::read_to_string(&manifest_path)
         .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
     let manifest = parse_manifest(&source, &manifest_path)?;
-    let project_path = root.join(&manifest.project);
+    let project_relative =
+        validate_relative_bundle_path("project", &manifest.project, &manifest_path)?;
+    let project_path = root.join(&project_relative);
     let project = nuisc::project::load_project(&project_path)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let project_plan_summary = nuisc::project::describe_project_compilation_plan(&plan);
@@ -243,8 +354,11 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
     let include_files = manifest
         .include
         .iter()
-        .map(|item| root.join(item))
-        .collect::<Vec<_>>();
+        .map(|item| {
+            validate_relative_bundle_path("include", item, &manifest_path)
+                .map(|relative| root.join(relative))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     for path in &include_files {
         if !path.exists() {
             return Err(format!(
@@ -494,6 +608,10 @@ pub fn list_local() -> Result<Vec<LocalGalaxyIndexEntry>, String> {
 
 pub fn install_local(name: &str, version: Option<&str>, output: &Path) -> Result<PathBuf, String> {
     ensure_local_layout()?;
+    validate_galaxy_token("name", name, Path::new("<galaxy install-local>"))?;
+    if let Some(version) = version {
+        validate_galaxy_token("version", version, Path::new("<galaxy install-local>"))?;
+    }
     let chosen = select_local_entry(name, version)?;
 
     let bundle = inspect_bundle(Path::new(&chosen.package))?;
@@ -507,6 +625,10 @@ pub fn install_local(name: &str, version: Option<&str>, output: &Path) -> Result
 
 pub fn verify_local(name: &str, version: Option<&str>) -> Result<VerifiedLocalGalaxy, String> {
     ensure_local_layout()?;
+    validate_galaxy_token("name", name, Path::new("<galaxy verify-local>"))?;
+    if let Some(version) = version {
+        validate_galaxy_token("version", version, Path::new("<galaxy verify-local>"))?;
+    }
     let chosen = select_local_entry(name, version)?;
     let bundle_path = PathBuf::from(&chosen.package);
     let bytes = fs::read(&bundle_path)
@@ -544,18 +666,34 @@ pub fn verify_local(name: &str, version: Option<&str>) -> Result<VerifiedLocalGa
 
 pub fn inspect_local(name: &str, version: Option<&str>) -> Result<InspectedGalaxyBundle, String> {
     ensure_local_layout()?;
+    validate_galaxy_token("name", name, Path::new("<galaxy inspect-local>"))?;
+    if let Some(version) = version {
+        validate_galaxy_token("version", version, Path::new("<galaxy inspect-local>"))?;
+    }
     let chosen = select_local_entry(name, version)?;
     inspect_bundle(Path::new(&chosen.package))
 }
 
 pub fn remove_local(name: &str, version: Option<&str>) -> Result<RemovedLocalGalaxy, String> {
     ensure_local_layout()?;
+    validate_galaxy_token("name", name, Path::new("<galaxy remove-local>"))?;
+    if let Some(version) = version {
+        validate_galaxy_token("version", version, Path::new("<galaxy remove-local>"))?;
+    }
     let chosen = select_local_entry(name, version)?;
     let package_path = PathBuf::from(&chosen.package);
     let index_entry = local_index_root()
         .join(&chosen.name)
         .join(format!("{}.toml", chosen.version));
 
+    if package_path.exists() {
+        validate_path_under_root(
+            "local package removal",
+            &package_path,
+            &local_packages_root(),
+            Path::new("<galaxy remove-local>"),
+        )?;
+    }
     if index_entry.exists() {
         fs::remove_file(&index_entry).map_err(|error| {
             format!(
@@ -1192,6 +1330,7 @@ fn decode_bundle(bytes: &[u8], path: &Path) -> Result<InspectedGalaxyBundle, Str
                 path.display()
             )
         })?;
+        validate_relative_bundle_path("entry path", entry_path, path)?;
         offset += path_len + content_len;
         entries.push(GalaxyBundleEntry {
             path: entry_path.to_owned(),
@@ -1216,12 +1355,30 @@ fn extract_bundle(bytes: &[u8], path: &Path, output: &Path) -> Result<(), String
     let manifest_len = u32::from_le_bytes(bytes[10..14].try_into().unwrap()) as usize;
     let entry_count = u32::from_le_bytes(bytes[14..18].try_into().unwrap()) as usize;
     let mut offset = 18usize + manifest_len;
+    if bytes.len() < offset {
+        return Err(format!(
+            "`{}` is truncated before install entries",
+            path.display()
+        ));
+    }
     for _ in 0..entry_count {
+        if bytes.len() < offset + 12 {
+            return Err(format!(
+                "`{}` is truncated while decoding install entries",
+                path.display()
+            ));
+        }
         let path_len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
         offset += 4;
         let content_len =
             u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap()) as usize;
         offset += 8;
+        if bytes.len() < offset + path_len + content_len {
+            return Err(format!(
+                "`{}` is truncated while decoding install entry payload",
+                path.display()
+            ));
+        }
         let relative = std::str::from_utf8(&bytes[offset..offset + path_len]).map_err(|e| {
             format!(
                 "`{}` has invalid utf-8 in install entry path: {e}",
@@ -1231,6 +1388,7 @@ fn extract_bundle(bytes: &[u8], path: &Path, output: &Path) -> Result<(), String
         offset += path_len;
         let content = &bytes[offset..offset + content_len];
         offset += content_len;
+        let relative = validate_relative_bundle_path("entry path", relative, path)?;
         let target = output.join(relative);
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)
@@ -1332,7 +1490,7 @@ fn render_ns_nova_manifest(manifest: &NsNovaManifest) -> String {
 }
 
 fn parse_manifest(source: &str, path: &Path) -> Result<GalaxyManifest, String> {
-    Ok(GalaxyManifest {
+    let manifest = GalaxyManifest {
         manifest_schema: parse_required_string(source, "manifest_schema", path)?,
         name: parse_required_string(source, "name", path)?,
         version: parse_required_string(source, "version", path)?,
@@ -1344,7 +1502,21 @@ fn parse_manifest(source: &str, path: &Path) -> Result<GalaxyManifest, String> {
         repository: parse_optional_string(source, "repository").unwrap_or_default(),
         authors: parse_optional_string_array(source, "authors").unwrap_or_default(),
         include: parse_optional_string_array(source, "include").unwrap_or_default(),
-    })
+    };
+    if manifest.manifest_schema != "galaxy-manifest-v1" {
+        return Err(format!(
+            "galaxy manifest `{}` has unsupported schema `{}`",
+            path.display(),
+            manifest.manifest_schema
+        ));
+    }
+    validate_galaxy_token("name", &manifest.name, path)?;
+    validate_galaxy_token("version", &manifest.version, path)?;
+    validate_relative_bundle_path("project", &manifest.project, path)?;
+    for item in &manifest.include {
+        validate_relative_bundle_path("include", item, path)?;
+    }
+    Ok(manifest)
 }
 
 fn parse_ns_nova_manifest(source: &str, path: &Path) -> Result<NsNovaManifest, String> {
@@ -1452,8 +1624,9 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::{
-        escape, parse_manifest, parse_ns_nova_manifest, render_manifest, render_ns_nova_manifest,
-        GalaxyManifest, NsNovaManifest,
+        decode_bundle, escape, parse_manifest, parse_ns_nova_manifest, render_manifest,
+        render_ns_nova_manifest, GalaxyManifest, NsNovaManifest, GALAXY_BUNDLE_VERSION,
+        GALAXY_MAGIC,
     };
     use std::path::Path;
 
@@ -1506,6 +1679,39 @@ mod tests {
     }
 
     #[test]
+    fn parse_manifest_rejects_path_like_package_name() {
+        let source = "manifest_schema = \"galaxy-manifest-v1\"\nname = \"../evil\"\nversion = \"0.1.0\"\npackage_kind = \"nuis-project\"\nproject = \"nuis.toml\"\ninclude = [\"nuis.toml\"]\n";
+        let error = match parse_manifest(source, Path::new("galaxy.toml")) {
+            Ok(_) => panic!("path-like galaxy name should fail"),
+            Err(error) => error,
+        };
+        assert!(error.contains("unsafe galaxy name"));
+    }
+
+    #[test]
+    fn decode_bundle_rejects_entry_path_traversal() {
+        let manifest = "manifest_schema = \"galaxy-manifest-v1\"\nname = \"safe-demo\"\nversion = \"0.1.0\"\npackage_kind = \"nuis-project\"\nproject = \"nuis.toml\"\ninclude = [\"nuis.toml\"]\n";
+        let entry_path = "../evil.txt";
+        let content = b"owned";
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(GALAXY_MAGIC);
+        bytes.extend_from_slice(&GALAXY_BUNDLE_VERSION.to_le_bytes());
+        bytes.extend_from_slice(&(manifest.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&1u32.to_le_bytes());
+        bytes.extend_from_slice(manifest.as_bytes());
+        bytes.extend_from_slice(&(entry_path.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&(content.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(entry_path.as_bytes());
+        bytes.extend_from_slice(content);
+
+        let error = match decode_bundle(&bytes, Path::new("unsafe.galaxy")) {
+            Ok(_) => panic!("bundle entry path traversal should fail"),
+            Err(error) => error,
+        };
+        assert!(error.contains("unsafe galaxy entry path"));
+    }
+
+    #[test]
     fn renders_and_parses_ns_nova_profile() {
         let manifest = NsNovaManifest {
             framework_schema: "ns-nova-manifest-v1".to_owned(),
@@ -1554,7 +1760,7 @@ mod tests {
 }
 
 fn parse_local_index_entry(source: &str, path: &Path) -> Result<LocalGalaxyIndexEntry, String> {
-    Ok(LocalGalaxyIndexEntry {
+    let entry = LocalGalaxyIndexEntry {
         name: parse_required_string(source, "name", path)?,
         version: parse_required_string(source, "version", path)?,
         package: parse_required_string(source, "package", path)?,
@@ -1562,10 +1768,18 @@ fn parse_local_index_entry(source: &str, path: &Path) -> Result<LocalGalaxyIndex
         abi: parse_optional_string_array(source, "abi").unwrap_or_default(),
         bundle_bytes: parse_optional_u64(source, "bundle_bytes"),
         bundle_fnv1a64: parse_optional_string(source, "bundle_fnv1a64"),
-    })
+    };
+    validate_galaxy_token("name", &entry.name, path)?;
+    validate_galaxy_token("version", &entry.version, path)?;
+    validate_relative_bundle_path("project", &entry.project, path)?;
+    Ok(entry)
 }
 
 fn select_local_entry(name: &str, version: Option<&str>) -> Result<LocalGalaxyIndexEntry, String> {
+    validate_galaxy_token("name", name, Path::new("<galaxy local lookup>"))?;
+    if let Some(version) = version {
+        validate_galaxy_token("version", version, Path::new("<galaxy local lookup>"))?;
+    }
     let entries = list_local()?;
     let mut matches = entries
         .into_iter()
@@ -1745,6 +1959,8 @@ fn parse_lock_entries(source: &str, path: &Path) -> Result<Vec<GalaxyLockEntry>,
         let name = parse_required_string(&block, "name", path)?;
         let version = parse_required_string(&block, "version", path)?;
         let bundle = PathBuf::from(parse_required_string(&block, "bundle", path)?);
+        validate_galaxy_token("dependency name", &name, path)?;
+        validate_galaxy_token("dependency version", &version, path)?;
         let bundle_bytes = parse_optional_u64(&block, "bundle_bytes").ok_or_else(|| {
             format!(
                 "galaxy lock `{}` dependency `{}` is missing required key `bundle_bytes`",

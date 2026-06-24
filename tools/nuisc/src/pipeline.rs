@@ -17,6 +17,60 @@ pub struct PipelineArtifacts {
     pub loaded_nustar: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompilePipelineStage {
+    pub id: &'static str,
+    pub status: &'static str,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompilePipelineReport {
+    pub source_kind: &'static str,
+    pub input_path: String,
+    pub effective_input_path: String,
+    pub project_name: Option<String>,
+    pub domain: String,
+    pub unit: String,
+    pub ast_functions: usize,
+    pub nir_functions: usize,
+    pub yir_nodes: usize,
+    pub yir_resources: usize,
+    pub yir_edges: usize,
+    pub llvm_ir_bytes: usize,
+    pub loaded_nustar: Vec<String>,
+    pub stages: Vec<CompilePipelineStage>,
+    pub ready_for_aot: bool,
+    pub recommended_next_step: &'static str,
+    pub recommended_reason: String,
+}
+
+impl CompilePipelineReport {
+    pub fn stage_count(&self) -> usize {
+        self.stages.len()
+    }
+
+    pub fn ok_stage_count(&self) -> usize {
+        self.stages
+            .iter()
+            .filter(|stage| stage.status == "ok")
+            .count()
+    }
+
+    pub fn summary_line(&self) -> String {
+        format!(
+            "source_kind={} domain={} unit={} stages={}/{} ready_for_aot={} next={}",
+            self.source_kind,
+            self.domain,
+            self.unit,
+            self.ok_stage_count(),
+            self.stage_count(),
+            self.ready_for_aot,
+            self.recommended_next_step
+        )
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PipelineCompileOptions {
     pub lowering_target: Option<crate::lowering::LoweringTargetConfig>,
@@ -49,6 +103,129 @@ impl ResolvedCompileInput {
         } else {
             compile_source_path_with_options(&self.input_path, options)
         }
+    }
+
+    pub fn compile_report(&self, artifacts: &PipelineArtifacts) -> CompilePipelineReport {
+        compile_pipeline_report(self, artifacts)
+    }
+}
+
+pub fn compile_pipeline_report(
+    resolved: &ResolvedCompileInput,
+    artifacts: &PipelineArtifacts,
+) -> CompilePipelineReport {
+    let source_kind = if resolved.project.is_some() {
+        "project"
+    } else {
+        "single_source"
+    };
+    let project_name = resolved
+        .project
+        .as_ref()
+        .map(|project| project.manifest.name.clone());
+    let mut stages = Vec::new();
+    stages.push(CompilePipelineStage {
+        id: "resolve_input",
+        status: "ok",
+        detail: format!(
+            "{} -> {}",
+            resolved.input_path.display(),
+            resolved.effective_input_path.display()
+        ),
+    });
+    if let Some(project) = &resolved.project {
+        stages.push(CompilePipelineStage {
+            id: "compile_plan",
+            status: "ok",
+            detail: format!(
+                "project={} modules={} tests={} galaxy_deps={}",
+                project.manifest.name,
+                project.modules.len(),
+                project.manifest.tests.len(),
+                project.manifest.galaxy_dependencies.len()
+            ),
+        });
+    }
+    stages.extend([
+        CompilePipelineStage {
+            id: "ast_parse",
+            status: "ok",
+            detail: format!(
+                "domain={} unit={} functions={} uses={}",
+                artifacts.ast.domain,
+                artifacts.ast.unit,
+                artifacts.ast.functions.len(),
+                artifacts.ast.uses.len()
+            ),
+        },
+        CompilePipelineStage {
+            id: "nir_lower_verify",
+            status: "ok",
+            detail: format!(
+                "functions={} externs={} structs={} enums={}",
+                artifacts.nir.functions.len(),
+                artifacts.nir.externs.len() + artifacts.nir.extern_interfaces.len(),
+                artifacts.nir.structs.len(),
+                artifacts.nir.enums.len()
+            ),
+        },
+        CompilePipelineStage {
+            id: "yir_lower",
+            status: "ok",
+            detail: format!(
+                "nodes={} resources={} edges={}",
+                artifacts.yir.nodes.len(),
+                artifacts.yir.resources.len(),
+                artifacts.yir.edges.len()
+            ),
+        },
+        CompilePipelineStage {
+            id: "llvm_emit",
+            status: "ok",
+            detail: format!("bytes={}", artifacts.llvm_ir.len()),
+        },
+        CompilePipelineStage {
+            id: "nustar_closure",
+            status: "ok",
+            detail: artifacts.loaded_nustar.join(","),
+        },
+    ]);
+    let ready_for_aot = !artifacts.llvm_ir.is_empty()
+        && !artifacts.loaded_nustar.is_empty()
+        && artifacts
+            .yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu");
+    let (recommended_next_step, recommended_reason) = if ready_for_aot {
+        (
+            "build",
+            "pipeline reached LLVM and has a non-empty Nustar closure, so the next durable step is AOT packaging/linking",
+        )
+    } else {
+        (
+            "inspect_yir",
+            "pipeline compiled but does not yet look like a native AOT-ready CPU artifact source",
+        )
+    };
+    CompilePipelineReport {
+        source_kind,
+        input_path: resolved.input_path.display().to_string(),
+        effective_input_path: resolved.effective_input_path.display().to_string(),
+        project_name,
+        domain: artifacts.nir.domain.clone(),
+        unit: artifacts.nir.unit.clone(),
+        ast_functions: artifacts.ast.functions.len(),
+        nir_functions: artifacts.nir.functions.len(),
+        yir_nodes: artifacts.yir.nodes.len(),
+        yir_resources: artifacts.yir.resources.len(),
+        yir_edges: artifacts.yir.edges.len(),
+        llvm_ir_bytes: artifacts.llvm_ir.len(),
+        loaded_nustar: artifacts.loaded_nustar.clone(),
+        stages,
+        ready_for_aot,
+        recommended_next_step,
+        recommended_reason: recommended_reason.to_owned(),
     }
 }
 
@@ -498,10 +675,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         NirExpr::ShaderBinding { value, .. } => {
             collect_instantiated_units_expr(value, units);
         }
-        NirExpr::ShaderBindSet {
-            pipeline,
-            bindings,
-        } => {
+        NirExpr::ShaderBindSet { pipeline, bindings } => {
             collect_instantiated_units_expr(pipeline, units);
             for binding in bindings {
                 collect_instantiated_units_expr(binding, units);
@@ -752,5 +926,53 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::DataBindCore(_)
         | NirExpr::DataMarker(_)
         | NirExpr::DataHandleTable(_) => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{compile_pipeline_report, resolve_compile_input};
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    fn temp_dir(label: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("nuis_pipeline_{label}_{unique}"));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn compile_pipeline_report_marks_single_source_ready_for_aot() {
+        let dir = temp_dir("single_source_report");
+        let input = dir.join("main.ns");
+        fs::write(
+            &input,
+            "mod cpu Main {\n  fn main() -> i64 {\n    return 7;\n  }\n}\n",
+        )
+        .unwrap();
+
+        let resolved = resolve_compile_input(&input).unwrap();
+        let artifacts = resolved.compile().unwrap();
+        let report = compile_pipeline_report(&resolved, &artifacts);
+
+        assert_eq!(report.source_kind, "single_source");
+        assert_eq!(report.domain, "cpu");
+        assert_eq!(report.unit, "Main");
+        assert!(report.ready_for_aot);
+        assert_eq!(report.recommended_next_step, "build");
+        assert!(report.stage_count() >= 5);
+        assert_eq!(report.stage_count(), report.ok_stage_count());
+        assert!(report
+            .stages
+            .iter()
+            .any(|stage| stage.id == "llvm_emit" && stage.status == "ok"));
+        assert!(report.loaded_nustar.contains(&"official.cpu".to_owned()));
+        assert!(report.summary_line().contains("ready_for_aot=true"));
     }
 }

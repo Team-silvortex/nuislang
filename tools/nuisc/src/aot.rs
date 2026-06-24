@@ -1,7 +1,7 @@
 use std::{
     collections::BTreeMap,
     fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -98,6 +98,92 @@ pub use nuis_artifact::{
     BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob, DomainBuildUnitPayloadBlobSection,
     NuisCompiledArtifact, NuisExecutableEnvelope, NuisLifecycleContract,
 };
+
+fn validate_artifact_binary_name(field: &str, value: &str, context: &Path) -> Result<(), String> {
+    let path = Path::new(value);
+    if value.is_empty() || path.components().count() != 1 {
+        return Err(format!(
+            "`{}` has unsafe {field} `{}`; expected a single file name",
+            context.display(),
+            value
+        ));
+    }
+    match path.components().next() {
+        Some(Component::Normal(_)) => Ok(()),
+        _ => Err(format!(
+            "`{}` has unsafe {field} `{}`; expected a plain file name",
+            context.display(),
+            value
+        )),
+    }
+}
+
+fn normalize_manifest_path(path: &Path) -> Result<PathBuf, String> {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(part) => out.push(part),
+            Component::RootDir => out.push(component.as_os_str()),
+            Component::Prefix(prefix) => out.push(prefix.as_os_str()),
+            Component::ParentDir => {
+                return Err(format!(
+                    "path `{}` contains parent-directory traversal",
+                    path.display()
+                ));
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn validate_manifest_path_in_output_dir(
+    field: &str,
+    value: &str,
+    output_dir: &str,
+    context: &Path,
+) -> Result<(), String> {
+    let output_path = Path::new(output_dir);
+    let candidate_path = Path::new(value);
+    if output_path.is_absolute() != candidate_path.is_absolute() {
+        return Err(format!(
+            "`{}` has unsafe {field} `{}`; path kind must match output_dir `{}`",
+            context.display(),
+            value,
+            output_dir
+        ));
+    }
+    let normalized_output = normalize_manifest_path(output_path).map_err(|error| {
+        format!(
+            "`{}` has unsafe output_dir `{}` while validating {field}: {error}",
+            context.display(),
+            output_dir
+        )
+    })?;
+    let normalized_candidate = normalize_manifest_path(candidate_path).map_err(|error| {
+        format!(
+            "`{}` has unsafe {field} `{}`: {error}",
+            context.display(),
+            value
+        )
+    })?;
+    if !normalized_candidate.starts_with(&normalized_output) {
+        return Err(format!(
+            "`{}` has unsafe {field} `{}`; expected path under output_dir `{}`",
+            context.display(),
+            value,
+            output_dir
+        ));
+    }
+    Ok(())
+}
+
+pub fn validate_nuis_compiled_artifact_layout(
+    path: &Path,
+    artifact: &NuisCompiledArtifact,
+) -> Result<(), String> {
+    validate_artifact_binary_name("binary_name", &artifact.binary_name, path)
+}
 
 pub struct BuildManifestCacheInfo {
     pub status: String,
@@ -918,12 +1004,12 @@ pub fn write_build_manifest(
             ));
         }
         if let Some(value) = &project.docs_index_path {
-            out.push_str(&format!(
-                "docs_index = \"{}\"\n",
-                escape_toml_string(value)
-            ));
+            out.push_str(&format!("docs_index = \"{}\"\n", escape_toml_string(value)));
         }
-        out.push_str(&format!("docs_module_count = {}\n", project.docs_module_count));
+        out.push_str(&format!(
+            "docs_module_count = {}\n",
+            project.docs_module_count
+        ));
         out.push_str(&format!(
             "docs_documented_module_count = {}\n",
             project.docs_documented_module_count
@@ -1097,6 +1183,11 @@ pub fn render_relocated_unpacked_build_manifest(
 ) -> Result<String, String> {
     let mut out = String::new();
     let source = &artifact.build_manifest_source;
+    let mut domain_build_units = parse_domain_build_unit_blocks(source, Path::new("<artifact>"))?;
+    write_domain_build_unit_stubs(output_dir, &mut domain_build_units)?;
+    let bridge_registry_path = write_domain_bridge_registry(output_dir, &domain_build_units)?;
+    let host_bridge_plan_index_path =
+        write_host_bridge_plan_index(output_dir, &domain_build_units)?;
     let mut skip_section = false;
     let strip_project_path_keys = [
         "manifest_copy = ",
@@ -1113,6 +1204,14 @@ pub fn render_relocated_unpacked_build_manifest(
     for raw in source.lines() {
         let line = raw.trim();
         if line == "[nuis_envelope]" || line == "[nuis_artifact]" || line == "[artifacts]" {
+            skip_section = true;
+            continue;
+        }
+        if line == "[bridge_registry]" || line == "[host_bridge_plan_index]" {
+            skip_section = true;
+            continue;
+        }
+        if line == "[[domain_build_unit]]" {
             skip_section = true;
             continue;
         }
@@ -1149,6 +1248,20 @@ pub fn render_relocated_unpacked_build_manifest(
     if !out.ends_with("\n\n") {
         out.push('\n');
     }
+
+    for unit in &domain_build_units {
+        out.push_str(&render_domain_build_unit_manifest_block(unit));
+    }
+    append_relocated_bridge_registry_manifest_section(
+        &mut out,
+        bridge_registry_path.as_deref(),
+        &domain_build_units,
+    );
+    append_relocated_host_bridge_plan_index_manifest_section(
+        &mut out,
+        host_bridge_plan_index_path.as_deref(),
+        &domain_build_units,
+    );
 
     out.push_str("[nuis_envelope]\n");
     out.push_str(&format!(
@@ -1281,8 +1394,14 @@ fn build_manifest_domain_units(
         .iter()
         .map(|contract| {
             let abi = abi_by_domain.get(&contract.domain_family).cloned();
-            let (machine_arch, machine_os, backend_family, vendor, device_class, selected_lowering_target) =
-                resolve_domain_build_unit_target(&contract.domain_family, abi.as_deref())?;
+            let (
+                machine_arch,
+                machine_os,
+                backend_family,
+                vendor,
+                device_class,
+                selected_lowering_target,
+            ) = resolve_domain_build_unit_target(&contract.domain_family, abi.as_deref())?;
             Ok(BuildManifestDomainBuildUnit {
                 package_id: contract.package_id.clone(),
                 domain_family: contract.domain_family.clone(),
@@ -1371,8 +1490,9 @@ fn write_domain_build_unit_stubs(
         let path = output_dir.join(format!("nuis.domain.{}.artifact.toml", unit.domain_family));
         unit.artifact_payload_path = Some(payload_path.display().to_string());
         unit.artifact_bridge_stub_path = Some(bridge_stub_path.display().to_string());
-        unit.artifact_ir_sidecar_path =
-            ir_sidecar_path.as_ref().map(|path| path.display().to_string());
+        unit.artifact_ir_sidecar_path = ir_sidecar_path
+            .as_ref()
+            .map(|path| path.display().to_string());
         unit.artifact_bridge_stub_inline = Some(bridge_stub.clone());
         unit.artifact_payload_blob_path = Some(payload_blob_path.display().to_string());
         unit.artifact_payload_blob_bytes = Some(payload_blob.len());
@@ -1404,6 +1524,176 @@ fn write_domain_build_unit_stubs(
         }
     }
     Ok(artifacts)
+}
+
+fn render_domain_build_unit_manifest_block(unit: &BuildManifestDomainBuildUnit) -> String {
+    let mut out = String::new();
+    out.push_str("[[domain_build_unit]]\n");
+    out.push_str(&format!(
+        "package_id = \"{}\"\n",
+        escape_toml_string(&unit.package_id)
+    ));
+    out.push_str(&format!(
+        "domain_family = \"{}\"\n",
+        escape_toml_string(&unit.domain_family)
+    ));
+    if let Some(value) = &unit.abi {
+        out.push_str(&format!("abi = \"{}\"\n", escape_toml_string(value)));
+    }
+    if let Some(value) = &unit.machine_arch {
+        out.push_str(&format!(
+            "machine_arch = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.machine_os {
+        out.push_str(&format!("machine_os = \"{}\"\n", escape_toml_string(value)));
+    }
+    if let Some(value) = &unit.backend_family {
+        out.push_str(&format!(
+            "backend_family = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.vendor {
+        out.push_str(&format!("vendor = \"{}\"\n", escape_toml_string(value)));
+    }
+    if let Some(value) = &unit.device_class {
+        out.push_str(&format!(
+            "device_class = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.selected_lowering_target {
+        out.push_str(&format!(
+            "selected_lowering_target = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.artifact_stub_path {
+        out.push_str(&format!(
+            "artifact_stub_path = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.artifact_stub_inline {
+        out.push_str(&format!(
+            "artifact_stub_inline = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.artifact_payload_path {
+        out.push_str(&format!(
+            "artifact_payload_path = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.artifact_bridge_stub_path {
+        out.push_str(&format!(
+            "artifact_bridge_stub_path = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.artifact_ir_sidecar_path {
+        out.push_str(&format!(
+            "artifact_ir_sidecar_path = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.artifact_bridge_stub_inline {
+        out.push_str(&format!(
+            "artifact_bridge_stub_inline = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.artifact_payload_blob_path {
+        out.push_str(&format!(
+            "artifact_payload_blob_path = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = unit.artifact_payload_blob_bytes {
+        out.push_str(&format!("artifact_payload_blob_bytes = {}\n", value));
+    }
+    if let Some(value) = &unit.artifact_payload_format {
+        out.push_str(&format!(
+            "artifact_payload_format = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.artifact_payload_blob_inline {
+        out.push_str(&format!(
+            "artifact_payload_blob_inline = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    out.push_str(&format!(
+        "contract_family = \"{}\"\n",
+        escape_toml_string(&unit.contract_family)
+    ));
+    out.push_str(&format!(
+        "packaging_role = \"{}\"\n",
+        escape_toml_string(&unit.packaging_role)
+    ));
+    out.push('\n');
+    out
+}
+
+fn append_relocated_bridge_registry_manifest_section(
+    out: &mut String,
+    bridge_registry_path: Option<&Path>,
+    units: &[BuildManifestDomainBuildUnit],
+) {
+    let Some(bridge_registry_path) = bridge_registry_path else {
+        return;
+    };
+    let hetero_units = units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .collect::<Vec<_>>();
+    let source = render_domain_bridge_registry(&hetero_units);
+    out.push_str("[bridge_registry]\n");
+    out.push_str(&format!(
+        "bridge_registry_path = \"{}\"\n",
+        escape_toml_string(&bridge_registry_path.display().to_string())
+    ));
+    out.push_str("bridge_registry_schema = \"nuis-bridge-registry-v1\"\n");
+    out.push_str(&format!("bridge_registry_units = {}\n", hetero_units.len()));
+    out.push_str(&format!(
+        "bridge_registry_inline = \"{}\"\n",
+        escape_toml_string(&source)
+    ));
+    out.push('\n');
+}
+
+fn append_relocated_host_bridge_plan_index_manifest_section(
+    out: &mut String,
+    host_bridge_plan_index_path: Option<&Path>,
+    units: &[BuildManifestDomainBuildUnit],
+) {
+    let Some(host_bridge_plan_index_path) = host_bridge_plan_index_path else {
+        return;
+    };
+    let hetero_units = units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .collect::<Vec<_>>();
+    let source = render_host_bridge_plan_index(&hetero_units);
+    out.push_str("[host_bridge_plan_index]\n");
+    out.push_str(&format!(
+        "host_bridge_plan_index_path = \"{}\"\n",
+        escape_toml_string(&host_bridge_plan_index_path.display().to_string())
+    ));
+    out.push_str("host_bridge_plan_index_schema = \"nuis-host-bridge-plan-index-v1\"\n");
+    out.push_str(&format!(
+        "host_bridge_plan_units = {}\n",
+        hetero_units.len()
+    ));
+    out.push_str(&format!(
+        "host_bridge_plan_index_inline = \"{}\"\n",
+        escape_toml_string(&source)
+    ));
+    out.push('\n');
 }
 
 fn write_domain_bridge_registry(
@@ -1587,26 +1877,26 @@ fn render_domain_build_unit_stub(unit: &BuildManifestDomainBuildUnit) -> String 
     if let Some(value) = &unit.machine_os {
         out.push_str(&format!("machine_os = \"{}\"\n", escape_toml_string(value)));
     }
-        if let Some(value) = &unit.backend_family {
-            out.push_str(&format!(
-                "backend_family = \"{}\"\n",
-                escape_toml_string(value)
-            ));
-        }
-        if let Some(value) = &unit.vendor {
-            out.push_str(&format!("vendor = \"{}\"\n", escape_toml_string(value)));
-        }
-        if let Some(value) = &unit.device_class {
-            out.push_str(&format!(
-                "device_class = \"{}\"\n",
-                escape_toml_string(value)
-            ));
-        }
-        if let Some(value) = &unit.selected_lowering_target {
-            out.push_str(&format!(
-                "selected_lowering_target = \"{}\"\n",
-                escape_toml_string(value)
-            ));
+    if let Some(value) = &unit.backend_family {
+        out.push_str(&format!(
+            "backend_family = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.vendor {
+        out.push_str(&format!("vendor = \"{}\"\n", escape_toml_string(value)));
+    }
+    if let Some(value) = &unit.device_class {
+        out.push_str(&format!(
+            "device_class = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.selected_lowering_target {
+        out.push_str(&format!(
+            "selected_lowering_target = \"{}\"\n",
+            escape_toml_string(value)
+        ));
     }
     if let Some(value) = &unit.artifact_stub_inline {
         out.push_str(&format!(
@@ -1906,11 +2196,9 @@ fn derived_lowering_profile_for_unit<'a>(
                 "vulkan-command-buffer",
                 "vulkan-timeline-semaphore",
             ),
-            ("shader", "directx.discrete-or-integrated-gpu") => (
-                "dxil-render-queue",
-                "directx-command-list",
-                "directx-fence",
-            ),
+            ("shader", "directx.discrete-or-integrated-gpu") => {
+                ("dxil-render-queue", "directx-command-list", "directx-fence")
+            }
             ("shader", "opengl.discrete-or-integrated-gpu") => (
                 "driver-managed-render-pipeline",
                 "opengl-driver-submit",
@@ -2143,9 +2431,7 @@ fn kernel_supported_dispatch_kinds_for_profile(
 ) -> Option<&'static [&'static str]> {
     match (unit.domain_family.as_str(), profile.profile_key) {
         ("kernel", "coreml.apple-ane") => Some(&["graph", "batch", "tile"]),
-        ("kernel", "vulkan.discrete-or-integrated-gpu") => {
-            Some(&["grid", "indirect", "batch"])
-        }
+        ("kernel", "vulkan.discrete-or-integrated-gpu") => Some(&["grid", "indirect", "batch"]),
         ("kernel", "cpu-fallback.cpu-host") => Some(&["range", "tile", "batch"]),
         ("kernel", _) => Some(&["graph"]),
         _ => None,
@@ -2254,9 +2540,7 @@ fn render_domain_build_unit_shader_ir_sidecar(unit: &BuildManifestDomainBuildUni
             out.push_str("[source_stub]\n");
             out.push_str("capabilities = \"OpCapability Shader\"\n");
             if has_stage("vertex") {
-                out.push_str(
-                    "vertex_body = \"OpEntryPoint Vertex %vs_main \\\"vs_main\\\"\"\n",
-                );
+                out.push_str("vertex_body = \"OpEntryPoint Vertex %vs_main \\\"vs_main\\\"\"\n");
             }
             if has_stage("fragment") {
                 out.push_str(
@@ -2293,7 +2577,9 @@ fn render_domain_build_unit_shader_ir_sidecar(unit: &BuildManifestDomainBuildUni
                 out.push_str("vertex_body = \"float4 vs_main(uint vid : SV_VertexID) : SV_Position { return float4(0, 0, 0, 1); }\"\n");
             }
             if has_stage("fragment") {
-                out.push_str("body = \"float4 main() : SV_Target0 { return float4(0, 0, 0, 1); }\"\n");
+                out.push_str(
+                    "body = \"float4 main() : SV_Target0 { return float4(0, 0, 0, 1); }\"\n",
+                );
             }
             if has_stage("compute") {
                 out.push_str("compute_body = \"[numthreads(8,8,1)] void cs_main(uint3 tid : SV_DispatchThreadID) { }\"\n");
@@ -2351,7 +2637,9 @@ fn render_domain_build_unit_shader_ir_sidecar(unit: &BuildManifestDomainBuildUni
             }
             out.push_str("[source_stub]\n");
             if has_stage("vertex") {
-                out.push_str("vertex_body = \"fn vs_stub(vid: u32) -> (f32, f32) { (vid as f32, 0.0) }\"\n");
+                out.push_str(
+                    "vertex_body = \"fn vs_stub(vid: u32) -> (f32, f32) { (vid as f32, 0.0) }\"\n",
+                );
             }
             if has_stage("fragment") {
                 out.push_str("body = \"fn shade_stub(tile: u32) -> u32 { tile }\"\n");
@@ -2432,7 +2720,9 @@ fn render_domain_build_unit_kernel_ir_sidecar(unit: &BuildManifestDomainBuildUni
             out.push_str("batch = \"infer_batch\"\n");
             out.push_str("[source_stub]\n");
             out.push_str("graph_body = \"program infer_main(tensor<1x4xf32> input) -> tensor<1x4xf32> { return input; }\"\n");
-            out.push_str("batch_body = \"batch infer_batch(count: i32) { /* coreml batch stub */ }\"\n");
+            out.push_str(
+                "batch_body = \"batch infer_batch(count: i32) { /* coreml batch stub */ }\"\n",
+            );
         }
         "vulkan.discrete-or-integrated-gpu" => {
             out.push_str("primary = \"grid\"\n");
@@ -2445,7 +2735,9 @@ fn render_domain_build_unit_kernel_ir_sidecar(unit: &BuildManifestDomainBuildUni
             out.push_str("indirect = \"main_indirect\"\n");
             out.push_str("[source_stub]\n");
             out.push_str("grid_body = \"OpEntryPoint GLCompute %main \\\"main\\\"\"\n");
-            out.push_str("indirect_body = \"OpEntryPoint GLCompute %main_indirect \\\"main_indirect\\\"\"\n");
+            out.push_str(
+                "indirect_body = \"OpEntryPoint GLCompute %main_indirect \\\"main_indirect\\\"\"\n",
+            );
         }
         "cpu-fallback.cpu-host" => {
             out.push_str("primary = \"range\"\n");
@@ -2514,7 +2806,9 @@ fn render_domain_build_unit_network_ir_sidecar(unit: &BuildManifestDomainBuildUn
             out.push_str("[source_stub]\n");
             out.push_str("connect_body = \"fn open_session(authority: text) -> session { session(authority) }\"\n");
             out.push_str("send_body = \"fn submit_request(session: session, request: packet) -> task { task(session, request) }\"\n");
-            out.push_str("recv_body = \"fn on_response(task: task) -> response { response(task) }\"\n");
+            out.push_str(
+                "recv_body = \"fn on_response(task: task) -> response { response(task) }\"\n",
+            );
             out.push_str("finalize_body = \"fn finish_exchange(response: response) -> status { commit(response) }\"\n");
         }
         "winsock.socket-io" => {
@@ -2530,7 +2824,9 @@ fn render_domain_build_unit_network_ir_sidecar(unit: &BuildManifestDomainBuildUn
             out.push_str("recv = \"await_iocp_completion\"\n");
             out.push_str("finalize = \"finish_iocp_exchange\"\n");
             out.push_str("[source_stub]\n");
-            out.push_str("connect_body = \"fn connect_overlapped(addr: text) -> socket { socket(addr) }\"\n");
+            out.push_str(
+                "connect_body = \"fn connect_overlapped(addr: text) -> socket { socket(addr) }\"\n",
+            );
             out.push_str("send_body = \"fn submit_overlapped_send(socket: socket, packet: packet) -> overlapped { overlapped(socket, packet) }\"\n");
             out.push_str("recv_body = \"fn await_iocp_completion(op: overlapped) -> response { response(op) }\"\n");
             out.push_str("finalize_body = \"fn finish_iocp_exchange(response: response) -> status { finalize(response) }\"\n");
@@ -3541,6 +3837,14 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         ));
     }
     let artifact_binary_name = parse_required_toml_string(&source, "artifact_binary_name", path)?;
+    validate_artifact_binary_name("artifact_binary_name", &artifact_binary_name, path)?;
+    validate_manifest_path_in_output_dir("nuis_envelope.path", &envelope_path, &output_dir, path)?;
+    validate_manifest_path_in_output_dir(
+        "nuis_artifact.artifact_path",
+        &artifact_path,
+        &output_dir,
+        path,
+    )?;
     let artifact_binary_bytes = parse_required_toml_usize(&source, "artifact_binary_bytes", path)?;
     let lifecycle_schema = parse_required_toml_string(&source, "lifecycle_schema", path)?;
     if lifecycle_schema != "nuis-lifecycle-contract-v1" {
@@ -3658,6 +3962,9 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
             path.display()
         ));
     }
+    for item in &artifacts {
+        validate_manifest_path_in_output_dir("artifact_hash.path", &item.path, &output_dir, path)?;
+    }
 
     let execution_contracts_checked = source
         .lines()
@@ -3691,6 +3998,34 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let mut domain_payload_backend_stubs_checked = 0usize;
     let mut domain_payload_bridge_plans_checked = 0usize;
     let mut domain_bridge_stubs_checked = 0usize;
+    for unit in &domain_build_units {
+        for (field, value) in [
+            (
+                "domain_build_unit.artifact_payload_blob_path",
+                unit.artifact_payload_blob_path.as_deref(),
+            ),
+            (
+                "domain_build_unit.artifact_stub_path",
+                unit.artifact_stub_path.as_deref(),
+            ),
+            (
+                "domain_build_unit.artifact_payload_path",
+                unit.artifact_payload_path.as_deref(),
+            ),
+            (
+                "domain_build_unit.artifact_bridge_stub_path",
+                unit.artifact_bridge_stub_path.as_deref(),
+            ),
+            (
+                "domain_build_unit.artifact_ir_sidecar_path",
+                unit.artifact_ir_sidecar_path.as_deref(),
+            ),
+        ] {
+            if let Some(value) = value {
+                validate_manifest_path_in_output_dir(field, value, &output_dir, path)?;
+            }
+        }
+    }
     let parsed_envelope = parse_nuis_executable_envelope(Path::new(&envelope_path))?;
     if parsed_envelope.schema != envelope_schema {
         return Err(format!(
@@ -4548,6 +4883,7 @@ pub fn verify_nuis_compiled_artifact(
     path: &Path,
 ) -> Result<NuisCompiledArtifactVerifyReport, String> {
     let artifact = parse_nuis_compiled_artifact(path)?;
+    validate_nuis_compiled_artifact_layout(path, &artifact)?;
     if artifact.schema != "nuis-compiled-artifact-v1" {
         return Err(format!(
             "`{}` has unsupported nuis artifact schema `{}`; expected `nuis-compiled-artifact-v1`",
@@ -8393,6 +8729,117 @@ mod tests {
         root
     }
 
+    fn write_minimal_cpu_artifact(label: &str) -> (PathBuf, PathBuf) {
+        let dir = temp_dir(label);
+        let ast = dir.join("demo.ast.txt");
+        let nir = dir.join("demo.nir.txt");
+        let yir = dir.join("demo.yir");
+        let ll = dir.join("demo.ll");
+        let bin = dir.join("demo.bin");
+        fs::write(&ast, "ast").unwrap();
+        fs::write(&nir, "nir").unwrap();
+        fs::write(&yir, "yir").unwrap();
+        fs::write(&ll, "llvm").unwrap();
+        fs::write(&bin, "bin").unwrap();
+
+        let written = CompileArtifacts {
+            ast_path: ast.display().to_string(),
+            nir_path: nir.display().to_string(),
+            yir_path: yir.display().to_string(),
+            llvm_ir_path: ll.display().to_string(),
+            binary_path: bin.display().to_string(),
+            packaging_mode: "native-cpu-llvm".to_owned(),
+        };
+        let cpu_target = CpuBuildTarget {
+            abi: "cpu.x86_64.sysv64".to_owned(),
+            machine_arch: "x86_64".to_owned(),
+            machine_os: "linux".to_owned(),
+            object_format: "elf".to_owned(),
+            calling_abi: "sysv64".to_owned(),
+            clang_target: "x86_64-unknown-linux-gnu".to_owned(),
+            cross_compile: true,
+        };
+        let manifest = super::write_build_manifest(
+            &dir,
+            &written,
+            &BuildManifestContext {
+                input_path: "/tmp/demo.ns".to_owned(),
+                output_dir: dir.display().to_string(),
+                loaded_nustar: vec!["official.cpu".to_owned()],
+                compile_cache: None,
+                project: None,
+                doc_index: None,
+                cpu_target,
+            },
+        )
+        .unwrap();
+        (dir, PathBuf::from(manifest))
+    }
+
+    #[test]
+    fn verify_compiled_artifact_rejects_binary_name_with_path_traversal() {
+        let (dir, _manifest) = write_minimal_cpu_artifact("artifact_binary_name_traversal");
+        let artifact_path = dir.join("nuis.compiled.artifact");
+        let mut artifact = parse_nuis_compiled_artifact(&artifact_path).unwrap();
+        artifact.binary_name = "../evil".to_owned();
+        super::write_nuis_compiled_artifact(&artifact_path, &artifact).unwrap();
+
+        let error = match verify_nuis_compiled_artifact(&artifact_path) {
+            Ok(_) => panic!("artifact with traversal binary_name should fail verification"),
+            Err(error) => error,
+        };
+        assert!(error.contains("unsafe binary_name"));
+        assert!(error.contains("single file name"));
+    }
+
+    #[test]
+    fn verify_build_manifest_rejects_artifact_path_outside_output_dir() {
+        let (dir, manifest) = write_minimal_cpu_artifact("manifest_artifact_path_traversal");
+        let mut source = fs::read_to_string(&manifest).unwrap();
+        source = source.replace(
+            &format!(
+                "artifact_path = \"{}\"",
+                dir.join("nuis.compiled.artifact").display()
+            ),
+            &format!(
+                "artifact_path = \"{}\"",
+                dir.join("..")
+                    .join("evil")
+                    .join("nuis.compiled.artifact")
+                    .display()
+            ),
+        );
+        fs::write(&manifest, source).unwrap();
+
+        let error = match verify_build_manifest(&manifest) {
+            Ok(_) => panic!("manifest with traversal artifact_path should fail verification"),
+            Err(error) => error,
+        };
+        assert!(error.contains("unsafe nuis_artifact.artifact_path"));
+        assert!(error.contains("parent-directory traversal"));
+    }
+
+    #[test]
+    fn verify_build_manifest_rejects_artifact_hash_path_outside_output_dir() {
+        let (dir, manifest) = write_minimal_cpu_artifact("manifest_artifact_hash_traversal");
+        let mut source = fs::read_to_string(&manifest).unwrap();
+        source = source.replace(
+            &format!("path = \"{}\"", dir.join("demo.ast.txt").display()),
+            &format!(
+                "path = \"{}\"",
+                dir.join("..").join("evil").join("demo.ast.txt").display()
+            ),
+        );
+        fs::write(&manifest, source).unwrap();
+
+        let error = match verify_build_manifest(&manifest) {
+            Ok(_) => panic!("manifest with traversal artifact_hash path should fail verification"),
+            Err(error) => error,
+        };
+        assert!(error.contains("unsafe artifact_hash.path"));
+        assert!(error.contains("parent-directory traversal"));
+    }
+
     #[test]
     fn project_metadata_summary_mismatch_error_suggests_rebuild_for_legacy_outputs() {
         let source_root = temp_dir("metadata_mismatch_source_exists");
@@ -8420,7 +8867,8 @@ mod tests {
     }
 
     #[test]
-    fn project_metadata_summary_mismatch_error_falls_back_to_manifest_commands_when_source_missing() {
+    fn project_metadata_summary_mismatch_error_falls_back_to_manifest_commands_when_source_missing()
+    {
         let message = super::project_metadata_summary_mismatch_error(
             "galaxy",
             "build/nuis.project.galaxy.txt",
@@ -8430,12 +8878,11 @@ mod tests {
             "build/out",
         );
         assert!(message.contains("older nuisc metadata format"));
-        assert!(message.contains(
-            "nuisc inspect-project-metadata \"build/out/nuis.build.manifest.toml\""
-        ));
-        assert!(message.contains(
-            "nuisc verify-build-manifest \"build/out/nuis.build.manifest.toml\""
-        ));
+        assert!(message
+            .contains("nuisc inspect-project-metadata \"build/out/nuis.build.manifest.toml\""));
+        assert!(
+            message.contains("nuisc verify-build-manifest \"build/out/nuis.build.manifest.toml\"")
+        );
     }
 
     fn sample_domain_unit(
@@ -8518,15 +8965,13 @@ mod tests {
         assert!(lowering_plan.contains("execution_route = \"unified-render-graph\""));
         assert!(lowering_plan.contains("submission_adapter = \"metal-command-encoder\""));
         assert!(lowering_plan.contains("wake_adapter = \"metal-shared-event\""));
-        assert!(lowering_plan.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]"));
+        assert!(
+            lowering_plan.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]")
+        );
         assert!(lowering_plan.contains("lowering_ir = \"msl2.4\""));
         assert!(lowering_plan.contains("shader_stage_model = \"metal-render-pipeline\""));
-        assert!(
-            lowering_plan.contains("stage_binding_model = \"argument-buffer-specialized\"")
-        );
-        assert!(
-            lowering_plan.contains("dispatch_encoding_model = \"tile-and-threadgroup\"")
-        );
+        assert!(lowering_plan.contains("stage_binding_model = \"argument-buffer-specialized\""));
+        assert!(lowering_plan.contains("dispatch_encoding_model = \"tile-and-threadgroup\""));
 
         assert!(backend_stub.contains("backend_profile = \"metal.apple-silicon-gpu\""));
         assert!(backend_stub.contains("execution_route = \"unified-render-graph\""));
@@ -8576,33 +9021,23 @@ mod tests {
         let lowering_plan = super::render_domain_build_unit_lowering_plan(&shader_unit);
         let backend_stub = super::render_domain_build_unit_backend_stub(&shader_unit);
 
-        assert!(
-            lowering_plan.contains("lowering_profile = \"vulkan.discrete-or-integrated-gpu\"")
-        );
+        assert!(lowering_plan.contains("lowering_profile = \"vulkan.discrete-or-integrated-gpu\""));
         assert!(lowering_plan.contains("execution_route = \"spirv-render-queue\""));
         assert!(lowering_plan.contains("submission_adapter = \"vulkan-command-buffer\""));
         assert!(lowering_plan.contains("wake_adapter = \"vulkan-timeline-semaphore\""));
-        assert!(lowering_plan.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]"));
+        assert!(
+            lowering_plan.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]")
+        );
         assert!(lowering_plan.contains("lowering_ir = \"spirv1.6\""));
-        assert!(
-            lowering_plan.contains("shader_stage_model = \"spirv-graphics-pipeline\"")
-        );
+        assert!(lowering_plan.contains("shader_stage_model = \"spirv-graphics-pipeline\""));
         assert!(lowering_plan.contains("stage_binding_model = \"descriptor-set-layout\""));
-        assert!(
-            lowering_plan.contains("dispatch_encoding_model = \"renderpass-command-buffer\"")
-        );
+        assert!(lowering_plan.contains("dispatch_encoding_model = \"renderpass-command-buffer\""));
 
-        assert!(
-            backend_stub.contains("backend_profile = \"vulkan.discrete-or-integrated-gpu\"")
-        );
+        assert!(backend_stub.contains("backend_profile = \"vulkan.discrete-or-integrated-gpu\""));
         assert!(backend_stub.contains("shader_ir = \"spirv1.6\""));
         assert!(backend_stub.contains("shader_entry_model = \"vulkan-pipeline\""));
-        assert!(
-            backend_stub.contains("queue_binding_model = \"explicit-device-queue\"")
-        );
-        assert!(
-            backend_stub.contains("resource_binding_model = \"descriptor-set-layout\"")
-        );
+        assert!(backend_stub.contains("queue_binding_model = \"explicit-device-queue\""));
+        assert!(backend_stub.contains("resource_binding_model = \"descriptor-set-layout\""));
         let sidecar = super::render_domain_build_unit_shader_ir_sidecar(&shader_unit);
         assert!(sidecar.contains("ir_container = \"text.spirv\""));
         assert!(sidecar.contains("entry_symbol = \"main\""));
@@ -8658,8 +9093,12 @@ mod tests {
         let lowering_plan = super::render_domain_build_unit_lowering_plan(&kernel_unit);
         let backend_stub = super::render_domain_build_unit_backend_stub(&kernel_unit);
 
-        assert!(lowering_plan.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]"));
-        assert!(backend_stub.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]"));
+        assert!(
+            lowering_plan.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]")
+        );
+        assert!(
+            backend_stub.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]")
+        );
     }
 
     #[test]
@@ -8747,7 +9186,9 @@ mod tests {
         assert!(sidecar.contains("request = \"http-client-session\""));
         assert!(sidecar.contains("response = \"completion-callback\""));
         assert!(sidecar.contains("streaming = \"delegate-push-stream\""));
-        assert!(sidecar.contains("binding_table = \"session.handle, request.packet, response.slot\""));
+        assert!(
+            sidecar.contains("binding_table = \"session.handle, request.packet, response.slot\"")
+        );
         assert!(sidecar.contains("connect = \"open_session\""));
         assert!(sidecar.contains("send = \"submit_request\""));
         assert!(sidecar.contains("recv = \"on_response\""));
@@ -8796,7 +9237,8 @@ mod tests {
         assert!(sidecar.contains("request = \"overlapped-client-session\""));
         assert!(sidecar.contains("response = \"iocp-completion\""));
         assert!(sidecar.contains("streaming = \"completion-port-stream\""));
-        assert!(sidecar.contains("binding_table = \"socket.handle, overlapped.packet, completion.port\""));
+        assert!(sidecar
+            .contains("binding_table = \"socket.handle, overlapped.packet, completion.port\""));
         assert!(sidecar.contains("connect = \"connect_overlapped\""));
         assert!(sidecar.contains("recv = \"await_iocp_completion\""));
         assert!(sidecar.contains("finalize = \"finish_iocp_exchange\""));
@@ -8902,7 +9344,8 @@ mod tests {
         assert!(shader_sidecar_text.contains("schema = \"nuis-shader-ir-sidecar-v1\""));
         assert!(shader_sidecar_text.contains("lowering_profile = \"metal.apple-silicon-gpu\""));
         assert!(shader_sidecar_text.contains("lowering_ir = \"msl2.4\""));
-        assert!(shader_sidecar_text.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]"));
+        assert!(shader_sidecar_text
+            .contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]"));
         assert!(shader_sidecar_text.contains("ir_container = \"text.msl\""));
         assert!(shader_sidecar_text.contains("entry_symbol = \"main0\""));
         assert!(shader_sidecar_text.contains("[pipeline_layout]"));
@@ -8917,7 +9360,10 @@ mod tests {
                 .unwrap();
         assert_eq!(shader_blob.sections.len(), 5);
         assert_eq!(shader_blob.sections[4].name, "shader_ir_sidecar");
-        assert_eq!(shader_blob.sections[4].bytes, shader_sidecar_text.as_bytes());
+        assert_eq!(
+            shader_blob.sections[4].bytes,
+            shader_sidecar_text.as_bytes()
+        );
     }
 
     #[test]
@@ -9379,10 +9825,8 @@ mod tests {
         );
         assert!(host_bridge_plan_index_text.contains("backend_family = \"urlsession\""));
         assert!(host_bridge_plan_index_text.contains("device_class = \"socket-io\""));
-        assert!(
-            host_bridge_plan_index_text
-                .contains("selected_lowering_target = \"urlsession.socket-io\"")
-        );
+        assert!(host_bridge_plan_index_text
+            .contains("selected_lowering_target = \"urlsession.socket-io\""));
         assert!(host_bridge_plan_index_text
             .contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
         let kernel_blob =
@@ -9493,9 +9937,7 @@ mod tests {
         assert!(kernel_bridge_stub_text.contains("schema = \"nuis-host-bridge-spec-v1\""));
         assert!(kernel_bridge_stub_text.contains("vendor = \"apple\""));
         assert!(kernel_bridge_stub_text.contains("device_class = \"apple-ane\""));
-        assert!(
-            kernel_bridge_stub_text.contains("selected_lowering_target = \"coreml.apple-ane\"")
-        );
+        assert!(kernel_bridge_stub_text.contains("selected_lowering_target = \"coreml.apple-ane\""));
         assert!(kernel_bridge_stub_text
             .contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
         assert!(kernel_bridge_stub_text.contains("host_ffi_surface = \"buffer,queue,fence\""));
@@ -9518,19 +9960,15 @@ mod tests {
         assert!(kernel_backend_text.contains("execution_route = \"ane-graph-execution\""));
         assert!(kernel_backend_text.contains("submission_adapter = \"coreml-graph-submit\""));
         assert!(kernel_backend_text.contains("wake_adapter = \"coreml-completion-callback\""));
-        assert!(
-            kernel_backend_text.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]")
-        );
+        assert!(kernel_backend_text
+            .contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]"));
         assert!(kernel_backend_text.contains("kernel_ir = \"coreml-program\""));
         assert!(kernel_backend_text.contains("kernel_entry_model = \"mlmodelc-function\""));
         assert!(kernel_backend_text.contains("queue_binding_model = \"ane-submission-service\""));
-        assert!(
-            kernel_backend_text.contains("resource_binding_model = \"tensor-argument-table\"")
-        );
+        assert!(kernel_backend_text.contains("resource_binding_model = \"tensor-argument-table\""));
         assert!(kernel_sidecar_text.contains("schema = \"nuis-kernel-ir-sidecar-v1\""));
-        assert!(
-            kernel_sidecar_text.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]")
-        );
+        assert!(kernel_sidecar_text
+            .contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]"));
         assert!(kernel_sidecar_text.contains("graph = \"infer_main\""));
         assert!(kernel_backend_text.contains("bind_phase = \"buffer-and-argument-bind\""));
         assert!(kernel_backend_text.contains("launch_phase = \"queue-dispatch-submit\""));
@@ -9574,17 +10012,18 @@ mod tests {
             network_bridge_plan.as_bytes()
         );
         assert_eq!(network_blob.sections[4].name, "network_ir_sidecar");
-        assert_eq!(network_blob.sections[4].bytes, network_ir_sidecar.as_bytes());
+        assert_eq!(
+            network_blob.sections[4].bytes,
+            network_ir_sidecar.as_bytes()
+        );
         let network_backend_text = std::str::from_utf8(&network_blob.sections[2].bytes).unwrap();
         let network_bridge_text = std::str::from_utf8(&network_blob.sections[3].bytes).unwrap();
         let network_sidecar_text = std::str::from_utf8(&network_blob.sections[4].bytes).unwrap();
         assert!(network_bridge_stub_text.contains("schema = \"nuis-host-bridge-spec-v1\""));
         assert!(network_bridge_stub_text.contains("vendor = \"apple\""));
         assert!(network_bridge_stub_text.contains("device_class = \"socket-io\""));
-        assert!(
-            network_bridge_stub_text
-                .contains("selected_lowering_target = \"urlsession.socket-io\"")
-        );
+        assert!(network_bridge_stub_text
+            .contains("selected_lowering_target = \"urlsession.socket-io\""));
         assert!(network_bridge_stub_text
             .contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
         assert!(network_bridge_stub_text.contains("host_ffi_surface = \"socket,urlsession\""));
@@ -9608,12 +10047,8 @@ mod tests {
         assert!(network_backend_text.contains("wake_adapter = \"urlsession-callback\""));
         assert!(network_backend_text.contains("transport_ir = \"foundation-url-request\""));
         assert!(network_backend_text.contains("transport_entry_model = \"urlsession-task\""));
-        assert!(
-            network_backend_text.contains("socket_binding_model = \"session-owned-socket\"")
-        );
-        assert!(
-            network_backend_text.contains("completion_binding_model = \"delegate-callback\"")
-        );
+        assert!(network_backend_text.contains("socket_binding_model = \"session-owned-socket\""));
+        assert!(network_backend_text.contains("completion_binding_model = \"delegate-callback\""));
         assert!(network_backend_text.contains("connect_phase = \"socket-bind-or-session-open\""));
         assert!(network_backend_text.contains("send_phase = \"packet-write-dispatch\""));
         assert!(network_backend_text.contains("recv_phase = \"callback-or-read-ready\""));
