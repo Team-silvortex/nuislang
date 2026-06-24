@@ -4,6 +4,11 @@ manifest = "cpu.toml"
 domain_family = "cpu"
 
 [[package]]
+package_id = "official.cpu.aarch64"
+manifest = "cpu-aarch64.toml"
+domain_family = "cpu"
+
+[[package]]
 package_id = "official.data"
 manifest = "data.toml"
 domain_family = "data"

@@ -27,6 +27,7 @@ pub struct AstUse {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstModule {
+    pub attributes: Vec<AstAttribute>,
     pub uses: Vec<AstUse>,
     pub domain: String,
     pub unit: String,
@@ -428,6 +429,7 @@ pub struct NirUse {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirModule {
+    pub annotations: Vec<NirAnnotation>,
     pub uses: Vec<NirUse>,
     pub domain: String,
     pub unit: String,
@@ -2309,9 +2311,9 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::ShaderBeginPass { .. }
         | NirExpr::ShaderDrawInstanced { .. }
         | NirExpr::ShaderProfileRender { .. } => NirExprEffectClass::Stateful,
-        NirExpr::ShaderSample { .. } | NirExpr::ShaderSampleUv { .. } | NirExpr::ShaderBindSet { .. } => {
-            NirExprEffectClass::DomainReadOnly
-        }
+        NirExpr::ShaderSample { .. }
+        | NirExpr::ShaderSampleUv { .. }
+        | NirExpr::ShaderBindSet { .. } => NirExprEffectClass::DomainReadOnly,
         NirExpr::Move(_)
         | NirExpr::AllocNode { .. }
         | NirExpr::AllocBuffer { .. }

@@ -120,7 +120,8 @@ use result_nodes::{
     lower_task_result_observer_node, push_await_node,
 };
 pub(crate) use scheduler_contracts::{
-    assign_default_lanes, materialize_registered_scheduler_contract_nodes,
+    assign_default_lanes, materialize_doc_contract_nodes,
+    materialize_registered_scheduler_contract_nodes,
 };
 use shader_exprs::lower_shader_expr;
 use shader_packets::lower_shader_packet_expr;
@@ -135,6 +136,8 @@ pub struct LoweringTargetConfig {
     pub object_format: String,
     pub calling_abi: String,
     pub clang_target: String,
+    pub isa_family: String,
+    pub isa_features: Vec<String>,
 }
 
 impl LoweringTargetConfig {
@@ -146,6 +149,8 @@ impl LoweringTargetConfig {
             object_format: target.object_format.clone(),
             calling_abi: target.calling_abi.clone(),
             clang_target: target.clang_target.clone(),
+            isa_family: target.isa_family.clone(),
+            isa_features: target.isa_features.clone(),
         }
     }
 
@@ -415,6 +420,9 @@ mod tests_branch_summaries;
 #[cfg(test)]
 #[path = "lowering/tests_direct_calls.rs"]
 mod tests_direct_calls;
+#[cfg(test)]
+#[path = "lowering/tests_doc_contracts.rs"]
+mod tests_doc_contracts;
 #[cfg(test)]
 #[path = "lowering/tests_higher_order_direct_calls.rs"]
 mod tests_higher_order_direct_calls;

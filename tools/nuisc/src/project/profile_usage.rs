@@ -59,9 +59,10 @@ pub(crate) fn nir_uses_shader_binding_profile_contract(
     profile_contract: &str,
 ) -> bool {
     module.functions.iter().any(|function| {
-        function.body.iter().any(|stmt| {
-            stmt_uses_shader_binding_profile_contract(stmt, profile_contract)
-        })
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_shader_binding_profile_contract(stmt, profile_contract))
     })
 }
 

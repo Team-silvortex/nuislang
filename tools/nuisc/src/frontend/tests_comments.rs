@@ -191,6 +191,15 @@ mod cpu docs {
 
     assert_eq!(ast.domain, "cpu");
     assert_eq!(ast.unit, "docs");
+    assert_eq!(ast.attributes.len(), 2);
+    assert!(matches!(
+        ast.attributes[0].args[0].value,
+        AstAttributeValue::String(ref value) if value == "file docs"
+    ));
+    assert!(matches!(
+        ast.attributes[1].args[0].value,
+        AstAttributeValue::String(ref value) if value == "more file docs"
+    ));
     assert_eq!(ast.functions.len(), 1);
 }
 

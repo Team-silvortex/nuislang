@@ -125,9 +125,9 @@ fn describe_kernel_node(node: &Node, resource: &Resource) -> Result<InstructionS
             Ok(InstructionSemantics::pure(Vec::new()))
         }
         "target_config" => {
-            if node.op.args.len() != 3 {
+            if node.op.args.len() != 3 && node.op.args.len() != 4 {
                 return Err(format!(
-                    "node `{}` expects `kernel.target_config <name> <resource> <arch> <runtime> <lane_width>`",
+                    "node `{}` expects `kernel.target_config <name> <resource> <arch> <runtime> <lane_width> [backend_features]`",
                     node.name
                 ));
             }
@@ -481,16 +481,22 @@ fn execute_kernel_node(
                 )
             },
         )?)),
-        "target_config" => Ok(Value::Tuple(vec![
-            Value::Symbol(node.op.args[0].clone()),
-            Value::Symbol(node.op.args[1].clone()),
-            Value::Int(node.op.args[2].parse::<i64>().map_err(|_| {
-                format!(
-                    "node `{}` has invalid lane width `{}`",
-                    node.name, node.op.args[2]
-                )
-            })?),
-        ])),
+        "target_config" => {
+            let mut values = vec![
+                Value::Symbol(node.op.args[0].clone()),
+                Value::Symbol(node.op.args[1].clone()),
+                Value::Int(node.op.args[2].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid lane width `{}`",
+                        node.name, node.op.args[2]
+                    )
+                })?),
+            ];
+            if let Some(features) = node.op.args.get(3) {
+                values.push(Value::Symbol(features.clone()));
+            }
+            Ok(Value::Tuple(values))
+        }
         "observe" => {
             let value = state.expect_value(&node.op.args[0])?.clone();
             let flow = parse_kernel_flow_state(&node.op.args[1])?;

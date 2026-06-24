@@ -17,9 +17,9 @@ impl RegisteredMod for ShaderMod {
 
         match node.op.instruction.as_str() {
             "target_config" => {
-                if node.op.args.len() != 3 {
+                if node.op.args.len() != 3 && node.op.args.len() != 4 {
                     return Err(format!(
-                        "node `{}` expects `shader.target_config <name> <resource> <arch> <runtime> <lane_width>`",
+                        "node `{}` expects `shader.target_config <name> <resource> <arch> <runtime> <lane_width> [backend_features]`",
                         node.name
                     ));
                 }
@@ -535,16 +535,22 @@ impl RegisteredMod for ShaderMod {
         state: &mut ExecutionState,
     ) -> Result<Value, String> {
         match node.op.instruction.as_str() {
-            "target_config" => Ok(Value::Tuple(vec![
-                Value::Symbol(node.op.args[0].clone()),
-                Value::Symbol(node.op.args[1].clone()),
-                Value::Int(node.op.args[2].parse::<i64>().map_err(|_| {
-                    format!(
-                        "node `{}` has invalid lane width `{}`",
-                        node.name, node.op.args[2]
-                    )
-                })?),
-            ])),
+            "target_config" => {
+                let mut values = vec![
+                    Value::Symbol(node.op.args[0].clone()),
+                    Value::Symbol(node.op.args[1].clone()),
+                    Value::Int(node.op.args[2].parse::<i64>().map_err(|_| {
+                        format!(
+                            "node `{}` has invalid lane width `{}`",
+                            node.name, node.op.args[2]
+                        )
+                    })?),
+                ];
+                if let Some(features) = node.op.args.get(3) {
+                    values.push(Value::Symbol(features.clone()));
+                }
+                Ok(Value::Tuple(values))
+            }
             "const" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(
                 |_| {
                     format!(

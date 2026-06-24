@@ -6,11 +6,11 @@ use nuis_semantics::model::{AstExternFunction, AstTypeRef};
 
 use super::{
     profile_apply::resolve_registered_abi_target, resolve_project_abi,
-    selected_lowering_target_for_registered_abi_target, LoadedProject,
-    ProjectAbiResolution, ProjectAbiSelectionView, ProjectExchangeOrganization,
-    ProjectExchangeRoute, ProjectLoweringIssue, ProjectLoweringIssueKind,
+    selected_lowering_target_for_registered_abi_target, LoadedProject, ProjectAbiResolution,
+    ProjectAbiSelectionView, ProjectExchangeOrganization, ProjectExchangeRoute,
+    ProjectImportsSummary, ProjectLoweringIssue, ProjectLoweringIssueKind,
     ProjectLoweringSelectionView, ProjectOrganization, ProjectOrganizationLink,
-    ProjectOrganizationModule, ProjectImportsSummary,
+    ProjectOrganizationModule,
 };
 
 fn json_escape(value: &str) -> String {
@@ -565,7 +565,9 @@ pub fn project_imports_summary(project: &LoadedProject) -> ProjectImportsSummary
         .map(|module| {
             (
                 module.path.clone(),
-                crate::frontend::extract_ast_doc_index(&module.ast).items.len(),
+                crate::frontend::extract_ast_doc_index(&module.ast)
+                    .items
+                    .len(),
             )
         })
         .collect::<BTreeMap<_, _>>();
@@ -607,14 +609,16 @@ pub fn write_project_import_index<W: fmt::Write>(
         .modules
         .iter()
         .map(|module| ((module.ast.domain.clone(), module.ast.unit.clone()), module))
-            .collect::<BTreeMap<_, _>>();
+        .collect::<BTreeMap<_, _>>();
     let doc_item_counts = project
         .modules
         .iter()
         .map(|module| {
             (
                 module.path.clone(),
-                crate::frontend::extract_ast_doc_index(&module.ast).items.len(),
+                crate::frontend::extract_ast_doc_index(&module.ast)
+                    .items
+                    .len(),
             )
         })
         .collect::<BTreeMap<_, _>>();

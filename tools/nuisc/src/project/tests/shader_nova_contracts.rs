@@ -2103,6 +2103,13 @@ fn project_support_modules_accept_darwin_x86_64_shader_and_data_abis() {
         node.name == "project_profile_shader_SurfaceShader_shader_target_config_auto"
             && node.op.module == "shader"
             && node.op.instruction == "target_config"
-            && node.op.args == vec!["x86_64".to_owned(), "metal".to_owned(), "1".to_owned()]
+            && node.op.args
+                == vec![
+                    "x86_64".to_owned(),
+                    "metal".to_owned(),
+                    "1".to_owned(),
+                    "argument-buffer,device.mac-discrete-or-integrated-gpu,metal,msl,resource-binding,shader-ir,vendor.apple"
+                        .to_owned()
+                ]
     }));
 }

@@ -4,6 +4,8 @@ use super::{extract_ast_doc_index, parse_nuis_ast};
 fn extracts_flat_doc_index_for_documented_items() {
     let ast = parse_nuis_ast(
         r#"
+/// module docs
+/// more module docs
 mod cpu docs {
     /// const docs
     const ANSWER: i32 = 42;
@@ -49,6 +51,7 @@ mod cpu docs {
         .iter()
         .map(|item| item.path.as_str())
         .collect::<Vec<_>>();
+    assert!(paths.contains(&"cpu.docs"));
     assert!(paths.contains(&"cpu.docs::ANSWER"));
     assert!(paths.contains(&"cpu.docs::Word"));
     assert!(paths.contains(&"cpu.docs::User"));
@@ -60,13 +63,28 @@ mod cpu docs {
     assert!(paths.contains(&"cpu.docs::Displayable::render"));
     assert!(paths.contains(&"cpu.docs::answer"));
 
+    let module = index
+        .items
+        .iter()
+        .find(|item| item.path == "cpu.docs")
+        .expect("module docs indexed");
+    assert_eq!(module.kind, "module");
+    assert_eq!(
+        module.docs,
+        vec!["module docs".to_owned(), "more module docs".to_owned()]
+    );
+    assert_eq!(module.signature.as_deref(), Some("mod cpu docs"));
+
     let function = index
         .items
         .iter()
         .find(|item| item.path == "cpu.docs::answer")
         .expect("function docs indexed");
     assert_eq!(function.kind, "function");
-    assert_eq!(function.docs, vec!["first line".to_owned(), "second line".to_owned()]);
+    assert_eq!(
+        function.docs,
+        vec!["first line".to_owned(), "second line".to_owned()]
+    );
     assert_eq!(
         function.signature.as_deref(),
         Some("async fn answer(name: Text) -> i32")

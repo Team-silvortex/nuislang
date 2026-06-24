@@ -2108,6 +2108,7 @@ fn verify_target_contract_text(
     let lane_width = fields.get("lane_width").copied().ok_or_else(|| {
         format!("project contract node `{node_name}` is missing `lane_width` field")
     })?;
+    let backend_features = fields.get("backend_features").copied();
     let arch = arch
         .strip_prefix("symbol:")
         .ok_or_else(|| format!("project contract node `{node_name}` expects `arch=symbol:...`"))?;
@@ -2172,6 +2173,19 @@ fn verify_target_contract_text(
             target.name
         ));
     }
+    if let Some(backend_features) = backend_features {
+        let backend_features = backend_features.strip_prefix("list:").ok_or_else(|| {
+            format!("project contract node `{node_name}` expects `backend_features=list:...`")
+        })?;
+        let target_backend_features = target.op.args.get(3).map(String::as_str);
+        if target_backend_features != Some(backend_features) {
+            return Err(format!(
+                "project contract node `{node_name}` encodes `backend_features={backend_features}`, but `{}` uses `{}`",
+                target.name,
+                target_backend_features.unwrap_or("<none>")
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -2198,6 +2212,8 @@ fn verify_cpu_target_contract_text(
     let vector_bits = fields.get("vector_bits").copied().ok_or_else(|| {
         format!("lowering contract node `{node_name}` is missing `vector_bits` field")
     })?;
+    let isa_family = fields.get("isa_family").copied();
+    let isa_features = fields.get("isa_features").copied();
     let arch = arch
         .strip_prefix("symbol:")
         .ok_or_else(|| format!("lowering contract node `{node_name}` expects `arch=symbol:...`"))?;
@@ -2244,6 +2260,8 @@ fn verify_cpu_target_contract_text(
                 target.name
             )
         })?;
+    let target_isa_family = target.op.args.get(3).map(String::as_str);
+    let target_isa_features = target.op.args.get(4).map(String::as_str);
     if target_arch != arch {
         return Err(format!(
             "lowering contract node `{node_name}` encodes `arch={arch}`, but `{}` uses `{target_arch}`",
@@ -2261,6 +2279,30 @@ fn verify_cpu_target_contract_text(
             "lowering contract node `{node_name}` encodes `vector_bits={vector_bits}`, but `{}` uses `{target_vector_bits}`",
             target.name
         ));
+    }
+    if let Some(isa_family) = isa_family {
+        let isa_family = isa_family.strip_prefix("symbol:").ok_or_else(|| {
+            format!("lowering contract node `{node_name}` expects `isa_family=symbol:...`")
+        })?;
+        if target_isa_family != Some(isa_family) {
+            return Err(format!(
+                "lowering contract node `{node_name}` encodes `isa_family={isa_family}`, but `{}` uses `{}`",
+                target.name,
+                target_isa_family.unwrap_or("<none>")
+            ));
+        }
+    }
+    if let Some(isa_features) = isa_features {
+        let isa_features = isa_features.strip_prefix("list:").ok_or_else(|| {
+            format!("lowering contract node `{node_name}` expects `isa_features=list:...`")
+        })?;
+        if target_isa_features != Some(isa_features) {
+            return Err(format!(
+                "lowering contract node `{node_name}` encodes `isa_features={isa_features}`, but `{}` uses `{}`",
+                target.name,
+                target_isa_features.unwrap_or("<none>")
+            ));
+        }
     }
     Ok(())
 }
@@ -2293,6 +2335,7 @@ fn verify_abi_selection_contract_text(
     let lane_width = fields.get("lane_width").copied().ok_or_else(|| {
         format!("project ABI selection contract node `{node_name}` is missing `lane_width` field")
     })?;
+    let backend_features = fields.get("backend_features").copied();
     let mode = mode.strip_prefix("symbol:").ok_or_else(|| {
         format!("project ABI selection contract node `{node_name}` expects `mode=symbol:...`")
     })?;
@@ -2372,6 +2415,21 @@ fn verify_abi_selection_contract_text(
             "project ABI selection contract node `{node_name}` encodes `lane_width={lane_width}`, but `{}` uses `{target_lane_width}`",
             target.name
         ));
+    }
+    if let Some(backend_features) = backend_features {
+        let backend_features = backend_features.strip_prefix("list:").ok_or_else(|| {
+            format!(
+                "project ABI selection contract node `{node_name}` expects `backend_features=list:...`"
+            )
+        })?;
+        let target_backend_features = target.op.args.get(3).map(String::as_str);
+        if target_backend_features != Some(backend_features) {
+            return Err(format!(
+                "project ABI selection contract node `{node_name}` encodes `backend_features={backend_features}`, but `{}` uses `{}`",
+                target.name,
+                target_backend_features.unwrap_or("<none>")
+            ));
+        }
     }
     Ok(())
 }

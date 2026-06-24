@@ -8,9 +8,9 @@ use std::path::Path;
 use super::{
     organize_project, organize_project_exchanges, packet, parse_project_manifest,
     render_project_abi_graph_line, resolve_project_abi, validate_project_abi_requirements,
-    validate_project_links, validate_project_modules, validate_project_unit_bindings, validate_project_uses,
-    LoadedProject, ProjectBuildMetadata, ProjectCompilationDependency, ProjectCompilationPlan,
-    ProjectDocsSummary, ProjectGalaxySummary, ProjectModule,
+    validate_project_links, validate_project_modules, validate_project_unit_bindings,
+    validate_project_uses, LoadedProject, ProjectBuildMetadata, ProjectCompilationDependency,
+    ProjectCompilationPlan, ProjectDocsSummary, ProjectGalaxySummary, ProjectModule,
     ProjectModuleOrigin, ProjectOutputIntent, ProjectSyntheticInput,
 };
 use super::{
@@ -90,10 +90,7 @@ pub fn project_galaxy_summary(project: &LoadedProject) -> ProjectGalaxySummary {
     }
 }
 
-fn write_project_docs_index<W: fmt::Write>(
-    out: &mut W,
-    project: &LoadedProject,
-) -> fmt::Result {
+fn write_project_docs_index<W: fmt::Write>(out: &mut W, project: &LoadedProject) -> fmt::Result {
     let summary = project_docs_summary(project);
     writeln!(
         out,

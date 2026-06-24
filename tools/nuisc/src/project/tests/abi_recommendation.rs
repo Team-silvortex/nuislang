@@ -83,27 +83,41 @@ fn materializes_shader_and_network_resources_from_project_abi_targets() {
         node.name == "project_profile_shader_SurfaceShader_shader_target_config_auto"
             && node.op.module == "shader"
             && node.op.instruction == "target_config"
-            && node.op.args == vec!["arm64".to_owned(), "metal".to_owned(), "1".to_owned()]
+            && node.op.args
+                == vec![
+                    "arm64".to_owned(),
+                    "metal".to_owned(),
+                    "1".to_owned(),
+                    "argument-buffer,device.apple-silicon-gpu,metal,msl,resource-binding,shader-ir,vendor.apple"
+                        .to_owned()
+                ]
     }));
     assert!(yir.nodes.iter().any(|node| {
         node.name == "project_profile_network_NetworkUnit_network_target_config_auto"
             && node.op.module == "network"
             && node.op.instruction == "target_config"
-            && node.op.args == vec!["arm64".to_owned(), "urlsession".to_owned(), "1".to_owned()]
+            && node.op.args
+                == vec![
+                    "arm64".to_owned(),
+                    "urlsession".to_owned(),
+                    "1".to_owned(),
+                    "async-bridge,darwin-network-stack,device.socket-io,socket-transport,tls-session,urlsession,vendor.apple"
+                        .to_owned()
+                ]
     }));
     assert!(yir.nodes.iter().any(|node| {
         node.name == "project_profile_shader_SurfaceShader_abi_selection_contract_type"
             && node.op.module == "cpu"
             && node.op.instruction == "text"
             && node.op.args
-                == vec!["mode=symbol:explicit;abi=symbol:shader.metal.msl2_4;arch=symbol:arm64;runtime=symbol:metal;vendor=symbol:apple;device=symbol:apple-silicon-gpu;lane_width=i64:1".to_owned()]
+                == vec!["mode=symbol:explicit;abi=symbol:shader.metal.msl2_4;arch=symbol:arm64;runtime=symbol:metal;vendor=symbol:apple;device=symbol:apple-silicon-gpu;lane_width=i64:1;backend_features=list:argument-buffer,device.apple-silicon-gpu,metal,msl,resource-binding,shader-ir,vendor.apple".to_owned()]
     }));
     assert!(yir.nodes.iter().any(|node| {
         node.name == "project_profile_network_NetworkUnit_abi_selection_contract_type"
             && node.op.module == "cpu"
             && node.op.instruction == "text"
             && node.op.args
-                == vec!["mode=symbol:explicit;abi=symbol:network.socket.macos.arm64.v1;arch=symbol:arm64;runtime=symbol:urlsession;vendor=symbol:apple;device=symbol:socket-io;lane_width=i64:1".to_owned()]
+                == vec!["mode=symbol:explicit;abi=symbol:network.socket.macos.arm64.v1;arch=symbol:arm64;runtime=symbol:urlsession;vendor=symbol:apple;device=symbol:socket-io;lane_width=i64:1;backend_features=list:async-bridge,darwin-network-stack,device.socket-io,socket-transport,tls-session,urlsession,vendor.apple".to_owned()]
     }));
 }
 
@@ -1296,6 +1310,7 @@ fn recommend_cpu_abi_profile_prefers_registered_host_target() {
         host_bridge_plan_end: None,
         support_surface: Vec::new(),
         support_profile_slots: Vec::new(),
+        capability_tags: Vec::new(),
         default_lanes: Vec::new(),
         clock_domain_id: "cpu.clock.host.v1".to_owned(),
         clock_kind: "host-monotonic".to_owned(),
@@ -1413,6 +1428,7 @@ fn recommend_data_abi_profile_prefers_registered_host_target() {
         host_bridge_plan_end: None,
         support_surface: Vec::new(),
         support_profile_slots: Vec::new(),
+        capability_tags: Vec::new(),
         default_lanes: Vec::new(),
         clock_domain_id: "data.clock.fabric.v1".to_owned(),
         clock_kind: "fabric-monotonic".to_owned(),
@@ -1531,6 +1547,7 @@ fn recommend_kernel_abi_profile_prefers_registered_host_target() {
         host_bridge_plan_end: None,
         support_surface: Vec::new(),
         support_profile_slots: Vec::new(),
+        capability_tags: Vec::new(),
         default_lanes: Vec::new(),
         clock_domain_id: "kernel.clock.dispatch.v1".to_owned(),
         clock_kind: "dispatch-monotonic".to_owned(),
@@ -1649,6 +1666,7 @@ fn recommend_shader_abi_profile_prefers_registered_host_target() {
         host_bridge_plan_end: None,
         support_surface: Vec::new(),
         support_profile_slots: Vec::new(),
+        capability_tags: Vec::new(),
         default_lanes: Vec::new(),
         clock_domain_id: "shader.clock.frame.v1".to_owned(),
         clock_kind: "frame-monotonic".to_owned(),
@@ -1775,6 +1793,7 @@ fn recommend_shader_abi_profile_prefers_vendor_device_host_trait() {
         host_bridge_plan_end: None,
         support_surface: Vec::new(),
         support_profile_slots: Vec::new(),
+        capability_tags: Vec::new(),
         default_lanes: Vec::new(),
         clock_domain_id: "shader.clock.frame.v1".to_owned(),
         clock_kind: "frame-monotonic".to_owned(),

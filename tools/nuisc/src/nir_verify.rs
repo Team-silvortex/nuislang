@@ -1418,10 +1418,7 @@ fn verify_expr(
                 task_result_facts,
             )?;
         }
-        NirExpr::ShaderBindSet {
-            pipeline,
-            bindings,
-        } => {
+        NirExpr::ShaderBindSet { pipeline, bindings } => {
             verify_expr(
                 pipeline,
                 moved,
@@ -2253,10 +2250,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             verify_expr_uses(uv, moved)?;
         }
         NirExpr::ShaderBinding { value, .. } => verify_expr_uses(value, moved)?,
-        NirExpr::ShaderBindSet {
-            pipeline,
-            bindings,
-        } => {
+        NirExpr::ShaderBindSet { pipeline, bindings } => {
             verify_expr_uses(pipeline, moved)?;
             for binding in bindings {
                 verify_expr_uses(binding, moved)?;

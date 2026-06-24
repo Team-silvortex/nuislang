@@ -1,8 +1,6 @@
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
-use crate::{
-    ExecutionPhaseAction, ExecutionPhaseContext, ExecutionPhaseOutcome, RuntimeError,
-};
+use crate::{ExecutionPhaseAction, ExecutionPhaseContext, ExecutionPhaseOutcome, RuntimeError};
 
 pub trait DomainAdapter: Send + Sync {
     fn adapter_id(&self) -> &'static str;

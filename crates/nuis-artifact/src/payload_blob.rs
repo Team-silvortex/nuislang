@@ -63,10 +63,7 @@ pub fn encode_domain_payload_blob(
         backend_family.len(),
         "domain payload blob backend_family",
     )?);
-    out.extend_from_slice(&encode_u32_len(
-        vendor.len(),
-        "domain payload blob vendor",
-    )?);
+    out.extend_from_slice(&encode_u32_len(vendor.len(), "domain payload blob vendor")?);
     out.extend_from_slice(&encode_u32_len(
         device_class.len(),
         "domain payload blob device_class",
@@ -218,13 +215,14 @@ pub fn decode_domain_payload_blob(
                 "domain payload blob backend_family is not valid UTF-8: {error}"
             ))
         })?;
-    let vendor = String::from_utf8(take_bytes(bytes, &mut offset, vendor_len)?).map_err(
-        |error| ArtifactError::new(format!(
-            "domain payload blob vendor is not valid UTF-8: {error}"
-        )),
-    )?;
-    let device_class =
-        String::from_utf8(take_bytes(bytes, &mut offset, device_class_len)?).map_err(|error| {
+    let vendor =
+        String::from_utf8(take_bytes(bytes, &mut offset, vendor_len)?).map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob vendor is not valid UTF-8: {error}"
+            ))
+        })?;
+    let device_class = String::from_utf8(take_bytes(bytes, &mut offset, device_class_len)?)
+        .map_err(|error| {
             ArtifactError::new(format!(
                 "domain payload blob device_class is not valid UTF-8: {error}"
             ))
@@ -372,7 +370,10 @@ mod tests {
         let encoded = encode_domain_payload_blob(&blob).unwrap();
         let decoded = decode_domain_payload_blob(&encoded).unwrap();
         assert_eq!(decoded, blob);
-        assert_eq!(decoded.section("contract_toml").unwrap().bytes, b"a".to_vec());
+        assert_eq!(
+            decoded.section("contract_toml").unwrap().bytes,
+            b"a".to_vec()
+        );
         assert_eq!(decoded.section_text("lowering_plan").unwrap().unwrap(), "b");
         assert!(decoded.ir_sidecar_section().is_none());
     }

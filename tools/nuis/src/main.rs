@@ -5934,6 +5934,12 @@ fn print_domain_contract_group(contract: &nuisc::registry::NustarDomainContract,
                     &contract.capability.support_profile_slots.join("; "),
                 );
             }
+            if !contract.capability.capability_tags.is_empty() {
+                print_scheduler_sample_field(
+                    "      capability_tags",
+                    &contract.capability.capability_tags.join("; "),
+                );
+            }
             if !contract.capability.default_lanes.is_empty() {
                 print_scheduler_sample_field(
                     "      default_lanes",

@@ -24,11 +24,10 @@ use super::profile_usage::{
     nir_uses_cpu_extern_call, nir_uses_data_profile_handle_table,
     nir_uses_data_profile_send_downlink, nir_uses_data_profile_send_uplink,
     nir_uses_network_profile_bind_core, nir_uses_network_profile_endpoint_kind,
-    nir_uses_network_profile_slot, nir_uses_shader_profile_color_seed,
-    nir_uses_shader_binding_profile_contract,
-    nir_uses_shader_profile_draw_instanced, nir_uses_shader_profile_packet,
-    nir_uses_shader_profile_radius_seed, nir_uses_shader_profile_render,
-    nir_uses_shader_profile_speed_seed,
+    nir_uses_network_profile_slot, nir_uses_shader_binding_profile_contract,
+    nir_uses_shader_profile_color_seed, nir_uses_shader_profile_draw_instanced,
+    nir_uses_shader_profile_packet, nir_uses_shader_profile_radius_seed,
+    nir_uses_shader_profile_render, nir_uses_shader_profile_speed_seed,
 };
 use super::shader_validation::validate_shader_profile_for_link;
 use super::support_contracts::{require_declared_support_surface, support_surface_for_domain};
@@ -2892,6 +2891,7 @@ mod tests {
 
     fn test_module_with_functions(functions: Vec<NirFunction>) -> NirModule {
         NirModule {
+            annotations: vec![],
             uses: vec![],
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),

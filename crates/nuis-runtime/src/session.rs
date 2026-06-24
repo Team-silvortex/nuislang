@@ -21,7 +21,10 @@ impl LoadedExecutable {
             .filter(|unit| unit.is_heterogeneous())
     }
 
-    pub fn payload_blob_for_domain(&self, domain_family: &str) -> Option<&DomainBuildUnitPayloadBlob> {
+    pub fn payload_blob_for_domain(
+        &self,
+        domain_family: &str,
+    ) -> Option<&DomainBuildUnitPayloadBlob> {
         self.domain_payload_blobs
             .iter()
             .find(|blob| blob.domain_family == domain_family)

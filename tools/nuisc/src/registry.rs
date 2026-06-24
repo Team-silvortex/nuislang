@@ -152,6 +152,7 @@ pub struct NustarPackageManifest {
     pub host_bridge_plan_end: Option<bool>,
     pub support_surface: Vec<String>,
     pub support_profile_slots: Vec<String>,
+    pub capability_tags: Vec<String>,
     pub default_lanes: Vec<String>,
     pub clock_domain_id: String,
     pub clock_kind: String,
@@ -196,6 +197,7 @@ pub struct NustarBinding {
     pub part_verify: Vec<String>,
     pub support_surface: Vec<String>,
     pub support_profile_slots: Vec<String>,
+    pub capability_tags: Vec<String>,
     pub default_lanes: Vec<String>,
     pub execution: NustarExecutionSummary,
     pub matched_support_surface: Vec<String>,
@@ -233,6 +235,7 @@ pub struct NustarClockSummary {
 pub struct NustarCapabilitySummary {
     pub support_surface: Vec<String>,
     pub support_profile_slots: Vec<String>,
+    pub capability_tags: Vec<String>,
     pub default_lanes: Vec<String>,
     pub clock: NustarClockSummary,
 }
@@ -464,6 +467,7 @@ pub fn capability_summary(manifest: &NustarPackageManifest) -> NustarCapabilityS
     NustarCapabilitySummary {
         support_surface: manifest.support_surface.clone(),
         support_profile_slots: manifest.support_profile_slots.clone(),
+        capability_tags: manifest.capability_tags.clone(),
         default_lanes: manifest.default_lanes.clone(),
         clock: NustarClockSummary {
             domain_id: manifest.clock_domain_id.clone(),
@@ -485,6 +489,40 @@ pub fn execution_summary(manifest: &NustarPackageManifest) -> NustarExecutionSum
         contract_family: format!("nustar.{}", manifest.domain_family),
         lowering_targets: manifest.lowering_targets.clone(),
     }
+}
+
+fn infer_default_capability_tags(domain_family: &str) -> Vec<String> {
+    match domain_family {
+        "cpu" => vec![
+            "host-execution",
+            "native-llvm",
+            "memory-runtime",
+            "syscall-surface",
+        ],
+        "data" => vec![
+            "fabric-plane",
+            "packet-layout",
+            "cross-domain-marker",
+            "window-transfer",
+        ],
+        "shader" => vec!["gpu-render", "frame-graph", "shader-ir", "resource-binding"],
+        "kernel" => vec![
+            "accelerator-compute",
+            "tensor-kernel",
+            "device-dispatch",
+            "buffer-table",
+        ],
+        "network" => vec![
+            "io-reactor",
+            "socket-transport",
+            "packet-exchange",
+            "async-bridge",
+        ],
+        _ => vec!["custom-domain"],
+    }
+    .into_iter()
+    .map(str::to_owned)
+    .collect()
 }
 
 pub fn domain_build_contract_summary(
@@ -1819,8 +1857,6 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
 
     let mut issues = Vec::new();
     let mut seen_packages = BTreeSet::new();
-    let mut seen_domains = BTreeSet::new();
-
     for entry in &index {
         let manifest_path = manifest_path(&root, entry);
         if !seen_packages.insert(entry.package_id.clone()) {
@@ -1832,19 +1868,6 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
                 message: format!(
                     "package `{}` appears more than once in `{}`",
                     entry.package_id,
-                    root.join(INDEX_FILE).display()
-                ),
-            });
-        }
-        if !seen_domains.insert(entry.domain_family.clone()) {
-            issues.push(NustarRegistryIssue {
-                kind: NustarRegistryIssueKind::DuplicateDomainFamily,
-                package: Some(entry.package_id.clone()),
-                domain: Some(entry.domain_family.clone()),
-                manifest_path: Some(manifest_path.display().to_string()),
-                message: format!(
-                    "domain `{}` appears more than once in `{}`",
-                    entry.domain_family,
                     root.join(INDEX_FILE).display()
                 ),
             });
@@ -2148,6 +2171,7 @@ pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
             "support_profile_slots",
             &contract.capability.support_profile_slots,
         ),
+        json_string_array_field("capability_tags", &contract.capability.capability_tags),
         json_string_array_field("default_lanes", &contract.capability.default_lanes),
         json_field("clock_domain_id", &contract.capability.clock.domain_id),
         json_field("clock_kind", &contract.capability.clock.kind),
@@ -2260,6 +2284,7 @@ pub fn domain_contract_json(contract: &NustarDomainContract) -> String {
             "support_profile_slots",
             &contract.capability.support_profile_slots,
         ),
+        json_string_array_field("capability_tags", &contract.capability.capability_tags),
         json_string_array_field("default_lanes", &contract.capability.default_lanes),
         json_field(
             "execution_skeleton_version",
@@ -2449,7 +2474,8 @@ pub fn load_index(root: &Path) -> Result<Vec<NustarPackageIndexEntry>, String> {
 }
 
 pub fn load_manifest(root: &Path, package_id: &str) -> Result<NustarPackageManifest, String> {
-    let index = load_index(root)?;
+    let root = resolve_registry_root(root);
+    let index = load_index(&root)?;
     let entry = index
         .into_iter()
         .find(|entry| entry.package_id == package_id)
@@ -2459,7 +2485,7 @@ pub fn load_manifest(root: &Path, package_id: &str) -> Result<NustarPackageManif
                 root.join(INDEX_FILE).display()
             )
         })?;
-    let path = manifest_path(root, &entry);
+    let path = manifest_path(&root, &entry);
     let source = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
     parse_manifest(&source, &path)
@@ -2681,6 +2707,7 @@ pub fn plan_bindings(
             part_verify: manifest.part_verify,
             support_surface: manifest.support_surface,
             support_profile_slots: manifest.support_profile_slots,
+            capability_tags: manifest.capability_tags,
             default_lanes: manifest.default_lanes,
             execution,
             matched_support_surface,
@@ -2744,7 +2771,9 @@ fn collect_resource_usage_hints_stmt(
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
         | NirStmt::Await(value)
-        | NirStmt::Expr(value) => collect_resource_usage_hints_expr(value, domain_family, resources),
+        | NirStmt::Expr(value) => {
+            collect_resource_usage_hints_expr(value, domain_family, resources)
+        }
         NirStmt::If {
             condition,
             then_body,
@@ -3807,6 +3836,8 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         parse_optional_string_array(source, "support_surface").unwrap_or_default();
     let support_profile_slots =
         parse_optional_string_array(source, "support_profile_slots").unwrap_or_default();
+    let capability_tags = parse_optional_string_array(source, "capability_tags")
+        .unwrap_or_else(|| infer_default_capability_tags(&domain_family));
     let default_lanes = parse_optional_string_array(source, "default_lanes").unwrap_or_default();
     let clock_domain_id = parse_optional_string(source, "clock_domain_id")
         .unwrap_or_else(|| format!("{domain_family}.clock.local.v1"));
@@ -3889,6 +3920,7 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         host_bridge_plan_end,
         support_surface,
         support_profile_slots,
+        capability_tags,
         default_lanes,
         clock_domain_id,
         clock_kind,
@@ -4371,6 +4403,7 @@ mod cpu Main {
             host_bridge_plan_end: None,
             support_surface: Vec::new(),
             support_profile_slots: Vec::new(),
+            capability_tags: Vec::new(),
             default_lanes: Vec::new(),
             clock_domain_id: "cpu.clock.host.v1".to_owned(),
             clock_kind: "host-monotonic".to_owned(),
@@ -4485,6 +4518,7 @@ mod cpu Main {
                 "host_bridge_plan_end = {}\n",
                 "support_surface = {}\n",
                 "support_profile_slots = {}\n",
+                "capability_tags = {}\n",
                 "default_lanes = {}\n",
                 "clock_domain_id = \"{}\"\n",
                 "clock_kind = \"{}\"\n",
@@ -4561,6 +4595,7 @@ mod cpu Main {
             render_optional_bool(manifest.host_bridge_plan_end),
             render_array(&manifest.support_surface),
             render_array(&manifest.support_profile_slots),
+            render_array(&manifest.capability_tags),
             render_array(&manifest.default_lanes),
             manifest.clock_domain_id,
             manifest.clock_kind,
@@ -4740,6 +4775,10 @@ mod cpu Main {
         assert!(summary
             .support_profile_slots
             .contains(&"protocol_kind".to_owned()));
+        assert!(summary.capability_tags.contains(&"io-reactor".to_owned()));
+        assert!(summary
+            .capability_tags
+            .contains(&"protocol-framing".to_owned()));
         assert!(summary
             .default_lanes
             .contains(&"network.send=tx".to_owned()));
@@ -4863,6 +4902,10 @@ mod cpu Main {
             .capability
             .support_surface
             .contains(&"network.profile.transport.v1".to_owned()));
+        assert!(contract
+            .capability
+            .capability_tags
+            .contains(&"socket-transport".to_owned()));
         assert_eq!(contract.execution.execution_domain, "network");
         assert_eq!(contract.execution.contract_family, "nustar.network");
         assert_eq!(contract.scheduler.clock.domain_id, "network.clock.io.v1");
@@ -4875,6 +4918,7 @@ mod cpu Main {
         let json = domain_contract_json(&contract);
         assert!(json.contains("\"execution_skeleton_version\":\"nustar-execution-skeleton-v1\""));
         assert!(json.contains("\"execution_contract_family\":\"nustar.network\""));
+        assert!(json.contains("\"capability_tags\":[\"io-reactor\""));
     }
 
     #[test]
@@ -4900,7 +4944,16 @@ mod cpu Main {
             .iter()
             .map(|item| item.domain_family.as_str())
             .collect::<Vec<_>>();
-        assert_eq!(domains, vec!["cpu", "data", "kernel", "network", "shader"]);
+        assert_eq!(
+            domains,
+            vec!["cpu", "cpu", "data", "kernel", "network", "shader"]
+        );
+        let cpu_packages = registrations
+            .iter()
+            .filter(|item| item.domain_family == "cpu")
+            .map(|item| item.package_id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(cpu_packages, vec!["official.cpu", "official.cpu.aarch64"]);
         let network = registrations
             .iter()
             .find(|item| item.domain_family == "network")
@@ -4920,6 +4973,36 @@ mod cpu Main {
     }
 
     #[test]
+    fn aarch64_cpu_nustar_is_independent_package_for_cpu_domain() {
+        let generic_cpu = load_manifest_for_domain(Path::new("nustar-packages"), "cpu").unwrap();
+        assert_eq!(generic_cpu.package_id, "official.cpu");
+        assert!(generic_cpu
+            .abi_profiles
+            .contains(&"cpu.x86_64.sysv64".to_owned()));
+
+        let aarch64_cpu =
+            load_manifest(Path::new("nustar-packages"), "official.cpu.aarch64").unwrap();
+        assert_eq!(aarch64_cpu.domain_family, "cpu");
+        assert_eq!(aarch64_cpu.package_id, "official.cpu.aarch64");
+        assert!(aarch64_cpu
+            .capability_tags
+            .contains(&"formal-verification-ready".to_owned()));
+        assert!(aarch64_cpu
+            .capability_tags
+            .contains(&"aarch64-only".to_owned()));
+        assert!(aarch64_cpu
+            .part_verify
+            .contains(&"verify.cpu.aarch64.call-frame.v1".to_owned()));
+        assert!(aarch64_cpu
+            .abi_profiles
+            .iter()
+            .all(|abi| abi.starts_with("cpu.arm64.")));
+        assert!(aarch64_cpu
+            .lowering_targets
+            .contains(&"aarch64-proof-skeleton".to_owned()));
+    }
+
+    #[test]
     fn validate_registered_domains_accepts_current_mainline_registry() {
         let issues = validate_registered_domains(Path::new("nustar-packages")).unwrap();
         assert!(issues.is_empty(), "unexpected registry issues: {issues:?}");
@@ -4927,7 +5010,7 @@ mod cpu Main {
     }
 
     #[test]
-    fn validate_registered_domains_rejects_duplicate_domain_and_bad_lane_target() {
+    fn validate_registered_domains_allows_duplicate_domain_but_rejects_bad_lane_target() {
         let root = temp_registry_root("registry-duplicate-domain");
         let cpu = cpu_manifest_with_host_target();
         let mut network =
@@ -4950,15 +5033,11 @@ mod cpu Main {
         let issues = validate_registered_domains(&root).unwrap();
         assert!(issues
             .iter()
-            .any(|issue| issue.kind == NustarRegistryIssueKind::DuplicateDomainFamily));
-        assert!(issues
-            .iter()
             .any(|issue| issue.kind == NustarRegistryIssueKind::DomainFamilyMismatch));
         assert!(issues
             .iter()
             .any(|issue| issue.kind == NustarRegistryIssueKind::LaneContractMismatch));
         let error = ensure_registered_domains_valid(&root).unwrap_err();
-        assert!(error.contains("NRV003"));
         assert!(error.contains("NRV005"));
         assert!(error.contains("NRV010"));
     }
@@ -5288,6 +5367,7 @@ mod cpu Main {
                 "expected covered network slot `{slot}`"
             );
         }
+        assert!(binding.capability_tags.contains(&"async-bridge".to_owned()));
     }
 
     #[test]
@@ -5495,7 +5575,10 @@ mod cpu Main {
             .iter()
             .find(|binding| binding.domain_family == "shader")
             .expect("shader binding should be present");
-        for surface in ["shader.profile.packet-slots.v1", "shader.profile.packet.nova.v1"] {
+        for surface in [
+            "shader.profile.packet-slots.v1",
+            "shader.profile.packet.nova.v1",
+        ] {
             assert!(
                 binding
                     .matched_support_surface
@@ -5590,9 +5673,7 @@ mod cpu Main {
             "shader.binding.set",
         ] {
             assert!(
-                resources
-                    .iter()
-                    .any(|candidate| candidate == resource),
+                resources.iter().any(|candidate| candidate == resource),
                 "expected matched shader resource hint `{resource}`"
             );
         }

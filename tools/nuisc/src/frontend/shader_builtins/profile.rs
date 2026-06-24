@@ -611,8 +611,7 @@ pub(super) fn lower_shader_profile_builtin_call(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "shader_profile_focus_slot(...) expects a string literal unit name"
-                        .to_owned(),
+                    "shader_profile_focus_slot(...) expects a string literal unit name".to_owned(),
                 );
             };
             NirExpr::ShaderProfileFocusSlotRef { unit: unit.clone() }

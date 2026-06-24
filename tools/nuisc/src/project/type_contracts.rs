@@ -381,7 +381,7 @@ fn materialize_abi_selection_contract_node(
     let Some(target) = resolve_registered_abi_target(domain, Some(abi_resolution))? else {
         return Ok(());
     };
-    let (arch, runtime, lane_width) = target_config_tokens_for_domain(domain, &target);
+    let tokens = target_config_tokens_for_domain(domain, &target);
     let target_suffix = match domain {
         "kernel" => "kernel_target_config_auto",
         "shader" => "shader_target_config_auto",
@@ -408,10 +408,14 @@ fn materialize_abi_selection_contract_node(
         "auto"
     };
     let contract_value = format!(
-        "mode=symbol:{mode};abi=symbol:{};arch=symbol:{arch};runtime=symbol:{runtime};vendor=symbol:{};device=symbol:{};lane_width=i64:{lane_width}",
+        "mode=symbol:{mode};abi=symbol:{};arch=symbol:{};runtime=symbol:{};vendor=symbol:{};device=symbol:{};lane_width=i64:{};backend_features=list:{}",
         requirement.abi,
+        tokens.arch,
+        tokens.runtime,
         target.vendor.as_deref().unwrap_or("none"),
-        target.device_class.as_deref().unwrap_or("none")
+        target.device_class.as_deref().unwrap_or("none"),
+        tokens.lane_width,
+        tokens.backend_features
     );
     push_profile_text_node(module, contract_name.clone(), contract_value);
     connect_project_contract_node(module, &contract_name, &target_name);
@@ -449,7 +453,7 @@ fn materialize_target_config_contract_node(
         sanitize_ident(unit)
     );
     let contract_value = format!(
-        "arch=symbol:{};runtime=symbol:{};vendor=symbol:{};device=symbol:{};lane_width=i64:{}",
+        "arch=symbol:{};runtime=symbol:{};vendor=symbol:{};device=symbol:{};lane_width=i64:{};backend_features=list:{}",
         target.op.args[0],
         target.op.args[1],
         selected_target
@@ -460,7 +464,8 @@ fn materialize_target_config_contract_node(
             .as_ref()
             .and_then(|target| target.device_class.as_deref())
             .unwrap_or("none"),
-        target.op.args[2]
+        target.op.args[2],
+        target.op.args.get(3).map(String::as_str).unwrap_or("")
     );
     push_profile_text_node(module, contract_name.clone(), contract_value);
     connect_project_contract_node(module, &contract_name, &target_name);

@@ -60,6 +60,7 @@ clock_resolution = "network-poll-step"
 clock_bridge_default = "global->io:bridge"
 support_surface = ["network.profile.bind-core.v1", "network.profile.connect.v1", "network.profile.accept.v1", "network.profile.send.v1", "network.profile.recv.v1", "network.profile.close.v1", "network.profile.timeout.v1", "network.profile.retry.v1", "network.profile.endpoint-kind.v1", "network.profile.stream-window.v1", "network.profile.transport.v1", "network.profile.protocol.v1"]
 support_profile_slots = ["bind_core", "endpoint_kind", "transport_family", "local_port", "remote_port", "connect_timeout_ms", "read_timeout_ms", "write_timeout_ms", "retry_budget", "stream_window", "recv_window", "send_window", "protocol_kind", "protocol_version", "protocol_header_bytes"]
+capability_tags = ["io-reactor", "socket-transport", "packet-exchange", "async-bridge", "protocol-framing"]
 default_lanes = ["network.target_config=control", "network.bind_core=control", "network.endpoint=control", "network.listen=control", "network.connect=control", "network.accept=control", "network.poll=control", "network.close=control", "network.retry=control", "network.send=tx", "network.recv=rx"]
 profiles = ["aot"]
 resource_families = ["network", "network.stream", "cpu", "data"]

@@ -163,20 +163,21 @@ pub(super) fn validate_network_target_projection(
                 unit, expected_name
             )
         })?;
-    let (expected_arch, expected_runtime, expected_lane) =
-        target_config_tokens_for_domain("network", &target);
+    let expected_tokens = target_config_tokens_for_domain("network", &target);
+    let expected_args = expected_tokens.clone().into_args();
     if node.op.module != "network"
         || node.op.instruction != "target_config"
-        || node.op.args
-            != vec![
-                expected_arch.clone(),
-                expected_runtime.clone(),
-                expected_lane.clone(),
-            ]
+        || node.op.args != expected_args
     {
         return Err(format!(
-            "project network unit `network.{}` requires `{}` to materialize network.target_config({}, {}, {}) for selected ABI `{}`",
-            unit, expected_name, expected_arch, expected_runtime, expected_lane, target.abi
+            "project network unit `network.{}` requires `{}` to materialize network.target_config({}, {}, {}, {}) for selected ABI `{}`",
+            unit,
+            expected_name,
+            expected_tokens.arch,
+            expected_tokens.runtime,
+            expected_tokens.lane_width,
+            expected_tokens.backend_features,
+            target.abi
         ));
     }
     Ok(())

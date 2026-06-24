@@ -5,7 +5,10 @@ use nuis_semantics::model::{
 
 pub(super) fn render_ast_struct(definition: &AstStructDef) -> String {
     let mut out = String::new();
-    out.push_str(&super::render_ast_doc_comments("  ", &definition.attributes));
+    out.push_str(&super::render_ast_doc_comments(
+        "  ",
+        &definition.attributes,
+    ));
     let attribute_prefix = super::render_ast_attributes(&definition.attributes);
     let visibility_prefix = super::render_ast_visibility(definition.visibility);
     out.push_str(&format!(
@@ -59,7 +62,10 @@ pub(super) fn render_nir_struct(definition: &NirStructDef) -> String {
 
 pub(super) fn render_ast_enum(definition: &AstEnumDef) -> String {
     let mut out = String::new();
-    out.push_str(&super::render_ast_doc_comments("  ", &definition.attributes));
+    out.push_str(&super::render_ast_doc_comments(
+        "  ",
+        &definition.attributes,
+    ));
     let attribute_prefix = super::render_ast_attributes(&definition.attributes);
     let visibility_prefix = super::render_ast_visibility(definition.visibility);
     out.push_str(&format!(

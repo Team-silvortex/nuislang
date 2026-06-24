@@ -6,6 +6,7 @@ use nuis_semantics::model::{
 
 fn module_with_body(body: Vec<NirStmt>) -> NirModule {
     NirModule {
+        annotations: vec![],
         uses: vec![],
         domain: "cpu".to_owned(),
         unit: "Main".to_owned(),

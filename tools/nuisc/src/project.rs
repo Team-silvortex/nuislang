@@ -27,13 +27,14 @@ mod support_contracts;
 mod type_contracts;
 mod validation_core;
 
+pub(crate) use abi::{
+    backend_family_for_registered_abi_target, backend_features_for_registered_abi_target,
+    selected_lowering_target_for_registered_abi_target,
+};
 pub use abi::{
     ensure_project_abi_selections_valid, project_abi_selection_check_json,
     render_project_abi_selection_check_lines, resolve_project_abi, validate_project_abi_selections,
     write_project_abi_selection_check_lines,
-};
-pub(crate) use abi::{
-    backend_family_for_registered_abi_target, selected_lowering_target_for_registered_abi_target,
 };
 #[cfg(test)]
 use abi::{host_calling_abi, host_object_format, recommend_abi_profile_for_host};

@@ -154,13 +154,17 @@ pub(super) fn lower_shader_expr(
             x,
             y,
             mode,
-        } => Some(lower_shader_sample(texture, sampler, x, y, *mode, state, bindings)),
+        } => Some(lower_shader_sample(
+            texture, sampler, x, y, *mode, state, bindings,
+        )),
         NirExpr::ShaderSampleUv {
             texture,
             sampler,
             uv,
             mode,
-        } => Some(lower_shader_sample_uv(texture, sampler, uv, *mode, state, bindings)),
+        } => Some(lower_shader_sample_uv(
+            texture, sampler, uv, *mode, state, bindings,
+        )),
         NirExpr::ShaderBinding {
             kind,
             slot,
@@ -176,9 +180,15 @@ pub(super) fn lower_shader_expr(
             state,
             bindings,
         )),
-        NirExpr::ShaderBindSet { pipeline, bindings: set_bindings } => {
-            Some(lower_shader_bind_set(pipeline, set_bindings, state, bindings))
-        }
+        NirExpr::ShaderBindSet {
+            pipeline,
+            bindings: set_bindings,
+        } => Some(lower_shader_bind_set(
+            pipeline,
+            set_bindings,
+            state,
+            bindings,
+        )),
         NirExpr::ShaderInlineWgsl { entry, source } => {
             Some(lower_shader_inline_wgsl(entry, source, state))
         }

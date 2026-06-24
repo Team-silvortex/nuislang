@@ -39,14 +39,14 @@ impl Parser {
     }
 
     pub fn parse_module(&mut self) -> Result<AstModule, String> {
-        self.consume_module_leading_doc_comments()?;
+        let mut attributes = self.consume_module_leading_doc_comments()?;
         let mut uses = Vec::new();
         let mut externs = Vec::new();
         let mut extern_interfaces = Vec::new();
         while self.peek_word("use") {
             uses.push(self.parse_use_decl()?);
         }
-        self.consume_module_leading_doc_comments()?;
+        attributes.extend(self.consume_module_leading_doc_comments()?);
         while self.peek_item_keyword_after_attributes("extern") {
             let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
             if !attributes.is_empty() {
@@ -62,7 +62,7 @@ impl Parser {
                 externs.push(self.parse_extern_function_with_abi(visibility, abi, None)?);
             }
         }
-        self.consume_module_leading_doc_comments()?;
+        attributes.extend(self.consume_module_leading_doc_comments()?);
         self.expect_word("mod")?;
         let domain = self.expect_ident()?;
         let unit = self.expect_ident()?;
@@ -114,6 +114,7 @@ impl Parser {
         self.expect_eof()?;
 
         Ok(AstModule {
+            attributes,
             uses,
             domain,
             unit,
@@ -1286,11 +1287,12 @@ impl Parser {
         Ok(())
     }
 
-    fn consume_module_leading_doc_comments(&mut self) -> Result<(), String> {
+    fn consume_module_leading_doc_comments(&mut self) -> Result<Vec<AstAttribute>, String> {
+        let mut attributes = Vec::new();
         while self.peek_doc_comment() {
-            self.parse_doc_comment_attribute()?;
+            attributes.push(self.parse_doc_comment_attribute()?);
         }
-        Ok(())
+        Ok(attributes)
     }
 
     fn parse_generic_param_decl_list(&mut self) -> Result<Vec<AstGenericParam>, String> {

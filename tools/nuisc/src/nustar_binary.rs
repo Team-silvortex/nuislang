@@ -604,7 +604,7 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
 
 fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nabi_targets = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ndefault_lanes = {}\nclock_domain_id = \"{}\"\nclock_kind = \"{}\"\nclock_epoch_kind = \"{}\"\nclock_resolution = \"{}\"\nclock_bridge_default = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nabi_targets = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ncapability_tags = {}\ndefault_lanes = {}\nclock_domain_id = \"{}\"\nclock_kind = \"{}\"\nclock_epoch_kind = \"{}\"\nclock_resolution = \"{}\"\nclock_bridge_default = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
@@ -632,6 +632,7 @@ fn render_manifest(manifest: &NustarPackageManifest) -> String {
         manifest.host_ffi_bridge,
         render_array(&manifest.support_surface),
         render_array(&manifest.support_profile_slots),
+        render_array(&manifest.capability_tags),
         render_array(&manifest.default_lanes),
         manifest.clock_domain_id,
         manifest.clock_kind,
@@ -693,11 +694,26 @@ fn current_calling_abi() -> &'static str {
     }
 }
 
+fn infer_default_capability_tags(domain_family: &str) -> Vec<String> {
+    match domain_family {
+        "cpu" => vec!["host-execution", "native-llvm", "memory-runtime"],
+        "data" => vec!["fabric-plane", "packet-layout", "cross-domain-marker"],
+        "shader" => vec!["gpu-render", "frame-graph", "shader-ir"],
+        "kernel" => vec!["accelerator-compute", "tensor-kernel", "device-dispatch"],
+        "network" => vec!["io-reactor", "socket-transport", "packet-exchange"],
+        _ => vec!["custom-domain"],
+    }
+    .into_iter()
+    .map(str::to_owned)
+    .collect()
+}
+
 fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifest, String> {
+    let domain_family = parse_required_string(source, "domain_family", path)?;
     Ok(NustarPackageManifest {
         manifest_schema: parse_required_string(source, "manifest_schema", path)?,
         package_id: parse_required_string(source, "package_id", path)?,
-        domain_family: parse_required_string(source, "domain_family", path)?,
+        domain_family: domain_family.clone(),
         frontend: parse_required_string(source, "frontend", path)?,
         entry_crate: parse_required_string(source, "entry_crate", path)?,
         ast_entry: parse_required_string(source, "ast_entry", path)?,
@@ -761,6 +777,8 @@ fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifes
         support_surface: parse_optional_string_array(source, "support_surface").unwrap_or_default(),
         support_profile_slots: parse_optional_string_array(source, "support_profile_slots")
             .unwrap_or_default(),
+        capability_tags: parse_optional_string_array(source, "capability_tags")
+            .unwrap_or_else(|| infer_default_capability_tags(&domain_family)),
         default_lanes: parse_optional_string_array(source, "default_lanes").unwrap_or_default(),
         clock_domain_id: parse_required_string(source, "clock_domain_id", path)?,
         clock_kind: parse_required_string(source, "clock_kind", path)?,
@@ -963,6 +981,7 @@ mod tests {
             host_bridge_plan_end: None,
             support_surface: Vec::new(),
             support_profile_slots: Vec::new(),
+            capability_tags: Vec::new(),
             default_lanes: Vec::new(),
             clock_domain_id: format!("{domain}.clock.local.v1"),
             clock_kind: "local-monotonic".to_owned(),

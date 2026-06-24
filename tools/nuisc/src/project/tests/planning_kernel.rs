@@ -550,20 +550,27 @@ fn materializes_default_kernel_target_config_from_project_abi() {
         node.name == "project_profile_kernel_KernelUnit_kernel_target_config_auto"
             && node.op.module == "kernel"
             && node.op.instruction == "target_config"
-            && node.op.args == vec!["apple_ane".to_owned(), "coreml".to_owned(), "1".to_owned()]
+            && node.op.args
+                == vec![
+                    "apple_ane".to_owned(),
+                    "coreml".to_owned(),
+                    "1".to_owned(),
+                    "ane-dispatch,buffer-table,coreml,device.apple-ane,kernel-dispatch,tensor-graph,vendor.apple"
+                        .to_owned()
+                ]
     }));
     assert!(yir.nodes.iter().any(|node| {
         node.name == "project_profile_kernel_KernelUnit_target_contract_type"
             && node.op.module == "cpu"
             && node.op.instruction == "text"
             && node.op.args
-                == vec!["arch=symbol:apple_ane;runtime=symbol:coreml;vendor=symbol:apple;device=symbol:apple-ane;lane_width=i64:1".to_owned()]
+                == vec!["arch=symbol:apple_ane;runtime=symbol:coreml;vendor=symbol:apple;device=symbol:apple-ane;lane_width=i64:1;backend_features=list:ane-dispatch,buffer-table,coreml,device.apple-ane,kernel-dispatch,tensor-graph,vendor.apple".to_owned()]
     }));
     assert!(yir.nodes.iter().any(|node| {
         node.name == "project_profile_kernel_KernelUnit_abi_selection_contract_type"
             && node.op.module == "cpu"
             && node.op.instruction == "text"
             && node.op.args
-                == vec!["mode=symbol:explicit;abi=symbol:kernel.apple_ane.coreml.v1;arch=symbol:apple_ane;runtime=symbol:coreml;vendor=symbol:apple;device=symbol:apple-ane;lane_width=i64:1".to_owned()]
+                == vec!["mode=symbol:explicit;abi=symbol:kernel.apple_ane.coreml.v1;arch=symbol:apple_ane;runtime=symbol:coreml;vendor=symbol:apple;device=symbol:apple-ane;lane_width=i64:1;backend_features=list:ane-dispatch,buffer-table,coreml,device.apple-ane,kernel-dispatch,tensor-graph,vendor.apple".to_owned()]
     }));
 }

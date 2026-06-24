@@ -122,9 +122,7 @@ pub(super) fn lower_shader_runtime_builtin_call(
                 return Err("shader_sampler(...) filter must be a string literal".to_owned());
             };
             let AstExpr::Text(address_mode) = address_mode else {
-                return Err(
-                    "shader_sampler(...) address_mode must be a string literal".to_owned(),
-                );
+                return Err("shader_sampler(...) address_mode must be a string literal".to_owned());
             };
             NirExpr::ShaderSampler {
                 filter: filter.clone(),
@@ -262,11 +260,7 @@ pub(super) fn lower_shader_runtime_builtin_call(
             };
             let layout = match layout {
                 Some(AstExpr::Text(layout)) => Some(layout.clone()),
-                Some(_) => {
-                    return Err(format!(
-                        "{callee}(...) layout must be a string literal"
-                    ))
-                }
+                Some(_) => return Err(format!("{callee}(...) layout must be a string literal")),
                 None => None,
             };
             NirExpr::ShaderBinding {

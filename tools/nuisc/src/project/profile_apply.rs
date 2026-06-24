@@ -4,7 +4,26 @@ use crate::registry::RegisteredAbiTarget;
 use nuis_semantics::model::{AstExpr, AstModule, AstStmt};
 use yir_core::{Node, Operation, Resource, ResourceKind, YirModule};
 
-use super::{sanitize_ident, ProjectAbiResolution};
+use super::{backend_features_for_registered_abi_target, sanitize_ident, ProjectAbiResolution};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct TargetConfigTokens {
+    pub arch: String,
+    pub runtime: String,
+    pub lane_width: String,
+    pub backend_features: String,
+}
+
+impl TargetConfigTokens {
+    pub(super) fn into_args(self) -> Vec<String> {
+        vec![
+            self.arch,
+            self.runtime,
+            self.lane_width,
+            self.backend_features,
+        ]
+    }
+}
 
 pub(super) fn apply_support_module_profile(
     ast: &AstModule,
@@ -129,8 +148,8 @@ pub(super) fn resolve_registered_abi_target(
 pub(super) fn target_config_tokens_for_domain(
     domain: &str,
     target: &RegisteredAbiTarget,
-) -> (String, String, String) {
-    match domain {
+) -> TargetConfigTokens {
+    let (arch, runtime, lane_width) = match domain {
         "kernel" => {
             let (arch, runtime) = kernel_target_tokens(target);
             (arch, runtime, "1".to_owned())
@@ -156,6 +175,12 @@ pub(super) fn target_config_tokens_for_domain(
             target.calling_abi.clone(),
             "1".to_owned(),
         ),
+    };
+    TargetConfigTokens {
+        arch,
+        runtime,
+        lane_width,
+        backend_features: backend_features_for_registered_abi_target(domain, target).join(","),
     }
 }
 
@@ -176,7 +201,7 @@ fn materialize_default_kernel_target_config(
     let Some(target) = resolve_registered_abi_target("kernel", abi_resolution)? else {
         return Ok(());
     };
-    let (arch, runtime, lane_width) = target_config_tokens_for_domain("kernel", &target);
+    let tokens = target_config_tokens_for_domain("kernel", &target);
     let name = format!(
         "project_profile_{}_{}_kernel_target_config_auto",
         sanitize_ident(&ast.domain),
@@ -189,7 +214,7 @@ fn materialize_default_kernel_target_config(
         Operation {
             module: "kernel".to_owned(),
             instruction: "target_config".to_owned(),
-            args: vec![arch, runtime, lane_width],
+            args: tokens.into_args(),
         },
     );
     Ok(())
@@ -203,7 +228,7 @@ fn materialize_default_shader_target_config(
     let Some(target) = resolve_registered_abi_target("shader", abi_resolution)? else {
         return Ok(());
     };
-    let (arch, runtime, lane_width) = target_config_tokens_for_domain("shader", &target);
+    let tokens = target_config_tokens_for_domain("shader", &target);
     let name = format!(
         "project_profile_{}_{}_shader_target_config_auto",
         sanitize_ident(&ast.domain),
@@ -216,7 +241,7 @@ fn materialize_default_shader_target_config(
         Operation {
             module: "shader".to_owned(),
             instruction: "target_config".to_owned(),
-            args: vec![arch, runtime, lane_width],
+            args: tokens.into_args(),
         },
     );
     Ok(())
@@ -230,7 +255,7 @@ fn materialize_default_network_target_config(
     let Some(target) = resolve_registered_abi_target("network", abi_resolution)? else {
         return Ok(());
     };
-    let (arch, runtime, lane_width) = target_config_tokens_for_domain("network", &target);
+    let tokens = target_config_tokens_for_domain("network", &target);
     let name = format!(
         "project_profile_{}_{}_network_target_config_auto",
         sanitize_ident(&ast.domain),
@@ -243,7 +268,7 @@ fn materialize_default_network_target_config(
         Operation {
             module: "network".to_owned(),
             instruction: "target_config".to_owned(),
-            args: vec![arch, runtime, lane_width],
+            args: tokens.into_args(),
         },
     );
     Ok(())

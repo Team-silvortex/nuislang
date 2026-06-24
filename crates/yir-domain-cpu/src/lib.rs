@@ -1209,9 +1209,9 @@ impl RegisteredMod for CpuMod {
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
             "target_config" => {
-                if node.op.args.len() != 3 {
+                if node.op.args.len() != 3 && node.op.args.len() != 5 {
                     return Err(format!(
-                        "node `{}` expects `cpu.target_config <name> <resource> <arch> <abi> <vector_bits>`",
+                        "node `{}` expects `cpu.target_config <name> <resource> <arch> <abi> <vector_bits> [isa_family isa_features]`",
                         node.name
                     ));
                 }
@@ -3199,11 +3199,16 @@ impl RegisteredMod for CpuMod {
                         node.name, node.op.args[2]
                     )
                 })?;
-                Ok(Value::Tuple(vec![
+                let mut values = vec![
                     Value::Symbol(arch),
                     Value::Symbol(abi),
                     Value::Int(vector_bits),
-                ]))
+                ];
+                if node.op.args.len() >= 5 {
+                    values.push(Value::Symbol(node.op.args[3].clone()));
+                    values.push(Value::Symbol(node.op.args[4].clone()));
+                }
+                Ok(Value::Tuple(values))
             }
             "instantiate_unit" => {
                 let domain = node.op.args[0].clone();

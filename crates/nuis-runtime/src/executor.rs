@@ -509,12 +509,14 @@ fn materialize_phase_action(
         .input_handles
         .iter()
         .filter_map(|key| {
-            slot_map.get(key.as_str()).map(|value| ExecutionResourceBinding {
-                key: key.clone(),
-                kind: slot_resource_kind(key),
-                capability_label: Some(slot_resource_capability_label(key)),
-                value: (*value).to_owned(),
-            })
+            slot_map
+                .get(key.as_str())
+                .map(|value| ExecutionResourceBinding {
+                    key: key.clone(),
+                    kind: slot_resource_kind(key),
+                    capability_label: Some(slot_resource_capability_label(key)),
+                    value: (*value).to_owned(),
+                })
         })
         .collect();
     action.resolved_resources = action
@@ -530,10 +532,7 @@ fn materialize_phase_action(
     action
 }
 
-fn resolve_resource_binding_value(
-    value: &str,
-    slot_map: &BTreeMap<&str, &str>,
-) -> String {
+fn resolve_resource_binding_value(value: &str, slot_map: &BTreeMap<&str, &str>) -> String {
     if let Some(slot_key) = value.strip_prefix("slot:") {
         slot_map
             .get(slot_key)
@@ -569,7 +568,11 @@ fn default_phase_outcome(
 }
 
 fn apply_phase_outcome(state: &mut ExecutionStateSnapshot, outcome: &ExecutionPhaseOutcome) {
-    let mut known = state.available_handles.iter().cloned().collect::<BTreeSet<_>>();
+    let mut known = state
+        .available_handles
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
     for handle in &outcome.produced_handles {
         if known.insert(handle.clone()) {
             state.available_handles.push(handle.clone());
@@ -1246,7 +1249,11 @@ mod tests {
         }
     }
 
-    fn sample_host_plan(domain_family: &str, package_id: &str, scheduler: &str) -> HostBridgePlanEntry {
+    fn sample_host_plan(
+        domain_family: &str,
+        package_id: &str,
+        scheduler: &str,
+    ) -> HostBridgePlanEntry {
         HostBridgePlanEntry {
             domain_family: domain_family.to_owned(),
             package_id: package_id.to_owned(),
@@ -1263,7 +1270,12 @@ mod tests {
         }
     }
 
-    fn sample_bridge_registry(domain_family: &str, package_id: &str, backend: &str, target: &str) -> BridgeRegistryEntry {
+    fn sample_bridge_registry(
+        domain_family: &str,
+        package_id: &str,
+        backend: &str,
+        target: &str,
+    ) -> BridgeRegistryEntry {
         BridgeRegistryEntry {
             domain_family: domain_family.to_owned(),
             package_id: package_id.to_owned(),
@@ -1338,7 +1350,10 @@ mod tests {
             plan.phases[0].action.output_handles,
             vec!["session.handle".to_owned()]
         );
-        assert_eq!(plan.phases[0].action.resolved_inputs, Vec::<ExecutionResourceBinding>::new());
+        assert_eq!(
+            plan.phases[0].action.resolved_inputs,
+            Vec::<ExecutionResourceBinding>::new()
+        );
         assert_eq!(
             plan.phases[0].action.resolved_resources,
             Vec::<ExecutionResourceBinding>::new()
@@ -1706,8 +1721,14 @@ mod tests {
 
         let plan = Executor.plan(&prepared).unwrap();
 
-        assert_eq!(plan.phases[0].action.input_handles, vec!["kernel.buffer".to_owned(), "queue.slot".to_owned()]);
-        assert_eq!(plan.phases[1].action.output_handles, vec!["dispatch.handle".to_owned()]);
+        assert_eq!(
+            plan.phases[0].action.input_handles,
+            vec!["kernel.buffer".to_owned(), "queue.slot".to_owned()]
+        );
+        assert_eq!(
+            plan.phases[1].action.output_handles,
+            vec!["dispatch.handle".to_owned()]
+        );
         assert_eq!(
             plan.phases[1].action.resource_bindings,
             vec![
@@ -1798,8 +1819,14 @@ mod tests {
 
         let trace = Executor.execute_prepared(&prepared).unwrap();
 
-        assert_eq!(trace.events[0].action.input_handles, vec!["shader.buffer".to_owned(), "frame.target".to_owned()]);
-        assert_eq!(trace.events[1].action.output_handles, vec!["draw.handle".to_owned()]);
+        assert_eq!(
+            trace.events[0].action.input_handles,
+            vec!["shader.buffer".to_owned(), "frame.target".to_owned()]
+        );
+        assert_eq!(
+            trace.events[1].action.output_handles,
+            vec!["draw.handle".to_owned()]
+        );
         assert_eq!(
             trace.events[3].action.resolved_resources,
             vec![

@@ -16,8 +16,7 @@ pub use error::RuntimeError;
 pub use executor::{
     ExecutionContract, ExecutionPhaseAction, ExecutionPhaseBinding, ExecutionPhaseContext,
     ExecutionPhaseOutcome, ExecutionPlan, ExecutionProfile, ExecutionResourceBinding,
-    ExecutionResourceKind, ExecutionStateSnapshot, ExecutionTrace, ExecutionTraceEvent,
-    Executor,
+    ExecutionResourceKind, ExecutionStateSnapshot, ExecutionTrace, ExecutionTraceEvent, Executor,
 };
 pub use loader::RuntimeLoader;
 pub use registry::{AdapterRegistry, DomainAdapter};

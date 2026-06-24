@@ -974,10 +974,9 @@ mod tests {
 
     #[test]
     fn parse_inspect_galaxy_docs_command() {
-        let command = parse_args(
-            vec!["inspect-galaxy-docs".to_owned(), "pixelmagic".to_owned()].into_iter(),
-        )
-        .unwrap();
+        let command =
+            parse_args(vec!["inspect-galaxy-docs".to_owned(), "pixelmagic".to_owned()].into_iter())
+                .unwrap();
         assert_eq!(
             command,
             CommandKind::InspectGalaxyDocs {
@@ -1015,10 +1014,9 @@ mod tests {
 
     #[test]
     fn parse_inspect_stdlib_docs_json_command() {
-        let command = parse_args(
-            vec!["inspect-stdlib-docs".to_owned(), "--json".to_owned()].into_iter(),
-        )
-        .unwrap();
+        let command =
+            parse_args(vec!["inspect-stdlib-docs".to_owned(), "--json".to_owned()].into_iter())
+                .unwrap();
         assert_eq!(command, CommandKind::InspectStdlibDocs { json: true });
     }
 

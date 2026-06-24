@@ -20,6 +20,7 @@ use yir_core::YirModule;
 
 pub fn render_ast(module: &AstModule) -> String {
     let mut out = String::new();
+    out.push_str(&render_ast_doc_comments("", &module.attributes));
     for item in &module.uses {
         out.push_str(&format!("use {} {}\n", item.domain, item.unit));
     }
@@ -1310,12 +1311,7 @@ fn render_nir_expr(value: &NirExpr) -> String {
                     binding_callee.as_str(),
                     "shader_packet_uniform_binding" | "shader_packet_storage_binding"
                 ) {
-                    return format!(
-                        "{}({}, {})",
-                        binding_callee,
-                        slot,
-                        render_nir_expr(value)
-                    );
+                    return format!("{}({}, {})", binding_callee, slot, render_nir_expr(value));
                 }
                 format!(
                     "{}({}, \"{}\", {})",
@@ -1325,12 +1321,7 @@ fn render_nir_expr(value: &NirExpr) -> String {
                     render_nir_expr(value)
                 )
             } else {
-                format!(
-                    "{}({}, {})",
-                    binding_callee,
-                    slot,
-                    render_nir_expr(value)
-                )
+                format!("{}({}, {})", binding_callee, slot, render_nir_expr(value))
             }
         }
         NirExpr::ShaderBindSet { pipeline, bindings } => {
@@ -2180,6 +2171,7 @@ mod tests {
     #[test]
     fn renders_mutable_and_reassigned_ast_locals() {
         let module = AstModule {
+            attributes: vec![],
             uses: vec![],
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -2252,6 +2244,7 @@ mod tests {
     #[test]
     fn renders_enum_declarations_in_ast() {
         let module = AstModule {
+            attributes: vec![],
             uses: vec![],
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -2301,6 +2294,13 @@ mod tests {
     #[test]
     fn renders_doc_comments_as_triple_slash_lines() {
         let module = AstModule {
+            attributes: vec![AstAttribute {
+                name: "doc".to_owned(),
+                args: vec![AstAttributeArg {
+                    name: None,
+                    value: AstAttributeValue::String("module docs".to_owned()),
+                }],
+            }],
             uses: vec![],
             domain: "cpu".to_owned(),
             unit: "Docs".to_owned(),
@@ -2420,11 +2420,27 @@ mod tests {
         };
 
         let rendered = render_ast(&module);
-        assert!(rendered.contains("/// const docs\n  const ANSWER: i32 = 42"), "{rendered}");
-        assert!(rendered.contains("/// empty docs\n    variant None"), "{rendered}");
-        assert!(rendered.contains("/// trait docs\n  trait Displayable"), "{rendered}");
-        assert!(rendered.contains("/// render docs\n    fn render(self: Self) -> Text;"), "{rendered}");
-        assert!(rendered.contains("/// function docs\n  fn answer() -> i32"), "{rendered}");
+        assert!(rendered.starts_with("/// module docs\n"), "{rendered}");
+        assert!(
+            rendered.contains("/// const docs\n  const ANSWER: i32 = 42"),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains("/// empty docs\n    variant None"),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains("/// trait docs\n  trait Displayable"),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains("/// render docs\n    fn render(self: Self) -> Text;"),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains("/// function docs\n  fn answer() -> i32"),
+            "{rendered}"
+        );
         assert!(!rendered.contains("@doc("), "{rendered}");
     }
 

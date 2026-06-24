@@ -555,7 +555,11 @@ fn materialize_domain_unit_support(
     Ok(())
 }
 
-fn materialized_support_path(output_dir: &Path, original: Option<&str>, fallback_name: &str) -> PathBuf {
+fn materialized_support_path(
+    output_dir: &Path,
+    original: Option<&str>,
+    fallback_name: &str,
+) -> PathBuf {
     if let Some(original) = original {
         let candidate = Path::new(original);
         if let Some(file_name) = candidate.file_name() {

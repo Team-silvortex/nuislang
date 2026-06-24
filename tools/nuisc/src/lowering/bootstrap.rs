@@ -151,6 +151,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
         let mut bindings = BTreeMap::<String, String>::new();
         lower_function_body(main, &mut state, &mut bindings, true)?;
     }
+    materialize_doc_contract_nodes(&mut yir, module);
     assign_default_lanes(&mut yir);
     materialize_registered_scheduler_contract_nodes(&mut yir);
     assign_default_lanes(&mut yir);
@@ -191,6 +192,8 @@ fn materialize_cpu_target_config_node(state: &mut LoweringState<'_>) {
     let arch = target_config.machine_arch.clone();
     let abi = target_config.abi.clone();
     let vector_bits = target_config.cpu_vector_bits().to_string();
+    let isa_family = target_config.isa_family.clone();
+    let isa_features = target_config.isa_features.join(",");
     let name = "lowering_cpu_target_config".to_owned();
     state.yir.nodes.push(Node {
         name: name.clone(),
@@ -198,7 +201,13 @@ fn materialize_cpu_target_config_node(state: &mut LoweringState<'_>) {
         op: Operation {
             module: "cpu".to_owned(),
             instruction: "target_config".to_owned(),
-            args: vec![arch.clone(), abi.clone(), vector_bits.clone()],
+            args: vec![
+                arch.clone(),
+                abi.clone(),
+                vector_bits.clone(),
+                isa_family.clone(),
+                isa_features.clone(),
+            ],
         },
     });
     let contract_name = "lowering_cpu_target_contract_type".to_owned();
@@ -209,8 +218,8 @@ fn materialize_cpu_target_config_node(state: &mut LoweringState<'_>) {
             module: "cpu".to_owned(),
             instruction: "text".to_owned(),
             args: vec![format!(
-                "arch=symbol:{};abi=symbol:{};vector_bits=i64:{}",
-                arch, abi, vector_bits
+                "arch=symbol:{};abi=symbol:{};vector_bits=i64:{};isa_family=symbol:{};isa_features=list:{}",
+                arch, abi, vector_bits, isa_family, isa_features
             )],
         },
     });

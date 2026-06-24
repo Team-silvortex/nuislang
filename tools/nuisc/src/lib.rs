@@ -19,16 +19,16 @@ pub mod render;
 pub mod shader_source;
 pub mod stdlib_registry;
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::collections::BTreeSet;
 
 use nuis_artifact::BuildManifestDomainBuildUnit;
 use nuis_runtime::{
-    AdapterRegistry, BridgeExecutor, DomainAdapter, ExecutionPhaseContext,
-    ExecutionPhaseAction, ExecutionPhaseBinding, ExecutionPhaseOutcome, ExecutionPlan,
-    ExecutionResourceBinding, ExecutionStateSnapshot, ExecutionTrace, ExecutionTraceEvent,
-    Executor, RuntimeLoader, RuntimeRole,
+    AdapterRegistry, BridgeExecutor, DomainAdapter, ExecutionPhaseAction, ExecutionPhaseBinding,
+    ExecutionPhaseContext, ExecutionPhaseOutcome, ExecutionPlan, ExecutionResourceBinding,
+    ExecutionStateSnapshot, ExecutionTrace, ExecutionTraceEvent, Executor, RuntimeLoader,
+    RuntimeRole,
 };
 
 pub use cli::CommandKind;
@@ -479,9 +479,7 @@ fn evaluate_domain_build_contract_drift(
                 unit.backend_family.as_deref(),
                 unit.selected_lowering_target.as_deref(),
             ) {
-                if backend_family != target
-                    && !target.starts_with(&format!("{backend_family}."))
-                {
+                if backend_family != target && !target.starts_with(&format!("{backend_family}.")) {
                     issues.push(format!(
                         "backend_family={} diverges from selected_lowering_target={}",
                         backend_family, target
@@ -882,9 +880,7 @@ fn artifact_report_summary_lines(
     lines
 }
 
-fn execution_inspect_issues(
-    overview: &ExecutionInspectOverview,
-) -> Vec<ExecutionInspectIssue> {
+fn execution_inspect_issues(overview: &ExecutionInspectOverview) -> Vec<ExecutionInspectIssue> {
     let mut issues = Vec::new();
     for domain in &overview.domains {
         if domain.selected_lowering_target.is_none() {
@@ -1276,13 +1272,15 @@ fn project_metadata_summary_from_manifest_report(
             .map(|path| path.display().to_string()),
         manifest_path: manifest_path.map(|path| path.display().to_string()),
         build_manifest_path: manifest_path.map(|path| path.display().to_string()),
-        artifact_path: artifact_path.map(|path| path.display().to_string()).or_else(|| {
-            if report.artifact_path.is_empty() {
-                None
-            } else {
-                Some(report.artifact_path.clone())
-            }
-        }),
+        artifact_path: artifact_path
+            .map(|path| path.display().to_string())
+            .or_else(|| {
+                if report.artifact_path.is_empty() {
+                    None
+                } else {
+                    Some(report.artifact_path.clone())
+                }
+            }),
         docs_index_path: report.project_docs_index.clone(),
         docs_module_count: report.project_docs_module_count,
         docs_documented_module_count: report.project_docs_documented_module_count,
@@ -1291,14 +1289,14 @@ fn project_metadata_summary_from_manifest_report(
         imports_library_count: report.project_imports_library_count,
         imports_visible_library_count: report.project_imports_visible_library_count,
         imports_visible_module_count: report.project_imports_visible_module_count,
-        imports_documented_visible_module_count:
-            report.project_imports_documented_visible_module_count,
+        imports_documented_visible_module_count: report
+            .project_imports_documented_visible_module_count,
         imports_documented_visible_item_count: report.project_imports_documented_visible_item_count,
         galaxy_index_path: report.project_galaxy_index.clone(),
         galaxy_count: report.project_galaxy_count,
         documented_galaxy_count: report.project_documented_galaxy_count,
-        documented_galaxy_library_module_count:
-            report.project_documented_galaxy_library_module_count,
+        documented_galaxy_library_module_count: report
+            .project_documented_galaxy_library_module_count,
         documented_galaxy_item_count: report.project_documented_galaxy_item_count,
     }
 }
@@ -1438,7 +1436,8 @@ fn resolve_artifact_report_inputs(
             false,
         ));
     }
-    let (manifest_input, manifest_verify) = reconstruct_manifest_report_from_artifact(input, &artifact)?;
+    let (manifest_input, manifest_verify) =
+        reconstruct_manifest_report_from_artifact(input, &artifact)?;
     Ok((
         manifest_input,
         artifact,
@@ -1539,10 +1538,7 @@ fn inspect_project_metadata_json(summary: &ProjectMetadataSummary) -> String {
             summary.imports_documented_visible_item_count,
         ),
         json_usize_field("galaxy_count", summary.galaxy_count),
-        json_usize_field(
-            "documented_galaxy_count",
-            summary.documented_galaxy_count,
-        ),
+        json_usize_field("documented_galaxy_count", summary.documented_galaxy_count),
         json_usize_field(
             "documented_galaxy_library_module_count",
             summary.documented_galaxy_library_module_count,
@@ -1799,7 +1795,9 @@ fn inspect_execution_sections(
         let prepared = bridge
             .prepare(&loaded, &adapters, &unit.domain_family)
             .map_err(|error| error.to_string())?;
-        let plan = executor.plan(&prepared).map_err(|error| error.to_string())?;
+        let plan = executor
+            .plan(&prepared)
+            .map_err(|error| error.to_string())?;
         let trace = executor
             .execute_prepared_plan(prepared.adapter, &plan)
             .map_err(|error| error.to_string())?;
@@ -1853,7 +1851,10 @@ fn render_execution_report(input: &Path) -> Result<String, String> {
         format!("nuis execution: {}", input.display()),
         format!("  packaging_mode: {}", artifact.packaging_mode),
         format!("  binary_name: {}", artifact.binary_name),
-        format!("  domain_families: {}", artifact.envelope.domain_families.join(", ")),
+        format!(
+            "  domain_families: {}",
+            artifact.envelope.domain_families.join(", ")
+        ),
         format!("  heterogeneous_execution_domains: {}", sections.len()),
     ];
 
@@ -1974,7 +1975,10 @@ fn execution_trace_event_json(event: &ExecutionTraceEvent) -> String {
         json_string_field("bridge_surface", &event.bridge_surface),
         json_string_field("scheduler_binding", &event.scheduler_binding),
         format!("\"action\":{}", execution_phase_action_json(&event.action)),
-        format!("\"outcome\":{}", execution_phase_outcome_json(&event.outcome)),
+        format!(
+            "\"outcome\":{}",
+            execution_phase_outcome_json(&event.outcome)
+        ),
         format!(
             "\"state_before\":{}",
             execution_state_snapshot_json(&event.state_before)
@@ -2413,7 +2417,10 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
         ),
         json_usize_field("doc_index_checked", report.doc_index_checked),
         json_optional_string_field("project_docs_index", report.project_docs_index.as_deref()),
-        json_usize_field("project_docs_module_count", report.project_docs_module_count),
+        json_usize_field(
+            "project_docs_module_count",
+            report.project_docs_module_count,
+        ),
         json_usize_field(
             "project_docs_documented_module_count",
             report.project_docs_documented_module_count,
@@ -2553,14 +2560,13 @@ fn artifact_report_json(
             json_string_field("error", &error)
         )
     });
-    let project_metadata = inspect_project_metadata_json(
-        &project_metadata_summary_from_manifest_report(
+    let project_metadata =
+        inspect_project_metadata_json(&project_metadata_summary_from_manifest_report(
             "build-manifest",
             Some(manifest_input),
             Some(artifact_verify_input),
             manifest_verify,
-        ),
-    );
+        ));
     let fields = vec![
         json_string_field("kind", "nuis_artifact_report"),
         json_string_field("input", &input.display().to_string()),
@@ -2585,7 +2591,10 @@ fn artifact_report_json(
             verify_build_manifest_json(manifest_input, manifest_verify)
         ),
         format!("\"project_metadata\":{}", project_metadata),
-        format!("\"doc_index\":{}", inspect_docs_json(Path::new(&manifest_verify.input), &doc_indexes)),
+        format!(
+            "\"doc_index\":{}",
+            inspect_docs_json(Path::new(&manifest_verify.input), &doc_indexes)
+        ),
         format!("\"execution_inspect\":{}", execution_inspect),
         format!("\"link_plan\":{}", link_plan_json(&link_plan)),
     ];
@@ -3032,6 +3041,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                         "  support_profile_slots: {}",
                         binding.support_profile_slots.join(", ")
                     );
+                }
+                if !binding.capability_tags.is_empty() {
+                    println!("  capability_tags: {}", binding.capability_tags.join(", "));
                 }
                 if !binding.default_lanes.is_empty() {
                     println!("  default_lanes: {}", binding.default_lanes.join(", "));
@@ -3661,13 +3673,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             let summary_view = summarize_domain_build_verification(&verdicts);
             let execution_overview = inspect_execution_overview(&manifest_input).ok();
             let doc_indexes = collect_doc_indexes_from_manifest_input(&manifest_verify).ok();
-            let project_metadata =
-                project_metadata_summary_from_manifest_report(
-                    "build-manifest",
-                    Some(&manifest_input),
-                    Some(&artifact_verify_input),
-                    &manifest_verify,
-                );
+            let project_metadata = project_metadata_summary_from_manifest_report(
+                "build-manifest",
+                Some(&manifest_input),
+                Some(&artifact_verify_input),
+                &manifest_verify,
+            );
             if summary {
                 println!("nuis artifact report summary: {}", input.display());
                 for line in artifact_report_summary_lines(
@@ -3726,7 +3737,13 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 manifest_verify.artifact_path
             );
             if let Some(indexes) = &doc_indexes {
-                println!("  documented_modules: {}", indexes.len());
+                println!(
+                    "  documented_modules: {}",
+                    indexes
+                        .iter()
+                        .filter(|index| !index.items.is_empty())
+                        .count()
+                );
                 println!(
                     "  documented_items: {}",
                     indexes.iter().map(|index| index.items.len()).sum::<usize>()
@@ -4159,7 +4176,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 if let Some(path) = &report.doc_index_path {
                     println!("  doc_index_path: {}", path);
                 }
-                println!("  doc_index_module_count: {}", report.doc_index_module_count);
+                println!(
+                    "  doc_index_module_count: {}",
+                    report.doc_index_module_count
+                );
                 println!(
                     "  doc_index_documented_item_count: {}",
                     report.doc_index_documented_item_count
@@ -4168,7 +4188,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 if let Some(path) = &report.project_docs_index {
                     println!("  project_docs_index: {}", path);
                 }
-                println!("  project_docs_module_count: {}", report.project_docs_module_count);
+                println!(
+                    "  project_docs_module_count: {}",
+                    report.project_docs_module_count
+                );
                 println!(
                     "  project_docs_documented_module_count: {}",
                     report.project_docs_documented_module_count
@@ -4357,7 +4380,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 print_project_context(&resolved);
             }
             let summaries = summarize_doc_indexes(&indexes);
-            let total_items = summaries.iter().map(|summary| summary.item_count).sum::<usize>();
+            let total_items = summaries
+                .iter()
+                .map(|summary| summary.item_count)
+                .sum::<usize>();
             println!("doc index: {}", input.display());
             println!("  module_count: {}", summaries.len());
             println!("  documented_item_count: {}", total_items);
@@ -4392,10 +4418,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             for module in summary.modules {
                 println!("  library_module: {}", module.library_module);
                 println!("    module_path: {}", module.module_path);
-                println!(
-                    "    documented_items: {}",
-                    module.documented_item_count
-                );
+                println!("    documented_items: {}", module.documented_item_count);
                 for item in module.doc_index.items {
                     println!("    item: {} {}", item.kind, item.path);
                     if let Some(signature) = item.signature {
@@ -4483,7 +4506,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 project_input.display(),
                 output_dir.display()
             );
-            println!("{}", render_project_metadata_compact_summary(&repaired_summary));
+            println!(
+                "{}",
+                render_project_metadata_compact_summary(&repaired_summary)
+            );
         }
         CommandKind::CacheStatus {
             input,
@@ -4838,11 +4864,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             )?;
             let cache_hit = cache::lookup_compile_cache(&cache_key)?;
             let compile_fresh = || -> Result<(aot::CompileArtifacts, Vec<String>), String> {
-                let artifacts = resolved.compile_with_options(&pipeline::PipelineCompileOptions {
-                    lowering_target: Some(
-                        lowering::LoweringTargetConfig::from_cpu_build_target(&cpu_target),
-                    ),
-                })?;
+                let artifacts =
+                    resolved.compile_with_options(&pipeline::PipelineCompileOptions {
+                        lowering_target: Some(
+                            lowering::LoweringTargetConfig::from_cpu_build_target(&cpu_target),
+                        ),
+                    })?;
                 let written = aot::write_and_link(
                     &resolved.effective_input_path,
                     &output_dir,
@@ -5191,6 +5218,7 @@ mod tests {
         assert!(json.contains("\"abi_contract\":{"));
         assert!(json.contains("\"host_bridge_contract\":{"));
         assert!(json.contains("\"runtime_capability_contract\":{"));
+        assert!(json.contains("\"capability_tags\":[\"io-reactor\""));
         assert!(json.contains("\"scheduler_contract\":{"));
         assert!(json.contains("\"std_net_extension\":{"));
         assert!(json.contains("\"domain\":\"network\""));
@@ -6331,11 +6359,20 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert_eq!(manifest_report.project_imports_library_count, 0);
         assert_eq!(manifest_report.project_imports_visible_library_count, 0);
         assert_eq!(manifest_report.project_imports_visible_module_count, 1);
-        assert_eq!(manifest_report.project_imports_documented_visible_module_count, 0);
-        assert_eq!(manifest_report.project_imports_documented_visible_item_count, 0);
+        assert_eq!(
+            manifest_report.project_imports_documented_visible_module_count,
+            0
+        );
+        assert_eq!(
+            manifest_report.project_imports_documented_visible_item_count,
+            0
+        );
         assert_eq!(manifest_report.project_galaxy_count, 0);
         assert_eq!(manifest_report.project_documented_galaxy_count, 0);
-        assert_eq!(manifest_report.project_documented_galaxy_library_module_count, 0);
+        assert_eq!(
+            manifest_report.project_documented_galaxy_library_module_count,
+            0
+        );
         assert_eq!(manifest_report.project_documented_galaxy_item_count, 0);
         assert_eq!(
             manifest_report.envelope_schema,
@@ -6621,6 +6658,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
     fn inspect_docs_json_exposes_documented_items() {
         let ast = frontend::parse_nuis_ast(
             r#"
+            /// module docs
             mod cpu Docs {
               /// function docs
               fn answer() -> i32 {
@@ -6636,8 +6674,12 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"kind\":\"nuis_doc_index\""));
         assert!(json.contains("\"input\":\"main.ns\""));
         assert!(json.contains("\"module_count\":1"));
-        assert!(json.contains("\"documented_item_count\":1"));
+        assert!(json.contains("\"documented_item_count\":2"));
         assert!(json.contains("\"module_path\":\"cpu.Docs\""));
+        assert!(json.contains("\"kind\":\"module\""));
+        assert!(json.contains("\"path\":\"cpu.Docs\""));
+        assert!(json.contains("\"docs\":[\"module docs\"]"));
+        assert!(json.contains("\"signature\":\"mod cpu Docs\""));
         assert!(json.contains("\"kind\":\"function\""));
         assert!(json.contains("\"path\":\"cpu.Docs::answer\""));
         assert!(json.contains("\"docs\":[\"function docs\"]"));
@@ -6654,6 +6696,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         std::fs::write(
             &path,
             r#"
+            /// module docs
             mod cpu Docs {
               /// value docs
               const ANSWER: i32 = 42;
@@ -6667,8 +6710,9 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
 
         assert_eq!(indexes.len(), 1);
         assert_eq!(indexes[0].module_path, "cpu.Docs");
-        assert_eq!(indexes[0].items.len(), 1);
-        assert_eq!(indexes[0].items[0].path, "cpu.Docs::ANSWER");
+        assert_eq!(indexes[0].items.len(), 2);
+        assert_eq!(indexes[0].items[0].path, "cpu.Docs");
+        assert_eq!(indexes[0].items[1].path, "cpu.Docs::ANSWER");
     }
 
     #[test]

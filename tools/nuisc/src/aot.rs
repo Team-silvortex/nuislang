@@ -199,6 +199,8 @@ pub struct CpuBuildTarget {
     pub object_format: String,
     pub calling_abi: String,
     pub clang_target: String,
+    pub isa_family: String,
+    pub isa_features: Vec<String>,
     pub cross_compile: bool,
 }
 
@@ -224,8 +226,34 @@ pub fn host_cpu_build_target() -> CpuBuildTarget {
         object_format,
         calling_abi,
         clang_target: clang_target_triple(&machine_arch, &machine_os),
+        isa_family: cpu_isa_family(&machine_arch).to_owned(),
+        isa_features: default_cpu_isa_features(&machine_arch, &machine_os),
         cross_compile: false,
     }
+}
+
+fn cpu_isa_family(machine_arch: &str) -> &'static str {
+    match machine_arch {
+        "arm64" | "aarch64" => "aarch64",
+        "x86_64" | "amd64" => "x86_64",
+        _ => "generic",
+    }
+}
+
+fn default_cpu_isa_features(machine_arch: &str, machine_os: &str) -> Vec<String> {
+    let features = match cpu_isa_family(machine_arch) {
+        "aarch64" => match machine_os {
+            "darwin" => &["a64", "neon", "fp-armv8", "crc", "lse", "atomics"][..],
+            "linux" => &["a64", "neon", "fp-armv8", "crc", "atomics"][..],
+            _ => &["a64", "neon", "fp-armv8"][..],
+        },
+        "x86_64" => match machine_os {
+            "windows" => &["x86-64", "sse2", "sse4.2", "popcnt"][..],
+            _ => &["x86-64", "sse2", "sse4.2", "avx2", "bmi2", "popcnt"][..],
+        },
+        _ => &["scalar"][..],
+    };
+    features.iter().map(|item| (*item).to_owned()).collect()
 }
 
 fn canonical_machine_arch(machine_arch: &str) -> &str {
@@ -313,6 +341,8 @@ pub fn resolve_cpu_build_target_from_abi(
         object_format: registered.object_format,
         calling_abi: registered.calling_abi,
         clang_target: registered.clang_target,
+        isa_family: cpu_isa_family(&registered.machine_arch).to_owned(),
+        isa_features: default_cpu_isa_features(&registered.machine_arch, &registered.machine_os),
         cross_compile: registered.machine_arch != host_machine_arch()
             || registered.machine_os != host_machine_os(),
     })
@@ -333,6 +363,8 @@ pub fn resolve_cpu_build_target_from_target(
         object_format: registered.object_format,
         calling_abi: registered.calling_abi,
         clang_target: registered.clang_target,
+        isa_family: cpu_isa_family(&registered.machine_arch).to_owned(),
+        isa_features: default_cpu_isa_features(&registered.machine_arch, &registered.machine_os),
         cross_compile: registered.machine_arch != host_machine_arch()
             || registered.machine_os != host_machine_os(),
     })
@@ -8757,6 +8789,8 @@ mod tests {
             object_format: "elf".to_owned(),
             calling_abi: "sysv64".to_owned(),
             clang_target: "x86_64-unknown-linux-gnu".to_owned(),
+            isa_family: "x86_64".to_owned(),
+            isa_features: vec!["x86-64".to_owned(), "sse2".to_owned()],
             cross_compile: true,
         };
         let manifest = super::write_build_manifest(
@@ -8926,6 +8960,9 @@ mod tests {
         assert_eq!(apple.machine_arch, "arm64");
         assert_eq!(apple.machine_os, "darwin");
         assert_eq!(apple.clang_target, "aarch64-apple-darwin");
+        assert_eq!(apple.isa_family, "aarch64");
+        assert!(apple.isa_features.contains(&"neon".to_owned()));
+        assert!(apple.isa_features.contains(&"lse".to_owned()));
 
         let apple_amd64 =
             resolve_cpu_build_target_from_abi(&registry_root, "cpu.x86_64.apple_sysv64").unwrap();
@@ -8934,17 +8971,25 @@ mod tests {
         assert_eq!(apple_amd64.object_format, "mach-o");
         assert_eq!(apple_amd64.calling_abi, "sysv64");
         assert_eq!(apple_amd64.clang_target, "x86_64-apple-darwin");
+        assert_eq!(apple_amd64.isa_family, "x86_64");
+        assert!(apple_amd64.isa_features.contains(&"sse2".to_owned()));
+        assert!(apple_amd64.isa_features.contains(&"avx2".to_owned()));
 
         let linux = resolve_cpu_build_target_from_abi(&registry_root, "cpu.x86_64.sysv64").unwrap();
         assert_eq!(linux.machine_arch, "x86_64");
         assert_eq!(linux.machine_os, "linux");
         assert_eq!(linux.object_format, "elf");
         assert_eq!(linux.calling_abi, "sysv64");
+        assert_eq!(linux.isa_family, "x86_64");
+        assert!(linux.isa_features.contains(&"bmi2".to_owned()));
 
         let windows =
             resolve_cpu_build_target_from_abi(&registry_root, "cpu.x86_64.win64").unwrap();
         assert_eq!(windows.machine_os, "windows");
         assert_eq!(windows.clang_target, "x86_64-pc-windows-msvc");
+        assert_eq!(windows.isa_family, "x86_64");
+        assert!(windows.isa_features.contains(&"sse4.2".to_owned()));
+        assert!(!windows.isa_features.contains(&"avx2".to_owned()));
     }
 
     #[test]
@@ -9273,6 +9318,8 @@ mod tests {
             object_format: "macho".to_owned(),
             calling_abi: "apple_aapcs64".to_owned(),
             clang_target: "arm64-apple-darwin".to_owned(),
+            isa_family: "aarch64".to_owned(),
+            isa_features: vec!["a64".to_owned(), "neon".to_owned()],
             cross_compile: false,
         };
         let manifest = super::write_build_manifest(
@@ -9439,6 +9486,8 @@ mod tests {
             object_format: "elf".to_owned(),
             calling_abi: "sysv64".to_owned(),
             clang_target: "x86_64-unknown-linux-gnu".to_owned(),
+            isa_family: "x86_64".to_owned(),
+            isa_features: vec!["x86-64".to_owned(), "sse2".to_owned()],
             cross_compile: true,
         };
         let manifest = super::write_build_manifest(
@@ -9686,6 +9735,8 @@ mod tests {
             object_format: "macho".to_owned(),
             calling_abi: "apple_aapcs64".to_owned(),
             clang_target: "arm64-apple-darwin".to_owned(),
+            isa_family: "aarch64".to_owned(),
+            isa_features: vec!["a64".to_owned(), "neon".to_owned()],
             cross_compile: false,
         };
         let manifest = super::write_build_manifest(
@@ -10162,6 +10213,8 @@ mod tests {
             object_format: "macho".to_owned(),
             calling_abi: "apple_aapcs64".to_owned(),
             clang_target: "arm64-apple-darwin".to_owned(),
+            isa_family: "aarch64".to_owned(),
+            isa_features: vec!["a64".to_owned(), "neon".to_owned()],
             cross_compile: false,
         };
         super::write_build_manifest(
@@ -10253,6 +10306,7 @@ mod tests {
         }
 
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -11552,6 +11606,7 @@ mod tests {
     #[test]
     fn c_shim_source_enables_hetero_lifecycle_surface_for_shader_modules() {
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "shader".to_owned(),
             unit: "SurfaceShader".to_owned(),
@@ -11585,6 +11640,7 @@ mod tests {
         }
 
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -11975,6 +12031,7 @@ mod tests {
         }
 
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -12074,6 +12131,7 @@ mod tests {
         }
 
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -12367,6 +12425,7 @@ mod tests {
         }
 
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -12550,6 +12609,7 @@ mod tests {
         }
 
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -12641,6 +12701,7 @@ mod tests {
         }
 
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -12706,6 +12767,7 @@ mod tests {
         }
 
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -12831,6 +12893,7 @@ mod tests {
         }
 
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -12871,6 +12934,7 @@ mod tests {
         }
 
         let ast = AstModule {
+            attributes: Vec::new(),
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),

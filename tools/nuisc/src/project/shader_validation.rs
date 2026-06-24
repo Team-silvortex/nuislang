@@ -409,20 +409,21 @@ pub(super) fn validate_shader_target_projection(
                 unit, expected_name
             )
         })?;
-    let (expected_arch, expected_runtime, expected_lane) =
-        target_config_tokens_for_domain("shader", &target);
+    let expected_tokens = target_config_tokens_for_domain("shader", &target);
+    let expected_args = expected_tokens.clone().into_args();
     if node.op.module != "shader"
         || node.op.instruction != "target_config"
-        || node.op.args
-            != vec![
-                expected_arch.clone(),
-                expected_runtime.clone(),
-                expected_lane.clone(),
-            ]
+        || node.op.args != expected_args
     {
         return Err(format!(
-            "project shader unit `shader.{}` requires `{}` to materialize shader.target_config({}, {}, {}) for selected ABI `{}`",
-            unit, expected_name, expected_arch, expected_runtime, expected_lane, target.abi
+            "project shader unit `shader.{}` requires `{}` to materialize shader.target_config({}, {}, {}, {}) for selected ABI `{}`",
+            unit,
+            expected_name,
+            expected_tokens.arch,
+            expected_tokens.runtime,
+            expected_tokens.lane_width,
+            expected_tokens.backend_features,
+            target.abi
         ));
     }
 

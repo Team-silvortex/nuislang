@@ -1220,10 +1220,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         NirExpr::ShaderBinding { value, .. } => {
             collect_used_vars_expr(value, out);
         }
-        NirExpr::ShaderBindSet {
-            pipeline,
-            bindings,
-        } => {
+        NirExpr::ShaderBindSet { pipeline, bindings } => {
             collect_used_vars_expr(pipeline, out);
             for binding in bindings {
                 collect_used_vars_expr(binding, out);
@@ -1462,6 +1459,7 @@ mod tests {
 
     fn sample_module(body: Vec<NirStmt>) -> NirModule {
         NirModule {
+            annotations: vec![],
             uses: vec![],
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -1828,6 +1826,7 @@ mod tests {
     #[test]
     fn inlines_annotated_pure_function_calls() {
         let mut module = NirModule {
+            annotations: vec![],
             uses: vec![],
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
@@ -1911,6 +1910,7 @@ mod tests {
     #[test]
     fn does_not_inline_noinline_annotated_function_calls() {
         let mut module = NirModule {
+            annotations: vec![],
             uses: vec![],
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),

@@ -36,15 +36,15 @@ mod task_builtins;
 #[cfg(test)]
 mod tests_benchmark_functions;
 #[cfg(test)]
+mod tests_comments;
+#[cfg(test)]
 mod tests_consts_aliases;
 #[cfg(test)]
 mod tests_control_flow;
 #[cfg(test)]
-mod tests_comments;
+mod tests_destructure_let;
 #[cfg(test)]
 mod tests_doc_index;
-#[cfg(test)]
-mod tests_destructure_let;
 #[cfg(test)]
 mod tests_enums;
 #[cfg(test)]
@@ -213,6 +213,14 @@ pub fn extract_ast_doc_index(module: &AstModule) -> AstDocIndex {
     let module_path = format!("{}.{}", module.domain, module.unit);
     let mut items = Vec::new();
 
+    push_doc_index_item(
+        &mut items,
+        "module",
+        module_path.clone(),
+        doc_lines(&module.attributes),
+        Some(format!("mod {} {}", module.domain, module.unit)),
+    );
+
     for constant in &module.consts {
         push_doc_index_item(
             &mut items,
@@ -343,7 +351,11 @@ fn render_const_signature(constant: &nuis_semantics::model::AstConstItem) -> Str
 }
 
 fn render_type_alias_signature(alias: &AstTypeAlias) -> String {
-    format!("type {} = {}", alias.name, render_ast_type_name(&alias.target))
+    format!(
+        "type {} = {}",
+        alias.name,
+        render_ast_type_name(&alias.target)
+    )
 }
 
 fn render_struct_signature(definition: &nuis_semantics::model::AstStructDef) -> String {
@@ -410,7 +422,10 @@ fn render_function_signature(function: &nuis_semantics::model::AstFunction) -> S
         .map(|ty| format!(" -> {}", render_ast_type_name(ty)))
         .unwrap_or_default();
     let async_prefix = if function.is_async { "async " } else { "" };
-    format!("{}fn {}({}){}", async_prefix, function.name, params, return_suffix)
+    format!(
+        "{}fn {}({}){}",
+        async_prefix, function.name, params, return_suffix
+    )
 }
 
 fn render_ast_type_name(ty: &AstTypeRef) -> String {
@@ -521,6 +536,7 @@ pub fn lower_project_ast_to_nir(
         lower_extern_items(module, &visible_type_aliases)?;
 
     let nir = NirModule {
+        annotations: lower_ast_attributes(&module.attributes),
         uses: module
             .uses
             .iter()

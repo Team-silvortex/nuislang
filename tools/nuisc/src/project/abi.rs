@@ -47,11 +47,98 @@ pub(crate) fn selected_lowering_target_for_registered_abi_target(
     }
     candidates.push(base.clone());
     for candidate in &candidates {
-        if registered_lowering_targets.iter().any(|item| item == candidate) {
+        if registered_lowering_targets
+            .iter()
+            .any(|item| item == candidate)
+        {
             return Some(candidate.clone());
         }
     }
     candidates.into_iter().next()
+}
+
+pub(crate) fn backend_features_for_registered_abi_target(
+    domain: &str,
+    target: &crate::registry::RegisteredAbiTarget,
+) -> Vec<String> {
+    let mut features = BTreeSet::new();
+    let backend = backend_family_for_registered_abi_target(domain, target);
+
+    if let Some(backend) = backend.as_deref() {
+        features.insert(backend.to_owned());
+    }
+    if let Some(vendor) = target.vendor.as_deref() {
+        features.insert(format!("vendor.{vendor}"));
+    }
+    if let Some(device) = target.device_class.as_deref() {
+        features.insert(format!("device.{device}"));
+    }
+
+    match domain {
+        "shader" => {
+            features.insert("shader-ir".to_owned());
+            features.insert("resource-binding".to_owned());
+            match backend.as_deref() {
+                Some("metal") => {
+                    features.insert("msl".to_owned());
+                    features.insert("argument-buffer".to_owned());
+                }
+                Some("vulkan") => {
+                    features.insert("spirv".to_owned());
+                    features.insert("descriptor-set".to_owned());
+                }
+                Some("directx") => {
+                    features.insert("dxil".to_owned());
+                    features.insert("descriptor-heap".to_owned());
+                }
+                Some("opengl") => {
+                    features.insert("glsl".to_owned());
+                }
+                Some("cpu-fallback") => {
+                    features.insert("host-render-fallback".to_owned());
+                }
+                _ => {}
+            }
+        }
+        "kernel" => {
+            features.insert("kernel-dispatch".to_owned());
+            features.insert("buffer-table".to_owned());
+            match backend.as_deref() {
+                Some("coreml") => {
+                    features.insert("tensor-graph".to_owned());
+                    features.insert("ane-dispatch".to_owned());
+                }
+                Some("vulkan") => {
+                    features.insert("spirv".to_owned());
+                    features.insert("compute-queue".to_owned());
+                }
+                Some("cpu-fallback") => {
+                    features.insert("host-kernel-fallback".to_owned());
+                }
+                _ => {}
+            }
+        }
+        "network" => {
+            features.insert("socket-transport".to_owned());
+            features.insert("async-bridge".to_owned());
+            match backend.as_deref() {
+                Some("urlsession") => {
+                    features.insert("darwin-network-stack".to_owned());
+                    features.insert("tls-session".to_owned());
+                }
+                Some("winsock") => {
+                    features.insert("winsock2".to_owned());
+                }
+                Some("socket") | Some("socket-abi") => {
+                    features.insert("posix-socket".to_owned());
+                }
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+
+    features.into_iter().collect()
 }
 
 fn json_escape(value: &str) -> String {

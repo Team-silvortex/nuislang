@@ -22,6 +22,15 @@ fn lowers_cpu_target_config_and_resource_kind_for_selected_abi() {
         object_format: "elf".to_owned(),
         calling_abi: "sysv64".to_owned(),
         clang_target: "x86_64-unknown-linux-gnu".to_owned(),
+        isa_family: "x86_64".to_owned(),
+        isa_features: vec![
+            "x86-64".to_owned(),
+            "sse2".to_owned(),
+            "sse4.2".to_owned(),
+            "avx2".to_owned(),
+            "bmi2".to_owned(),
+            "popcnt".to_owned(),
+        ],
     };
 
     let yir = lower_nir_to_yir_builtin_cpu_with_target(&module, Some(&target)).unwrap();
@@ -37,7 +46,9 @@ fn lowers_cpu_target_config_and_resource_kind_for_selected_abi() {
         vec![
             "x86_64".to_owned(),
             "cpu.x86_64.sysv64".to_owned(),
-            "128".to_owned()
+            "128".to_owned(),
+            "x86_64".to_owned(),
+            "x86-64,sse2,sse4.2,avx2,bmi2,popcnt".to_owned()
         ]
     );
     let contract = yir
@@ -47,7 +58,7 @@ fn lowers_cpu_target_config_and_resource_kind_for_selected_abi() {
         .unwrap();
     assert_eq!(
         contract.op.args,
-        vec!["arch=symbol:x86_64;abi=symbol:cpu.x86_64.sysv64;vector_bits=i64:128".to_owned()]
+        vec!["arch=symbol:x86_64;abi=symbol:cpu.x86_64.sysv64;vector_bits=i64:128;isa_family=symbol:x86_64;isa_features=list:x86-64,sse2,sse4.2,avx2,bmi2,popcnt".to_owned()]
     );
     assert!(yir.edges.iter().any(|edge| {
         edge.from == "lowering_cpu_target_contract_type" && edge.to == "lowering_cpu_target_config"
@@ -87,6 +98,8 @@ fn rejects_unregistered_lowering_abi_target() {
         object_format: "elf".to_owned(),
         calling_abi: "sysv64".to_owned(),
         clang_target: "x86_64-unknown-linux-gnu".to_owned(),
+        isa_family: "x86_64".to_owned(),
+        isa_features: vec!["x86-64".to_owned(), "sse2".to_owned()],
     };
 
     let error = lower_nir_to_yir(&module, &manifest, Some(&target)).unwrap_err();
@@ -115,6 +128,8 @@ fn rejects_nurs_extern_when_lowering_target_is_plain_c_abi() {
         object_format: "elf".to_owned(),
         calling_abi: "sysv64".to_owned(),
         clang_target: "x86_64-unknown-linux-gnu".to_owned(),
+        isa_family: "x86_64".to_owned(),
+        isa_features: vec!["x86-64".to_owned(), "sse2".to_owned()],
     };
 
     let error = lower_nir_to_yir_builtin_cpu_with_target(&module, Some(&target)).unwrap_err();
@@ -145,6 +160,15 @@ fn allows_nurs_extern_when_lowering_target_declares_nurs_bridge() {
         object_format: "mach-o".to_owned(),
         calling_abi: "aapcs64-darwin".to_owned(),
         clang_target: "aarch64-apple-darwin".to_owned(),
+        isa_family: "aarch64".to_owned(),
+        isa_features: vec![
+            "a64".to_owned(),
+            "neon".to_owned(),
+            "fp-armv8".to_owned(),
+            "crc".to_owned(),
+            "lse".to_owned(),
+            "atomics".to_owned(),
+        ],
     };
 
     let yir = lower_nir_to_yir_builtin_cpu_with_target(&module, Some(&target)).unwrap();

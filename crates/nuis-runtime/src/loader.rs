@@ -174,8 +174,8 @@ fn decode_hex_bytes(value: &str) -> Result<Vec<u8>, String> {
     while index < bytes.len() {
         let chunk = std::str::from_utf8(&bytes[index..index + 2])
             .map_err(|_| "hex payload is not valid UTF-8".to_owned())?;
-        let byte = u8::from_str_radix(chunk, 16)
-            .map_err(|_| format!("invalid hex byte `{chunk}`"))?;
+        let byte =
+            u8::from_str_radix(chunk, 16).map_err(|_| format!("invalid hex byte `{chunk}`"))?;
         out.push(byte);
         index += 2;
     }

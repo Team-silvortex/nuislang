@@ -98,8 +98,8 @@ impl BridgeExecutor {
 mod tests {
     use nuis_artifact::{
         BridgeRegistry, BridgeRegistryEntry, BuildManifest, BuildManifestDomainBuildUnit,
-        DomainBuildUnitPayloadBlob, HostBridgePlanEntry, HostBridgePlanIndex,
-        NuisCompiledArtifact, NuisExecutableEnvelope, NuisLifecycleContract,
+        DomainBuildUnitPayloadBlob, HostBridgePlanEntry, HostBridgePlanIndex, NuisCompiledArtifact,
+        NuisExecutableEnvelope, NuisLifecycleContract,
     };
 
     use crate::{AdapterRegistry, DomainAdapter, LoadedExecutable};
@@ -323,10 +323,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            prepared
-                .lowering_plan_text()
-                .unwrap()
-                .unwrap(),
+            prepared.lowering_plan_text().unwrap().unwrap(),
             "execution_route = \"foundation-session-reactor\""
         );
         assert_eq!(
