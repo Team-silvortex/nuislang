@@ -48,6 +48,136 @@ fn emits_dynamic_declare_for_cpu_extern_calls() {
 }
 
 #[test]
+fn emits_dynamic_declare_for_i32_cpu_extern_calls() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    module.nodes.push(Node {
+        name: "arg0".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.const_i32", vec!["7".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "curve_call".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.extern_call_i32",
+            vec![
+                "c".to_owned(),
+                "host_i32_curve".to_owned(),
+                "arg0".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    module.edges.push(Edge {
+        kind: EdgeKind::Dep,
+        from: "arg0".to_owned(),
+        to: "curve_call".to_owned(),
+    });
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("declare i32 @host_i32_curve(i32)"));
+    assert!(llvm_ir.contains("call i32 @host_i32_curve(i32"));
+}
+
+#[test]
+fn emits_dynamic_declare_for_text_ptr_cpu_extern_calls() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    module.nodes.push(Node {
+        name: "message".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.text", vec!["hello".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "text_call".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.extern_call_i64",
+            vec![
+                "c".to_owned(),
+                "host_accept_text_ptr".to_owned(),
+                "message".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    module.edges.push(Edge {
+        kind: EdgeKind::Dep,
+        from: "message".to_owned(),
+        to: "text_call".to_owned(),
+    });
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("declare i64 @host_accept_text_ptr(ptr)"));
+    assert!(llvm_ir.contains("call i64 @host_accept_text_ptr(ptr"));
+}
+
+#[test]
+fn emits_dynamic_declare_for_buffer_ptr_cpu_extern_calls() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    module.nodes.push(Node {
+        name: "len".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.const_i64", vec!["8".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "fill".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.const_i64", vec!["0".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "buffer".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.alloc_buffer",
+            vec!["len".to_owned(), "fill".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "buffer_call".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.extern_call_i64",
+            vec![
+                "c".to_owned(),
+                "host_fill_buffer_ptr".to_owned(),
+                "buffer".to_owned(),
+                "len".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    for (from, to) in [
+        ("len", "buffer"),
+        ("fill", "buffer"),
+        ("buffer", "buffer_call"),
+        ("len", "buffer_call"),
+    ] {
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        });
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("declare i64 @host_fill_buffer_ptr(ptr, i64)"));
+    assert!(llvm_ir.contains("call i64 @host_fill_buffer_ptr(ptr"));
+}
+
+#[test]
 fn emits_module_with_contract_metadata_nodes_on_cpu_without_fake_cycles() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

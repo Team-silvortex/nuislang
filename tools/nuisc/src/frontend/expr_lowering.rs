@@ -8,8 +8,8 @@ use super::unary_lowering::lower_unary_expr_with_async;
 use super::validation_helpers::render_type_name;
 use super::{
     i32_type, infer_nir_expr_type, instantiate_struct_field_type, lower_call_expr_with_async,
-    named_type, resolve_declared_or_inferred, struct_field_type, AstExpr, FunctionSignature, NirExpr,
-    NirStructDef, NirTypeRef,
+    named_type, resolve_declared_or_inferred, struct_field_type, AstExpr, FunctionSignature,
+    NirExpr, NirStructDef, NirTypeRef,
 };
 
 #[allow(clippy::too_many_arguments)]

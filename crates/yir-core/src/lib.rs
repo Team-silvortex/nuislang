@@ -700,7 +700,10 @@ impl Operation {
             SemanticOp::NetworkObserve => {
                 let direct_project_ref = source.semantic_op() == SemanticOp::CpuProjectProfileRef;
                 let host_transport_probe = source.module == "cpu"
-                    && source.instruction == "extern_call_i64"
+                    && matches!(
+                        source.instruction.as_str(),
+                        "extern_call_i64" | "extern_call_i32"
+                    )
                     && source.args.len() >= 2
                     && matches!(
                         source.args[1].as_str(),
@@ -761,8 +764,8 @@ impl Operation {
             | "load_at" | "store_value" | "store_next" | "store_at" | "is_null" | "free" => {
                 CpuLlvmLoweringClass::Memory
             }
-            "input_i64" | "extern_call_i64" | "param_bool" | "param_i32" | "param_i64"
-            | "call_bool" | "call_i32" | "call_i64" => CpuLlvmLoweringClass::Runtime,
+            "input_i64" | "extern_call_i64" | "extern_call_i32" | "param_bool" | "param_i32"
+            | "param_i64" | "call_bool" | "call_i32" | "call_i64" => CpuLlvmLoweringClass::Runtime,
             "print"
             | "return_bool"
             | "return_i32"

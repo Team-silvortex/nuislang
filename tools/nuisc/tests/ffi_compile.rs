@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{fs, path::Path};
 
 fn compiled_source(path: &str) {
     nuisc::pipeline::compile_source_path(Path::new(path))
@@ -24,6 +24,70 @@ fn lowers_i32_ffi_frontdoor_source_to_i32_extern_call() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu" && node.op.instruction == "extern_call_i32"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("declare i32 @host_i32_curve(i32)"));
+    assert!(artifacts.llvm_ir.contains("call i32 @host_i32_curve(i32"));
+}
+
+#[test]
+fn rejects_c_ffi_signatures_outside_nustar_allowlist() {
+    let path = std::env::temp_dir().join(format!(
+        "nuis_bad_ffi_allowlist_{}_{}.ns",
+        std::process::id(),
+        "f64"
+    ));
+    fs::write(
+        &path,
+        r#"
+        mod cpu Main {
+          extern "c" fn host_f64_curve(value: f64) -> f64;
+
+          fn main() -> f64 {
+            return host_f64_curve(1.0);
+          }
+        }
+        "#,
+    )
+    .expect("should write temporary ffi source");
+
+    let error = nuisc::pipeline::compile_source_path(&path)
+        .err()
+        .expect("f64 ffi source should be rejected by C ABI signature allowlist");
+    let _ = fs::remove_file(&path);
+
+    assert!(error.contains("signature `f64(f64)` is not allowed"));
+    assert!(error.contains("allowed signatures"));
+}
+
+#[test]
+fn rejects_registered_c_ffi_symbol_with_wrong_signature() {
+    let path = std::env::temp_dir().join(format!(
+        "nuis_bad_ffi_symbol_allowlist_{}_{}.ns",
+        std::process::id(),
+        "host_i32_curve"
+    ));
+    fs::write(
+        &path,
+        r#"
+        mod cpu Main {
+          extern "c" fn host_i32_curve(value: f64) -> f64;
+
+          fn main() -> f64 {
+            return host_i32_curve(1.0);
+          }
+        }
+        "#,
+    )
+    .expect("should write temporary ffi source");
+
+    let error = nuisc::pipeline::compile_source_path(&path)
+        .err()
+        .expect("registered C FFI symbol with wrong signature should be rejected");
+    let _ = fs::remove_file(&path);
+
+    assert!(error.contains("symbol `host_i32_curve` signature `f64(f64)` is not allowed"));
+    assert!(error.contains("allowed symbol signatures: i32(i32)"));
 }
 
 #[test]

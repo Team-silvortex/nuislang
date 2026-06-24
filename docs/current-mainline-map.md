@@ -111,7 +111,8 @@ Use this section as a router, not as a full inventory.
   [reference/control-flow-lowering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/control-flow-lowering-contract.md),
   [reference/nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md),
   [reference/cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md),
-  [reference/cpu-thread-lock-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-boundary.md)
+  [reference/cpu-thread-lock-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-boundary.md),
+  [reference/ffi-pointer-safety-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/ffi-pointer-safety-boundary.md)
 * domain and project contracts:
   [examples/projects/domains/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md),
   [reference/std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md),

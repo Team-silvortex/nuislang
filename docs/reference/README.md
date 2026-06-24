@@ -30,6 +30,7 @@ Start in this order:
   - [control-flow-lowering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/control-flow-lowering-contract.md)
   - [generic-diagnostic-ownership-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/generic-diagnostic-ownership-contract.md)
   - [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
+  - [ffi-pointer-safety-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/ffi-pointer-safety-boundary.md)
   - [std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
   - [std-host-io-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-host-io-layering-contract.md)
   - [std-data-window-fabric-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-data-window-fabric-layering-contract.md)

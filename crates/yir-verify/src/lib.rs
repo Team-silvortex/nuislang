@@ -2990,7 +2990,10 @@ fn is_resolved_network_profile_slot(node: &Node) -> bool {
 
 fn is_host_network_transport_probe_source(node: &Node) -> bool {
     node.op.module == "cpu"
-        && node.op.instruction == "extern_call_i64"
+        && matches!(
+            node.op.instruction.as_str(),
+            "extern_call_i64" | "extern_call_i32"
+        )
         && node.op.args.len() >= 2
         && matches!(
             node.op.args[1].as_str(),

@@ -2365,27 +2365,27 @@ int main(void) {
 
 fn validate_host_ffi_symbols(module: &YirModule) -> Result<(), String> {
     for node in &module.nodes {
-        if node.op.module != "cpu" || node.op.instruction != "extern_call_i64" {
+        if node.op.module != "cpu" || !is_cpu_extern_call_instruction(&node.op.instruction) {
             continue;
         }
         if node.op.args.len() < 2 {
             return Err(format!(
-                "cpu.extern_call_i64 node `{}` must include abi and symbol arguments",
-                node.name
+                "cpu.{} node `{}` must include abi and symbol arguments",
+                node.op.instruction, node.name
             ));
         }
         let abi = node.op.args[0].as_str();
         if abi != "nurs" && abi != "c" {
             return Err(format!(
-                "cpu.extern_call_i64 node `{}` uses unsupported abi `{abi}`; expected `nurs` or `c`",
-                node.name
+                "cpu.{} node `{}` uses unsupported abi `{abi}`; expected `nurs` or `c`",
+                node.op.instruction, node.name
             ));
         }
         let symbol = node.op.args[1].as_str();
         if symbol.trim().is_empty() {
             return Err(format!(
-                "cpu.extern_call_i64 node `{}` has an empty symbol name",
-                node.name
+                "cpu.{} node `{}` has an empty symbol name",
+                node.op.instruction, node.name
             ));
         }
     }
@@ -2416,7 +2416,7 @@ fn validate_host_ffi_symbols(module: &YirModule) -> Result<(), String> {
 fn collect_host_ffi_symbols(module: &YirModule) -> BTreeMap<String, usize> {
     let mut out = BTreeMap::new();
     for node in &module.nodes {
-        if node.op.module != "cpu" || node.op.instruction != "extern_call_i64" {
+        if node.op.module != "cpu" || !is_cpu_extern_call_instruction(&node.op.instruction) {
             continue;
         }
         if node.op.args.len() < 2 {
@@ -2433,6 +2433,10 @@ fn collect_host_ffi_symbols(module: &YirModule) -> BTreeMap<String, usize> {
             .or_insert(arg_count);
     }
     out
+}
+
+fn is_cpu_extern_call_instruction(instruction: &str) -> bool {
+    matches!(instruction, "extern_call_i64" | "extern_call_i32")
 }
 
 fn render_host_ffi_stubs(module: &YirModule) -> String {

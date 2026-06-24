@@ -3633,9 +3633,29 @@ pub fn validate_abi_capabilities(
                     ));
                 }
                 op_allowed.insert(value.to_owned());
+            } else if let Some(value) = cap.strip_prefix("ffi:") {
+                if value.trim().is_empty() {
+                    return Err(format!(
+                        "nustar package `{}` has invalid abi_capabilities entry `{}`; `ffi:` capability must include a signature pattern",
+                        manifest.package_id, raw
+                    ));
+                }
+            } else if let Some(value) = cap.strip_prefix("ffi_symbol:") {
+                let Some((symbol, signature)) = value.split_once('=') else {
+                    return Err(format!(
+                        "nustar package `{}` has invalid abi_capabilities entry `{}`; `ffi_symbol:` capability must use `symbol=signature`",
+                        manifest.package_id, raw
+                    ));
+                };
+                if symbol.trim().is_empty() || signature.trim().is_empty() {
+                    return Err(format!(
+                        "nustar package `{}` has invalid abi_capabilities entry `{}`; `ffi_symbol:` capability must include a symbol and signature",
+                        manifest.package_id, raw
+                    ));
+                }
             } else {
                 return Err(format!(
-                    "nustar package `{}` has invalid abi_capabilities capability `{}` in `{}`; expected `surface:<pattern>` or `op:<pattern>`",
+                    "nustar package `{}` has invalid abi_capabilities capability `{}` in `{}`; expected `surface:<pattern>`, `op:<pattern>`, `ffi:<signature>`, or `ffi_symbol:<symbol>=<signature>`",
                     manifest.package_id, cap, raw
                 ));
             }

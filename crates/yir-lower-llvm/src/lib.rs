@@ -2793,12 +2793,17 @@ fn emit_cpu_function(
                     ));
                     continue;
                 }
+                let dynamic_args = !is_builtin_host_ffi_symbol(symbol);
                 let lowered_args = node.op.args[2..]
                     .iter()
                     .map(|arg| {
-                        registers
-                            .get(arg)
-                            .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg))
+                        registers.get(arg).and_then(|value| {
+                            if dynamic_args {
+                                lower_dynamic_extern_arg(value, &mut body, &mut next_reg)
+                            } else {
+                                lower_i64_extern_arg(value, &mut body, &mut next_reg)
+                            }
+                        })
                     })
                     .collect::<Option<Vec<_>>>();
                 let Some(lowered_args) = lowered_args else {
@@ -2809,26 +2814,14 @@ fn emit_cpu_function(
                     continue;
                 };
                 let reg = fresh_reg(&mut next_reg);
-                let call = match lowered_args.as_slice() {
-                    [] => format!("call i64 @{symbol}()"),
-                    [a0] => format!("call i64 @{symbol}(i64 {a0})"),
-                    [a0, a1] => format!("call i64 @{symbol}(i64 {a0}, i64 {a1})"),
-                    [a0, a1, a2] => format!("call i64 @{symbol}(i64 {a0}, i64 {a1}, i64 {a2})"),
-                    [a0, a1, a2, a3] => {
-                        format!("call i64 @{symbol}(i64 {a0}, i64 {a1}, i64 {a2}, i64 {a3})")
-                    }
-                    [a0, a1, a2, a3, a4, a5] => format!(
-                        "call i64 @{symbol}(i64 {a0}, i64 {a1}, i64 {a2}, i64 {a3}, i64 {a4}, i64 {a5})"
-                    ),
-                    _ => {
-                        body.push(format!(
-                            "  ; deferred lowering for cpu.extern_call_i64 `{}` because symbol `{}` has unsupported arity {}",
-                            node.name,
-                            symbol,
-                            lowered_args.len()
-                        ));
-                        continue;
-                    }
+                let Some(call) = render_extern_call("i64", symbol, &lowered_args) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.extern_call_i64 `{}` because symbol `{}` has unsupported arity {}",
+                        node.name,
+                        symbol,
+                        lowered_args.len()
+                    ));
+                    continue;
                 };
                 body.push(format!("  {reg} = {call}"));
                 if symbol == "host_deserialize_text_from"
@@ -2853,6 +2846,50 @@ fn emit_cpu_function(
                     registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
                     *last_cpu_value = Some(reg);
                 }
+            }
+            ("cpu", "extern_call_i32") => {
+                let abi = &node.op.args[0];
+                let symbol = &node.op.args[1];
+                if abi != "nurs" && abi != "c" {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.extern_call_i32 `{}` because ABI `{}` is not supported by the current LLVM bridge",
+                        node.name, abi
+                    ));
+                    continue;
+                }
+                let dynamic_args = !is_builtin_host_ffi_symbol(symbol);
+                let lowered_args = node.op.args[2..]
+                    .iter()
+                    .map(|arg| {
+                        registers.get(arg).and_then(|value| {
+                            if dynamic_args {
+                                lower_dynamic_extern_arg(value, &mut body, &mut next_reg)
+                            } else {
+                                lower_i32_extern_arg(value, &mut body, &mut next_reg)
+                            }
+                        })
+                    })
+                    .collect::<Option<Vec<_>>>();
+                let Some(lowered_args) = lowered_args else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.extern_call_i32 `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                let Some(call) = render_extern_call("i32", symbol, &lowered_args) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.extern_call_i32 `{}` because symbol `{}` has unsupported arity {}",
+                        node.name,
+                        symbol,
+                        lowered_args.len()
+                    ));
+                    continue;
+                };
+                body.push(format!("  {reg} = {call}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "call_bool")
             | ("cpu", "call_i32")
@@ -10851,28 +10888,14 @@ define i64 @nuis_yir_entry() {{\n{}\n}}\n",
 }
 
 fn render_dynamic_extern_decls(module: &YirModule) -> Vec<String> {
-    let builtin_symbols = [
-        "malloc",
-        "free",
-        "puts",
-        "nuis_debug_print_bool",
-        "nuis_debug_print_i32",
-        "nuis_debug_print_i64",
-        "nuis_debug_print_f32",
-        "nuis_debug_print_f64",
-        "host_color_bias",
-        "host_speed_curve",
-        "host_radius_curve",
-        "host_mix_tick",
-        "HostRenderCurves__color_bias",
-        "HostRenderCurves__speed_curve",
-        "HostRenderCurves__radius_curve",
-        "HostRenderCurves__mix_tick",
-        "HostMath__speed_curve",
-    ];
-    let mut declared = BTreeMap::<String, usize>::new();
+    let producer_types = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node_result_llvm_abi_type(node)))
+        .collect::<BTreeMap<_, _>>();
+    let mut declared = BTreeMap::<String, (&'static str, Vec<&'static str>)>::new();
     for node in &module.nodes {
-        if node.op.module != "cpu" || node.op.instruction != "extern_call_i64" {
+        if node.op.module != "cpu" || !is_cpu_extern_call_instruction(&node.op.instruction) {
             continue;
         }
         if node.op.args.len() < 2 {
@@ -10883,26 +10906,25 @@ fn render_dynamic_extern_decls(module: &YirModule) -> Vec<String> {
             continue;
         }
         let symbol = node.op.args[1].clone();
-        if builtin_symbols
-            .iter()
-            .any(|builtin| builtin == &symbol.as_str())
-        {
+        if is_builtin_host_ffi_symbol(&symbol) {
             continue;
         }
-        let arity = node.op.args.len().saturating_sub(2);
-        declared.entry(symbol).or_insert(arity);
+        let return_ty = cpu_extern_call_llvm_return_type(&node.op.instruction);
+        let arg_types = node.op.args[2..]
+            .iter()
+            .map(|arg| producer_types.get(arg.as_str()).copied().unwrap_or("i64"))
+            .collect::<Vec<_>>();
+        declared.entry(symbol).or_insert((return_ty, arg_types));
     }
     declared
         .into_iter()
-        .map(|(symbol, arity)| {
-            let signature = if arity == 0 {
+        .map(|(symbol, (return_ty, arg_types))| {
+            let signature = if arg_types.is_empty() {
                 String::new()
             } else {
-                std::iter::repeat_n("i64", arity)
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                arg_types.join(", ")
             };
-            format!("declare i64 @{symbol}({signature})")
+            format!("declare {return_ty} @{symbol}({signature})")
         })
         .collect()
 }
@@ -11044,6 +11066,126 @@ fn coerce_to_i64(
             Some(reg)
         }
         _ => None,
+    }
+}
+
+fn coerce_to_i32(
+    value: &LlvmValueRef,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+) -> Option<String> {
+    match value {
+        LlvmValueRef::I32(value) => Some(value.clone()),
+        LlvmValueRef::I64(value) | LlvmValueRef::TextHandle { handle: value, .. } => {
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = trunc i64 {value} to i32"));
+            Some(reg)
+        }
+        LlvmValueRef::Bool { i1, .. } => {
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = zext i1 {i1} to i32"));
+            Some(reg)
+        }
+        LlvmValueRef::F32(value) => {
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = fptosi float {value} to i32"));
+            Some(reg)
+        }
+        LlvmValueRef::F64(value) => {
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = fptosi double {value} to i32"));
+            Some(reg)
+        }
+        _ => None,
+    }
+}
+
+fn lower_dynamic_extern_arg(
+    value: &LlvmValueRef,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+) -> Option<String> {
+    match value {
+        LlvmValueRef::Ptr(value) | LlvmValueRef::TextHandle { ptr: value, .. } => {
+            Some(format!("ptr {value}"))
+        }
+        LlvmValueRef::I32(_) => {
+            coerce_to_i32(value, body, next_reg).map(|value| format!("i32 {value}"))
+        }
+        _ => coerce_to_i64(value, body, next_reg).map(|value| format!("i64 {value}")),
+    }
+}
+
+fn lower_i64_extern_arg(
+    value: &LlvmValueRef,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+) -> Option<String> {
+    coerce_to_i64(value, body, next_reg).map(|value| format!("i64 {value}"))
+}
+
+fn lower_i32_extern_arg(
+    value: &LlvmValueRef,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+) -> Option<String> {
+    coerce_to_i32(value, body, next_reg).map(|value| format!("i32 {value}"))
+}
+
+fn render_extern_call(return_ty: &str, symbol: &str, lowered_args: &[String]) -> Option<String> {
+    if lowered_args.len() > 6 {
+        return None;
+    }
+    Some(format!(
+        "call {return_ty} @{symbol}({})",
+        lowered_args.join(", ")
+    ))
+}
+
+fn is_cpu_extern_call_instruction(instruction: &str) -> bool {
+    matches!(instruction, "extern_call_i64" | "extern_call_i32")
+}
+
+fn cpu_extern_call_llvm_return_type(instruction: &str) -> &'static str {
+    match instruction {
+        "extern_call_i32" => "i32",
+        _ => "i64",
+    }
+}
+
+fn is_builtin_host_ffi_symbol(symbol: &str) -> bool {
+    matches!(
+        symbol,
+        "malloc"
+            | "free"
+            | "puts"
+            | "nuis_debug_print_bool"
+            | "nuis_debug_print_i32"
+            | "nuis_debug_print_i64"
+            | "nuis_debug_print_f32"
+            | "nuis_debug_print_f64"
+            | "host_color_bias"
+            | "host_speed_curve"
+            | "host_radius_curve"
+            | "host_mix_tick"
+            | "HostRenderCurves__color_bias"
+            | "HostRenderCurves__speed_curve"
+            | "HostRenderCurves__radius_curve"
+            | "HostRenderCurves__mix_tick"
+            | "HostMath__speed_curve"
+    )
+}
+
+fn node_result_llvm_abi_type(node: &Node) -> &'static str {
+    if node.op.module != "cpu" {
+        return "i64";
+    }
+    match node.op.instruction.as_str() {
+        "text" | "null" | "borrow" | "move_ptr" | "alloc_node" | "alloc_buffer" | "load_next" => {
+            "ptr"
+        }
+        "const_i32" | "cast_i64_to_i32" | "extern_call_i32" | "call_i32" | "param_i32" => "i32",
+        _ => "i64",
     }
 }
 
@@ -11378,7 +11520,7 @@ fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
 
     let mut last_cpu_extern_on_resource = BTreeMap::<String, String>::new();
     for node in &module.nodes {
-        if node.op.module == "cpu" && node.op.instruction == "extern_call_i64" {
+        if node.op.module == "cpu" && is_cpu_extern_call_instruction(&node.op.instruction) {
             if let Some(previous) =
                 last_cpu_extern_on_resource.insert(node.resource.clone(), node.name.clone())
             {
