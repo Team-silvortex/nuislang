@@ -5,7 +5,10 @@ use std::{
     process::{self, Command},
 };
 
-use yir_core::{Value, YirModule};
+use yir_core::{
+    ffi::{ffi_symbol_signature_hash, is_ffi_symbol_hash_token},
+    Value, YirModule,
+};
 use yir_exec::execute_module;
 use yir_host_render::rasterize_frame;
 use yir_lower_contract::{analyze_kernel_lowering, analyze_shader_lowering};
@@ -41,8 +44,8 @@ fn run() -> Result<(), String> {
     let module = yir_syntax::parse_module(&source)?;
     verify_module(&module)?;
     validate_host_ffi_symbols(&module)?;
-    let host_ffi_symbols = collect_host_ffi_symbols(&module);
-    let host_ffi_stub_source = render_host_ffi_stubs(&module);
+    let host_ffi_symbols = collect_host_ffi_symbols(&module)?;
+    let host_ffi_stub_source = render_host_ffi_stubs(&host_ffi_symbols);
 
     let output_dir = PathBuf::from(output_dir);
     fs::create_dir_all(&output_dir)
@@ -66,7 +69,7 @@ fn run() -> Result<(), String> {
     let llvm_ir = emit_module(&module)?;
     fs::write(&ll_path, llvm_ir)
         .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;
-    fs::write(&shim_path, c_shim_source(&module))
+    fs::write(&shim_path, c_shim_source(&host_ffi_symbols))
         .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
 
     let mut manifest = vec![
@@ -75,13 +78,18 @@ fn run() -> Result<(), String> {
     ];
     if host_ffi_symbols.is_empty() {
         manifest.push("host_ffi_symbols=none".to_owned());
+        manifest.push("host_ffi_symbol_hashes=none".to_owned());
     } else {
-        let symbol_list = host_ffi_symbols
-            .iter()
-            .map(|(symbol, arg_count)| format!("{symbol}:{arg_count}"))
-            .collect::<Vec<_>>()
-            .join(",");
+        let symbol_list = render_host_ffi_symbol_manifest(&host_ffi_symbols);
+        let hash_list = render_host_ffi_symbol_hash_manifest(&host_ffi_symbols);
+        verify_host_ffi_manifest_lines(&symbol_list, &hash_list)?;
+        verify_host_ffi_manifest_against_registry_lines(
+            &symbol_list,
+            &hash_list,
+            DEFAULT_HOST_FFI_REGISTRY_LINES,
+        )?;
         manifest.push(format!("host_ffi_symbols={symbol_list}"));
+        manifest.push(format!("host_ffi_symbol_hashes={hash_list}"));
     }
 
     let shader_contract = analyze_shader_lowering(&module);
@@ -2290,6 +2298,92 @@ struct RuntimeFrameSupport {
     frame_scale: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HostFfiReturnType {
+    I64,
+    I32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HostFfiArgType {
+    I64,
+    I32,
+}
+
+trait HostFfiScalarType {
+    fn token(self) -> &'static str;
+    fn c_type(self) -> &'static str;
+}
+
+impl HostFfiScalarType for HostFfiReturnType {
+    fn token(self) -> &'static str {
+        match self {
+            Self::I64 => "i64",
+            Self::I32 => "i32",
+        }
+    }
+
+    fn c_type(self) -> &'static str {
+        match self {
+            Self::I64 => "int64_t",
+            Self::I32 => "int32_t",
+        }
+    }
+}
+
+impl HostFfiScalarType for HostFfiArgType {
+    fn token(self) -> &'static str {
+        match self {
+            Self::I64 => "i64",
+            Self::I32 => "i32",
+        }
+    }
+
+    fn c_type(self) -> &'static str {
+        match self {
+            Self::I64 => "int64_t",
+            Self::I32 => "int32_t",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostFfiSignature {
+    abi: String,
+    return_type: HostFfiReturnType,
+    arg_types: Vec<HostFfiArgType>,
+}
+
+const DEFAULT_HOST_FFI_REGISTRY_LINES: &[&str] = &[
+    "nurs:ffi_symbol:HostRenderCurves__color_bias=i64(i64)|ffi_symbol:HostRenderCurves__speed_curve=i64(i64)|ffi_symbol:HostRenderCurves__radius_curve=i64(i64)|ffi_symbol:HostRenderCurves__mix_tick=i64(i64,i64)|ffi_symbol:HostMath__speed_curve=i64(i64)",
+    "c:ffi_symbol:host_speed_curve=i64(i64)|ffi_symbol:host_i32_curve=i32(i32)|ffi_symbol_hash:host_hashed_curve=fnv1a64:38ca92f356fcb551|ffi_symbol:host_argv_count=i64()|ffi_symbol:host_monotonic_time_ns=i64()",
+    "c:ffi_symbol:host_network_connect_probe=i64(i64,i64,i64)|ffi_symbol:host_network_open_tcp_stream=i64(i64,i64)|ffi_symbol:host_network_open_tcp_listener=i64(i64,i64,i64)|ffi_symbol:host_network_open_udp_datagram=i64(i64,i64)|ffi_symbol:host_network_bind_udp_datagram=i64(i64,i64,i64)",
+    "c:ffi_symbol:host_network_accept_owned=i64(i64,i64,i64)|ffi_symbol:host_network_close_owned=i64(i64)|ffi_symbol:host_network_send_owned=i64(i64,i64,i64)|ffi_symbol:host_network_recv_owned=i64(i64,i64,i64)|ffi_symbol:host_network_recv_http_status_owned=i64(i64,i64,i64)",
+    "c:ffi_symbol:host_network_accept_probe=i64(i64,i64,i64)|ffi_symbol:host_network_close=i64(i64)|ffi_symbol:host_network_send_probe=i64(i64,i64,i64)|ffi_symbol:host_network_recv_probe=i64(i64,i64,i64)",
+];
+
+impl HostFfiSignature {
+    fn arg_count(&self) -> usize {
+        self.arg_types.len()
+    }
+
+    fn render(&self) -> String {
+        format!(
+            "{}({})",
+            self.return_type.token(),
+            self.arg_types
+                .iter()
+                .map(|arg| arg.token())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    }
+
+    fn hash(&self, symbol: &str) -> String {
+        ffi_symbol_signature_hash(&self.abi, symbol, &self.render())
+    }
+}
+
 fn bytes_to_c_array(bytes: &[u8]) -> String {
     let mut out = String::new();
     for (index, byte) in bytes.iter().enumerate() {
@@ -2302,8 +2396,8 @@ fn bytes_to_c_array(bytes: &[u8]) -> String {
     out
 }
 
-fn c_shim_source(module: &YirModule) -> String {
-    let host_ffi_stubs = render_host_ffi_stubs(module);
+fn c_shim_source(host_ffi_symbols: &BTreeMap<String, HostFfiSignature>) -> String {
+    let host_ffi_stubs = render_host_ffi_stubs(host_ffi_symbols);
     let mut out = String::new();
     out.push_str(
         r#"#include <stdint.h>
@@ -2390,7 +2484,7 @@ fn validate_host_ffi_symbols(module: &YirModule) -> Result<(), String> {
         }
     }
 
-    for (symbol, arg_count) in collect_host_ffi_symbols(module) {
+    for (symbol, signature) in collect_host_ffi_symbols(module)? {
         let expected = if symbol.ends_with("color_bias")
             || symbol.ends_with("speed_curve")
             || symbol.ends_with("radius_curve")
@@ -2402,9 +2496,10 @@ fn validate_host_ffi_symbols(module: &YirModule) -> Result<(), String> {
             None
         };
         if let Some(expected_arg_count) = expected {
-            if arg_count != expected_arg_count {
+            if signature.arg_count() != expected_arg_count {
                 return Err(format!(
-                    "host ffi symbol `{symbol}` expects {expected_arg_count} argument(s) but YIR uses {arg_count}"
+                    "host ffi symbol `{symbol}` expects {expected_arg_count} argument(s) but YIR uses {}",
+                    signature.arg_count()
                 ));
             }
         }
@@ -2413,8 +2508,15 @@ fn validate_host_ffi_symbols(module: &YirModule) -> Result<(), String> {
     Ok(())
 }
 
-fn collect_host_ffi_symbols(module: &YirModule) -> BTreeMap<String, usize> {
+fn collect_host_ffi_symbols(
+    module: &YirModule,
+) -> Result<BTreeMap<String, HostFfiSignature>, String> {
     let mut out = BTreeMap::new();
+    let nodes_by_name = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
     for node in &module.nodes {
         if node.op.module != "cpu" || !is_cpu_extern_call_instruction(&node.op.instruction) {
             continue;
@@ -2423,32 +2525,275 @@ fn collect_host_ffi_symbols(module: &YirModule) -> BTreeMap<String, usize> {
             continue;
         }
         let symbol = node.op.args[1].clone();
-        let arg_count = node.op.args.len().saturating_sub(2);
-        out.entry(symbol)
-            .and_modify(|current| {
-                if *current < arg_count {
-                    *current = arg_count;
-                }
-            })
-            .or_insert(arg_count);
+        let signature = HostFfiSignature {
+            abi: node.op.args[0].clone(),
+            return_type: host_ffi_return_type(&node.op.instruction).ok_or_else(|| {
+                format!(
+                    "cpu.{} node `{}` has no known host FFI return type",
+                    node.op.instruction, node.name
+                )
+            })?,
+            arg_types: node
+                .op
+                .args
+                .iter()
+                .skip(2)
+                .map(|arg| host_ffi_arg_type_for_input(arg, &nodes_by_name))
+                .collect(),
+        };
+        if let Some(existing) = out.insert(symbol.clone(), signature.clone()) {
+            if existing != signature {
+                return Err(format!(
+                    "host ffi symbol `{symbol}` is used with conflicting signatures: {} and {}",
+                    existing.render(),
+                    signature.render()
+                ));
+            }
+        }
     }
-    out
+    Ok(out)
 }
 
 fn is_cpu_extern_call_instruction(instruction: &str) -> bool {
     matches!(instruction, "extern_call_i64" | "extern_call_i32")
 }
 
-fn render_host_ffi_stubs(module: &YirModule) -> String {
+fn host_ffi_return_type(instruction: &str) -> Option<HostFfiReturnType> {
+    match instruction {
+        "extern_call_i64" => Some(HostFfiReturnType::I64),
+        "extern_call_i32" => Some(HostFfiReturnType::I32),
+        _ => None,
+    }
+}
+
+fn host_ffi_arg_type_for_input(
+    input: &str,
+    nodes_by_name: &BTreeMap<&str, &yir_core::Node>,
+) -> HostFfiArgType {
+    nodes_by_name
+        .get(input)
+        .map(|node| host_ffi_arg_type_for_node(node))
+        .unwrap_or(HostFfiArgType::I64)
+}
+
+fn host_ffi_arg_type_for_node(node: &yir_core::Node) -> HostFfiArgType {
+    if node.op.module != "cpu" {
+        return HostFfiArgType::I64;
+    }
+    match node.op.instruction.as_str() {
+        "const_i32" | "cast_i64_to_i32" | "extern_call_i32" | "call_i32" | "param_i32" => {
+            HostFfiArgType::I32
+        }
+        _ => HostFfiArgType::I64,
+    }
+}
+
+fn render_host_ffi_symbol_manifest(
+    host_ffi_symbols: &BTreeMap<String, HostFfiSignature>,
+) -> String {
+    host_ffi_symbols
+        .iter()
+        .map(|(symbol, signature)| format!("{}@{}:{}", symbol, signature.abi, signature.render()))
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
+fn render_host_ffi_symbol_hash_manifest(
+    host_ffi_symbols: &BTreeMap<String, HostFfiSignature>,
+) -> String {
+    host_ffi_symbols
+        .iter()
+        .map(|(symbol, signature)| format!("{}:{}", symbol, signature.hash(symbol)))
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
+fn verify_host_ffi_manifest_lines(symbol_list: &str, hash_list: &str) -> Result<(), String> {
+    let symbols = parse_host_ffi_symbol_manifest_entries(symbol_list)?;
+    let hashes = parse_host_ffi_hash_manifest_entries(hash_list)?;
+    for (symbol, (abi, signature)) in &symbols {
+        let Some(actual_hash) = hashes.get(symbol) else {
+            return Err(format!(
+                "host ffi manifest is missing hash for symbol `{symbol}`"
+            ));
+        };
+        let expected_hash = ffi_symbol_signature_hash(abi, symbol, signature);
+        if actual_hash != &expected_hash {
+            return Err(format!(
+                "host ffi manifest hash mismatch for `{symbol}`: expected {expected_hash}, found {actual_hash}"
+            ));
+        }
+    }
+    for symbol in hashes.keys() {
+        if !symbols.contains_key(symbol) {
+            return Err(format!(
+                "host ffi manifest contains hash for undeclared symbol `{symbol}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostFfiRegistration {
+    Signature(String),
+    Hash(String),
+}
+
+impl HostFfiRegistration {
+    fn allows(&self, signature: &str, hash: &str) -> bool {
+        match self {
+            Self::Signature(expected) => expected == signature,
+            Self::Hash(expected) => expected == hash,
+        }
+    }
+}
+
+fn verify_host_ffi_manifest_against_registry_lines(
+    symbol_list: &str,
+    hash_list: &str,
+    registry_lines: &[&str],
+) -> Result<(), String> {
+    let symbols = parse_host_ffi_symbol_manifest_entries(symbol_list)?;
+    let hashes = parse_host_ffi_hash_manifest_entries(hash_list)?;
+    let registry = parse_host_ffi_registry_lines(registry_lines)?;
+    for (symbol, (abi, signature)) in &symbols {
+        let Some(actual_hash) = hashes.get(symbol) else {
+            return Err(format!(
+                "host ffi manifest is missing hash for symbol `{symbol}`"
+            ));
+        };
+        let allowed = registry
+            .get(&(abi.clone(), symbol.clone()))
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+        if allowed.is_empty() {
+            return Err(format!(
+                "host ffi symbol `{symbol}` ABI `{abi}` is not registered by the packer host FFI registry"
+            ));
+        }
+        if !allowed
+            .iter()
+            .any(|entry| entry.allows(signature, actual_hash))
+        {
+            return Err(format!(
+                "host ffi symbol `{symbol}` ABI `{abi}` signature `{signature}` hash `{actual_hash}` is not allowed by the packer host FFI registry"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn parse_host_ffi_registry_lines(
+    registry_lines: &[&str],
+) -> Result<BTreeMap<(String, String), Vec<HostFfiRegistration>>, String> {
+    let mut out = BTreeMap::new();
+    for raw in registry_lines {
+        let Some((abi, caps)) = raw.split_once(':') else {
+            return Err(format!(
+                "invalid host ffi registry entry `{raw}`; expected `abi:capability[...]`"
+            ));
+        };
+        if abi.trim().is_empty() {
+            return Err(format!(
+                "invalid host ffi registry entry `{raw}`; ABI is required"
+            ));
+        }
+        for cap in caps.split('|').map(str::trim).filter(|cap| !cap.is_empty()) {
+            if let Some(entry) = cap.strip_prefix("ffi_symbol:") {
+                let Some((symbol, signature)) = entry.split_once('=') else {
+                    return Err(format!(
+                        "invalid host ffi registry capability `{cap}`; expected `ffi_symbol:symbol=signature`"
+                    ));
+                };
+                out.entry((abi.to_owned(), symbol.trim().to_owned()))
+                    .or_insert_with(Vec::new)
+                    .push(HostFfiRegistration::Signature(signature.trim().to_owned()));
+            } else if let Some(entry) = cap.strip_prefix("ffi_symbol_hash:") {
+                let Some((symbol, hash)) = entry.split_once('=') else {
+                    return Err(format!(
+                        "invalid host ffi registry capability `{cap}`; expected `ffi_symbol_hash:symbol=fnv1a64:<hex>`"
+                    ));
+                };
+                if !is_ffi_symbol_hash_token(hash.trim()) {
+                    return Err(format!(
+                        "invalid host ffi registry capability `{cap}`; hash must use `fnv1a64:<hex>`"
+                    ));
+                }
+                out.entry((abi.to_owned(), symbol.trim().to_owned()))
+                    .or_insert_with(Vec::new)
+                    .push(HostFfiRegistration::Hash(hash.trim().to_owned()));
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn parse_host_ffi_symbol_manifest_entries(
+    value: &str,
+) -> Result<BTreeMap<String, (String, String)>, String> {
+    let mut out = BTreeMap::new();
+    if value == "none" || value.trim().is_empty() {
+        return Ok(out);
+    }
+    for entry in value.split(';') {
+        let Some((symbol_abi, signature)) = entry.split_once(':') else {
+            return Err(format!(
+                "invalid host_ffi_symbols entry `{entry}`; expected `symbol@abi:signature`"
+            ));
+        };
+        let Some((symbol, abi)) = symbol_abi.split_once('@') else {
+            return Err(format!(
+                "invalid host_ffi_symbols entry `{entry}`; expected `symbol@abi:signature`"
+            ));
+        };
+        if symbol.trim().is_empty() || abi.trim().is_empty() || signature.trim().is_empty() {
+            return Err(format!(
+                "invalid host_ffi_symbols entry `{entry}`; symbol, abi, and signature are required"
+            ));
+        }
+        out.insert(symbol.to_owned(), (abi.to_owned(), signature.to_owned()));
+    }
+    Ok(out)
+}
+
+fn parse_host_ffi_hash_manifest_entries(value: &str) -> Result<BTreeMap<String, String>, String> {
+    let mut out = BTreeMap::new();
+    if value == "none" || value.trim().is_empty() {
+        return Ok(out);
+    }
+    for entry in value.split(';') {
+        let Some((symbol, payload)) = entry.split_once(':') else {
+            return Err(format!(
+                "invalid host_ffi_symbol_hashes entry `{entry}`; expected `symbol:fnv1a64:<hex>`"
+            ));
+        };
+        if symbol.trim().is_empty() || payload.trim().is_empty() {
+            return Err(format!(
+                "invalid host_ffi_symbol_hashes entry `{entry}`; symbol and hash are required"
+            ));
+        }
+        if !is_ffi_symbol_hash_token(payload) {
+            return Err(format!(
+                "invalid host_ffi_symbol_hashes entry `{entry}`; hash must use `fnv1a64:<hex>`"
+            ));
+        }
+        out.insert(symbol.to_owned(), payload.to_owned());
+    }
+    Ok(out)
+}
+
+fn render_host_ffi_stubs(host_ffi_symbols: &BTreeMap<String, HostFfiSignature>) -> String {
     let mut out = String::new();
-    for (symbol, arg_count) in collect_host_ffi_symbols(module) {
+    for (symbol, signature) in host_ffi_symbols {
         out.push('\n');
-        out.push_str(&render_host_ffi_stub(&symbol, arg_count));
+        out.push_str(&render_host_ffi_stub(symbol, signature));
     }
     out
 }
 
-fn render_host_ffi_stub(symbol: &str, arg_count: usize) -> String {
+fn render_host_ffi_stub(symbol: &str, signature_info: &HostFfiSignature) -> String {
+    let arg_count = signature_info.arg_count();
     let mut signature = String::new();
     if arg_count == 0 {
         signature.push_str("void");
@@ -2457,7 +2802,10 @@ fn render_host_ffi_stub(symbol: &str, arg_count: usize) -> String {
             if index > 0 {
                 signature.push_str(", ");
             }
-            signature.push_str(&format!("int64_t arg{index}"));
+            signature.push_str(&format!(
+                "{} arg{index}",
+                signature_info.arg_types[index].c_type()
+            ));
         }
     }
 
@@ -2521,7 +2869,10 @@ fn render_host_ffi_stub(symbol: &str, arg_count: usize) -> String {
         format!("    return {expr};")
     };
 
-    format!("int64_t {symbol}({signature}) {{\n{body}\n}}\n")
+    format!(
+        "{} {symbol}({signature}) {{\n{body}\n}}\n",
+        signature_info.return_type.c_type()
+    )
 }
 
 fn maybe_prepare_embedded_runtime_support(
@@ -3251,4 +3602,164 @@ int main(int argc, const char **argv) {{
 }}
 "###
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        collect_host_ffi_symbols, render_host_ffi_stubs, render_host_ffi_symbol_hash_manifest,
+        render_host_ffi_symbol_manifest, verify_host_ffi_manifest_against_registry_lines,
+        verify_host_ffi_manifest_lines, HostFfiArgType, HostFfiReturnType,
+    };
+    use yir_core::{Node, Operation, YirModule};
+
+    fn cpu_node(name: &str, instruction: &str, args: &[&str]) -> Node {
+        Node {
+            name: name.to_owned(),
+            resource: "cpu.main".to_owned(),
+            op: Operation {
+                module: "cpu".to_owned(),
+                instruction: instruction.to_owned(),
+                args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+            },
+        }
+    }
+
+    fn extern_node(name: &str, instruction: &str, symbol: &str, args: &[&str]) -> Node {
+        let mut op_args = vec!["c".to_owned(), symbol.to_owned()];
+        op_args.extend(args.iter().map(|arg| (*arg).to_owned()));
+        cpu_node(
+            name,
+            instruction,
+            &op_args.iter().map(String::as_str).collect::<Vec<_>>(),
+        )
+    }
+
+    #[test]
+    fn host_ffi_stub_tracks_i32_return_and_arg_type() {
+        let mut module = YirModule::new("1");
+        module.nodes.push(cpu_node("seed", "const_i32", &["7"]));
+        module.nodes.push(extern_node(
+            "curve",
+            "extern_call_i32",
+            "host_i32_curve",
+            &["seed"],
+        ));
+
+        let symbols = collect_host_ffi_symbols(&module).unwrap();
+        let signature = symbols.get("host_i32_curve").unwrap();
+        assert_eq!(signature.return_type, HostFfiReturnType::I32);
+        assert_eq!(signature.arg_types, vec![HostFfiArgType::I32]);
+        assert_eq!(signature.render(), "i32(i32)");
+        assert_eq!(signature.hash("host_i32_curve"), "fnv1a64:b0042e2b5ee2c2aa");
+
+        let stubs = render_host_ffi_stubs(&symbols);
+        assert!(stubs.contains("int32_t host_i32_curve(int32_t arg0)"));
+    }
+
+    #[test]
+    fn host_ffi_manifest_hashes_are_self_verifying() {
+        let mut module = YirModule::new("1");
+        module.nodes.push(cpu_node("lhs", "const_i32", &["7"]));
+        module.nodes.push(cpu_node("rhs", "const_i32", &["5"]));
+        module.nodes.push(extern_node(
+            "mix",
+            "extern_call_i64",
+            "host_i32_mix",
+            &["lhs", "rhs"],
+        ));
+
+        let symbols = collect_host_ffi_symbols(&module).unwrap();
+        let symbol_manifest = render_host_ffi_symbol_manifest(&symbols);
+        let hash_manifest = render_host_ffi_symbol_hash_manifest(&symbols);
+
+        assert_eq!(symbol_manifest, "host_i32_mix@c:i64(i32,i32)");
+        assert!(hash_manifest.starts_with("host_i32_mix:fnv1a64:"));
+        verify_host_ffi_manifest_lines(&symbol_manifest, &hash_manifest).unwrap();
+    }
+
+    #[test]
+    fn host_ffi_manifest_hashes_reject_drift() {
+        let mut module = YirModule::new("1");
+        module.nodes.push(cpu_node("seed", "const_i32", &["7"]));
+        module.nodes.push(extern_node(
+            "curve",
+            "extern_call_i32",
+            "host_i32_curve",
+            &["seed"],
+        ));
+
+        let symbols = collect_host_ffi_symbols(&module).unwrap();
+        let symbol_manifest = render_host_ffi_symbol_manifest(&symbols);
+        let error = verify_host_ffi_manifest_lines(
+            &symbol_manifest,
+            "host_i32_curve:fnv1a64:0000000000000000",
+        )
+        .err()
+        .expect("mismatched host ffi hash should be rejected");
+
+        assert!(error.contains("host ffi manifest hash mismatch for `host_i32_curve`"));
+        assert!(error.contains("fnv1a64:b0042e2b5ee2c2aa"));
+    }
+
+    #[test]
+    fn host_ffi_manifest_line_verifier_rejects_abi_drift() {
+        let error = verify_host_ffi_manifest_lines(
+            "host_i32_curve@nurs:i32(i32)",
+            "host_i32_curve:fnv1a64:b0042e2b5ee2c2aa",
+        )
+        .err()
+        .expect("manifest hash should bind the ABI as well as the signature");
+
+        assert!(error.contains("host ffi manifest hash mismatch for `host_i32_curve`"));
+    }
+
+    #[test]
+    fn host_ffi_manifest_registry_verifier_accepts_registered_symbol() {
+        let symbol_line = "host_i32_curve@c:i32(i32)";
+        let hash_line = "host_i32_curve:fnv1a64:b0042e2b5ee2c2aa";
+        verify_host_ffi_manifest_against_registry_lines(
+            symbol_line,
+            hash_line,
+            &["c:ffi_symbol:host_i32_curve=i32(i32)"],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn host_ffi_manifest_registry_verifier_rejects_unregistered_symbol() {
+        let error = verify_host_ffi_manifest_against_registry_lines(
+            "host_unregistered@c:i64(i64)",
+            "host_unregistered:fnv1a64:f8a191df2b6270f9",
+            &["c:ffi_symbol:host_i32_curve=i32(i32)"],
+        )
+        .err()
+        .expect("unregistered host ffi symbol should be rejected");
+
+        assert!(error.contains("host ffi symbol `host_unregistered` ABI `c` is not registered"));
+    }
+
+    #[test]
+    fn host_ffi_collection_rejects_conflicting_symbol_signatures() {
+        let mut module = YirModule::new("1");
+        module.nodes.push(extern_node(
+            "curve_i64",
+            "extern_call_i64",
+            "host_curve",
+            &["seed"],
+        ));
+        module.nodes.push(extern_node(
+            "curve_i32",
+            "extern_call_i32",
+            "host_curve",
+            &["seed"],
+        ));
+
+        let error = collect_host_ffi_symbols(&module)
+            .err()
+            .expect("same host symbol with different return width should be rejected");
+        assert!(error.contains("host ffi symbol `host_curve` is used with conflicting signatures"));
+        assert!(error.contains("i64(i64)"));
+        assert!(error.contains("i32(i64)"));
+    }
 }

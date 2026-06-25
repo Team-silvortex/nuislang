@@ -4,9 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::registry::HostFfiRegistryView;
 use nuis_semantics::model::{
     AstExternFunction, AstModule, AstTypeRef, NirExpr, NirModule, NirStmt,
 };
+use yir_core::ffi::ffi_symbol_signature_hash;
 use yir_core::YirModule;
 
 const NUSTAR_REGISTRY_ROOT: &str = "nustar-packages";
@@ -485,29 +487,37 @@ fn validate_extern_signature_allowlist(
     function: &AstExternFunction,
     lowering_manifest: &crate::registry::NustarPackageManifest,
 ) -> Result<(), String> {
+    let ffi_registry = HostFfiRegistryView::from_manifest(lowering_manifest);
     let signature = extern_signature_pattern(function);
     let symbol = extern_ffi_symbol_name(function);
-    let symbol_allowed =
-        host_ffi_symbol_signature_allowlist(lowering_manifest, &function.abi, &symbol);
-    if !symbol_allowed.is_empty() {
-        if symbol_allowed
-            .iter()
-            .any(|pattern| ffi_signature_pattern_matches(pattern, &signature))
-        {
+    let symbol_allowlist = ffi_registry.symbol_registrations(&function.abi, &symbol);
+    if !symbol_allowlist.is_empty() {
+        let actual_hash = ffi_symbol_signature_hash(&function.abi, &symbol, &signature);
+        if symbol_allowlist.iter().any(|entry| {
+            entry.matches(
+                |pattern| ffi_signature_pattern_matches(pattern, &signature),
+                &actual_hash,
+            )
+        }) {
             return Ok(());
         }
         return Err(format!(
-            "extern `{}` ABI `{}` symbol `{}` signature `{}` is not allowed by nustar package `{}`; allowed symbol signatures: {}",
+            "extern `{}` ABI `{}` symbol `{}` signature `{}` hash `{}` is not allowed by nustar package `{}`; allowed symbol registrations: {}",
             function.name,
             function.abi,
             symbol,
             signature,
+            actual_hash,
             lowering_manifest.package_id,
-            symbol_allowed.join(", ")
+            symbol_allowlist
+                .iter()
+                .map(|entry| entry.render())
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
 
-    let allowed = host_ffi_signature_allowlist(lowering_manifest, &function.abi)?;
+    let allowed = host_ffi_signature_allowlist(lowering_manifest, &ffi_registry, &function.abi)?;
     if allowed
         .iter()
         .any(|pattern| ffi_signature_pattern_matches(pattern, &signature))
@@ -534,70 +544,24 @@ fn extern_ffi_symbol_name(function: &AstExternFunction) -> String {
     }
 }
 
-fn host_ffi_symbol_signature_allowlist(
-    lowering_manifest: &crate::registry::NustarPackageManifest,
-    abi: &str,
-    symbol: &str,
-) -> Vec<String> {
-    let mut out = Vec::new();
-    for raw in &lowering_manifest.abi_capabilities {
-        let Some((entry_abi, caps)) = raw.split_once(':') else {
-            continue;
-        };
-        if entry_abi.trim() != abi {
-            continue;
-        }
-        for cap in caps.split('|').map(str::trim).filter(|cap| !cap.is_empty()) {
-            let Some(entry) = cap.strip_prefix("ffi_symbol:") else {
-                continue;
-            };
-            let Some((entry_symbol, pattern)) = entry.split_once('=') else {
-                continue;
-            };
-            if entry_symbol.trim() == symbol {
-                out.push(pattern.trim().to_owned());
-            }
-        }
-    }
-    out.sort();
-    out.dedup();
-    out
-}
-
 fn host_ffi_signature_allowlist(
     lowering_manifest: &crate::registry::NustarPackageManifest,
+    ffi_registry: &HostFfiRegistryView,
     abi: &str,
 ) -> Result<Vec<String>, String> {
-    let mut out = Vec::new();
-    let mut saw_abi = false;
-    for raw in &lowering_manifest.abi_capabilities {
-        let Some((entry_abi, caps)) = raw.split_once(':') else {
-            continue;
-        };
-        if entry_abi.trim() != abi {
-            continue;
-        }
-        saw_abi = true;
-        for cap in caps.split('|').map(str::trim).filter(|cap| !cap.is_empty()) {
-            if let Some(pattern) = cap.strip_prefix("ffi:") {
-                out.push(pattern.trim().to_owned());
-            }
-        }
-    }
-    if !saw_abi {
+    if !ffi_registry.has_abi(abi) {
         return Err(format!(
             "extern ABI `{}` has no abi_capabilities mapping in nustar package `{}`",
             abi, lowering_manifest.package_id
         ));
     }
+    let out = ffi_registry.signature_families(abi).to_vec();
     if out.is_empty() {
         return Err(format!(
             "extern ABI `{}` in nustar package `{}` has no `ffi:` signature allowlist entries",
             abi, lowering_manifest.package_id
         ));
     }
-    out.sort();
-    out.dedup();
     Ok(out)
 }
 

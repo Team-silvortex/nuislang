@@ -86,8 +86,65 @@ fn rejects_registered_c_ffi_symbol_with_wrong_signature() {
         .expect("registered C FFI symbol with wrong signature should be rejected");
     let _ = fs::remove_file(&path);
 
-    assert!(error.contains("symbol `host_i32_curve` signature `f64(f64)` is not allowed"));
-    assert!(error.contains("allowed symbol signatures: i32(i32)"));
+    assert!(error.contains("symbol `host_i32_curve` signature `f64(f64)`"));
+    assert!(error.contains("allowed symbol registrations: signature:i32(i32)"));
+}
+
+#[test]
+fn accepts_hash_registered_c_ffi_symbol_signature() {
+    let path = std::env::temp_dir().join(format!(
+        "nuis_hash_ffi_allowlist_{}_{}.ns",
+        std::process::id(),
+        "host_hashed_curve"
+    ));
+    fs::write(
+        &path,
+        r#"
+        mod cpu Main {
+          extern "c" fn host_hashed_curve(value: i64) -> i64;
+
+          fn main() -> i64 {
+            return host_hashed_curve(7);
+          }
+        }
+        "#,
+    )
+    .expect("should write temporary hash ffi source");
+
+    nuisc::pipeline::compile_source_path(&path)
+        .unwrap_or_else(|error| panic!("hash-registered ffi source should compile: {error}"));
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn rejects_hash_registered_c_ffi_symbol_with_wrong_signature() {
+    let path = std::env::temp_dir().join(format!(
+        "nuis_bad_hash_ffi_allowlist_{}_{}.ns",
+        std::process::id(),
+        "host_hashed_curve"
+    ));
+    fs::write(
+        &path,
+        r#"
+        mod cpu Main {
+          extern "c" fn host_hashed_curve(value: f64) -> f64;
+
+          fn main() -> f64 {
+            return host_hashed_curve(1.0);
+          }
+        }
+        "#,
+    )
+    .expect("should write temporary bad hash ffi source");
+
+    let error = nuisc::pipeline::compile_source_path(&path)
+        .err()
+        .expect("hash-registered C FFI symbol with wrong signature should be rejected");
+    let _ = fs::remove_file(&path);
+
+    assert!(error.contains("symbol `host_hashed_curve` signature `f64(f64)`"));
+    assert!(error.contains("hash `fnv1a64:a1c664e04682ecad`"));
+    assert!(error.contains("hash:fnv1a64:38ca92f356fcb551"));
 }
 
 #[test]

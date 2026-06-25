@@ -46,10 +46,33 @@ Current initial allowlist shape:
 * i32 scalar probes: `i32(*)`
 * buffer bridge families: `i64(ref_Buffer+*)` and `i32(ref_Buffer+*)`
 * registered symbol contracts: `ffi_symbol:<symbol>=<signature>`
+* hash-registered symbol contracts: `ffi_symbol_hash:<symbol>=fnv1a64:<hex>`
 
 The signature families remain intentionally coarse as a staging guard. When a
 symbol has a `ffi_symbol:` entry, that symbol is checked against its registered
 signature first and cannot fall back to the wider family allowlist.
+
+The hash form uses the canonical input:
+
+`nuis-ffi-symbol-v1|<abi>|<symbol>|<signature>`
+
+For example, `c|host_hashed_curve|i64(i64)` is registered as
+`ffi_symbol_hash:host_hashed_curve=fnv1a64:38ca92f356fcb551`.
+
+AOT bundle manifests mirror the same contract with:
+
+* `host_ffi_symbols=<symbol>@<abi>:<signature>;...`
+* `host_ffi_symbol_hashes=<symbol>:fnv1a64:<hex>;...`
+
+The packer verifies these two lines against each other before writing the
+bundle manifest, so ABI drift, signature drift, and hash drift are caught at
+pack time.
+
+The packer also compares those manifest lines against its host FFI registry
+view. A symbol must be registered by `(abi, symbol)` and must match either the
+registered signature or the registered signature hash. This keeps `C ABI` as a
+declared capability instead of an implicit escape hatch, even in generated AOT
+bundles.
 
 The narrow buffer bridge means:
 

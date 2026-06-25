@@ -1,5 +1,7 @@
 use std::{collections::BTreeMap, fmt};
 
+pub mod ffi;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct YirModule {
     pub version: String,
