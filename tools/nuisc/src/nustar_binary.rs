@@ -864,7 +864,7 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
                 return Some(Vec::new());
             }
             let mut values = Vec::new();
-            for part in inner.split(',') {
+            for part in split_quoted_array_items(inner)? {
                 let item = part.trim();
                 if !(item.starts_with('"') && item.ends_with('"') && item.len() >= 2) {
                     return None;
@@ -875,6 +875,33 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
         }
     }
     None
+}
+
+fn split_quoted_array_items(inner: &str) -> Option<Vec<&str>> {
+    let mut items = Vec::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut start = 0;
+    for (index, ch) in inner.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ',' if !in_string => {
+                items.push(&inner[start..index]);
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if in_string || escaped {
+        return None;
+    }
+    items.push(&inner[start..]);
+    Some(items)
 }
 
 fn parse_optional_string(source: &str, key: &str) -> Option<String> {
@@ -994,6 +1021,23 @@ mod tests {
             lowering_targets: vec!["native".to_owned()],
             ops: vec![format!("{domain}.const")],
         }
+    }
+
+    #[test]
+    fn string_array_parser_preserves_commas_inside_quoted_ffi_signatures() {
+        let values = parse_optional_string_array(
+            r#"abi_capabilities = ["c:ffi_symbol:host_network_open_tcp_stream=i64(i64,i64)", "nurs:ffi_symbol:HostMath__speed_curve=i64(i64)"]"#,
+            "abi_capabilities",
+        )
+        .expect("array should parse");
+
+        assert_eq!(
+            values,
+            vec![
+                "c:ffi_symbol:host_network_open_tcp_stream=i64(i64,i64)",
+                "nurs:ffi_symbol:HostMath__speed_curve=i64(i64)"
+            ]
+        );
     }
 
     #[test]

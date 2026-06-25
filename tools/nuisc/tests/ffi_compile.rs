@@ -91,6 +91,66 @@ fn rejects_registered_c_ffi_symbol_with_wrong_signature() {
 }
 
 #[test]
+fn rejects_registered_host_runtime_symbol_with_wide_family_signature() {
+    let path = std::env::temp_dir().join(format!(
+        "nuis_bad_host_runtime_symbol_allowlist_{}_{}.ns",
+        std::process::id(),
+        "host_argv_count"
+    ));
+    fs::write(
+        &path,
+        r#"
+        mod cpu Main {
+          extern "c" fn host_argv_count(seed: i64) -> i64;
+
+          fn main() -> i64 {
+            return host_argv_count(1);
+          }
+        }
+        "#,
+    )
+    .expect("should write temporary host runtime ffi source");
+
+    let error = nuisc::pipeline::compile_source_path(&path)
+        .err()
+        .expect("registered host runtime symbol should not fall back to i64(*)");
+    let _ = fs::remove_file(&path);
+
+    assert!(error.contains("symbol `host_argv_count` signature `i64(i64)`"));
+    assert!(error.contains("allowed symbol registrations: signature:i64()"));
+}
+
+#[test]
+fn rejects_registered_network_probe_symbol_with_wide_family_signature() {
+    let path = std::env::temp_dir().join(format!(
+        "nuis_bad_network_probe_symbol_allowlist_{}_{}.ns",
+        std::process::id(),
+        "host_network_connect_probe"
+    ));
+    fs::write(
+        &path,
+        r#"
+        mod cpu Main {
+          extern "c" fn host_network_connect_probe(port: i64) -> i64;
+
+          fn main() -> i64 {
+            return host_network_connect_probe(8080);
+          }
+        }
+        "#,
+    )
+    .expect("should write temporary network probe ffi source");
+
+    let error = nuisc::pipeline::compile_source_path(&path)
+        .err()
+        .expect("registered network probe symbol should not fall back to i64(*)");
+    let _ = fs::remove_file(&path);
+
+    assert!(error.contains("symbol `host_network_connect_probe` signature `i64(i64)`"));
+    assert!(error.contains("allowed symbol registrations: signature:i64(i64,i64,i64)"));
+}
+
+#[test]
 fn accepts_hash_registered_c_ffi_symbol_signature() {
     let path = std::env::temp_dir().join(format!(
         "nuis_hash_ffi_allowlist_{}_{}.ns",

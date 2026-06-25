@@ -458,8 +458,8 @@ current linked-list prototype.
 
 Reference examples:
 
-* valid: [examples/yir/cpu_linked_list_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu_linked_list_rustish.yir)
-* valid buffer example: [examples/yir/cpu_buffer_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu_buffer_rustish.yir)
+* valid: [examples/yir/cpu/cpu_linked_list_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/cpu_linked_list_rustish.yir)
+* valid buffer example: [examples/yir/cpu/cpu_buffer_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/cpu_buffer_rustish.yir)
 * invalid borrowed write: [examples/invalid/yir/cpu_borrow_write_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/cpu_borrow_write_invalid.yir)
 * invalid owner write while borrowed: [examples/invalid/yir/cpu_owner_write_while_borrowed_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/cpu_owner_write_while_borrowed_invalid.yir)
 * invalid borrowed buffer write: [examples/invalid/yir/cpu_buffer_borrow_write_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/cpu_buffer_borrow_write_invalid.yir)

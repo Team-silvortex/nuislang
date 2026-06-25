@@ -59,6 +59,11 @@ The hash form uses the canonical input:
 For example, `c|host_hashed_curve|i64(i64)` is registered as
 `ffi_symbol_hash:host_hashed_curve=fnv1a64:38ca92f356fcb551`.
 
+In `nustar` manifest strings, multi-argument `ffi_symbol:` signatures can use
+the same comma-separated form as source-facing signatures, for example
+`i64(i64,i64)`. Older `+`-separated manifest signatures such as
+`i64(i64+i64)` remain accepted as a compatibility alias.
+
 AOT bundle manifests mirror the same contract with:
 
 * `host_ffi_symbols=<symbol>@<abi>:<signature>;...`

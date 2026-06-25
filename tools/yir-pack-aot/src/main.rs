@@ -3609,8 +3609,10 @@ mod tests {
     use super::{
         collect_host_ffi_symbols, render_host_ffi_stubs, render_host_ffi_symbol_hash_manifest,
         render_host_ffi_symbol_manifest, verify_host_ffi_manifest_against_registry_lines,
-        verify_host_ffi_manifest_lines, HostFfiArgType, HostFfiReturnType,
+        verify_host_ffi_manifest_lines, HostFfiArgType, HostFfiReturnType, HostFfiSignature,
+        DEFAULT_HOST_FFI_REGISTRY_LINES,
     };
+    use std::collections::BTreeMap;
     use yir_core::{Node, Operation, YirModule};
 
     fn cpu_node(name: &str, instruction: &str, args: &[&str]) -> Node {
@@ -3633,6 +3635,35 @@ mod tests {
             instruction,
             &op_args.iter().map(String::as_str).collect::<Vec<_>>(),
         )
+    }
+
+    fn host_ffi_signature(
+        abi: &str,
+        return_type: HostFfiReturnType,
+        arg_types: Vec<HostFfiArgType>,
+    ) -> HostFfiSignature {
+        HostFfiSignature {
+            abi: abi.to_owned(),
+            return_type,
+            arg_types,
+        }
+    }
+
+    fn i64_host_ffi_signature(abi: &str, arg_count: usize) -> HostFfiSignature {
+        host_ffi_signature(
+            abi,
+            HostFfiReturnType::I64,
+            vec![HostFfiArgType::I64; arg_count],
+        )
+    }
+
+    fn insert_i64_host_ffi_symbol(
+        symbols: &mut BTreeMap<String, HostFfiSignature>,
+        abi: &str,
+        symbol: &str,
+        arg_count: usize,
+    ) {
+        symbols.insert(symbol.to_owned(), i64_host_ffi_signature(abi, arg_count));
     }
 
     #[test]
@@ -3722,6 +3753,57 @@ mod tests {
             symbol_line,
             hash_line,
             &["c:ffi_symbol:host_i32_curve=i32(i32)"],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn default_host_ffi_registry_accepts_all_builtin_stub_symbols() {
+        let mut symbols = BTreeMap::new();
+        for (symbol, arg_count) in [
+            ("HostRenderCurves__color_bias", 1),
+            ("HostRenderCurves__speed_curve", 1),
+            ("HostRenderCurves__radius_curve", 1),
+            ("HostRenderCurves__mix_tick", 2),
+            ("HostMath__speed_curve", 1),
+        ] {
+            insert_i64_host_ffi_symbol(&mut symbols, "nurs", symbol, arg_count);
+        }
+        for (symbol, arg_count) in [
+            ("host_speed_curve", 1),
+            ("host_hashed_curve", 1),
+            ("host_argv_count", 0),
+            ("host_monotonic_time_ns", 0),
+            ("host_network_connect_probe", 3),
+            ("host_network_open_tcp_stream", 2),
+            ("host_network_open_tcp_listener", 3),
+            ("host_network_open_udp_datagram", 2),
+            ("host_network_bind_udp_datagram", 3),
+            ("host_network_accept_owned", 3),
+            ("host_network_close_owned", 1),
+            ("host_network_send_owned", 3),
+            ("host_network_recv_owned", 3),
+            ("host_network_recv_http_status_owned", 3),
+            ("host_network_accept_probe", 3),
+            ("host_network_close", 1),
+            ("host_network_send_probe", 3),
+            ("host_network_recv_probe", 3),
+        ] {
+            insert_i64_host_ffi_symbol(&mut symbols, "c", symbol, arg_count);
+        }
+        symbols.insert(
+            "host_i32_curve".to_owned(),
+            host_ffi_signature("c", HostFfiReturnType::I32, vec![HostFfiArgType::I32]),
+        );
+
+        let symbol_manifest = render_host_ffi_symbol_manifest(&symbols);
+        let hash_manifest = render_host_ffi_symbol_hash_manifest(&symbols);
+
+        verify_host_ffi_manifest_lines(&symbol_manifest, &hash_manifest).unwrap();
+        verify_host_ffi_manifest_against_registry_lines(
+            &symbol_manifest,
+            &hash_manifest,
+            DEFAULT_HOST_FFI_REGISTRY_LINES,
         )
         .unwrap();
     }

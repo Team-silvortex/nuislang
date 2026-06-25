@@ -90,7 +90,7 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
             let body = collected.trim();
             let body = body.strip_prefix('[')?.strip_suffix(']')?;
             let mut values = Vec::new();
-            for item in body.split(',') {
+            for item in split_quoted_array_items(body)? {
                 let item = item.trim();
                 if item.is_empty() {
                     continue;
@@ -105,6 +105,33 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
         }
     }
     None
+}
+
+fn split_quoted_array_items(inner: &str) -> Option<Vec<&str>> {
+    let mut items = Vec::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut start = 0;
+    for (index, ch) in inner.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ',' if !in_string => {
+                items.push(&inner[start..index]);
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if in_string || escaped {
+        return None;
+    }
+    items.push(&inner[start..]);
+    Some(items)
 }
 
 fn parse_optional_link_array(source: &str, key: &str) -> Option<Vec<ProjectLink>> {
@@ -194,4 +221,26 @@ pub(super) fn sanitize_ident(raw: &str) -> String {
     raw.chars()
         .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn string_array_parser_preserves_commas_inside_quoted_project_values() {
+        let values = parse_optional_string_array(
+            r#"modules = ["main.ns", "generated/report,with-comma.ns"]"#,
+            "modules",
+        )
+        .expect("array should parse");
+
+        assert_eq!(
+            values,
+            vec![
+                "main.ns".to_owned(),
+                "generated/report,with-comma.ns".to_owned()
+            ]
+        );
+    }
 }

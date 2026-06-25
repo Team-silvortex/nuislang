@@ -176,6 +176,23 @@ mod tests {
     }
 
     #[test]
+    fn string_array_parser_preserves_commas_inside_quoted_stdlib_values() {
+        let values = parse_optional_string_array(
+            r#"surfaces = ["surface.std.text,json.v1", "surface.std.io.v1"]"#,
+            "surfaces",
+        )
+        .expect("array should parse");
+
+        assert_eq!(
+            values,
+            vec![
+                "surface.std.text,json.v1".to_owned(),
+                "surface.std.io.v1".to_owned()
+            ]
+        );
+    }
+
+    #[test]
     fn core_manifest_exposes_canonical_surface_registry_ids() {
         let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
         let manifest = load_stdlib_module_manifest(&stdlib_root, "core").expect("load core");
@@ -459,7 +476,7 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
             let body = collected.trim();
             let body = body.strip_prefix('[')?.strip_suffix(']')?;
             let mut values = Vec::new();
-            for item in body.split(',') {
+            for item in split_quoted_array_items(body)? {
                 let item = item.trim();
                 if item.is_empty() {
                     continue;
@@ -470,6 +487,33 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
         }
     }
     None
+}
+
+fn split_quoted_array_items(inner: &str) -> Option<Vec<&str>> {
+    let mut items = Vec::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut start = 0;
+    for (index, ch) in inner.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ',' if !in_string => {
+                items.push(&inner[start..index]);
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if in_string || escaped {
+        return None;
+    }
+    items.push(&inner[start..]);
+    Some(items)
 }
 
 fn parse_quoted(raw: &str) -> Option<String> {

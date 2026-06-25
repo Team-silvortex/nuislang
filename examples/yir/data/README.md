@@ -10,7 +10,7 @@ Recommended starting points:
 
 * [data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_fabric_demo.yir)
   current typed Fabric/data surface
-* [shader_overlay_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/shader_overlay_demo.yir)
+* [shader_overlay_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_overlay_demo.yir)
   data-assisted render path reference
 * [data_external_handle_bridge_probe.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_external_handle_bridge_probe.yir)
   comment-only bridge probe for future `Window` / `Marker` / `HandleTable`
