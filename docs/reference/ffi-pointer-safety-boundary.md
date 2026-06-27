@@ -59,6 +59,16 @@ symbols. The broad `i64(*)` family remains only as a compatibility staging
 surface for experiments, not as the intended security boundary for official
 host facades.
 
+`libc` is a separate registered ABI surface rather than another name for the
+project-owned `c` host facade set. The initial libc allowlist is deliberately
+tiny: `getpid() -> i32`, `usleep(i32) -> i32`, `puts(String) -> i32`,
+`strlen(String) -> i64`, `write(i32, String, i64) -> i64`, and
+`close(i32) -> i32`, plus `read(i32, ref_Buffer, i64) -> i64`. The text and
+buffer bridges are still not raw
+pointer escapes: source code passes a Nuis `String`, and lowering exposes the
+backing C string pointer only inside the registered call boundary. That keeps
+system C calls explicit and auditable while the wider C FFI nustar grows.
+
 The hash form uses the canonical input:
 
 `nuis-ffi-symbol-v1|<abi>|<symbol>|<signature>`

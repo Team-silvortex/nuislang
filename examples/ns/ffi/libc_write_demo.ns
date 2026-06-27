@@ -1,0 +1,12 @@
+mod cpu Main {
+  extern "libc" fn strlen(message: String) -> i64;
+  extern "libc" fn write(fd: i32, message: String, len: i64) -> i64;
+
+  fn main() -> i64 {
+    let message: String = "nuis libc write bridge\n";
+    let len: i64 = strlen(message);
+    let stdout_fd: i32 = i32_from_i64(1);
+    let written: i64 = write(stdout_fd, message, len);
+    return written - len;
+  }
+}

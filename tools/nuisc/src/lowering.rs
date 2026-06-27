@@ -163,7 +163,7 @@ impl LoweringTargetConfig {
 
     pub fn supports_host_ffi_abi(&self, abi: &str) -> bool {
         match abi {
-            "c" => true,
+            "c" | "libc" => true,
             "nurs" => self.abi.contains(".nurs."),
             _ => false,
         }

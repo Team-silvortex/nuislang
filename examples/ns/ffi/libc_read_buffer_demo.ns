@@ -1,0 +1,13 @@
+mod cpu Main {
+  extern "libc" fn read(fd: i32, buffer: ref Buffer, len: i64) -> i64;
+
+  fn main() -> i64 {
+    let scratch: ref Buffer = alloc_buffer(8, 0);
+    let invalid_fd: i32 = i32_from_i64(-1);
+    let read_len: i64 = read(invalid_fd, scratch, buffer_len(scratch));
+    if read_len < 0 {
+      return 0;
+    }
+    return 1;
+  }
+}

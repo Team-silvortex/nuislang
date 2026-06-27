@@ -1,0 +1,12 @@
+mod cpu Main {
+  extern "libc" fn close(fd: i32) -> i32;
+
+  fn main() -> i64 {
+    let invalid_fd: i32 = i32_from_i64(-1);
+    let status: i32 = close(invalid_fd);
+    if status < i32_from_i64(0) {
+      return 0;
+    }
+    return 1;
+  }
+}

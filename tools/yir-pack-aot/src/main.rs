@@ -2294,6 +2294,7 @@ enum HostFfiReturnType {
 enum HostFfiArgType {
     I64,
     I32,
+    RefBuffer,
 }
 
 trait HostFfiScalarType {
@@ -2322,6 +2323,7 @@ impl HostFfiScalarType for HostFfiArgType {
         match self {
             Self::I64 => "i64",
             Self::I32 => "i32",
+            Self::RefBuffer => "ref_Buffer",
         }
     }
 
@@ -2329,6 +2331,7 @@ impl HostFfiScalarType for HostFfiArgType {
         match self {
             Self::I64 => "int64_t",
             Self::I32 => "int32_t",
+            Self::RefBuffer => "void *",
         }
     }
 }
@@ -2562,9 +2565,9 @@ fn validate_host_ffi_symbols(module: &YirModule) -> Result<(), String> {
             ));
         }
         let abi = node.op.args[0].as_str();
-        if abi != "nurs" && abi != "c" {
+        if abi != "nurs" && abi != "c" && abi != "libc" {
             return Err(format!(
-                "cpu.{} node `{}` uses unsupported abi `{abi}`; expected `nurs` or `c`",
+                "cpu.{} node `{}` uses unsupported abi `{abi}`; expected `nurs`, `c`, or `libc`",
                 node.op.instruction, node.name
             ));
         }
@@ -2617,9 +2620,10 @@ fn collect_host_ffi_symbols(
         if node.op.args.len() < 2 {
             continue;
         }
+        let abi = node.op.args[0].clone();
         let symbol = node.op.args[1].clone();
         let signature = HostFfiSignature {
-            abi: node.op.args[0].clone(),
+            abi: abi.clone(),
             return_type: host_ffi_return_type(&node.op.instruction).ok_or_else(|| {
                 format!(
                     "cpu.{} node `{}` has no known host FFI return type",
@@ -2631,7 +2635,7 @@ fn collect_host_ffi_symbols(
                 .args
                 .iter()
                 .skip(2)
-                .map(|arg| host_ffi_arg_type_for_input(arg, &nodes_by_name))
+                .map(|arg| host_ffi_arg_type_for_input(&abi, arg, &nodes_by_name))
                 .collect(),
         };
         if let Some(existing) = out.insert(symbol.clone(), signature.clone()) {
@@ -2660,22 +2664,28 @@ fn host_ffi_return_type(instruction: &str) -> Option<HostFfiReturnType> {
 }
 
 fn host_ffi_arg_type_for_input(
+    abi: &str,
     input: &str,
     nodes_by_name: &BTreeMap<&str, &yir_core::Node>,
 ) -> HostFfiArgType {
     nodes_by_name
         .get(input)
-        .map(|node| host_ffi_arg_type_for_node(node))
+        .map(|node| host_ffi_arg_type_for_node(abi, node))
         .unwrap_or(HostFfiArgType::I64)
 }
 
-fn host_ffi_arg_type_for_node(node: &yir_core::Node) -> HostFfiArgType {
+fn host_ffi_arg_type_for_node(abi: &str, node: &yir_core::Node) -> HostFfiArgType {
     if node.op.module != "cpu" {
         return HostFfiArgType::I64;
     }
     match node.op.instruction.as_str() {
         "const_i32" | "cast_i64_to_i32" | "extern_call_i32" | "call_i32" | "param_i32" => {
             HostFfiArgType::I32
+        }
+        "text" | "null" | "borrow" | "move_ptr" | "alloc_node" | "alloc_buffer" | "load_next"
+            if abi == "libc" =>
+        {
+            HostFfiArgType::RefBuffer
         }
         _ => HostFfiArgType::I64,
     }
@@ -2771,7 +2781,7 @@ fn append_host_ffi_manifest_entries(
     let registry_view = parse_host_ffi_registry_lines(&registry.lines)?;
     let registry_symbols = registry_view.len();
     let registry_abis = host_ffi_registry_abis(&registry_view);
-    verify_host_ffi_manifest_against_registry_lines(&symbol_list, &hash_list, &registry.lines)?;
+    verify_host_ffi_manifest_against_registry(&symbol_list, &hash_list, &registry_view)?;
     let used_abis = host_ffi_symbols
         .values()
         .map(|signature| signature.abi.clone())
@@ -2839,14 +2849,23 @@ impl HostFfiRegistration {
     }
 }
 
+#[cfg(test)]
 fn verify_host_ffi_manifest_against_registry_lines(
     symbol_list: &str,
     hash_list: &str,
     registry_lines: &[String],
 ) -> Result<(), String> {
+    let registry = parse_host_ffi_registry_lines(registry_lines)?;
+    verify_host_ffi_manifest_against_registry(symbol_list, hash_list, &registry)
+}
+
+fn verify_host_ffi_manifest_against_registry(
+    symbol_list: &str,
+    hash_list: &str,
+    registry: &BTreeMap<(String, String), Vec<HostFfiRegistration>>,
+) -> Result<(), String> {
     let symbols = parse_host_ffi_symbol_manifest_entries(symbol_list)?;
     let hashes = parse_host_ffi_hash_manifest_entries(hash_list)?;
-    let registry = parse_host_ffi_registry_lines(registry_lines)?;
     for (symbol, (abi, signature)) in &symbols {
         let Some(actual_hash) = hashes.get(symbol) else {
             return Err(format!(
@@ -2976,6 +2995,9 @@ fn parse_host_ffi_hash_manifest_entries(value: &str) -> Result<BTreeMap<String, 
 fn render_host_ffi_stubs(host_ffi_symbols: &BTreeMap<String, HostFfiSignature>) -> String {
     let mut out = String::new();
     for (symbol, signature) in host_ffi_symbols {
+        if signature.abi == "libc" {
+            continue;
+        }
         out.push('\n');
         out.push_str(&render_host_ffi_stub(symbol, signature));
     }
@@ -3801,8 +3823,8 @@ mod tests {
         host_ffi_registry_abis, host_ffi_registry_hash, is_ffi_symbol_hash_token,
         parse_host_ffi_registry_lines, parse_manifest_string_array, render_host_ffi_stubs,
         render_host_ffi_symbol_hash_manifest, render_host_ffi_symbol_manifest,
-        verify_host_ffi_manifest_against_registry_lines, verify_host_ffi_manifest_lines,
-        HostFfiArgType, HostFfiReturnType, HostFfiSignature,
+        verify_host_ffi_manifest_against_registry, verify_host_ffi_manifest_against_registry_lines,
+        verify_host_ffi_manifest_lines, HostFfiArgType, HostFfiReturnType, HostFfiSignature,
     };
     use std::collections::BTreeMap;
     use yir_core::{Node, Operation, YirModule};
@@ -3820,7 +3842,18 @@ mod tests {
     }
 
     fn extern_node(name: &str, instruction: &str, symbol: &str, args: &[&str]) -> Node {
+        extern_node_with_abi("c", name, instruction, symbol, args)
+    }
+
+    fn extern_node_with_abi(
+        abi: &str,
+        name: &str,
+        instruction: &str,
+        symbol: &str,
+        args: &[&str],
+    ) -> Node {
         let mut op_args = vec!["c".to_owned(), symbol.to_owned()];
+        op_args[0] = abi.to_owned();
         op_args.extend(args.iter().map(|arg| (*arg).to_owned()));
         cpu_node(
             name,
@@ -3882,6 +3915,39 @@ mod tests {
 
         let stubs = render_host_ffi_stubs(&symbols);
         assert!(stubs.contains("int32_t host_i32_curve(int32_t arg0)"));
+    }
+
+    #[test]
+    fn libc_ref_buffer_signature_is_recorded_but_not_stubbed() {
+        let mut module = YirModule::new("1");
+        module.nodes.push(cpu_node("fd", "const_i32", &["-1"]));
+        module.nodes.push(cpu_node("len", "const_i64", &["8"]));
+        module
+            .nodes
+            .push(cpu_node("scratch", "alloc_buffer", &["len", "len"]));
+        module.nodes.push(extern_node_with_abi(
+            "libc",
+            "read_call",
+            "extern_call_i64",
+            "read",
+            &["fd", "scratch", "len"],
+        ));
+
+        let symbols = collect_host_ffi_symbols(&module).unwrap();
+        let signature = symbols.get("read").unwrap();
+        assert_eq!(signature.abi, "libc");
+        assert_eq!(
+            signature.arg_types,
+            vec![
+                HostFfiArgType::I32,
+                HostFfiArgType::RefBuffer,
+                HostFfiArgType::I64
+            ]
+        );
+        assert_eq!(signature.render(), "i64(i32,ref_Buffer,i64)");
+
+        let stubs = render_host_ffi_stubs(&symbols);
+        assert!(!stubs.contains(" read("));
     }
 
     #[test]
@@ -3954,6 +4020,21 @@ mod tests {
     }
 
     #[test]
+    fn host_ffi_manifest_registry_verifier_accepts_parsed_registry_view() {
+        let registry = parse_host_ffi_registry_lines(&registry_lines(&[
+            "c:ffi_symbol:host_i32_curve=i32(i32)",
+        ]))
+        .unwrap();
+
+        verify_host_ffi_manifest_against_registry(
+            "host_i32_curve@c:i32(i32)",
+            "host_i32_curve:fnv1a64:b0042e2b5ee2c2aa",
+            &registry,
+        )
+        .unwrap();
+    }
+
+    #[test]
     fn host_ffi_registry_manifest_parser_preserves_commas_inside_signatures() {
         let values = parse_manifest_string_array(
             r#"abi_capabilities = ["c:ffi_symbol:host_file_open=i64(i64,i64)", "c:ffi_symbol:host_stdout_write=i64(i64)"]"#,
@@ -3992,6 +4073,13 @@ mod tests {
         assert!(registry.contains_key(&("c".to_owned(), "host_stdout_write".to_owned())));
         assert!(registry.contains_key(&("c".to_owned(), "host_file_open".to_owned())));
         assert!(registry.contains_key(&("c".to_owned(), "host_command_spawn_in".to_owned())));
+        assert!(registry.contains_key(&("libc".to_owned(), "getpid".to_owned())));
+        assert!(registry.contains_key(&("libc".to_owned(), "usleep".to_owned())));
+        assert!(registry.contains_key(&("libc".to_owned(), "puts".to_owned())));
+        assert!(registry.contains_key(&("libc".to_owned(), "strlen".to_owned())));
+        assert!(registry.contains_key(&("libc".to_owned(), "write".to_owned())));
+        assert!(registry.contains_key(&("libc".to_owned(), "close".to_owned())));
+        assert!(registry.contains_key(&("libc".to_owned(), "read".to_owned())));
     }
 
     #[test]
@@ -4022,7 +4110,7 @@ mod tests {
             .any(|line| line.starts_with("host_ffi_registry_source=cpu-manifest:")));
         assert!(manifest
             .iter()
-            .any(|line| line == "host_ffi_registry_abis=c,nurs"));
+            .any(|line| line == "host_ffi_registry_abis=c,libc,nurs"));
         let registry_hash = manifest
             .iter()
             .find_map(|line| line.strip_prefix("host_ffi_registry_hash="))
@@ -4083,11 +4171,12 @@ mod tests {
     fn host_ffi_registry_abis_are_sorted_and_deduplicated() {
         let registry = parse_host_ffi_registry_lines(&registry_lines(&[
             "nurs:ffi_symbol:HostMath__speed_curve=i64(i64)",
+            "libc:ffi_symbol:getpid=i32()|ffi_symbol:usleep=i32(i32)|ffi_symbol:puts=i32(String)|ffi_symbol:strlen=i64(String)|ffi_symbol:write=i64(i32,String,i64)|ffi_symbol:close=i32(i32)|ffi_symbol:read=i64(i32,ref_Buffer,i64)",
             "c:ffi_symbol:host_stdout_write=i64(i64)|ffi_symbol:host_stderr_write=i64(i64)",
         ]))
         .unwrap();
 
-        assert_eq!(host_ffi_registry_abis(&registry), "c,nurs");
+        assert_eq!(host_ffi_registry_abis(&registry), "c,libc,nurs");
     }
 
     #[test]

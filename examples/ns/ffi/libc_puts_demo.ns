@@ -1,0 +1,8 @@
+mod cpu Main {
+  extern "libc" fn puts(message: String) -> i32;
+
+  fn main() -> i64 {
+    let _printed: i32 = puts("nuis libc puts bridge");
+    return 0;
+  }
+}

@@ -1,5 +1,5 @@
 mod cpu Main {
-  extern "c" fn usleep(usec: i64) -> i32;
+  extern "libc" fn usleep(usec: i32) -> i32;
   extern "c" fn host_wall_time_ns() -> i64;
   extern "c" fn host_monotonic_time_ns() -> i64;
   extern "c" fn host_clock_domain_id() -> i64;
@@ -69,7 +69,8 @@ mod cpu Main {
     clock_domain="global",
     clock_policy="bridge"
   ) async fn slow_global_timeout() -> i64 {
-    let _slept: i32 = usleep(100000);
+    let delay_usec: i32 = i32_from_i64(100000);
+    let _slept: i32 = usleep(delay_usec);
     return 1;
   }
 

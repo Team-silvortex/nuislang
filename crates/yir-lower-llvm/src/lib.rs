@@ -2786,14 +2786,14 @@ fn emit_cpu_function(
             ("cpu", "extern_call_i64") => {
                 let abi = &node.op.args[0];
                 let symbol = &node.op.args[1];
-                if abi != "nurs" && abi != "c" {
+                if abi != "nurs" && abi != "c" && abi != "libc" {
                     body.push(format!(
                         "  ; deferred lowering for cpu.extern_call_i64 `{}` because ABI `{}` is not supported by the current LLVM bridge",
                         node.name, abi
                     ));
                     continue;
                 }
-                let dynamic_args = !is_builtin_host_ffi_symbol(symbol);
+                let dynamic_args = abi == "libc" || !is_builtin_host_ffi_symbol(symbol);
                 let lowered_args = node.op.args[2..]
                     .iter()
                     .map(|arg| {
@@ -2850,14 +2850,14 @@ fn emit_cpu_function(
             ("cpu", "extern_call_i32") => {
                 let abi = &node.op.args[0];
                 let symbol = &node.op.args[1];
-                if abi != "nurs" && abi != "c" {
+                if abi != "nurs" && abi != "c" && abi != "libc" {
                     body.push(format!(
                         "  ; deferred lowering for cpu.extern_call_i32 `{}` because ABI `{}` is not supported by the current LLVM bridge",
                         node.name, abi
                     ));
                     continue;
                 }
-                let dynamic_args = !is_builtin_host_ffi_symbol(symbol);
+                let dynamic_args = abi == "libc" || !is_builtin_host_ffi_symbol(symbol);
                 let lowered_args = node.op.args[2..]
                     .iter()
                     .map(|arg| {
@@ -10902,7 +10902,7 @@ fn render_dynamic_extern_decls(module: &YirModule) -> Vec<String> {
             continue;
         }
         let abi = node.op.args[0].as_str();
-        if abi != "c" && abi != "nurs" {
+        if abi != "c" && abi != "nurs" && abi != "libc" {
             continue;
         }
         let symbol = node.op.args[1].clone();

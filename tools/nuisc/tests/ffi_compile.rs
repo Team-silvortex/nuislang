@@ -13,6 +13,7 @@ fn compiled_source(path: &str) {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct SourceExternSignature {
+    abi: String,
     symbol: String,
     signature: String,
     path: PathBuf,
@@ -41,7 +42,8 @@ fn collect_source_extern_signatures(root: &Path) -> Vec<SourceExternSignature> {
         let source = fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("should read `{}`: {error}", path.display()));
         out.extend(parse_source_extern_signatures(&source).into_iter().map(
-            |(symbol, signature)| SourceExternSignature {
+            |(abi, symbol, signature)| SourceExternSignature {
+                abi,
                 symbol,
                 signature,
                 path: path.clone(),
@@ -51,17 +53,26 @@ fn collect_source_extern_signatures(root: &Path) -> Vec<SourceExternSignature> {
     out
 }
 
-fn parse_source_extern_signatures(source: &str) -> Vec<(String, String)> {
+fn parse_source_extern_signatures(source: &str) -> Vec<(String, String, String)> {
     let mut out = Vec::new();
     let mut rest = source;
-    let needle = "extern \"c\" fn ";
+    let needle = "extern \"";
     while let Some(index) = rest.find(needle) {
         let after_needle = &rest[index + needle.len()..];
-        let Some(open_index) = after_needle.find('(') else {
+        let Some(abi_end) = after_needle.find('"') else {
             break;
         };
-        let symbol = after_needle[..open_index].trim();
-        let after_open = &after_needle[open_index + 1..];
+        let abi = after_needle[..abi_end].trim();
+        let after_abi = after_needle[abi_end + 1..].trim_start();
+        let Some(after_fn) = after_abi.strip_prefix("fn ") else {
+            rest = after_abi;
+            continue;
+        };
+        let Some(open_index) = after_fn.find('(') else {
+            break;
+        };
+        let symbol = after_fn[..open_index].trim();
+        let after_open = &after_fn[open_index + 1..];
         let Some(close_index) = after_open.find(')') else {
             break;
         };
@@ -79,6 +90,7 @@ fn parse_source_extern_signatures(source: &str) -> Vec<(String, String)> {
             .trim();
         if !symbol.is_empty() && !return_type.is_empty() {
             out.push((
+                abi.to_owned(),
                 symbol.to_owned(),
                 render_source_ffi_signature(return_type, args),
             ));
@@ -133,15 +145,24 @@ fn source_host_ffi_facades_are_exactly_registered_by_cpu_nustar() {
     let mut unique = BTreeSet::new();
     let mut missing = BTreeMap::new();
     for declaration in declarations {
-        if declaration.symbol == "usleep" {
+        if !unique.insert((
+            declaration.abi.clone(),
+            declaration.symbol.clone(),
+            declaration.signature.clone(),
+        )) {
             continue;
         }
-        if !unique.insert((declaration.symbol.clone(), declaration.signature.clone())) {
-            continue;
-        }
-        if !source_extern_is_registered(&view, "c", &declaration.symbol, &declaration.signature) {
+        if !source_extern_is_registered(
+            &view,
+            &declaration.abi,
+            &declaration.symbol,
+            &declaration.signature,
+        ) {
             missing.insert(
-                format!("{} {}", declaration.symbol, declaration.signature),
+                format!(
+                    "{} {} {}",
+                    declaration.abi, declaration.symbol, declaration.signature
+                ),
                 declaration.path,
             );
         }
@@ -151,6 +172,19 @@ fn source_host_ffi_facades_are_exactly_registered_by_cpu_nustar() {
         missing.is_empty(),
         "source C FFI declarations must be exact-registered by official.cpu; missing: {missing:#?}"
     );
+}
+
+#[test]
+fn accepts_registered_libc_demo_signatures() {
+    compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns",
+    );
+    compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_usleep_demo.ns");
+    compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_puts_demo.ns");
+    compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_strlen_demo.ns");
+    compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_write_demo.ns");
+    compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_close_demo.ns");
+    compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_read_buffer_demo.ns");
 }
 
 #[test]
@@ -326,6 +360,66 @@ fn rejects_registered_stdout_facade_symbol_with_wide_family_signature() {
 
     assert!(error.contains("symbol `host_stdout_write` signature `i64(i64,i64)`"));
     assert!(error.contains("allowed symbol registrations: signature:i64(i64)"));
+}
+
+#[test]
+fn rejects_registered_libc_symbol_with_wide_family_signature() {
+    let path = std::env::temp_dir().join(format!(
+        "nuis_bad_libc_symbol_allowlist_{}_{}.ns",
+        std::process::id(),
+        "usleep"
+    ));
+    fs::write(
+        &path,
+        r#"
+        mod cpu Main {
+          extern "libc" fn usleep(usec: i64) -> i32;
+
+          fn main() -> i32 {
+            return usleep(1);
+          }
+        }
+        "#,
+    )
+    .expect("should write temporary libc ffi source");
+
+    let error = nuisc::pipeline::compile_source_path(&path)
+        .err()
+        .expect("registered libc symbol should not fall back to a wide signature");
+    let _ = fs::remove_file(&path);
+
+    assert!(error.contains("symbol `usleep` signature `i32(i64)`"));
+    assert!(error.contains("allowed symbol registrations: signature:i32(i32)"));
+}
+
+#[test]
+fn rejects_unregistered_libc_symbol_even_with_known_text_signature() {
+    let path = std::env::temp_dir().join(format!(
+        "nuis_bad_libc_symbol_allowlist_{}_{}.ns",
+        std::process::id(),
+        "strlen_like"
+    ));
+    fs::write(
+        &path,
+        r#"
+        mod cpu Main {
+          extern "libc" fn strlen_like(message: String) -> i64;
+
+          fn main() -> i64 {
+            return strlen_like("nuis");
+          }
+        }
+        "#,
+    )
+    .expect("should write temporary libc ffi source");
+
+    let error = nuisc::pipeline::compile_source_path(&path)
+        .err()
+        .expect("unregistered libc symbol should not use a wide family allowlist");
+    let _ = fs::remove_file(&path);
+
+    assert!(error.contains("ABI `libc`"));
+    assert!(error.contains("has no `ffi:` signature allowlist entries"));
 }
 
 #[test]

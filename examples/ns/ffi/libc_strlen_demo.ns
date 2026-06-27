@@ -1,0 +1,8 @@
+mod cpu Main {
+  extern "libc" fn strlen(message: String) -> i64;
+
+  fn main() -> i64 {
+    let len: i64 = strlen("nuis");
+    return len - 4;
+  }
+}

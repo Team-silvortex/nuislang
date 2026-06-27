@@ -4018,6 +4018,53 @@ fn resolve_project_profile_ref(node: &Node) -> Result<Value, String> {
 }
 
 fn execute_extern_i64(abi: &str, symbol: &str, args: &[i64]) -> Result<i64, String> {
+    if abi == "libc" {
+        return match symbol {
+            "getpid" => {
+                let [] = args else {
+                    return Err("libc getpid expects 0 args".to_owned());
+                };
+                Ok(1)
+            }
+            "usleep" => {
+                let [_usec] = args else {
+                    return Err("libc usleep expects 1 arg".to_owned());
+                };
+                Ok(0)
+            }
+            "puts" => {
+                let [_message] = args else {
+                    return Err("libc puts expects 1 arg".to_owned());
+                };
+                Ok(0)
+            }
+            "strlen" => {
+                let [_message] = args else {
+                    return Err("libc strlen expects 1 arg".to_owned());
+                };
+                Ok(0)
+            }
+            "write" => {
+                let [_fd, _message, len] = args else {
+                    return Err("libc write expects 3 args".to_owned());
+                };
+                Ok(*len)
+            }
+            "close" => {
+                let [_fd] = args else {
+                    return Err("libc close expects 1 arg".to_owned());
+                };
+                Ok(0)
+            }
+            "read" => {
+                let [_fd, _buffer, _len] = args else {
+                    return Err("libc read expects 3 args".to_owned());
+                };
+                Ok(-1)
+            }
+            _ => Err("unknown libc extern symbol".to_owned()),
+        };
+    }
     if abi != "nurs" && abi != "c" {
         return Err(format!("unsupported extern ABI `{abi}`"));
     }

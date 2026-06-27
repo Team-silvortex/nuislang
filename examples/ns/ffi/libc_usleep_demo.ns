@@ -1,0 +1,11 @@
+mod cpu Main {
+  extern "libc" fn getpid() -> i32;
+  extern "libc" fn usleep(usec: i32) -> i32;
+
+  fn main() -> i64 {
+    let _pid: i32 = getpid();
+    let delay_usec: i32 = i32_from_i64(1000);
+    let _slept: i32 = usleep(delay_usec);
+    return 0;
+  }
+}

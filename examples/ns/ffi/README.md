@@ -37,6 +37,35 @@ Host bridge ladder:
 * [hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_ffi.ns)
 * [hello_c_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_ffi.ns)
 * [hello_c_i32_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_i32_ffi.ns)
+* [libc_usleep_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_usleep_demo.ns)
+* [libc_puts_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_puts_demo.ns)
+* [libc_strlen_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_strlen_demo.ns)
+* [libc_write_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_write_demo.ns)
+* [libc_close_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_close_demo.ns)
+* [libc_read_buffer_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_read_buffer_demo.ns)
+
+Runnable libc smoke:
+
+```bash
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/ns/ffi/libc_usleep_demo.ns /tmp/nuis_libc_usleep_demo
+cargo run -p nuis -- run-artifact /tmp/nuis_libc_usleep_demo
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/ns/ffi/libc_puts_demo.ns /tmp/nuis_libc_puts_demo
+cargo run -p nuis -- run-artifact /tmp/nuis_libc_puts_demo
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/ns/ffi/libc_strlen_demo.ns /tmp/nuis_libc_strlen_demo
+cargo run -p nuis -- run-artifact /tmp/nuis_libc_strlen_demo
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/ns/ffi/libc_write_demo.ns /tmp/nuis_libc_write_demo
+cargo run -p nuis -- run-artifact /tmp/nuis_libc_write_demo
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/ns/ffi/libc_close_demo.ns /tmp/nuis_libc_close_demo
+cargo run -p nuis -- run-artifact /tmp/nuis_libc_close_demo
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/ns/ffi/libc_read_buffer_demo.ns /tmp/nuis_libc_read_buffer_demo
+cargo run -p nuis -- run-artifact /tmp/nuis_libc_read_buffer_demo
+```
 
 Task/runtime ladder:
 
