@@ -469,6 +469,43 @@ fn emits_module_with_contract_metadata_nodes_on_cpu_without_fake_cycles() {
 
     let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
     assert!(llvm_ir.contains("ret i64"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.target_config"));
+}
+
+#[test]
+fn emits_static_aot_tick_i64_values() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    module.nodes.push(Node {
+        name: "tick".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.tick_i64", vec!["4".to_owned(), "3".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bias".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.const_i64", vec!["10".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "sum".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.add", vec!["tick".to_owned(), "bias".to_owned()]).unwrap(),
+    });
+    for from in ["tick", "bias"] {
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: from.to_owned(),
+            to: "sum".to_owned(),
+        });
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("static AOT lowering freezes cpu.tick_i64"));
+    assert!(llvm_ir.contains("add i64 4, 3"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.tick_i64"));
 }
 
 #[test]

@@ -219,3 +219,32 @@ fn libc_read_buffer_demo_builds_and_runs_as_native_artifact() {
     let run_stdout = String::from_utf8_lossy(&run.stdout);
     assert!(run_stdout.contains("exit_status: 0"));
 }
+
+#[test]
+fn clock_test_facade_builds_and_runs_as_native_artifact() {
+    let _guard = CLI_SMOKE_LOCK.lock().unwrap();
+    let output_dir = temp_dir("clock_test_facades");
+    let output_dir_text = output_dir.display().to_string();
+
+    let build = run_nuis(&[
+        "build",
+        "--cpu-abi",
+        "cpu.arm64.apple_aapcs64",
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build hello_clock_test_facades");
+
+    let build_stdout = String::from_utf8_lossy(&build.stdout);
+    assert!(build_stdout.contains("ready_to_run: true"));
+    assert!(output_dir.join("hello_clock_test_facades").exists());
+    let llvm_ir = fs::read_to_string(output_dir.join("hello_clock_test_facades.ll")).unwrap();
+    assert!(llvm_ir.contains("static AOT lowering freezes cpu.tick_i64"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.tick_i64"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.target_config"));
+
+    let run = run_nuis(&["run-artifact", &output_dir_text]);
+    assert_success(&run, "nuis run-artifact hello_clock_test_facades");
+    let run_stdout = String::from_utf8_lossy(&run.stdout);
+    assert!(run_stdout.contains("exit_status: 0"));
+}

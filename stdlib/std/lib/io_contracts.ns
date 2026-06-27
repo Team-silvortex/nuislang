@@ -1,0 +1,70 @@
+/// Host I/O status helpers exposed through the standard auto-injected contracts.
+mod cpu StdIoContracts {
+  /// Encodes a successful host I/O operation.
+  pub fn io_ok() -> i64 {
+    return 0;
+  }
+
+  /// Encodes a failed host I/O operation.
+  pub fn io_error() -> i64 {
+    return 1;
+  }
+
+  /// Returns true when a host byte count represents success.
+  pub fn byte_count_ok(count: i64) -> bool {
+    return count >= 0;
+  }
+
+  /// Converts a host byte count into a process-style exit code.
+  pub fn byte_count_exit_code(count: i64) -> i64 {
+    if byte_count_ok(count) {
+      return io_ok();
+    }
+    return io_error();
+  }
+
+  /// Returns the non-negative byte count or zero when the host reported failure.
+  pub fn byte_count_or_zero(count: i64) -> i64 {
+    if byte_count_ok(count) {
+      return count;
+    }
+    return 0;
+  }
+
+  /// Encodes whether a flush-style host operation succeeded.
+  pub fn flush_exit_code(status: i64) -> i64 {
+    if status >= 0 {
+      return io_ok();
+    }
+    return io_error();
+  }
+
+  /// Combines write and flush outcomes into a single success/failure code.
+  pub fn write_flush_exit_code(write_count: i64, flush_status: i64) -> i64 {
+    if !byte_count_ok(write_count) {
+      return io_error();
+    }
+    return flush_exit_code(flush_status);
+  }
+
+  /// Produces a compact score for stdout/stderr write and flush probes.
+  pub fn console_status_total(
+    stdout_written: i64,
+    stderr_written: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64
+  ) -> i64 {
+    return byte_count_or_zero(stdout_written)
+      + byte_count_or_zero(stderr_written)
+      + flush_exit_code(stdout_flushed)
+      + flush_exit_code(stderr_flushed);
+  }
+
+  /// Normalizes a read result against its requested byte length.
+  pub fn read_progress_score(requested_len: i64, read_len: i64) -> i64 {
+    if requested_len <= 0 {
+      return byte_count_exit_code(read_len);
+    }
+    return byte_count_or_zero(read_len) + requested_len;
+  }
+}

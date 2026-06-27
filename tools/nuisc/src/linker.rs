@@ -60,6 +60,11 @@ pub struct LinkPlanArtifact {
     pub binary_path: String,
     pub binary_bytes: usize,
     pub build_manifest_bytes: usize,
+    pub container_kind: Option<String>,
+    pub container_version: Option<u16>,
+    pub section_count: Option<usize>,
+    pub section_names: Vec<String>,
+    pub section_table_valid: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,6 +142,9 @@ pub fn build_link_plan(
         })
         .collect::<Vec<_>>();
 
+    let artifact_container =
+        aot::inspect_nuis_compiled_artifact_container(Path::new(&report.artifact_path)).ok();
+
     LinkPlan {
         schema: LINK_PLAN_SCHEMA.to_owned(),
         input: report.input.clone(),
@@ -175,6 +183,22 @@ pub fn build_link_plan(
             binary_path: binary_path.clone(),
             binary_bytes: artifact.binary_bytes,
             build_manifest_bytes: artifact.build_manifest_bytes,
+            container_kind: artifact_container
+                .as_ref()
+                .map(|container| container.container_kind.clone()),
+            container_version: artifact_container
+                .as_ref()
+                .map(|container| container.binary_version),
+            section_count: artifact_container
+                .as_ref()
+                .map(|container| container.section_count),
+            section_names: artifact_container
+                .as_ref()
+                .map(|container| container.section_names.clone())
+                .unwrap_or_default(),
+            section_table_valid: artifact_container
+                .as_ref()
+                .map(|container| container.section_table_valid),
         },
         bridge_registry_path: report.bridge_registry_path.clone(),
         host_bridge_plan_index_path: report.host_bridge_plan_index_path.clone(),
@@ -231,6 +255,24 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
     }
     if let Some(path) = &plan.host_bridge_plan_index_path {
         lines.push(format!("host_bridge_plan_index: {path}"));
+    }
+    if let Some(kind) = &plan.compiled_artifact.container_kind {
+        lines.push(format!(
+            "artifact_container: kind={} version={} sections={} valid={}",
+            kind,
+            plan.compiled_artifact
+                .container_version
+                .map(|version| version.to_string())
+                .unwrap_or_else(|| "unknown".to_owned()),
+            plan.compiled_artifact
+                .section_count
+                .map(|count| count.to_string())
+                .unwrap_or_else(|| "unknown".to_owned()),
+            plan.compiled_artifact
+                .section_table_valid
+                .map(|valid| valid.to_string())
+                .unwrap_or_else(|| "unknown".to_owned())
+        ));
     }
     for unit in &plan.domain_units {
         lines.push(format!(

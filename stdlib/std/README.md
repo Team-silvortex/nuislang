@@ -106,6 +106,9 @@ First auto-injectable library module:
 * [lib/task_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/task_contracts.ns)
   exposes the initial `StdTaskContracts` helper surface for project-level
   stdlib galaxy injection
+* [lib/io_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/io_contracts.ns)
+  exposes the initial `StdIoContracts` helper surface for normalizing host I/O
+  byte counts, flush statuses, and process-style exit codes
 
 Intended scope:
 

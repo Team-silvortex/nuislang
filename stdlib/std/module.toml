@@ -13,7 +13,8 @@ surfaces = [
 ]
 
 library_modules = [
-  "lib/task_contracts.ns"
+  "lib/task_contracts.ns",
+  "lib/io_contracts.ns"
 ]
 
 library_import_policy = "project-auto"

@@ -6,12 +6,16 @@ mod envelope;
 mod error;
 mod host_bridge_plan;
 mod payload_blob;
+pub mod protocol;
 mod toml;
 
 pub use artifact::{
-    decode_nuis_compiled_artifact_binary, encode_nuis_compiled_artifact_binary,
-    materialize_embedded_artifact_support, parse_nuis_compiled_artifact,
-    write_nuis_compiled_artifact, NuisCompiledArtifact, NuisLifecycleContract,
+    decode_nuis_compiled_artifact_binary, decode_nuis_compiled_artifact_section_table_binary,
+    encode_nuis_compiled_artifact_binary, encode_nuis_compiled_artifact_section_table,
+    encode_nuis_compiled_artifact_section_table_binary, materialize_embedded_artifact_support,
+    parse_nuis_compiled_artifact, validate_compiled_artifact_section_table,
+    write_nuis_compiled_artifact, NuisCompiledArtifact, NuisCompiledArtifactSection,
+    NuisCompiledArtifactSectionTable, NuisLifecycleContract,
 };
 pub use bridge_registry::{
     parse_bridge_registry, parse_bridge_registry_from_source, BridgeRegistry, BridgeRegistryEntry,

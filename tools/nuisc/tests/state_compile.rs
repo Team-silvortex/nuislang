@@ -691,11 +691,26 @@ fn lowers_ordinary_recursive_bool_state_project_with_bool_helper_shape() {
         recursive_calls >= 2,
         "expected bool recursive project to preserve mutual bool recursion"
     );
-    assert!(artifacts
+    let bool_returns = artifacts
         .yir
         .nodes
         .iter()
-        .any(|node| { node.op.module == "cpu" && node.op.instruction == "guard_return" }));
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "return_bool")
+        .count();
+    let selects = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+    assert!(
+        bool_returns >= 3,
+        "expected bool recursive project to emit bool helper returns"
+    );
+    assert!(
+        selects >= 3,
+        "expected bool recursive project to lower bool branches through select nodes"
+    );
 }
 
 #[test]
@@ -1381,11 +1396,26 @@ fn lowers_ordinary_recursive_mixed_state_project_with_bool_recursive_helper_shap
         step_calls >= 1,
         "expected mixed recursive project to preserve scalar step helper"
     );
-    assert!(artifacts
+    let bool_returns = artifacts
         .yir
         .nodes
         .iter()
-        .any(|node| { node.op.module == "cpu" && node.op.instruction == "guard_return" }));
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "return_bool")
+        .count();
+    let selects = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
+    assert!(
+        bool_returns >= 3,
+        "expected mixed recursive project to emit bool helper returns"
+    );
+    assert!(
+        selects >= 3,
+        "expected mixed recursive project to lower bool branches through select nodes"
+    );
 }
 
 #[test]

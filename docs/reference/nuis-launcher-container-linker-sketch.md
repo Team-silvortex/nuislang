@@ -3,6 +3,10 @@
 This file sketches a short design direction for how `nuis` should eventually
 organize executable artifacts in an explicitly heterogeneous world.
 
+Current protocol anchor:
+
+* [nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
+
 The important split is:
 
 * host platforms own process launch
@@ -85,6 +89,13 @@ The host OS should not need to understand this layout in detail.
 
 The host only needs enough shell logic to start it.
 
+Current implementation vocabulary:
+
+* `NART` is the current compiled artifact carrier
+* `NENV` is the current executable envelope wrapper
+* `NDPB` is the current per-domain payload blob
+* `nuis.build.manifest.toml` is the current inspectable build index
+
 ### 3. Nuis Linker
 
 This is the repository-owned composition step that sits above host linkers.
@@ -104,6 +115,10 @@ but more importantly:
 
 So the host linker remains useful, but it becomes the last-mile wrapper rather
 than the primary semantic organizer.
+
+The next meaningful linker milestone is not “replace `clang` tomorrow”. It is:
+
+`consume the Nuis binary protocol as the semantic input, then decide which host wrapper is necessary`
 
 ## ABI Grain
 

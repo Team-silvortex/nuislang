@@ -62,7 +62,10 @@ mod cpu Main {
     assert_eq!(std.library_import_policy.as_str(), "project-auto");
     assert_eq!(
         std.library_modules,
-        vec!["lib/task_contracts.ns".to_owned()]
+        vec![
+            "lib/task_contracts.ns".to_owned(),
+            "lib/io_contracts.ns".to_owned()
+        ]
     );
 
     let core = project
@@ -120,18 +123,18 @@ mod cpu Main {
     assert!(galaxy_index.contains("documented_library_modules="));
     assert!(galaxy_index.contains("documented_items="));
     assert!(galaxy_index.contains("std\tpackage=nuis.std\tdirect=false"));
-    assert!(galaxy_index.contains("library_modules=lib/task_contracts.ns"));
+    assert!(galaxy_index.contains("library_modules=lib/task_contracts.ns, lib/io_contracts.ns"));
     assert!(galaxy_index.contains("library_import_policy=project-auto"));
     assert!(galaxy_index.contains("blockers=<none>"));
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=9\tdocumented_modules=8\tdocumented_items=54"));
+    assert!(docs_index.contains("summary\tmodules=10\tdocumented_modules=9\tdocumented_items=64"));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=33\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=8\tvisible_libraries=8\tvisible_modules=9\tdocumented_visible_modules=8\tdocumented_visible_items=54"
+        "summary\tlibraries=9\tvisible_libraries=9\tvisible_modules=10\tdocumented_visible_modules=9\tdocumented_visible_items=64"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -155,9 +158,13 @@ mod cpu Main {
         "library\tcore\tlib/prelude_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
+        "library\tstd\tlib/io_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
         "visible\tcpu\tMain\tdoc_items=0\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
     assert!(imports_index.contains("visible\tcpu\tStdTaskContracts\tdoc_items="));
+    assert!(imports_index.contains("visible\tcpu\tStdIoContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tPixelMagicContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tshader\tPixelMagicSurfaceContracts\tdoc_items="));
     assert!(imports_index.contains("import_policy=project-auto"));
@@ -230,6 +237,10 @@ mod cpu Main {
         .modules
         .iter()
         .any(|module| module.ast.unit == "StdTaskContracts"));
+    assert!(project
+        .modules
+        .iter()
+        .any(|module| module.ast.unit == "StdIoContracts"));
 
     validate_project_modules(&project.modules).unwrap();
     validate_project_uses(&project.modules, &project.resolved_galaxies).unwrap();
@@ -302,6 +313,7 @@ galaxy = ["pixelmagic=workspace"]
         r#"
 use cpu CorePrelude;
 use cpu PixelMagicContracts;
+use cpu StdIoContracts;
 use cpu StdTaskContracts;
 
 mod cpu Main {
@@ -309,7 +321,7 @@ mod cpu Main {
     return CorePrelude.sum3_i64(
       PixelMagicContracts.grayscale_packet_total(5101, 160, 120),
       StdTaskContracts.add_bias(7, 5),
-      CorePrelude.one_i64()
+      StdIoContracts.byte_count_exit_code(12) + CorePrelude.one_i64()
     );
   }
 }
@@ -328,6 +340,11 @@ mod cpu Main {
         .functions
         .iter()
         .any(|function| function.name == "StdTaskContracts.add_bias"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdIoContracts.byte_count_exit_code"));
     assert!(artifacts
         .nir
         .functions
@@ -921,7 +938,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=8\tvisible_libraries=8\tvisible_modules=9\tdocumented_visible_modules=8\tdocumented_visible_items=54"
+        "summary\tlibraries=9\tvisible_libraries=9\tvisible_modules=10\tdocumented_visible_modules=9\tdocumented_visible_items=64"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

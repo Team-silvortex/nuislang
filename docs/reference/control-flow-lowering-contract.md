@@ -133,6 +133,46 @@ Working rule:
 * the final `break` / `continue` condition still has to collapse into a known
   loop-state/carry test family
 
+## Native Lowering Gate
+
+The current control-flow contract is no longer checked only at the frontend or
+YIR text level. Representative flow/post-flow shapes now also have a native
+compile-and-launch smoke gate.
+
+Current native smoke anchors:
+
+* [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
+* [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
+* [task_async_while_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo)
+* [task_async_while_post_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo)
+* [task_async_post_flow_shared_suffix_loop_control_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo)
+
+Regression anchor:
+
+* [artifact_cli.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/artifact_cli.rs)
+
+Useful local gate:
+
+```bash
+cargo test -p nuisc --test artifact_cli cli_compile_emits_runnable_native_control_flow_binaries
+```
+
+What this gate is intended to catch:
+
+* malformed LLVM block chains in flow/post-flow loop lowering
+* missing terminators or accidental fallthrough between generated loop blocks
+* unresolved YIR payload names leaking into LLVM carry formulas
+* async loop steps that should recognize `let value = await step(value)` before
+  the final loop-control decision
+
+Short rule:
+
+`a control-flow shape is stronger when it survives frontend compile, YIR lowering, LLVM lowering, and native launch smoke`
+
+This is still not a promise of arbitrary CFG lowering or full self-hosting.
+The current gate proves specific structured families that the compiler can
+recognize and lower predictably.
+
 ## Not Yet Supported
 
 ### Branch-local consuming task/thread/mutex runtime primitives

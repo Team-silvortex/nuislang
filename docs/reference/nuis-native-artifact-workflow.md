@@ -112,7 +112,41 @@ The current checked-in coverage is split deliberately:
   [tooling_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/tooling_compile.rs)
 * AOT compile/package/launch smoke:
   [lib.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lib.rs)
+* representative native control-flow compile/launch smoke:
+  [artifact_cli.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/artifact_cli.rs)
 
 Short rule:
 
 `the example gives the repository a visible frontdoor; the AOT smoke proves the emitted binary is not only packaged but launchable`
+
+## Native Control-Flow Smoke
+
+The native artifact route now also covers a small representative set of
+structured control-flow examples. This matters because project/YIR compile
+success alone is not enough to prove the final LLVM block graph and host-linked
+binary are coherent.
+
+Useful local commands:
+
+```bash
+cargo test -p yir-lower-llvm
+cargo test -p nuisc --test state_compile --test task_compile
+cargo test -p nuisc --test artifact_cli cli_compile_emits_runnable_native_control_flow_binaries
+```
+
+Current smoke families:
+
+* state flow/post-flow branching loops
+* async flow/post-flow loop-control conditions
+* async post-flow shared-suffix loop-control carrying
+
+Launch rule:
+
+`the smoke requires the produced executable to launch and return an exit status; it does not require status 0 because these examples often return business values`
+
+Current honest boundary:
+
+* this proves a real `nuis -> nuisc -> native-cpu-llvm -> clang -> executable`
+  route for representative control-flow shapes
+* this does not replace the future self-owned `nuis` linker
+* this does not mean every high-level source CFG can lower natively yet

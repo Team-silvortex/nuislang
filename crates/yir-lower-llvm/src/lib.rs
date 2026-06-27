@@ -2783,6 +2783,24 @@ fn emit_cpu_function(
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
                 *last_cpu_value = Some(reg);
             }
+            ("cpu", "tick_i64") => {
+                let start = node.op.args.first().map(String::as_str).unwrap_or("0");
+                let step = node.op.args.get(1).map(String::as_str).unwrap_or("1");
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!(
+                    "  ; static AOT lowering freezes cpu.tick_i64 to start + step"
+                ));
+                body.push(format!("  {reg} = add i64 {start}, {step}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                *last_cpu_value = Some(reg);
+            }
+            ("cpu", "target_config")
+            | ("cpu", "bind_core")
+            | ("cpu", "instantiate_unit")
+            | ("cpu", "window")
+            | ("cpu", "present_frame") => {
+                registers.insert(node.name.clone(), LlvmValueRef::Void);
+            }
             ("cpu", "extern_call_i64") => {
                 let abi = &node.op.args[0];
                 let symbol = &node.op.args[1];
@@ -7107,16 +7125,23 @@ fn emit_cpu_function(
                 }
                 let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
                 collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
-                let mut no_match_block = loop_update.clone();
-                for (index, (condition, action)) in flow_leaves.iter().enumerate().rev() {
-                    let leaf_block = if index == 0 {
-                        None
-                    } else {
-                        Some(fresh_block(&mut next_block, "loop_async_flow_rhs"))
-                    };
-                    if let Some(block) = &leaf_block {
+                let condition_blocks = (0..flow_leaves.len())
+                    .map(|index| {
+                        if index == 0 {
+                            None
+                        } else {
+                            Some(fresh_block(&mut next_block, "loop_async_flow_rhs"))
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                for (index, (condition, action)) in flow_leaves.iter().enumerate() {
+                    if let Some(block) = &condition_blocks[index] {
                         body.push(format!("{block}:"));
                     }
+                    let no_match_block = condition_blocks
+                        .get(index + 1)
+                        .and_then(|block| block.clone())
+                        .unwrap_or_else(|| loop_update.clone());
                     let control_cond = eval_control_expr(
                         condition,
                         &next_current,
@@ -7141,11 +7166,7 @@ fn emit_cpu_function(
                             ));
                         }
                     }
-                    if let Some(block) = leaf_block {
-                        no_match_block = block;
-                    }
                 }
-                body.push(format!("  br label %{no_match_block}"));
                 body.push(format!("{loop_update}:"));
                 let mut next_carries = Vec::new();
                 for (index, (cond_kind, cond_rhs, then_kind, else_kind)) in
@@ -8468,7 +8489,24 @@ fn emit_cpu_function(
                     if then_end > node.op.args.len() {
                         return Err(format!("cpu.{loop_instruction} `{}` is missing payload for carry kind `{then_kind}` during LLVM lowering", node.name));
                     }
-                    let then_source = node.op.args[then_start..then_end].to_vec();
+                    let mut then_source = vec![then_kind.clone()];
+                    for payload_name in &node.op.args[then_start + 1..then_end] {
+                        let Some(payload_value) = registers.get(payload_name).cloned() else {
+                            body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because carry source payload `{payload_name}` is outside the current CPU LLVM slice", node.name));
+                            deferred = true;
+                            break;
+                        };
+                        let Some(payload) = coerce_to_i64(&payload_value, &mut body, &mut next_reg)
+                        else {
+                            body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because carry source payload `{payload_name}` is not coercible to i64", node.name));
+                            deferred = true;
+                            break;
+                        };
+                        then_source.push(payload);
+                    }
+                    if deferred {
+                        break;
+                    }
                     let Some(else_kind) = node.op.args.get(then_end).cloned() else {
                         return Err(format!("cpu.{loop_instruction} `{}` has truncated else carry source during LLVM lowering", node.name));
                     };
@@ -8479,7 +8517,24 @@ fn emit_cpu_function(
                     if else_end > node.op.args.len() {
                         return Err(format!("cpu.{loop_instruction} `{}` is missing payload for carry kind `{else_kind}` during LLVM lowering", node.name));
                     }
-                    let else_source = node.op.args[then_end..else_end].to_vec();
+                    let mut else_source = vec![else_kind.clone()];
+                    for payload_name in &node.op.args[then_end + 1..else_end] {
+                        let Some(payload_value) = registers.get(payload_name).cloned() else {
+                            body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because carry source payload `{payload_name}` is outside the current CPU LLVM slice", node.name));
+                            deferred = true;
+                            break;
+                        };
+                        let Some(payload) = coerce_to_i64(&payload_value, &mut body, &mut next_reg)
+                        else {
+                            body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because carry source payload `{payload_name}` is not coercible to i64", node.name));
+                            deferred = true;
+                            break;
+                        };
+                        else_source.push(payload);
+                    }
+                    if deferred {
+                        break;
+                    }
                     carry_initials.push(init);
                     carry_specs.push((cond_kind_name.clone(), cond_rhs, then_source, else_source));
                     cursor = else_end;
@@ -9075,16 +9130,23 @@ fn emit_cpu_function(
                 }
                 let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
                 collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
-                let mut no_match_block = loop_continue.clone();
-                for (index, (condition, action)) in flow_leaves.iter().enumerate().rev() {
-                    let leaf_block = if index == 0 {
-                        None
-                    } else {
-                        Some(fresh_block(&mut next_block, "loop_async_post_flow_rhs"))
-                    };
-                    if let Some(block) = &leaf_block {
+                let condition_blocks = (0..flow_leaves.len())
+                    .map(|index| {
+                        if index == 0 {
+                            None
+                        } else {
+                            Some(fresh_block(&mut next_block, "loop_async_post_flow_rhs"))
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                for (index, (condition, action)) in flow_leaves.iter().enumerate() {
+                    if let Some(block) = &condition_blocks[index] {
                         body.push(format!("{block}:"));
                     }
+                    let no_match_block = condition_blocks
+                        .get(index + 1)
+                        .and_then(|block| block.clone())
+                        .unwrap_or_else(|| loop_continue.clone());
                     let control_cond = eval_control_expr(
                         condition,
                         &next_current,
@@ -9112,11 +9174,7 @@ fn emit_cpu_function(
                             ));
                         }
                     }
-                    if let Some(block) = leaf_block {
-                        no_match_block = block;
-                    }
                 }
-                body.push(format!("  br label %{no_match_block}"));
                 body.push(format!("{loop_continue}:"));
                 body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
                 for (slot, val) in carry_slots.iter().zip(next_carries.iter()) {
@@ -9636,16 +9694,23 @@ fn emit_cpu_function(
                 };
                 let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
                 collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
-                let mut no_match_block = loop_continue.clone();
-                for (index, (condition, action)) in flow_leaves.iter().enumerate().rev() {
-                    let leaf_block = if index == 0 {
-                        None
-                    } else {
-                        Some(fresh_block(&mut next_block, "loop_post_flow_rhs"))
-                    };
-                    if let Some(block) = &leaf_block {
+                let condition_blocks = (0..flow_leaves.len())
+                    .map(|index| {
+                        if index == 0 {
+                            None
+                        } else {
+                            Some(fresh_block(&mut next_block, "loop_post_flow_rhs"))
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                for (index, (condition, action)) in flow_leaves.iter().enumerate() {
+                    if let Some(block) = &condition_blocks[index] {
                         body.push(format!("{block}:"));
                     }
+                    let no_match_block = condition_blocks
+                        .get(index + 1)
+                        .and_then(|block| block.clone())
+                        .unwrap_or_else(|| loop_continue.clone());
                     let control_cond = eval_control_expr(
                         condition,
                         &next_current,
@@ -9672,11 +9737,7 @@ fn emit_cpu_function(
                             ));
                         }
                     }
-                    if let Some(block) = leaf_block {
-                        no_match_block = block;
-                    }
                 }
-                body.push(format!("  br label %{no_match_block}"));
                 body.push(format!("{loop_continue}:"));
                 body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
                 for (carry_slot, next_carry) in carry_slots.iter().zip(next_carries.iter()) {
@@ -10095,16 +10156,23 @@ fn emit_cpu_function(
                 };
                 let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
                 collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
-                let mut no_match_block = loop_update.clone();
-                for (index, (condition, action)) in flow_leaves.iter().enumerate().rev() {
-                    let leaf_block = if index == 0 {
-                        None
-                    } else {
-                        Some(fresh_block(&mut next_block, "loop_flow_rhs"))
-                    };
-                    if let Some(block) = &leaf_block {
+                let condition_blocks = (0..flow_leaves.len())
+                    .map(|index| {
+                        if index == 0 {
+                            None
+                        } else {
+                            Some(fresh_block(&mut next_block, "loop_flow_rhs"))
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                for (index, (condition, action)) in flow_leaves.iter().enumerate() {
+                    if let Some(block) = &condition_blocks[index] {
                         body.push(format!("{block}:"));
                     }
+                    let no_match_block = condition_blocks
+                        .get(index + 1)
+                        .and_then(|block| block.clone())
+                        .unwrap_or_else(|| loop_update.clone());
                     let control_cond = eval_control_expr(
                         condition,
                         &next_current,
@@ -10127,11 +10195,7 @@ fn emit_cpu_function(
                             ));
                         }
                     }
-                    if let Some(block) = leaf_block {
-                        no_match_block = block;
-                    }
                 }
-                body.push(format!("  br label %{no_match_block}"));
                 body.push(format!("{loop_update}:"));
                 let resolve_source = |kind: &str,
                                       next_current: &String,

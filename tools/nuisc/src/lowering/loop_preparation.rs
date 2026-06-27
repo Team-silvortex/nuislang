@@ -2484,17 +2484,21 @@ fn split_temp_prefixed_loop_step_bindings<'a>(
     let mut temp_bindings = Vec::<(String, NirExpr)>::new();
     let prev_current = NirExpr::Var(TAIL_RECURSIVE_PREV_CURRENT_BINDING.to_owned());
     for (index, stmt) in body.iter().enumerate() {
-        let binding = match stmt {
-            NirStmt::Let { .. } | NirStmt::Const { .. } => stmt,
+        let (name, expr) = match stmt {
+            NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+                (name.clone(), value.clone())
+            }
             _ => return None,
         };
-        let (name, expr) = extract_pure_branch_binding(binding, pure_helpers)?;
         if name == binding_name {
             return Some((
                 normalize_loop_control_temp_bindings(temp_bindings),
                 stmt,
                 &body[index + 1..],
             ));
+        }
+        if !is_terminal_branch_pure_expr(&expr, pure_helpers) {
+            return None;
         }
         let normalized = inline_pure_helper_calls(&expr, inlineable_pure_helpers);
         let preserved = substitute_branch_binding(&normalized, binding_name, &prev_current);

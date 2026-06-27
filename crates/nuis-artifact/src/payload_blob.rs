@@ -1,7 +1,7 @@
-use crate::{ArtifactError, BuildManifestDomainBuildUnit};
-
-const NUIS_DOMAIN_PAYLOAD_BLOB_MAGIC: &[u8; 4] = b"NDPB";
-const NUIS_DOMAIN_PAYLOAD_BLOB_VERSION: u16 = 2;
+use crate::{
+    protocol::{DOMAIN_PAYLOAD_BLOB_BINARY_VERSION, DOMAIN_PAYLOAD_BLOB_MAGIC},
+    ArtifactError, BuildManifestDomainBuildUnit,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DomainBuildUnitPayloadBlob {
@@ -49,8 +49,8 @@ pub fn encode_domain_payload_blob(
     let payload_format = blob.payload_format.as_bytes();
 
     let mut out = Vec::new();
-    out.extend_from_slice(NUIS_DOMAIN_PAYLOAD_BLOB_MAGIC);
-    out.extend_from_slice(&NUIS_DOMAIN_PAYLOAD_BLOB_VERSION.to_le_bytes());
+    out.extend_from_slice(DOMAIN_PAYLOAD_BLOB_MAGIC);
+    out.extend_from_slice(&DOMAIN_PAYLOAD_BLOB_BINARY_VERSION.to_le_bytes());
     out.extend_from_slice(&encode_u32_len(
         domain_family.len(),
         "domain payload blob domain_family",
@@ -125,11 +125,11 @@ pub fn decode_domain_payload_blob(
     if bytes.len() < 54 {
         return Err(ArtifactError::new("domain payload blob is too short"));
     }
-    if &bytes[..4] != NUIS_DOMAIN_PAYLOAD_BLOB_MAGIC {
+    if &bytes[..4] != DOMAIN_PAYLOAD_BLOB_MAGIC {
         return Err(ArtifactError::new("domain payload blob has invalid magic"));
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if version != NUIS_DOMAIN_PAYLOAD_BLOB_VERSION {
+    if version != DOMAIN_PAYLOAD_BLOB_BINARY_VERSION {
         return Err(ArtifactError::new(format!(
             "unsupported domain payload blob version `{version}`"
         )));

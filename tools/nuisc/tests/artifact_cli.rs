@@ -32,6 +32,59 @@ fn assert_success(output: &std::process::Output, context: &str) {
     );
 }
 
+fn assert_binary_launches(binary: &Path, context: &str) {
+    let output = Command::new(binary).output().unwrap_or_else(|error| {
+        panic!("failed to launch {context} `{}`: {error}", binary.display())
+    });
+    assert!(
+        output.status.code().is_some(),
+        "{context} terminated without an exit code\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
+#[test]
+fn cli_compile_emits_runnable_native_control_flow_binaries() {
+    for (label, project, binary_name) in [
+        (
+            "native_flow_branching_while",
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo",
+            "flow_branching_while_demo",
+        ),
+        (
+            "native_post_flow_branching_while",
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo",
+            "post_flow_branching_while_demo",
+        ),
+        (
+            "native_task_async_flow_while",
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo",
+            "task_async_while_flow_cond_demo",
+        ),
+        (
+            "native_task_async_post_flow_while",
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo",
+            "task_async_while_post_flow_cond_demo",
+        ),
+        (
+            "native_task_async_post_flow_shared_suffix",
+            "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo",
+            "task_async_post_flow_shared_suffix_loop_control_demo",
+        ),
+    ] {
+        let output_dir = temp_dir(label);
+        let compile = run_nuisc(&["compile", project, &output_dir.display().to_string()]);
+        assert_success(&compile, "nuisc compile native control-flow smoke");
+
+        let llvm_ir = output_dir.join(format!("{binary_name}.ll"));
+        let binary = output_dir.join(binary_name);
+        assert!(llvm_ir.exists(), "expected {}", llvm_ir.display());
+        assert!(binary.exists(), "expected {}", binary.display());
+        assert_binary_launches(&binary, binary_name);
+    }
+}
+
 #[test]
 fn cli_artifact_commands_report_benchmark_tooling_outputs() {
     let project = Path::new(

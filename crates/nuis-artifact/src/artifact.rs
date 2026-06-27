@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
 };
@@ -7,12 +8,20 @@ use crate::{
     decode_domain_payload_blob,
     envelope::{decode_nuis_executable_envelope_binary, encode_nuis_executable_envelope_binary},
     parse_build_manifest_from_source,
-    toml::{parse_optional_toml_string_array, render_string_array},
+    protocol::{
+        supported_compiled_artifact_sections, COMPILED_ARTIFACT_BINARY_VERSION,
+        COMPILED_ARTIFACT_MAGIC, COMPILED_ARTIFACT_SCHEMA_V1,
+        COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML, COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY,
+        COMPILED_ARTIFACT_SECTION_HOST_BINARY, COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML,
+        COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML, COMPILED_ARTIFACT_SECTION_METADATA_TOML,
+        COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION, DOMAIN_PAYLOAD_SECTION_CONTRACT_TOML,
+    },
+    toml::{
+        escape_toml_string, parse_optional_toml_string_array, parse_required_toml_string,
+        render_string_array,
+    },
     ArtifactError, BuildManifestDomainBuildUnit, NuisExecutableEnvelope,
 };
-
-const NUIS_COMPILED_ARTIFACT_MAGIC: &[u8; 4] = b"NART";
-const NUIS_COMPILED_ARTIFACT_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NuisLifecycleContract {
@@ -44,9 +53,47 @@ pub struct NuisCompiledArtifact {
     pub binary_blob: Vec<u8>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NuisCompiledArtifactSection {
+    pub name: String,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NuisCompiledArtifactSectionTable {
+    pub sections: Vec<NuisCompiledArtifactSection>,
+}
+
+impl NuisCompiledArtifactSectionTable {
+    pub fn section_names(&self) -> Vec<&str> {
+        self.sections
+            .iter()
+            .map(|section| section.name.as_str())
+            .collect()
+    }
+
+    pub fn section_bytes(&self, name: &str) -> Result<&[u8], ArtifactError> {
+        section_bytes(self, name)
+    }
+
+    pub fn section_utf8(&self, name: &str) -> Result<&str, ArtifactError> {
+        section_utf8(self, name)
+    }
+
+    pub fn contains_section(&self, name: &str) -> bool {
+        self.sections.iter().any(|section| section.name == name)
+    }
+}
+
 fn encode_u32_len(len: usize, what: &str) -> Result<[u8; 4], ArtifactError> {
     let len = u32::try_from(len)
         .map_err(|_| ArtifactError::new(format!("{what} exceeds 4 GiB and cannot be encoded")))?;
+    Ok(len.to_le_bytes())
+}
+
+fn encode_u64_len(len: usize, what: &str) -> Result<[u8; 8], ArtifactError> {
+    let len = u64::try_from(len)
+        .map_err(|_| ArtifactError::new(format!("{what} exceeds u64 and cannot be encoded")))?;
     Ok(len.to_le_bytes())
 }
 
@@ -74,8 +121,8 @@ pub fn encode_nuis_compiled_artifact_binary(
     let build_manifest_source = artifact.build_manifest_source.as_bytes();
     let binary_blob = &artifact.binary_blob;
     let mut out = Vec::new();
-    out.extend_from_slice(NUIS_COMPILED_ARTIFACT_MAGIC);
-    out.extend_from_slice(&NUIS_COMPILED_ARTIFACT_VERSION.to_le_bytes());
+    out.extend_from_slice(COMPILED_ARTIFACT_MAGIC);
+    out.extend_from_slice(&COMPILED_ARTIFACT_BINARY_VERSION.to_le_bytes());
     out.extend_from_slice(&encode_u32_len(
         envelope.len(),
         "compiled artifact envelope",
@@ -169,24 +216,171 @@ pub fn encode_nuis_compiled_artifact_binary(
     Ok(out)
 }
 
+pub fn encode_nuis_compiled_artifact_section_table_binary(
+    artifact: &NuisCompiledArtifact,
+) -> Result<Vec<u8>, ArtifactError> {
+    let table = compiled_artifact_to_section_table(artifact)?;
+    encode_nuis_compiled_artifact_section_table(&table)
+}
+
+pub fn encode_nuis_compiled_artifact_section_table(
+    table: &NuisCompiledArtifactSectionTable,
+) -> Result<Vec<u8>, ArtifactError> {
+    let mut out = Vec::new();
+    out.extend_from_slice(COMPILED_ARTIFACT_MAGIC);
+    out.extend_from_slice(&COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION.to_le_bytes());
+    out.extend_from_slice(&encode_u32_len(
+        table.sections.len(),
+        "compiled artifact section count",
+    )?);
+    for section in &table.sections {
+        out.extend_from_slice(&encode_u32_len(
+            section.name.len(),
+            "compiled artifact section name",
+        )?);
+        out.extend_from_slice(&encode_u64_len(
+            section.bytes.len(),
+            "compiled artifact section payload",
+        )?);
+    }
+    for section in &table.sections {
+        out.extend_from_slice(section.name.as_bytes());
+        out.extend_from_slice(&section.bytes);
+    }
+    Ok(out)
+}
+
+pub fn decode_nuis_compiled_artifact_section_table_binary(
+    bytes: &[u8],
+) -> Result<NuisCompiledArtifactSectionTable, ArtifactError> {
+    if bytes.len() < 10 {
+        return Err(ArtifactError::new(
+            "nuis compiled artifact section table is too short",
+        ));
+    }
+    if &bytes[..4] != COMPILED_ARTIFACT_MAGIC {
+        return Err(ArtifactError::new(
+            "nuis compiled artifact section table has invalid magic",
+        ));
+    }
+    let version = u16::from_le_bytes([bytes[4], bytes[5]]);
+    if version != COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION {
+        return Err(ArtifactError::new(format!(
+            "unsupported nuis compiled artifact section table version `{version}`"
+        )));
+    }
+    let section_count = u32::from_le_bytes([bytes[6], bytes[7], bytes[8], bytes[9]]) as usize;
+    let mut offset = 10usize;
+    let mut section_meta = Vec::with_capacity(section_count);
+    for _ in 0..section_count {
+        if offset + 12 > bytes.len() {
+            return Err(ArtifactError::new(
+                "nuis compiled artifact section table header is truncated",
+            ));
+        }
+        let name_len = u32::from_le_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        ]) as usize;
+        offset += 4;
+        let payload_len = u64::from_le_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+            bytes[offset + 4],
+            bytes[offset + 5],
+            bytes[offset + 6],
+            bytes[offset + 7],
+        ]) as usize;
+        offset += 8;
+        section_meta.push((name_len, payload_len));
+    }
+    let total_payload_len = section_meta
+        .iter()
+        .map(|(name_len, payload_len)| name_len + payload_len)
+        .sum::<usize>();
+    if bytes.len() != offset + total_payload_len {
+        return Err(ArtifactError::new(format!(
+            "nuis compiled artifact section table length mismatch: header says {total_payload_len} payload bytes, actual {}",
+            bytes.len().saturating_sub(offset)
+        )));
+    }
+    let mut sections = Vec::with_capacity(section_count);
+    for (name_len, payload_len) in section_meta {
+        let name =
+            String::from_utf8(take_exact(bytes, &mut offset, name_len)?).map_err(|error| {
+                ArtifactError::new(format!(
+                    "compiled artifact section name is not valid UTF-8: {error}"
+                ))
+            })?;
+        let section_bytes = take_exact(bytes, &mut offset, payload_len)?;
+        sections.push(NuisCompiledArtifactSection {
+            name,
+            bytes: section_bytes,
+        });
+    }
+    let table = NuisCompiledArtifactSectionTable { sections };
+    validate_compiled_artifact_section_table(&table)?;
+    Ok(table)
+}
+
+pub fn validate_compiled_artifact_section_table(
+    table: &NuisCompiledArtifactSectionTable,
+) -> Result<(), ArtifactError> {
+    let mut seen = BTreeSet::new();
+    for section in &table.sections {
+        if section.name.trim().is_empty() {
+            return Err(ArtifactError::new(
+                "compiled artifact section table contains an empty section name",
+            ));
+        }
+        if !seen.insert(section.name.as_str()) {
+            return Err(ArtifactError::new(format!(
+                "compiled artifact section table contains duplicate section `{}`",
+                section.name
+            )));
+        }
+    }
+    for required in supported_compiled_artifact_sections() {
+        if !table.contains_section(required) {
+            return Err(ArtifactError::new(format!(
+                "compiled artifact section table is missing required section `{required}`"
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub fn decode_nuis_compiled_artifact_binary(
     bytes: &[u8],
 ) -> Result<NuisCompiledArtifact, ArtifactError> {
-    if bytes.len() < 78 {
+    if bytes.len() < 6 {
         return Err(ArtifactError::new(
             "nuis compiled artifact binary is too short",
         ));
     }
-    if &bytes[..4] != NUIS_COMPILED_ARTIFACT_MAGIC {
+    if &bytes[..4] != COMPILED_ARTIFACT_MAGIC {
         return Err(ArtifactError::new(
             "nuis compiled artifact binary has invalid magic",
         ));
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if version != NUIS_COMPILED_ARTIFACT_VERSION {
+    if version == COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION {
+        let table = decode_nuis_compiled_artifact_section_table_binary(bytes)?;
+        return section_table_to_compiled_artifact(&table);
+    }
+    if version != COMPILED_ARTIFACT_BINARY_VERSION {
         return Err(ArtifactError::new(format!(
             "unsupported nuis compiled artifact binary version `{version}`"
         )));
+    }
+    if bytes.len() < 78 {
+        return Err(ArtifactError::new(
+            "nuis compiled artifact binary is too short",
+        ));
     }
     let mut offset = 6usize;
     let next_len = |bytes: &[u8], offset: &mut usize| -> Result<usize, ArtifactError> {
@@ -391,7 +585,7 @@ pub fn decode_nuis_compiled_artifact_binary(
         )?;
     let binary_blob = take_bytes(bytes, &mut offset, binary_blob_len)?;
     Ok(NuisCompiledArtifact {
-        schema: "nuis-compiled-artifact-v1".to_owned(),
+        schema: COMPILED_ARTIFACT_SCHEMA_V1.to_owned(),
         packaging_mode,
         cpu_target_abi,
         cpu_target_machine_arch,
@@ -426,6 +620,243 @@ pub fn decode_nuis_compiled_artifact_binary(
         },
         build_manifest_source,
         binary_blob,
+    })
+}
+
+fn take_exact(bytes: &[u8], offset: &mut usize, len: usize) -> Result<Vec<u8>, ArtifactError> {
+    if *offset + len > bytes.len() {
+        return Err(ArtifactError::new(
+            "nuis compiled artifact binary payload is truncated",
+        ));
+    }
+    let value = bytes[*offset..*offset + len].to_vec();
+    *offset += len;
+    Ok(value)
+}
+
+fn compiled_artifact_to_section_table(
+    artifact: &NuisCompiledArtifact,
+) -> Result<NuisCompiledArtifactSectionTable, ArtifactError> {
+    let metadata = render_compiled_artifact_metadata(artifact);
+    let lifecycle = render_lifecycle_contract(&artifact.lifecycle);
+    let lowering_index = render_lowering_index(artifact)?;
+    let envelope = encode_nuis_executable_envelope_binary(&artifact.envelope)?;
+    Ok(NuisCompiledArtifactSectionTable {
+        sections: vec![
+            NuisCompiledArtifactSection {
+                name: COMPILED_ARTIFACT_SECTION_METADATA_TOML.to_owned(),
+                bytes: metadata.into_bytes(),
+            },
+            NuisCompiledArtifactSection {
+                name: COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY.to_owned(),
+                bytes: envelope,
+            },
+            NuisCompiledArtifactSection {
+                name: COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML.to_owned(),
+                bytes: lifecycle.into_bytes(),
+            },
+            NuisCompiledArtifactSection {
+                name: COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML.to_owned(),
+                bytes: artifact.build_manifest_source.as_bytes().to_vec(),
+            },
+            NuisCompiledArtifactSection {
+                name: COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML.to_owned(),
+                bytes: lowering_index.into_bytes(),
+            },
+            NuisCompiledArtifactSection {
+                name: COMPILED_ARTIFACT_SECTION_HOST_BINARY.to_owned(),
+                bytes: artifact.binary_blob.clone(),
+            },
+        ],
+    })
+}
+
+fn section_table_to_compiled_artifact(
+    table: &NuisCompiledArtifactSectionTable,
+) -> Result<NuisCompiledArtifact, ArtifactError> {
+    let metadata = section_utf8(table, COMPILED_ARTIFACT_SECTION_METADATA_TOML)?;
+    let lifecycle_source = section_utf8(table, COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML)?;
+    let build_manifest_source =
+        section_utf8(table, COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML)?.to_owned();
+    let envelope = decode_nuis_executable_envelope_binary(section_bytes(
+        table,
+        COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY,
+    )?)?;
+    let binary_blob = section_bytes(table, COMPILED_ARTIFACT_SECTION_HOST_BINARY)?.to_vec();
+    let lifecycle = parse_lifecycle_contract(lifecycle_source)?;
+    Ok(NuisCompiledArtifact {
+        schema: parse_required_toml_string(
+            metadata,
+            "artifact_schema",
+            Path::new("<compiled-artifact-metadata>"),
+        )?,
+        packaging_mode: parse_required_toml_string(
+            metadata,
+            "packaging_mode",
+            Path::new("<compiled-artifact-metadata>"),
+        )?,
+        cpu_target_abi: parse_required_toml_string(
+            metadata,
+            "cpu_target_abi",
+            Path::new("<compiled-artifact-metadata>"),
+        )?,
+        cpu_target_machine_arch: parse_required_toml_string(
+            metadata,
+            "cpu_target_machine_arch",
+            Path::new("<compiled-artifact-metadata>"),
+        )?,
+        cpu_target_machine_os: parse_required_toml_string(
+            metadata,
+            "cpu_target_machine_os",
+            Path::new("<compiled-artifact-metadata>"),
+        )?,
+        cpu_target_object_format: parse_required_toml_string(
+            metadata,
+            "cpu_target_object_format",
+            Path::new("<compiled-artifact-metadata>"),
+        )?,
+        cpu_target_calling_abi: parse_required_toml_string(
+            metadata,
+            "cpu_target_calling_abi",
+            Path::new("<compiled-artifact-metadata>"),
+        )?,
+        binary_name: parse_required_toml_string(
+            metadata,
+            "binary_name",
+            Path::new("<compiled-artifact-metadata>"),
+        )?,
+        binary_bytes: binary_blob.len(),
+        build_manifest_bytes: build_manifest_source.len(),
+        envelope,
+        lifecycle,
+        build_manifest_source,
+        binary_blob,
+    })
+}
+
+fn section_bytes<'a>(
+    table: &'a NuisCompiledArtifactSectionTable,
+    name: &str,
+) -> Result<&'a [u8], ArtifactError> {
+    table
+        .sections
+        .iter()
+        .find(|section| section.name == name)
+        .map(|section| section.bytes.as_slice())
+        .ok_or_else(|| ArtifactError::new(format!("compiled artifact is missing section `{name}`")))
+}
+
+fn section_utf8<'a>(
+    table: &'a NuisCompiledArtifactSectionTable,
+    name: &str,
+) -> Result<&'a str, ArtifactError> {
+    std::str::from_utf8(section_bytes(table, name)?).map_err(|error| {
+        ArtifactError::new(format!(
+            "compiled artifact section `{name}` is not valid UTF-8: {error}"
+        ))
+    })
+}
+
+fn render_compiled_artifact_metadata(artifact: &NuisCompiledArtifact) -> String {
+    format!(
+        "artifact_schema = \"{}\"\npackaging_mode = \"{}\"\ncpu_target_abi = \"{}\"\ncpu_target_machine_arch = \"{}\"\ncpu_target_machine_os = \"{}\"\ncpu_target_object_format = \"{}\"\ncpu_target_calling_abi = \"{}\"\nbinary_name = \"{}\"\n",
+        escape_toml_string(&artifact.schema),
+        escape_toml_string(&artifact.packaging_mode),
+        escape_toml_string(&artifact.cpu_target_abi),
+        escape_toml_string(&artifact.cpu_target_machine_arch),
+        escape_toml_string(&artifact.cpu_target_machine_os),
+        escape_toml_string(&artifact.cpu_target_object_format),
+        escape_toml_string(&artifact.cpu_target_calling_abi),
+        escape_toml_string(&artifact.binary_name),
+    )
+}
+
+fn render_lifecycle_contract(lifecycle: &NuisLifecycleContract) -> String {
+    format!(
+        "lifecycle_schema = \"{}\"\nlifecycle_bootstrap_entry = \"{}\"\nlifecycle_tick_policy = \"{}\"\nlifecycle_shutdown_policy = \"{}\"\nlifecycle_yalivia_rpc = \"{}\"\nlifecycle_hook_surface = {}\nlifecycle_export_surface = {}\nlifecycle_runtime_capability_flags = {}\n",
+        escape_toml_string(&lifecycle.schema),
+        escape_toml_string(&lifecycle.bootstrap_entry),
+        escape_toml_string(&lifecycle.tick_policy),
+        escape_toml_string(&lifecycle.shutdown_policy),
+        escape_toml_string(&lifecycle.yalivia_rpc),
+        render_string_array(&lifecycle.hook_surface),
+        render_string_array(&lifecycle.export_surface),
+        render_string_array(&lifecycle.runtime_capability_flags),
+    )
+}
+
+fn render_lowering_index(artifact: &NuisCompiledArtifact) -> Result<String, ArtifactError> {
+    let manifest = parse_build_manifest_from_source(
+        &artifact.build_manifest_source,
+        Path::new("<compiled-artifact-build-manifest>"),
+    )?;
+    let mut out = String::new();
+    out.push_str("schema = \"nuis-lowering-index-v1\"\n");
+    out.push_str(&format!(
+        "packaging_mode = \"{}\"\n",
+        escape_toml_string(&artifact.packaging_mode)
+    ));
+    out.push_str(&format!(
+        "domain_unit_count = {}\n",
+        manifest.domain_build_units.len()
+    ));
+    for unit in &manifest.domain_build_units {
+        out.push_str("\n[[lowering_unit]]\n");
+        out.push_str(&format!(
+            "package_id = \"{}\"\n",
+            escape_toml_string(&unit.package_id)
+        ));
+        out.push_str(&format!(
+            "domain_family = \"{}\"\n",
+            escape_toml_string(&unit.domain_family)
+        ));
+        if let Some(value) = &unit.backend_family {
+            out.push_str(&format!(
+                "backend_family = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &unit.selected_lowering_target {
+            out.push_str(&format!(
+                "selected_lowering_target = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &unit.artifact_ir_sidecar_path {
+            out.push_str(&format!(
+                "artifact_ir_sidecar_path = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        out.push_str(&format!(
+            "contract_family = \"{}\"\n",
+            escape_toml_string(&unit.contract_family)
+        ));
+        out.push_str(&format!(
+            "packaging_role = \"{}\"\n",
+            escape_toml_string(&unit.packaging_role)
+        ));
+    }
+    Ok(out)
+}
+
+fn parse_lifecycle_contract(source: &str) -> Result<NuisLifecycleContract, ArtifactError> {
+    let path = Path::new("<compiled-artifact-lifecycle>");
+    Ok(NuisLifecycleContract {
+        schema: parse_required_toml_string(source, "lifecycle_schema", path)?,
+        bootstrap_entry: parse_required_toml_string(source, "lifecycle_bootstrap_entry", path)?,
+        tick_policy: parse_required_toml_string(source, "lifecycle_tick_policy", path)?,
+        shutdown_policy: parse_required_toml_string(source, "lifecycle_shutdown_policy", path)?,
+        yalivia_rpc: parse_required_toml_string(source, "lifecycle_yalivia_rpc", path)?,
+        hook_surface: parse_optional_toml_string_array(source, "lifecycle_hook_surface")
+            .unwrap_or_default(),
+        export_surface: parse_optional_toml_string_array(source, "lifecycle_export_surface")
+            .unwrap_or_default(),
+        runtime_capability_flags: parse_optional_toml_string_array(
+            source,
+            "lifecycle_runtime_capability_flags",
+        )
+        .unwrap_or_default(),
     })
 }
 
@@ -516,7 +947,7 @@ fn materialize_domain_unit_support(
         if let Some(contract_section) = decoded
             .sections
             .iter()
-            .find(|section| section.name == "contract_toml")
+            .find(|section| section.name == DOMAIN_PAYLOAD_SECTION_CONTRACT_TOML)
         {
             let path = output_dir.join(format!("nuis.domain.{}.payload.toml", unit.domain_family));
             fs::write(&path, &contract_section.bytes).map_err(|error| {
@@ -596,7 +1027,15 @@ mod tests {
     };
 
     use crate::{
-        encode_domain_payload_blob, materialize_embedded_artifact_support,
+        decode_nuis_compiled_artifact_binary, decode_nuis_compiled_artifact_section_table_binary,
+        encode_domain_payload_blob, encode_nuis_compiled_artifact_section_table,
+        encode_nuis_compiled_artifact_section_table_binary, materialize_embedded_artifact_support,
+        protocol::{
+            COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML,
+            COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY, COMPILED_ARTIFACT_SECTION_HOST_BINARY,
+            COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML,
+            COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML, COMPILED_ARTIFACT_SECTION_METADATA_TOML,
+        },
         DomainBuildUnitPayloadBlob, DomainBuildUnitPayloadBlobSection, NuisCompiledArtifact,
         NuisExecutableEnvelope, NuisLifecycleContract,
     };
@@ -618,6 +1057,178 @@ mod tests {
             let _ = write!(&mut out, "{byte:02x}");
         }
         out
+    }
+
+    fn sample_compiled_artifact() -> NuisCompiledArtifact {
+        let build_manifest_source = r#"manifest_schema = "nuis-build-manifest-v1"
+input = "/tmp/demo.ns"
+output_dir = "/tmp/out"
+packaging_mode = "native-cpu-llvm"
+path = "/tmp/out/nuis.executable.envelope.toml"
+schema = "nuis-executable-envelope-v1"
+package_count = 1
+artifact_path = "/tmp/out/nuis.compiled.artifact"
+artifact_schema = "nuis-compiled-artifact-v1"
+artifact_binary_name = "demo"
+artifact_binary_bytes = 3
+lifecycle_schema = "nuis-lifecycle-contract-v1"
+lifecycle_bootstrap_entry = "nuis.bootstrap.lifecycle.v1"
+lifecycle_tick_policy = "cooperative"
+lifecycle_shutdown_policy = "graceful"
+lifecycle_yalivia_rpc = "disabled"
+lifecycle_hook_surface = ["on_bootstrap"]
+lifecycle_export_surface = ["main"]
+lifecycle_runtime_capability_flags = ["runtime.tick"]
+function_kind = "function-node"
+graph_kind = "function-graph"
+default_time_mode = "logical"
+cpu_target_abi = "cpu.arm64.apple_aapcs64"
+cpu_target_machine_arch = "arm64"
+cpu_target_machine_os = "darwin"
+cpu_target_object_format = "mach-o"
+cpu_target_calling_abi = "aapcs64-darwin"
+cpu_target_clang = "arm64-apple-darwin"
+cpu_target_cross = false
+
+[[execution_contract]]
+package_id = "official.cpu"
+domain_family = "cpu"
+
+[[domain_build_unit]]
+package_id = "official.cpu"
+domain_family = "cpu"
+backend_family = "llvm"
+selected_lowering_target = "llvm"
+contract_family = "nustar.cpu"
+packaging_role = "host-binary"
+"#
+        .to_owned();
+        NuisCompiledArtifact {
+            schema: "nuis-compiled-artifact-v1".to_owned(),
+            packaging_mode: "native-cpu-llvm".to_owned(),
+            cpu_target_abi: "cpu.arm64.apple_aapcs64".to_owned(),
+            cpu_target_machine_arch: "arm64".to_owned(),
+            cpu_target_machine_os: "darwin".to_owned(),
+            cpu_target_object_format: "mach-o".to_owned(),
+            cpu_target_calling_abi: "aapcs64-darwin".to_owned(),
+            binary_name: "demo".to_owned(),
+            binary_bytes: 3,
+            build_manifest_bytes: build_manifest_source.len(),
+            envelope: NuisExecutableEnvelope {
+                schema: "nuis-executable-envelope-v1".to_owned(),
+                executable_kind: "native".to_owned(),
+                package_count: 1,
+                domain_families: vec!["cpu".to_owned()],
+                contract_families: vec!["nustar.cpu".to_owned()],
+                function_kind: "function-node".to_owned(),
+                graph_kind: "function-graph".to_owned(),
+                default_time_mode: "logical".to_owned(),
+            },
+            lifecycle: NuisLifecycleContract {
+                schema: "nuis-lifecycle-contract-v1".to_owned(),
+                bootstrap_entry: "nuis.bootstrap.lifecycle.v1".to_owned(),
+                tick_policy: "cooperative".to_owned(),
+                shutdown_policy: "graceful".to_owned(),
+                yalivia_rpc: "disabled".to_owned(),
+                hook_surface: vec!["on_bootstrap".to_owned()],
+                export_surface: vec!["main".to_owned()],
+                runtime_capability_flags: vec!["runtime.tick".to_owned()],
+            },
+            build_manifest_source,
+            binary_blob: b"bin".to_vec(),
+        }
+    }
+
+    #[test]
+    fn section_table_artifact_roundtrips_through_generic_decoder() {
+        let artifact = sample_compiled_artifact();
+
+        let encoded = encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap();
+        let table = decode_nuis_compiled_artifact_section_table_binary(&encoded).unwrap();
+        let decoded = decode_nuis_compiled_artifact_binary(&encoded).unwrap();
+        let section_names = table
+            .sections
+            .iter()
+            .map(|section| section.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            section_names,
+            vec![
+                COMPILED_ARTIFACT_SECTION_METADATA_TOML,
+                COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY,
+                COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML,
+                COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML,
+                COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML,
+                COMPILED_ARTIFACT_SECTION_HOST_BINARY,
+            ]
+        );
+        let lowering_index = table
+            .section_utf8(COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML)
+            .unwrap();
+        assert!(lowering_index.contains("schema = \"nuis-lowering-index-v1\""));
+        assert!(lowering_index.contains("domain_unit_count = 1"));
+        assert!(lowering_index.contains("backend_family = \"llvm\""));
+        assert!(lowering_index.contains("selected_lowering_target = \"llvm\""));
+        assert_eq!(decoded, artifact);
+    }
+
+    #[test]
+    fn section_table_rejects_missing_required_section() {
+        let artifact = sample_compiled_artifact();
+        let encoded = encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap();
+        let mut table = decode_nuis_compiled_artifact_section_table_binary(&encoded).unwrap();
+        table
+            .sections
+            .retain(|section| section.name != COMPILED_ARTIFACT_SECTION_HOST_BINARY);
+
+        let encoded_without_host = encode_nuis_compiled_artifact_section_table(&table).unwrap();
+        let error =
+            decode_nuis_compiled_artifact_section_table_binary(&encoded_without_host).unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("missing required section `host_binary`"));
+    }
+
+    #[test]
+    fn section_table_rejects_duplicate_section_names() {
+        let artifact = sample_compiled_artifact();
+        let encoded = encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap();
+        let mut table = decode_nuis_compiled_artifact_section_table_binary(&encoded).unwrap();
+        table.sections.push(table.sections[0].clone());
+
+        let encoded_with_duplicate = encode_nuis_compiled_artifact_section_table(&table).unwrap();
+        let error = decode_nuis_compiled_artifact_section_table_binary(&encoded_with_duplicate)
+            .unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("duplicate section `metadata_toml`"));
+    }
+
+    #[test]
+    fn section_table_exposes_lookup_helpers_for_linker_consumers() {
+        let artifact = sample_compiled_artifact();
+        let encoded = encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap();
+        let table = decode_nuis_compiled_artifact_section_table_binary(&encoded).unwrap();
+
+        assert!(table.contains_section(COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY));
+        assert!(table
+            .section_names()
+            .contains(&COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML));
+        assert_eq!(
+            table
+                .section_utf8(COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML)
+                .unwrap(),
+            artifact.build_manifest_source
+        );
+        assert_eq!(
+            table
+                .section_bytes(COMPILED_ARTIFACT_SECTION_HOST_BINARY)
+                .unwrap(),
+            artifact.binary_blob
+        );
     }
 
     #[test]

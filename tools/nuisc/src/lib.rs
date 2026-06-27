@@ -729,6 +729,26 @@ fn link_plan_json(plan: &linker::LinkPlan) -> String {
         json_string_field("final_stage_output", &plan.final_stage.output_path),
         json_string_array_field("final_stage_inputs", &plan.final_stage.inputs),
         json_string_array_field("final_stage_notes", &plan.final_stage.notes),
+        json_optional_string_field(
+            "artifact_container_kind",
+            plan.compiled_artifact.container_kind.as_deref(),
+        ),
+        match plan.compiled_artifact.container_version {
+            Some(version) => format!("\"artifact_container_version\":{}", version),
+            None => "\"artifact_container_version\":null".to_owned(),
+        },
+        match plan.compiled_artifact.section_count {
+            Some(count) => json_usize_field("artifact_section_count", count),
+            None => "\"artifact_section_count\":null".to_owned(),
+        },
+        json_string_array_field(
+            "artifact_section_names",
+            &plan.compiled_artifact.section_names,
+        ),
+        match plan.compiled_artifact.section_table_valid {
+            Some(valid) => json_bool_field("artifact_section_table_valid", valid),
+            None => "\"artifact_section_table_valid\":null".to_owned(),
+        },
         json_usize_field("domain_unit_count", plan.domain_units.len()),
         format!("\"domain_units\":[{}]", domain_units),
     ];
@@ -1777,6 +1797,39 @@ fn load_nuis_compiled_artifact(input: &Path) -> Result<aot::NuisCompiledArtifact
     }
 }
 
+fn inspect_artifact_container_for_input(
+    input: &Path,
+    manifest_verify: Option<&aot::BuildManifestVerifyReport>,
+) -> Result<Option<aot::NuisCompiledArtifactContainerInspect>, String> {
+    let artifact_path = if input.is_dir() {
+        let direct = input.join("nuis.compiled.artifact");
+        if direct.is_file() {
+            Some(direct)
+        } else {
+            manifest_verify.map(|report| PathBuf::from(&report.artifact_path))
+        }
+    } else if input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name == "nuis.build.manifest.toml")
+        .unwrap_or(false)
+    {
+        manifest_verify.map(|report| PathBuf::from(&report.artifact_path))
+    } else {
+        let bytes = std::fs::read(input)
+            .map_err(|error| format!("failed to read `{}`: {error}", input.display()))?;
+        if bytes.starts_with(b"NART") {
+            Some(input.to_path_buf())
+        } else {
+            None
+        }
+    };
+    match artifact_path {
+        Some(path) => Ok(Some(aot::inspect_nuis_compiled_artifact_container(&path)?)),
+        None => Ok(None),
+    }
+}
+
 fn inspect_execution_sections(
     input: &Path,
 ) -> Result<Vec<(String, ExecutionPlan, ExecutionTrace)>, String> {
@@ -2074,6 +2127,7 @@ fn inspect_execution_json(input: &Path) -> Result<String, String> {
 fn inspect_artifact_json(
     input: &Path,
     artifact: &aot::NuisCompiledArtifact,
+    container: Option<&aot::NuisCompiledArtifactContainerInspect>,
     manifest_verify: Option<&aot::BuildManifestVerifyReport>,
 ) -> String {
     let mut fields = vec![
@@ -2126,6 +2180,32 @@ fn inspect_artifact_json(
             &artifact.lifecycle.runtime_capability_flags,
         ),
     ];
+    if let Some(container) = container {
+        fields.push(json_string_field(
+            "artifact_container_magic",
+            &container.magic,
+        ));
+        fields.push(json_usize_field(
+            "artifact_container_version",
+            container.binary_version as usize,
+        ));
+        fields.push(json_string_field(
+            "artifact_container_kind",
+            &container.container_kind,
+        ));
+        fields.push(json_usize_field(
+            "artifact_section_count",
+            container.section_count,
+        ));
+        fields.push(json_string_array_field(
+            "artifact_section_names",
+            &container.section_names,
+        ));
+        fields.push(json_bool_field(
+            "artifact_section_table_valid",
+            container.section_table_valid,
+        ));
+    }
     if let Some(report) = manifest_verify {
         let link_plan = linker::build_link_plan(report, artifact);
         let drift_checks = domain_build_contract_drift_checks(&report.domain_build_units);
@@ -2231,6 +2311,17 @@ fn verify_artifact_json(input: &Path, report: &aot::NuisCompiledArtifactVerifyRe
         json_string_field("kind", "nuis_artifact_verify"),
         json_string_field("input", &input.display().to_string()),
         json_string_field("schema", &report.schema),
+        json_string_field("artifact_container_kind", &report.artifact_container_kind),
+        json_usize_field(
+            "artifact_container_version",
+            report.artifact_container_version as usize,
+        ),
+        json_usize_field("artifact_section_count", report.artifact_section_count),
+        json_string_array_field("artifact_section_names", &report.artifact_section_names),
+        json_bool_field(
+            "artifact_section_table_valid",
+            report.artifact_section_table_valid,
+        ),
         json_string_field("packaging_mode", &report.packaging_mode),
         json_string_field("binary_name", &report.binary_name),
         json_usize_field("binary_bytes", report.binary_bytes),
@@ -2567,6 +2658,8 @@ fn artifact_report_json(
             Some(artifact_verify_input),
             manifest_verify,
         ));
+    let artifact_container =
+        aot::inspect_nuis_compiled_artifact_container(artifact_verify_input).ok();
     let fields = vec![
         json_string_field("kind", "nuis_artifact_report"),
         json_string_field("input", &input.display().to_string()),
@@ -2580,7 +2673,12 @@ fn artifact_report_json(
         ),
         format!(
             "\"artifact_inspect\":{}",
-            inspect_artifact_json(input, artifact, Some(manifest_verify))
+            inspect_artifact_json(
+                input,
+                artifact,
+                artifact_container.as_ref(),
+                Some(manifest_verify),
+            )
         ),
         format!(
             "\"artifact_verify\":{}",
@@ -3408,14 +3506,37 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             } else {
                 Some(reconstruct_manifest_report_from_artifact(&input, &artifact)?.1)
             };
+            let container = inspect_artifact_container_for_input(&input, manifest_verify.as_ref())?;
             if json {
                 println!(
                     "{}",
-                    inspect_artifact_json(&input, &artifact, manifest_verify.as_ref())
+                    inspect_artifact_json(
+                        &input,
+                        &artifact,
+                        container.as_ref(),
+                        manifest_verify.as_ref(),
+                    )
                 );
                 return Ok(());
             }
             println!("nuis artifact: {}", input.display());
+            if let Some(container) = &container {
+                println!(
+                    "  artifact_container: {} version {}",
+                    container.container_kind, container.binary_version
+                );
+                println!("  artifact_section_count: {}", container.section_count);
+                if !container.section_names.is_empty() {
+                    println!(
+                        "  artifact_section_names: {}",
+                        container.section_names.join(", ")
+                    );
+                }
+                println!(
+                    "  artifact_section_table_valid: {}",
+                    container.section_table_valid
+                );
+            }
             println!("  schema: {}", artifact.schema);
             println!("  packaging_mode: {}", artifact.packaging_mode);
             println!("  cpu_target_abi: {}", artifact.cpu_target_abi);
@@ -3844,6 +3965,28 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             }
             println!("nuis artifact verified: {}", artifact_input.display());
             println!("  schema: {}", report.schema);
+            println!(
+                "  artifact_container_kind: {}",
+                report.artifact_container_kind
+            );
+            println!(
+                "  artifact_container_version: {}",
+                report.artifact_container_version
+            );
+            println!(
+                "  artifact_section_count: {}",
+                report.artifact_section_count
+            );
+            if !report.artifact_section_names.is_empty() {
+                println!(
+                    "  artifact_section_names: {}",
+                    report.artifact_section_names.join(", ")
+                );
+            }
+            println!(
+                "  artifact_section_table_valid: {}",
+                report.artifact_section_table_valid
+            );
             println!("  packaging_mode: {}", report.packaging_mode);
             println!("  binary_name: {}", report.binary_name);
             println!("  binary_bytes: {}", report.binary_bytes);
@@ -5605,7 +5748,11 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         let manifest_path = output_dir.join("nuis.build.manifest.toml");
         let artifact = load_nuis_compiled_artifact(&manifest_path).unwrap();
         let report = aot::verify_build_manifest(&manifest_path).unwrap();
-        let json = inspect_artifact_json(&manifest_path, &artifact, Some(&report));
+        let container = inspect_artifact_container_for_input(&manifest_path, Some(&report))
+            .unwrap()
+            .unwrap();
+        let json =
+            inspect_artifact_json(&manifest_path, &artifact, Some(&container), Some(&report));
 
         assert!(json.contains("\"domain_build_unit_count\":"));
         assert!(json.contains("\"domain_build_units\":["));
@@ -5635,6 +5782,74 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"final_stage_driver\":\"clang\""));
         assert!(json.contains("\"final_stage_kind\":\"host-native-link\""));
         assert!(json.contains("\"final_stage_link_mode\":\"host-toolchain-finalize\""));
+        assert!(json.contains("\"artifact_container_kind\":\"compiled-artifact-v1\""));
+        assert!(json.contains("\"artifact_container_version\":1"));
+        assert!(json.contains("\"artifact_section_table_valid\":true"));
+        assert!(json.contains("\"link_plan\":{\"schema\":\"nuis-link-plan-v1\""));
+        assert!(json.contains("\"artifact_section_count\":0"));
+    }
+
+    #[test]
+    fn inspect_artifact_json_accepts_section_table_artifact_container() {
+        let project_name = "inspect_artifact_v2_section_table_json";
+        let project_root = write_temp_project_fixture(
+            project_name,
+            r#"
+name = "inspect_artifact_v2_section_table_json"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return 7;
+              }
+            }
+            "#,
+        );
+        let output_dir = temp_dir("inspect_artifact_v2_section_table_outputs");
+
+        run(CommandKind::Compile {
+            input: project_root,
+            output_dir: output_dir.clone(),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+        })
+        .unwrap();
+
+        let manifest_path = output_dir.join("nuis.build.manifest.toml");
+        let artifact = load_nuis_compiled_artifact(&manifest_path).unwrap();
+        let v2_path = output_dir.join("nuis.compiled.v2.artifact");
+        let v2_bytes = aot::encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap();
+        std::fs::write(&v2_path, v2_bytes).unwrap();
+
+        let decoded = load_nuis_compiled_artifact(&v2_path).unwrap();
+        let container = inspect_artifact_container_for_input(&v2_path, None)
+            .unwrap()
+            .unwrap();
+        let json = inspect_artifact_json(&v2_path, &decoded, Some(&container), None);
+        let verify_report = aot::verify_nuis_compiled_artifact(&v2_path).unwrap();
+        let verify_json = verify_artifact_json(&v2_path, &verify_report);
+
+        assert_eq!(decoded.binary_name, artifact.binary_name);
+        assert!(json.contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\""));
+        assert!(json.contains("\"artifact_container_version\":2"));
+        assert!(json.contains("\"artifact_section_count\":6"));
+        assert!(json.contains("\"metadata_toml\""));
+        assert!(json.contains("\"envelope_binary\""));
+        assert!(json.contains("\"lifecycle_toml\""));
+        assert!(json.contains("\"build_manifest_toml\""));
+        assert!(json.contains("\"lowering_index_toml\""));
+        assert!(json.contains("\"host_binary\""));
+        assert!(json.contains("\"artifact_section_table_valid\":true"));
+        assert!(verify_json
+            .contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\""));
+        assert!(verify_json.contains("\"artifact_container_version\":2"));
+        assert!(verify_json.contains("\"artifact_section_count\":6"));
+        assert!(verify_json.contains("\"artifact_roundtrip_verified\":true"));
     }
 
     #[test]
@@ -5727,13 +5942,25 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         let manifest_verify = aot::verify_build_manifest(&manifest_path).unwrap();
         let artifact_verify = aot::verify_nuis_compiled_artifact(&artifact_path).unwrap();
 
-        let inspect_json = inspect_artifact_json(&manifest_path, &artifact, Some(&manifest_verify));
+        let container =
+            inspect_artifact_container_for_input(&manifest_path, Some(&manifest_verify))
+                .unwrap()
+                .unwrap();
+        let inspect_json = inspect_artifact_json(
+            &manifest_path,
+            &artifact,
+            Some(&container),
+            Some(&manifest_verify),
+        );
         assert!(inspect_json.contains("\"kind\":\"nuis_artifact_inspect\""));
         assert!(inspect_json.contains("\"binary_name\":\"benchmark_report_file_demo\""));
         assert!(inspect_json.contains("\"packaging_mode\":\"native-cpu-llvm\""));
+        assert!(inspect_json.contains("\"artifact_container_kind\":\"compiled-artifact-v1\""));
         assert!(inspect_json.contains("\"domain_build_units\":["));
         assert!(inspect_json.contains("\"domain_build_contracts\":["));
         assert!(inspect_json.contains("\"link_plan\":{"));
+        assert!(inspect_json.contains("\"artifact_container_version\":1"));
+        assert!(inspect_json.contains("\"artifact_section_count\":0"));
         assert!(inspect_json.contains("\"final_stage_driver\":\"clang\""));
 
         let verify_manifest_json = verify_build_manifest_json(&manifest_path, &manifest_verify);
@@ -5749,6 +5976,10 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(
             verify_artifact_json_text.contains("\"binary_name\":\"benchmark_report_file_demo\"")
         );
+        assert!(verify_artifact_json_text
+            .contains("\"artifact_container_kind\":\"compiled-artifact-v1\""));
+        assert!(verify_artifact_json_text.contains("\"artifact_container_version\":1"));
+        assert!(verify_artifact_json_text.contains("\"artifact_section_count\":0"));
         assert!(verify_artifact_json_text.contains("\"artifact_roundtrip_verified\":true"));
         assert!(verify_artifact_json_text.contains("\"lifecycle_contract_consistent\":true"));
 
@@ -6017,6 +6248,11 @@ mod cpu Main {
     fn artifact_report_summary_lines_expose_compact_overview() {
         let artifact_verify = aot::NuisCompiledArtifactVerifyReport {
             schema: "nuis-compiled-artifact-v1".to_owned(),
+            artifact_container_kind: "compiled-artifact-v1".to_owned(),
+            artifact_container_version: 1,
+            artifact_section_count: 0,
+            artifact_section_names: Vec::new(),
+            artifact_section_table_valid: true,
             packaging_mode: "native-cpu-llvm".to_owned(),
             binary_name: "demo".to_owned(),
             binary_bytes: 1,
@@ -6089,6 +6325,11 @@ mod cpu Main {
                 binary_path: "out/demo".to_owned(),
                 binary_bytes: 1,
                 build_manifest_bytes: 1,
+                container_kind: Some("compiled-artifact-v1".to_owned()),
+                container_version: Some(1),
+                section_count: Some(0),
+                section_names: Vec::new(),
+                section_table_valid: Some(true),
             },
             bridge_registry_path: None,
             host_bridge_plan_index_path: None,
@@ -6748,10 +6989,11 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         let json = inspect_stdlib_docs_json(&summary);
 
         assert!(json.contains("\"kind\":\"nuis_stdlib_doc_index\""));
-        assert!(json.contains("\"galaxy_count\":4"));
+        assert!(json.contains("\"galaxy_count\":5"));
         assert!(json.contains("\"galaxy\":\"core\""));
         assert!(json.contains("\"galaxy\":\"std\""));
         assert!(json.contains("\"galaxy\":\"pixelmagic\""));
+        assert!(json.contains("\"galaxy\":\"witsage\""));
         assert!(json.contains("\"galaxy\":\"ns-nova\""));
     }
 }

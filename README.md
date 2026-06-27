@@ -220,7 +220,8 @@ High-signal implemented surfaces:
 * first constrained trait/generic monomorphization slices
 * packet schema/contract metadata through `@packet`,
   `@packet_field`, and `@packet_control_field`
-* executable `while` subsets for counted/carry/flow-style loops
+* executable `while` subsets for counted/carry/flow-style loops, including
+  representative native compile/launch smoke
 * `std net` low-level syscall/socket/flow layering
 * project-level host FFI contract indexing
 * `ns-nova` framework manifests with family/render/selection assembly metadata for `core / ui / future scene` layering

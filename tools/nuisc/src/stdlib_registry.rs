@@ -220,6 +220,13 @@ mod tests {
                 "surface.std.project-utility.v1".to_owned(),
             ]
         );
+        assert_eq!(
+            manifest.library_modules,
+            vec![
+                "lib/task_contracts.ns".to_owned(),
+                "lib/io_contracts.ns".to_owned(),
+            ]
+        );
     }
 
     #[test]

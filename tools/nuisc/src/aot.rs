@@ -6,12 +6,18 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use nuis_artifact::protocol::{
+    COMPILED_ARTIFACT_BINARY_VERSION, COMPILED_ARTIFACT_MAGIC,
+    COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION,
+};
 use nuis_artifact::{
     decode_domain_payload_blob as shared_decode_domain_payload_blob,
     decode_nuis_compiled_artifact_binary as shared_decode_nuis_compiled_artifact_binary,
+    decode_nuis_compiled_artifact_section_table_binary as shared_decode_nuis_compiled_artifact_section_table_binary,
     decode_nuis_executable_envelope_binary as shared_decode_nuis_executable_envelope_binary,
     encode_domain_payload_blob as shared_encode_domain_payload_blob,
     encode_nuis_compiled_artifact_binary as shared_encode_nuis_compiled_artifact_binary,
+    encode_nuis_compiled_artifact_section_table_binary as shared_encode_nuis_compiled_artifact_section_table_binary,
     encode_nuis_executable_envelope_binary as shared_encode_nuis_executable_envelope_binary,
     parse_domain_build_unit_blocks as shared_parse_domain_build_unit_blocks,
     parse_nuis_compiled_artifact as shared_parse_nuis_compiled_artifact,
@@ -98,6 +104,16 @@ pub use nuis_artifact::{
     BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob, DomainBuildUnitPayloadBlobSection,
     NuisCompiledArtifact, NuisExecutableEnvelope, NuisLifecycleContract,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NuisCompiledArtifactContainerInspect {
+    pub magic: String,
+    pub binary_version: u16,
+    pub container_kind: String,
+    pub section_count: usize,
+    pub section_names: Vec<String>,
+    pub section_table_valid: bool,
+}
 
 fn validate_artifact_binary_name(field: &str, value: &str, context: &Path) -> Result<(), String> {
     let path = Path::new(value);
@@ -1191,8 +1207,68 @@ pub fn encode_nuis_compiled_artifact_binary(
     shared_encode_nuis_compiled_artifact_binary(artifact).map_err(|error| error.to_string())
 }
 
+pub fn encode_nuis_compiled_artifact_section_table_binary(
+    artifact: &NuisCompiledArtifact,
+) -> Result<Vec<u8>, String> {
+    shared_encode_nuis_compiled_artifact_section_table_binary(artifact)
+        .map_err(|error| error.to_string())
+}
+
 pub fn decode_nuis_compiled_artifact_binary(bytes: &[u8]) -> Result<NuisCompiledArtifact, String> {
     shared_decode_nuis_compiled_artifact_binary(bytes).map_err(|error| error.to_string())
+}
+
+pub fn inspect_nuis_compiled_artifact_container(
+    path: &Path,
+) -> Result<NuisCompiledArtifactContainerInspect, String> {
+    let bytes =
+        fs::read(path).map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    if bytes.len() < 6 {
+        return Err(format!(
+            "`{}` is too short to be a nuis compiled artifact container",
+            path.display()
+        ));
+    }
+    if &bytes[..4] != COMPILED_ARTIFACT_MAGIC {
+        return Err(format!(
+            "`{}` has invalid nuis artifact magic",
+            path.display()
+        ));
+    }
+    let binary_version = u16::from_le_bytes([bytes[4], bytes[5]]);
+    let magic = std::str::from_utf8(COMPILED_ARTIFACT_MAGIC)
+        .unwrap_or("NART")
+        .to_owned();
+    if binary_version == COMPILED_ARTIFACT_BINARY_VERSION {
+        return Ok(NuisCompiledArtifactContainerInspect {
+            magic,
+            binary_version,
+            container_kind: "compiled-artifact-v1".to_owned(),
+            section_count: 0,
+            section_names: Vec::new(),
+            section_table_valid: true,
+        });
+    }
+    if binary_version == COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION {
+        let table = shared_decode_nuis_compiled_artifact_section_table_binary(&bytes)
+            .map_err(|error| error.to_string())?;
+        return Ok(NuisCompiledArtifactContainerInspect {
+            magic,
+            binary_version,
+            container_kind: "compiled-artifact-section-table-v2".to_owned(),
+            section_count: table.sections.len(),
+            section_names: table
+                .section_names()
+                .into_iter()
+                .map(str::to_owned)
+                .collect(),
+            section_table_valid: true,
+        });
+    }
+    Err(format!(
+        "`{}` has unsupported nuis artifact binary version `{binary_version}`",
+        path.display()
+    ))
 }
 
 pub fn write_nuis_compiled_artifact(
@@ -3769,6 +3845,11 @@ pub struct BuildManifestVerifyReport {
 
 pub struct NuisCompiledArtifactVerifyReport {
     pub schema: String,
+    pub artifact_container_kind: String,
+    pub artifact_container_version: u16,
+    pub artifact_section_count: usize,
+    pub artifact_section_names: Vec<String>,
+    pub artifact_section_table_valid: bool,
     pub packaging_mode: String,
     pub binary_name: String,
     pub binary_bytes: usize,
@@ -4914,6 +4995,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
 pub fn verify_nuis_compiled_artifact(
     path: &Path,
 ) -> Result<NuisCompiledArtifactVerifyReport, String> {
+    let container = inspect_nuis_compiled_artifact_container(path)?;
     let artifact = parse_nuis_compiled_artifact(path)?;
     validate_nuis_compiled_artifact_layout(path, &artifact)?;
     if artifact.schema != "nuis-compiled-artifact-v1" {
@@ -4984,6 +5066,11 @@ pub fn verify_nuis_compiled_artifact(
 
     Ok(NuisCompiledArtifactVerifyReport {
         schema: artifact.schema,
+        artifact_container_kind: container.container_kind,
+        artifact_container_version: container.binary_version,
+        artifact_section_count: container.section_count,
+        artifact_section_names: container.section_names,
+        artifact_section_table_valid: container.section_table_valid,
         packaging_mode: artifact.packaging_mode,
         binary_name: artifact.binary_name,
         binary_bytes: artifact.binary_bytes,

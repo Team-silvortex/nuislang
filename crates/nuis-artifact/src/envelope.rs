@@ -1,15 +1,16 @@
 use std::{fs, path::Path};
 
 use crate::{
+    protocol::{
+        EXECUTABLE_ENVELOPE_BINARY_VERSION, EXECUTABLE_ENVELOPE_MAGIC,
+        EXECUTABLE_ENVELOPE_SCHEMA_V1,
+    },
     toml::{
         escape_toml_string, parse_optional_toml_string, parse_required_toml_string,
         parse_required_toml_string_array, parse_required_toml_usize, render_string_array,
     },
     ArtifactError,
 };
-
-const NUIS_ENVELOPE_BINARY_MAGIC: &[u8; 4] = b"NENV";
-const NUIS_ENVELOPE_BINARY_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NuisExecutableEnvelope {
@@ -25,7 +26,10 @@ pub struct NuisExecutableEnvelope {
 
 pub fn render_nuis_executable_envelope(envelope: &NuisExecutableEnvelope) -> String {
     let mut out = String::new();
-    out.push_str("envelope_schema = \"nuis-executable-envelope-v1\"\n");
+    out.push_str(&format!(
+        "envelope_schema = \"{}\"\n",
+        EXECUTABLE_ENVELOPE_SCHEMA_V1
+    ));
     out.push_str(&format!(
         "executable_kind = \"{}\"\n",
         escape_toml_string(&envelope.executable_kind)
@@ -61,8 +65,8 @@ pub fn encode_nuis_executable_envelope_binary(
     let payload_len = u32::try_from(payload.len())
         .map_err(|_| ArtifactError::new("nuis executable envelope payload exceeds 4 GiB"))?;
     let mut out = Vec::with_capacity(4 + 2 + 4 + payload.len());
-    out.extend_from_slice(NUIS_ENVELOPE_BINARY_MAGIC);
-    out.extend_from_slice(&NUIS_ENVELOPE_BINARY_VERSION.to_le_bytes());
+    out.extend_from_slice(EXECUTABLE_ENVELOPE_MAGIC);
+    out.extend_from_slice(&EXECUTABLE_ENVELOPE_BINARY_VERSION.to_le_bytes());
     out.extend_from_slice(&payload_len.to_le_bytes());
     out.extend_from_slice(&payload);
     Ok(out)
@@ -76,13 +80,13 @@ pub fn decode_nuis_executable_envelope_binary(
             "nuis executable envelope binary is too short",
         ));
     }
-    if &bytes[..4] != NUIS_ENVELOPE_BINARY_MAGIC {
+    if &bytes[..4] != EXECUTABLE_ENVELOPE_MAGIC {
         return Err(ArtifactError::new(
             "nuis executable envelope binary has invalid magic",
         ));
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if version != NUIS_ENVELOPE_BINARY_VERSION {
+    if version != EXECUTABLE_ENVELOPE_BINARY_VERSION {
         return Err(ArtifactError::new(format!(
             "unsupported nuis executable envelope binary version `{version}`"
         )));

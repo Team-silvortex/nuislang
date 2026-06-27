@@ -75,6 +75,10 @@ mod cpu Main {
   }
 
   fn main() -> i64 {
-    return summarize_clock_snapshot(1);
+    let snapshot: i64 = summarize_clock_snapshot(1);
+    if snapshot >= 0 {
+      return 0;
+    }
+    return 1;
   }
 }

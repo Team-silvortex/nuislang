@@ -2869,6 +2869,11 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
     let mut artifact_verified = false;
     let mut manifest_verify_error = None;
     let mut artifact_verify_error = None;
+    let mut artifact_container_kind = None;
+    let mut artifact_container_version = None;
+    let mut artifact_section_count = None;
+    let mut artifact_section_names = Vec::new();
+    let mut artifact_section_table_valid = None;
 
     if let Some(path) = manifest_path.as_ref() {
         match nuisc::aot::verify_build_manifest(path) {
@@ -2884,6 +2889,18 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
     }
 
     if let Some(path) = artifact_path.as_ref() {
+        match nuisc::aot::inspect_nuis_compiled_artifact_container(path) {
+            Ok(container) => {
+                artifact_container_kind = Some(container.container_kind);
+                artifact_container_version = Some(container.binary_version);
+                artifact_section_count = Some(container.section_count);
+                artifact_section_names = container.section_names;
+                artifact_section_table_valid = Some(container.section_table_valid);
+            }
+            Err(error) => {
+                artifact_verify_error = Some(error);
+            }
+        }
         match nuisc::aot::verify_nuis_compiled_artifact(path) {
             Ok(report) => {
                 artifact_verified = true;
@@ -3007,6 +3024,11 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
         recommended_reason,
         manifest_verify_error,
         artifact_verify_error,
+        artifact_container_kind,
+        artifact_container_version,
+        artifact_section_count,
+        artifact_section_names,
+        artifact_section_table_valid,
     }
 }
 
@@ -3045,6 +3067,23 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
             json_bool_field("binary_exists", report.binary_exists),
             json_bool_field("manifest_verified", report.manifest_verified),
             json_bool_field("artifact_verified", report.artifact_verified),
+            json_optional_string_field(
+                "artifact_container_kind",
+                report.artifact_container_kind.as_deref(),
+            ),
+            match report.artifact_container_version {
+                Some(version) => format!("\"artifact_container_version\":{}", version),
+                None => "\"artifact_container_version\":null".to_owned(),
+            },
+            match report.artifact_section_count {
+                Some(count) => json_usize_field("artifact_section_count", count),
+                None => "\"artifact_section_count\":null".to_owned(),
+            },
+            json_string_array_field("artifact_section_names", &report.artifact_section_names),
+            match report.artifact_section_table_valid {
+                Some(valid) => json_bool_field("artifact_section_table_valid", valid),
+                None => "\"artifact_section_table_valid\":null".to_owned(),
+            },
             json_bool_field("ready_to_run", report.ready_to_run),
             json_field("recommended_next_step", &report.recommended_next_step),
             json_field("recommended_command", &report.recommended_command),
@@ -3502,6 +3541,24 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
     println!("  binary_exists: {}", report.binary_exists);
     println!("  manifest_verified: {}", report.manifest_verified);
     println!("  artifact_verified: {}", report.artifact_verified);
+    if let Some(kind) = report.artifact_container_kind.as_deref() {
+        println!("  artifact_container_kind: {}", kind);
+    }
+    if let Some(version) = report.artifact_container_version {
+        println!("  artifact_container_version: {}", version);
+    }
+    if let Some(count) = report.artifact_section_count {
+        println!("  artifact_section_count: {}", count);
+    }
+    if !report.artifact_section_names.is_empty() {
+        println!(
+            "  artifact_section_names: {}",
+            report.artifact_section_names.join(", ")
+        );
+    }
+    if let Some(valid) = report.artifact_section_table_valid {
+        println!("  artifact_section_table_valid: {}", valid);
+    }
     println!("  ready_to_run: {}", report.ready_to_run);
     println!(
         "  artifact_diagnostic_code: {}",
@@ -4216,6 +4273,11 @@ pub(crate) struct ArtifactDoctorReport {
     pub(crate) binary_exists: bool,
     pub(crate) manifest_verified: bool,
     pub(crate) artifact_verified: bool,
+    pub(crate) artifact_container_kind: Option<String>,
+    pub(crate) artifact_container_version: Option<u16>,
+    pub(crate) artifact_section_count: Option<usize>,
+    pub(crate) artifact_section_names: Vec<String>,
+    pub(crate) artifact_section_table_valid: Option<bool>,
     pub(crate) ready_to_run: bool,
     pub(crate) recommended_next_step: String,
     pub(crate) recommended_command: String,
@@ -7169,6 +7231,11 @@ mod cpu Main {
         assert!(json.contains("\"binary_exists\":true"));
         assert!(json.contains("\"manifest_verified\":true"));
         assert!(json.contains("\"artifact_verified\":true"));
+        assert!(json.contains("\"artifact_container_kind\":\"compiled-artifact-v1\""));
+        assert!(json.contains("\"artifact_container_version\":1"));
+        assert!(json.contains("\"artifact_section_count\":0"));
+        assert!(json.contains("\"artifact_section_names\":[]"));
+        assert!(json.contains("\"artifact_section_table_valid\":true"));
         assert!(json.contains("\"ready_to_run\":true"));
         assert!(json.contains("\"artifact_diagnostic_code\":\"ready_to_run\""));
         assert!(json.contains("\"self_check_ready\":true"));
