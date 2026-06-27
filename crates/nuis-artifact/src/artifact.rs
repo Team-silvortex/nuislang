@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -17,7 +17,8 @@ use crate::{
         COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION, DOMAIN_PAYLOAD_SECTION_CONTRACT_TOML,
     },
     toml::{
-        escape_toml_string, parse_optional_toml_string_array, parse_required_toml_string,
+        escape_toml_string, parse_optional_map_string, parse_optional_toml_string_array,
+        parse_required_map_string_in_block, parse_required_toml_string, parse_required_toml_usize,
         render_string_array,
     },
     ArtifactError, BuildManifestDomainBuildUnit, NuisExecutableEnvelope,
@@ -62,6 +63,25 @@ pub struct NuisCompiledArtifactSection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NuisCompiledArtifactSectionTable {
     pub sections: Vec<NuisCompiledArtifactSection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NuisLoweringIndex {
+    pub schema: String,
+    pub packaging_mode: String,
+    pub domain_unit_count: usize,
+    pub units: Vec<NuisLoweringIndexUnit>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NuisLoweringIndexUnit {
+    pub package_id: String,
+    pub domain_family: String,
+    pub backend_family: Option<String>,
+    pub selected_lowering_target: Option<String>,
+    pub artifact_ir_sidecar_path: Option<String>,
+    pub contract_family: String,
+    pub packaging_role: String,
 }
 
 impl NuisCompiledArtifactSectionTable {
@@ -352,6 +372,105 @@ pub fn validate_compiled_artifact_section_table(
         }
     }
     Ok(())
+}
+
+pub fn parse_nuis_lowering_index_from_source(
+    source: &str,
+    path: &Path,
+) -> Result<NuisLoweringIndex, ArtifactError> {
+    let schema = parse_required_toml_string(source, "schema", path)?;
+    let packaging_mode = parse_required_toml_string(source, "packaging_mode", path)?;
+    let domain_unit_count = parse_required_toml_usize(source, "domain_unit_count", path)?;
+    let units = parse_lowering_unit_blocks(source, path)?;
+    if units.len() != domain_unit_count {
+        return Err(ArtifactError::new(format!(
+            "`{}` lowering index domain_unit_count mismatch: declared={}, actual={}",
+            path.display(),
+            domain_unit_count,
+            units.len()
+        )));
+    }
+    Ok(NuisLoweringIndex {
+        schema,
+        packaging_mode,
+        domain_unit_count,
+        units,
+    })
+}
+
+fn parse_lowering_unit_blocks(
+    source: &str,
+    path: &Path,
+) -> Result<Vec<NuisLoweringIndexUnit>, ArtifactError> {
+    let mut rows = Vec::new();
+    let mut current = BTreeMap::<String, String>::new();
+    let mut in_block = false;
+    for raw in source.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if line == "[[lowering_unit]]" {
+            if in_block {
+                rows.push(parse_lowering_unit_row(&current, path)?);
+                current.clear();
+            }
+            in_block = true;
+            continue;
+        }
+        if line.starts_with('[') {
+            if in_block {
+                rows.push(parse_lowering_unit_row(&current, path)?);
+                current.clear();
+                in_block = false;
+            }
+            continue;
+        }
+        if in_block {
+            if let Some((key, value)) = line.split_once('=') {
+                current.insert(key.trim().to_owned(), value.trim().to_owned());
+            }
+        }
+    }
+    if in_block {
+        rows.push(parse_lowering_unit_row(&current, path)?);
+    }
+    Ok(rows)
+}
+
+fn parse_lowering_unit_row(
+    values: &BTreeMap<String, String>,
+    path: &Path,
+) -> Result<NuisLoweringIndexUnit, ArtifactError> {
+    Ok(NuisLoweringIndexUnit {
+        package_id: parse_required_map_string_in_block(
+            values,
+            "package_id",
+            path,
+            "lowering_unit",
+        )?,
+        domain_family: parse_required_map_string_in_block(
+            values,
+            "domain_family",
+            path,
+            "lowering_unit",
+        )?,
+        backend_family: parse_optional_map_string(values, "backend_family"),
+        selected_lowering_target: parse_optional_map_string(values, "selected_lowering_target"),
+        artifact_ir_sidecar_path: parse_optional_map_string(values, "artifact_ir_sidecar_path"),
+        contract_family: parse_required_map_string_in_block(
+            values,
+            "contract_family",
+            path,
+            "lowering_unit",
+        )?,
+        packaging_role: parse_required_map_string_in_block(
+            values,
+            "packaging_role",
+            path,
+            "lowering_unit",
+        )?,
+    })
 }
 
 pub fn decode_nuis_compiled_artifact_binary(
@@ -684,6 +803,10 @@ fn section_table_to_compiled_artifact(
     )?)?;
     let binary_blob = section_bytes(table, COMPILED_ARTIFACT_SECTION_HOST_BINARY)?.to_vec();
     let lifecycle = parse_lifecycle_contract(lifecycle_source)?;
+    validate_lowering_index_against_build_manifest(
+        section_utf8(table, COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML)?,
+        &build_manifest_source,
+    )?;
     Ok(NuisCompiledArtifact {
         schema: parse_required_toml_string(
             metadata,
@@ -732,6 +855,125 @@ fn section_table_to_compiled_artifact(
         build_manifest_source,
         binary_blob,
     })
+}
+
+fn validate_lowering_index_against_build_manifest(
+    lowering_index_source: &str,
+    build_manifest_source: &str,
+) -> Result<(), ArtifactError> {
+    let lowering_index = parse_nuis_lowering_index_from_source(
+        lowering_index_source,
+        Path::new("<compiled-artifact-lowering-index>"),
+    )?;
+    let build_manifest = parse_build_manifest_from_source(
+        build_manifest_source,
+        Path::new("<compiled-artifact-build-manifest>"),
+    )?;
+    if lowering_index.packaging_mode != build_manifest.packaging_mode {
+        return Err(ArtifactError::new(format!(
+            "compiled artifact lowering index packaging_mode `{}` does not match build manifest packaging_mode `{}`",
+            lowering_index.packaging_mode, build_manifest.packaging_mode
+        )));
+    }
+    if lowering_index.units.len() != build_manifest.domain_build_units.len() {
+        return Err(ArtifactError::new(format!(
+            "compiled artifact lowering index unit count `{}` does not match build manifest domain build unit count `{}`",
+            lowering_index.units.len(),
+            build_manifest.domain_build_units.len()
+        )));
+    }
+    for (index, (lowering_unit, manifest_unit)) in lowering_index
+        .units
+        .iter()
+        .zip(build_manifest.domain_build_units.iter())
+        .enumerate()
+    {
+        validate_lowering_unit_matches_manifest_unit(index, lowering_unit, manifest_unit)?;
+    }
+    Ok(())
+}
+
+fn validate_lowering_unit_matches_manifest_unit(
+    index: usize,
+    lowering_unit: &NuisLoweringIndexUnit,
+    manifest_unit: &BuildManifestDomainBuildUnit,
+) -> Result<(), ArtifactError> {
+    let unit_label = format!(
+        "lowering unit #{index} ({}/{})",
+        lowering_unit.package_id, lowering_unit.domain_family
+    );
+    validate_lowering_unit_string(
+        &unit_label,
+        "package_id",
+        &lowering_unit.package_id,
+        &manifest_unit.package_id,
+    )?;
+    validate_lowering_unit_string(
+        &unit_label,
+        "domain_family",
+        &lowering_unit.domain_family,
+        &manifest_unit.domain_family,
+    )?;
+    validate_lowering_unit_option(
+        &unit_label,
+        "backend_family",
+        lowering_unit.backend_family.as_deref(),
+        manifest_unit.backend_family.as_deref(),
+    )?;
+    validate_lowering_unit_option(
+        &unit_label,
+        "selected_lowering_target",
+        lowering_unit.selected_lowering_target.as_deref(),
+        manifest_unit.selected_lowering_target.as_deref(),
+    )?;
+    validate_lowering_unit_option(
+        &unit_label,
+        "artifact_ir_sidecar_path",
+        lowering_unit.artifact_ir_sidecar_path.as_deref(),
+        manifest_unit.artifact_ir_sidecar_path.as_deref(),
+    )?;
+    validate_lowering_unit_string(
+        &unit_label,
+        "contract_family",
+        &lowering_unit.contract_family,
+        &manifest_unit.contract_family,
+    )?;
+    validate_lowering_unit_string(
+        &unit_label,
+        "packaging_role",
+        &lowering_unit.packaging_role,
+        &manifest_unit.packaging_role,
+    )
+}
+
+fn validate_lowering_unit_string(
+    unit_label: &str,
+    field: &str,
+    lowering_value: &str,
+    manifest_value: &str,
+) -> Result<(), ArtifactError> {
+    if lowering_value == manifest_value {
+        return Ok(());
+    }
+    Err(ArtifactError::new(format!(
+        "compiled artifact lowering index {unit_label} field `{field}` value `{lowering_value}` does not match build manifest value `{manifest_value}`"
+    )))
+}
+
+fn validate_lowering_unit_option(
+    unit_label: &str,
+    field: &str,
+    lowering_value: Option<&str>,
+    manifest_value: Option<&str>,
+) -> Result<(), ArtifactError> {
+    if lowering_value == manifest_value {
+        return Ok(());
+    }
+    Err(ArtifactError::new(format!(
+        "compiled artifact lowering index {unit_label} field `{field}` value `{}` does not match build manifest value `{}`",
+        lowering_value.unwrap_or("<none>"),
+        manifest_value.unwrap_or("<none>")
+    )))
 }
 
 fn section_bytes<'a>(
@@ -1030,6 +1272,7 @@ mod tests {
         decode_nuis_compiled_artifact_binary, decode_nuis_compiled_artifact_section_table_binary,
         encode_domain_payload_blob, encode_nuis_compiled_artifact_section_table,
         encode_nuis_compiled_artifact_section_table_binary, materialize_embedded_artifact_support,
+        parse_nuis_lowering_index_from_source,
         protocol::{
             COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML,
             COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY, COMPILED_ARTIFACT_SECTION_HOST_BINARY,
@@ -1171,6 +1414,56 @@ packaging_role = "host-binary"
         assert!(lowering_index.contains("backend_family = \"llvm\""));
         assert!(lowering_index.contains("selected_lowering_target = \"llvm\""));
         assert_eq!(decoded, artifact);
+    }
+
+    #[test]
+    fn lowering_index_parser_validates_generated_section() {
+        let artifact = sample_compiled_artifact();
+        let encoded = encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap();
+        let table = decode_nuis_compiled_artifact_section_table_binary(&encoded).unwrap();
+        let lowering_index_source = table
+            .section_utf8(COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML)
+            .unwrap();
+        let lowering_index = parse_nuis_lowering_index_from_source(
+            lowering_index_source,
+            std::path::Path::new("<test-lowering-index>"),
+        )
+        .unwrap();
+
+        assert_eq!(lowering_index.schema, "nuis-lowering-index-v1");
+        assert_eq!(lowering_index.packaging_mode, "native-cpu-llvm");
+        assert_eq!(lowering_index.domain_unit_count, 1);
+        assert_eq!(lowering_index.units[0].domain_family, "cpu");
+        assert_eq!(
+            lowering_index.units[0].selected_lowering_target.as_deref(),
+            Some("llvm")
+        );
+    }
+
+    #[test]
+    fn section_table_rejects_lowering_index_build_manifest_drift() {
+        let artifact = sample_compiled_artifact();
+        let encoded = encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap();
+        let mut table = decode_nuis_compiled_artifact_section_table_binary(&encoded).unwrap();
+        let lowering_section = table
+            .sections
+            .iter_mut()
+            .find(|section| section.name == COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML)
+            .unwrap();
+        let drifted = std::str::from_utf8(&lowering_section.bytes)
+            .unwrap()
+            .replace(
+                "selected_lowering_target = \"llvm\"",
+                "selected_lowering_target = \"shader-msl\"",
+            );
+        lowering_section.bytes = drifted.into_bytes();
+
+        let encoded_with_drift = encode_nuis_compiled_artifact_section_table(&table).unwrap();
+        let error = decode_nuis_compiled_artifact_binary(&encoded_with_drift).unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("field `selected_lowering_target` value `shader-msl`"));
     }
 
     #[test]

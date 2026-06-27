@@ -2874,6 +2874,10 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
     let mut artifact_section_count = None;
     let mut artifact_section_names = Vec::new();
     let mut artifact_section_table_valid = None;
+    let mut lowering_unit_count = None;
+    let mut lowering_domain_families = Vec::new();
+    let mut lowering_targets = Vec::new();
+    let mut lowering_units = Vec::new();
 
     if let Some(path) = manifest_path.as_ref() {
         match nuisc::aot::verify_build_manifest(path) {
@@ -2896,6 +2900,10 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
                 artifact_section_count = Some(container.section_count);
                 artifact_section_names = container.section_names;
                 artifact_section_table_valid = Some(container.section_table_valid);
+                lowering_unit_count = Some(container.lowering_unit_count);
+                lowering_domain_families = container.lowering_domain_families;
+                lowering_targets = container.lowering_targets;
+                lowering_units = container.lowering_units;
             }
             Err(error) => {
                 artifact_verify_error = Some(error);
@@ -3029,6 +3037,10 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
         artifact_section_count,
         artifact_section_names,
         artifact_section_table_valid,
+        lowering_unit_count,
+        lowering_domain_families,
+        lowering_targets,
+        lowering_units,
     }
 }
 
@@ -3084,6 +3096,13 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
                 Some(valid) => json_bool_field("artifact_section_table_valid", valid),
                 None => "\"artifact_section_table_valid\":null".to_owned(),
             },
+            match report.lowering_unit_count {
+                Some(count) => json_usize_field("lowering_unit_count", count),
+                None => "\"lowering_unit_count\":null".to_owned(),
+            },
+            json_string_array_field("lowering_domain_families", &report.lowering_domain_families),
+            json_string_array_field("lowering_targets", &report.lowering_targets),
+            artifact_lowering_units_json(&report.lowering_units),
             json_bool_field("ready_to_run", report.ready_to_run),
             json_field("recommended_next_step", &report.recommended_next_step),
             json_field("recommended_command", &report.recommended_command),
@@ -3558,6 +3577,18 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
     }
     if let Some(valid) = report.artifact_section_table_valid {
         println!("  artifact_section_table_valid: {}", valid);
+    }
+    if let Some(count) = report.lowering_unit_count {
+        println!("  lowering_unit_count: {}", count);
+    }
+    if !report.lowering_domain_families.is_empty() {
+        println!(
+            "  lowering_domain_families: {}",
+            report.lowering_domain_families.join(", ")
+        );
+    }
+    if !report.lowering_targets.is_empty() {
+        println!("  lowering_targets: {}", report.lowering_targets.join(", "));
     }
     println!("  ready_to_run: {}", report.ready_to_run);
     println!(
@@ -4278,6 +4309,10 @@ pub(crate) struct ArtifactDoctorReport {
     pub(crate) artifact_section_count: Option<usize>,
     pub(crate) artifact_section_names: Vec<String>,
     pub(crate) artifact_section_table_valid: Option<bool>,
+    pub(crate) lowering_unit_count: Option<usize>,
+    pub(crate) lowering_domain_families: Vec<String>,
+    pub(crate) lowering_targets: Vec<String>,
+    pub(crate) lowering_units: Vec<nuisc::aot::NuisCompiledArtifactLoweringUnitInspect>,
     pub(crate) ready_to_run: bool,
     pub(crate) recommended_next_step: String,
     pub(crate) recommended_command: String,
@@ -4865,6 +4900,38 @@ pub(crate) fn json_string_array_field(name: &str, values: &[String]) -> String {
     }
     out.push(']');
     out
+}
+
+fn artifact_lowering_unit_json(
+    unit: &nuisc::aot::NuisCompiledArtifactLoweringUnitInspect,
+) -> String {
+    let fields = vec![
+        json_field("package_id", &unit.package_id),
+        json_field("domain_family", &unit.domain_family),
+        json_optional_string_field("backend_family", unit.backend_family.as_deref()),
+        json_optional_string_field(
+            "selected_lowering_target",
+            unit.selected_lowering_target.as_deref(),
+        ),
+        json_optional_string_field(
+            "artifact_ir_sidecar_path",
+            unit.artifact_ir_sidecar_path.as_deref(),
+        ),
+        json_field("contract_family", &unit.contract_family),
+        json_field("packaging_role", &unit.packaging_role),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn artifact_lowering_units_json(
+    units: &[nuisc::aot::NuisCompiledArtifactLoweringUnitInspect],
+) -> String {
+    let entries = units
+        .iter()
+        .map(artifact_lowering_unit_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("\"lowering_units\":[{}]", entries)
 }
 
 #[allow(dead_code)]
@@ -7236,6 +7303,10 @@ mod cpu Main {
         assert!(json.contains("\"artifact_section_count\":0"));
         assert!(json.contains("\"artifact_section_names\":[]"));
         assert!(json.contains("\"artifact_section_table_valid\":true"));
+        assert!(json.contains("\"lowering_unit_count\":0"));
+        assert!(json.contains("\"lowering_domain_families\":[]"));
+        assert!(json.contains("\"lowering_targets\":[]"));
+        assert!(json.contains("\"lowering_units\":[]"));
         assert!(json.contains("\"ready_to_run\":true"));
         assert!(json.contains("\"artifact_diagnostic_code\":\"ready_to_run\""));
         assert!(json.contains("\"self_check_ready\":true"));

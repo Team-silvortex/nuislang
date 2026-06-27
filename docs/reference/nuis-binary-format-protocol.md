@@ -140,12 +140,22 @@ Current tool visibility:
 * `nuisc inspect-artifact --json` reports the artifact container kind and binary
   version
 * `NART` v2 inputs additionally expose section count and section names
+* `NART` v2 inputs additionally parse `lowering_index_toml` into lowering unit
+  count, domain family summary, selected lowering target summary, and structured
+  `lowering_units`
 * `NART` v1 inputs report an empty section list because the v1 layout is a fixed
   field stream rather than a section table
 * `nuisc` regression coverage now proves the inspect frontdoor can load a
   section-table `NART` v2 artifact
-* generated link-plan JSON includes artifact container kind/version and section
-  metadata when the artifact file is available
+* generated link-plan JSON includes artifact container kind/version, section
+  metadata, lowering summaries, and structured lowering units when the artifact
+  file is available
+* generated link-plan JSON also reports `artifact_lowering_alignment`, which
+  compares structured artifact lowering units against manifest domain units by
+  package/domain/backend/target/sidecar/contract/packaging role
+* `nuis artifact-doctor --json` passes through the same artifact container and
+  lowering visibility so the top-level workflow can diagnose artifact/linker
+  drift without reopening lower-level tools manually
 
 ### 4. Domain Payload Blob
 

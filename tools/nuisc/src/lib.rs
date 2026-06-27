@@ -146,6 +146,23 @@ struct DomainBuildVerificationSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct ArtifactLoweringAlignmentCheck {
+    index: usize,
+    package_id: String,
+    domain_family: String,
+    consistent: bool,
+    issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ArtifactLoweringAlignmentSummary {
+    checked: usize,
+    mismatches: usize,
+    consistent: bool,
+    checks: Vec<ArtifactLoweringAlignmentCheck>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ExecutionInspectDomainOverview {
     domain_family: String,
     selected_lowering_target: Option<String>,
@@ -240,6 +257,34 @@ fn json_optional_string_field(name: &str, value: Option<&str>) -> String {
         Some(value) => json_string_field(name, value),
         None => format!("\"{}\":null", name),
     }
+}
+
+fn artifact_lowering_unit_json(unit: &aot::NuisCompiledArtifactLoweringUnitInspect) -> String {
+    let fields = vec![
+        json_string_field("package_id", &unit.package_id),
+        json_string_field("domain_family", &unit.domain_family),
+        json_optional_string_field("backend_family", unit.backend_family.as_deref()),
+        json_optional_string_field(
+            "selected_lowering_target",
+            unit.selected_lowering_target.as_deref(),
+        ),
+        json_optional_string_field(
+            "artifact_ir_sidecar_path",
+            unit.artifact_ir_sidecar_path.as_deref(),
+        ),
+        json_string_field("contract_family", &unit.contract_family),
+        json_string_field("packaging_role", &unit.packaging_role),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn artifact_lowering_units_json(units: &[aot::NuisCompiledArtifactLoweringUnitInspect]) -> String {
+    let entries = units
+        .iter()
+        .map(artifact_lowering_unit_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("\"lowering_units\":[{}]", entries)
 }
 
 fn success_logs_enabled() -> bool {
@@ -687,6 +732,150 @@ fn domain_build_verification_summary_json(summary: &DomainBuildVerificationSumma
     format!("{{{}}}", fields.join(","))
 }
 
+fn artifact_lowering_alignment_summary(
+    plan: &linker::LinkPlan,
+) -> ArtifactLoweringAlignmentSummary {
+    let artifact_units = &plan.compiled_artifact.lowering_units;
+    let manifest_units = &plan.domain_units;
+    if artifact_units.is_empty() && plan.compiled_artifact.section_count.unwrap_or(0) == 0 {
+        return ArtifactLoweringAlignmentSummary {
+            checked: 0,
+            mismatches: 0,
+            consistent: true,
+            checks: Vec::new(),
+        };
+    }
+    let checked = artifact_units.len();
+    let mut checks = artifact_units
+        .iter()
+        .enumerate()
+        .map(|(index, artifact_unit)| {
+            let mut issues = Vec::new();
+            let Some(manifest_unit) = manifest_units.get(index) else {
+                issues.push("missing_manifest_domain_unit".to_owned());
+                return ArtifactLoweringAlignmentCheck {
+                    index,
+                    package_id: artifact_unit.package_id.clone(),
+                    domain_family: artifact_unit.domain_family.clone(),
+                    consistent: false,
+                    issues,
+                };
+            };
+            push_alignment_issue(
+                &mut issues,
+                "package_id",
+                Some(artifact_unit.package_id.as_str()),
+                Some(manifest_unit.package_id.as_str()),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "domain_family",
+                Some(artifact_unit.domain_family.as_str()),
+                Some(manifest_unit.domain_family.as_str()),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "backend_family",
+                artifact_unit.backend_family.as_deref(),
+                manifest_unit.backend_family.as_deref(),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "selected_lowering_target",
+                artifact_unit.selected_lowering_target.as_deref(),
+                manifest_unit.selected_lowering_target.as_deref(),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "artifact_ir_sidecar_path",
+                artifact_unit.artifact_ir_sidecar_path.as_deref(),
+                manifest_unit.artifact_ir_sidecar_path.as_deref(),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "contract_family",
+                Some(artifact_unit.contract_family.as_str()),
+                Some(manifest_unit.contract_family.as_str()),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "packaging_role",
+                Some(artifact_unit.packaging_role.as_str()),
+                Some(manifest_unit.packaging_role.as_str()),
+            );
+            ArtifactLoweringAlignmentCheck {
+                index,
+                package_id: artifact_unit.package_id.clone(),
+                domain_family: artifact_unit.domain_family.clone(),
+                consistent: issues.is_empty(),
+                issues,
+            }
+        })
+        .collect::<Vec<_>>();
+    if artifact_units.len() < manifest_units.len() {
+        for index in artifact_units.len()..manifest_units.len() {
+            let manifest_unit = &manifest_units[index];
+            checks.push(ArtifactLoweringAlignmentCheck {
+                index,
+                package_id: manifest_unit.package_id.clone(),
+                domain_family: manifest_unit.domain_family.clone(),
+                consistent: false,
+                issues: vec!["missing_artifact_lowering_unit".to_owned()],
+            });
+        }
+    }
+    let mismatches = checks.iter().filter(|check| !check.consistent).count();
+    ArtifactLoweringAlignmentSummary {
+        checked,
+        mismatches,
+        consistent: mismatches == 0,
+        checks,
+    }
+}
+
+fn push_alignment_issue(
+    issues: &mut Vec<String>,
+    field: &str,
+    artifact_value: Option<&str>,
+    manifest_value: Option<&str>,
+) {
+    if artifact_value == manifest_value {
+        return;
+    }
+    issues.push(format!(
+        "{field}:artifact={}:manifest={}",
+        artifact_value.unwrap_or("<none>"),
+        manifest_value.unwrap_or("<none>")
+    ));
+}
+
+fn artifact_lowering_alignment_check_json(check: &ArtifactLoweringAlignmentCheck) -> String {
+    let fields = vec![
+        json_usize_field("index", check.index),
+        json_string_field("package_id", &check.package_id),
+        json_string_field("domain_family", &check.domain_family),
+        json_bool_field("consistent", check.consistent),
+        json_string_array_field("issues", &check.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn artifact_lowering_alignment_summary_json(summary: &ArtifactLoweringAlignmentSummary) -> String {
+    let checks = summary
+        .checks
+        .iter()
+        .map(artifact_lowering_alignment_check_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = vec![
+        json_usize_field("checked", summary.checked),
+        json_usize_field("mismatches", summary.mismatches),
+        json_bool_field("consistent", summary.consistent),
+        format!("\"checks\":[{}]", checks),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
 fn link_plan_domain_unit_json(unit: &linker::LinkPlanDomainUnit) -> String {
     let mut fields = vec![
         json_string_field("kind", &unit.kind),
@@ -710,6 +899,9 @@ fn link_plan_domain_unit_json(unit: &linker::LinkPlanDomainUnit) -> String {
     if let Some(value) = unit.selected_lowering_target.as_deref() {
         fields.push(json_string_field("selected_lowering_target", value));
     }
+    if let Some(value) = unit.artifact_ir_sidecar_path.as_deref() {
+        fields.push(json_string_field("artifact_ir_sidecar_path", value));
+    }
     format!("{{{}}}", fields.join(","))
 }
 
@@ -720,6 +912,7 @@ fn link_plan_json(plan: &linker::LinkPlan) -> String {
         .map(link_plan_domain_unit_json)
         .collect::<Vec<_>>()
         .join(",");
+    let lowering_alignment = artifact_lowering_alignment_summary(plan);
     let mut fields = vec![
         json_string_field("schema", &plan.schema),
         json_string_field("packaging_mode", &plan.packaging_mode),
@@ -749,6 +942,20 @@ fn link_plan_json(plan: &linker::LinkPlan) -> String {
             Some(valid) => json_bool_field("artifact_section_table_valid", valid),
             None => "\"artifact_section_table_valid\":null".to_owned(),
         },
+        match plan.compiled_artifact.lowering_unit_count {
+            Some(count) => json_usize_field("lowering_unit_count", count),
+            None => "\"lowering_unit_count\":null".to_owned(),
+        },
+        json_string_array_field(
+            "lowering_domain_families",
+            &plan.compiled_artifact.lowering_domain_families,
+        ),
+        json_string_array_field("lowering_targets", &plan.compiled_artifact.lowering_targets),
+        artifact_lowering_units_json(&plan.compiled_artifact.lowering_units),
+        format!(
+            "\"artifact_lowering_alignment\":{}",
+            artifact_lowering_alignment_summary_json(&lowering_alignment)
+        ),
         json_usize_field("domain_unit_count", plan.domain_units.len()),
         format!("\"domain_units\":[{}]", domain_units),
     ];
@@ -2205,6 +2412,19 @@ fn inspect_artifact_json(
             "artifact_section_table_valid",
             container.section_table_valid,
         ));
+        fields.push(json_usize_field(
+            "lowering_unit_count",
+            container.lowering_unit_count,
+        ));
+        fields.push(json_string_array_field(
+            "lowering_domain_families",
+            &container.lowering_domain_families,
+        ));
+        fields.push(json_string_array_field(
+            "lowering_targets",
+            &container.lowering_targets,
+        ));
+        fields.push(artifact_lowering_units_json(&container.lowering_units));
     }
     if let Some(report) = manifest_verify {
         let link_plan = linker::build_link_plan(report, artifact);
@@ -2322,6 +2542,10 @@ fn verify_artifact_json(input: &Path, report: &aot::NuisCompiledArtifactVerifyRe
             "artifact_section_table_valid",
             report.artifact_section_table_valid,
         ),
+        json_usize_field("lowering_unit_count", report.lowering_unit_count),
+        json_string_array_field("lowering_domain_families", &report.lowering_domain_families),
+        json_string_array_field("lowering_targets", &report.lowering_targets),
+        artifact_lowering_units_json(&report.lowering_units),
         json_string_field("packaging_mode", &report.packaging_mode),
         json_string_field("binary_name", &report.binary_name),
         json_usize_field("binary_bytes", report.binary_bytes),
@@ -3536,6 +3760,19 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "  artifact_section_table_valid: {}",
                     container.section_table_valid
                 );
+                println!("  lowering_unit_count: {}", container.lowering_unit_count);
+                if !container.lowering_domain_families.is_empty() {
+                    println!(
+                        "  lowering_domain_families: {}",
+                        container.lowering_domain_families.join(", ")
+                    );
+                }
+                if !container.lowering_targets.is_empty() {
+                    println!(
+                        "  lowering_targets: {}",
+                        container.lowering_targets.join(", ")
+                    );
+                }
             }
             println!("  schema: {}", artifact.schema);
             println!("  packaging_mode: {}", artifact.packaging_mode);
@@ -3987,6 +4224,16 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 "  artifact_section_table_valid: {}",
                 report.artifact_section_table_valid
             );
+            println!("  lowering_unit_count: {}", report.lowering_unit_count);
+            if !report.lowering_domain_families.is_empty() {
+                println!(
+                    "  lowering_domain_families: {}",
+                    report.lowering_domain_families.join(", ")
+                );
+            }
+            if !report.lowering_targets.is_empty() {
+                println!("  lowering_targets: {}", report.lowering_targets.join(", "));
+            }
             println!("  packaging_mode: {}", report.packaging_mode);
             println!("  binary_name: {}", report.binary_name);
             println!("  binary_bytes: {}", report.binary_bytes);
@@ -5785,6 +6032,9 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"artifact_container_kind\":\"compiled-artifact-v1\""));
         assert!(json.contains("\"artifact_container_version\":1"));
         assert!(json.contains("\"artifact_section_table_valid\":true"));
+        assert!(json.contains("\"lowering_unit_count\":0"));
+        assert!(json.contains("\"lowering_domain_families\":[]"));
+        assert!(json.contains("\"lowering_targets\":[]"));
         assert!(json.contains("\"link_plan\":{\"schema\":\"nuis-link-plan-v1\""));
         assert!(json.contains("\"artifact_section_count\":0"));
     }
@@ -5845,10 +6095,20 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(json.contains("\"lowering_index_toml\""));
         assert!(json.contains("\"host_binary\""));
         assert!(json.contains("\"artifact_section_table_valid\":true"));
+        assert!(json.contains("\"lowering_unit_count\":1"));
+        assert!(json.contains("\"lowering_domain_families\":[\"cpu\"]"));
+        assert!(json.contains("\"lowering_targets\":[\"llvm\"]"));
+        assert!(json.contains("\"lowering_units\":[{"));
+        assert!(json.contains("\"package_id\":\"official.cpu\""));
+        assert!(json.contains("\"domain_family\":\"cpu\""));
+        assert!(json.contains("\"selected_lowering_target\":\"llvm\""));
         assert!(verify_json
             .contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\""));
         assert!(verify_json.contains("\"artifact_container_version\":2"));
         assert!(verify_json.contains("\"artifact_section_count\":6"));
+        assert!(verify_json.contains("\"lowering_unit_count\":1"));
+        assert!(verify_json.contains("\"lowering_targets\":[\"llvm\"]"));
+        assert!(verify_json.contains("\"lowering_units\":[{"));
         assert!(verify_json.contains("\"artifact_roundtrip_verified\":true"));
     }
 
@@ -5961,6 +6221,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         assert!(inspect_json.contains("\"link_plan\":{"));
         assert!(inspect_json.contains("\"artifact_container_version\":1"));
         assert!(inspect_json.contains("\"artifact_section_count\":0"));
+        assert!(inspect_json.contains("\"lowering_unit_count\":0"));
         assert!(inspect_json.contains("\"final_stage_driver\":\"clang\""));
 
         let verify_manifest_json = verify_build_manifest_json(&manifest_path, &manifest_verify);
@@ -5980,6 +6241,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
             .contains("\"artifact_container_kind\":\"compiled-artifact-v1\""));
         assert!(verify_artifact_json_text.contains("\"artifact_container_version\":1"));
         assert!(verify_artifact_json_text.contains("\"artifact_section_count\":0"));
+        assert!(verify_artifact_json_text.contains("\"lowering_unit_count\":0"));
         assert!(verify_artifact_json_text.contains("\"artifact_roundtrip_verified\":true"));
         assert!(verify_artifact_json_text.contains("\"lifecycle_contract_consistent\":true"));
 
@@ -6253,6 +6515,10 @@ mod cpu Main {
             artifact_section_count: 0,
             artifact_section_names: Vec::new(),
             artifact_section_table_valid: true,
+            lowering_unit_count: 0,
+            lowering_domain_families: Vec::new(),
+            lowering_targets: Vec::new(),
+            lowering_units: Vec::new(),
             packaging_mode: "native-cpu-llvm".to_owned(),
             binary_name: "demo".to_owned(),
             binary_bytes: 1,
@@ -6330,6 +6596,10 @@ mod cpu Main {
                 section_count: Some(0),
                 section_names: Vec::new(),
                 section_table_valid: Some(true),
+                lowering_unit_count: Some(0),
+                lowering_domain_families: Vec::new(),
+                lowering_targets: Vec::new(),
+                lowering_units: Vec::new(),
             },
             bridge_registry_path: None,
             host_bridge_plan_index_path: None,
@@ -6350,6 +6620,7 @@ mod cpu Main {
                 artifact_stub_inline: None,
                 artifact_payload_path: None,
                 artifact_bridge_stub_path: None,
+                artifact_ir_sidecar_path: None,
                 artifact_bridge_stub_inline: None,
                 artifact_payload_blob_path: None,
                 artifact_payload_blob_bytes: None,
@@ -6426,6 +6697,36 @@ mod cpu Main {
             lines[6],
             "summary_docs: modules=1 documented_items=1 documented_modules=cpu.Main"
         );
+
+        let v1_link_plan_json = link_plan_json(&link_plan);
+        assert!(v1_link_plan_json.contains("\"artifact_lowering_alignment\":{"));
+        assert!(v1_link_plan_json.contains("\"checked\":0"));
+        assert!(v1_link_plan_json.contains("\"mismatches\":0"));
+        assert!(v1_link_plan_json.contains("\"consistent\":true"));
+
+        let mut v2_link_plan = link_plan.clone();
+        v2_link_plan.compiled_artifact.container_kind =
+            Some("compiled-artifact-section-table-v2".to_owned());
+        v2_link_plan.compiled_artifact.container_version = Some(2);
+        v2_link_plan.compiled_artifact.section_count = Some(6);
+        v2_link_plan.compiled_artifact.lowering_unit_count = Some(1);
+        v2_link_plan.compiled_artifact.lowering_domain_families = vec!["cpu".to_owned()];
+        v2_link_plan.compiled_artifact.lowering_targets = vec!["llvm".to_owned()];
+        v2_link_plan.compiled_artifact.lowering_units =
+            vec![aot::NuisCompiledArtifactLoweringUnitInspect {
+                package_id: "official.cpu".to_owned(),
+                domain_family: "cpu".to_owned(),
+                backend_family: Some("llvm".to_owned()),
+                selected_lowering_target: Some("llvm".to_owned()),
+                artifact_ir_sidecar_path: None,
+                contract_family: "nustar.cpu".to_owned(),
+                packaging_role: "host-binary".to_owned(),
+            }];
+        let v2_link_plan_json = link_plan_json(&v2_link_plan);
+        assert!(v2_link_plan_json.contains("\"artifact_lowering_alignment\":{"));
+        assert!(v2_link_plan_json.contains("\"checked\":1"));
+        assert!(v2_link_plan_json.contains("\"mismatches\":0"));
+        assert!(v2_link_plan_json.contains("\"checks\":[{"));
     }
 
     #[test]

@@ -8,7 +8,7 @@ use std::{
 
 use nuis_artifact::protocol::{
     COMPILED_ARTIFACT_BINARY_VERSION, COMPILED_ARTIFACT_MAGIC,
-    COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION,
+    COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML, COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION,
 };
 use nuis_artifact::{
     decode_domain_payload_blob as shared_decode_domain_payload_blob,
@@ -23,6 +23,7 @@ use nuis_artifact::{
     parse_nuis_compiled_artifact as shared_parse_nuis_compiled_artifact,
     parse_nuis_executable_envelope as shared_parse_nuis_executable_envelope,
     parse_nuis_executable_envelope_from_source as shared_parse_nuis_executable_envelope_from_source,
+    parse_nuis_lowering_index_from_source as shared_parse_nuis_lowering_index_from_source,
     render_nuis_executable_envelope as shared_render_nuis_executable_envelope,
     write_nuis_compiled_artifact as shared_write_nuis_compiled_artifact,
     write_nuis_executable_envelope as shared_write_nuis_executable_envelope,
@@ -106,6 +107,17 @@ pub use nuis_artifact::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NuisCompiledArtifactLoweringUnitInspect {
+    pub package_id: String,
+    pub domain_family: String,
+    pub backend_family: Option<String>,
+    pub selected_lowering_target: Option<String>,
+    pub artifact_ir_sidecar_path: Option<String>,
+    pub contract_family: String,
+    pub packaging_role: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NuisCompiledArtifactContainerInspect {
     pub magic: String,
     pub binary_version: u16,
@@ -113,6 +125,10 @@ pub struct NuisCompiledArtifactContainerInspect {
     pub section_count: usize,
     pub section_names: Vec<String>,
     pub section_table_valid: bool,
+    pub lowering_unit_count: usize,
+    pub lowering_domain_families: Vec<String>,
+    pub lowering_targets: Vec<String>,
+    pub lowering_units: Vec<NuisCompiledArtifactLoweringUnitInspect>,
 }
 
 fn validate_artifact_binary_name(field: &str, value: &str, context: &Path) -> Result<(), String> {
@@ -1247,11 +1263,56 @@ pub fn inspect_nuis_compiled_artifact_container(
             section_count: 0,
             section_names: Vec::new(),
             section_table_valid: true,
+            lowering_unit_count: 0,
+            lowering_domain_families: Vec::new(),
+            lowering_targets: Vec::new(),
+            lowering_units: Vec::new(),
         });
     }
     if binary_version == COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION {
         let table = shared_decode_nuis_compiled_artifact_section_table_binary(&bytes)
             .map_err(|error| error.to_string())?;
+        let _ = shared_decode_nuis_compiled_artifact_binary(&bytes).map_err(|error| {
+            format!(
+                "`{}` has inconsistent nuis artifact section payloads: {error}",
+                path.display()
+            )
+        })?;
+        let lowering_index_source = table
+            .section_utf8(COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML)
+            .map_err(|error| error.to_string())?;
+        let lowering_index = shared_parse_nuis_lowering_index_from_source(
+            lowering_index_source,
+            Path::new("<compiled-artifact-lowering-index>"),
+        )
+        .map_err(|error| error.to_string())?;
+        let mut lowering_domain_families = lowering_index
+            .units
+            .iter()
+            .map(|unit| unit.domain_family.clone())
+            .collect::<Vec<_>>();
+        lowering_domain_families.sort();
+        lowering_domain_families.dedup();
+        let mut lowering_targets = lowering_index
+            .units
+            .iter()
+            .filter_map(|unit| unit.selected_lowering_target.clone())
+            .collect::<Vec<_>>();
+        lowering_targets.sort();
+        lowering_targets.dedup();
+        let lowering_units = lowering_index
+            .units
+            .iter()
+            .map(|unit| NuisCompiledArtifactLoweringUnitInspect {
+                package_id: unit.package_id.clone(),
+                domain_family: unit.domain_family.clone(),
+                backend_family: unit.backend_family.clone(),
+                selected_lowering_target: unit.selected_lowering_target.clone(),
+                artifact_ir_sidecar_path: unit.artifact_ir_sidecar_path.clone(),
+                contract_family: unit.contract_family.clone(),
+                packaging_role: unit.packaging_role.clone(),
+            })
+            .collect();
         return Ok(NuisCompiledArtifactContainerInspect {
             magic,
             binary_version,
@@ -1263,6 +1324,10 @@ pub fn inspect_nuis_compiled_artifact_container(
                 .map(str::to_owned)
                 .collect(),
             section_table_valid: true,
+            lowering_unit_count: lowering_index.domain_unit_count,
+            lowering_domain_families,
+            lowering_targets,
+            lowering_units,
         });
     }
     Err(format!(
@@ -3850,6 +3915,10 @@ pub struct NuisCompiledArtifactVerifyReport {
     pub artifact_section_count: usize,
     pub artifact_section_names: Vec<String>,
     pub artifact_section_table_valid: bool,
+    pub lowering_unit_count: usize,
+    pub lowering_domain_families: Vec<String>,
+    pub lowering_targets: Vec<String>,
+    pub lowering_units: Vec<NuisCompiledArtifactLoweringUnitInspect>,
     pub packaging_mode: String,
     pub binary_name: String,
     pub binary_bytes: usize,
@@ -5071,6 +5140,10 @@ pub fn verify_nuis_compiled_artifact(
         artifact_section_count: container.section_count,
         artifact_section_names: container.section_names,
         artifact_section_table_valid: container.section_table_valid,
+        lowering_unit_count: container.lowering_unit_count,
+        lowering_domain_families: container.lowering_domain_families,
+        lowering_targets: container.lowering_targets,
+        lowering_units: container.lowering_units,
         packaging_mode: artifact.packaging_mode,
         binary_name: artifact.binary_name,
         binary_bytes: artifact.binary_bytes,
@@ -8810,11 +8883,17 @@ mod tests {
     use super::{
         build_nuis_lifecycle_contract, c_shim_source, decode_nuis_compiled_artifact_binary,
         decode_nuis_executable_envelope_binary, encode_nuis_compiled_artifact_binary,
-        encode_nuis_executable_envelope_binary, parse_nuis_compiled_artifact,
+        encode_nuis_compiled_artifact_section_table_binary, encode_nuis_executable_envelope_binary,
+        inspect_nuis_compiled_artifact_container, parse_nuis_compiled_artifact,
         parse_nuis_executable_envelope, render_nuis_executable_envelope,
         resolve_cpu_build_target_from_abi, verify_build_manifest, verify_nuis_compiled_artifact,
         BuildManifestCacheInfo, BuildManifestContext, BuildManifestDomainBuildUnit,
         BuildManifestProjectInfo, CompileArtifacts, CpuBuildTarget, NuisExecutableEnvelope,
+    };
+    use nuis_artifact::{
+        decode_nuis_compiled_artifact_section_table_binary,
+        encode_nuis_compiled_artifact_section_table,
+        protocol::COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML,
     };
     use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef, AstVisibility};
     use std::{
@@ -8911,6 +8990,39 @@ mod tests {
         };
         assert!(error.contains("unsafe binary_name"));
         assert!(error.contains("single file name"));
+    }
+
+    #[test]
+    fn inspect_compiled_artifact_container_rejects_lowering_index_manifest_drift() {
+        let (dir, _manifest) = write_minimal_cpu_artifact("artifact_lowering_index_drift");
+        let artifact_path = dir.join("nuis.compiled.artifact");
+        let artifact = parse_nuis_compiled_artifact(&artifact_path).unwrap();
+        let encoded = encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap();
+        let mut table = decode_nuis_compiled_artifact_section_table_binary(&encoded).unwrap();
+        let lowering_section = table
+            .sections
+            .iter_mut()
+            .find(|section| section.name == COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML)
+            .unwrap();
+        let drifted = std::str::from_utf8(&lowering_section.bytes)
+            .unwrap()
+            .replace(
+                "selected_lowering_target = \"llvm\"",
+                "selected_lowering_target = \"shader-msl\"",
+            );
+        lowering_section.bytes = drifted.into_bytes();
+        let drifted_path = dir.join("nuis.compiled.drifted.v2.artifact");
+        fs::write(
+            &drifted_path,
+            encode_nuis_compiled_artifact_section_table(&table).unwrap(),
+        )
+        .unwrap();
+
+        let error = inspect_nuis_compiled_artifact_container(&drifted_path).unwrap_err();
+
+        assert!(error.contains("inconsistent nuis artifact section payloads"));
+        assert!(error.contains("selected_lowering_target"));
+        assert!(error.contains("shader-msl"));
     }
 
     #[test]

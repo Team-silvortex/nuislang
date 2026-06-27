@@ -65,6 +65,10 @@ pub struct LinkPlanArtifact {
     pub section_count: Option<usize>,
     pub section_names: Vec<String>,
     pub section_table_valid: Option<bool>,
+    pub lowering_unit_count: Option<usize>,
+    pub lowering_domain_families: Vec<String>,
+    pub lowering_targets: Vec<String>,
+    pub lowering_units: Vec<crate::aot::NuisCompiledArtifactLoweringUnitInspect>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +89,7 @@ pub struct LinkPlanDomainUnit {
     pub artifact_stub_inline: Option<String>,
     pub artifact_payload_path: Option<String>,
     pub artifact_bridge_stub_path: Option<String>,
+    pub artifact_ir_sidecar_path: Option<String>,
     pub artifact_bridge_stub_inline: Option<String>,
     pub artifact_payload_blob_path: Option<String>,
     pub artifact_payload_blob_bytes: Option<usize>,
@@ -134,6 +139,7 @@ pub fn build_link_plan(
             artifact_stub_inline: unit.artifact_stub_inline.clone(),
             artifact_payload_path: unit.artifact_payload_path.clone(),
             artifact_bridge_stub_path: unit.artifact_bridge_stub_path.clone(),
+            artifact_ir_sidecar_path: unit.artifact_ir_sidecar_path.clone(),
             artifact_bridge_stub_inline: unit.artifact_bridge_stub_inline.clone(),
             artifact_payload_blob_path: unit.artifact_payload_blob_path.clone(),
             artifact_payload_blob_bytes: unit.artifact_payload_blob_bytes,
@@ -199,6 +205,21 @@ pub fn build_link_plan(
             section_table_valid: artifact_container
                 .as_ref()
                 .map(|container| container.section_table_valid),
+            lowering_unit_count: artifact_container
+                .as_ref()
+                .map(|container| container.lowering_unit_count),
+            lowering_domain_families: artifact_container
+                .as_ref()
+                .map(|container| container.lowering_domain_families.clone())
+                .unwrap_or_default(),
+            lowering_targets: artifact_container
+                .as_ref()
+                .map(|container| container.lowering_targets.clone())
+                .unwrap_or_default(),
+            lowering_units: artifact_container
+                .as_ref()
+                .map(|container| container.lowering_units.clone())
+                .unwrap_or_default(),
         },
         bridge_registry_path: report.bridge_registry_path.clone(),
         host_bridge_plan_index_path: report.host_bridge_plan_index_path.clone(),
