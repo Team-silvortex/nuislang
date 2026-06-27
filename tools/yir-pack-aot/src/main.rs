@@ -1,12 +1,12 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     env, fs,
     path::{Path, PathBuf},
     process::{self, Command},
 };
 
 use yir_core::{
-    ffi::{ffi_symbol_signature_hash, is_ffi_symbol_hash_token},
+    ffi::{ffi_symbol_signature_hash, is_ffi_symbol_hash_token, FFI_SYMBOL_HASH_PREFIX},
     Value, YirModule,
 };
 use yir_exec::execute_module;
@@ -76,21 +76,7 @@ fn run() -> Result<(), String> {
         format!("module={input}"),
         format!("llvm_ir={}", ll_path.display()),
     ];
-    if host_ffi_symbols.is_empty() {
-        manifest.push("host_ffi_symbols=none".to_owned());
-        manifest.push("host_ffi_symbol_hashes=none".to_owned());
-    } else {
-        let symbol_list = render_host_ffi_symbol_manifest(&host_ffi_symbols);
-        let hash_list = render_host_ffi_symbol_hash_manifest(&host_ffi_symbols);
-        verify_host_ffi_manifest_lines(&symbol_list, &hash_list)?;
-        verify_host_ffi_manifest_against_registry_lines(
-            &symbol_list,
-            &hash_list,
-            DEFAULT_HOST_FFI_REGISTRY_LINES,
-        )?;
-        manifest.push(format!("host_ffi_symbols={symbol_list}"));
-        manifest.push(format!("host_ffi_symbol_hashes={hash_list}"));
-    }
+    append_host_ffi_manifest_entries(&mut manifest, &host_ffi_symbols)?;
 
     let shader_contract = analyze_shader_lowering(&module);
     let kernel_contract = analyze_kernel_lowering(&module);
@@ -2354,13 +2340,120 @@ struct HostFfiSignature {
     arg_types: Vec<HostFfiArgType>,
 }
 
-const DEFAULT_HOST_FFI_REGISTRY_LINES: &[&str] = &[
+const PACKER_BUILTIN_HOST_FFI_REGISTRY_LINES: &[&str] = &[
     "nurs:ffi_symbol:HostRenderCurves__color_bias=i64(i64)|ffi_symbol:HostRenderCurves__speed_curve=i64(i64)|ffi_symbol:HostRenderCurves__radius_curve=i64(i64)|ffi_symbol:HostRenderCurves__mix_tick=i64(i64,i64)|ffi_symbol:HostMath__speed_curve=i64(i64)",
-    "c:ffi_symbol:host_speed_curve=i64(i64)|ffi_symbol:host_i32_curve=i32(i32)|ffi_symbol_hash:host_hashed_curve=fnv1a64:38ca92f356fcb551|ffi_symbol:host_argv_count=i64()|ffi_symbol:host_monotonic_time_ns=i64()",
-    "c:ffi_symbol:host_network_connect_probe=i64(i64,i64,i64)|ffi_symbol:host_network_open_tcp_stream=i64(i64,i64)|ffi_symbol:host_network_open_tcp_listener=i64(i64,i64,i64)|ffi_symbol:host_network_open_udp_datagram=i64(i64,i64)|ffi_symbol:host_network_bind_udp_datagram=i64(i64,i64,i64)",
-    "c:ffi_symbol:host_network_accept_owned=i64(i64,i64,i64)|ffi_symbol:host_network_close_owned=i64(i64)|ffi_symbol:host_network_send_owned=i64(i64,i64,i64)|ffi_symbol:host_network_recv_owned=i64(i64,i64,i64)|ffi_symbol:host_network_recv_http_status_owned=i64(i64,i64,i64)",
-    "c:ffi_symbol:host_network_accept_probe=i64(i64,i64,i64)|ffi_symbol:host_network_close=i64(i64)|ffi_symbol:host_network_send_probe=i64(i64,i64,i64)|ffi_symbol:host_network_recv_probe=i64(i64,i64,i64)",
 ];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostFfiRegistryLines {
+    source: String,
+    lines: Vec<String>,
+}
+
+fn default_host_ffi_registry() -> HostFfiRegistryLines {
+    load_default_host_ffi_registry().unwrap_or_else(|error| HostFfiRegistryLines {
+        source: format!("packer-builtin-fallback:{error}"),
+        lines: PACKER_BUILTIN_HOST_FFI_REGISTRY_LINES
+            .iter()
+            .map(|line| line.to_string())
+            .collect(),
+    })
+}
+
+fn load_default_host_ffi_registry() -> Result<HostFfiRegistryLines, String> {
+    let manifest_path = host_ffi_registry_manifest_candidates()
+        .into_iter()
+        .find(|path| path.exists())
+        .ok_or_else(|| {
+            "could not find `nustar-packages/cpu.toml` for host FFI registry loading".to_owned()
+        })?;
+    let source = fs::read_to_string(&manifest_path)
+        .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
+    let mut lines = PACKER_BUILTIN_HOST_FFI_REGISTRY_LINES
+        .iter()
+        .map(|line| line.to_string())
+        .collect::<Vec<_>>();
+    lines.extend(
+        parse_manifest_string_array(&source, "abi_capabilities").ok_or_else(|| {
+            format!(
+                "manifest `{}` does not declare `abi_capabilities`",
+                manifest_path.display()
+            )
+        })?,
+    );
+    parse_host_ffi_registry_lines(&lines)?;
+    Ok(HostFfiRegistryLines {
+        source: format!("cpu-manifest:{}", manifest_path.display()),
+        lines,
+    })
+}
+
+fn host_ffi_registry_manifest_candidates() -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if let Ok(path) = env::var("NUIS_HOST_FFI_REGISTRY_MANIFEST") {
+        out.push(PathBuf::from(path));
+    }
+    out.push(PathBuf::from("nustar-packages/cpu.toml"));
+    out.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../nustar-packages/cpu.toml"));
+    out
+}
+
+fn parse_manifest_string_array(source: &str, key: &str) -> Option<Vec<String>> {
+    let key_start = source.find(&format!("{key} = ["))?;
+    let after_open = &source[key_start..].split_once('[')?.1;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut end_index = None;
+    for (index, ch) in after_open.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ']' if !in_string => {
+                end_index = Some(index);
+                break;
+            }
+            _ => {}
+        }
+    }
+    let body = &after_open[..end_index?];
+    Some(split_quoted_array_items(body))
+}
+
+fn split_quoted_array_items(value: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut current = String::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    for ch in value.chars() {
+        if escaped {
+            current.push(ch);
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ',' if !in_string => {
+                push_manifest_array_item(&mut values, &current);
+                current.clear();
+            }
+            _ => current.push(ch),
+        }
+    }
+    push_manifest_array_item(&mut values, &current);
+    values
+}
+
+fn push_manifest_array_item(values: &mut Vec<String>, raw: &str) {
+    let item = raw.trim().trim_matches('"').trim();
+    if !item.is_empty() {
+        values.push(item.to_owned());
+    }
+}
 
 impl HostFfiSignature {
     fn arg_count(&self) -> usize {
@@ -2608,6 +2701,103 @@ fn render_host_ffi_symbol_hash_manifest(
         .join(";")
 }
 
+fn host_ffi_footprint_hash(symbol_list: &str, hash_list: &str) -> String {
+    fnv1a64_hash(&format!("nuis-ffi-footprint-v1|{symbol_list}|{hash_list}"))
+}
+
+fn host_ffi_registry_hash(registry_lines: &[String]) -> String {
+    let mut canonical_lines = registry_lines
+        .iter()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>();
+    canonical_lines.sort();
+    fnv1a64_hash(&format!(
+        "nuis-ffi-registry-v1|{}",
+        canonical_lines.join("|")
+    ))
+}
+
+fn host_ffi_registry_abis(
+    registry: &BTreeMap<(String, String), Vec<HostFfiRegistration>>,
+) -> String {
+    let abis = registry
+        .keys()
+        .map(|(abi, _)| abi.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    if abis.is_empty() {
+        "none".to_owned()
+    } else {
+        abis.join(",")
+    }
+}
+
+fn fnv1a64_hash(value: &str) -> String {
+    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+
+    let mut hash = FNV_OFFSET;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    format!("{FFI_SYMBOL_HASH_PREFIX}{hash:016x}")
+}
+
+fn append_host_ffi_manifest_entries(
+    manifest: &mut Vec<String>,
+    host_ffi_symbols: &BTreeMap<String, HostFfiSignature>,
+) -> Result<(), String> {
+    if host_ffi_symbols.is_empty() {
+        manifest.push("host_ffi_symbols=none".to_owned());
+        manifest.push("host_ffi_symbol_hashes=none".to_owned());
+        manifest.push("host_ffi_footprint_hash=none".to_owned());
+        manifest.push("host_ffi_used_symbols=0".to_owned());
+        manifest.push("host_ffi_used_abis=none".to_owned());
+        manifest.push("host_ffi_registry_source=none".to_owned());
+        manifest.push("host_ffi_registry_lines=0".to_owned());
+        manifest.push("host_ffi_registry_symbols=0".to_owned());
+        manifest.push("host_ffi_registry_abis=none".to_owned());
+        manifest.push("host_ffi_registry_hash=none".to_owned());
+        return Ok(());
+    }
+
+    let symbol_list = render_host_ffi_symbol_manifest(host_ffi_symbols);
+    let hash_list = render_host_ffi_symbol_hash_manifest(host_ffi_symbols);
+    verify_host_ffi_manifest_lines(&symbol_list, &hash_list)?;
+    let registry = default_host_ffi_registry();
+    let registry_view = parse_host_ffi_registry_lines(&registry.lines)?;
+    let registry_symbols = registry_view.len();
+    let registry_abis = host_ffi_registry_abis(&registry_view);
+    verify_host_ffi_manifest_against_registry_lines(&symbol_list, &hash_list, &registry.lines)?;
+    let used_abis = host_ffi_symbols
+        .values()
+        .map(|signature| signature.abi.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>()
+        .join(",");
+    manifest.push(format!("host_ffi_symbols={symbol_list}"));
+    manifest.push(format!("host_ffi_symbol_hashes={hash_list}"));
+    manifest.push(format!(
+        "host_ffi_footprint_hash={}",
+        host_ffi_footprint_hash(&symbol_list, &hash_list)
+    ));
+    manifest.push(format!("host_ffi_used_symbols={}", host_ffi_symbols.len()));
+    manifest.push(format!("host_ffi_used_abis={used_abis}"));
+    manifest.push(format!("host_ffi_registry_source={}", registry.source));
+    manifest.push(format!("host_ffi_registry_lines={}", registry.lines.len()));
+    manifest.push(format!("host_ffi_registry_symbols={registry_symbols}"));
+    manifest.push(format!("host_ffi_registry_abis={registry_abis}"));
+    manifest.push(format!(
+        "host_ffi_registry_hash={}",
+        host_ffi_registry_hash(&registry.lines)
+    ));
+    Ok(())
+}
+
 fn verify_host_ffi_manifest_lines(symbol_list: &str, hash_list: &str) -> Result<(), String> {
     let symbols = parse_host_ffi_symbol_manifest_entries(symbol_list)?;
     let hashes = parse_host_ffi_hash_manifest_entries(hash_list)?;
@@ -2652,7 +2842,7 @@ impl HostFfiRegistration {
 fn verify_host_ffi_manifest_against_registry_lines(
     symbol_list: &str,
     hash_list: &str,
-    registry_lines: &[&str],
+    registry_lines: &[String],
 ) -> Result<(), String> {
     let symbols = parse_host_ffi_symbol_manifest_entries(symbol_list)?;
     let hashes = parse_host_ffi_hash_manifest_entries(hash_list)?;
@@ -2685,7 +2875,7 @@ fn verify_host_ffi_manifest_against_registry_lines(
 }
 
 fn parse_host_ffi_registry_lines(
-    registry_lines: &[&str],
+    registry_lines: &[String],
 ) -> Result<BTreeMap<(String, String), Vec<HostFfiRegistration>>, String> {
     let mut out = BTreeMap::new();
     for raw in registry_lines {
@@ -3607,10 +3797,12 @@ int main(int argc, const char **argv) {{
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_host_ffi_symbols, render_host_ffi_stubs, render_host_ffi_symbol_hash_manifest,
-        render_host_ffi_symbol_manifest, verify_host_ffi_manifest_against_registry_lines,
-        verify_host_ffi_manifest_lines, HostFfiArgType, HostFfiReturnType, HostFfiSignature,
-        DEFAULT_HOST_FFI_REGISTRY_LINES,
+        append_host_ffi_manifest_entries, collect_host_ffi_symbols, default_host_ffi_registry,
+        host_ffi_registry_abis, host_ffi_registry_hash, is_ffi_symbol_hash_token,
+        parse_host_ffi_registry_lines, parse_manifest_string_array, render_host_ffi_stubs,
+        render_host_ffi_symbol_hash_manifest, render_host_ffi_symbol_manifest,
+        verify_host_ffi_manifest_against_registry_lines, verify_host_ffi_manifest_lines,
+        HostFfiArgType, HostFfiReturnType, HostFfiSignature,
     };
     use std::collections::BTreeMap;
     use yir_core::{Node, Operation, YirModule};
@@ -3664,6 +3856,10 @@ mod tests {
         arg_count: usize,
     ) {
         symbols.insert(symbol.to_owned(), i64_host_ffi_signature(abi, arg_count));
+    }
+
+    fn registry_lines(lines: &[&str]) -> Vec<String> {
+        lines.iter().map(|line| (*line).to_owned()).collect()
     }
 
     #[test]
@@ -3752,9 +3948,146 @@ mod tests {
         verify_host_ffi_manifest_against_registry_lines(
             symbol_line,
             hash_line,
-            &["c:ffi_symbol:host_i32_curve=i32(i32)"],
+            &registry_lines(&["c:ffi_symbol:host_i32_curve=i32(i32)"]),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn host_ffi_registry_manifest_parser_preserves_commas_inside_signatures() {
+        let values = parse_manifest_string_array(
+            r#"abi_capabilities = ["c:ffi_symbol:host_file_open=i64(i64,i64)", "c:ffi_symbol:host_stdout_write=i64(i64)"]"#,
+            "abi_capabilities",
+        )
+        .expect("abi_capabilities array should parse");
+
+        assert_eq!(
+            values,
+            vec![
+                "c:ffi_symbol:host_file_open=i64(i64,i64)".to_owned(),
+                "c:ffi_symbol:host_stdout_write=i64(i64)".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn parsed_host_ffi_registry_manifest_lines_are_registry_compatible() {
+        let values = parse_manifest_string_array(
+            r#"abi_capabilities = ["c:ffi_symbol:host_file_open=i64(i64,i64)|ffi_symbol:host_stdout_write=i64(i64)", "nurs:ffi_symbol:HostMath__speed_curve=i64(i64)"]"#,
+            "abi_capabilities",
+        )
+        .expect("abi_capabilities array should parse");
+        let registry = parse_host_ffi_registry_lines(&values).unwrap();
+
+        assert!(registry.contains_key(&("c".to_owned(), "host_file_open".to_owned())));
+        assert!(registry.contains_key(&("c".to_owned(), "host_stdout_write".to_owned())));
+        assert!(registry.contains_key(&("nurs".to_owned(), "HostMath__speed_curve".to_owned())));
+    }
+
+    #[test]
+    fn default_host_ffi_registry_loads_cpu_manifest_facades() {
+        let registry_lines = default_host_ffi_registry();
+        assert!(registry_lines.source.starts_with("cpu-manifest:"));
+        let registry = parse_host_ffi_registry_lines(&registry_lines.lines).unwrap();
+        assert!(registry.contains_key(&("c".to_owned(), "host_stdout_write".to_owned())));
+        assert!(registry.contains_key(&("c".to_owned(), "host_file_open".to_owned())));
+        assert!(registry.contains_key(&("c".to_owned(), "host_command_spawn_in".to_owned())));
+    }
+
+    #[test]
+    fn host_ffi_manifest_entries_record_registry_source() {
+        let mut symbols = BTreeMap::new();
+        insert_i64_host_ffi_symbol(&mut symbols, "c", "host_stdout_write", 1);
+
+        let mut manifest = Vec::new();
+        append_host_ffi_manifest_entries(&mut manifest, &symbols).unwrap();
+
+        assert!(manifest
+            .iter()
+            .any(|line| line == "host_ffi_symbols=host_stdout_write@c:i64(i64)"));
+        assert!(manifest
+            .iter()
+            .any(|line| line.starts_with("host_ffi_symbol_hashes=host_stdout_write:fnv1a64:")));
+        let footprint_hash = manifest
+            .iter()
+            .find_map(|line| line.strip_prefix("host_ffi_footprint_hash="))
+            .expect("footprint hash should be recorded");
+        assert!(is_ffi_symbol_hash_token(footprint_hash));
+        assert!(manifest
+            .iter()
+            .any(|line| line == "host_ffi_used_symbols=1"));
+        assert!(manifest.iter().any(|line| line == "host_ffi_used_abis=c"));
+        assert!(manifest
+            .iter()
+            .any(|line| line.starts_with("host_ffi_registry_source=cpu-manifest:")));
+        assert!(manifest
+            .iter()
+            .any(|line| line == "host_ffi_registry_abis=c,nurs"));
+        let registry_hash = manifest
+            .iter()
+            .find_map(|line| line.strip_prefix("host_ffi_registry_hash="))
+            .expect("registry hash should be recorded");
+        assert!(is_ffi_symbol_hash_token(registry_hash));
+        let registry_line_count = manifest
+            .iter()
+            .find_map(|line| line.strip_prefix("host_ffi_registry_lines="))
+            .and_then(|value| value.parse::<usize>().ok())
+            .expect("registry line count should be recorded");
+        let registry_symbol_count = manifest
+            .iter()
+            .find_map(|line| line.strip_prefix("host_ffi_registry_symbols="))
+            .and_then(|value| value.parse::<usize>().ok())
+            .expect("registry symbol count should be recorded");
+        assert!(registry_line_count > 0);
+        assert!(registry_symbol_count > 0);
+    }
+
+    #[test]
+    fn host_ffi_manifest_entries_record_no_registry_when_unused() {
+        let mut manifest = Vec::new();
+        append_host_ffi_manifest_entries(&mut manifest, &BTreeMap::new()).unwrap();
+
+        assert_eq!(
+            manifest,
+            vec![
+                "host_ffi_symbols=none".to_owned(),
+                "host_ffi_symbol_hashes=none".to_owned(),
+                "host_ffi_footprint_hash=none".to_owned(),
+                "host_ffi_used_symbols=0".to_owned(),
+                "host_ffi_used_abis=none".to_owned(),
+                "host_ffi_registry_source=none".to_owned(),
+                "host_ffi_registry_lines=0".to_owned(),
+                "host_ffi_registry_symbols=0".to_owned(),
+                "host_ffi_registry_abis=none".to_owned(),
+                "host_ffi_registry_hash=none".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn host_ffi_registry_hash_is_order_stable() {
+        let lhs = registry_lines(&[
+            "c:ffi_symbol:host_stdout_write=i64(i64)",
+            "nurs:ffi_symbol:HostMath__speed_curve=i64(i64)",
+        ]);
+        let rhs = registry_lines(&[
+            "nurs:ffi_symbol:HostMath__speed_curve=i64(i64)",
+            "c:ffi_symbol:host_stdout_write=i64(i64)",
+        ]);
+
+        assert_eq!(host_ffi_registry_hash(&lhs), host_ffi_registry_hash(&rhs));
+        assert!(is_ffi_symbol_hash_token(&host_ffi_registry_hash(&lhs)));
+    }
+
+    #[test]
+    fn host_ffi_registry_abis_are_sorted_and_deduplicated() {
+        let registry = parse_host_ffi_registry_lines(&registry_lines(&[
+            "nurs:ffi_symbol:HostMath__speed_curve=i64(i64)",
+            "c:ffi_symbol:host_stdout_write=i64(i64)|ffi_symbol:host_stderr_write=i64(i64)",
+        ]))
+        .unwrap();
+
+        assert_eq!(host_ffi_registry_abis(&registry), "c,nurs");
     }
 
     #[test]
@@ -3788,6 +4121,10 @@ mod tests {
             ("host_network_close", 1),
             ("host_network_send_probe", 3),
             ("host_network_recv_probe", 3),
+            ("host_stdout_write", 1),
+            ("host_file_open", 2),
+            ("host_serialize_i64_into", 3),
+            ("host_command_spawn_in", 4),
         ] {
             insert_i64_host_ffi_symbol(&mut symbols, "c", symbol, arg_count);
         }
@@ -3803,7 +4140,7 @@ mod tests {
         verify_host_ffi_manifest_against_registry_lines(
             &symbol_manifest,
             &hash_manifest,
-            DEFAULT_HOST_FFI_REGISTRY_LINES,
+            &default_host_ffi_registry().lines,
         )
         .unwrap();
     }
@@ -3813,7 +4150,7 @@ mod tests {
         let error = verify_host_ffi_manifest_against_registry_lines(
             "host_unregistered@c:i64(i64)",
             "host_unregistered:fnv1a64:f8a191df2b6270f9",
-            &["c:ffi_symbol:host_i32_curve=i32(i32)"],
+            &registry_lines(&["c:ffi_symbol:host_i32_curve=i32(i32)"]),
         )
         .err()
         .expect("unregistered host ffi symbol should be rejected");

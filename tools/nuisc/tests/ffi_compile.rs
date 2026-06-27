@@ -1,8 +1,156 @@
-use std::{fs, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::{Path, PathBuf},
+};
+
+use nuisc::registry::{HostFfiRegistryView, HostFfiSymbolRegistration};
 
 fn compiled_source(path: &str) {
     nuisc::pipeline::compile_source_path(Path::new(path))
         .unwrap_or_else(|error| panic!("ffi source `{path}` should compile: {error}"));
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct SourceExternSignature {
+    symbol: String,
+    signature: String,
+    path: PathBuf,
+}
+
+fn collect_ns_files(root: &Path, out: &mut Vec<PathBuf>) {
+    let entries = fs::read_dir(root)
+        .unwrap_or_else(|error| panic!("should read `{}`: {error}", root.display()));
+    for entry in entries {
+        let entry = entry.expect("directory entry should be readable");
+        let path = entry.path();
+        if path.is_dir() {
+            collect_ns_files(&path, out);
+        } else if path.extension().and_then(|ext| ext.to_str()) == Some("ns") {
+            out.push(path);
+        }
+    }
+}
+
+fn collect_source_extern_signatures(root: &Path) -> Vec<SourceExternSignature> {
+    let mut files = Vec::new();
+    collect_ns_files(root, &mut files);
+
+    let mut out = Vec::new();
+    for path in files {
+        let source = fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("should read `{}`: {error}", path.display()));
+        out.extend(parse_source_extern_signatures(&source).into_iter().map(
+            |(symbol, signature)| SourceExternSignature {
+                symbol,
+                signature,
+                path: path.clone(),
+            },
+        ));
+    }
+    out
+}
+
+fn parse_source_extern_signatures(source: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut rest = source;
+    let needle = "extern \"c\" fn ";
+    while let Some(index) = rest.find(needle) {
+        let after_needle = &rest[index + needle.len()..];
+        let Some(open_index) = after_needle.find('(') else {
+            break;
+        };
+        let symbol = after_needle[..open_index].trim();
+        let after_open = &after_needle[open_index + 1..];
+        let Some(close_index) = after_open.find(')') else {
+            break;
+        };
+        let args = &after_open[..close_index];
+        let after_close = &after_open[close_index + 1..];
+        let Some(return_index) = after_close.find("->") else {
+            rest = after_close;
+            continue;
+        };
+        let after_return = &after_close[return_index + 2..];
+        let return_type = after_return
+            .split(|ch| ch == ';' || ch == '{' || ch == '\n')
+            .next()
+            .unwrap_or_default()
+            .trim();
+        if !symbol.is_empty() && !return_type.is_empty() {
+            out.push((
+                symbol.to_owned(),
+                render_source_ffi_signature(return_type, args),
+            ));
+        }
+        rest = after_return;
+    }
+    out
+}
+
+fn render_source_ffi_signature(return_type: &str, args: &str) -> String {
+    let arg_types = args
+        .split(',')
+        .map(str::trim)
+        .filter(|arg| !arg.is_empty())
+        .map(|arg| arg.rsplit_once(':').map(|(_, ty)| ty).unwrap_or(arg))
+        .map(|ty| ty.trim().replace(' ', "_"))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{}({})", return_type.trim().replace(' ', "_"), arg_types)
+}
+
+fn source_extern_is_registered(
+    view: &HostFfiRegistryView,
+    abi: &str,
+    symbol: &str,
+    signature: &str,
+) -> bool {
+    let hash = yir_core::ffi::ffi_symbol_signature_hash(abi, symbol, signature);
+    view.symbol_registrations(abi, symbol)
+        .iter()
+        .any(|registration| match registration {
+            HostFfiSymbolRegistration::Signature(registered) => {
+                registered.replace('+', ",") == signature
+            }
+            HostFfiSymbolRegistration::Hash(registered) => registered == &hash,
+        })
+}
+
+#[test]
+fn source_host_ffi_facades_are_exactly_registered_by_cpu_nustar() {
+    let workspace = Path::new("/Users/Shared/chroot/dev/nuislang");
+    let manifest =
+        nuisc::registry::load_manifest(&workspace.join("nustar-packages"), "official.cpu")
+            .expect("official cpu manifest should load");
+    let view = HostFfiRegistryView::from_manifest(&manifest);
+
+    let mut declarations = collect_source_extern_signatures(&workspace.join("stdlib"));
+    declarations.extend(collect_source_extern_signatures(
+        &workspace.join("examples"),
+    ));
+
+    let mut unique = BTreeSet::new();
+    let mut missing = BTreeMap::new();
+    for declaration in declarations {
+        if declaration.symbol == "usleep" {
+            continue;
+        }
+        if !unique.insert((declaration.symbol.clone(), declaration.signature.clone())) {
+            continue;
+        }
+        if !source_extern_is_registered(&view, "c", &declaration.symbol, &declaration.signature) {
+            missing.insert(
+                format!("{} {}", declaration.symbol, declaration.signature),
+                declaration.path,
+            );
+        }
+    }
+
+    assert!(
+        missing.is_empty(),
+        "source C FFI declarations must be exact-registered by official.cpu; missing: {missing:#?}"
+    );
 }
 
 #[test]
@@ -148,6 +296,36 @@ fn rejects_registered_network_probe_symbol_with_wide_family_signature() {
 
     assert!(error.contains("symbol `host_network_connect_probe` signature `i64(i64)`"));
     assert!(error.contains("allowed symbol registrations: signature:i64(i64,i64,i64)"));
+}
+
+#[test]
+fn rejects_registered_stdout_facade_symbol_with_wide_family_signature() {
+    let path = std::env::temp_dir().join(format!(
+        "nuis_bad_stdout_facade_symbol_allowlist_{}_{}.ns",
+        std::process::id(),
+        "host_stdout_write"
+    ));
+    fs::write(
+        &path,
+        r#"
+        mod cpu Main {
+          extern "c" fn host_stdout_write(lhs: i64, rhs: i64) -> i64;
+
+          fn main() -> i64 {
+            return host_stdout_write(1, 2);
+          }
+        }
+        "#,
+    )
+    .expect("should write temporary stdout facade ffi source");
+
+    let error = nuisc::pipeline::compile_source_path(&path)
+        .err()
+        .expect("registered stdout facade symbol should not fall back to i64(*)");
+    let _ = fs::remove_file(&path);
+
+    assert!(error.contains("symbol `host_stdout_write` signature `i64(i64,i64)`"));
+    assert!(error.contains("allowed symbol registrations: signature:i64(i64)"));
 }
 
 #[test]

@@ -52,6 +52,13 @@ The signature families remain intentionally coarse as a staging guard. When a
 symbol has a `ffi_symbol:` entry, that symbol is checked against its registered
 signature first and cannot fall back to the wider family allowlist.
 
+The alpha mainline also keeps the source-facing `host_*` facade set used by
+`std` and curated examples in exact `ffi_symbol:` registration. This includes
+the current CLI/text/filesystem/process/diagnostic/result/network facade
+symbols. The broad `i64(*)` family remains only as a compatibility staging
+surface for experiments, not as the intended security boundary for official
+host facades.
+
 The hash form uses the canonical input:
 
 `nuis-ffi-symbol-v1|<abi>|<symbol>|<signature>`
@@ -79,6 +86,22 @@ registered signature or the registered signature hash. This keeps `C ABI` as a
 declared capability instead of an implicit escape hatch, even in generated AOT
 bundles.
 
+By default, the AOT packer loads the host FFI registry view from the CPU
+`nustar` manifest and then adds only its own built-in shim symbols. This keeps
+official `std`/CLI/network facade registration anchored in one manifest source
+instead of duplicating it in the packer. Generated bundle manifests always
+record `host_ffi_registry_source` so fallback behavior is visible during
+debugging; bundles without host FFI use `host_ffi_registry_source=none`.
+Bundles also record `host_ffi_registry_lines` and
+`host_ffi_registry_symbols` to make the loaded registry size auditable.
+`host_ffi_registry_abis` records the ABI set visible through that registry, and
+`host_ffi_registry_hash` fingerprints the canonical sorted registry lines so
+registry drift can be detected without diffing the whole manifest. Bundles also
+record `host_ffi_used_symbols` and `host_ffi_used_abis` to summarize the
+bundle's actual host FFI footprint. `host_ffi_footprint_hash` hashes the
+canonical symbol/signature list and per-symbol hash list so two bundles can be
+compared for host FFI drift without diffing every entry.
+
 The narrow buffer bridge means:
 
 * an extern parameter may be declared as `ref Buffer` for current buffer
@@ -94,7 +117,7 @@ Not currently source-stable:
 * pointer arithmetic
 * arbitrary `ref T` host ABI parameters
 * host ABI pointer returns
-* unsafe blocks or unsafe function contracts
+* generalized external authority contracts for raw host memory
 
 ## Current AOT / LLVM Contract
 
@@ -158,12 +181,17 @@ Current safe reading:
 * LLVM `ptr` lowering is allowed only as an AOT bridge step
 * source-visible raw pointer APIs need an explicit future safety surface
 
-## Future Unsafe Gate
+## Future External Authority Gate
+
+`nuis` may not need a Rust-style `unsafe` keyword at all. The stronger alpha
+direction is that native code is only promised to be valid inside the `nuis`
+execution and memory model; calls outside that model must pass through explicit
+registered capabilities.
 
 Before raw pointer syntax or generalized pointer FFI is opened, the language
-needs at least:
+therefore needs at least:
 
-* an explicit unsafe marker for raw host pointer APIs
+* an explicit external-authority marker for raw host pointer APIs
 * a source-visible distinction between owned, borrowed, and raw host pointers
 * GLM facts for host calls that consume, lend, mutate, or retain pointer values
 * verifier rules for pointer escape across async/task/thread boundaries
@@ -178,4 +206,4 @@ Until those exist, new FFI work should prefer:
 
 Short future rule:
 
-`unsafe pointer FFI should be introduced as a contract surface, not as a convenient spelling`
+`raw pointer FFI should be introduced as a registered external capability, not as a convenient spelling`
