@@ -1,4 +1,8 @@
 pub mod aot;
+mod aot_domain_profile;
+mod aot_ffi_bridge;
+mod aot_symbol_anchor;
+mod aot_toml;
 pub mod cache;
 pub mod cli;
 pub mod codegen_wasm;

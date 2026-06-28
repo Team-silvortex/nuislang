@@ -31,6 +31,19 @@ use nuis_artifact::{
 use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef, NirModule};
 use yir_core::YirModule;
 
+use crate::aot_domain_profile::{
+    derived_lowering_profile_for_unit, kernel_supported_dispatch_kinds_for_profile,
+    render_target_specific_backend_fields, render_target_specific_lowering_fields,
+    shader_supported_stages_for_profile,
+};
+use crate::aot_ffi_bridge;
+use crate::aot_symbol_anchor;
+use crate::aot_toml::{
+    escape_toml_string, parse_optional_toml_string, parse_optional_toml_usize,
+    parse_required_map_string, parse_required_map_usize, parse_required_toml_bool,
+    parse_required_toml_string, parse_required_toml_string_array, parse_required_toml_usize,
+    render_string_array,
+};
 use crate::render;
 
 pub struct CompileArtifacts {
@@ -2033,36 +2046,39 @@ fn render_domain_lowering_plan_index(units: &[&BuildManifestDomainBuildUnit]) ->
         ));
         out.push_str(&format!(
             "symbol_namespace = \"{}\"\n",
-            escape_toml_string(&domain_lowering_symbol_namespace(unit))
+            escape_toml_string(&aot_symbol_anchor::namespace(unit))
         ));
         out.push_str(&format!(
             "debug_anchor = \"{}\"\n",
-            escape_toml_string(&domain_lowering_debug_anchor(unit))
+            escape_toml_string(&aot_symbol_anchor::debug_anchor(unit))
         ));
         out.push_str(&format!(
             "linkage_anchor = \"{}\"\n",
-            escape_toml_string(&domain_lowering_linkage_anchor(unit))
+            escape_toml_string(&aot_symbol_anchor::linkage_anchor(unit))
         ));
         out.push_str(&format!(
             "source_map_scope = \"{}\"\n",
-            escape_toml_string(&domain_lowering_source_map_scope(unit))
+            escape_toml_string(&aot_symbol_anchor::source_map_scope(unit))
         ));
         out.push_str(&format!(
             "host_ffi_bridge = \"{}\"\n",
-            escape_toml_string(&domain_lowering_host_ffi_bridge(unit))
+            escape_toml_string(&aot_ffi_bridge::bridge(unit))
         ));
-        out.push_str("host_ffi_policy = \"signature-whitelist-required\"\n");
+        out.push_str(&format!(
+            "host_ffi_policy = \"{}\"\n",
+            aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY
+        ));
         out.push_str(&format!(
             "host_ffi_symbol = \"{}\"\n",
-            escape_toml_string(&domain_lowering_host_ffi_symbol(unit))
+            escape_toml_string(&aot_ffi_bridge::symbol(unit))
         ));
         out.push_str(&format!(
             "host_ffi_signature = \"{}\"\n",
-            escape_toml_string(domain_lowering_host_ffi_signature())
+            escape_toml_string(aot_ffi_bridge::signature())
         ));
         out.push_str(&format!(
             "host_ffi_signature_hash = \"{}\"\n",
-            escape_toml_string(&domain_lowering_host_ffi_signature_hash(unit))
+            escape_toml_string(&aot_ffi_bridge::signature_hash(unit))
         ));
         out.push_str(&format!(
             "ir_sidecar_path = \"{}\"\n",
@@ -2090,83 +2106,6 @@ fn render_domain_lowering_plan_index(units: &[&BuildManifestDomainBuildUnit]) ->
         ));
     }
     out
-}
-
-fn domain_lowering_symbol_component(value: &str) -> String {
-    value
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
-        .collect()
-}
-
-fn domain_lowering_symbol_namespace(unit: &BuildManifestDomainBuildUnit) -> String {
-    format!(
-        "nuis::domain::{}::{}",
-        domain_lowering_symbol_component(&unit.domain_family),
-        domain_lowering_symbol_component(
-            unit.selected_lowering_target.as_deref().unwrap_or("none")
-        )
-    )
-}
-
-fn domain_lowering_debug_anchor(unit: &BuildManifestDomainBuildUnit) -> String {
-    format!(
-        "nuis.debug.{}.{}",
-        domain_lowering_symbol_component(&unit.domain_family),
-        domain_lowering_symbol_component(
-            unit.selected_lowering_target.as_deref().unwrap_or("none")
-        )
-    )
-}
-
-fn domain_lowering_linkage_anchor(unit: &BuildManifestDomainBuildUnit) -> String {
-    format!(
-        "nuis.link.{}.{}",
-        domain_lowering_symbol_component(&unit.domain_family),
-        domain_lowering_symbol_component(
-            unit.selected_lowering_target.as_deref().unwrap_or("none")
-        )
-    )
-}
-
-fn domain_lowering_source_map_scope(unit: &BuildManifestDomainBuildUnit) -> String {
-    format!(
-        "domain:{}/package:{}/target:{}",
-        unit.domain_family,
-        unit.package_id,
-        unit.selected_lowering_target.as_deref().unwrap_or("none")
-    )
-}
-
-fn domain_lowering_host_ffi_bridge(unit: &BuildManifestDomainBuildUnit) -> String {
-    format!(
-        "cffi.{}.dispatch.v1",
-        domain_lowering_symbol_component(&unit.domain_family)
-    )
-}
-
-fn domain_lowering_host_ffi_symbol(unit: &BuildManifestDomainBuildUnit) -> String {
-    format!(
-        "nuis_{}_{}_dispatch_v1",
-        domain_lowering_symbol_component(&unit.domain_family),
-        domain_lowering_symbol_component(
-            unit.selected_lowering_target.as_deref().unwrap_or("none")
-        )
-    )
-}
-
-fn domain_lowering_host_ffi_signature() -> &'static str {
-    "fn(payload: ptr, payload_len: usize, bridge_state: ptr) -> i64"
-}
-
-fn domain_lowering_host_ffi_signature_hash(unit: &BuildManifestDomainBuildUnit) -> String {
-    let material = format!(
-        "{}|{}|{}",
-        domain_lowering_host_ffi_bridge(unit),
-        domain_lowering_host_ffi_symbol(unit),
-        domain_lowering_host_ffi_signature()
-    );
-    fnv1a64_hex(material.as_bytes())
 }
 
 fn render_domain_bridge_registry(units: &[&BuildManifestDomainBuildUnit]) -> String {
@@ -2207,16 +2146,19 @@ fn render_domain_bridge_registry(units: &[&BuildManifestDomainBuildUnit]) -> Str
         ));
         out.push_str(&format!(
             "host_ffi_bridge = \"{}\"\n",
-            escape_toml_string(&domain_lowering_host_ffi_bridge(unit))
+            escape_toml_string(&aot_ffi_bridge::bridge(unit))
         ));
-        out.push_str("host_ffi_policy = \"signature-whitelist-required\"\n");
+        out.push_str(&format!(
+            "host_ffi_policy = \"{}\"\n",
+            aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY
+        ));
         out.push_str(&format!(
             "host_ffi_symbol = \"{}\"\n",
-            escape_toml_string(&domain_lowering_host_ffi_symbol(unit))
+            escape_toml_string(&aot_ffi_bridge::symbol(unit))
         ));
         out.push_str(&format!(
             "host_ffi_signature_hash = \"{}\"\n",
-            escape_toml_string(&domain_lowering_host_ffi_signature_hash(unit))
+            escape_toml_string(&aot_ffi_bridge::signature_hash(unit))
         ));
         out.push_str(&format!(
             "bridge_stub_path = \"{}\"\n",
@@ -2296,16 +2238,19 @@ fn render_host_bridge_plan_index(units: &[&BuildManifestDomainBuildUnit]) -> Str
         ));
         out.push_str(&format!(
             "host_ffi_bridge = \"{}\"\n",
-            escape_toml_string(&domain_lowering_host_ffi_bridge(unit))
+            escape_toml_string(&aot_ffi_bridge::bridge(unit))
         ));
-        out.push_str("host_ffi_policy = \"signature-whitelist-required\"\n");
+        out.push_str(&format!(
+            "host_ffi_policy = \"{}\"\n",
+            aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY
+        ));
         out.push_str(&format!(
             "host_ffi_symbol = \"{}\"\n",
-            escape_toml_string(&domain_lowering_host_ffi_symbol(unit))
+            escape_toml_string(&aot_ffi_bridge::symbol(unit))
         ));
         out.push_str(&format!(
             "host_ffi_signature_hash = \"{}\"\n",
-            escape_toml_string(&domain_lowering_host_ffi_signature_hash(unit))
+            escape_toml_string(&aot_ffi_bridge::signature_hash(unit))
         ));
         out.push_str(&format!(
             "bridge_stub_path = \"{}\"\n",
@@ -2642,280 +2587,6 @@ fn domain_build_contract_summary_for_unit(
     match crate::registry::load_manifest(Path::new("nustar-packages"), &unit.package_id) {
         Ok(manifest) => crate::registry::domain_build_contract_summary(&manifest),
         Err(_) => crate::registry::domain_build_contract_summary_for_domain(&unit.domain_family),
-    }
-}
-
-struct DerivedLoweringProfile<'a> {
-    profile_key: &'a str,
-    execution_route: &'static str,
-    submission_adapter: &'static str,
-    wake_adapter: &'static str,
-}
-
-fn derived_lowering_profile_for_unit<'a>(
-    unit: &'a BuildManifestDomainBuildUnit,
-) -> DerivedLoweringProfile<'a> {
-    let profile_key = unit
-        .selected_lowering_target
-        .as_deref()
-        .or(unit.backend_family.as_deref())
-        .unwrap_or("none");
-    let (execution_route, submission_adapter, wake_adapter) =
-        match (unit.domain_family.as_str(), profile_key) {
-            ("shader", "metal.apple-silicon-gpu") => (
-                "unified-render-graph",
-                "metal-command-encoder",
-                "metal-shared-event",
-            ),
-            ("shader", "metal.mac-discrete-or-integrated-gpu") => (
-                "render-graph-device-queue",
-                "metal-command-buffer",
-                "metal-frame-fence",
-            ),
-            ("shader", "vulkan.discrete-or-integrated-gpu") => (
-                "spirv-render-queue",
-                "vulkan-command-buffer",
-                "vulkan-timeline-semaphore",
-            ),
-            ("shader", "directx.discrete-or-integrated-gpu") => {
-                ("dxil-render-queue", "directx-command-list", "directx-fence")
-            }
-            ("shader", "opengl.discrete-or-integrated-gpu") => (
-                "driver-managed-render-pipeline",
-                "opengl-driver-submit",
-                "gl-sync-object",
-            ),
-            ("shader", "cpu-fallback.cpu-host") => (
-                "host-render-fallback",
-                "cpu-raster-dispatch",
-                "host-frame-complete",
-            ),
-            ("kernel", "coreml.apple-ane") => (
-                "ane-graph-execution",
-                "coreml-graph-submit",
-                "coreml-completion-callback",
-            ),
-            ("kernel", "vulkan.discrete-or-integrated-gpu") => (
-                "spirv-compute-queue",
-                "vulkan-compute-submit",
-                "vulkan-timeline-semaphore",
-            ),
-            ("kernel", "cpu-fallback.cpu-host") => (
-                "host-kernel-fallback",
-                "cpu-threadpool-dispatch",
-                "host-join-wake",
-            ),
-            ("network", "urlsession.socket-io") => (
-                "foundation-session-reactor",
-                "urlsession-task-submit",
-                "urlsession-callback",
-            ),
-            ("network", "winsock.socket-io") => (
-                "windows-socket-reactor",
-                "winsock-overlapped-submit",
-                "iocp-ready",
-            ),
-            ("network", "socket-abi.socket-io") => (
-                "posix-socket-reactor",
-                "socket-send-recv-submit",
-                "poll-ready",
-            ),
-            ("shader", _) => (
-                "generic-render-dispatch",
-                "render-submit-bridge",
-                "frame-present",
-            ),
-            ("kernel", _) => (
-                "generic-accelerator-dispatch",
-                "hetero-submit-bridge",
-                "completion-fence",
-            ),
-            ("network", _) => ("generic-io-reactor", "network-poll-bridge", "io-ready"),
-            ("cpu", _) | ("host", _) => ("host-inline-call", "direct-call", "immediate"),
-            _ => ("generic-dispatch", "generic-submit", "generic-wake"),
-        };
-    DerivedLoweringProfile {
-        profile_key,
-        execution_route,
-        submission_adapter,
-        wake_adapter,
-    }
-}
-
-fn render_target_specific_backend_fields(
-    unit: &BuildManifestDomainBuildUnit,
-    profile: &DerivedLoweringProfile<'_>,
-) -> String {
-    let mut out = String::new();
-    match (unit.domain_family.as_str(), profile.profile_key) {
-        ("shader", "metal.apple-silicon-gpu") => {
-            out.push_str("shader_ir = \"msl2.4\"\n");
-            out.push_str("shader_entry_model = \"metal-function-constant-specialized\"\n");
-            out.push_str("queue_binding_model = \"unified-command-queue\"\n");
-            out.push_str("resource_binding_model = \"argument-buffer-table\"\n");
-        }
-        ("shader", "metal.mac-discrete-or-integrated-gpu") => {
-            out.push_str("shader_ir = \"msl2.4\"\n");
-            out.push_str("shader_entry_model = \"metal-pipeline-state\"\n");
-            out.push_str("queue_binding_model = \"device-command-queue\"\n");
-            out.push_str("resource_binding_model = \"descriptor-table-emulated\"\n");
-        }
-        ("shader", "vulkan.discrete-or-integrated-gpu") => {
-            out.push_str("shader_ir = \"spirv1.6\"\n");
-            out.push_str("shader_entry_model = \"vulkan-pipeline\"\n");
-            out.push_str("queue_binding_model = \"explicit-device-queue\"\n");
-            out.push_str("resource_binding_model = \"descriptor-set-layout\"\n");
-        }
-        ("shader", "directx.discrete-or-integrated-gpu") => {
-            out.push_str("shader_ir = \"dxil6.8\"\n");
-            out.push_str("shader_entry_model = \"directx-pipeline-state\"\n");
-            out.push_str("queue_binding_model = \"command-queue\"\n");
-            out.push_str("resource_binding_model = \"root-signature\"\n");
-        }
-        ("shader", "opengl.discrete-or-integrated-gpu") => {
-            out.push_str("shader_ir = \"glsl460\"\n");
-            out.push_str("shader_entry_model = \"driver-linked-program\"\n");
-            out.push_str("queue_binding_model = \"driver-managed\"\n");
-            out.push_str("resource_binding_model = \"uniform-slot-table\"\n");
-        }
-        ("shader", "cpu-fallback.cpu-host") => {
-            out.push_str("shader_ir = \"host-simd\"\n");
-            out.push_str("shader_entry_model = \"cpu-raster-kernel\"\n");
-            out.push_str("queue_binding_model = \"threadpool-work-queue\"\n");
-            out.push_str("resource_binding_model = \"host-buffer-slices\"\n");
-        }
-        ("kernel", "coreml.apple-ane") => {
-            out.push_str("kernel_ir = \"coreml-program\"\n");
-            out.push_str("kernel_entry_model = \"mlmodelc-function\"\n");
-            out.push_str("queue_binding_model = \"ane-submission-service\"\n");
-            out.push_str("resource_binding_model = \"tensor-argument-table\"\n");
-        }
-        ("kernel", "vulkan.discrete-or-integrated-gpu") => {
-            out.push_str("kernel_ir = \"spirv1.6\"\n");
-            out.push_str("kernel_entry_model = \"compute-pipeline\"\n");
-            out.push_str("queue_binding_model = \"compute-queue\"\n");
-            out.push_str("resource_binding_model = \"descriptor-set-layout\"\n");
-        }
-        ("kernel", "cpu-fallback.cpu-host") => {
-            out.push_str("kernel_ir = \"host-simd\"\n");
-            out.push_str("kernel_entry_model = \"threadpool-kernel\"\n");
-            out.push_str("queue_binding_model = \"host-work-queue\"\n");
-            out.push_str("resource_binding_model = \"host-buffer-slices\"\n");
-        }
-        ("network", "urlsession.socket-io") => {
-            out.push_str("transport_ir = \"foundation-url-request\"\n");
-            out.push_str("transport_entry_model = \"urlsession-task\"\n");
-            out.push_str("socket_binding_model = \"session-owned-socket\"\n");
-            out.push_str("completion_binding_model = \"delegate-callback\"\n");
-        }
-        ("network", "winsock.socket-io") => {
-            out.push_str("transport_ir = \"winsock-overlapped\"\n");
-            out.push_str("transport_entry_model = \"iocp-request\"\n");
-            out.push_str("socket_binding_model = \"overlapped-socket-handle\"\n");
-            out.push_str("completion_binding_model = \"iocp-completion-port\"\n");
-        }
-        ("network", "socket-abi.socket-io") => {
-            out.push_str("transport_ir = \"posix-socket\"\n");
-            out.push_str("transport_entry_model = \"poll-reactor-request\"\n");
-            out.push_str("socket_binding_model = \"fd-owned-session\"\n");
-            out.push_str("completion_binding_model = \"poll-ready-token\"\n");
-        }
-        _ => {}
-    }
-    out
-}
-
-fn render_target_specific_lowering_fields(
-    unit: &BuildManifestDomainBuildUnit,
-    profile: &DerivedLoweringProfile<'_>,
-) -> String {
-    let mut out = String::new();
-    match (unit.domain_family.as_str(), profile.profile_key) {
-        ("shader", "metal.apple-silicon-gpu") => {
-            out.push_str("lowering_ir = \"msl2.4\"\n");
-            out.push_str("shader_stage_model = \"metal-render-pipeline\"\n");
-            out.push_str("stage_binding_model = \"argument-buffer-specialized\"\n");
-            out.push_str("dispatch_encoding_model = \"tile-and-threadgroup\"\n");
-        }
-        ("shader", "metal.mac-discrete-or-integrated-gpu") => {
-            out.push_str("lowering_ir = \"msl2.4\"\n");
-            out.push_str("shader_stage_model = \"metal-render-pipeline\"\n");
-            out.push_str("stage_binding_model = \"descriptor-table-emulated\"\n");
-            out.push_str("dispatch_encoding_model = \"device-queue-encoder\"\n");
-        }
-        ("shader", "vulkan.discrete-or-integrated-gpu") => {
-            out.push_str("lowering_ir = \"spirv1.6\"\n");
-            out.push_str("shader_stage_model = \"spirv-graphics-pipeline\"\n");
-            out.push_str("stage_binding_model = \"descriptor-set-layout\"\n");
-            out.push_str("dispatch_encoding_model = \"renderpass-command-buffer\"\n");
-        }
-        ("shader", "directx.discrete-or-integrated-gpu") => {
-            out.push_str("lowering_ir = \"dxil6.8\"\n");
-            out.push_str("shader_stage_model = \"dxil-pso\"\n");
-            out.push_str("stage_binding_model = \"root-signature\"\n");
-            out.push_str("dispatch_encoding_model = \"command-list-recording\"\n");
-        }
-        ("shader", "opengl.discrete-or-integrated-gpu") => {
-            out.push_str("lowering_ir = \"glsl460\"\n");
-            out.push_str("shader_stage_model = \"linked-program-pipeline\"\n");
-            out.push_str("stage_binding_model = \"uniform-slot-table\"\n");
-            out.push_str("dispatch_encoding_model = \"driver-issued-draw\"\n");
-        }
-        ("shader", "cpu-fallback.cpu-host") => {
-            out.push_str("lowering_ir = \"host-simd\"\n");
-            out.push_str("shader_stage_model = \"cpu-raster-pipeline\"\n");
-            out.push_str("stage_binding_model = \"host-buffer-slices\"\n");
-            out.push_str("dispatch_encoding_model = \"threadpool-tile-dispatch\"\n");
-        }
-        ("network", "urlsession.socket-io") => {
-            out.push_str("lowering_ir = \"foundation-url-request\"\n");
-            out.push_str("transport_binding_model = \"session-task-packet\"\n");
-            out.push_str("completion_encoding_model = \"delegate-callback-lifecycle\"\n");
-        }
-        ("network", "winsock.socket-io") => {
-            out.push_str("lowering_ir = \"winsock-overlapped\"\n");
-            out.push_str("transport_binding_model = \"overlapped-packet-reactor\"\n");
-            out.push_str("completion_encoding_model = \"iocp-completion-lifecycle\"\n");
-        }
-        ("network", "socket-abi.socket-io") => {
-            out.push_str("lowering_ir = \"posix-socket\"\n");
-            out.push_str("transport_binding_model = \"packet-poll-reactor\"\n");
-            out.push_str("completion_encoding_model = \"poll-ready-lifecycle\"\n");
-        }
-        _ => {}
-    }
-    out
-}
-
-fn shader_supported_stages_for_profile(
-    unit: &BuildManifestDomainBuildUnit,
-    profile: &DerivedLoweringProfile<'_>,
-) -> Option<&'static [&'static str]> {
-    match (unit.domain_family.as_str(), profile.profile_key) {
-        (
-            "shader",
-            "metal.apple-silicon-gpu"
-            | "metal.mac-discrete-or-integrated-gpu"
-            | "vulkan.discrete-or-integrated-gpu"
-            | "directx.discrete-or-integrated-gpu"
-            | "opengl.discrete-or-integrated-gpu"
-            | "cpu-fallback.cpu-host",
-        ) => Some(&["vertex", "fragment", "compute"]),
-        ("shader", _) => Some(&["fragment"]),
-        _ => None,
-    }
-}
-
-fn kernel_supported_dispatch_kinds_for_profile(
-    unit: &BuildManifestDomainBuildUnit,
-    profile: &DerivedLoweringProfile<'_>,
-) -> Option<&'static [&'static str]> {
-    match (unit.domain_family.as_str(), profile.profile_key) {
-        ("kernel", "coreml.apple-ane") => Some(&["graph", "batch", "tile"]),
-        ("kernel", "vulkan.discrete-or-integrated-gpu") => Some(&["grid", "indirect", "batch"]),
-        ("kernel", "cpu-fallback.cpu-host") => Some(&["range", "tile", "batch"]),
-        ("kernel", _) => Some(&["graph"]),
-        _ => None,
     }
 }
 
@@ -4050,21 +3721,6 @@ fn artifact_hash_fallback_bytes(
     }
 }
 
-fn render_string_array(values: &[String]) -> String {
-    let quoted = values
-        .iter()
-        .map(|value| format!("\"{}\"", escape_toml_string(value)))
-        .collect::<Vec<_>>();
-    format!("[{}]", quoted.join(", "))
-}
-
-fn escape_toml_string(value: &str) -> String {
-    value
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
-}
-
 fn detect_vcs_info(input_path: &str, output_dir: &str) -> VcsInfo {
     let candidates = [
         PathBuf::from(input_path),
@@ -5044,13 +4700,16 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 .artifact_bridge_stub_path
                 .as_deref()
                 .unwrap_or("<none>");
-            let expected_host_ffi_bridge = domain_lowering_host_ffi_bridge(unit);
-            let expected_host_ffi_symbol = domain_lowering_host_ffi_symbol(unit);
-            let expected_host_ffi_signature_hash = domain_lowering_host_ffi_signature_hash(unit);
+            let expected_host_ffi_bridge = aot_ffi_bridge::bridge(unit);
+            let expected_host_ffi_symbol = aot_ffi_bridge::symbol(unit);
+            let expected_host_ffi_signature_hash = aot_ffi_bridge::signature_hash(unit);
             for (field, expected) in [
                 ("bridge_stub_path", expected_bridge_stub),
                 ("host_ffi_bridge", expected_host_ffi_bridge.as_str()),
-                ("host_ffi_policy", "signature-whitelist-required"),
+                (
+                    "host_ffi_policy",
+                    aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY,
+                ),
                 ("host_ffi_symbol", expected_host_ffi_symbol.as_str()),
                 (
                     "host_ffi_signature_hash",
@@ -5150,13 +4809,16 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 .artifact_bridge_stub_path
                 .as_deref()
                 .unwrap_or("<none>");
-            let expected_host_ffi_bridge = domain_lowering_host_ffi_bridge(unit);
-            let expected_host_ffi_symbol = domain_lowering_host_ffi_symbol(unit);
-            let expected_host_ffi_signature_hash = domain_lowering_host_ffi_signature_hash(unit);
+            let expected_host_ffi_bridge = aot_ffi_bridge::bridge(unit);
+            let expected_host_ffi_symbol = aot_ffi_bridge::symbol(unit);
+            let expected_host_ffi_signature_hash = aot_ffi_bridge::signature_hash(unit);
             for (field, expected) in [
                 ("bridge_stub_path", expected_bridge_stub),
                 ("host_ffi_bridge", expected_host_ffi_bridge.as_str()),
-                ("host_ffi_policy", "signature-whitelist-required"),
+                (
+                    "host_ffi_policy",
+                    aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY,
+                ),
                 ("host_ffi_symbol", expected_host_ffi_symbol.as_str()),
                 (
                     "host_ffi_signature_hash",
@@ -5258,13 +4920,13 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 .artifact_bridge_stub_path
                 .as_deref()
                 .unwrap_or("<none>");
-            let expected_symbol_namespace = domain_lowering_symbol_namespace(unit);
-            let expected_debug_anchor = domain_lowering_debug_anchor(unit);
-            let expected_linkage_anchor = domain_lowering_linkage_anchor(unit);
-            let expected_source_map_scope = domain_lowering_source_map_scope(unit);
-            let expected_host_ffi_bridge = domain_lowering_host_ffi_bridge(unit);
-            let expected_host_ffi_symbol = domain_lowering_host_ffi_symbol(unit);
-            let expected_host_ffi_signature_hash = domain_lowering_host_ffi_signature_hash(unit);
+            let expected_symbol_namespace = aot_symbol_anchor::namespace(unit);
+            let expected_debug_anchor = aot_symbol_anchor::debug_anchor(unit);
+            let expected_linkage_anchor = aot_symbol_anchor::linkage_anchor(unit);
+            let expected_source_map_scope = aot_symbol_anchor::source_map_scope(unit);
+            let expected_host_ffi_bridge = aot_ffi_bridge::bridge(unit);
+            let expected_host_ffi_symbol = aot_ffi_bridge::symbol(unit);
+            let expected_host_ffi_signature_hash = aot_ffi_bridge::signature_hash(unit);
             for (field, expected) in [
                 ("selected_lowering_target", expected_target),
                 ("symbol_namespace", expected_symbol_namespace.as_str()),
@@ -5272,9 +4934,12 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 ("linkage_anchor", expected_linkage_anchor.as_str()),
                 ("source_map_scope", expected_source_map_scope.as_str()),
                 ("host_ffi_bridge", expected_host_ffi_bridge.as_str()),
-                ("host_ffi_policy", "signature-whitelist-required"),
+                (
+                    "host_ffi_policy",
+                    aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY,
+                ),
                 ("host_ffi_symbol", expected_host_ffi_symbol.as_str()),
-                ("host_ffi_signature", domain_lowering_host_ffi_signature()),
+                ("host_ffi_signature", aot_ffi_bridge::signature()),
                 (
                     "host_ffi_signature_hash",
                     expected_host_ffi_signature_hash.as_str(),
@@ -5724,172 +5389,6 @@ fn parse_artifact_hash_row(
         bytes,
         fnv1a64,
     })
-}
-
-fn parse_required_toml_string(source: &str, key: &str, path: &Path) -> Result<String, String> {
-    parse_optional_toml_string(source, key)
-        .ok_or_else(|| format!("`{}` is missing required key `{key}`", path.display()))
-}
-
-fn parse_required_toml_bool(source: &str, key: &str, path: &Path) -> Result<bool, String> {
-    parse_optional_toml_bool(source, key)
-        .ok_or_else(|| format!("`{}` is missing required key `{key}`", path.display()))
-}
-
-fn parse_required_toml_usize(source: &str, key: &str, path: &Path) -> Result<usize, String> {
-    parse_optional_toml_usize(source, key)
-        .ok_or_else(|| format!("`{}` is missing required key `{key}`", path.display()))
-}
-
-fn parse_required_toml_string_array(
-    source: &str,
-    key: &str,
-    path: &Path,
-) -> Result<Vec<String>, String> {
-    parse_optional_toml_string_array(source, key)
-        .ok_or_else(|| format!("`{}` is missing required key `{key}`", path.display()))
-}
-
-fn parse_optional_toml_string(source: &str, key: &str) -> Option<String> {
-    let prefix = format!("{key} = ");
-    for raw in source.lines() {
-        let line = raw.trim();
-        if let Some(rest) = line.strip_prefix(&prefix) {
-            let value = rest.trim();
-            if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
-                return unescape_toml_basic_string(&value[1..value.len() - 1]);
-            }
-            return None;
-        }
-    }
-    None
-}
-
-fn parse_optional_toml_bool(source: &str, key: &str) -> Option<bool> {
-    let prefix = format!("{key} = ");
-    for raw in source.lines() {
-        let line = raw.trim();
-        if let Some(rest) = line.strip_prefix(&prefix) {
-            return match rest.trim() {
-                "true" => Some(true),
-                "false" => Some(false),
-                _ => None,
-            };
-        }
-    }
-    None
-}
-
-fn parse_optional_toml_usize(source: &str, key: &str) -> Option<usize> {
-    let prefix = format!("{key} = ");
-    for raw in source.lines() {
-        let line = raw.trim();
-        if let Some(rest) = line.strip_prefix(&prefix) {
-            return rest.trim().parse::<usize>().ok();
-        }
-    }
-    None
-}
-
-fn parse_optional_toml_string_array(source: &str, key: &str) -> Option<Vec<String>> {
-    let prefix = format!("{key} = ");
-    for raw in source.lines() {
-        let line = raw.trim();
-        if let Some(rest) = line.strip_prefix(&prefix) {
-            let value = rest.trim();
-            if !value.starts_with('[') || !value.ends_with(']') {
-                return None;
-            }
-            let inner = value[1..value.len() - 1].trim();
-            if inner.is_empty() {
-                return Some(Vec::new());
-            }
-            let mut items = Vec::new();
-            for part in inner.split(',') {
-                let item = part.trim();
-                if !item.starts_with('"') || !item.ends_with('"') || item.len() < 2 {
-                    return None;
-                }
-                items.push(unescape_toml_basic_string(&item[1..item.len() - 1])?);
-            }
-            return Some(items);
-        }
-    }
-    None
-}
-
-fn parse_required_map_string(
-    values: &BTreeMap<String, String>,
-    key: &str,
-    manifest_path: &Path,
-) -> Result<String, String> {
-    parse_required_map_string_in_block(values, key, manifest_path, "artifact_hash")
-}
-
-fn parse_required_map_usize(
-    values: &BTreeMap<String, String>,
-    key: &str,
-    manifest_path: &Path,
-) -> Result<usize, String> {
-    let value = values.get(key).ok_or_else(|| {
-        format!(
-            "`{}` artifact_hash block is missing required key `{key}`",
-            manifest_path.display()
-        )
-    })?;
-    value.parse::<usize>().map_err(|_| {
-        format!(
-            "`{}` artifact_hash key `{key}` must be an unsigned integer",
-            manifest_path.display()
-        )
-    })
-}
-
-fn parse_required_map_string_in_block(
-    values: &BTreeMap<String, String>,
-    key: &str,
-    manifest_path: &Path,
-    block_name: &str,
-) -> Result<String, String> {
-    let value = values.get(key).ok_or_else(|| {
-        format!(
-            "`{}` {block_name} block is missing required key `{key}`",
-            manifest_path.display()
-        )
-    })?;
-    if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
-        return unescape_toml_basic_string(&value[1..value.len() - 1]).ok_or_else(|| {
-            format!(
-                "`{}` {block_name} key `{key}` contains an unsupported escape sequence",
-                manifest_path.display()
-            )
-        });
-    }
-    Err(format!(
-        "`{}` {block_name} key `{key}` must be a quoted string",
-        manifest_path.display()
-    ))
-}
-
-fn unescape_toml_basic_string(value: &str) -> Option<String> {
-    let mut out = String::with_capacity(value.len());
-    let mut chars = value.chars();
-    while let Some(ch) = chars.next() {
-        if ch != '\\' {
-            out.push(ch);
-            continue;
-        }
-        let escaped = chars.next()?;
-        match escaped {
-            '\\' => out.push('\\'),
-            '"' => out.push('"'),
-            'n' => out.push('\n'),
-            't' => out.push('\t'),
-            'r' => out.push('\r'),
-            _ => return None,
-        }
-    }
-    Some(out)
 }
 
 fn requires_window_bundle(yir: &YirModule) -> bool {
