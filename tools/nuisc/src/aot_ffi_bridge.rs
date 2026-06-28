@@ -1,5 +1,7 @@
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
+use crate::aot_encoding::fnv1a64_hex;
+
 pub(crate) const SIGNATURE_WHITELIST_POLICY: &str = "signature-whitelist-required";
 
 pub(crate) fn bridge(unit: &BuildManifestDomainBuildUnit) -> String {
@@ -28,17 +30,6 @@ fn symbol_component(value: &str) -> String {
         .chars()
         .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
         .collect()
-}
-
-fn fnv1a64_hex(bytes: &[u8]) -> String {
-    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
-    const FNV_PRIME: u64 = 0x100000001b3;
-    let mut hash = FNV_OFFSET;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(FNV_PRIME);
-    }
-    format!("0x{hash:016x}")
 }
 
 #[cfg(test)]
