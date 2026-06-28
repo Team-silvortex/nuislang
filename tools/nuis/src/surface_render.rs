@@ -52,12 +52,18 @@ fn write_link_plan_text_fields<W: fmt::Write>(
             "  link_plan_final_output: {}",
             plan.final_stage.output_path
         )?;
+        writeln!(
+            out,
+            "  link_plan_lowering_plan_index_path: {}",
+            plan.lowering_plan_index_path.as_deref().unwrap_or("<none>")
+        )?;
         writeln!(out, "  link_plan_domain_units: {}", plan.domain_units.len())?;
     } else {
         writeln!(out, "  link_plan_final_stage: <unavailable>")?;
         writeln!(out, "  link_plan_final_driver: <unavailable>")?;
         writeln!(out, "  link_plan_final_link_mode: <unavailable>")?;
         writeln!(out, "  link_plan_final_output: <unavailable>")?;
+        writeln!(out, "  link_plan_lowering_plan_index_path: <unavailable>")?;
         writeln!(out, "  link_plan_domain_units: 0")?;
     }
     Ok(())
@@ -81,6 +87,10 @@ fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<Str
         crate::json_optional_string_field(
             "link_plan_final_output",
             link_plan.map(|plan| plan.final_stage.output_path.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "link_plan_lowering_plan_index_path",
+            link_plan.and_then(|plan| plan.lowering_plan_index_path.as_deref()),
         ),
         crate::json_usize_field(
             "link_plan_domain_units",

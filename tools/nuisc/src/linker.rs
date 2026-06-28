@@ -16,6 +16,7 @@ pub struct LinkPlan {
     pub compiled_artifact: LinkPlanArtifact,
     pub bridge_registry_path: Option<String>,
     pub host_bridge_plan_index_path: Option<String>,
+    pub lowering_plan_index_path: Option<String>,
     pub domain_units: Vec<LinkPlanDomainUnit>,
     pub artifact_lowering_alignment: ArtifactLoweringAlignmentSummary,
     pub final_stage: LinkPlanFinalStage,
@@ -245,6 +246,7 @@ pub fn build_link_plan(
         compiled_artifact,
         bridge_registry_path: report.bridge_registry_path.clone(),
         host_bridge_plan_index_path: report.host_bridge_plan_index_path.clone(),
+        lowering_plan_index_path: report.lowering_plan_index_path.clone(),
         domain_units,
         artifact_lowering_alignment,
         final_stage: derive_final_stage(report, &binary_path),
@@ -417,6 +419,9 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
     if let Some(path) = &plan.host_bridge_plan_index_path {
         lines.push(format!("host_bridge_plan_index: {path}"));
     }
+    if let Some(path) = &plan.lowering_plan_index_path {
+        lines.push(format!("lowering_plan_index: {path}"));
+    }
     if let Some(kind) = &plan.compiled_artifact.container_kind {
         lines.push(format!(
             "artifact_container: kind={} version={} sections={} valid={}",
@@ -464,6 +469,9 @@ fn derive_final_stage(
         inputs.push(path.clone());
     }
     if let Some(path) = &report.host_bridge_plan_index_path {
+        inputs.push(path.clone());
+    }
+    if let Some(path) = &report.lowering_plan_index_path {
         inputs.push(path.clone());
     }
     let (kind, driver, link_mode, mut notes) = match report.packaging_mode.as_str() {
@@ -592,6 +600,10 @@ mod tests {
             host_bridge_plan_units: 1,
             host_bridge_plan_checked: 1,
             host_bridge_plan_entries_checked: 1,
+            lowering_plan_index_path: Some("out/nuis.lowering.plan-index.toml".to_owned()),
+            lowering_plan_units: 1,
+            lowering_plan_index_checked: 1,
+            lowering_plan_entries_checked: 1,
             artifacts_checked: 1,
             project_metadata_checked: 0,
         }
@@ -735,6 +747,15 @@ mod tests {
 
         assert_eq!(plan.final_stage.driver, "yir-pack-aot");
         assert_eq!(plan.final_stage.kind, "heterogeneous-bundle-pack");
+        assert_eq!(
+            plan.lowering_plan_index_path.as_deref(),
+            Some("out/nuis.lowering.plan-index.toml")
+        );
+        assert!(plan
+            .final_stage
+            .inputs
+            .iter()
+            .any(|input| input == "out/nuis.lowering.plan-index.toml"));
         assert_eq!(plan.domain_units.len(), 2);
         assert_eq!(plan.domain_units[1].kind, "heterogeneous");
         assert_eq!(

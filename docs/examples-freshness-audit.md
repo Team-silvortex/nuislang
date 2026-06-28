@@ -12,8 +12,11 @@ to list everything that exists, but to decide:
 
 Companion current-state matrix:
 
-* [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
-* [versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+* [versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
+* [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+* predecessor context:
+  [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md),
+  [versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
 
 Current policy:
 
@@ -22,13 +25,13 @@ Current policy:
 * do not archive or delete examples that still carry active doc, workflow, or
   regression value until those references are intentionally moved
 
-Alpha closeout rule:
+Alpha hardening rule:
 
-* this file is the example-tree execution companion for the repo-level alpha
-  closeout board
+* this file is the example-tree companion for the repo-level `alpha-0.4.*`
+  inventory and hardening plan
 * use it to decide which example routes stay frontdoor, which only stay as
-  companions, and which should be demoted before alpha wording gets harder
-  elsewhere
+  companions, and which should be demoted before current docs make stronger
+  claims
 
 ## Buckets
 
@@ -187,13 +190,14 @@ Next likely work:
 * demote any single-file demo that now exists mainly to mirror a stronger
   project-route example
 
-## First-Pass Result
+## Alpha-0.4 Result
 
 Operational note:
 
 * this is not yet a full archive plan for every subtree
-* for alpha closeout, the important thing is that frontdoor routes are narrow
-  and consistent before the remaining long tail is fully reclassified
+* for `alpha-0.4.*`, the important thing is that frontdoor routes match tested
+  workflow and runtime probes before the remaining long tail is fully
+  reclassified
 
 ### Keep Frontdoor
 
@@ -391,6 +395,19 @@ Next-batch candidate board:
   blocker:
   still useful as a living design-space marker while protocol layering remains
   active
+* `kernel explicit target-config long tail`
+  paths:
+  `examples/projects/domains/kernel_*/*kernel_unit.ns`,
+  `examples/ns/demos/kernel_*.ns`
+  current role:
+  companion-only cleanup debt
+  suggested next action:
+  keep frontdoor kernel routes on the auto-materialized registered-ABI target
+  config path, then migrate the long tail in a focused pass instead of mixing
+  it into unrelated docs cleanup
+  blocker:
+  many files still carry narrow compile/probe value, and only the frontdoor
+  routes need to be build-clean for this pass
 * `filesystem path micro-probe family`
   paths:
   `examples/projects/filesystem/path_*_demo`

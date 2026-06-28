@@ -36,6 +36,45 @@ impl nuis_runtime::DomainAdapter for BuildReportRuntimeAdapter {
         ctx: &nuis_runtime::ExecutionPhaseContext<'_>,
         action: &nuis_runtime::ExecutionPhaseAction,
     ) -> Option<nuis_runtime::ExecutionPhaseOutcome> {
+        if runtime_context_is_kernel_host_reference(ctx) {
+            return Some(nuis_runtime::ExecutionPhaseOutcome {
+                status: "kernel-host-reference-dispatch-complete".to_owned(),
+                produced_handles: action.output_handles.clone(),
+                produced_slots: action
+                    .output_handles
+                    .iter()
+                    .map(|key| nuis_runtime::ExecutionResourceBinding {
+                        key: key.clone(),
+                        kind: runtime_slot_resource_kind(key),
+                        capability_label: Some(format!(
+                            "cap.kernel_host_reference.{}.{}",
+                            ctx.domain_family, key
+                        )),
+                        value: format!(
+                            "kernel-host-reference://{}/{}/{}",
+                            ctx.selected_lowering_target.unwrap_or("<none>"),
+                            ctx.phase,
+                            key
+                        ),
+                    })
+                    .collect(),
+                notes: vec![
+                    "backend_mode=host-reference".to_owned(),
+                    format!(
+                        "ffi_bridge={}",
+                        runtime_domain_ffi_bridge(ctx.domain_family)
+                    ),
+                    "ffi_policy=signature-whitelist-required".to_owned(),
+                    format!("ffi_symbol={}", runtime_domain_ffi_symbol(ctx)),
+                    format!(
+                        "device_backend_requested={}",
+                        ctx.selected_lowering_target.unwrap_or("<none>")
+                    ),
+                    format!("phase={}", ctx.phase),
+                    "kernel payload reached runtime adapter dispatch boundary".to_owned(),
+                ],
+            });
+        }
         if !runtime_context_is_cpu_fallback(ctx) {
             return None;
         }
@@ -68,6 +107,32 @@ impl nuis_runtime::DomainAdapter for BuildReportRuntimeAdapter {
             ],
         })
     }
+}
+
+fn runtime_context_is_kernel_host_reference(ctx: &nuis_runtime::ExecutionPhaseContext<'_>) -> bool {
+    ctx.domain_family == "kernel" && !runtime_context_is_cpu_fallback(ctx)
+}
+
+fn runtime_domain_ffi_bridge(domain_family: &str) -> String {
+    format!(
+        "cffi.{}.dispatch.v1",
+        runtime_symbol_component(domain_family)
+    )
+}
+
+fn runtime_domain_ffi_symbol(ctx: &nuis_runtime::ExecutionPhaseContext<'_>) -> String {
+    format!(
+        "nuis_{}_{}_dispatch_v1",
+        runtime_symbol_component(ctx.domain_family),
+        runtime_symbol_component(ctx.selected_lowering_target.unwrap_or("none"))
+    )
+}
+
+fn runtime_symbol_component(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
+        .collect()
 }
 
 fn runtime_context_is_cpu_fallback(ctx: &nuis_runtime::ExecutionPhaseContext<'_>) -> bool {
@@ -3247,6 +3312,10 @@ fn runtime_session_json_fields(
             json_usize_field("host_bridge_plan_units", 0),
             json_usize_field("host_bridge_plan_checked", 0),
             json_usize_field("host_bridge_plan_entries_checked", 0),
+            json_optional_string_field("lowering_plan_index_path", None),
+            json_usize_field("lowering_plan_units", 0),
+            json_usize_field("lowering_plan_index_checked", 0),
+            json_usize_field("lowering_plan_entries_checked", 0),
             json_usize_field("domain_payload_blobs_checked", 0),
             json_usize_field("domain_payload_blob_sections_checked", 0),
             json_usize_field("domain_payload_contract_sections_checked", 0),
@@ -3280,6 +3349,19 @@ fn runtime_session_json_fields(
         json_usize_field(
             "host_bridge_plan_entries_checked",
             report.host_bridge_plan_entries_checked,
+        ),
+        json_optional_string_field(
+            "lowering_plan_index_path",
+            report.lowering_plan_index_path.as_deref(),
+        ),
+        json_usize_field("lowering_plan_units", report.lowering_plan_units),
+        json_usize_field(
+            "lowering_plan_index_checked",
+            report.lowering_plan_index_checked,
+        ),
+        json_usize_field(
+            "lowering_plan_entries_checked",
+            report.lowering_plan_entries_checked,
         ),
         json_usize_field(
             "domain_payload_blobs_checked",
@@ -3419,7 +3501,13 @@ fn runtime_execution_json_fields(
         return runtime_execution_unavailable_fields(false, None);
     };
     match runtime_execution_summary(path) {
-        Ok((domains, plan_phases, trace_events, host_fallback_events)) => vec![
+        Ok((
+            domains,
+            plan_phases,
+            trace_events,
+            host_fallback_events,
+            kernel_host_reference_events,
+        )) => vec![
             json_bool_field("runtime_execution_attempted", true),
             json_bool_field("runtime_execution_ok", true),
             json_optional_string_field("runtime_execution_error", None),
@@ -3429,6 +3517,10 @@ fn runtime_execution_json_fields(
             json_usize_field(
                 "runtime_execution_host_fallback_events",
                 host_fallback_events,
+            ),
+            json_usize_field(
+                "runtime_execution_kernel_host_reference_events",
+                kernel_host_reference_events,
             ),
         ],
         Err(error) => runtime_execution_unavailable_fields(true, Some(&error)),
@@ -3444,6 +3536,7 @@ fn runtime_execution_unavailable_fields(attempted: bool, error: Option<&str>) ->
         json_usize_field("runtime_execution_plan_phases", 0),
         json_usize_field("runtime_execution_trace_events", 0),
         json_usize_field("runtime_execution_host_fallback_events", 0),
+        json_usize_field("runtime_execution_kernel_host_reference_events", 0),
     ]
 }
 
@@ -3527,7 +3620,7 @@ fn runtime_host_yir_unavailable_fields(
     ]
 }
 
-fn runtime_execution_summary(path: &Path) -> Result<(usize, usize, usize, usize), String> {
+fn runtime_execution_summary(path: &Path) -> Result<(usize, usize, usize, usize, usize), String> {
     let loaded = nuis_runtime::RuntimeLoader
         .load_from_artifact_path(path)
         .map_err(|error| error.to_string())?;
@@ -3539,6 +3632,7 @@ fn runtime_execution_summary(path: &Path) -> Result<(usize, usize, usize, usize)
     let mut plan_phases = 0usize;
     let mut trace_events = 0usize;
     let mut host_fallback_events = 0usize;
+    let mut kernel_host_reference_events = 0usize;
     for unit in loaded.heterogeneous_units() {
         let prepared = bridge
             .prepare(&loaded, &adapters, &unit.domain_family)
@@ -3554,11 +3648,22 @@ fn runtime_execution_summary(path: &Path) -> Result<(usize, usize, usize, usize)
             .iter()
             .filter(|event| event.outcome.status == "host-cpu-fallback-complete")
             .count();
+        kernel_host_reference_events += trace
+            .events
+            .iter()
+            .filter(|event| event.outcome.status == "kernel-host-reference-dispatch-complete")
+            .count();
         domains += 1;
         plan_phases += plan.phases.len();
         trace_events += trace.events.len();
     }
-    Ok((domains, plan_phases, trace_events, host_fallback_events))
+    Ok((
+        domains,
+        plan_phases,
+        trace_events,
+        host_fallback_events,
+        kernel_host_reference_events,
+    ))
 }
 
 pub(crate) fn render_build_report_json(input: &Path) -> String {
@@ -3859,6 +3964,14 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
             .unwrap_or("<unavailable>")
     );
     println!(
+        "  link_plan_lowering_plan_index_path: {}",
+        diagnostics
+            .link_plan
+            .as_ref()
+            .and_then(|plan| plan.lowering_plan_index_path.as_deref())
+            .unwrap_or("<unavailable>")
+    );
+    println!(
         "  link_plan_domain_units: {}",
         diagnostics
             .link_plan
@@ -4006,6 +4119,22 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
             "  host_bridge_plan_entries_checked: {}",
             report.host_bridge_plan_entries_checked
         );
+        println!(
+            "  lowering_plan_index_path: {}",
+            report
+                .lowering_plan_index_path
+                .as_deref()
+                .unwrap_or("<none>")
+        );
+        println!("  lowering_plan_units: {}", report.lowering_plan_units);
+        println!(
+            "  lowering_plan_index_checked: {}",
+            report.lowering_plan_index_checked
+        );
+        println!(
+            "  lowering_plan_entries_checked: {}",
+            report.lowering_plan_entries_checked
+        );
         println!("  domain_units: {}", report.domain_build_units.len());
         for unit in &report.domain_build_units {
             let abi = unit.abi.as_deref().unwrap_or("<none>");
@@ -4085,7 +4214,13 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
                 }
             }
             match runtime_execution_summary(path) {
-                Ok((domains, plan_phases, trace_events, host_fallback_events)) => {
+                Ok((
+                    domains,
+                    plan_phases,
+                    trace_events,
+                    host_fallback_events,
+                    kernel_host_reference_events,
+                )) => {
                     println!("  runtime_execution_attempted: true");
                     println!("  runtime_execution_ok: true");
                     println!("  runtime_execution_domains: {}", domains);
@@ -4094,6 +4229,10 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
                     println!(
                         "  runtime_execution_host_fallback_events: {}",
                         host_fallback_events
+                    );
+                    println!(
+                        "  runtime_execution_kernel_host_reference_events: {}",
+                        kernel_host_reference_events
                     );
                 }
                 Err(error) => {
@@ -4147,6 +4286,7 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
         println!("  runtime_execution_attempted: false");
         println!("  runtime_execution_ok: false");
         println!("  runtime_execution_host_fallback_events: 0");
+        println!("  runtime_execution_kernel_host_reference_events: 0");
         println!("  runtime_host_yir_attempted: false");
         println!("  runtime_host_yir_ok: false");
     }
@@ -4162,6 +4302,10 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
             plan.final_stage.link_mode
         );
         println!("  link_plan_final_output: {}", plan.final_stage.output_path);
+        println!(
+            "  link_plan_lowering_plan_index_path: {}",
+            plan.lowering_plan_index_path.as_deref().unwrap_or("<none>")
+        );
     }
     Ok(())
 }
@@ -4277,6 +4421,10 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
         json_optional_string_field(
             "link_plan_final_output",
             link_plan.map(|plan| plan.final_stage.output_path.as_str()),
+        ),
+        json_optional_string_field(
+            "link_plan_lowering_plan_index_path",
+            link_plan.and_then(|plan| plan.lowering_plan_index_path.as_deref()),
         ),
         json_usize_field(
             "link_plan_domain_units",
@@ -7916,6 +8064,7 @@ mod cpu Main {
         assert!(json.contains("\"runtime_host_yir_tensor_values\":3"));
         assert!(json.contains("\"runtime_host_yir_scalar_values\":1"));
         assert!(json.contains("\"runtime_host_yir_kernel_integer_checksum\":73"));
+        assert!(json.contains("\"runtime_execution_kernel_host_reference_events\":4"));
     }
 
     #[test]

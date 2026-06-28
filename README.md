@@ -27,17 +27,21 @@ Current versioning entrypoints:
 
 * current mainline router:
   [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* current `alpha-0.1.*` status anchor:
+* current `alpha-0.4.*` system inventory:
+  [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
+* current `alpha-0.4.*` hardening plan:
+  [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+* predecessor `alpha-0.1.*` status anchor:
   [docs/versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
-* current alpha closeout board:
+* predecessor alpha closeout board:
   [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
-* current alpha closeout checklist:
+* predecessor alpha closeout checklist:
   [docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
 * previous pre-alpha snapshot anchor:
   [docs/versioning/nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
 * previous pre-alpha workflow anchor:
   [docs/versioning/nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-* current ABI compile vocabulary bridge into `0.20.*`:
+* predecessor ABI compile vocabulary bridge into `0.20.*`:
   [docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 * previous pre-alpha regression gate:
   [docs/versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
@@ -49,7 +53,9 @@ Current versioning entrypoints:
   [docs/versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md)
 
 If you want the current line first, start with
-[docs/versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md).
+[docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md),
+then use
+[docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md).
 
 If you want the older pre-alpha history anchor after that, start with
 [`0.19.0` snapshot](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md), then use
@@ -213,6 +219,10 @@ High-signal implemented surfaces:
 * explicit `--cpu-abi` and `--target` overrides for CPU builds
 * compile-cache inspection and pruning through `nuis`
 * AOT bundle generation for current CPU-only and macOS window-hosted demo paths
+* runtime-side artifact loading and host-consumable summary reporting through
+  `nuis-runtime`
+* host-YIR execution probes that read artifact YIR sidecars and execute
+  registered YIR domain mods, including real kernel tensor result summaries
 * source visibility boundaries through minimal `pub/private`
 * `project-status` / `project-doctor` public-surface reporting
 * intrinsic frontend annotations for `@test`, `@export`, `@inline`,
@@ -236,6 +246,8 @@ Current mainline, meaning “good default places to stand on today”:
 * `nuis -> NIR -> YIR -> LLVM/AOT` build path
 * multi-file `nuis.toml` projects
 * `nustar`-driven ABI and lane policy registration
+* artifact-to-runtime inspection through `nuis-runtime`, including host-YIR
+  reference execution for payload-backed YIR sidecars
 * `examples/projects` as the primary runnable/compile-contract example layer
 * `docs/reference` as the primary implementation-truth documentation layer
 * `stdlib/std` and `stdlib/ns-nova` as the current source-asset/library growth path
@@ -261,8 +273,9 @@ If you want the shortest path by goal:
 
 * consolidated current mainline map
   - [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* current alpha closeout execution board
-  - [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+* current alpha system inventory and hardening plan
+  - [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
+  - [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 * current user-facing project path
   - [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
   - [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)

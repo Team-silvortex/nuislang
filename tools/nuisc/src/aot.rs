@@ -565,6 +565,11 @@ pub fn write_build_manifest(
     } else {
         Some(render_host_bridge_plan_index(&hetero_units))
     };
+    let lowering_plan_index_inline = if hetero_units.is_empty() {
+        None
+    } else {
+        Some(render_domain_lowering_plan_index(&hetero_units))
+    };
 
     let bridge_registry_path = write_domain_bridge_registry(output_dir, &domain_build_units)?;
     if let Some(bridge_registry_path) = &bridge_registry_path {
@@ -579,6 +584,14 @@ pub fn write_build_manifest(
         artifacts.push((
             "host_bridge_plan_index".to_owned(),
             host_bridge_plan_index_path.clone(),
+        ));
+    }
+    let lowering_plan_index_path =
+        write_domain_lowering_plan_index(output_dir, &domain_build_units)?;
+    if let Some(lowering_plan_index_path) = &lowering_plan_index_path {
+        artifacts.push((
+            "domain_lowering_plan_index".to_owned(),
+            lowering_plan_index_path.clone(),
         ));
     }
 
@@ -824,6 +837,28 @@ pub fn write_build_manifest(
         if let Some(source) = &host_bridge_plan_index_inline {
             out.push_str(&format!(
                 "host_bridge_plan_index_inline = \"{}\"\n",
+                escape_toml_string(source)
+            ));
+        }
+    }
+    if let Some(lowering_plan_index_path) = &lowering_plan_index_path {
+        out.push('\n');
+        out.push_str("[domain_lowering_plan_index]\n");
+        out.push_str(&format!(
+            "lowering_plan_index_path = \"{}\"\n",
+            escape_toml_string(&lowering_plan_index_path.display().to_string())
+        ));
+        out.push_str("lowering_plan_index_schema = \"nuis-domain-lowering-plan-index-v1\"\n");
+        out.push_str(&format!(
+            "lowering_plan_units = {}\n",
+            domain_build_units
+                .iter()
+                .filter(|unit| unit.domain_family != "cpu")
+                .count()
+        ));
+        if let Some(source) = &lowering_plan_index_inline {
+            out.push_str(&format!(
+                "lowering_plan_index_inline = \"{}\"\n",
                 escape_toml_string(source)
             ));
         }
@@ -1361,6 +1396,8 @@ pub fn render_relocated_unpacked_build_manifest(
     let bridge_registry_path = write_domain_bridge_registry(output_dir, &domain_build_units)?;
     let host_bridge_plan_index_path =
         write_host_bridge_plan_index(output_dir, &domain_build_units)?;
+    let lowering_plan_index_path =
+        write_domain_lowering_plan_index(output_dir, &domain_build_units)?;
     let mut skip_section = false;
     let strip_project_path_keys = [
         "manifest_copy = ",
@@ -1380,7 +1417,10 @@ pub fn render_relocated_unpacked_build_manifest(
             skip_section = true;
             continue;
         }
-        if line == "[bridge_registry]" || line == "[host_bridge_plan_index]" {
+        if line == "[bridge_registry]"
+            || line == "[host_bridge_plan_index]"
+            || line == "[domain_lowering_plan_index]"
+        {
             skip_section = true;
             continue;
         }
@@ -1433,6 +1473,11 @@ pub fn render_relocated_unpacked_build_manifest(
     append_relocated_host_bridge_plan_index_manifest_section(
         &mut out,
         host_bridge_plan_index_path.as_deref(),
+        &domain_build_units,
+    );
+    append_relocated_domain_lowering_plan_index_manifest_section(
+        &mut out,
+        lowering_plan_index_path.as_deref(),
         &domain_build_units,
     );
 
@@ -1869,6 +1914,33 @@ fn append_relocated_host_bridge_plan_index_manifest_section(
     out.push('\n');
 }
 
+fn append_relocated_domain_lowering_plan_index_manifest_section(
+    out: &mut String,
+    lowering_plan_index_path: Option<&Path>,
+    units: &[BuildManifestDomainBuildUnit],
+) {
+    let Some(lowering_plan_index_path) = lowering_plan_index_path else {
+        return;
+    };
+    let hetero_units = units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .collect::<Vec<_>>();
+    let source = render_domain_lowering_plan_index(&hetero_units);
+    out.push_str("[domain_lowering_plan_index]\n");
+    out.push_str(&format!(
+        "lowering_plan_index_path = \"{}\"\n",
+        escape_toml_string(&lowering_plan_index_path.display().to_string())
+    ));
+    out.push_str("lowering_plan_index_schema = \"nuis-domain-lowering-plan-index-v1\"\n");
+    out.push_str(&format!("lowering_plan_units = {}\n", hetero_units.len()));
+    out.push_str(&format!(
+        "lowering_plan_index_inline = \"{}\"\n",
+        escape_toml_string(&source)
+    ));
+    out.push('\n');
+}
+
 fn write_domain_bridge_registry(
     output_dir: &Path,
     units: &[BuildManifestDomainBuildUnit],
@@ -1885,6 +1957,216 @@ fn write_domain_bridge_registry(
     fs::write(&path, source)
         .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
     Ok(Some(path))
+}
+
+fn write_domain_lowering_plan_index(
+    output_dir: &Path,
+    units: &[BuildManifestDomainBuildUnit],
+) -> Result<Option<PathBuf>, String> {
+    let hetero_units = units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .collect::<Vec<_>>();
+    if hetero_units.is_empty() {
+        return Ok(None);
+    }
+    let path = output_dir.join("nuis.lowering.plan-index.toml");
+    let source = render_domain_lowering_plan_index(&hetero_units);
+    fs::write(&path, source)
+        .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
+    Ok(Some(path))
+}
+
+fn render_domain_lowering_plan_index(units: &[&BuildManifestDomainBuildUnit]) -> String {
+    let mut out = String::new();
+    out.push_str("schema = \"nuis-domain-lowering-plan-index-v1\"\n");
+    out.push_str(&format!("plan_count = {}\n", units.len()));
+    let domains = units
+        .iter()
+        .map(|unit| unit.domain_family.clone())
+        .collect::<Vec<_>>();
+    out.push_str(&format!("domains = {}\n", render_string_array(&domains)));
+    for unit in units {
+        let contract = domain_build_contract_summary_for_unit(unit);
+        let profile = derived_lowering_profile_for_unit(unit);
+        out.push('\n');
+        out.push_str("[[lowering_plan]]\n");
+        out.push_str(&format!(
+            "domain_family = \"{}\"\n",
+            escape_toml_string(&unit.domain_family)
+        ));
+        out.push_str(&format!(
+            "package_id = \"{}\"\n",
+            escape_toml_string(&unit.package_id)
+        ));
+        out.push_str(&format!(
+            "contract_family = \"{}\"\n",
+            escape_toml_string(&unit.contract_family)
+        ));
+        out.push_str(&format!(
+            "backend_family = \"{}\"\n",
+            escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
+        ));
+        out.push_str(&format!(
+            "selected_lowering_target = \"{}\"\n",
+            escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
+        ));
+        out.push_str(&format!(
+            "lowering_profile = \"{}\"\n",
+            escape_toml_string(profile.profile_key)
+        ));
+        out.push_str(&format!(
+            "emission_kind = \"{}\"\n",
+            escape_toml_string(&contract.lowering.emission_kind)
+        ));
+        out.push_str(&format!(
+            "execution_route = \"{}\"\n",
+            escape_toml_string(profile.execution_route)
+        ));
+        out.push_str(&format!(
+            "submission_adapter = \"{}\"\n",
+            escape_toml_string(profile.submission_adapter)
+        ));
+        out.push_str(&format!(
+            "wake_adapter = \"{}\"\n",
+            escape_toml_string(profile.wake_adapter)
+        ));
+        out.push_str(&format!(
+            "symbol_namespace = \"{}\"\n",
+            escape_toml_string(&domain_lowering_symbol_namespace(unit))
+        ));
+        out.push_str(&format!(
+            "debug_anchor = \"{}\"\n",
+            escape_toml_string(&domain_lowering_debug_anchor(unit))
+        ));
+        out.push_str(&format!(
+            "linkage_anchor = \"{}\"\n",
+            escape_toml_string(&domain_lowering_linkage_anchor(unit))
+        ));
+        out.push_str(&format!(
+            "source_map_scope = \"{}\"\n",
+            escape_toml_string(&domain_lowering_source_map_scope(unit))
+        ));
+        out.push_str(&format!(
+            "host_ffi_bridge = \"{}\"\n",
+            escape_toml_string(&domain_lowering_host_ffi_bridge(unit))
+        ));
+        out.push_str("host_ffi_policy = \"signature-whitelist-required\"\n");
+        out.push_str(&format!(
+            "host_ffi_symbol = \"{}\"\n",
+            escape_toml_string(&domain_lowering_host_ffi_symbol(unit))
+        ));
+        out.push_str(&format!(
+            "host_ffi_signature = \"{}\"\n",
+            escape_toml_string(domain_lowering_host_ffi_signature())
+        ));
+        out.push_str(&format!(
+            "host_ffi_signature_hash = \"{}\"\n",
+            escape_toml_string(&domain_lowering_host_ffi_signature_hash(unit))
+        ));
+        out.push_str(&format!(
+            "ir_sidecar_path = \"{}\"\n",
+            escape_toml_string(unit.artifact_ir_sidecar_path.as_deref().unwrap_or("<none>"))
+        ));
+        out.push_str(&format!(
+            "payload_blob_path = \"{}\"\n",
+            escape_toml_string(
+                unit.artifact_payload_blob_path
+                    .as_deref()
+                    .unwrap_or("<none>")
+            )
+        ));
+        out.push_str(&format!(
+            "bridge_stub_path = \"{}\"\n",
+            escape_toml_string(
+                unit.artifact_bridge_stub_path
+                    .as_deref()
+                    .unwrap_or("<none>")
+            )
+        ));
+        out.push_str(&format!(
+            "plan_inline = \"{}\"\n",
+            escape_toml_string(&render_domain_build_unit_lowering_plan(unit).replace('\n', "\\n"))
+        ));
+    }
+    out
+}
+
+fn domain_lowering_symbol_component(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
+        .collect()
+}
+
+fn domain_lowering_symbol_namespace(unit: &BuildManifestDomainBuildUnit) -> String {
+    format!(
+        "nuis::domain::{}::{}",
+        domain_lowering_symbol_component(&unit.domain_family),
+        domain_lowering_symbol_component(
+            unit.selected_lowering_target.as_deref().unwrap_or("none")
+        )
+    )
+}
+
+fn domain_lowering_debug_anchor(unit: &BuildManifestDomainBuildUnit) -> String {
+    format!(
+        "nuis.debug.{}.{}",
+        domain_lowering_symbol_component(&unit.domain_family),
+        domain_lowering_symbol_component(
+            unit.selected_lowering_target.as_deref().unwrap_or("none")
+        )
+    )
+}
+
+fn domain_lowering_linkage_anchor(unit: &BuildManifestDomainBuildUnit) -> String {
+    format!(
+        "nuis.link.{}.{}",
+        domain_lowering_symbol_component(&unit.domain_family),
+        domain_lowering_symbol_component(
+            unit.selected_lowering_target.as_deref().unwrap_or("none")
+        )
+    )
+}
+
+fn domain_lowering_source_map_scope(unit: &BuildManifestDomainBuildUnit) -> String {
+    format!(
+        "domain:{}/package:{}/target:{}",
+        unit.domain_family,
+        unit.package_id,
+        unit.selected_lowering_target.as_deref().unwrap_or("none")
+    )
+}
+
+fn domain_lowering_host_ffi_bridge(unit: &BuildManifestDomainBuildUnit) -> String {
+    format!(
+        "cffi.{}.dispatch.v1",
+        domain_lowering_symbol_component(&unit.domain_family)
+    )
+}
+
+fn domain_lowering_host_ffi_symbol(unit: &BuildManifestDomainBuildUnit) -> String {
+    format!(
+        "nuis_{}_{}_dispatch_v1",
+        domain_lowering_symbol_component(&unit.domain_family),
+        domain_lowering_symbol_component(
+            unit.selected_lowering_target.as_deref().unwrap_or("none")
+        )
+    )
+}
+
+fn domain_lowering_host_ffi_signature() -> &'static str {
+    "fn(payload: ptr, payload_len: usize, bridge_state: ptr) -> i64"
+}
+
+fn domain_lowering_host_ffi_signature_hash(unit: &BuildManifestDomainBuildUnit) -> String {
+    let material = format!(
+        "{}|{}|{}",
+        domain_lowering_host_ffi_bridge(unit),
+        domain_lowering_host_ffi_symbol(unit),
+        domain_lowering_host_ffi_signature()
+    );
+    fnv1a64_hex(material.as_bytes())
 }
 
 fn render_domain_bridge_registry(units: &[&BuildManifestDomainBuildUnit]) -> String {
@@ -1922,6 +2204,19 @@ fn render_domain_bridge_registry(units: &[&BuildManifestDomainBuildUnit]) -> Str
         out.push_str(&format!(
             "selected_lowering_target = \"{}\"\n",
             escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
+        ));
+        out.push_str(&format!(
+            "host_ffi_bridge = \"{}\"\n",
+            escape_toml_string(&domain_lowering_host_ffi_bridge(unit))
+        ));
+        out.push_str("host_ffi_policy = \"signature-whitelist-required\"\n");
+        out.push_str(&format!(
+            "host_ffi_symbol = \"{}\"\n",
+            escape_toml_string(&domain_lowering_host_ffi_symbol(unit))
+        ));
+        out.push_str(&format!(
+            "host_ffi_signature_hash = \"{}\"\n",
+            escape_toml_string(&domain_lowering_host_ffi_signature_hash(unit))
         ));
         out.push_str(&format!(
             "bridge_stub_path = \"{}\"\n",
@@ -1998,6 +2293,19 @@ fn render_host_bridge_plan_index(units: &[&BuildManifestDomainBuildUnit]) -> Str
         out.push_str(&format!(
             "selected_lowering_target = \"{}\"\n",
             escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
+        ));
+        out.push_str(&format!(
+            "host_ffi_bridge = \"{}\"\n",
+            escape_toml_string(&domain_lowering_host_ffi_bridge(unit))
+        ));
+        out.push_str("host_ffi_policy = \"signature-whitelist-required\"\n");
+        out.push_str(&format!(
+            "host_ffi_symbol = \"{}\"\n",
+            escape_toml_string(&domain_lowering_host_ffi_symbol(unit))
+        ));
+        out.push_str(&format!(
+            "host_ffi_signature_hash = \"{}\"\n",
+            escape_toml_string(&domain_lowering_host_ffi_signature_hash(unit))
         ));
         out.push_str(&format!(
             "bridge_stub_path = \"{}\"\n",
@@ -3703,12 +4011,16 @@ fn artifact_hash_fallback_bytes(
     domain_build_units: &[BuildManifestDomainBuildUnit],
     bridge_registry_inline: Option<&str>,
     host_bridge_plan_index_inline: Option<&str>,
+    lowering_plan_index_inline: Option<&str>,
 ) -> Option<Vec<u8>> {
     if kind == "domain_bridge_registry" {
         return bridge_registry_inline.map(|value| value.as_bytes().to_vec());
     }
     if kind == "host_bridge_plan_index" {
         return host_bridge_plan_index_inline.map(|value| value.as_bytes().to_vec());
+    }
+    if kind == "domain_lowering_plan_index" {
+        return lowering_plan_index_inline.map(|value| value.as_bytes().to_vec());
     }
 
     let (prefix, domain_family) = [
@@ -3904,6 +4216,10 @@ pub struct BuildManifestVerifyReport {
     pub host_bridge_plan_units: usize,
     pub host_bridge_plan_checked: usize,
     pub host_bridge_plan_entries_checked: usize,
+    pub lowering_plan_index_path: Option<String>,
+    pub lowering_plan_units: usize,
+    pub lowering_plan_index_checked: usize,
+    pub lowering_plan_entries_checked: usize,
     pub artifacts_checked: usize,
     pub project_metadata_checked: usize,
 }
@@ -4135,6 +4451,13 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         parse_optional_toml_usize(&source, "host_bridge_plan_units").unwrap_or(0);
     let host_bridge_plan_index_inline =
         parse_optional_toml_string(&source, "host_bridge_plan_index_inline");
+    let lowering_plan_index_path = parse_optional_toml_string(&source, "lowering_plan_index_path");
+    let lowering_plan_index_schema =
+        parse_optional_toml_string(&source, "lowering_plan_index_schema");
+    let lowering_plan_units =
+        parse_optional_toml_usize(&source, "lowering_plan_units").unwrap_or(0);
+    let lowering_plan_index_inline =
+        parse_optional_toml_string(&source, "lowering_plan_index_inline");
     let project_plan_summary = parse_optional_toml_string(&source, "plan_summary");
 
     let artifacts = parse_artifact_hash_blocks(&source, path)?;
@@ -4302,6 +4625,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 &domain_build_units,
                 bridge_registry_inline.as_deref(),
                 host_bridge_plan_index_inline.as_deref(),
+                lowering_plan_index_inline.as_deref(),
             )
             .ok_or_else(|| format!("failed to read artifact `{}`", item.path))?,
         };
@@ -4720,14 +5044,27 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 .artifact_bridge_stub_path
                 .as_deref()
                 .unwrap_or("<none>");
-            if !registry_source.contains(&format!(
-                "bridge_stub_path = \"{}\"",
-                escape_toml_string(expected_bridge_stub)
-            )) {
-                return Err(format!(
-                    "bridge registry `{}` is missing bridge stub path for `{}`",
-                    registry_label, unit.domain_family
-                ));
+            let expected_host_ffi_bridge = domain_lowering_host_ffi_bridge(unit);
+            let expected_host_ffi_symbol = domain_lowering_host_ffi_symbol(unit);
+            let expected_host_ffi_signature_hash = domain_lowering_host_ffi_signature_hash(unit);
+            for (field, expected) in [
+                ("bridge_stub_path", expected_bridge_stub),
+                ("host_ffi_bridge", expected_host_ffi_bridge.as_str()),
+                ("host_ffi_policy", "signature-whitelist-required"),
+                ("host_ffi_symbol", expected_host_ffi_symbol.as_str()),
+                (
+                    "host_ffi_signature_hash",
+                    expected_host_ffi_signature_hash.as_str(),
+                ),
+            ] {
+                if !registry_source
+                    .contains(&format!("{field} = \"{}\"", escape_toml_string(expected)))
+                {
+                    return Err(format!(
+                        "bridge registry `{}` is missing {field} for `{}`",
+                        registry_label, unit.domain_family
+                    ));
+                }
             }
             bridge_registry_entries_checked += 1;
         }
@@ -4813,14 +5150,27 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
                 .artifact_bridge_stub_path
                 .as_deref()
                 .unwrap_or("<none>");
-            if !plan_index_source.contains(&format!(
-                "bridge_stub_path = \"{}\"",
-                escape_toml_string(expected_bridge_stub)
-            )) {
-                return Err(format!(
-                    "host bridge plan index `{}` is missing bridge stub path for `{}`",
-                    plan_index_label, unit.domain_family
-                ));
+            let expected_host_ffi_bridge = domain_lowering_host_ffi_bridge(unit);
+            let expected_host_ffi_symbol = domain_lowering_host_ffi_symbol(unit);
+            let expected_host_ffi_signature_hash = domain_lowering_host_ffi_signature_hash(unit);
+            for (field, expected) in [
+                ("bridge_stub_path", expected_bridge_stub),
+                ("host_ffi_bridge", expected_host_ffi_bridge.as_str()),
+                ("host_ffi_policy", "signature-whitelist-required"),
+                ("host_ffi_symbol", expected_host_ffi_symbol.as_str()),
+                (
+                    "host_ffi_signature_hash",
+                    expected_host_ffi_signature_hash.as_str(),
+                ),
+            ] {
+                if !plan_index_source
+                    .contains(&format!("{field} = \"{}\"", escape_toml_string(expected)))
+                {
+                    return Err(format!(
+                        "host bridge plan index `{}` is missing {field} for `{}`",
+                        plan_index_label, unit.domain_family
+                    ));
+                }
             }
             host_bridge_plan_entries_checked += 1;
         }
@@ -4828,6 +5178,126 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     } else if heterogeneous_domain_count > 0 {
         return Err(format!(
             "`{}` is missing host bridge plan index for heterogeneous domains",
+            path.display()
+        ));
+    }
+
+    let mut lowering_plan_index_checked = 0usize;
+    let mut lowering_plan_entries_checked = 0usize;
+    if lowering_plan_index_path.is_some() || lowering_plan_index_inline.is_some() {
+        if lowering_plan_index_schema.as_deref() != Some("nuis-domain-lowering-plan-index-v1") {
+            return Err(format!(
+                "`{}` has unsupported lowering plan index schema `{:?}`; expected `nuis-domain-lowering-plan-index-v1`",
+                path.display(),
+                lowering_plan_index_schema
+            ));
+        }
+        let (index_source, index_label) = if let Some(source) = &lowering_plan_index_inline {
+            (
+                source.clone(),
+                "<embedded-domain-lowering-plan-index>".to_owned(),
+            )
+        } else {
+            let lowering_plan_index_path = lowering_plan_index_path.as_ref().unwrap();
+            (
+                fs::read_to_string(lowering_plan_index_path).map_err(|error| {
+                    format!(
+                        "failed to read domain lowering plan index `{}` referenced by `{}`: {error}",
+                        lowering_plan_index_path,
+                        path.display()
+                    )
+                })?,
+                lowering_plan_index_path.clone(),
+            )
+        };
+        let index_schema =
+            parse_required_toml_string(&index_source, "schema", Path::new(&index_label))?;
+        if index_schema != "nuis-domain-lowering-plan-index-v1" {
+            return Err(format!(
+                "domain lowering plan index `{}` has unsupported schema `{}`",
+                index_label, index_schema
+            ));
+        }
+        let plan_count =
+            parse_required_toml_usize(&index_source, "plan_count", Path::new(&index_label))?;
+        if plan_count != lowering_plan_units {
+            return Err(format!(
+                "domain lowering plan index `{}` count mismatch: manifest={}, index={}",
+                index_label, lowering_plan_units, plan_count
+            ));
+        }
+        let plan_block_count = index_source
+            .lines()
+            .filter(|line| line.trim() == "[[lowering_plan]]")
+            .count();
+        if plan_block_count != lowering_plan_units {
+            return Err(format!(
+                "domain lowering plan index `{}` block count mismatch: manifest={}, blocks={}",
+                index_label, lowering_plan_units, plan_block_count
+            ));
+        }
+        if lowering_plan_units != heterogeneous_domain_count {
+            return Err(format!(
+                "`{}` lowering_plan_units mismatch: expected {}, found {}",
+                path.display(),
+                heterogeneous_domain_count,
+                lowering_plan_units
+            ));
+        }
+        for unit in domain_build_units
+            .iter()
+            .filter(|unit| unit.domain_family != "cpu")
+        {
+            let expected_target = unit.selected_lowering_target.as_deref().unwrap_or("none");
+            let expected_ir_sidecar = unit.artifact_ir_sidecar_path.as_deref().unwrap_or("<none>");
+            let expected_payload_blob = unit
+                .artifact_payload_blob_path
+                .as_deref()
+                .unwrap_or("<none>");
+            let expected_bridge_stub = unit
+                .artifact_bridge_stub_path
+                .as_deref()
+                .unwrap_or("<none>");
+            let expected_symbol_namespace = domain_lowering_symbol_namespace(unit);
+            let expected_debug_anchor = domain_lowering_debug_anchor(unit);
+            let expected_linkage_anchor = domain_lowering_linkage_anchor(unit);
+            let expected_source_map_scope = domain_lowering_source_map_scope(unit);
+            let expected_host_ffi_bridge = domain_lowering_host_ffi_bridge(unit);
+            let expected_host_ffi_symbol = domain_lowering_host_ffi_symbol(unit);
+            let expected_host_ffi_signature_hash = domain_lowering_host_ffi_signature_hash(unit);
+            for (field, expected) in [
+                ("selected_lowering_target", expected_target),
+                ("symbol_namespace", expected_symbol_namespace.as_str()),
+                ("debug_anchor", expected_debug_anchor.as_str()),
+                ("linkage_anchor", expected_linkage_anchor.as_str()),
+                ("source_map_scope", expected_source_map_scope.as_str()),
+                ("host_ffi_bridge", expected_host_ffi_bridge.as_str()),
+                ("host_ffi_policy", "signature-whitelist-required"),
+                ("host_ffi_symbol", expected_host_ffi_symbol.as_str()),
+                ("host_ffi_signature", domain_lowering_host_ffi_signature()),
+                (
+                    "host_ffi_signature_hash",
+                    expected_host_ffi_signature_hash.as_str(),
+                ),
+                ("ir_sidecar_path", expected_ir_sidecar),
+                ("payload_blob_path", expected_payload_blob),
+                ("bridge_stub_path", expected_bridge_stub),
+            ] {
+                if !index_source
+                    .contains(&format!("{field} = \"{}\"", escape_toml_string(expected)))
+                {
+                    return Err(format!(
+                        "domain lowering plan index `{}` is missing {field} for `{}`",
+                        index_label, unit.domain_family
+                    ));
+                }
+            }
+            lowering_plan_entries_checked += 1;
+        }
+        lowering_plan_index_checked = 1;
+    } else if heterogeneous_domain_count > 0 {
+        return Err(format!(
+            "`{}` is missing domain lowering plan index for heterogeneous domains",
             path.display()
         ));
     }
@@ -5056,6 +5526,10 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         host_bridge_plan_units,
         host_bridge_plan_checked,
         host_bridge_plan_entries_checked,
+        lowering_plan_index_path,
+        lowering_plan_units,
+        lowering_plan_index_checked,
+        lowering_plan_entries_checked,
         artifacts_checked: artifacts.len(),
         project_metadata_checked,
     })
@@ -9871,6 +10345,9 @@ mod tests {
         assert_eq!(report.host_bridge_plan_index_path, None);
         assert_eq!(report.host_bridge_plan_units, 0);
         assert_eq!(report.host_bridge_plan_checked, 0);
+        assert_eq!(report.lowering_plan_index_path, None);
+        assert_eq!(report.lowering_plan_units, 0);
+        assert_eq!(report.lowering_plan_index_checked, 0);
         assert_eq!(report.doc_index_path, None);
         assert_eq!(report.doc_index_module_count, 0);
         assert_eq!(report.doc_index_documented_item_count, 0);
@@ -10015,6 +10492,9 @@ mod tests {
         assert_eq!(report.host_bridge_plan_units, 2);
         assert_eq!(report.host_bridge_plan_checked, 1);
         assert_eq!(report.host_bridge_plan_entries_checked, 2);
+        assert_eq!(report.lowering_plan_units, 2);
+        assert_eq!(report.lowering_plan_index_checked, 1);
+        assert_eq!(report.lowering_plan_entries_checked, 2);
         let kernel_payload = dir.join("nuis.domain.kernel.payload.toml");
         let kernel_bridge_stub = dir.join("nuis.domain.kernel.bridge.stub.txt");
         let kernel_payload_blob = dir.join("nuis.domain.kernel.payload.bin");
@@ -10023,6 +10503,7 @@ mod tests {
         let network_payload_blob = dir.join("nuis.domain.network.payload.bin");
         let bridge_registry = dir.join("nuis.bridge.registry.toml");
         let host_bridge_plan_index = dir.join("nuis.host-bridge.plan-index.toml");
+        let lowering_plan_index = dir.join("nuis.lowering.plan-index.toml");
         assert!(kernel_payload.exists());
         assert!(kernel_bridge_stub.exists());
         assert!(kernel_payload_blob.exists());
@@ -10031,14 +10512,17 @@ mod tests {
         assert!(network_payload_blob.exists());
         assert!(bridge_registry.exists());
         assert!(host_bridge_plan_index.exists());
+        assert!(lowering_plan_index.exists());
         let kernel_payload_text = fs::read_to_string(&kernel_payload).unwrap();
         let kernel_bridge_stub_text = fs::read_to_string(&kernel_bridge_stub).unwrap();
         let network_payload_text = fs::read_to_string(&network_payload).unwrap();
         let network_bridge_stub_text = fs::read_to_string(&network_bridge_stub).unwrap();
         let bridge_registry_text = fs::read_to_string(&bridge_registry).unwrap();
         let host_bridge_plan_index_text = fs::read_to_string(&host_bridge_plan_index).unwrap();
+        let lowering_plan_index_text = fs::read_to_string(&lowering_plan_index).unwrap();
         let bridge_registry_path_text = bridge_registry.display().to_string();
         let host_bridge_plan_index_path_text = host_bridge_plan_index.display().to_string();
+        let lowering_plan_index_path_text = lowering_plan_index.display().to_string();
         assert_eq!(
             report.bridge_registry_path.as_deref(),
             Some(bridge_registry_path_text.as_str())
@@ -10046,6 +10530,10 @@ mod tests {
         assert_eq!(
             report.host_bridge_plan_index_path.as_deref(),
             Some(host_bridge_plan_index_path_text.as_str())
+        );
+        assert_eq!(
+            report.lowering_plan_index_path.as_deref(),
+            Some(lowering_plan_index_path_text.as_str())
         );
         assert!(bridge_registry_text.contains("schema = \"nuis-bridge-registry-v1\""));
         assert!(bridge_registry_text.contains("bridge_count = 2"));
@@ -10061,6 +10549,14 @@ mod tests {
         assert!(
             bridge_registry_text.contains("selected_lowering_target = \"urlsession.socket-io\"")
         );
+        assert!(bridge_registry_text.contains("host_ffi_bridge = \"cffi.kernel.dispatch.v1\""));
+        assert!(bridge_registry_text.contains("host_ffi_bridge = \"cffi.network.dispatch.v1\""));
+        assert!(bridge_registry_text.contains("host_ffi_policy = \"signature-whitelist-required\""));
+        assert!(bridge_registry_text
+            .contains("host_ffi_symbol = \"nuis_kernel_coreml_apple_ane_dispatch_v1\""));
+        assert!(bridge_registry_text
+            .contains("host_ffi_symbol = \"nuis_network_urlsession_socket_io_dispatch_v1\""));
+        assert!(bridge_registry_text.contains("host_ffi_signature_hash = \"0x"));
         assert!(bridge_registry_text.contains("bridge_stub_path = "));
         assert!(host_bridge_plan_index_text.contains("schema = \"nuis-host-bridge-plan-index-v1\""));
         assert!(host_bridge_plan_index_text.contains("plan_count = 2"));
@@ -10077,8 +10573,63 @@ mod tests {
         assert!(host_bridge_plan_index_text.contains("device_class = \"socket-io\""));
         assert!(host_bridge_plan_index_text
             .contains("selected_lowering_target = \"urlsession.socket-io\""));
+        assert!(
+            host_bridge_plan_index_text.contains("host_ffi_bridge = \"cffi.kernel.dispatch.v1\"")
+        );
+        assert!(
+            host_bridge_plan_index_text.contains("host_ffi_bridge = \"cffi.network.dispatch.v1\"")
+        );
+        assert!(host_bridge_plan_index_text
+            .contains("host_ffi_policy = \"signature-whitelist-required\""));
+        assert!(host_bridge_plan_index_text
+            .contains("host_ffi_symbol = \"nuis_kernel_coreml_apple_ane_dispatch_v1\""));
+        assert!(host_bridge_plan_index_text
+            .contains("host_ffi_symbol = \"nuis_network_urlsession_socket_io_dispatch_v1\""));
+        assert!(host_bridge_plan_index_text.contains("host_ffi_signature_hash = \"0x"));
         assert!(host_bridge_plan_index_text
             .contains("phase_order = [\"bind\", \"submit\", \"wait\", \"finalize\"]"));
+        assert!(
+            lowering_plan_index_text.contains("schema = \"nuis-domain-lowering-plan-index-v1\"")
+        );
+        assert!(lowering_plan_index_text.contains("plan_count = 2"));
+        assert!(lowering_plan_index_text.contains("[[lowering_plan]]"));
+        assert!(lowering_plan_index_text.contains("domain_family = \"kernel\""));
+        assert!(lowering_plan_index_text.contains("domain_family = \"network\""));
+        assert!(
+            lowering_plan_index_text.contains("selected_lowering_target = \"coreml.apple-ane\"")
+        );
+        assert!(lowering_plan_index_text
+            .contains("selected_lowering_target = \"urlsession.socket-io\""));
+        assert!(lowering_plan_index_text.contains("execution_route = \"ane-graph-execution\""));
+        assert!(
+            lowering_plan_index_text.contains("execution_route = \"foundation-session-reactor\"")
+        );
+        assert!(lowering_plan_index_text
+            .contains("symbol_namespace = \"nuis::domain::kernel::coreml_apple_ane\""));
+        assert!(lowering_plan_index_text
+            .contains("debug_anchor = \"nuis.debug.kernel.coreml_apple_ane\""));
+        assert!(lowering_plan_index_text
+            .contains("linkage_anchor = \"nuis.link.kernel.coreml_apple_ane\""));
+        assert!(lowering_plan_index_text.contains(
+            "source_map_scope = \"domain:kernel/package:official.kernel/target:coreml.apple-ane\""
+        ));
+        assert!(lowering_plan_index_text.contains("host_ffi_bridge = \"cffi.kernel.dispatch.v1\""));
+        assert!(
+            lowering_plan_index_text.contains("host_ffi_policy = \"signature-whitelist-required\"")
+        );
+        assert!(lowering_plan_index_text
+            .contains("host_ffi_symbol = \"nuis_kernel_coreml_apple_ane_dispatch_v1\""));
+        assert!(lowering_plan_index_text.contains(
+            "host_ffi_signature = \"fn(payload: ptr, payload_len: usize, bridge_state: ptr) -> i64\""
+        ));
+        assert!(lowering_plan_index_text.contains("host_ffi_signature_hash = \"0x"));
+        assert!(lowering_plan_index_text
+            .contains("symbol_namespace = \"nuis::domain::network::urlsession_socket_io\""));
+        assert!(lowering_plan_index_text
+            .contains("debug_anchor = \"nuis.debug.network.urlsession_socket_io\""));
+        assert!(lowering_plan_index_text.contains("ir_sidecar_path = "));
+        assert!(lowering_plan_index_text.contains("payload_blob_path = "));
+        assert!(lowering_plan_index_text.contains("bridge_stub_path = "));
         let kernel_blob =
             super::decode_domain_build_unit_payload_blob(&fs::read(&kernel_payload_blob).unwrap())
                 .unwrap();

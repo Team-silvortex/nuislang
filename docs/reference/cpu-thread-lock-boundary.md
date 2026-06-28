@@ -1,7 +1,12 @@
 # CPU Thread/Lock Boundary
 
-This file records the current practical boundary for staged `Thread<T>`,
-`Mutex<T>`, and `MutexGuard<T>` work on the mainline before `alpha-0.0.1`.
+This file records the practical boundary for staged `Thread<T>`, `Mutex<T>`,
+and `MutexGuard<T>` work that entered the mainline before `alpha-0.0.1`.
+
+For present-tense `alpha-0.4.*` routing, read this as a still-relevant
+contract note under the current system inventory, not as the repo entrypoint:
+
+* [../versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
 
 It is not the final thread runtime or memory-visibility design.
 

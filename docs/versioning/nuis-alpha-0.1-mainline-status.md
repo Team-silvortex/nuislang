@@ -1,16 +1,22 @@
 # `nuis` `alpha-0.1.*` Mainline Status
 
-This file is the short current-state anchor for the `alpha-0.1.*` line.
+This file is now a predecessor anchor for the `alpha-0.1.*` line.
 
-It is not a historical closeout file.
+For present-tense `alpha-0.4.*` work, start with:
+
+* [nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
+* [nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+
+It is not an `alpha-0.0.1` closeout file, but it is no longer the default
+current-line entrypoint.
 
 It is the shortest answer to one question:
 
-`what should a teammate treat as the real current nuis mainline now that the repository is already past alpha-0.0.1 closeout?`
+`what did the first post-closeout alpha line establish before alpha-0.4 hardening?`
 
-## Current Line
+## Alpha-0.1 Line
 
-`alpha-0.1.*` should be read as:
+`alpha-0.1.*` should now be read as:
 
 * post-closeout consolidation
 * frontdoor/workflow internalization
@@ -22,9 +28,9 @@ Short rule:
 
 `alpha-0.1.*` is where the repository should become easier to read, easier to route, and harder to misstate`
 
-## Current Mainline Spine
+## Alpha-0.1 Mainline Spine
 
-The current compile spine should now be read as:
+The `alpha-0.1.*` compile spine was:
 
 ```text
 nuis source / project
@@ -48,9 +54,9 @@ nuis
   -> LLVM / AOT packaging
 ```
 
-## What Is Actually Solid Today
+## What Became Solid In This Line
 
-These are the strongest current repository truths:
+These were the strongest repository truths from this line:
 
 * project and single-file workflow frontdoors are now explicit
 * `workflow`, `project-status`, `project-doctor`, and `artifact-doctor` now expose one readable grouped surface family
@@ -77,9 +83,9 @@ Short rule:
 
 `current mainline truth is good enough to build on, not good enough to call finished`
 
-## Current First Reading Route
+## Predecessor Reading Route
 
-If you are entering the repo fresh today, use this order:
+If you are intentionally reading the `alpha-0.1.*` predecessor line, use this order:
 
 1. [../current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 2. [../reference/nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)
@@ -93,11 +99,11 @@ If you need the previous line that led into this one, then drop to:
 * [nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
 * [nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
 
-## Current Practical Rule
+## Practical Rule
 
 When updating current-facing docs, examples, or workflow output:
 
-* prefer `alpha-0.1.*` wording for the present tense
+* prefer `alpha-0.4.*` wording for the present tense
 * keep `0.19.*`, `0.20.*`, and `alpha-0.0.1` files as historical transition anchors
 * do not let closeout-era wording remain the default frontdoor for current repo orientation
 

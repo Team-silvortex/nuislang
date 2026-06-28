@@ -834,6 +834,9 @@ fn link_plan_json(plan: &linker::LinkPlan) -> String {
     if let Some(path) = &plan.host_bridge_plan_index_path {
         fields.push(json_string_field("host_bridge_plan_index_path", path));
     }
+    if let Some(path) = &plan.lowering_plan_index_path {
+        fields.push(json_string_field("lowering_plan_index_path", path));
+    }
     format!("{{{}}}", fields.join(","))
 }
 
@@ -2370,6 +2373,10 @@ fn inspect_artifact_json(
             "host_bridge_plan_entries_checked",
             report.host_bridge_plan_entries_checked,
         ));
+        fields.push(json_usize_field(
+            "lowering_plan_entries_checked",
+            report.lowering_plan_entries_checked,
+        ));
         fields.push(format!(
             "\"domain_build_verification_summary\":{}",
             domain_build_verification_summary_json(&summary)
@@ -2592,6 +2599,19 @@ fn verify_build_manifest_json(input: &Path, report: &aot::BuildManifestVerifyRep
         json_usize_field(
             "host_bridge_plan_entries_checked",
             report.host_bridge_plan_entries_checked,
+        ),
+        json_optional_string_field(
+            "lowering_plan_index_path",
+            report.lowering_plan_index_path.as_deref(),
+        ),
+        json_usize_field("lowering_plan_units", report.lowering_plan_units),
+        json_usize_field(
+            "lowering_plan_index_checked",
+            report.lowering_plan_index_checked,
+        ),
+        json_usize_field(
+            "lowering_plan_entries_checked",
+            report.lowering_plan_entries_checked,
         ),
         json_optional_string_field("doc_index_path", report.doc_index_path.as_deref()),
         json_usize_field("doc_index_module_count", report.doc_index_module_count),
@@ -4432,6 +4452,18 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "  host_bridge_plan_entries_checked: {}",
                     report.host_bridge_plan_entries_checked
                 );
+                if let Some(path) = &report.lowering_plan_index_path {
+                    println!("  lowering_plan_index_path: {}", path);
+                }
+                println!("  lowering_plan_units: {}", report.lowering_plan_units);
+                println!(
+                    "  lowering_plan_index_checked: {}",
+                    report.lowering_plan_index_checked
+                );
+                println!(
+                    "  lowering_plan_entries_checked: {}",
+                    report.lowering_plan_entries_checked
+                );
                 if let Some(path) = &report.doc_index_path {
                     println!("  doc_index_path: {}", path);
                 }
@@ -5751,6 +5783,10 @@ mod tests {
             host_bridge_plan_units: 0,
             host_bridge_plan_checked: 0,
             host_bridge_plan_entries_checked: 0,
+            lowering_plan_index_path: None,
+            lowering_plan_units: 0,
+            lowering_plan_index_checked: 0,
+            lowering_plan_entries_checked: 0,
             artifacts_checked: 0,
             project_metadata_checked: 0,
         };
@@ -6472,6 +6508,7 @@ mod cpu Main {
             },
             bridge_registry_path: None,
             host_bridge_plan_index_path: None,
+            lowering_plan_index_path: None,
             domain_units: vec![linker::LinkPlanDomainUnit {
                 kind: "host".to_owned(),
                 package_id: "official.cpu".to_owned(),

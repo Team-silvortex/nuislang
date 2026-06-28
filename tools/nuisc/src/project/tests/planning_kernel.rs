@@ -198,7 +198,7 @@ fn builds_project_compilation_plan_from_shared_organization_layers() {
     }));
     assert_eq!(
         describe_project_output_intent_categories(&plan),
-        "core-artifacts=1, project-metadata=8, verification-inputs=1"
+        "core-artifacts=1, project-metadata=10, verification-inputs=1"
     );
     assert_eq!(
         describe_project_compilation_plan(&plan),
@@ -387,22 +387,37 @@ fn categorizes_project_compilation_dependencies() {
         }
         "#,
     )]);
-    project.manifest.galaxy_dependencies = vec![ProjectGalaxyDependency {
+    project.resolved_galaxies = vec![crate::stdlib_registry::ResolvedGalaxyDependency {
         name: "demo.dep".to_owned(),
         version: "1.2.3".to_owned(),
+        package_id: "nuis.demo.dep".to_owned(),
+        direct: true,
+        requested_by: vec!["demo.dep".to_owned()],
+        module_dir: PathBuf::from("stdlib/demo.dep"),
+        manifest_path: PathBuf::from("stdlib/demo.dep/module.toml"),
+        depends_on: vec![],
+        surfaces: vec!["surface.demo.dep.contracts.v1".to_owned()],
+        source_modules: vec![],
+        resolved_source_paths: vec![],
+        library_modules: vec!["lib/demo_dep.ns".to_owned()],
+        resolved_library_paths: vec![PathBuf::from("stdlib/demo.dep/lib/demo_dep.ns")],
+        library_import_policy: crate::stdlib_registry::StdlibLibraryImportPolicy::ProjectAuto,
+        auto_injectable: true,
+        auto_inject_blockers: vec![],
     }];
 
     let plan = build_project_compilation_plan(&project).unwrap();
     assert_eq!(plan.dependencies.len(), 1);
-    assert_eq!(plan.dependencies[0].category, "package-registry");
-    assert_eq!(plan.dependencies[0].source, "galaxy-manifest");
+    assert_eq!(plan.dependencies[0].category, "stdlib-galaxy-direct");
+    assert_eq!(plan.dependencies[0].source, "project-galaxy-manifest");
     assert_eq!(
         describe_project_dependency_categories(&plan),
-        "package-registry=1"
+        "stdlib-galaxy-direct=1"
     );
 
     let rendered = render_project_compilation_plan_index(&plan);
-    assert!(rendered.contains("dependencies package-registry:demo.dep=1.2.3 (galaxy-manifest)"));
+    assert!(rendered
+        .contains("dependencies stdlib-galaxy-direct:demo.dep=1.2.3 (project-galaxy-manifest)"));
 }
 
 #[test]
@@ -417,6 +432,24 @@ fn validates_kernel_profile_slot_contract() {
             const batch_lanes: i64 = 16;
             let profile_entry: Unit =
               kernel_target_config("apple_ane", "coreml", batch_lanes);
+          }
+        }
+        "#,
+    )]);
+
+    validate_kernel_profile_slot_contract(&project, "KernelUnit").unwrap();
+}
+
+#[test]
+fn validates_kernel_profile_slot_contract_with_auto_target_config() {
+    let project = project_with_modules(vec![(
+        "kernel_unit.ns",
+        r#"
+        mod kernel KernelUnit {
+          fn profile() {
+            const bind_core: i64 = 2;
+            const queue_depth: i64 = 8;
+            const batch_lanes: i64 = 16;
           }
         }
         "#,

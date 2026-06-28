@@ -9,11 +9,13 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * [nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 * [nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
 
 Use this first when the question is:
 
+* what exists and what is still soft in the current `alpha-0.4.*` toolchain
 * what the current `alpha-0.4.*` mainline should optimize for before
   `alpha-0.7.0`
 * what the `alpha-0.1.*` mainline established before this hardening pass
@@ -126,7 +128,7 @@ Read:
 
 Practical rule:
 
-* start at `alpha-0.4.*` first
+* start at `alpha-0.4.*` inventory and hardening first
 * use `alpha-0.1.*` for the first post-closeout alpha consolidation line
 * then use `0.20.*` and `0.19.*` only when you are intentionally
   reconstructing the line that led here

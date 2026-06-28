@@ -3,13 +3,18 @@
 This file is the shortest predecessor index for the mainline boundaries that
 mattered most before `alpha-0.0.1`.
 
+For present-tense `alpha-0.4.*` work, start with:
+
+* [../versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
+* [../versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+
 It is not a full architecture manual.
 
 It is the reading page for:
 
 `if I need to understand what nuis already treats as real before alpha, where should I look first?`
 
-If you want the current post-closeout line first, start with:
+If you want the earlier post-closeout line, use:
 
 * [../versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
 * [nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)

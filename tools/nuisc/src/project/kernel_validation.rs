@@ -145,14 +145,15 @@ pub(super) fn validate_kernel_profile_slot_contract(
         ));
     }
 
-    let target_config_uses_batch_lanes = profile_fn.body.iter().any(|stmt| {
-        matches!(
-            extract_profile_call(stmt),
-            Some((_name, "kernel_target_config", args))
-                if matches!(args.get(2), Some(super::AstExpr::Var(name)) if name == "batch_lanes")
-        )
+    let explicit_target_config = profile_fn.body.iter().find_map(|stmt| {
+        let call = extract_profile_call(stmt)?;
+        (call.1 == "kernel_target_config").then_some(call)
     });
-    if !target_config_uses_batch_lanes {
+    if matches!(
+        explicit_target_config,
+        Some((_name, "kernel_target_config", args))
+            if !matches!(args.get(2), Some(super::AstExpr::Var(name)) if name == "batch_lanes")
+    ) {
         return Err(format!(
             "project kernel unit `kernel.{}` requires kernel_target_config(..., batch_lanes) to consume the `batch_lanes` profile slot",
             unit

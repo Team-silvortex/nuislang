@@ -28,7 +28,7 @@ Current role rule:
 
 * this subtree is one of the strongest single-file semantic anchor sets in the
   repository
-* before `alpha-0.0.1`, it should read as:
+* during `alpha-0.4.*`, it should read as:
   ownership baseline -> task/GLM compile-closure spine -> thread/lock staged
   anchors -> narrow probes
 * not every task-facing file here is equal-entry frontdoor material

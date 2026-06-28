@@ -9,22 +9,22 @@ local README for the area you are actively touching.
 
 If you only need the shortest current `alpha-0.4.*` reading route, use this order:
 
-1. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-2. [versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
+1. [versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
+2. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 3. [reference/nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)
 4. [reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
 5. [reference/nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
 6. [reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
 7. [reference/ffi-pointer-safety-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/ffi-pointer-safety-boundary.md)
 8. [reference/nustar-capability-split-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nustar-capability-split-boundary.md)
-9. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-10. [versioning/nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
+9. [versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
+10. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 11. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
 12. [versioning/nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
 
 Short rule:
 
-`hardening plan says what to optimize; workflow says how the route composes; vocabulary says what the ABI words mean; regression/checklist says how that truth is defended`
+`inventory says what exists; hardening plan says what to optimize; workflow says how the route composes; predecessor docs explain how the current shape got here`
 
 ## Start Here
 
@@ -32,7 +32,9 @@ Short rule:
   [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
 * current `alpha-0.4.*` hardening plan:
   [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-* current `alpha-0.1.*` status:
+* current `alpha-0.4.*` system inventory:
+  [versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
+* predecessor `alpha-0.1.*` status:
   [versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
 * current frontdoor surface reference:
   [reference/nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)
@@ -40,7 +42,7 @@ Short rule:
   [reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
 * current binary format protocol:
   [reference/nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
-* current ABI vocabulary bridge into `0.20.*`:
+* predecessor ABI vocabulary bridge into `0.20.*`:
   [versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 * immediate predecessor alpha closeout set:
   [versioning/nuis-alpha-0.0.1-preflight-report.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-preflight-report.md),
@@ -97,6 +99,8 @@ Use this section as a router, not as a full inventory.
   [reference/nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
   current native control-flow smoke gate:
   [artifact_cli.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/artifact_cli.rs)
+  current host-YIR runtime probe:
+  [host_yir.rs](/Users/Shared/chroot/dev/nuislang/crates/nuis-runtime/src/host_yir.rs)
 * tool/reference surface:
   [reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
 * std layering and tooling:

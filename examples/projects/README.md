@@ -17,7 +17,7 @@ The important reading rule now is:
   [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
 * if you want the current repo-level line status that explains why some
   examples are frontdoor while others are only companions, use
-  [docs/versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
+  [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
 
 Current source-style rule:
 
@@ -176,7 +176,7 @@ Practical consequence:
 * keep old-but-still-useful companions when they still carry regression value
 * keep probe routes when they still support runtime validation or design docs
 * stop treating long directory inventories as the first reading route
-* during the `alpha-0.1.*` consolidation pass, prefer demotion and rerouting
+* during the `alpha-0.4.*` hardening pass, prefer demotion and rerouting
   before deletion
 
 ## Artifact Bundles

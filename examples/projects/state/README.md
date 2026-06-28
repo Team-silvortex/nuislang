@@ -11,14 +11,14 @@ This folder is the project-form companion area for:
 
 Use this README as a router, not as a full inventory.
 
-Alpha closeout rule:
+Alpha hardening rule:
 
 * this subtree is still `active` in the
   [examples freshness audit](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
   and should be read as a guided ladder, not as a flat shelf
-* during `alpha-0.0.1` closeout, the goal here is to keep one short control
+* during `alpha-0.4.*` hardening, the goal here is to keep one short control
   flow route, one short recursion route, and one short generic/control-flow
-  route obvious before the remaining micro-demos are reconsidered
+  route obvious while the remaining micro-demos stay companion coverage
 
 ## Start Here
 

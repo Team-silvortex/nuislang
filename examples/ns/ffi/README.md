@@ -22,8 +22,9 @@ Current role rule:
 
 * this subtree is a narrow source-side facade mirror layer
 * it should not compete with project-form tooling/filesystem/task onboarding
-* before `alpha-0.0.1`, the goal is to keep one short host bridge ladder, one
-  short task/runtime ladder, and one short path/runtime ladder obvious
+* during `alpha-0.4.*`, the goal is to keep one short host bridge ladder, one
+  short task/runtime ladder, and one short path/runtime ladder obvious while
+  project-form examples carry the broader workflow story
 * when a facade belongs to the std-owned host surface, prefer
   `extern "c" @host_symbol("...") fn ...;` over hard-coding raw `host_*`
   symbol names in frontdoor examples

@@ -11,9 +11,9 @@ Canonical short map:
 
 * [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
   Use that file first when you want the shortest current route.
-* [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+* [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
   Use that file when the question is whether a source route is current
-  frontdoor, companion-only, or still an active closeout lane.
+  frontdoor, companion-only, or only predecessor/probe material.
 
 Current source-style rule:
 
@@ -22,12 +22,12 @@ Current source-style rule:
 * if you need the lowering/builtin explanation behind that surface, use
   [docs/reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
 
-Alpha closeout rule:
+Alpha hardening rule:
 
 * this tree is still `active` in the
   [examples freshness audit](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
-* its best role before `alpha-0.0.1` is narrow semantic anchoring, not
-  competing with multi-file project onboarding
+* its best `alpha-0.4.*` role is narrow semantic anchoring, not competing with
+  multi-file project onboarding
 * the current goal is to keep one short basic-language ladder, one short
   ownership/task ladder, and one short host-facade ladder obvious before the
   longer single-file tail is reclassified further
