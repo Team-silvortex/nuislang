@@ -30,6 +30,73 @@ impl nuis_runtime::DomainAdapter for BuildReportRuntimeAdapter {
     fn supports(&self, _unit: &nuis_artifact::BuildManifestDomainBuildUnit) -> bool {
         true
     }
+
+    fn phase_outcome(
+        &self,
+        ctx: &nuis_runtime::ExecutionPhaseContext<'_>,
+        action: &nuis_runtime::ExecutionPhaseAction,
+    ) -> Option<nuis_runtime::ExecutionPhaseOutcome> {
+        if !runtime_context_is_cpu_fallback(ctx) {
+            return None;
+        }
+        Some(nuis_runtime::ExecutionPhaseOutcome {
+            status: "host-cpu-fallback-complete".to_owned(),
+            produced_handles: action.output_handles.clone(),
+            produced_slots: action
+                .output_handles
+                .iter()
+                .map(|key| nuis_runtime::ExecutionResourceBinding {
+                    key: key.clone(),
+                    kind: runtime_slot_resource_kind(key),
+                    capability_label: Some(format!(
+                        "cap.host_cpu_fallback.{}.{}",
+                        ctx.domain_family, key
+                    )),
+                    value: format!(
+                        "host-cpu-fallback://{}/{}/{}",
+                        ctx.domain_family, ctx.phase, key
+                    ),
+                })
+                .collect(),
+            notes: vec![
+                format!("domain={}", ctx.domain_family),
+                format!(
+                    "lowering={}",
+                    ctx.selected_lowering_target.unwrap_or("<none>")
+                ),
+                "executed by host CPU fallback adapter scaffold".to_owned(),
+            ],
+        })
+    }
+}
+
+fn runtime_context_is_cpu_fallback(ctx: &nuis_runtime::ExecutionPhaseContext<'_>) -> bool {
+    let backend = ctx.backend_family.unwrap_or("");
+    let target = ctx.selected_lowering_target.unwrap_or("");
+    backend == "cpu-fallback"
+        || backend == "cpu-host"
+        || target == "cpu-fallback"
+        || target == "cpu-host"
+        || target.starts_with("cpu-fallback.")
+        || target.ends_with(".cpu-host")
+}
+
+fn runtime_slot_resource_kind(key: &str) -> nuis_runtime::ExecutionResourceKind {
+    if key.ends_with(".handle") {
+        nuis_runtime::ExecutionResourceKind::Handle
+    } else if key.ends_with(".packet") || key.contains("packet") {
+        nuis_runtime::ExecutionResourceKind::Packet
+    } else if key.ends_with(".buffer") || key.contains("buffer") {
+        nuis_runtime::ExecutionResourceKind::Buffer
+    } else if key.ends_with(".response") || key.contains("response") || key.ends_with(".target") {
+        nuis_runtime::ExecutionResourceKind::Response
+    } else if key.contains("scheduler") {
+        nuis_runtime::ExecutionResourceKind::Scheduler
+    } else if key.contains("bridge") {
+        nuis_runtime::ExecutionResourceKind::Bridge
+    } else {
+        nuis_runtime::ExecutionResourceKind::Slot
+    }
 }
 
 fn main() {
@@ -2782,6 +2849,10 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
         ],
     );
     append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
+    append_json_field_strings(
+        &mut out,
+        runtime_host_yir_json_fields(doctor.artifact_path.as_deref(), doctor.artifact_verified),
+    );
     append_workflow_link_plan_json_fields(&mut out, link_plan.as_ref());
     out.push('}');
     out
@@ -3257,6 +3328,9 @@ fn runtime_load_json_fields(artifact_path: Option<&Path>, artifact_verified: boo
             json_usize_field("runtime_loaded_domain_units", 0),
             json_usize_field("runtime_loaded_heterogeneous_units", 0),
             json_usize_field("runtime_loaded_payload_blobs", 0),
+            json_usize_field("runtime_payload_backed_heterogeneous_units", 0),
+            json_usize_field("runtime_cpu_fallback_units", 0),
+            json_usize_field("runtime_host_consumable_units", 0),
             json_bool_field("runtime_loaded_bridge_registry", false),
             json_bool_field("runtime_loaded_host_bridge_plan_index", false),
         ];
@@ -3269,37 +3343,55 @@ fn runtime_load_json_fields(artifact_path: Option<&Path>, artifact_verified: boo
             json_usize_field("runtime_loaded_domain_units", 0),
             json_usize_field("runtime_loaded_heterogeneous_units", 0),
             json_usize_field("runtime_loaded_payload_blobs", 0),
+            json_usize_field("runtime_payload_backed_heterogeneous_units", 0),
+            json_usize_field("runtime_cpu_fallback_units", 0),
+            json_usize_field("runtime_host_consumable_units", 0),
             json_bool_field("runtime_loaded_bridge_registry", false),
             json_bool_field("runtime_loaded_host_bridge_plan_index", false),
         ];
     };
     match nuis_runtime::RuntimeLoader.load_from_artifact_path(path) {
-        Ok(loaded) => vec![
-            json_bool_field("runtime_load_attempted", true),
-            json_bool_field("runtime_load_ok", true),
-            json_optional_string_field("runtime_load_error", None),
-            json_field(
-                "runtime_loaded_lifecycle_entry",
-                &loaded.artifact.lifecycle.bootstrap_entry,
-            ),
-            json_usize_field("runtime_loaded_domain_units", loaded.domain_units.len()),
-            json_usize_field(
-                "runtime_loaded_heterogeneous_units",
-                loaded.heterogeneous_units().count(),
-            ),
-            json_usize_field(
-                "runtime_loaded_payload_blobs",
-                loaded.domain_payload_blobs.len(),
-            ),
-            json_bool_field(
-                "runtime_loaded_bridge_registry",
-                loaded.bridge_registry.is_some(),
-            ),
-            json_bool_field(
-                "runtime_loaded_host_bridge_plan_index",
-                loaded.host_bridge_plan_index.is_some(),
-            ),
-        ],
+        Ok(loaded) => {
+            let host_consumable = loaded.host_consumable_summary();
+            vec![
+                json_bool_field("runtime_load_attempted", true),
+                json_bool_field("runtime_load_ok", true),
+                json_optional_string_field("runtime_load_error", None),
+                json_field(
+                    "runtime_loaded_lifecycle_entry",
+                    &loaded.artifact.lifecycle.bootstrap_entry,
+                ),
+                json_usize_field("runtime_loaded_domain_units", loaded.domain_units.len()),
+                json_usize_field(
+                    "runtime_loaded_heterogeneous_units",
+                    loaded.heterogeneous_units().count(),
+                ),
+                json_usize_field(
+                    "runtime_loaded_payload_blobs",
+                    loaded.domain_payload_blobs.len(),
+                ),
+                json_usize_field(
+                    "runtime_payload_backed_heterogeneous_units",
+                    host_consumable.payload_backed_units,
+                ),
+                json_usize_field(
+                    "runtime_cpu_fallback_units",
+                    host_consumable.cpu_fallback_units,
+                ),
+                json_usize_field(
+                    "runtime_host_consumable_units",
+                    host_consumable.host_consumable_units,
+                ),
+                json_bool_field(
+                    "runtime_loaded_bridge_registry",
+                    loaded.bridge_registry.is_some(),
+                ),
+                json_bool_field(
+                    "runtime_loaded_host_bridge_plan_index",
+                    loaded.host_bridge_plan_index.is_some(),
+                ),
+            ]
+        }
         Err(error) => vec![
             json_bool_field("runtime_load_attempted", true),
             json_bool_field("runtime_load_ok", false),
@@ -3307,6 +3399,9 @@ fn runtime_load_json_fields(artifact_path: Option<&Path>, artifact_verified: boo
             json_usize_field("runtime_loaded_domain_units", 0),
             json_usize_field("runtime_loaded_heterogeneous_units", 0),
             json_usize_field("runtime_loaded_payload_blobs", 0),
+            json_usize_field("runtime_payload_backed_heterogeneous_units", 0),
+            json_usize_field("runtime_cpu_fallback_units", 0),
+            json_usize_field("runtime_host_consumable_units", 0),
             json_bool_field("runtime_loaded_bridge_registry", false),
             json_bool_field("runtime_loaded_host_bridge_plan_index", false),
         ],
@@ -3324,13 +3419,17 @@ fn runtime_execution_json_fields(
         return runtime_execution_unavailable_fields(false, None);
     };
     match runtime_execution_summary(path) {
-        Ok((domains, plan_phases, trace_events)) => vec![
+        Ok((domains, plan_phases, trace_events, host_fallback_events)) => vec![
             json_bool_field("runtime_execution_attempted", true),
             json_bool_field("runtime_execution_ok", true),
             json_optional_string_field("runtime_execution_error", None),
             json_usize_field("runtime_execution_domains", domains),
             json_usize_field("runtime_execution_plan_phases", plan_phases),
             json_usize_field("runtime_execution_trace_events", trace_events),
+            json_usize_field(
+                "runtime_execution_host_fallback_events",
+                host_fallback_events,
+            ),
         ],
         Err(error) => runtime_execution_unavailable_fields(true, Some(&error)),
     }
@@ -3344,10 +3443,91 @@ fn runtime_execution_unavailable_fields(attempted: bool, error: Option<&str>) ->
         json_usize_field("runtime_execution_domains", 0),
         json_usize_field("runtime_execution_plan_phases", 0),
         json_usize_field("runtime_execution_trace_events", 0),
+        json_usize_field("runtime_execution_host_fallback_events", 0),
     ]
 }
 
-fn runtime_execution_summary(path: &Path) -> Result<(usize, usize, usize), String> {
+fn runtime_host_yir_json_fields(
+    artifact_path: Option<&Path>,
+    artifact_verified: bool,
+) -> Vec<String> {
+    if !artifact_verified {
+        return runtime_host_yir_unavailable_fields(false, None, None);
+    }
+    let Some(path) = artifact_path else {
+        return runtime_host_yir_unavailable_fields(false, None, None);
+    };
+    match runtime_host_yir_summary(path) {
+        Ok(Some((yir_path, summary))) => vec![
+            json_bool_field("runtime_host_yir_attempted", true),
+            json_bool_field("runtime_host_yir_ok", true),
+            json_optional_string_field("runtime_host_yir_error", None),
+            json_field("runtime_host_yir_path", &yir_path),
+            json_usize_field("runtime_host_yir_nodes", summary.nodes_executed),
+            json_usize_field(
+                "runtime_host_yir_kernel_nodes",
+                summary.kernel_nodes_executed,
+            ),
+            json_usize_field("runtime_host_yir_tensor_values", summary.tensor_values),
+            json_usize_field("runtime_host_yir_scalar_values", summary.scalar_values),
+            json_usize_field("runtime_host_yir_frame_values", summary.frame_values),
+            json_i64_field(
+                "runtime_host_yir_integer_checksum",
+                summary.integer_checksum,
+            ),
+            json_i64_field(
+                "runtime_host_yir_kernel_integer_checksum",
+                summary.kernel_integer_checksum,
+            ),
+        ],
+        Ok(None) => runtime_host_yir_unavailable_fields(false, None, None),
+        Err(error) => runtime_host_yir_unavailable_fields(true, Some(&error), None),
+    }
+}
+
+fn runtime_host_yir_summary(
+    artifact_path: &Path,
+) -> Result<Option<(String, nuis_runtime::HostYirExecutionSummary)>, String> {
+    let loaded = nuis_runtime::RuntimeLoader
+        .load_from_artifact_path(artifact_path)
+        .map_err(|error| error.to_string())?;
+    let Some(yir_path) = loaded
+        .manifest
+        .artifact_hashes
+        .iter()
+        .find(|entry| entry.kind == "yir")
+        .map(|entry| entry.path.clone())
+    else {
+        return Ok(None);
+    };
+    let source = fs::read_to_string(&yir_path)
+        .map_err(|error| format!("failed to read host YIR `{yir_path}`: {error}"))?;
+    let summary = nuis_runtime::execute_host_yir_source(&source)
+        .map_err(|error| format!("failed to execute host YIR `{}`: {}", yir_path, error))?;
+    Ok(Some((yir_path, summary)))
+}
+
+fn runtime_host_yir_unavailable_fields(
+    attempted: bool,
+    error: Option<&str>,
+    yir_path: Option<&str>,
+) -> Vec<String> {
+    vec![
+        json_bool_field("runtime_host_yir_attempted", attempted),
+        json_bool_field("runtime_host_yir_ok", false),
+        json_optional_string_field("runtime_host_yir_error", error),
+        json_optional_string_field("runtime_host_yir_path", yir_path),
+        json_usize_field("runtime_host_yir_nodes", 0),
+        json_usize_field("runtime_host_yir_kernel_nodes", 0),
+        json_usize_field("runtime_host_yir_tensor_values", 0),
+        json_usize_field("runtime_host_yir_scalar_values", 0),
+        json_usize_field("runtime_host_yir_frame_values", 0),
+        json_i64_field("runtime_host_yir_integer_checksum", 0),
+        json_i64_field("runtime_host_yir_kernel_integer_checksum", 0),
+    ]
+}
+
+fn runtime_execution_summary(path: &Path) -> Result<(usize, usize, usize, usize), String> {
     let loaded = nuis_runtime::RuntimeLoader
         .load_from_artifact_path(path)
         .map_err(|error| error.to_string())?;
@@ -3358,6 +3538,7 @@ fn runtime_execution_summary(path: &Path) -> Result<(usize, usize, usize), Strin
     let mut domains = 0usize;
     let mut plan_phases = 0usize;
     let mut trace_events = 0usize;
+    let mut host_fallback_events = 0usize;
     for unit in loaded.heterogeneous_units() {
         let prepared = bridge
             .prepare(&loaded, &adapters, &unit.domain_family)
@@ -3368,11 +3549,16 @@ fn runtime_execution_summary(path: &Path) -> Result<(usize, usize, usize), Strin
         let trace = executor
             .execute_prepared_plan(prepared.adapter, &plan)
             .map_err(|error| error.to_string())?;
+        host_fallback_events += trace
+            .events
+            .iter()
+            .filter(|event| event.outcome.status == "host-cpu-fallback-complete")
+            .count();
         domains += 1;
         plan_phases += plan.phases.len();
         trace_events += trace.events.len();
     }
-    Ok((domains, plan_phases, trace_events))
+    Ok((domains, plan_phases, trace_events, host_fallback_events))
 }
 
 pub(crate) fn render_build_report_json(input: &Path) -> String {
@@ -3528,6 +3714,10 @@ pub(crate) fn render_build_report_json(input: &Path) -> String {
     append_json_field_strings(
         &mut out,
         runtime_execution_json_fields(doctor.artifact_path.as_deref(), doctor.artifact_verified),
+    );
+    append_json_field_strings(
+        &mut out,
+        runtime_host_yir_json_fields(doctor.artifact_path.as_deref(), doctor.artifact_verified),
     );
     append_workflow_link_plan_json_fields(&mut out, diagnostics.link_plan.plan.as_ref());
     out.push('}');
@@ -3848,6 +4038,7 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
         if let Some(path) = doctor.artifact_path.as_ref() {
             match nuis_runtime::RuntimeLoader.load_from_artifact_path(path) {
                 Ok(loaded) => {
+                    let host_consumable = loaded.host_consumable_summary();
                     println!("  runtime_load_attempted: true");
                     println!("  runtime_load_ok: true");
                     println!(
@@ -3867,6 +4058,18 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
                         loaded.domain_payload_blobs.len()
                     );
                     println!(
+                        "  runtime_payload_backed_heterogeneous_units: {}",
+                        host_consumable.payload_backed_units
+                    );
+                    println!(
+                        "  runtime_cpu_fallback_units: {}",
+                        host_consumable.cpu_fallback_units
+                    );
+                    println!(
+                        "  runtime_host_consumable_units: {}",
+                        host_consumable.host_consumable_units
+                    );
+                    println!(
                         "  runtime_loaded_bridge_registry: {}",
                         loaded.bridge_registry.is_some()
                     );
@@ -3882,17 +4085,59 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
                 }
             }
             match runtime_execution_summary(path) {
-                Ok((domains, plan_phases, trace_events)) => {
+                Ok((domains, plan_phases, trace_events, host_fallback_events)) => {
                     println!("  runtime_execution_attempted: true");
                     println!("  runtime_execution_ok: true");
                     println!("  runtime_execution_domains: {}", domains);
                     println!("  runtime_execution_plan_phases: {}", plan_phases);
                     println!("  runtime_execution_trace_events: {}", trace_events);
+                    println!(
+                        "  runtime_execution_host_fallback_events: {}",
+                        host_fallback_events
+                    );
                 }
                 Err(error) => {
                     println!("  runtime_execution_attempted: true");
                     println!("  runtime_execution_ok: false");
                     println!("  runtime_execution_error: {}", error);
+                }
+            }
+            match runtime_host_yir_summary(path) {
+                Ok(Some((yir_path, summary))) => {
+                    println!("  runtime_host_yir_attempted: true");
+                    println!("  runtime_host_yir_ok: true");
+                    println!("  runtime_host_yir_path: {}", yir_path);
+                    println!("  runtime_host_yir_nodes: {}", summary.nodes_executed);
+                    println!(
+                        "  runtime_host_yir_kernel_nodes: {}",
+                        summary.kernel_nodes_executed
+                    );
+                    println!(
+                        "  runtime_host_yir_tensor_values: {}",
+                        summary.tensor_values
+                    );
+                    println!(
+                        "  runtime_host_yir_scalar_values: {}",
+                        summary.scalar_values
+                    );
+                    println!("  runtime_host_yir_frame_values: {}", summary.frame_values);
+                    println!(
+                        "  runtime_host_yir_integer_checksum: {}",
+                        summary.integer_checksum
+                    );
+                    println!(
+                        "  runtime_host_yir_kernel_integer_checksum: {}",
+                        summary.kernel_integer_checksum
+                    );
+                }
+                Ok(None) => {
+                    println!("  runtime_host_yir_attempted: false");
+                    println!("  runtime_host_yir_ok: false");
+                }
+                Err(error) => {
+                    println!("  runtime_host_yir_attempted: true");
+                    println!("  runtime_host_yir_ok: false");
+                    println!("  runtime_host_yir_error: {}", error);
                 }
             }
         }
@@ -3901,6 +4146,9 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
         println!("  runtime_load_ok: false");
         println!("  runtime_execution_attempted: false");
         println!("  runtime_execution_ok: false");
+        println!("  runtime_execution_host_fallback_events: 0");
+        println!("  runtime_host_yir_attempted: false");
+        println!("  runtime_host_yir_ok: false");
     }
     println!(
         "  link_plan_available: {}",
@@ -4864,6 +5112,10 @@ pub(crate) fn json_bool_field(name: &str, value: bool) -> String {
 }
 
 pub(crate) fn json_usize_field(name: &str, value: usize) -> String {
+    format!("\"{}\":{}", name, value)
+}
+
+fn json_i64_field(name: &str, value: i64) -> String {
     format!("\"{}\":{}", name, value)
 }
 
@@ -7565,6 +7817,105 @@ mod cpu Main {
         assert!(json.contains("\"runtime_execution_domains\":1"));
         assert!(json.contains("\"runtime_execution_plan_phases\":"));
         assert!(json.contains("\"runtime_execution_trace_events\":"));
+        assert!(json.contains("\"runtime_payload_backed_heterogeneous_units\":1"));
+        assert!(json.contains("\"runtime_cpu_fallback_units\":"));
+        assert!(json.contains("\"runtime_host_consumable_units\":"));
+    }
+
+    #[test]
+    fn build_report_json_exposes_host_cpu_fallback_runtime_events() {
+        let project_root = write_temp_project_fixture(
+            "shader_cpu_fallback_runtime_demo",
+            r#"
+name = "shader_cpu_fallback_runtime_demo"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "surface_shader.ns"]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "shader=shader.render.cpu-fallback.v1",
+]
+"#
+            .trim_start(),
+            r#"
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    let vertex_budget: i64 = shader_profile_vertex_count("SurfaceShader");
+    let instance_budget: i64 = shader_profile_instance_count("SurfaceShader");
+    let packet_tag: i64 = shader_profile_packet_tag("SurfaceShader");
+    let swapchain: Target = shader_profile_target("SurfaceShader");
+    print(vertex_budget + instance_budget + packet_tag);
+  }
+}
+"#,
+        );
+        fs::write(
+            project_root.join("surface_shader.ns"),
+            r#"
+mod shader SurfaceShader {
+  fn profile() {
+    const vertex_count: i64 = 4;
+    const instance_count: i64 = 1;
+    const packet_tag: i64 = 17;
+
+    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+    let profile_view: Viewport = shader_viewport(160, 120);
+    let profile_pipe: Pipeline = shader_pipeline("cpu_fallback_surface", "triangle_strip");
+  }
+}
+"#,
+        )
+        .expect("write shader surface");
+        let output_dir = temp_dir("build_report_shader_cpu_fallback_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_build_report_json(&output_dir);
+
+        assert!(json.contains("\"domain_family\":\"shader\""));
+        assert!(json.contains("\"runtime_payload_backed_heterogeneous_units\":1"));
+        assert!(json.contains("\"runtime_cpu_fallback_units\":1"));
+        assert!(json.contains("\"runtime_host_consumable_units\":1"));
+        assert!(json.contains("\"runtime_execution_host_fallback_events\":"));
+        assert!(!json.contains("\"runtime_execution_host_fallback_events\":0"));
+    }
+
+    #[test]
+    fn build_report_json_executes_host_yir_kernel_values() {
+        let project_root = write_temp_project_fixture(
+            "kernel_host_yir_runtime_demo",
+            r#"
+name = "kernel_host_yir_runtime_demo"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+            .trim_start(),
+            r#"
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(1, 3, "2,4,6");
+    let weights = kernel_tensor(3, 2, "1,-2,3,0,2,1");
+    let projected = kernel_matmul(input, weights);
+    let summary: i64 = kernel_reduce_sum(projected);
+    print(summary);
+  }
+}
+"#,
+        );
+        let output_dir = temp_dir("build_report_kernel_host_yir_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_build_report_json(&output_dir);
+
+        assert!(json.contains("\"runtime_host_yir_attempted\":true"));
+        assert!(json.contains("\"runtime_host_yir_ok\":true"));
+        assert!(json.contains("\"runtime_host_yir_kernel_nodes\":4"));
+        assert!(json.contains("\"runtime_host_yir_tensor_values\":3"));
+        assert!(json.contains("\"runtime_host_yir_scalar_values\":1"));
+        assert!(json.contains("\"runtime_host_yir_kernel_integer_checksum\":73"));
     }
 
     #[test]
@@ -8539,7 +8890,7 @@ mod cpu Main {
         assert!(json.contains("\"source_kind\":\"project\""));
         assert!(json.contains("\"project\":\"imports_manual_only_hint\""));
         assert!(json.contains("\"explicit_galaxy_imports_count\":0"));
-        assert!(json.contains("\"visible_library_modules_count\":2"));
+        assert!(json.contains("\"visible_library_modules_count\":4"));
         assert!(json.contains("\"hidden_manual_only_library_modules_count\":1"));
         assert!(json.contains(
             "\"hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]"

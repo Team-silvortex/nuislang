@@ -64,7 +64,8 @@ mod cpu Main {
         std.library_modules,
         vec![
             "lib/task_contracts.ns".to_owned(),
-            "lib/io_contracts.ns".to_owned()
+            "lib/io_contracts.ns".to_owned(),
+            "lib/fs_contracts.ns".to_owned()
         ]
     );
 
@@ -123,18 +124,20 @@ mod cpu Main {
     assert!(galaxy_index.contains("documented_library_modules="));
     assert!(galaxy_index.contains("documented_items="));
     assert!(galaxy_index.contains("std\tpackage=nuis.std\tdirect=false"));
-    assert!(galaxy_index.contains("library_modules=lib/task_contracts.ns, lib/io_contracts.ns"));
+    assert!(galaxy_index.contains(
+        "library_modules=lib/task_contracts.ns, lib/io_contracts.ns, lib/fs_contracts.ns"
+    ));
     assert!(galaxy_index.contains("library_import_policy=project-auto"));
     assert!(galaxy_index.contains("blockers=<none>"));
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=10\tdocumented_modules=9\tdocumented_items=64"));
+    assert!(docs_index.contains("summary\tmodules=11\tdocumented_modules=10\tdocumented_items=86"));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=33\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=9\tvisible_libraries=9\tvisible_modules=10\tdocumented_visible_modules=9\tdocumented_visible_items=64"
+        "summary\tlibraries=10\tvisible_libraries=10\tvisible_modules=11\tdocumented_visible_modules=10\tdocumented_visible_items=86"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -161,10 +164,14 @@ mod cpu Main {
         "library\tstd\tlib/io_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
+        "library\tstd\tlib/fs_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
         "visible\tcpu\tMain\tdoc_items=0\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
     assert!(imports_index.contains("visible\tcpu\tStdTaskContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tStdIoContracts\tdoc_items="));
+    assert!(imports_index.contains("visible\tcpu\tStdFsContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tPixelMagicContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tshader\tPixelMagicSurfaceContracts\tdoc_items="));
     assert!(imports_index.contains("import_policy=project-auto"));
@@ -314,6 +321,7 @@ galaxy = ["pixelmagic=workspace"]
 use cpu CorePrelude;
 use cpu PixelMagicContracts;
 use cpu StdIoContracts;
+use cpu StdFsContracts;
 use cpu StdTaskContracts;
 
 mod cpu Main {
@@ -321,7 +329,20 @@ mod cpu Main {
     return CorePrelude.sum3_i64(
       PixelMagicContracts.grayscale_packet_total(5101, 160, 120),
       StdTaskContracts.add_bias(7, 5),
-      StdIoContracts.byte_count_exit_code(12) + CorePrelude.one_i64()
+      StdIoContracts.byte_count_exit_code(12)
+        + StdIoContracts.stdin_status_total(8, 4, 16, 12)
+        + StdIoContracts.tty_status_total(1, 1, 80, 24)
+        + StdIoContracts.line_input_status_total(30, 31, 5)
+        + StdIoContracts.terminal_status_total(10, 11, 0, 0, 8, 4, 1, 1, 80, 24)
+        + StdFsContracts.host_fs_value_exit_code(7)
+        + StdFsContracts.metadata_status_total(1, 2, 3)
+        + StdFsContracts.file_io_status_total(4, 5, 0)
+        + StdFsContracts.file_write_status_total(4, 9, 0)
+        + StdFsContracts.file_copy_status_total(5, 9, 0)
+        + StdFsContracts.directory_status_total(6, 7, 0)
+        + StdFsContracts.directory_mutation_status_total(0, 1, 0, 0)
+        + StdFsContracts.path_probe_status_total(0, 1, 1)
+        + CorePrelude.one_i64()
     );
   }
 }
@@ -345,6 +366,66 @@ mod cpu Main {
         .functions
         .iter()
         .any(|function| function.name == "StdIoContracts.byte_count_exit_code"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdIoContracts.stdin_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdIoContracts.tty_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdIoContracts.line_input_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdIoContracts.terminal_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdFsContracts.host_fs_value_exit_code"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdFsContracts.metadata_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdFsContracts.file_io_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdFsContracts.file_write_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdFsContracts.file_copy_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdFsContracts.directory_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdFsContracts.directory_mutation_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdFsContracts.path_probe_status_total"));
     assert!(artifacts
         .nir
         .functions
@@ -938,7 +1019,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=9\tvisible_libraries=9\tvisible_modules=10\tdocumented_visible_modules=9\tdocumented_visible_items=64"
+        "summary\tlibraries=10\tvisible_libraries=10\tvisible_modules=11\tdocumented_visible_modules=10\tdocumented_visible_items=86"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

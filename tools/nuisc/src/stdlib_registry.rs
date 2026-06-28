@@ -225,6 +225,7 @@ mod tests {
             vec![
                 "lib/task_contracts.ns".to_owned(),
                 "lib/io_contracts.ns".to_owned(),
+                "lib/fs_contracts.ns".to_owned(),
             ]
         );
     }

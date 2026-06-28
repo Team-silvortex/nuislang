@@ -13,3 +13,6 @@ path = "src/lib.rs"
 
 [dependencies]
 nuis-artifact = { path = "../nuis-artifact" }
+yir-core = { path = "../yir-core" }
+yir-exec = { path = "../yir-exec" }
+yir-syntax = { path = "../yir-syntax" }

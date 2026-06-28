@@ -67,4 +67,65 @@ mod cpu StdIoContracts {
     }
     return byte_count_or_zero(read_len) + requested_len;
   }
+
+  /// Combines two stdin read probes into a compact progress score.
+  pub fn stdin_status_total(
+    primary_requested_len: i64,
+    primary_read_len: i64,
+    secondary_requested_len: i64,
+    secondary_read_len: i64
+  ) -> i64 {
+    return read_progress_score(primary_requested_len, primary_read_len)
+      + read_progress_score(secondary_requested_len, secondary_read_len);
+  }
+
+  /// Returns true when a TTY probe value is non-negative.
+  pub fn tty_value_ok(value: i64) -> bool {
+    return value >= 0;
+  }
+
+  /// Returns the non-negative TTY probe value or zero on failure.
+  pub fn tty_value_or_zero(value: i64) -> i64 {
+    if tty_value_ok(value) {
+      return value;
+    }
+    return 0;
+  }
+
+  /// Produces a compact score for a single TTY probe.
+  pub fn tty_status_total(fd: i64, is_tty: i64, width: i64, height: i64) -> i64 {
+    return tty_value_or_zero(fd)
+      + tty_value_or_zero(is_tty)
+      + tty_value_or_zero(width)
+      + tty_value_or_zero(height);
+  }
+
+  /// Produces a compact score for line-input handle and length probes.
+  pub fn line_input_status_total(prompt_handle: i64, line_handle: i64, line_len: i64) -> i64 {
+    return byte_count_or_zero(prompt_handle)
+      + byte_count_or_zero(line_handle)
+      + byte_count_or_zero(line_len);
+  }
+
+  /// Combines console, stdin, and TTY probes for terminal-oriented IO recipes.
+  pub fn terminal_status_total(
+    stdout_written: i64,
+    stderr_written: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64,
+    requested_len: i64,
+    stdin_read_len: i64,
+    fd: i64,
+    is_tty: i64,
+    width: i64,
+    height: i64
+  ) -> i64 {
+    return console_status_total(
+      stdout_written,
+      stderr_written,
+      stdout_flushed,
+      stderr_flushed
+    ) + read_progress_score(requested_len, stdin_read_len)
+      + tty_status_total(fd, is_tty, width, height);
+  }
 }

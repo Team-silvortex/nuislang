@@ -1,0 +1,109 @@
+/// Filesystem status helpers exposed through the standard auto-injected contracts.
+mod cpu StdFsContracts {
+  /// Encodes a successful filesystem operation.
+  pub fn fs_ok() -> i64 {
+    return 0;
+  }
+
+  /// Encodes a failed filesystem operation.
+  pub fn fs_error() -> i64 {
+    return 1;
+  }
+
+  /// Returns true when a host filesystem handle or byte count is non-negative.
+  pub fn host_fs_value_ok(value: i64) -> bool {
+    return value >= 0;
+  }
+
+  /// Converts a host filesystem value into a process-style exit code.
+  pub fn host_fs_value_exit_code(value: i64) -> i64 {
+    if host_fs_value_ok(value) {
+      return fs_ok();
+    }
+    return fs_error();
+  }
+
+  /// Returns the non-negative filesystem value or zero when the host reported failure.
+  pub fn host_fs_value_or_zero(value: i64) -> i64 {
+    if host_fs_value_ok(value) {
+      return value;
+    }
+    return 0;
+  }
+
+  /// Returns true when a metadata probe says the path exists.
+  pub fn metadata_exists(exists: i64) -> bool {
+    return exists > 0;
+  }
+
+  /// Produces a compact score for exists/kind/size metadata probes.
+  pub fn metadata_status_total(exists: i64, kind: i64, size: i64) -> i64 {
+    return host_fs_value_or_zero(exists)
+      + host_fs_value_or_zero(kind)
+      + host_fs_value_or_zero(size);
+  }
+
+  /// Encodes whether a file read made valid progress for the requested length.
+  pub fn read_exit_code(requested_len: i64, read_len: i64) -> i64 {
+    if requested_len < 0 {
+      return fs_error();
+    }
+    return host_fs_value_exit_code(read_len);
+  }
+
+  /// Encodes whether a file write made valid progress for the requested length.
+  pub fn write_exit_code(requested_len: i64, written_len: i64) -> i64 {
+    if requested_len < 0 {
+      return fs_error();
+    }
+    return host_fs_value_exit_code(written_len);
+  }
+
+  /// Combines open/read/close outcomes into a compact file I/O score.
+  pub fn file_io_status_total(open_handle: i64, read_len: i64, close_status: i64) -> i64 {
+    return host_fs_value_or_zero(open_handle)
+      + host_fs_value_or_zero(read_len)
+      + host_fs_value_exit_code(close_status);
+  }
+
+  /// Combines open/write/close outcomes into a compact file output score.
+  pub fn file_write_status_total(open_handle: i64, written_len: i64, close_status: i64) -> i64 {
+    return host_fs_value_or_zero(open_handle)
+      + host_fs_value_or_zero(written_len)
+      + host_fs_value_exit_code(close_status);
+  }
+
+  /// Combines read/write/close outcomes for copy-style filesystem recipes.
+  pub fn file_copy_status_total(read_len: i64, written_len: i64, close_status: i64) -> i64 {
+    return host_fs_value_or_zero(read_len)
+      + host_fs_value_or_zero(written_len)
+      + host_fs_value_exit_code(close_status);
+  }
+
+  /// Combines directory open/count/close outcomes into a compact directory score.
+  pub fn directory_status_total(dir_handle: i64, entry_count: i64, close_status: i64) -> i64 {
+    return host_fs_value_or_zero(dir_handle)
+      + host_fs_value_or_zero(entry_count)
+      + host_fs_value_exit_code(close_status);
+  }
+
+  /// Combines create/remove host statuses into a compact mutation score.
+  pub fn directory_mutation_status_total(
+    create_status: i64,
+    exists_after_create: i64,
+    remove_status: i64,
+    exists_after_remove: i64
+  ) -> i64 {
+    return host_fs_value_exit_code(create_status)
+      + host_fs_value_or_zero(exists_after_create)
+      + host_fs_value_exit_code(remove_status)
+      + host_fs_value_or_zero(exists_after_remove);
+  }
+
+  /// Combines basic path probes into a compact path analysis score.
+  pub fn path_probe_status_total(is_empty: i64, has_parent: i64, has_extension: i64) -> i64 {
+    return host_fs_value_or_zero(is_empty)
+      + host_fs_value_or_zero(has_parent)
+      + host_fs_value_or_zero(has_extension);
+  }
+}

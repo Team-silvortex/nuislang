@@ -17,6 +17,7 @@ pub struct LinkPlan {
     pub bridge_registry_path: Option<String>,
     pub host_bridge_plan_index_path: Option<String>,
     pub domain_units: Vec<LinkPlanDomainUnit>,
+    pub artifact_lowering_alignment: ArtifactLoweringAlignmentSummary,
     pub final_stage: LinkPlanFinalStage,
 }
 
@@ -69,6 +70,23 @@ pub struct LinkPlanArtifact {
     pub lowering_domain_families: Vec<String>,
     pub lowering_targets: Vec<String>,
     pub lowering_units: Vec<crate::aot::NuisCompiledArtifactLoweringUnitInspect>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactLoweringAlignmentCheck {
+    pub index: usize,
+    pub package_id: String,
+    pub domain_family: String,
+    pub consistent: bool,
+    pub issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactLoweringAlignmentSummary {
+    pub checked: usize,
+    pub mismatches: usize,
+    pub consistent: bool,
+    pub checks: Vec<ArtifactLoweringAlignmentCheck>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,6 +169,47 @@ pub fn build_link_plan(
     let artifact_container =
         aot::inspect_nuis_compiled_artifact_container(Path::new(&report.artifact_path)).ok();
 
+    let compiled_artifact = LinkPlanArtifact {
+        path: report.artifact_path.clone(),
+        binary_name: artifact.binary_name.clone(),
+        binary_path: binary_path.clone(),
+        binary_bytes: artifact.binary_bytes,
+        build_manifest_bytes: artifact.build_manifest_bytes,
+        container_kind: artifact_container
+            .as_ref()
+            .map(|container| container.container_kind.clone()),
+        container_version: artifact_container
+            .as_ref()
+            .map(|container| container.binary_version),
+        section_count: artifact_container
+            .as_ref()
+            .map(|container| container.section_count),
+        section_names: artifact_container
+            .as_ref()
+            .map(|container| container.section_names.clone())
+            .unwrap_or_default(),
+        section_table_valid: artifact_container
+            .as_ref()
+            .map(|container| container.section_table_valid),
+        lowering_unit_count: artifact_container
+            .as_ref()
+            .map(|container| container.lowering_unit_count),
+        lowering_domain_families: artifact_container
+            .as_ref()
+            .map(|container| container.lowering_domain_families.clone())
+            .unwrap_or_default(),
+        lowering_targets: artifact_container
+            .as_ref()
+            .map(|container| container.lowering_targets.clone())
+            .unwrap_or_default(),
+        lowering_units: artifact_container
+            .as_ref()
+            .map(|container| container.lowering_units.clone())
+            .unwrap_or_default(),
+    };
+    let artifact_lowering_alignment =
+        build_artifact_lowering_alignment_summary(&compiled_artifact, &domain_units);
+
     LinkPlan {
         schema: LINK_PLAN_SCHEMA.to_owned(),
         input: report.input.clone(),
@@ -183,49 +242,130 @@ pub fn build_link_plan(
             graph_kind: artifact.envelope.graph_kind.clone(),
             default_time_mode: artifact.envelope.default_time_mode.clone(),
         },
-        compiled_artifact: LinkPlanArtifact {
-            path: report.artifact_path.clone(),
-            binary_name: artifact.binary_name.clone(),
-            binary_path: binary_path.clone(),
-            binary_bytes: artifact.binary_bytes,
-            build_manifest_bytes: artifact.build_manifest_bytes,
-            container_kind: artifact_container
-                .as_ref()
-                .map(|container| container.container_kind.clone()),
-            container_version: artifact_container
-                .as_ref()
-                .map(|container| container.binary_version),
-            section_count: artifact_container
-                .as_ref()
-                .map(|container| container.section_count),
-            section_names: artifact_container
-                .as_ref()
-                .map(|container| container.section_names.clone())
-                .unwrap_or_default(),
-            section_table_valid: artifact_container
-                .as_ref()
-                .map(|container| container.section_table_valid),
-            lowering_unit_count: artifact_container
-                .as_ref()
-                .map(|container| container.lowering_unit_count),
-            lowering_domain_families: artifact_container
-                .as_ref()
-                .map(|container| container.lowering_domain_families.clone())
-                .unwrap_or_default(),
-            lowering_targets: artifact_container
-                .as_ref()
-                .map(|container| container.lowering_targets.clone())
-                .unwrap_or_default(),
-            lowering_units: artifact_container
-                .as_ref()
-                .map(|container| container.lowering_units.clone())
-                .unwrap_or_default(),
-        },
+        compiled_artifact,
         bridge_registry_path: report.bridge_registry_path.clone(),
         host_bridge_plan_index_path: report.host_bridge_plan_index_path.clone(),
         domain_units,
+        artifact_lowering_alignment,
         final_stage: derive_final_stage(report, &binary_path),
     }
+}
+
+pub fn build_artifact_lowering_alignment_summary(
+    artifact: &LinkPlanArtifact,
+    domain_units: &[LinkPlanDomainUnit],
+) -> ArtifactLoweringAlignmentSummary {
+    let artifact_units = &artifact.lowering_units;
+    if artifact_units.is_empty() && artifact.section_count.unwrap_or(0) == 0 {
+        return ArtifactLoweringAlignmentSummary {
+            checked: 0,
+            mismatches: 0,
+            consistent: true,
+            checks: Vec::new(),
+        };
+    }
+    let checked = artifact_units.len();
+    let mut checks = artifact_units
+        .iter()
+        .enumerate()
+        .map(|(index, artifact_unit)| {
+            let mut issues = Vec::new();
+            let Some(domain_unit) = domain_units.get(index) else {
+                issues.push("missing_manifest_domain_unit".to_owned());
+                return ArtifactLoweringAlignmentCheck {
+                    index,
+                    package_id: artifact_unit.package_id.clone(),
+                    domain_family: artifact_unit.domain_family.clone(),
+                    consistent: false,
+                    issues,
+                };
+            };
+            push_alignment_issue(
+                &mut issues,
+                "package_id",
+                Some(artifact_unit.package_id.as_str()),
+                Some(domain_unit.package_id.as_str()),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "domain_family",
+                Some(artifact_unit.domain_family.as_str()),
+                Some(domain_unit.domain_family.as_str()),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "backend_family",
+                artifact_unit.backend_family.as_deref(),
+                domain_unit.backend_family.as_deref(),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "selected_lowering_target",
+                artifact_unit.selected_lowering_target.as_deref(),
+                domain_unit.selected_lowering_target.as_deref(),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "artifact_ir_sidecar_path",
+                artifact_unit.artifact_ir_sidecar_path.as_deref(),
+                domain_unit.artifact_ir_sidecar_path.as_deref(),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "contract_family",
+                Some(artifact_unit.contract_family.as_str()),
+                Some(domain_unit.contract_family.as_str()),
+            );
+            push_alignment_issue(
+                &mut issues,
+                "packaging_role",
+                Some(artifact_unit.packaging_role.as_str()),
+                Some(domain_unit.packaging_role.as_str()),
+            );
+            ArtifactLoweringAlignmentCheck {
+                index,
+                package_id: artifact_unit.package_id.clone(),
+                domain_family: artifact_unit.domain_family.clone(),
+                consistent: issues.is_empty(),
+                issues,
+            }
+        })
+        .collect::<Vec<_>>();
+    if artifact_units.len() < domain_units.len() {
+        for index in artifact_units.len()..domain_units.len() {
+            let domain_unit = &domain_units[index];
+            checks.push(ArtifactLoweringAlignmentCheck {
+                index,
+                package_id: domain_unit.package_id.clone(),
+                domain_family: domain_unit.domain_family.clone(),
+                consistent: false,
+                issues: vec!["missing_artifact_lowering_unit".to_owned()],
+            });
+        }
+    }
+    let mismatches = checks.iter().filter(|check| !check.consistent).count();
+    ArtifactLoweringAlignmentSummary {
+        checked,
+        mismatches,
+        consistent: mismatches == 0,
+        checks,
+    }
+}
+
+fn push_alignment_issue(
+    issues: &mut Vec<String>,
+    field: &str,
+    artifact_value: Option<&str>,
+    domain_value: Option<&str>,
+) {
+    if artifact_value == domain_value {
+        return;
+    }
+    issues.push(format!(
+        "{field}:artifact={}:manifest={}",
+        artifact_value.unwrap_or("<none>"),
+        domain_value.unwrap_or("<none>")
+    ));
 }
 
 pub fn build_link_plan_from_manifest(path: &Path) -> Result<LinkPlan, String> {
@@ -295,6 +435,12 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
                 .unwrap_or_else(|| "unknown".to_owned())
         ));
     }
+    lines.push(format!(
+        "artifact_lowering_alignment: checked={} mismatches={} consistent={}",
+        plan.artifact_lowering_alignment.checked,
+        plan.artifact_lowering_alignment.mismatches,
+        plan.artifact_lowering_alignment.consistent
+    ));
     for unit in &plan.domain_units {
         lines.push(format!(
             "domain_unit: kind={} domain={} package={} lowering={} backend={} role={}",
@@ -526,6 +672,8 @@ mod tests {
         assert_eq!(plan.compiled_artifact.binary_path, "out/demo");
         assert_eq!(plan.domain_units.len(), 1);
         assert_eq!(plan.domain_units[0].kind, "host");
+        assert_eq!(plan.artifact_lowering_alignment.checked, 0);
+        assert!(plan.artifact_lowering_alignment.consistent);
     }
 
     #[test]
@@ -593,5 +741,7 @@ mod tests {
             plan.domain_units[1].artifact_payload_blob_path.as_deref(),
             Some("out/shader.ndpb")
         );
+        assert_eq!(plan.artifact_lowering_alignment.checked, 0);
+        assert!(plan.artifact_lowering_alignment.consistent);
     }
 }

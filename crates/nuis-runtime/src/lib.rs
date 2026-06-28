@@ -7,6 +7,7 @@
 pub mod bridge;
 pub mod error;
 pub mod executor;
+pub mod host_yir;
 pub mod loader;
 pub mod registry;
 pub mod session;
@@ -18,9 +19,12 @@ pub use executor::{
     ExecutionPhaseOutcome, ExecutionPlan, ExecutionProfile, ExecutionResourceBinding,
     ExecutionResourceKind, ExecutionStateSnapshot, ExecutionTrace, ExecutionTraceEvent, Executor,
 };
+pub use host_yir::{
+    execute_host_yir_module, execute_host_yir_source, HostYirExecutionSummary, HostYirValueSummary,
+};
 pub use loader::RuntimeLoader;
 pub use registry::{AdapterRegistry, DomainAdapter};
-pub use session::LoadedExecutable;
+pub use session::{HostConsumableDomainUnit, HostConsumableSummary, LoadedExecutable};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeRole {

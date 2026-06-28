@@ -146,23 +146,6 @@ struct DomainBuildVerificationSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ArtifactLoweringAlignmentCheck {
-    index: usize,
-    package_id: String,
-    domain_family: String,
-    consistent: bool,
-    issues: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ArtifactLoweringAlignmentSummary {
-    checked: usize,
-    mismatches: usize,
-    consistent: bool,
-    checks: Vec<ArtifactLoweringAlignmentCheck>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 struct ExecutionInspectDomainOverview {
     domain_family: String,
     selected_lowering_target: Option<String>,
@@ -732,124 +715,9 @@ fn domain_build_verification_summary_json(summary: &DomainBuildVerificationSumma
     format!("{{{}}}", fields.join(","))
 }
 
-fn artifact_lowering_alignment_summary(
-    plan: &linker::LinkPlan,
-) -> ArtifactLoweringAlignmentSummary {
-    let artifact_units = &plan.compiled_artifact.lowering_units;
-    let manifest_units = &plan.domain_units;
-    if artifact_units.is_empty() && plan.compiled_artifact.section_count.unwrap_or(0) == 0 {
-        return ArtifactLoweringAlignmentSummary {
-            checked: 0,
-            mismatches: 0,
-            consistent: true,
-            checks: Vec::new(),
-        };
-    }
-    let checked = artifact_units.len();
-    let mut checks = artifact_units
-        .iter()
-        .enumerate()
-        .map(|(index, artifact_unit)| {
-            let mut issues = Vec::new();
-            let Some(manifest_unit) = manifest_units.get(index) else {
-                issues.push("missing_manifest_domain_unit".to_owned());
-                return ArtifactLoweringAlignmentCheck {
-                    index,
-                    package_id: artifact_unit.package_id.clone(),
-                    domain_family: artifact_unit.domain_family.clone(),
-                    consistent: false,
-                    issues,
-                };
-            };
-            push_alignment_issue(
-                &mut issues,
-                "package_id",
-                Some(artifact_unit.package_id.as_str()),
-                Some(manifest_unit.package_id.as_str()),
-            );
-            push_alignment_issue(
-                &mut issues,
-                "domain_family",
-                Some(artifact_unit.domain_family.as_str()),
-                Some(manifest_unit.domain_family.as_str()),
-            );
-            push_alignment_issue(
-                &mut issues,
-                "backend_family",
-                artifact_unit.backend_family.as_deref(),
-                manifest_unit.backend_family.as_deref(),
-            );
-            push_alignment_issue(
-                &mut issues,
-                "selected_lowering_target",
-                artifact_unit.selected_lowering_target.as_deref(),
-                manifest_unit.selected_lowering_target.as_deref(),
-            );
-            push_alignment_issue(
-                &mut issues,
-                "artifact_ir_sidecar_path",
-                artifact_unit.artifact_ir_sidecar_path.as_deref(),
-                manifest_unit.artifact_ir_sidecar_path.as_deref(),
-            );
-            push_alignment_issue(
-                &mut issues,
-                "contract_family",
-                Some(artifact_unit.contract_family.as_str()),
-                Some(manifest_unit.contract_family.as_str()),
-            );
-            push_alignment_issue(
-                &mut issues,
-                "packaging_role",
-                Some(artifact_unit.packaging_role.as_str()),
-                Some(manifest_unit.packaging_role.as_str()),
-            );
-            ArtifactLoweringAlignmentCheck {
-                index,
-                package_id: artifact_unit.package_id.clone(),
-                domain_family: artifact_unit.domain_family.clone(),
-                consistent: issues.is_empty(),
-                issues,
-            }
-        })
-        .collect::<Vec<_>>();
-    if artifact_units.len() < manifest_units.len() {
-        for index in artifact_units.len()..manifest_units.len() {
-            let manifest_unit = &manifest_units[index];
-            checks.push(ArtifactLoweringAlignmentCheck {
-                index,
-                package_id: manifest_unit.package_id.clone(),
-                domain_family: manifest_unit.domain_family.clone(),
-                consistent: false,
-                issues: vec!["missing_artifact_lowering_unit".to_owned()],
-            });
-        }
-    }
-    let mismatches = checks.iter().filter(|check| !check.consistent).count();
-    ArtifactLoweringAlignmentSummary {
-        checked,
-        mismatches,
-        consistent: mismatches == 0,
-        checks,
-    }
-}
-
-fn push_alignment_issue(
-    issues: &mut Vec<String>,
-    field: &str,
-    artifact_value: Option<&str>,
-    manifest_value: Option<&str>,
-) {
-    if artifact_value == manifest_value {
-        return;
-    }
-    issues.push(format!(
-        "{field}:artifact={}:manifest={}",
-        artifact_value.unwrap_or("<none>"),
-        manifest_value.unwrap_or("<none>")
-    ));
-}
-
-fn artifact_lowering_alignment_check_json(check: &ArtifactLoweringAlignmentCheck) -> String {
+fn artifact_lowering_alignment_check_json(
+    check: &linker::ArtifactLoweringAlignmentCheck,
+) -> String {
     let fields = vec![
         json_usize_field("index", check.index),
         json_string_field("package_id", &check.package_id),
@@ -860,7 +728,9 @@ fn artifact_lowering_alignment_check_json(check: &ArtifactLoweringAlignmentCheck
     format!("{{{}}}", fields.join(","))
 }
 
-fn artifact_lowering_alignment_summary_json(summary: &ArtifactLoweringAlignmentSummary) -> String {
+fn artifact_lowering_alignment_summary_json(
+    summary: &linker::ArtifactLoweringAlignmentSummary,
+) -> String {
     let checks = summary
         .checks
         .iter()
@@ -912,7 +782,6 @@ fn link_plan_json(plan: &linker::LinkPlan) -> String {
         .map(link_plan_domain_unit_json)
         .collect::<Vec<_>>()
         .join(",");
-    let lowering_alignment = artifact_lowering_alignment_summary(plan);
     let mut fields = vec![
         json_string_field("schema", &plan.schema),
         json_string_field("packaging_mode", &plan.packaging_mode),
@@ -954,7 +823,7 @@ fn link_plan_json(plan: &linker::LinkPlan) -> String {
         artifact_lowering_units_json(&plan.compiled_artifact.lowering_units),
         format!(
             "\"artifact_lowering_alignment\":{}",
-            artifact_lowering_alignment_summary_json(&lowering_alignment)
+            artifact_lowering_alignment_summary_json(&plan.artifact_lowering_alignment)
         ),
         json_usize_field("domain_unit_count", plan.domain_units.len()),
         format!("\"domain_units\":[{}]", domain_units),
@@ -6627,6 +6496,12 @@ mod cpu Main {
                 artifact_payload_format: None,
                 artifact_payload_blob_inline: None,
             }],
+            artifact_lowering_alignment: linker::ArtifactLoweringAlignmentSummary {
+                checked: 0,
+                mismatches: 0,
+                consistent: true,
+                checks: Vec::new(),
+            },
             final_stage: linker::LinkPlanFinalStage {
                 kind: "host-native-link".to_owned(),
                 driver: "clang".to_owned(),
@@ -6722,6 +6597,11 @@ mod cpu Main {
                 contract_family: "nustar.cpu".to_owned(),
                 packaging_role: "host-binary".to_owned(),
             }];
+        v2_link_plan.artifact_lowering_alignment =
+            linker::build_artifact_lowering_alignment_summary(
+                &v2_link_plan.compiled_artifact,
+                &v2_link_plan.domain_units,
+            );
         let v2_link_plan_json = link_plan_json(&v2_link_plan);
         assert!(v2_link_plan_json.contains("\"artifact_lowering_alignment\":{"));
         assert!(v2_link_plan_json.contains("\"checked\":1"));

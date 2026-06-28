@@ -25,6 +25,9 @@ name = "nuis-runtime"
 version = "0.1.0"
 dependencies = [
  "nuis-artifact",
+ "yir-core",
+ "yir-exec",
+ "yir-syntax",
 ]
 
 [[package]]

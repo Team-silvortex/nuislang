@@ -150,9 +150,10 @@ Current tool visibility:
 * generated link-plan JSON includes artifact container kind/version, section
   metadata, lowering summaries, and structured lowering units when the artifact
   file is available
-* generated link-plan JSON also reports `artifact_lowering_alignment`, which
-  compares structured artifact lowering units against manifest domain units by
-  package/domain/backend/target/sidecar/contract/packaging role
+* generated link plans carry `artifact_lowering_alignment` as a structured
+  linker field, and JSON renders it by comparing artifact lowering units against
+  manifest domain units by package/domain/backend/target/sidecar/contract/
+  packaging role
 * `nuis artifact-doctor --json` passes through the same artifact container and
   lowering visibility so the top-level workflow can diagnose artifact/linker
   drift without reopening lower-level tools manually

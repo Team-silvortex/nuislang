@@ -109,6 +109,10 @@ First auto-injectable library module:
 * [lib/io_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/io_contracts.ns)
   exposes the initial `StdIoContracts` helper surface for normalizing host I/O
   byte counts, flush statuses, and process-style exit codes
+* [lib/fs_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/fs_contracts.ns)
+  exposes the initial `StdFsContracts` helper surface for normalizing
+  filesystem metadata, file read/write/copy status, directory mutation, and
+  path probe summaries
 
 Intended scope:
 
