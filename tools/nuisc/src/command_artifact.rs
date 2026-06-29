@@ -1,45 +1,17 @@
-use std::path::PathBuf;
+#[path = "command_artifact_envelope.rs"]
+mod command_artifact_envelope;
+#[path = "command_artifact_inspect.rs"]
+mod command_artifact_inspect;
+#[path = "command_artifact_report_cmd.rs"]
+mod command_artifact_report_cmd;
+#[path = "command_artifact_verify.rs"]
+mod command_artifact_verify;
 
-use crate::aot;
-use crate::command_helpers::load_nuis_executable_envelope;
-
-pub(crate) fn run_pack_envelope(input: PathBuf, output: PathBuf) -> Result<(), String> {
-    let envelope = load_nuis_executable_envelope(&input)?;
-    let encoded = aot::encode_nuis_executable_envelope_binary(&envelope)?;
-    std::fs::write(&output, encoded)
-        .map_err(|error| format!("failed to write `{}`: {error}", output.display()))?;
-    println!("packed nuis envelope: {}", output.display());
-    println!("  source: {}", input.display());
-    println!("  schema: {}", envelope.schema);
-    println!("  executable_kind: {}", envelope.executable_kind);
-    println!("  package_count: {}", envelope.package_count);
-    Ok(())
-}
-
-pub(crate) fn run_unpack_envelope(input: PathBuf, output: PathBuf) -> Result<(), String> {
-    let envelope = load_nuis_executable_envelope(&input)?;
-    aot::write_nuis_executable_envelope(&output, &envelope)?;
-    println!("unpacked nuis envelope: {}", output.display());
-    println!("  source: {}", input.display());
-    println!("  schema: {}", envelope.schema);
-    println!("  executable_kind: {}", envelope.executable_kind);
-    println!("  package_count: {}", envelope.package_count);
-    Ok(())
-}
-
-pub(crate) fn run_inspect_envelope(input: PathBuf) -> Result<(), String> {
-    let envelope = load_nuis_executable_envelope(&input)?;
-    println!("nuis envelope: {}", input.display());
-    println!("  schema: {}", envelope.schema);
-    println!("  executable_kind: {}", envelope.executable_kind);
-    println!("  package_count: {}", envelope.package_count);
-    println!("  domain_families: {}", envelope.domain_families.join(", "));
-    println!(
-        "  contract_families: {}",
-        envelope.contract_families.join(", ")
-    );
-    println!("  function_kind: {}", envelope.function_kind);
-    println!("  graph_kind: {}", envelope.graph_kind);
-    println!("  default_time_mode: {}", envelope.default_time_mode);
-    Ok(())
-}
+pub(crate) use command_artifact_envelope::{
+    run_inspect_envelope, run_pack_envelope, run_unpack_envelope,
+};
+pub(crate) use command_artifact_inspect::run_inspect_artifact;
+pub(crate) use command_artifact_report_cmd::run_artifact_report;
+pub(crate) use command_artifact_verify::{
+    run_unpack_artifact, run_verify_artifact, run_verify_build_manifest,
+};
