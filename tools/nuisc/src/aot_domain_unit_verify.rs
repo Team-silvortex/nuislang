@@ -5,8 +5,8 @@ use nuis_artifact::{
     BuildManifestDomainBuildUnit,
 };
 
-use crate::aot::validate_manifest_path_in_output_dir;
 use crate::aot_manifest_core_verify::ManifestCoreVerification;
+use crate::aot_manifest_path::validate_manifest_path_in_output_dir;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DomainBuildUnitVerification {

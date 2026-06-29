@@ -29,6 +29,17 @@ pub(crate) fn render_domain_build_unit_manifest_block(
     out
 }
 
+pub(crate) fn append_domain_build_unit_manifest_sections(
+    out: &mut String,
+    units: &[BuildManifestDomainBuildUnit],
+) {
+    for unit in units {
+        out.push('\n');
+        out.push_str(render_domain_build_unit_manifest_block(unit).trim_end());
+        out.push('\n');
+    }
+}
+
 pub(crate) fn render_domain_build_unit_stub(unit: &BuildManifestDomainBuildUnit) -> String {
     let mut out = String::new();
     out.push_str("schema = \"nuis-domain-build-unit-v1\"\n");

@@ -2,12 +2,12 @@ use std::{fs, path::Path};
 
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
-use crate::aot::validate_manifest_path_in_output_dir;
 use crate::aot_artifact::{
     parse_nuis_compiled_artifact, parse_nuis_executable_envelope, validate_artifact_binary_name,
 };
 use crate::aot_artifact_hash::{artifact_hash_fallback_bytes, parse_artifact_hash_blocks};
 use crate::aot_encoding::fnv1a64_hex;
+use crate::aot_manifest_path::validate_manifest_path_in_output_dir;
 use crate::aot_toml::{
     parse_required_toml_string, parse_required_toml_string_array, parse_required_toml_usize,
 };

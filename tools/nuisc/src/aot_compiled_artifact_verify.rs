@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::aot::{
-    render_relocated_unpacked_build_manifest, verify_build_manifest, write_nuis_compiled_artifact,
+    render_relocated_unpacked_build_manifest, write_nuis_compiled_artifact,
     write_nuis_executable_envelope,
 };
 use crate::aot_artifact::{
@@ -13,6 +13,7 @@ use crate::aot_artifact::{
     validate_nuis_compiled_artifact_layout,
 };
 use crate::aot_lifecycle::build_nuis_lifecycle_contract;
+use crate::aot_manifest_verify::verify_build_manifest;
 use crate::aot_verify_report::NuisCompiledArtifactVerifyReport;
 
 pub(crate) fn verify_nuis_compiled_artifact_impl(
@@ -124,4 +125,10 @@ pub(crate) fn verify_nuis_compiled_artifact_impl(
         cpu_target_calling_abi: artifact.cpu_target_calling_abi,
         artifact_roundtrip_verified: true,
     })
+}
+
+pub fn verify_nuis_compiled_artifact(
+    path: &Path,
+) -> Result<NuisCompiledArtifactVerifyReport, String> {
+    verify_nuis_compiled_artifact_impl(path)
 }

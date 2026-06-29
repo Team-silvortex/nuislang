@@ -115,6 +115,12 @@ pub fn validate_manifest_for_packaging(manifest: &NustarPackageManifest) -> Resu
             manifest.package_id
         ));
     }
+    let capability_abi_set = manifest
+        .abi_profiles
+        .iter()
+        .chain(manifest.host_ffi_abis.iter())
+        .map(|value| value.trim().to_owned())
+        .collect::<BTreeSet<_>>();
 
     for profile in &manifest.abi_profiles {
         crate::registry::validate_manifest_abi(manifest, profile)?;
@@ -133,9 +139,9 @@ pub fn validate_manifest_for_packaging(manifest: &NustarPackageManifest) -> Resu
             ));
         };
         let abi = abi.trim();
-        if !profile_set.contains(abi) {
+        if !capability_abi_set.contains(abi) {
             return Err(format!(
-                "nustar package `{}` has abi_capabilities entry `{}` referencing undeclared ABI profile `{}`",
+                "nustar package `{}` has abi_capabilities entry `{}` referencing undeclared ABI or host FFI ABI `{}`",
                 manifest.package_id, raw, abi
             ));
         }

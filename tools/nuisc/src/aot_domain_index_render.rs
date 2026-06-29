@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
@@ -166,6 +169,124 @@ pub(crate) fn append_relocated_domain_lowering_plan_index_manifest_section(
         escape_toml_string(&source)
     ));
     out.push('\n');
+}
+
+pub(crate) fn append_build_manifest_domain_index_sections(
+    out: &mut String,
+    bridge_registry_path: Option<&Path>,
+    bridge_registry_inline: Option<&str>,
+    host_bridge_plan_index_path: Option<&Path>,
+    host_bridge_plan_index_inline: Option<&str>,
+    lowering_plan_index_path: Option<&Path>,
+    lowering_plan_index_inline: Option<&str>,
+    units: &[BuildManifestDomainBuildUnit],
+) {
+    let hetero_unit_count = units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .count();
+    if let Some(bridge_registry_path) = bridge_registry_path {
+        out.push('\n');
+        out.push_str("[bridge_registry]\n");
+        out.push_str(&format!(
+            "bridge_registry_path = \"{}\"\n",
+            escape_toml_string(&bridge_registry_path.display().to_string())
+        ));
+        out.push_str("bridge_registry_schema = \"nuis-bridge-registry-v1\"\n");
+        out.push_str(&format!("bridge_registry_units = {hetero_unit_count}\n"));
+        if let Some(source) = bridge_registry_inline {
+            out.push_str(&format!(
+                "bridge_registry_inline = \"{}\"\n",
+                escape_toml_string(source)
+            ));
+        }
+    }
+    if let Some(host_bridge_plan_index_path) = host_bridge_plan_index_path {
+        out.push('\n');
+        out.push_str("[host_bridge_plan_index]\n");
+        out.push_str(&format!(
+            "host_bridge_plan_index_path = \"{}\"\n",
+            escape_toml_string(&host_bridge_plan_index_path.display().to_string())
+        ));
+        out.push_str("host_bridge_plan_index_schema = \"nuis-host-bridge-plan-index-v1\"\n");
+        out.push_str(&format!("host_bridge_plan_units = {hetero_unit_count}\n"));
+        if let Some(source) = host_bridge_plan_index_inline {
+            out.push_str(&format!(
+                "host_bridge_plan_index_inline = \"{}\"\n",
+                escape_toml_string(source)
+            ));
+        }
+    }
+    if let Some(lowering_plan_index_path) = lowering_plan_index_path {
+        out.push('\n');
+        out.push_str("[domain_lowering_plan_index]\n");
+        out.push_str(&format!(
+            "lowering_plan_index_path = \"{}\"\n",
+            escape_toml_string(&lowering_plan_index_path.display().to_string())
+        ));
+        out.push_str("lowering_plan_index_schema = \"nuis-domain-lowering-plan-index-v1\"\n");
+        out.push_str(&format!("lowering_plan_units = {hetero_unit_count}\n"));
+        if let Some(source) = lowering_plan_index_inline {
+            out.push_str(&format!(
+                "lowering_plan_index_inline = \"{}\"\n",
+                escape_toml_string(source)
+            ));
+        }
+    }
+}
+
+pub(crate) fn write_domain_bridge_registry(
+    output_dir: &Path,
+    units: &[BuildManifestDomainBuildUnit],
+) -> Result<Option<PathBuf>, String> {
+    let hetero_units = units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .collect::<Vec<_>>();
+    if hetero_units.is_empty() {
+        return Ok(None);
+    }
+    let path = output_dir.join("nuis.bridge.registry.toml");
+    let source = render_domain_bridge_registry(&hetero_units);
+    fs::write(&path, source)
+        .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
+    Ok(Some(path))
+}
+
+pub(crate) fn write_domain_lowering_plan_index(
+    output_dir: &Path,
+    units: &[BuildManifestDomainBuildUnit],
+) -> Result<Option<PathBuf>, String> {
+    let hetero_units = units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .collect::<Vec<_>>();
+    if hetero_units.is_empty() {
+        return Ok(None);
+    }
+    let path = output_dir.join("nuis.lowering.plan-index.toml");
+    let source = render_domain_lowering_plan_index(&hetero_units);
+    fs::write(&path, source)
+        .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
+    Ok(Some(path))
+}
+
+pub(crate) fn write_host_bridge_plan_index(
+    output_dir: &Path,
+    units: &[BuildManifestDomainBuildUnit],
+) -> Result<Option<PathBuf>, String> {
+    let hetero_units = units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .collect::<Vec<_>>();
+    if hetero_units.is_empty() {
+        return Ok(None);
+    }
+    let path = output_dir.join("nuis.host-bridge.plan-index.toml");
+    let source = render_host_bridge_plan_index(&hetero_units);
+    fs::write(&path, source)
+        .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
+    Ok(Some(path))
 }
 
 pub(crate) fn render_domain_lowering_plan_index(units: &[&BuildManifestDomainBuildUnit]) -> String {

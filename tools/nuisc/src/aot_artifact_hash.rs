@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
@@ -6,8 +6,8 @@ use crate::aot_domain_render::render_domain_build_unit_host_bridge_stub;
 use crate::aot_domain_unit_render::{
     render_domain_build_unit_payload, render_domain_build_unit_stub,
 };
-use crate::aot_encoding::hex_decode_bytes;
-use crate::aot_toml::{parse_required_map_string, parse_required_map_usize};
+use crate::aot_encoding::{fnv1a64_hex, hex_decode_bytes};
+use crate::aot_toml::{escape_toml_string, parse_required_map_string, parse_required_map_usize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ArtifactHashRow {
@@ -55,6 +55,44 @@ pub(crate) fn parse_artifact_hash_blocks(
         rows.push(parse_artifact_hash_row(&current, path)?);
     }
     Ok(rows)
+}
+
+pub(crate) fn append_artifacts_manifest_section(
+    out: &mut String,
+    artifacts: &[(String, std::path::PathBuf)],
+) {
+    out.push('\n');
+    out.push_str("[artifacts]\n");
+    for (kind, artifact_path) in artifacts {
+        out.push_str(&format!(
+            "{kind} = \"{}\"\n",
+            escape_toml_string(&artifact_path.display().to_string())
+        ));
+    }
+}
+
+pub(crate) fn append_artifact_hash_manifest_sections(
+    out: &mut String,
+    artifacts: &[(String, std::path::PathBuf)],
+) -> Result<(), String> {
+    for (kind, artifact_path) in artifacts {
+        let bytes = fs::read(artifact_path).map_err(|error| {
+            format!(
+                "failed to read artifact `{}`: {error}",
+                artifact_path.display()
+            )
+        })?;
+        out.push('\n');
+        out.push_str("[[artifact_hash]]\n");
+        out.push_str(&format!("kind = \"{}\"\n", escape_toml_string(kind)));
+        out.push_str(&format!(
+            "path = \"{}\"\n",
+            escape_toml_string(&artifact_path.display().to_string())
+        ));
+        out.push_str(&format!("bytes = {}\n", bytes.len()));
+        out.push_str(&format!("fnv1a64 = \"{}\"\n", fnv1a64_hex(&bytes)));
+    }
+    Ok(())
 }
 
 pub(crate) fn artifact_hash_fallback_bytes(
