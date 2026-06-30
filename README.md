@@ -33,6 +33,8 @@ Current versioning entrypoints:
   [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 * current `alpha-0.4.*` documentation sync inventory:
   [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
+* long-range heterogeneous OS roadmap:
+  [docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md)
 * predecessor `alpha-0.1.*` status anchor:
   [docs/versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
 * predecessor alpha closeout board:

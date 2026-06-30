@@ -25,6 +25,7 @@ If you want to understand the repository as it exists today, start here:
 * [versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 * [versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
+* [versioning/nuis-long-range-heterogeneous-os-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md)
 * [reference/nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)
 * [reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
 * [versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
@@ -43,6 +44,9 @@ If your immediate question is “what is the current minor-line history anchor?�
 start with the `alpha-0.4.*` inventory and hardening plan, then use
 `alpha-0.1.*`, `0.20.*`, and `0.19.*` only when you intentionally need the
 predecessor line.
+
+If your immediate question is “what long-range hardware/OS shape should current
+architecture avoid foreclosing?”, read the long-range heterogeneous OS roadmap.
 
 If your immediate question is “which ABI words are now preferred before
 current alpha work broadens the surface further?”, read the `0.20.0` ABI
