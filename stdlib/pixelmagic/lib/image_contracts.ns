@@ -289,6 +289,59 @@ mod cpu PixelMagicContracts {
     );
   }
 
+  /// Produces the aggregate score for a CPU-visible render plan.
+  pub fn render_plan_total(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    first_op_kind: i64,
+    second_op_kind: i64,
+    first_amount: i64,
+    second_amount: i64,
+    sample_kind: i64,
+    channel_pick: i64,
+    sample_count: i64,
+    edge_policy: i64,
+    uv_mode: i64,
+    output_kind: i64
+  ) -> i64 {
+    let filter_total: i64 = filter_chain_total(
+      source_handle,
+      width,
+      height,
+      first_op_kind,
+      second_op_kind,
+      first_amount,
+      second_amount
+    );
+    let analysis_total: i64 =
+      analysis_quality_total(source_handle, width, height, sample_count, edge_policy + 1, channel_pick);
+    let texture_total: i64 = texture_handoff_total(
+      source_handle,
+      width,
+      height,
+      sample_kind,
+      1,
+      sample_count,
+      edge_policy,
+      sample_kind,
+      channel_pick
+    );
+    let shader_total: i64 = shader_pipeline_total(
+      source_handle,
+      width,
+      height,
+      sample_kind,
+      channel_pick,
+      sample_count,
+      edge_policy,
+      uv_mode,
+      output_kind
+    );
+    let frame_budget: i64 = width + height + sample_count + output_kind;
+    return filter_total + analysis_total + texture_total + shader_total + frame_budget;
+  }
+
   /// Summarizes the shader profile contract metadata exposed by PixelMagic.
   pub fn surface_contract_profile_total() -> i64 {
     let target: Target = shader_profile_target("PixelMagicSurfaceContracts");

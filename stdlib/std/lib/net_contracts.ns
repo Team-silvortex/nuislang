@@ -1,0 +1,117 @@
+/// Network status and session helpers exposed through the standard auto-injected contracts.
+mod cpu StdNetContracts {
+  /// Encodes a ready network observer state.
+  pub fn ready_code(ready: bool) -> i64 {
+    if ready {
+      return 1;
+    }
+    return 0;
+  }
+
+  /// Encodes a successful network contract operation.
+  pub fn net_ok() -> i64 {
+    return 0;
+  }
+
+  /// Encodes a failed network contract operation.
+  pub fn net_error() -> i64 {
+    return 1;
+  }
+
+  /// Converts a ready flag into a process-style status code.
+  pub fn ready_exit_code(ready: bool) -> i64 {
+    if ready {
+      return net_ok();
+    }
+    return net_error();
+  }
+
+  /// Produces a compact score for network profile windows.
+  pub fn window_total(stream_window: i64, recv_window: i64, send_window: i64) -> i64 {
+    return stream_window + recv_window + send_window;
+  }
+
+  /// Produces a compact score for local/remote endpoint pairing.
+  pub fn endpoint_total(local_port: i64, remote_port: i64, transport_family: i64) -> i64 {
+    return local_port + remote_port + transport_family;
+  }
+
+  /// Produces a compact score for protocol header metadata.
+  pub fn protocol_total(
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64
+  ) -> i64 {
+    return protocol_kind + protocol_version + protocol_header_bytes;
+  }
+
+  /// Estimates request bytes for the current HTTP-ish client recipes.
+  pub fn http_request_bytes(
+    protocol_header_bytes: i64,
+    protocol_version: i64,
+    send_window: i64
+  ) -> i64 {
+    return protocol_header_bytes + protocol_version + 16 + protocol_header_bytes + send_window;
+  }
+
+  /// Estimates response bytes for the current HTTP-ish client recipes.
+  pub fn http_response_bytes(protocol_header_bytes: i64, recv_window: i64) -> i64 {
+    return protocol_header_bytes + 12 + protocol_header_bytes + recv_window;
+  }
+
+  /// Produces a compact score for a network result triple.
+  pub fn result_ready_total(
+    config_ready: bool,
+    send_ready: bool,
+    recv_ready: bool,
+    value: i64
+  ) -> i64 {
+    return ready_code(config_ready) + ready_code(send_ready) + ready_code(recv_ready) + value;
+  }
+
+  /// Produces a compact score for owned transport handle lifecycle.
+  pub fn owned_transport_total(
+    open_handle: i64,
+    send_value: i64,
+    recv_value: i64,
+    close_value: i64
+  ) -> i64 {
+    return open_handle + send_value + recv_value + close_value;
+  }
+
+  /// Produces a compact score for retry and timeout policy.
+  pub fn policy_total(timeout_budget: i64, retry_budget: i64, connect_timeout_ms: i64) -> i64 {
+    return timeout_budget + retry_budget + connect_timeout_ms;
+  }
+
+  /// Produces a compact score for a full client-side network session.
+  pub fn client_session_total(
+    argv_count: i64,
+    transport_total: i64,
+    policy_total: i64,
+    protocol_total: i64,
+    request_bytes: i64,
+    response_bytes: i64,
+    lifecycle_total: i64,
+    status_code: i64
+  ) -> i64 {
+    return argv_count +
+      transport_total +
+      policy_total +
+      protocol_total +
+      request_bytes +
+      response_bytes +
+      lifecycle_total +
+      status_code;
+  }
+
+  /// Produces a compact score for task/windowed network bridge summaries.
+  pub fn task_bridge_total(
+    session_total: i64,
+    batch_count: i64,
+    window_count: i64,
+    bridge_visible: bool
+  ) -> i64 {
+    return session_total + batch_count + window_count + ready_code(bridge_visible);
+  }
+}

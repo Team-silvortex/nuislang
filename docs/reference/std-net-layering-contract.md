@@ -51,6 +51,9 @@ The practical current rule is:
 * `std net` is the first thin readable facade over that truth
 * the recipe surfaces are intentionally narrow and do not yet claim a finished
   socket API
+* shared reusable status/window/session helper functions should live in
+  [StdNetContracts](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/net_contracts.ns)
+  rather than being redefined in every recipe
 * repository-stage validation still runs through companion project demos rather
   than a frozen standalone stdlib test harness
 

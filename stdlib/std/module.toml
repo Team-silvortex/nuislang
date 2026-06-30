@@ -9,13 +9,21 @@ surfaces = [
   "surface.std.collections.v1",
   "surface.std.host-ffi-helpers.v1",
   "surface.std.data-plane-helpers.v1",
-  "surface.std.project-utility.v1"
+  "surface.std.project-utility.v1",
+  "surface.std.cli-workflow-contracts.v1",
+  "surface.std.net-session-contracts.v1",
+  "surface.std.text-json-contracts.v1",
+  "surface.std.time-benchmark-contracts.v1"
 ]
 
 library_modules = [
   "lib/task_contracts.ns",
   "lib/io_contracts.ns",
-  "lib/fs_contracts.ns"
+  "lib/fs_contracts.ns",
+  "lib/cli_contracts.ns",
+  "lib/net_contracts.ns",
+  "lib/text_contracts.ns",
+  "lib/time_contracts.ns"
 ]
 
 library_import_policy = "project-auto"

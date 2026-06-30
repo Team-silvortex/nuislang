@@ -49,9 +49,13 @@ pub use rendering_abi::{
     render_project_abi_selection_lines, render_project_abi_selection_view_lines,
     write_project_abi_selection_lines, write_project_abi_selection_view_lines,
 };
+#[cfg(test)]
+pub(super) use rendering_abi_index::render_project_abi_index;
+pub(super) use rendering_abi_index::write_project_abi_index;
 pub use rendering_abi_index::{describe_project_abi_graph, render_project_abi_graph_line};
-pub(super) use rendering_abi_index::{render_project_abi_index, write_project_abi_index};
-pub(super) use rendering_host_ffi::{render_project_host_ffi_index, write_project_host_ffi_index};
+#[cfg(test)]
+pub(super) use rendering_host_ffi::render_project_host_ffi_index;
+pub(super) use rendering_host_ffi::write_project_host_ffi_index;
 pub use rendering_imports::{
     project_imports_summary, render_project_import_index, write_project_import_index,
 };
@@ -61,9 +65,12 @@ pub use rendering_lowering::{
     write_project_lowering_selection_lines,
 };
 pub use rendering_organization::{organize_project, organize_project_exchanges};
+#[cfg(test)]
 pub(super) use rendering_organization::{
-    render_project_exchange_index, render_project_organization_index, write_project_exchange_index,
-    write_project_organization_index,
+    render_project_exchange_index, render_project_organization_index,
+};
+pub(super) use rendering_organization::{
+    write_project_exchange_index, write_project_organization_index,
 };
 
 fn write_joined<W, T, F>(out: &mut W, items: &[T], sep: &str, mut write_item: F) -> fmt::Result

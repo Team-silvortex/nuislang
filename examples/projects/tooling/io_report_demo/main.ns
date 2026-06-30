@@ -1,3 +1,6 @@
+use cpu StdIoContracts;
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
@@ -53,11 +56,12 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: IoReportProjectSummary = capture_io_report_project();
-    return summary.report_handle
-      + summary.report_len
-      + summary.stdout_written
-      + summary.stderr_written
-      + summary.stdout_flushed
-      + summary.stderr_flushed;
+    return StdTextContracts.report_status_total(summary.report_handle, summary.report_len)
+      + StdIoContracts.console_status_total(
+        summary.stdout_written,
+        summary.stderr_written,
+        summary.stdout_flushed,
+        summary.stderr_flushed
+      );
   }
 }

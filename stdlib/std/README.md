@@ -113,6 +113,21 @@ First auto-injectable library module:
   exposes the initial `StdFsContracts` helper surface for normalizing
   filesystem metadata, file read/write/copy status, directory mutation, and
   path probe summaries
+* [lib/cli_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/cli_contracts.ns)
+  exposes the initial `StdCliContracts` helper surface for normalizing
+  command requests/results, workflow gates, CLI sessions, and project
+  frontdoor recommendations
+* [lib/net_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/net_contracts.ns)
+  exposes the initial `StdNetContracts` helper surface for normalizing
+  network ready states, endpoint/window summaries, HTTP byte estimates,
+  owned-transport lifecycle values, and session/task bridge totals
+* [lib/text_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/text_contracts.ns)
+  exposes the initial `StdTextContracts` helper surface for normalizing text
+  handles, measured lengths, formatted report probes, JSON shape lengths, and
+  text pipeline summaries
+* [lib/time_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/time_contracts.ns)
+  exposes the initial `StdTimeContracts` helper surface for normalizing wall
+  time, monotonic time, sleep, clock-domain, and benchmark span probes
 
 Intended scope:
 

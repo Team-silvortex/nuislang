@@ -16,6 +16,8 @@ Intended scope:
 * host-side image description shaping
 * narrow image packet/resource contracts
 * texture/resource lowering helpers that feed shader-facing consumers
+* render-plan summaries that connect filter chains, image analysis, texture
+  handoff, and shader-facing consumption
 * future filter/transform/image-kernel families once the frontdoor is stable
 
 Relationship:
@@ -72,6 +74,8 @@ Current source-asset status:
   [core/shader_consumer_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/shader_consumer_recipe.ns),
   plus
   [core/pixelmagic_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/pixelmagic_pipeline_recipe.ns),
+  plus
+  [core/render_plan_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/render_plan_recipe.ns),
   plus the first image-op family:
   [core/grayscale_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/grayscale_recipe.ns),
   [core/invert_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/invert_recipe.ns),
@@ -100,6 +104,9 @@ Current first responsibility:
 * establish a canonical `PixelMagicShaderPacket` shape
 * establish a canonical `PixelMagicShaderConsumer` shape
 * establish a canonical `PixelMagic` project-shaped pipeline recipe
+* establish a canonical render-plan summary that ties filter chains,
+  analysis, texture handoff, and shader consumption into one CPU-visible
+  contract
 * establish the first checked-in image-op family for grayscale / invert / threshold style work
 * establish the next checked-in filter family for brightness / contrast / blur / edge / sharpen style work
 * establish the first checked-in image-analysis family for histogram / image-stats style work
@@ -113,6 +120,7 @@ Current official surface registry:
 * `contract.pixelmagic.image-resource-shaping.v1`
 * `contract.pixelmagic.texture-handoff.v1`
 * `contract.pixelmagic.shader-facing-image-prep.v1`
+* `contract.pixelmagic.render-plan.v1`
 * `surface.pixelmagic.shader.contracts.v1`
 * `surface.pixelmagic.shader.packet-bridge.v1`
 * `surface.pixelmagic.shader.render.v1`

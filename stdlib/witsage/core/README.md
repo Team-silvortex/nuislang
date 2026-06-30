@@ -15,6 +15,8 @@ Current intended responsibility:
 * k-nearest-neighbor style scoring plans
 * kernel-facing plan dispatch
 * classification and regression-style evaluation summaries
+* compact pipeline plans that connect dataset, preprocessing, model,
+  evaluation, and kernel dispatch contracts
 
 Current source anchor:
 
@@ -28,3 +30,4 @@ Current source anchor:
 * [kernel_plan_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/kernel_plan_recipe.ns)
 * [confusion_matrix_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/confusion_matrix_recipe.ns)
 * [evaluation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/evaluation_recipe.ns)
+* [pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/pipeline_recipe.ns)

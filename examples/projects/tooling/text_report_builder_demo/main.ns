@@ -1,3 +1,5 @@
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
@@ -54,13 +56,12 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: TextReportBuilderProjectSummary = capture_text_report_builder_project();
-    return summary.title_line_handle
-      + summary.title_line_len
-      + summary.kv_line_handle
-      + summary.kv_line_len
-      + summary.status_line_handle
-      + summary.status_line_len
-      + summary.report_handle
-      + summary.report_len;
+    return StdTextContracts.text_value_or_zero(summary.title_line_handle)
+      + StdTextContracts.text_value_or_zero(summary.title_line_len)
+      + StdTextContracts.text_value_or_zero(summary.kv_line_handle)
+      + StdTextContracts.text_value_or_zero(summary.kv_line_len)
+      + StdTextContracts.text_value_or_zero(summary.status_line_handle)
+      + StdTextContracts.text_value_or_zero(summary.status_line_len)
+      + StdTextContracts.report_status_total(summary.report_handle, summary.report_len);
   }
 }

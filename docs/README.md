@@ -24,6 +24,7 @@ If you want to understand the repository as it exists today, start here:
 * [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 * [versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+* [versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 * [reference/nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)
 * [reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
 * [versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
@@ -33,6 +34,10 @@ If you want to understand the repository as it exists today, start here:
 If your immediate question is “what is the canonical compile route today?”,
 start with the `alpha-0.4.*` system inventory, then the frontdoor/native
 artifact reference pair before drilling into deeper reference material.
+
+If your immediate question is “which docs are current, which are predecessor
+anchors, and what wording is safe?”, read the `alpha-0.4.*` documentation sync
+inventory before editing broad docs.
 
 If your immediate question is “what is the current minor-line history anchor?”,
 start with the `alpha-0.4.*` inventory and hardening plan, then use

@@ -1,0 +1,87 @@
+/// Text and JSON shaping helpers exposed through the standard auto-injected contracts.
+mod cpu StdTextContracts {
+  /// Encodes a successful text operation.
+  pub fn text_ok() -> i64 {
+    return 0;
+  }
+
+  /// Encodes a failed text operation.
+  pub fn text_error() -> i64 {
+    return 1;
+  }
+
+  /// Returns true when a host text handle or length is non-negative.
+  pub fn text_value_ok(value: i64) -> bool {
+    return value >= 0;
+  }
+
+  /// Returns the non-negative text value or zero when the host reported failure.
+  pub fn text_value_or_zero(value: i64) -> i64 {
+    if text_value_ok(value) {
+      return value;
+    }
+    return 0;
+  }
+
+  /// Converts a text length probe into a process-style exit code.
+  pub fn text_len_exit_code(len: i64) -> i64 {
+    if text_value_ok(len) {
+      return text_ok();
+    }
+    return text_error();
+  }
+
+  /// Combines two text lengths and one merged text handle into a compact score.
+  pub fn concat_status_total(lhs_len: i64, rhs_len: i64, merged_handle: i64) -> i64 {
+    return text_value_or_zero(lhs_len)
+      + text_value_or_zero(rhs_len)
+      + text_value_or_zero(merged_handle);
+  }
+
+  /// Combines JSON pair/array/object length probes into a compact score.
+  pub fn json_shape_total(pair_len: i64, array_len: i64, object_len: i64) -> i64 {
+    return text_value_or_zero(pair_len)
+      + text_value_or_zero(array_len)
+      + text_value_or_zero(object_len);
+  }
+
+  /// Combines formatted text handles and measured length into a compact score.
+  pub fn format_status_total(
+    single_handle: i64,
+    pair_handle: i64,
+    pair_len: i64
+  ) -> i64 {
+    return text_value_or_zero(single_handle)
+      + text_value_or_zero(pair_handle)
+      + text_value_or_zero(pair_len);
+  }
+
+  /// Combines report handle/length probes into a compact report score.
+  pub fn report_status_total(report_handle: i64, report_len: i64) -> i64 {
+    return text_value_or_zero(report_handle) + text_value_or_zero(report_len);
+  }
+
+  /// Combines text, formatting, pipeline, and JSON probes for text pipeline recipes.
+  pub fn pipeline_status_total(
+    lhs_len: i64,
+    rhs_len: i64,
+    merged_handle: i64,
+    merged_len: i64,
+    chained_handle: i64,
+    single_handle: i64,
+    pair_handle: i64,
+    pair_len: i64,
+    pipeline_handle: i64,
+    pipeline_len: i64,
+    json_pair_len: i64,
+    json_array_len: i64,
+    json_object_len: i64
+  ) -> i64 {
+    return concat_status_total(lhs_len, rhs_len, merged_handle)
+      + text_value_or_zero(merged_len)
+      + text_value_or_zero(chained_handle)
+      + format_status_total(single_handle, pair_handle, pair_len)
+      + report_status_total(pipeline_handle, pipeline_len)
+      + json_shape_total(json_pair_len, json_array_len, json_object_len);
+  }
+}

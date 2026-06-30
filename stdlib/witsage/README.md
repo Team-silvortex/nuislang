@@ -13,6 +13,8 @@ Target character:
 * preprocessing, statistics, and feature-shaping contracts
 * small model-plan recipes for linear scoring, clustering, and nearest-neighbor work
 * evaluation summaries for classification and regression-style workflows
+* pipeline summaries that connect preprocessing, model plans, evaluation, and
+  kernel dispatch contracts
 * kernel-facing execution summaries that can sit on top of `nuis` heterogeneous lowering
 
 Relationship:
@@ -46,8 +48,9 @@ Current source-asset status:
   [core/knn_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/knn_recipe.ns),
   [core/kernel_plan_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/kernel_plan_recipe.ns),
   [core/confusion_matrix_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/confusion_matrix_recipe.ns),
+  [core/evaluation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/evaluation_recipe.ns),
   and
-  [core/evaluation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/evaluation_recipe.ns)
+  [core/pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/pipeline_recipe.ns)
 
 Current first responsibility:
 
@@ -56,6 +59,8 @@ Current first responsibility:
 * establish preprocessing contracts for normalization and train/test split planning
 * establish simple classical model-plan contracts
 * establish first classification evaluation contracts
+* establish a small end-to-end classical ML pipeline summary that ties dataset,
+  preprocessing, model, evaluation, and kernel plan contracts together
 * establish a kernel-facing plan shape without coupling WitSage to one backend
 * establish compact classifier/kernel pipeline helper scores for usable
   source-level examples
@@ -71,3 +76,4 @@ Current official surface registry:
 * `contract.witsage.kernel-plan.v1`
 * `contract.witsage.preprocessing.v1`
 * `contract.witsage.evaluation.v1`
+* `contract.witsage.pipeline.v1`

@@ -20,11 +20,14 @@ pub use crate::aot_cpu_target::{
     resolve_cpu_build_target_from_project_abi, resolve_cpu_build_target_from_target,
     CpuBuildTarget,
 };
+#[cfg(test)]
 use crate::aot_domain_payload_blob::decode_domain_build_unit_payload_blob;
+#[cfg(test)]
 use crate::aot_domain_render::{
     render_domain_build_unit_backend_stub, render_domain_build_unit_bridge_plan,
     render_domain_build_unit_host_bridge_stub, render_domain_build_unit_lowering_plan,
 };
+#[cfg(test)]
 use crate::aot_kernel_sidecar::render_domain_build_unit_kernel_ir_sidecar;
 #[cfg(test)]
 use crate::aot_lifecycle::build_nuis_lifecycle_contract;
@@ -35,8 +38,11 @@ pub use crate::aot_manifest_types::{
 };
 pub use crate::aot_manifest_verify::verify_build_manifest;
 pub use crate::aot_manifest_writer::write_build_manifest;
+#[cfg(test)]
 use crate::aot_network_sidecar::render_domain_build_unit_network_ir_sidecar;
+#[cfg(test)]
 use crate::aot_project_metadata_verify::project_metadata_summary_mismatch_error;
+#[cfg(test)]
 use crate::aot_shader_sidecar::render_domain_build_unit_shader_ir_sidecar;
 pub use crate::aot_verify_report::{BuildManifestVerifyReport, NuisCompiledArtifactVerifyReport};
 

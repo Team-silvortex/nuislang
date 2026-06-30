@@ -34,6 +34,7 @@ mod artifact_report_summary;
 #[path = "artifact_report_verify.rs"]
 mod artifact_report_verify;
 
+#[allow(unused_imports)]
 pub(crate) use artifact_report_domain::{
     domain_build_contract_summary_json, domain_build_unit_json, domain_registry_json,
 };

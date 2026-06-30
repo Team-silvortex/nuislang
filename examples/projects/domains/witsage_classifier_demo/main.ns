@@ -24,6 +24,19 @@ mod cpu Main {
         WitSageContracts.linear_model_kind(),
         predicted_class
       );
+    let full_pipeline_score: i64 =
+      WitSageContracts.pipeline_total(
+        6401,
+        160,
+        3,
+        128,
+        32,
+        WitSageContracts.zscore_normalization_kind(),
+        WitSageContracts.linear_model_kind(),
+        WitSageContracts.kernel_map_plan_kind(),
+        96,
+        predicted_class
+      );
     let matrix_score: i64 =
       WitSageContracts.confusion_matrix_total(71, 83, 5, 1);
     let eval_score: i64 =
@@ -34,6 +47,6 @@ mod cpu Main {
         predicted_class
       );
 
-    print(pipeline_score + eval_score);
+    print(pipeline_score + eval_score + full_pipeline_score);
   }
 }

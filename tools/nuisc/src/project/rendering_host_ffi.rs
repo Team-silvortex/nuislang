@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(test)]
 pub(in crate::project) fn render_project_host_ffi_index(project: &LoadedProject) -> String {
     let mut out = String::new();
     write_project_host_ffi_index(&mut out, project)

@@ -11,6 +11,7 @@ If you want the current line instead of historical backfill, start with:
 
 * [nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * [nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+* [nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 * [nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
 
 Use this first when the question is:
@@ -18,6 +19,8 @@ Use this first when the question is:
 * what exists and what is still soft in the current `alpha-0.4.*` toolchain
 * what the current `alpha-0.4.*` mainline should optimize for before
   `alpha-0.7.0`
+* which documentation routes and wording are current after the alpha-0.4
+  cleanup/synchronization pass
 * what the `alpha-0.1.*` mainline established before this hardening pass
 * what should count as present-tense repo truth
 * which older files should now be treated as predecessor anchors

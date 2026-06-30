@@ -1,0 +1,87 @@
+mod cpu Main {
+  struct WitSagePipelinePlan {
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    train_rows: i64,
+    test_rows: i64,
+    preprocessing_kind: i64,
+    model_kind: i64,
+    kernel_plan_kind: i64,
+    work_items: i64,
+    metric_seed: i64
+  }
+
+  struct WitSagePipelineSummary {
+    dataset_total: i64,
+    preprocessing_total: i64,
+    model_total: i64,
+    kernel_total: i64,
+    evaluation_total: i64
+  }
+
+  fn build_pipeline_plan(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    train_rows: i64,
+    test_rows: i64,
+    preprocessing_kind: i64,
+    model_kind: i64,
+    kernel_plan_kind: i64,
+    work_items: i64,
+    metric_seed: i64
+  ) -> WitSagePipelinePlan {
+    return WitSagePipelinePlan {
+      dataset_handle: dataset_handle,
+      rows: rows,
+      columns: columns,
+      train_rows: train_rows,
+      test_rows: test_rows,
+      preprocessing_kind: preprocessing_kind,
+      model_kind: model_kind,
+      kernel_plan_kind: kernel_plan_kind,
+      work_items: work_items,
+      metric_seed: metric_seed
+    };
+  }
+
+  fn summarize_pipeline(plan: WitSagePipelinePlan) -> WitSagePipelineSummary {
+    let dataset_total: i64 =
+      plan.dataset_handle + plan.rows + plan.columns + plan.train_rows + plan.test_rows;
+    let preprocessing_total: i64 =
+      plan.dataset_handle + plan.rows + plan.columns + plan.preprocessing_kind + plan.metric_seed;
+    let model_total: i64 =
+      plan.model_kind + plan.columns + plan.metric_seed + 1;
+    let kernel_total: i64 =
+      plan.dataset_handle +
+      plan.rows +
+      plan.columns +
+      plan.model_kind +
+      plan.kernel_plan_kind +
+      plan.work_items;
+    let evaluation_total: i64 =
+      plan.test_rows + plan.metric_seed + plan.model_kind + plan.kernel_plan_kind;
+    return WitSagePipelineSummary {
+      dataset_total: dataset_total,
+      preprocessing_total: preprocessing_total,
+      model_total: model_total,
+      kernel_total: kernel_total,
+      evaluation_total: evaluation_total
+    };
+  }
+
+  fn summarize_pipeline_total(summary: WitSagePipelineSummary) -> i64 {
+    return summary.dataset_total +
+      summary.preprocessing_total +
+      summary.model_total +
+      summary.kernel_total +
+      summary.evaluation_total;
+  }
+
+  fn main() {
+    let plan: WitSagePipelinePlan = build_pipeline_plan(6501, 160, 4, 128, 32, 2, 1, 2, 640, 97);
+    let summary: WitSagePipelineSummary = summarize_pipeline(plan);
+    print(summarize_pipeline_total(summary));
+  }
+}

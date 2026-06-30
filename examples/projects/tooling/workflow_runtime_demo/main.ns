@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
   extern "c" fn host_command_status(command_handle: i64) -> i64;
@@ -51,7 +53,7 @@ mod cpu Main {
       status: host_command_status(handle),
       wait_code: host_command_wait(handle),
       wait_exit: wait_exit,
-      succeeded: wait_exit == 0
+      succeeded: StdCliContracts.success_exit_code(wait_exit == 0) == StdCliContracts.cli_ok()
     };
   }
 
@@ -94,11 +96,34 @@ mod cpu Main {
     first: WorkflowStepReport,
     second: WorkflowStepReport
   ) -> WorkflowReport {
+    let first_command_total: i64 = StdCliContracts.command_result_total(
+      first.result.handle,
+      first.result.status,
+      first.result.wait_code,
+      first.result.wait_exit,
+      first.result.succeeded
+    );
+    let second_command_total: i64 = StdCliContracts.command_result_total(
+      second.result.handle,
+      second.result.status,
+      second.result.wait_code,
+      second.result.wait_exit,
+      second.result.succeeded
+    );
+    let gate_total: i64 = StdCliContracts.workflow_gate_total(
+      StdCliContracts.workflow_step_total(first.name_handle, first_command_total, first.executed, false),
+      StdCliContracts.workflow_step_total(second.name_handle, second_command_total, second.executed, second.executed == false),
+      0,
+      0,
+      0,
+      StdCliContracts.encode_success(first.executed) + StdCliContracts.encode_success(second.executed),
+      first.result.succeeded && second.result.succeeded
+    );
     if first.result.succeeded == false {
       return WorkflowReport {
         first: first,
         second: second,
-        first_failure_handle: first.name_handle,
+        first_failure_handle: first.name_handle + gate_total,
         overall_success: false
       };
     }
@@ -106,7 +131,7 @@ mod cpu Main {
       return WorkflowReport {
         first: first,
         second: second,
-        first_failure_handle: second.name_handle,
+        first_failure_handle: second.name_handle + gate_total,
         overall_success: false
       };
     }
@@ -114,7 +139,7 @@ mod cpu Main {
       first: first,
       second: second,
       first_failure_handle: 0,
-      overall_success: true
+      overall_success: StdCliContracts.success_exit_code(gate_total > 0) == StdCliContracts.cli_ok()
     };
   }
 
@@ -138,9 +163,6 @@ mod cpu Main {
 
   fn main() -> i64 {
     let report: WorkflowReport = capture_workflow_runtime_project();
-    if report.overall_success {
-      return 0;
-    }
-    return 1;
+    return StdCliContracts.success_exit_code(report.overall_success);
   }
 }

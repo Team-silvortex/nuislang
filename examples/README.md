@@ -23,6 +23,7 @@ If the example tree feels noisy, that is real. The current rule is:
 If you want the fastest route into the current repository spine:
 
 * [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 * [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
 * [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
 * [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)

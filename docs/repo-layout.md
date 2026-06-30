@@ -21,7 +21,11 @@ quickly.
   examples, and current checked-in build bundles
 * [stdlib](/Users/Shared/chroot/dev/nuislang/stdlib)
   standard-library layout plus staged `.ns` source assets, especially the
-  first real `ns-nova` modules
+  `std`, `PixelMagic`, `WitSage`, and `ns-nova` official library/galaxy
+  surfaces
+* [subprojects](/Users/Shared/chroot/dev/nuislang/subprojects)
+  sibling ecosystem projects hosted in-tree for now, currently `vulpoya` and
+  `yalivia`, with boundaries kept explicit rather than merged into `nuisc`
 * [docs](/Users/Shared/chroot/dev/nuislang/docs)
   current reference docs, grammar/front-end notes, design notes, and historical
   archive material
@@ -37,6 +41,8 @@ Use this as the shortest repo-level split:
   - [examples/projects](/Users/Shared/chroot/dev/nuislang/examples/projects)
   - [examples/ns](/Users/Shared/chroot/dev/nuislang/examples/ns)
   - [stdlib/std](/Users/Shared/chroot/dev/nuislang/stdlib/std)
+  - [stdlib/pixelmagic](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic)
+  - [stdlib/witsage](/Users/Shared/chroot/dev/nuislang/stdlib/witsage)
   - [docs/reference](/Users/Shared/chroot/dev/nuislang/docs/reference)
 * experimental or softer-edged today
   - [examples/yir](/Users/Shared/chroot/dev/nuislang/examples/yir)
@@ -86,6 +92,8 @@ If you want implementation internals:
 If you want framework/library evolution:
 
 * [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
+* [stdlib/pixelmagic/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
+* [stdlib/witsage/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/README.md)
 * [stdlib/ns-nova/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
 
 If you want older design background:

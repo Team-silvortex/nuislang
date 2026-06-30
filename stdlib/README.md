@@ -57,7 +57,9 @@ At the current repo stage:
 * `core` and `std` now also expose their first library-module surfaces through
   [core/lib/prelude_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/lib/prelude_contracts.ns)
   and
-  [std/lib/task_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/task_contracts.ns)
+  [std/lib/task_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/task_contracts.ns),
+  with additional std contract companions such as
+  [std/lib/text_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/text_contracts.ns)
 * `ns-nova` now also exposes its first library-module surface through
   [ns-nova/lib/nova_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/lib/nova_contracts.ns)
   but unlike `core`, `std`, and `pixelmagic`, it is currently marked
@@ -104,8 +106,9 @@ Asset view by layer:
   - see
     [stdlib/witsage/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/README.md)
 * `ns-nova`
-  - current framework/source-asset layer
-  - currently the richest family-shaped stdlib surface
+  - current future framework/source-asset layer
+  - currently important as an official GUI/rendering galaxy, but intentionally
+    behind AOT, `std`, PixelMagic, and WitSage hardening
   - declared through
     [stdlib/ns-nova/module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/module.toml)
     with `11` checked-in source modules
@@ -117,22 +120,28 @@ Current asset types:
 * `core`
   facade modules plus a first small blueprint layer
 * `std`
-  host-backed facade modules plus recipe modules for CLI, reporting, automation,
-  and early clock/test timing alignment
+  host-backed facade modules plus auto-injectable task/IO/filesystem/CLI/network
+  contracts and recipe modules for reporting, automation, and early
+  clock/test timing alignment
 * `pixelmagic`
-  image/resource handoff modules and future shader-facing image prep contracts
+  image/resource handoff, render-plan, and future shader-facing image prep
+  contracts
 * `witsage`
-  dataset/statistics/model-plan modules and future kernel-facing classical ML contracts
+  dataset/statistics/model-plan/pipeline modules and future kernel-facing
+  classical ML contracts
 * `ns-nova`
-  framework-oriented runtime/blueprint/recipe modules across `core`, `ui`, and `scene`
+  framework-oriented runtime/blueprint/recipe modules across `core`, `ui`, and
+  `scene`, still mostly contract/source-asset oriented
 
 Current boundaries:
 
 * none of these layers are yet an automatically imported library tree
 * `core` is intentionally conservative
 * `std` is broadening quickly, but most surfaces are still explicitly host-backed
-* `ns-nova` is the most mature source-asset family, but it still relies on
-  project/demo routes as the full end-to-end truth source
+* `pixelmagic` and `witsage` are the current official pressure tests for
+  shader/kernel cooperation
+* `ns-nova` remains deliberately later-stage because it depends on the lower
+  AOT, library, shader, kernel, and future runtime layers
 
 ## Read In This Order
 

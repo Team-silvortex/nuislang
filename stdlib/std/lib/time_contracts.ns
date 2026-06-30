@@ -1,0 +1,71 @@
+/// Time, clock, and benchmark helpers exposed through the standard auto-injected contracts.
+mod cpu StdTimeContracts {
+  /// Encodes a successful time operation.
+  pub fn time_ok() -> i64 {
+    return 0;
+  }
+
+  /// Encodes a failed time operation.
+  pub fn time_error() -> i64 {
+    return 1;
+  }
+
+  /// Returns true when a host time probe is non-negative.
+  pub fn time_value_ok(value: i64) -> bool {
+    return value >= 0;
+  }
+
+  /// Returns the non-negative time value or zero when the host reported failure.
+  pub fn time_value_or_zero(value: i64) -> i64 {
+    if time_value_ok(value) {
+      return value;
+    }
+    return 0;
+  }
+
+  /// Converts a duration probe into a process-style exit code.
+  pub fn duration_exit_code(duration_ns: i64) -> i64 {
+    if time_value_ok(duration_ns) {
+      return time_ok();
+    }
+    return time_error();
+  }
+
+  /// Combines wall, monotonic, and sleep probes into a compact time score.
+  pub fn time_sample_total(wall_ns: i64, monotonic_ns: i64, slept_ns: i64) -> i64 {
+    return time_value_or_zero(wall_ns)
+      + time_value_or_zero(monotonic_ns)
+      + time_value_or_zero(slept_ns);
+  }
+
+  /// Combines global clock-domain probes into a compact clock score.
+  pub fn clock_domain_total(domain_id: i64, epoch_ns: i64, tick: i64, scale_ppm: i64) -> i64 {
+    return time_value_or_zero(domain_id)
+      + time_value_or_zero(epoch_ns)
+      + time_value_or_zero(tick)
+      + time_value_or_zero(scale_ppm);
+  }
+
+  /// Combines three benchmark span and sleep probes into a compact score.
+  pub fn benchmark_triplet_total(
+    first_span_ns: i64,
+    second_span_ns: i64,
+    third_span_ns: i64,
+    min_span_ns: i64,
+    max_span_ns: i64,
+    mid_span_ns: i64,
+    avg_span_ns: i64,
+    total_span_ns: i64,
+    total_sleep_ns: i64
+  ) -> i64 {
+    return time_value_or_zero(first_span_ns)
+      + time_value_or_zero(second_span_ns)
+      + time_value_or_zero(third_span_ns)
+      + time_value_or_zero(min_span_ns)
+      + time_value_or_zero(max_span_ns)
+      + time_value_or_zero(mid_span_ns)
+      + time_value_or_zero(avg_span_ns)
+      + time_value_or_zero(total_span_ns)
+      + time_value_or_zero(total_sleep_ns);
+  }
+}

@@ -1,0 +1,151 @@
+/// CLI and workflow helpers exposed through the standard auto-injected contracts.
+mod cpu StdCliContracts {
+  /// Encodes a successful CLI/tooling operation.
+  pub fn cli_ok() -> i64 {
+    return 0;
+  }
+
+  /// Encodes a failed CLI/tooling operation.
+  pub fn cli_error() -> i64 {
+    return 1;
+  }
+
+  /// Encodes whether a workflow step completed successfully.
+  pub fn encode_success(success: bool) -> i64 {
+    if success {
+      return 1;
+    }
+    return 0;
+  }
+
+  /// Encodes whether a workflow step was skipped by a previous failure.
+  pub fn encode_blocked(blocked: bool) -> i64 {
+    if blocked {
+      return 1;
+    }
+    return 0;
+  }
+
+  /// Converts a success flag into a process-style exit code.
+  pub fn success_exit_code(success: bool) -> i64 {
+    if success {
+      return cli_ok();
+    }
+    return cli_error();
+  }
+
+  /// Produces a compact score for a command request.
+  pub fn command_request_total(
+    program_handle: i64,
+    argv_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> i64 {
+    return program_handle + argv_handle + cwd_handle + timeout_ms;
+  }
+
+  /// Produces a compact score for a command result.
+  pub fn command_result_total(
+    command_handle: i64,
+    status: i64,
+    wait_code: i64,
+    wait_exit: i64,
+    succeeded: bool
+  ) -> i64 {
+    return command_handle + status + wait_code + wait_exit + encode_success(succeeded);
+  }
+
+  /// Produces a compact score for one workflow step report.
+  pub fn workflow_step_total(
+    name_handle: i64,
+    command_total: i64,
+    executed: bool,
+    blocked_by_failure: bool
+  ) -> i64 {
+    return name_handle +
+      command_total +
+      encode_success(executed) +
+      encode_blocked(blocked_by_failure);
+  }
+
+  /// Produces a compact score for an ordered four-step workflow gate.
+  pub fn workflow_gate_total(
+    first_step: i64,
+    second_step: i64,
+    third_step: i64,
+    fourth_step: i64,
+    first_failure_handle: i64,
+    executed_steps: i64,
+    overall_success: bool
+  ) -> i64 {
+    return first_step +
+      second_step +
+      third_step +
+      fourth_step +
+      first_failure_handle +
+      executed_steps +
+      encode_success(overall_success);
+  }
+
+  /// Produces a compact score for a project frontdoor recommendation.
+  pub fn workflow_recommendation_total(
+    next_step_handle: i64,
+    command_handle: i64,
+    reason_handle: i64
+  ) -> i64 {
+    return next_step_handle + command_handle + reason_handle;
+  }
+
+  /// Produces a compact score for a build/reporting frontdoor surface.
+  pub fn workflow_frontdoor_total(
+    source_kind_handle: i64,
+    workflow_kind_handle: i64,
+    workflow_brief_handle: i64,
+    workflow_samples_handle: i64,
+    recommendation_total: i64
+  ) -> i64 {
+    return source_kind_handle +
+      workflow_kind_handle +
+      workflow_brief_handle +
+      workflow_samples_handle +
+      recommendation_total;
+  }
+
+  /// Produces a compact score for a CLI session.
+  pub fn cli_session_total(
+    argv_count: i64,
+    line_handle: i64,
+    line_len: i64,
+    tick_ns: i64,
+    completed: bool,
+    timed_out: bool
+  ) -> i64 {
+    return argv_count +
+      line_handle +
+      line_len +
+      tick_ns +
+      encode_success(completed) +
+      encode_blocked(timed_out);
+  }
+
+  /// Produces a compact score for a build pipeline report.
+  pub fn build_pipeline_total(
+    prepare_total: i64,
+    check_total: i64,
+    compile_total: i64,
+    package_total: i64,
+    first_failure_handle: i64,
+    executed_steps: i64,
+    overall_success: bool
+  ) -> i64 {
+    return workflow_gate_total(
+      prepare_total,
+      check_total,
+      compile_total,
+      package_total,
+      first_failure_handle,
+      executed_steps,
+      overall_success
+    );
+  }
+}

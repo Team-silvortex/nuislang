@@ -20,6 +20,8 @@ Current intended responsibility:
 * first image-op family
 * resource-set lowering shape
 * shader-facing seed preparation
+* render-plan summaries for filter chain, analysis, texture handoff, and
+  shader consumption scoring
 
 Current source anchor:
 
@@ -31,6 +33,7 @@ Current source anchor:
 * [shader_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/shader_packet_recipe.ns)
 * [shader_consumer_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/shader_consumer_recipe.ns)
 * [pixelmagic_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/pixelmagic_pipeline_recipe.ns)
+* [render_plan_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/render_plan_recipe.ns)
 * [grayscale_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/grayscale_recipe.ns)
 * [invert_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/invert_recipe.ns)
 * [threshold_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/threshold_recipe.ns)
@@ -91,6 +94,12 @@ Current source anchor:
 * a checked-in `packet -> resource -> binding -> sample -> shader -> consumer` pipeline skeleton
 * one project-shaped summary path for the whole canonical chain
 * a stable composition target before real package/import and shader frontdoor work is finished
+
+`render_plan_recipe.ns` currently provides:
+
+* a checked-in filter-chain, analysis, texture-handoff, and shader-consumer render plan summary
+* a CPU-visible contract for image-processing pipelines that should later feed real shader demos
+* a stable plan shape that remains independent from any single GPU vendor backend
 
 `grayscale_recipe.ns`, `invert_recipe.ns`, and `threshold_recipe.ns` currently provide:
 

@@ -35,6 +35,7 @@ Current entrypoints:
 
 * [../current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 * [nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+* [nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 * [../reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
 * [../reference/nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
 
@@ -115,8 +116,10 @@ Current safe wording:
 
 ## Documentation Drift Found In This Pass
 
-The main drift pattern is not that docs are absent. It is that old anchors kept
-their front-door wording after the project moved on.
+The main drift pattern was not that docs were absent. It was that old anchors
+kept their front-door wording after the project moved on. The current cleanup
+anchor is
+[nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md).
 
 High-priority cleanup targets:
 

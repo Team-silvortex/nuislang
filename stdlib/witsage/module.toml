@@ -11,7 +11,8 @@ surfaces = [
   "contract.witsage.classical-model.v1",
   "contract.witsage.kernel-plan.v1",
   "contract.witsage.preprocessing.v1",
-  "contract.witsage.evaluation.v1"
+  "contract.witsage.evaluation.v1",
+  "contract.witsage.pipeline.v1"
 ]
 
 library_modules = [
@@ -31,5 +32,6 @@ source_modules = [
   "core/knn_recipe.ns",
   "core/kernel_plan_recipe.ns",
   "core/confusion_matrix_recipe.ns",
-  "core/evaluation_recipe.ns"
+  "core/evaluation_recipe.ns",
+  "core/pipeline_recipe.ns"
 ]

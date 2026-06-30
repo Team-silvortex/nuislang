@@ -31,6 +31,8 @@ Current versioning entrypoints:
   [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * current `alpha-0.4.*` hardening plan:
   [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+* current `alpha-0.4.*` documentation sync inventory:
+  [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 * predecessor `alpha-0.1.*` status anchor:
   [docs/versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
 * predecessor alpha closeout board:
@@ -55,7 +57,9 @@ Current versioning entrypoints:
 If you want the current line first, start with
 [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md),
 then use
-[docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md).
+[docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+and
+[docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md).
 
 If you want the older pre-alpha history anchor after that, start with
 [`0.19.0` snapshot](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md), then use
@@ -223,6 +227,8 @@ High-signal implemented surfaces:
   `nuis-runtime`
 * host-YIR execution probes that read artifact YIR sidecars and execute
   registered YIR domain mods, including real kernel tensor result summaries
+* repository source hygiene with non-test `tools/nuisc/src` implementation
+  files kept below the current 600-line policy threshold
 * source visibility boundaries through minimal `pub/private`
 * `project-status` / `project-doctor` public-surface reporting
 * intrinsic frontend annotations for `@test`, `@export`, `@inline`,
@@ -250,7 +256,10 @@ Current mainline, meaning “good default places to stand on today”:
   reference execution for payload-backed YIR sidecars
 * `examples/projects` as the primary runnable/compile-contract example layer
 * `docs/reference` as the primary implementation-truth documentation layer
-* `stdlib/std` and `stdlib/ns-nova` as the current source-asset/library growth path
+* `stdlib/std`, `stdlib/pixelmagic`, and `stdlib/witsage` as the current
+  source-asset/library proving path
+* `stdlib/ns-nova` as an official future GUI/render galaxy that should remain
+  behind AOT/std/PixelMagic/WitSage hardening for now
 
 Current experimental or intentionally still soft-edged tracks:
 
@@ -276,6 +285,7 @@ If you want the shortest path by goal:
 * current alpha system inventory and hardening plan
   - [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
   - [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+  - [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 * current user-facing project path
   - [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
   - [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
@@ -289,6 +299,8 @@ If you want the shortest path by goal:
 * current `std` and framework source assets
   - [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
   - [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+  - [stdlib/pixelmagic/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
+  - [stdlib/witsage/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/README.md)
   - [stdlib/ns-nova/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
 * quick repo map
   - [docs/repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)

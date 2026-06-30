@@ -117,6 +117,7 @@ pub mod stdlib_registry;
 
 pub use cli::CommandKind;
 
+#[allow(unused_imports)]
 pub(crate) use crate::command_helpers::{
     inspect_artifact_container_for_input, load_nuis_compiled_artifact, NUSTAR_REGISTRY_ROOT,
 };
@@ -126,15 +127,18 @@ pub use crate::command_helpers::{
     project_galaxy_workflow_brief, project_test_workflow_brief,
 };
 
+#[allow(unused_imports)]
 use crate::artifact_report::{
     artifact_report_json, artifact_report_summary_lines, domain_build_contract_summary_json,
     domain_registry_json, inspect_artifact_json, reconstruct_manifest_report_from_artifact,
     verify_artifact_json, verify_build_manifest_json,
 };
 
+#[allow(unused_imports)]
 use crate::execution_inspect::{execution_inspect_issues, ExecutionInspectOverview};
 #[cfg(test)]
 use crate::execution_inspect::{ExecutionInspectDomainOverview, ExecutionInspectIssue};
+#[allow(unused_imports)]
 use crate::inspect_report::{
     collect_benchmark_inventory, collect_doc_indexes, inspect_benchmarks_json, inspect_docs_json,
     inspect_galaxy_doc_summary, inspect_galaxy_docs_json, inspect_stdlib_doc_summary,
@@ -146,8 +150,10 @@ pub(crate) use crate::json_report::{
     json_optional_string_field, json_string_array_field, json_string_field, json_usize_field,
 };
 
+#[allow(unused_imports)]
 use crate::link_report::link_plan_json;
 
+#[allow(unused_imports)]
 use crate::project_metadata_report::{
     inspect_project_metadata, inspect_project_metadata_json,
     render_project_metadata_compact_summary, render_project_metadata_paths,
@@ -156,6 +162,7 @@ use crate::project_metadata_report::{
 
 #[cfg(test)]
 use crate::domain_build_report::domain_build_unit_contract_json;
+#[allow(unused_imports)]
 use crate::domain_build_report::{
     domain_build_unit_verification_verdict, evaluate_domain_build_contract_drift,
     DomainBuildVerificationSummary,

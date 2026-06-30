@@ -100,6 +100,7 @@ mod tests {
                 "contract.pixelmagic.image-resource-shaping.v1".to_owned(),
                 "contract.pixelmagic.texture-handoff.v1".to_owned(),
                 "contract.pixelmagic.shader-facing-image-prep.v1".to_owned(),
+                "contract.pixelmagic.render-plan.v1".to_owned(),
                 "surface.pixelmagic.shader.contracts.v1".to_owned(),
                 "surface.pixelmagic.shader.packet-bridge.v1".to_owned(),
                 "surface.pixelmagic.shader.render.v1".to_owned(),
@@ -163,6 +164,10 @@ mod tests {
                 "surface.std.host-ffi-helpers.v1".to_owned(),
                 "surface.std.data-plane-helpers.v1".to_owned(),
                 "surface.std.project-utility.v1".to_owned(),
+                "surface.std.cli-workflow-contracts.v1".to_owned(),
+                "surface.std.net-session-contracts.v1".to_owned(),
+                "surface.std.text-json-contracts.v1".to_owned(),
+                "surface.std.time-benchmark-contracts.v1".to_owned(),
             ]
         );
         assert_eq!(
@@ -171,6 +176,10 @@ mod tests {
                 "lib/task_contracts.ns".to_owned(),
                 "lib/io_contracts.ns".to_owned(),
                 "lib/fs_contracts.ns".to_owned(),
+                "lib/cli_contracts.ns".to_owned(),
+                "lib/net_contracts.ns".to_owned(),
+                "lib/text_contracts.ns".to_owned(),
+                "lib/time_contracts.ns".to_owned(),
             ]
         );
     }

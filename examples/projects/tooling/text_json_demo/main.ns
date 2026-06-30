@@ -1,3 +1,5 @@
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
@@ -34,13 +36,16 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: TextJsonProjectSummary = capture_text_json_project();
-    return summary.lhs_len
-      + summary.rhs_len
-      + summary.merged_handle
-      + summary.merged_len
-      + summary.measured_len
-      + summary.pair_len
-      + summary.array_len
-      + summary.object_len;
+    return StdTextContracts.concat_status_total(
+      summary.lhs_len,
+      summary.rhs_len,
+      summary.merged_handle
+    ) + StdTextContracts.text_value_or_zero(summary.merged_len)
+      + StdTextContracts.text_value_or_zero(summary.measured_len)
+      + StdTextContracts.json_shape_total(
+        summary.pair_len,
+        summary.array_len,
+        summary.object_len
+      );
   }
 }

@@ -14,6 +14,8 @@ Canonical companions:
   [docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
 * tooling/workflow contract:
   [docs/reference/std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+* auto-injected CLI/workflow helper surface:
+  [lib/cli_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/cli_contracts.ns)
 * tooling image-preprocess bridge:
   [docs/reference/tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
 * mainline layering rule:
@@ -40,6 +42,8 @@ Short rule:
 * workflow should stay the first explicit gate/plan/report layer
 * CLI/report/build/project recipes should reuse that gate shape rather than
   silently inventing a new one
+* shared scoring/exit-code helpers should live in `StdCliContracts`, not in
+  every launch-shaped recipe
 
 ## Current Semantic Split
 

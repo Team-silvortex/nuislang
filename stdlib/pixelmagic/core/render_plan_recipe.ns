@@ -1,0 +1,111 @@
+mod cpu Main {
+  struct PixelMagicRenderPlan {
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    first_op_kind: i64,
+    second_op_kind: i64,
+    first_amount: i64,
+    second_amount: i64,
+    sample_kind: i64,
+    channel_pick: i64,
+    sample_count: i64,
+    edge_policy: i64,
+    uv_mode: i64,
+    output_kind: i64
+  }
+
+  struct PixelMagicRenderSummary {
+    filter_total: i64,
+    analysis_total: i64,
+    texture_total: i64,
+    shader_total: i64,
+    frame_budget: i64
+  }
+
+  fn build_pixelmagic_render_plan(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    first_op_kind: i64,
+    second_op_kind: i64,
+    first_amount: i64,
+    second_amount: i64,
+    sample_kind: i64,
+    channel_pick: i64,
+    sample_count: i64,
+    edge_policy: i64,
+    uv_mode: i64,
+    output_kind: i64
+  ) -> PixelMagicRenderPlan {
+    return PixelMagicRenderPlan {
+      source_handle: source_handle,
+      width: width,
+      height: height,
+      first_op_kind: first_op_kind,
+      second_op_kind: second_op_kind,
+      first_amount: first_amount,
+      second_amount: second_amount,
+      sample_kind: sample_kind,
+      channel_pick: channel_pick,
+      sample_count: sample_count,
+      edge_policy: edge_policy,
+      uv_mode: uv_mode,
+      output_kind: output_kind
+    };
+  }
+
+  fn summarize_pixelmagic_render_plan(plan: PixelMagicRenderPlan) -> PixelMagicRenderSummary {
+    let first_filter: i64 =
+      plan.source_handle + plan.width + plan.height + plan.first_op_kind + plan.first_amount + 1;
+    let second_filter: i64 =
+      plan.source_handle + plan.width + plan.height + plan.second_op_kind + plan.second_amount + 1;
+    let filter_total: i64 = first_filter + second_filter + plan.width + plan.height;
+    let analysis_total: i64 =
+      plan.source_handle +
+      plan.width +
+      plan.height +
+      plan.channel_pick +
+      plan.sample_count +
+      plan.edge_policy;
+    let texture_total: i64 =
+      plan.source_handle +
+      plan.width +
+      plan.height +
+      plan.sample_kind +
+      plan.channel_pick +
+      plan.uv_mode;
+    let shader_total: i64 =
+      plan.source_handle +
+      plan.width +
+      plan.height +
+      plan.sample_kind +
+      plan.channel_pick +
+      plan.sample_count +
+      plan.edge_policy +
+      plan.uv_mode +
+      plan.output_kind;
+    return PixelMagicRenderSummary {
+      filter_total: filter_total,
+      analysis_total: analysis_total,
+      texture_total: texture_total,
+      shader_total: shader_total,
+      frame_budget: plan.width + plan.height + plan.sample_count + plan.output_kind
+    };
+  }
+
+  fn summarize_pixelmagic_render_total(summary: PixelMagicRenderSummary) -> i64 {
+    return summary.filter_total +
+      summary.analysis_total +
+      summary.texture_total +
+      summary.shader_total +
+      summary.frame_budget;
+  }
+
+  fn main() {
+    let plan: PixelMagicRenderPlan =
+      build_pixelmagic_render_plan(6601, 192, 108, 4, 8, 12, 2, 1, 0, 8, 1, 0, 1);
+    let summary: PixelMagicRenderSummary = summarize_pixelmagic_render_plan(plan);
+    print(summarize_pixelmagic_render_total(summary));
+  }
+}

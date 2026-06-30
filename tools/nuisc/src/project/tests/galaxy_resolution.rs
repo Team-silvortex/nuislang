@@ -65,7 +65,11 @@ mod cpu Main {
         vec![
             "lib/task_contracts.ns".to_owned(),
             "lib/io_contracts.ns".to_owned(),
-            "lib/fs_contracts.ns".to_owned()
+            "lib/fs_contracts.ns".to_owned(),
+            "lib/cli_contracts.ns".to_owned(),
+            "lib/net_contracts.ns".to_owned(),
+            "lib/text_contracts.ns".to_owned(),
+            "lib/time_contracts.ns".to_owned()
         ]
     );
 
@@ -120,24 +124,24 @@ mod cpu Main {
     assert!(galaxy_index.contains("library_modules=lib/image_contracts.ns, lib/shader_contracts.ns, lib/packet_bridge_surface.ns, lib/render_surface.ns, lib/texture_surface.ns, lib/pipeline_surface.ns"));
     assert!(galaxy_index.contains("core\tpackage=nuis.core\tdirect=false"));
     assert!(galaxy_index.contains("library_modules=lib/prelude_contracts.ns"));
-    assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true\trequested_by=pixelmagic\tsource_modules=18\tauto_injectable=true"));
+    assert!(galaxy_index.contains("pixelmagic\tpackage=nuis.pixelmagic\tdirect=true\trequested_by=pixelmagic\tsource_modules=19\tauto_injectable=true"));
     assert!(galaxy_index.contains("documented_library_modules="));
     assert!(galaxy_index.contains("documented_items="));
     assert!(galaxy_index.contains("std\tpackage=nuis.std\tdirect=false"));
     assert!(galaxy_index.contains(
-        "library_modules=lib/task_contracts.ns, lib/io_contracts.ns, lib/fs_contracts.ns"
+        "library_modules=lib/task_contracts.ns, lib/io_contracts.ns, lib/fs_contracts.ns, lib/cli_contracts.ns, lib/net_contracts.ns, lib/text_contracts.ns, lib/time_contracts.ns"
     ));
     assert!(galaxy_index.contains("library_import_policy=project-auto"));
     assert!(galaxy_index.contains("blockers=<none>"));
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=11\tdocumented_modules=10\tdocumented_items=86"));
+    assert!(docs_index.contains("summary\tmodules=15\tdocumented_modules=14\tdocumented_items=136"));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
-        .contains("module\tcpu.PixelMagicContracts\titems=33\tsource_kind=galaxy-auto-inject"));
+        .contains("module\tcpu.PixelMagicContracts\titems=34\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=10\tvisible_libraries=10\tvisible_modules=11\tdocumented_visible_modules=10\tdocumented_visible_items=86"
+        "summary\tlibraries=14\tvisible_libraries=14\tvisible_modules=15\tdocumented_visible_modules=14\tdocumented_visible_items=136"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -158,6 +162,18 @@ mod cpu Main {
         "library\tpixelmagic\tlib/pipeline_surface.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
+        "library\tstd\tlib/cli_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tstd\tlib/net_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tstd\tlib/text_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tstd\tlib/time_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
         "library\tcore\tlib/prelude_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
@@ -172,6 +188,8 @@ mod cpu Main {
     assert!(imports_index.contains("visible\tcpu\tStdTaskContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tStdIoContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tStdFsContracts\tdoc_items="));
+    assert!(imports_index.contains("visible\tcpu\tStdTextContracts\tdoc_items="));
+    assert!(imports_index.contains("visible\tcpu\tStdTimeContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tPixelMagicContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tshader\tPixelMagicSurfaceContracts\tdoc_items="));
     assert!(imports_index.contains("import_policy=project-auto"));
@@ -323,6 +341,8 @@ use cpu PixelMagicContracts;
 use cpu StdIoContracts;
 use cpu StdFsContracts;
 use cpu StdTaskContracts;
+use cpu StdTextContracts;
+use cpu StdTimeContracts;
 
 mod cpu Main {
   fn main() -> i64 {
@@ -342,6 +362,8 @@ mod cpu Main {
         + StdFsContracts.directory_status_total(6, 7, 0)
         + StdFsContracts.directory_mutation_status_total(0, 1, 0, 0)
         + StdFsContracts.path_probe_status_total(0, 1, 1)
+        + StdTextContracts.pipeline_status_total(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
+        + StdTimeContracts.time_sample_total(100, 200, 300)
         + CorePrelude.one_i64()
     );
   }
@@ -426,6 +448,16 @@ mod cpu Main {
         .functions
         .iter()
         .any(|function| function.name == "StdFsContracts.path_probe_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdTextContracts.pipeline_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdTimeContracts.time_sample_total"));
     assert!(artifacts
         .nir
         .functions
@@ -574,6 +606,17 @@ mod cpu Main {
       WitSageContracts.zscore_normalization_kind(),
       WitSageContracts.linear_model_kind(),
       feature_seed
+    ) + WitSageContracts.pipeline_total(
+      6401,
+      160,
+      3,
+      128,
+      32,
+      WitSageContracts.zscore_normalization_kind(),
+      WitSageContracts.linear_model_kind(),
+      WitSageContracts.kernel_map_plan_kind(),
+      32,
+      feature_seed
     ) + WitSageContracts.kernel_pipeline_total(
       6401,
       160,
@@ -595,6 +638,11 @@ mod cpu Main {
         .functions
         .iter()
         .any(|function| function.name == "WitSageContracts.classifier_pipeline_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "WitSageContracts.pipeline_total"));
     assert!(artifacts
         .nir
         .functions
@@ -1019,7 +1067,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=10\tvisible_libraries=10\tvisible_modules=11\tdocumented_visible_modules=10\tdocumented_visible_items=86"
+        "summary\tlibraries=14\tvisible_libraries=14\tvisible_modules=15\tdocumented_visible_modules=14\tdocumented_visible_items=136"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

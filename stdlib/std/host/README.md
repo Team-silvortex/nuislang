@@ -12,6 +12,8 @@ Canonical companions:
 
 * cluster contract:
   [std-host-io-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-host-io-layering-contract.md)
+* auto-injected text/json helper surface:
+  [lib/text_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/text_contracts.ns)
 * global `std` rule:
   [std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
 * shortest repo-wide route:
@@ -39,6 +41,8 @@ Current rule:
   [tooling/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/tooling/README.md)
 * use this router for host reads, writes, text shaping, and report-facing
   helpers
+* shared text/json probe summaries should live in `StdTextContracts`, not be
+  re-encoded independently in every text or CLI recipe
 * treat `line_input_recipe` as the effective narrow line-input pure layer even
   though there is no separate `line_input_runtime_recipe`
 

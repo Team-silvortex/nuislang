@@ -171,6 +171,30 @@ mod cpu WitSageContracts {
     return shape + prep + split + model + eval;
   }
 
+  /// Produces a compact end-to-end WitSage pipeline score.
+  pub fn pipeline_total(
+    dataset_handle: i64,
+    rows: i64,
+    columns: i64,
+    train_rows: i64,
+    test_rows: i64,
+    preprocessing_kind: i64,
+    model_kind: i64,
+    kernel_plan_kind: i64,
+    work_items: i64,
+    metric_seed: i64
+  ) -> i64 {
+    let dataset_total: i64 =
+      dataset_handle + rows + columns + train_rows + test_rows;
+    let preprocessing_score: i64 =
+      preprocessing_total(dataset_handle, rows, columns, preprocessing_kind, metric_seed);
+    let model_score: i64 = model_kind + columns + metric_seed + 1;
+    let kernel_score: i64 =
+      kernel_plan_total(dataset_handle, rows, columns, model_kind, kernel_plan_kind, work_items);
+    let eval_score: i64 = test_rows + metric_seed + model_kind + kernel_plan_kind;
+    return dataset_total + preprocessing_score + model_score + kernel_score + eval_score;
+  }
+
   /// Produces a compact kernel-backed WitSage execution score.
   pub fn kernel_pipeline_total(
     dataset_handle: i64,

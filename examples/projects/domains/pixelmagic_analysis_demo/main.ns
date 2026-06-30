@@ -33,7 +33,22 @@ mod cpu Main {
       PixelMagicContracts.blur_op_kind(),
       1
     );
-    return filter_score + quality_score + handoff_score;
+    let render_plan_score: i64 = PixelMagicContracts.render_plan_total(
+      source_handle,
+      width,
+      height,
+      PixelMagicContracts.edge_op_kind(),
+      PixelMagicContracts.sharpen_op_kind(),
+      12,
+      9,
+      PixelMagicContracts.blur_op_kind(),
+      1,
+      4,
+      0,
+      0,
+      PixelMagicContracts.sample_output_kind_color()
+    );
+    return filter_score + quality_score + handoff_score + render_plan_score;
   }
 
   fn main() {

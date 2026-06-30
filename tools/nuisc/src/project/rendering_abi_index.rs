@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(test)]
 pub(in crate::project) fn render_project_abi_index(
     project: &LoadedProject,
 ) -> Result<String, String> {
