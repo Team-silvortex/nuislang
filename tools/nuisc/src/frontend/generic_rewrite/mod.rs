@@ -1,5 +1,15 @@
 mod blocks;
+mod blocks_expected;
+mod blocks_hoists;
+mod blocks_stmt;
 mod exprs;
+mod exprs_alias_expected;
+mod exprs_aliases;
+mod exprs_calls;
+mod exprs_expected;
+mod exprs_operators;
+mod exprs_specialization;
+mod exprs_structs;
 mod hoists;
 
 use std::collections::{BTreeMap, BTreeSet};
