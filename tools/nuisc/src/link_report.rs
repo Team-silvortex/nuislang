@@ -63,6 +63,76 @@ pub(crate) fn link_plan_domain_unit_json(unit: &linker::LinkPlanDomainUnit) -> S
     format!("{{{}}}", fields.join(","))
 }
 
+pub(crate) fn link_plan_hetero_node_json(node: &linker::LinkPlanHeteroNode) -> String {
+    let fields = vec![
+        json_usize_field("index", node.index),
+        json_string_field("timestamp", &node.timestamp),
+        json_string_field("domain_family", &node.domain_family),
+        json_string_field("package_id", &node.package_id),
+        json_string_field("lifecycle_hook", &node.lifecycle_hook),
+        json_string_array_field("wait_on", &node.wait_on),
+        json_string_array_field("emits", &node.emits),
+        json_string_field("link_input", &node.link_input),
+        json_bool_field("c_world_wrapper", node.c_world_wrapper),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn link_plan_data_segment_json(segment: &linker::LinkPlanDataSegment) -> String {
+    let fields = vec![
+        json_usize_field("index", segment.index),
+        json_string_field("segment_id", &segment.segment_id),
+        json_string_field("domain_family", &segment.domain_family),
+        json_string_field("owner_package", &segment.owner_package),
+        json_string_field("order_key", &segment.order_key),
+        json_string_field("access_phase", &segment.access_phase),
+        json_optional_string_field("source_path", segment.source_path.as_deref()),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn link_plan_hetero_validation_json(
+    validation: &linker::LinkPlanHeteroValidationSummary,
+) -> String {
+    let fields = vec![
+        json_usize_field("checked", validation.checked),
+        json_bool_field("valid", validation.valid),
+        json_string_array_field("issues", &validation.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn link_plan_hetero_calculate_json(plan: &linker::LinkPlanHeteroCalculate) -> String {
+    let nodes = plan
+        .nodes
+        .iter()
+        .map(link_plan_hetero_node_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let segments = plan
+        .data_segments
+        .iter()
+        .map(link_plan_data_segment_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = vec![
+        json_string_field("schema", &plan.schema),
+        json_string_field("mode", &plan.mode),
+        json_bool_field("static_link", plan.static_link),
+        json_bool_field("lifecycle_driven", plan.lifecycle_driven),
+        json_string_field("time_order_model", &plan.time_order_model),
+        json_string_field("data_order_model", &plan.data_order_model),
+        json_string_field("c_world_policy", &plan.c_world_policy),
+        format!(
+            "\"validation\":{}",
+            link_plan_hetero_validation_json(&plan.validation)
+        ),
+        format!("\"nodes\":[{}]", nodes),
+        format!("\"data_segments\":[{}]", segments),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
 pub(crate) fn link_plan_json(plan: &linker::LinkPlan) -> String {
     let domain_units = plan
         .domain_units
@@ -112,6 +182,10 @@ pub(crate) fn link_plan_json(plan: &linker::LinkPlan) -> String {
         format!(
             "\"artifact_lowering_alignment\":{}",
             artifact_lowering_alignment_summary_json(&plan.artifact_lowering_alignment)
+        ),
+        format!(
+            "\"hetero_calculate\":{}",
+            link_plan_hetero_calculate_json(&plan.hetero_calculate)
         ),
         json_usize_field("domain_unit_count", plan.domain_units.len()),
         format!("\"domain_units\":[{}]", domain_units),

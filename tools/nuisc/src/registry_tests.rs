@@ -528,6 +528,78 @@ fn network_manifest_skeleton_is_registered() {
 }
 
 #[test]
+fn shader_manifest_registers_texture_sampling_contracts() {
+    let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "shader").unwrap();
+    assert_eq!(manifest.package_id, "official.shader");
+    assert!(manifest
+        .support_surface
+        .contains(&"shader.profile.texture.v1".to_owned()));
+    assert!(manifest
+        .support_surface
+        .contains(&"shader.profile.sampler.v1".to_owned()));
+    assert!(manifest
+        .support_surface
+        .contains(&"shader.profile.bind-set.v1".to_owned()));
+    assert!(manifest
+        .support_profile_slots
+        .contains(&"texture_format".to_owned()));
+    assert!(manifest
+        .support_profile_slots
+        .contains(&"sampler_kind".to_owned()));
+    assert!(manifest
+        .support_profile_slots
+        .contains(&"bind_set".to_owned()));
+    assert!(manifest
+        .capability_tags
+        .contains(&"texture-sampling".to_owned()));
+    assert!(manifest
+        .capability_tags
+        .contains(&"bind-group-layout".to_owned()));
+    assert!(manifest
+        .default_lanes
+        .contains(&"shader.texture2d=resource".to_owned()));
+    assert!(manifest
+        .default_lanes
+        .contains(&"shader.sample_uv=render".to_owned()));
+}
+
+#[test]
+fn kernel_manifest_registers_tensor_axis_contracts() {
+    let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "kernel").unwrap();
+    assert_eq!(manifest.package_id, "official.kernel");
+    assert!(manifest
+        .support_surface
+        .contains(&"kernel.profile.tensor-shape.v1".to_owned()));
+    assert!(manifest
+        .support_surface
+        .contains(&"kernel.profile.tensor-reduce.v1".to_owned()));
+    assert!(manifest
+        .support_surface
+        .contains(&"kernel.profile.tensor-selection.v1".to_owned()));
+    assert!(manifest
+        .support_profile_slots
+        .contains(&"tensor_rows".to_owned()));
+    assert!(manifest
+        .support_profile_slots
+        .contains(&"reduce_axis".to_owned()));
+    assert!(manifest
+        .support_profile_slots
+        .contains(&"result_buffer".to_owned()));
+    assert!(manifest
+        .capability_tags
+        .contains(&"axis-reduction".to_owned()));
+    assert!(manifest
+        .capability_tags
+        .contains(&"tensor-selection".to_owned()));
+    assert!(manifest
+        .default_lanes
+        .contains(&"kernel.reduce_sum_axis=reduce".to_owned()));
+    assert!(manifest
+        .default_lanes
+        .contains(&"kernel.topk_axis=select".to_owned()));
+}
+
+#[test]
 fn cpu_manifest_contract_is_registered() {
     let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "cpu").unwrap();
     assert_eq!(manifest.package_id, "official.cpu");
@@ -898,6 +970,27 @@ fn validate_registered_domains_rejects_shader_backend_without_lowering_target() 
     assert!(issues.iter().any(|issue| {
         issue.kind == NustarRegistryIssueKind::DomainContractMismatch
             && issue.message.contains("cpu-fallback")
+    }));
+}
+
+#[test]
+fn validate_registered_domains_rejects_shader_missing_texture_profile_slot() {
+    let root = temp_registry_root("registry-shader-texture-slot");
+    let mut shader = load_manifest_for_domain(Path::new("nustar-packages"), "shader").unwrap();
+    shader
+        .support_profile_slots
+        .retain(|slot| slot != "texture_format");
+    let entries = vec![NustarPackageIndexEntry {
+        package_id: shader.package_id.clone(),
+        manifest: "shader.toml".to_owned(),
+        domain_family: shader.domain_family.clone(),
+    }];
+    write_registry_fixture(&root, &entries, &[shader]);
+
+    let issues = validate_registered_domains(&root).unwrap();
+    assert!(issues.iter().any(|issue| {
+        issue.kind == NustarRegistryIssueKind::DomainContractMismatch
+            && issue.message.contains("texture_format")
     }));
 }
 

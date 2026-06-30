@@ -15,6 +15,7 @@ pub struct LinkPlan {
     pub lowering_plan_index_path: Option<String>,
     pub domain_units: Vec<LinkPlanDomainUnit>,
     pub artifact_lowering_alignment: ArtifactLoweringAlignmentSummary,
+    pub hetero_calculate: LinkPlanHeteroCalculate,
     pub final_stage: LinkPlanFinalStage,
 }
 
@@ -120,4 +121,49 @@ pub struct LinkPlanFinalStage {
     pub output_path: String,
     pub inputs: Vec<String>,
     pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanHeteroCalculate {
+    pub schema: String,
+    pub mode: String,
+    pub static_link: bool,
+    pub lifecycle_driven: bool,
+    pub time_order_model: String,
+    pub data_order_model: String,
+    pub c_world_policy: String,
+    pub nodes: Vec<LinkPlanHeteroNode>,
+    pub data_segments: Vec<LinkPlanDataSegment>,
+    pub validation: LinkPlanHeteroValidationSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanHeteroNode {
+    pub index: usize,
+    pub timestamp: String,
+    pub domain_family: String,
+    pub package_id: String,
+    pub lifecycle_hook: String,
+    pub wait_on: Vec<String>,
+    pub emits: Vec<String>,
+    pub link_input: String,
+    pub c_world_wrapper: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanDataSegment {
+    pub index: usize,
+    pub segment_id: String,
+    pub domain_family: String,
+    pub owner_package: String,
+    pub order_key: String,
+    pub access_phase: String,
+    pub source_path: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanHeteroValidationSummary {
+    pub checked: usize,
+    pub valid: bool,
+    pub issues: Vec<String>,
 }

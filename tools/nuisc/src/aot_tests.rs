@@ -325,6 +325,11 @@ fn shader_lowering_and_stub_include_profile_aware_fields() {
     assert!(lowering_plan.contains("submission_adapter = \"metal-command-encoder\""));
     assert!(lowering_plan.contains("wake_adapter = \"metal-shared-event\""));
     assert!(lowering_plan.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]"));
+    assert!(lowering_plan.contains("shader.profile.texture.v1"));
+    assert!(lowering_plan.contains("shader.profile.sample-path.v1"));
+    assert!(
+        lowering_plan.contains("registered_lane_groups = [\"setup\", \"resource\", \"render\"]")
+    );
     assert!(lowering_plan.contains("lowering_ir = \"msl2.4\""));
     assert!(lowering_plan.contains("shader_stage_model = \"metal-render-pipeline\""));
     assert!(lowering_plan.contains("stage_binding_model = \"argument-buffer-specialized\""));
@@ -345,6 +350,14 @@ fn shader_lowering_and_stub_include_profile_aware_fields() {
     assert!(host_bridge_stub.contains("wake_adapter = \"metal-shared-event\""));
     let sidecar = super::render_domain_build_unit_shader_ir_sidecar(&shader_unit);
     assert!(sidecar.contains("ir_container = \"text.msl\""));
+    assert!(sidecar.contains("shader.profile.bind-set.v1"));
+    assert!(sidecar.contains("registered_lane_groups = [\"setup\", \"resource\", \"render\"]"));
+    assert!(sidecar.contains("[lowering_capabilities]"));
+    assert!(sidecar.contains("capability_owner = \"shader-nustar\""));
+    assert!(sidecar.contains("native_ir = \"msl2.4\""));
+    assert!(sidecar.contains("resource_lowering = \"argument-buffer-table\""));
+    assert!(sidecar.contains("texture_lowering = \"texture2d-sampler-argument\""));
+    assert!(sidecar.contains("shader.stage-interface"));
     assert!(sidecar.contains("entry_symbol = \"main0\""));
     assert!(sidecar.contains("stage_kind = \"fragment\""));
     assert!(sidecar.contains("resource_layout = \"argument-buffer\""));
@@ -381,6 +394,10 @@ fn shader_vulkan_lowering_plan_switches_to_spirv_pipeline_profile() {
     assert!(lowering_plan.contains("submission_adapter = \"vulkan-command-buffer\""));
     assert!(lowering_plan.contains("wake_adapter = \"vulkan-timeline-semaphore\""));
     assert!(lowering_plan.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]"));
+    assert!(lowering_plan.contains("shader.profile.sampler.v1"));
+    assert!(
+        lowering_plan.contains("registered_lane_groups = [\"setup\", \"resource\", \"render\"]")
+    );
     assert!(lowering_plan.contains("lowering_ir = \"spirv1.6\""));
     assert!(lowering_plan.contains("shader_stage_model = \"spirv-graphics-pipeline\""));
     assert!(lowering_plan.contains("stage_binding_model = \"descriptor-set-layout\""));
@@ -393,6 +410,10 @@ fn shader_vulkan_lowering_plan_switches_to_spirv_pipeline_profile() {
     assert!(backend_stub.contains("resource_binding_model = \"descriptor-set-layout\""));
     let sidecar = super::render_domain_build_unit_shader_ir_sidecar(&shader_unit);
     assert!(sidecar.contains("ir_container = \"text.spirv\""));
+    assert!(sidecar.contains("pipeline_lowering = \"vulkan-graphics-pipeline\""));
+    assert!(sidecar.contains("resource_lowering = \"descriptor-set-layout\""));
+    assert!(sidecar.contains("texture_lowering = \"sampled-image-descriptor\""));
+    assert!(sidecar.contains("spirv.interface-layout"));
     assert!(sidecar.contains("entry_symbol = \"main\""));
     assert!(sidecar.contains("stage_kind = \"fragment\""));
     assert!(sidecar.contains("resource_layout = \"descriptor-set\""));
@@ -445,6 +466,11 @@ fn kernel_coreml_profile_reports_dispatch_kinds() {
     let backend_stub = super::render_domain_build_unit_backend_stub(&kernel_unit);
 
     assert!(lowering_plan.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]"));
+    assert!(lowering_plan.contains("kernel.profile.tensor-reduce.v1"));
+    assert!(lowering_plan.contains("kernel.profile.result-buffer.v1"));
+    assert!(lowering_plan.contains(
+        "registered_lane_groups = [\"setup\", \"memory\", \"compute\", \"shape\", \"reduce\", \"select\", \"debug\"]"
+    ));
     assert!(backend_stub.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]"));
 }
 
@@ -462,6 +488,16 @@ fn kernel_coreml_sidecar_emits_dispatch_templates() {
 
     assert!(sidecar.contains("schema = \"nuis-kernel-ir-sidecar-v1\""));
     assert!(sidecar.contains("supported_dispatch_kinds = [\"graph\", \"batch\", \"tile\"]"));
+    assert!(sidecar.contains("kernel.profile.tensor-selection.v1"));
+    assert!(sidecar.contains(
+        "registered_lane_groups = [\"setup\", \"memory\", \"compute\", \"shape\", \"reduce\", \"select\", \"debug\"]"
+    ));
+    assert!(sidecar.contains("[lowering_capabilities]"));
+    assert!(sidecar.contains("capability_owner = \"kernel-nustar\""));
+    assert!(sidecar.contains("native_ir = \"coreml-program\""));
+    assert!(sidecar.contains("tensor_lowering = \"ranked-tensor-graph\""));
+    assert!(sidecar.contains("dispatch_lowering = \"ane-graph-submit\""));
+    assert!(sidecar.contains("kernel.shape-contract"));
     assert!(sidecar.contains("[dispatch_shapes]"));
     assert!(sidecar.contains("primary = \"graph\""));
     assert!(sidecar.contains("[entry_points]"));
@@ -484,6 +520,10 @@ fn kernel_vulkan_sidecar_emits_grid_and_indirect_dispatch_templates() {
 
     assert!(sidecar.contains("schema = \"nuis-kernel-ir-sidecar-v1\""));
     assert!(sidecar.contains("supported_dispatch_kinds = [\"grid\", \"indirect\", \"batch\"]"));
+    assert!(sidecar.contains("native_ir = \"spirv1.6\""));
+    assert!(sidecar.contains("tensor_lowering = \"storage-buffer-tensor-view\""));
+    assert!(sidecar.contains("dispatch_lowering = \"compute-grid-or-indirect\""));
+    assert!(sidecar.contains("spirv.compute-layout"));
     assert!(sidecar.contains("primary = \"grid\""));
     assert!(sidecar.contains("fallback = \"indirect\""));
     assert!(sidecar.contains("binding_table = \"set0.buffer0, set0.buffer1\""));
@@ -506,6 +546,10 @@ fn kernel_cpu_fallback_sidecar_emits_range_and_tile_dispatch_templates() {
 
     assert!(sidecar.contains("schema = \"nuis-kernel-ir-sidecar-v1\""));
     assert!(sidecar.contains("supported_dispatch_kinds = [\"range\", \"tile\", \"batch\"]"));
+    assert!(sidecar.contains("native_ir = \"host-simd\""));
+    assert!(sidecar.contains("tensor_lowering = \"slice-backed-tensor-view\""));
+    assert!(sidecar.contains("dispatch_lowering = \"threadpool-range-or-tile\""));
+    assert!(sidecar.contains("host.slice-bounds"));
     assert!(sidecar.contains("primary = \"range\""));
     assert!(sidecar.contains("fallback = \"tile\""));
     assert!(sidecar.contains("binding_table = \"slice.input, slice.output\""));
@@ -696,6 +740,9 @@ fn build_manifest_emits_shader_ir_sidecar() {
         shader_sidecar_text.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]")
     );
     assert!(shader_sidecar_text.contains("ir_container = \"text.msl\""));
+    assert!(shader_sidecar_text.contains("[lowering_capabilities]"));
+    assert!(shader_sidecar_text.contains("capability_owner = \"shader-nustar\""));
+    assert!(shader_sidecar_text.contains("pipeline_lowering = \"metal-render-pipeline-state\""));
     assert!(shader_sidecar_text.contains("entry_symbol = \"main0\""));
     assert!(shader_sidecar_text.contains("[pipeline_layout]"));
     assert!(shader_sidecar_text.contains("[resource_bindings]"));
@@ -1215,6 +1262,11 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
     );
     assert!(lowering_plan_index_text.contains("execution_route = \"ane-graph-execution\""));
     assert!(lowering_plan_index_text.contains("execution_route = \"foundation-session-reactor\""));
+    assert!(lowering_plan_index_text.contains("kernel.profile.tensor-reduce.v1"));
+    assert!(lowering_plan_index_text.contains("kernel.profile.result-buffer.v1"));
+    assert!(lowering_plan_index_text.contains(
+        "registered_lane_groups = [\"setup\", \"memory\", \"compute\", \"shape\", \"reduce\", \"select\", \"debug\"]"
+    ));
     assert!(lowering_plan_index_text
         .contains("symbol_namespace = \"nuis::domain::kernel::coreml_apple_ane\""));
     assert!(

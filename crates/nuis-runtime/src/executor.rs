@@ -451,7 +451,7 @@ fn optional_summary<'a>(
     prepared: &PreparedDomainExecution<'_>,
 ) -> Result<Option<String>, RuntimeError> {
     match section {
-        Some(Ok(text)) => Ok(Some(normalize_summary(text))),
+        Some(Ok(text)) => Ok(Some(normalize_ir_sidecar_summary(text))),
         Some(Err(error)) => Err(RuntimeError::new(format!(
             "invalid ir sidecar text for domain `{}`: {error}",
             prepared.unit.domain_family
@@ -466,6 +466,44 @@ fn normalize_summary(text: &str) -> String {
         .find(|line| !line.is_empty())
         .unwrap_or("")
         .to_owned()
+}
+
+fn normalize_ir_sidecar_summary(text: &str) -> String {
+    let mut in_lowering_capabilities = false;
+    let mut fields = Vec::new();
+    for line in text.lines().map(str::trim) {
+        if line == "[lowering_capabilities]" {
+            in_lowering_capabilities = true;
+            continue;
+        }
+        if in_lowering_capabilities && line.starts_with('[') {
+            break;
+        }
+        if !in_lowering_capabilities || line.is_empty() {
+            continue;
+        }
+        let Some((key, value)) = line.split_once(" = ") else {
+            continue;
+        };
+        if matches!(
+            key,
+            "capability_owner"
+                | "native_ir"
+                | "pipeline_lowering"
+                | "resource_lowering"
+                | "dispatch_lowering"
+                | "tensor_lowering"
+                | "texture_lowering"
+                | "result_lowering"
+        ) {
+            fields.push(format!("{key}={}", value.trim_matches('"')));
+        }
+    }
+    if fields.is_empty() {
+        normalize_summary(text)
+    } else {
+        fields.join(" ")
+    }
 }
 
 fn join_or_dash(values: &[String]) -> String {
@@ -741,6 +779,19 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
             value: ctx.backend_summary.to_owned(),
         },
     ];
+    if let Some(ir_sidecar_summary) = ctx.ir_sidecar_summary {
+        bindings.push(ExecutionResourceBinding {
+            key: "lowering_capabilities".to_owned(),
+            kind: ExecutionResourceKind::Metadata,
+            capability_label: Some(domain_resource_capability_label(
+                ctx.domain_family,
+                ctx.selected_lowering_target,
+                "lowering_capabilities",
+                &ExecutionResourceKind::Metadata,
+            )),
+            value: ir_sidecar_summary.to_owned(),
+        });
+    }
     match ctx.domain_family {
         "network" => {
             bindings.push(ExecutionResourceBinding {
@@ -1184,7 +1235,7 @@ mod tests {
                 },
                 DomainBuildUnitPayloadBlobSection {
                     name: "kernel_ir_sidecar".to_owned(),
-                    bytes: b"schema = \"nuis-kernel-ir-sidecar-v1\"".to_vec(),
+                    bytes: b"schema = \"nuis-kernel-ir-sidecar-v1\"\n[lowering_capabilities]\ncapability_owner = \"kernel-nustar\"\nnative_ir = \"spirv1.6\"\ntensor_lowering = \"storage-buffer-tensor-view\"\ndispatch_lowering = \"compute-grid-or-indirect\"\nresult_lowering = \"storage-buffer-result\"".to_vec(),
                 },
             ],
         }
@@ -1243,7 +1294,7 @@ mod tests {
                 },
                 DomainBuildUnitPayloadBlobSection {
                     name: "shader_ir_sidecar".to_owned(),
-                    bytes: b"schema = \"nuis-shader-ir-sidecar-v1\"".to_vec(),
+                    bytes: b"schema = \"nuis-shader-ir-sidecar-v1\"\n[lowering_capabilities]\ncapability_owner = \"shader-nustar\"\nnative_ir = \"msl2.4\"\npipeline_lowering = \"metal-render-pipeline-state\"\nresource_lowering = \"argument-buffer-table\"\ntexture_lowering = \"texture2d-sampler-argument\"".to_vec(),
                 },
             ],
         }
@@ -1722,6 +1773,12 @@ mod tests {
         let plan = Executor.plan(&prepared).unwrap();
 
         assert_eq!(
+            plan.phases[0].ir_sidecar_summary.as_deref(),
+            Some(
+                "capability_owner=kernel-nustar native_ir=spirv1.6 tensor_lowering=storage-buffer-tensor-view dispatch_lowering=compute-grid-or-indirect result_lowering=storage-buffer-result"
+            )
+        );
+        assert_eq!(
             plan.phases[0].action.input_handles,
             vec!["kernel.buffer".to_owned(), "queue.slot".to_owned()]
         );
@@ -1764,6 +1821,17 @@ mod tests {
                         &ExecutionResourceKind::Metadata,
                     )),
                     value: "kernel_ir = \"spirv1.6\"".to_owned()
+                },
+                ExecutionResourceBinding {
+                    key: "lowering_capabilities".to_owned(),
+                    kind: ExecutionResourceKind::Metadata,
+                    capability_label: Some(domain_resource_capability_label(
+                        "kernel",
+                        Some("vulkan.discrete-or-integrated-gpu"),
+                        "lowering_capabilities",
+                        &ExecutionResourceKind::Metadata,
+                    )),
+                    value: "capability_owner=kernel-nustar native_ir=spirv1.6 tensor_lowering=storage-buffer-tensor-view dispatch_lowering=compute-grid-or-indirect result_lowering=storage-buffer-result".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "kernel_buffer".to_owned(),
@@ -1818,6 +1886,14 @@ mod tests {
             prepared_network_execution(&adapter, &payload, &host_plan, &bridge_registry, &unit);
 
         let trace = Executor.execute_prepared(&prepared).unwrap();
+        let plan = Executor.plan(&prepared).unwrap();
+
+        assert_eq!(
+            plan.phases[0].ir_sidecar_summary.as_deref(),
+            Some(
+                "capability_owner=shader-nustar native_ir=msl2.4 pipeline_lowering=metal-render-pipeline-state resource_lowering=argument-buffer-table texture_lowering=texture2d-sampler-argument"
+            )
+        );
 
         assert_eq!(
             trace.events[0].action.input_handles,
@@ -1862,6 +1938,17 @@ mod tests {
                         &ExecutionResourceKind::Metadata,
                     )),
                     value: "shader_ir = \"msl2.4\"".to_owned()
+                },
+                ExecutionResourceBinding {
+                    key: "lowering_capabilities".to_owned(),
+                    kind: ExecutionResourceKind::Metadata,
+                    capability_label: Some(domain_resource_capability_label(
+                        "shader",
+                        Some("metal.apple-silicon-gpu"),
+                        "lowering_capabilities",
+                        &ExecutionResourceKind::Metadata,
+                    )),
+                    value: "capability_owner=shader-nustar native_ir=msl2.4 pipeline_lowering=metal-render-pipeline-state resource_lowering=argument-buffer-table texture_lowering=texture2d-sampler-argument".to_owned()
                 },
                 ExecutionResourceBinding {
                     key: "shader_buffer".to_owned(),

@@ -261,6 +261,35 @@ pub(crate) fn shader_supported_stages_for_profile(
     }
 }
 
+pub(crate) fn shader_registered_feature_surfaces_for_profile(
+    unit: &BuildManifestDomainBuildUnit,
+    _profile: &DerivedLoweringProfile<'_>,
+) -> Option<&'static [&'static str]> {
+    match unit.domain_family.as_str() {
+        "shader" => Some(&[
+            "shader.profile.target.v1",
+            "shader.profile.viewport.v1",
+            "shader.profile.pipeline.v1",
+            "shader.profile.texture.v1",
+            "shader.profile.sampler.v1",
+            "shader.profile.bind-set.v1",
+            "shader.profile.attachment.v1",
+            "shader.profile.sample-path.v1",
+        ]),
+        _ => None,
+    }
+}
+
+pub(crate) fn shader_registered_lane_groups_for_profile(
+    unit: &BuildManifestDomainBuildUnit,
+    _profile: &DerivedLoweringProfile<'_>,
+) -> Option<&'static [&'static str]> {
+    match unit.domain_family.as_str() {
+        "shader" => Some(&["setup", "resource", "render"]),
+        _ => None,
+    }
+}
+
 pub(crate) fn kernel_supported_dispatch_kinds_for_profile(
     unit: &BuildManifestDomainBuildUnit,
     profile: &DerivedLoweringProfile<'_>,
@@ -272,6 +301,57 @@ pub(crate) fn kernel_supported_dispatch_kinds_for_profile(
         ("kernel", _) => Some(&["graph"]),
         _ => None,
     }
+}
+
+pub(crate) fn kernel_registered_feature_surfaces_for_profile(
+    unit: &BuildManifestDomainBuildUnit,
+    _profile: &DerivedLoweringProfile<'_>,
+) -> Option<&'static [&'static str]> {
+    match unit.domain_family.as_str() {
+        "kernel" => Some(&[
+            "kernel.profile.bind-core.v1",
+            "kernel.profile.queue.v1",
+            "kernel.profile.batch-lanes.v1",
+            "kernel.profile.entry.v1",
+            "kernel.profile.tensor-shape.v1",
+            "kernel.profile.tensor-broadcast.v1",
+            "kernel.profile.tensor-reduce.v1",
+            "kernel.profile.tensor-selection.v1",
+            "kernel.profile.tensor-sort.v1",
+            "kernel.profile.tensor-topk.v1",
+            "kernel.profile.dispatch-grid.v1",
+            "kernel.profile.result-buffer.v1",
+        ]),
+        _ => None,
+    }
+}
+
+pub(crate) fn kernel_registered_lane_groups_for_profile(
+    unit: &BuildManifestDomainBuildUnit,
+    _profile: &DerivedLoweringProfile<'_>,
+) -> Option<&'static [&'static str]> {
+    match unit.domain_family.as_str() {
+        "kernel" => Some(&[
+            "setup", "memory", "compute", "shape", "reduce", "select", "debug",
+        ]),
+        _ => None,
+    }
+}
+
+pub(crate) fn registered_feature_surfaces_for_profile(
+    unit: &BuildManifestDomainBuildUnit,
+    profile: &DerivedLoweringProfile<'_>,
+) -> Option<&'static [&'static str]> {
+    shader_registered_feature_surfaces_for_profile(unit, profile)
+        .or_else(|| kernel_registered_feature_surfaces_for_profile(unit, profile))
+}
+
+pub(crate) fn registered_lane_groups_for_profile(
+    unit: &BuildManifestDomainBuildUnit,
+    profile: &DerivedLoweringProfile<'_>,
+) -> Option<&'static [&'static str]> {
+    shader_registered_lane_groups_for_profile(unit, profile)
+        .or_else(|| kernel_registered_lane_groups_for_profile(unit, profile))
 }
 
 #[cfg(test)]

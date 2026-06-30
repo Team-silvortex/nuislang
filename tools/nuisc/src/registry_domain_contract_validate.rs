@@ -65,27 +65,30 @@ fn validate_shader_domain_contract(
                     .to_owned(),
         });
     }
-    if !manifest
-        .support_profile_slots
-        .iter()
-        .any(|slot| slot == "target")
-        || !manifest
+    for required_slot in [
+        "target",
+        "viewport",
+        "pipeline",
+        "texture_format",
+        "sampler_kind",
+        "bind_set",
+    ] {
+        if !manifest
             .support_profile_slots
             .iter()
-            .any(|slot| slot == "viewport")
-        || !manifest
-            .support_profile_slots
-            .iter()
-            .any(|slot| slot == "pipeline")
-    {
-        issues.push(NustarRegistryIssue {
-            kind: NustarRegistryIssueKind::DomainContractMismatch,
-            package: Some(manifest.package_id.clone()),
-            domain: Some(manifest.domain_family.clone()),
-            manifest_path: Some(manifest_path.display().to_string()),
-            message: "shader domain must expose target/viewport/pipeline support_profile_slots"
-                .to_owned(),
-        });
+            .any(|slot| slot == required_slot)
+        {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "shader domain must expose `{}` in support_profile_slots",
+                    required_slot
+                ),
+            });
+        }
     }
     issues
 }
@@ -122,7 +125,16 @@ fn validate_kernel_domain_contract(
             ),
         });
     }
-    for required_slot in ["bind_core", "queue_depth", "batch_lanes", "entry"] {
+    for required_slot in [
+        "bind_core",
+        "queue_depth",
+        "batch_lanes",
+        "entry",
+        "tensor_rows",
+        "tensor_cols",
+        "reduce_axis",
+        "result_buffer",
+    ] {
         if !manifest
             .support_profile_slots
             .iter()

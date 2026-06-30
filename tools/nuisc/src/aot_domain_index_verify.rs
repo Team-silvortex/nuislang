@@ -2,9 +2,15 @@ use std::{fs, path::Path};
 
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
+use crate::aot_domain_profile::{
+    derived_lowering_profile_for_unit, registered_feature_surfaces_for_profile,
+    registered_lane_groups_for_profile,
+};
 use crate::aot_ffi_bridge;
 use crate::aot_symbol_anchor;
-use crate::aot_toml::{escape_toml_string, parse_required_toml_string, parse_required_toml_usize};
+use crate::aot_toml::{
+    escape_toml_string, parse_required_toml_string, parse_required_toml_usize, render_string_array,
+};
 
 pub(crate) struct DomainIndexVerifyReport {
     pub bridge_registry_checked: usize,
@@ -408,6 +414,35 @@ fn verify_lowering_plan_fields(
         if !source.contains(&format!("{field} = \"{}\"", escape_toml_string(expected))) {
             return Err(format!(
                 "domain lowering plan index `{}` is missing {field} for `{}`",
+                label, unit.domain_family
+            ));
+        }
+    }
+    let profile = derived_lowering_profile_for_unit(unit);
+    if let Some(feature_surfaces) = registered_feature_surfaces_for_profile(unit, &profile) {
+        let expected = render_string_array(
+            &feature_surfaces
+                .iter()
+                .map(|surface| (*surface).to_owned())
+                .collect::<Vec<_>>(),
+        );
+        if !source.contains(&format!("registered_feature_surfaces = {expected}")) {
+            return Err(format!(
+                "domain lowering plan index `{}` is missing registered_feature_surfaces for `{}`",
+                label, unit.domain_family
+            ));
+        }
+    }
+    if let Some(lane_groups) = registered_lane_groups_for_profile(unit, &profile) {
+        let expected = render_string_array(
+            &lane_groups
+                .iter()
+                .map(|lane| (*lane).to_owned())
+                .collect::<Vec<_>>(),
+        );
+        if !source.contains(&format!("registered_lane_groups = {expected}")) {
+            return Err(format!(
+                "domain lowering plan index `{}` is missing registered_lane_groups for `{}`",
                 label, unit.domain_family
             ));
         }

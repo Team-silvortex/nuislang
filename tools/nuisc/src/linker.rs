@@ -6,6 +6,8 @@ use crate::aot;
 mod linker_alignment;
 #[path = "linker_final_stage.rs"]
 mod linker_final_stage;
+#[path = "linker_hetero_calculate.rs"]
+mod linker_hetero_calculate;
 #[path = "linker_render.rs"]
 mod linker_render;
 #[path = "linker_types.rs"]
@@ -16,8 +18,9 @@ use linker_final_stage::derive_final_stage;
 pub use linker_render::render_link_plan_summary;
 pub use linker_types::{
     ArtifactLoweringAlignmentCheck, ArtifactLoweringAlignmentSummary, LinkPlan, LinkPlanArtifact,
-    LinkPlanCpuTarget, LinkPlanDomainUnit, LinkPlanEnvelope, LinkPlanFinalStage, LinkPlanLifecycle,
-    LINK_PLAN_SCHEMA,
+    LinkPlanCpuTarget, LinkPlanDataSegment, LinkPlanDomainUnit, LinkPlanEnvelope,
+    LinkPlanFinalStage, LinkPlanHeteroCalculate, LinkPlanHeteroNode,
+    LinkPlanHeteroValidationSummary, LinkPlanLifecycle, LINK_PLAN_SCHEMA,
 };
 
 pub fn build_link_plan(
@@ -105,6 +108,18 @@ pub fn build_link_plan(
     let artifact_lowering_alignment =
         build_artifact_lowering_alignment_summary(&compiled_artifact, &domain_units);
 
+    let lifecycle = LinkPlanLifecycle {
+        bootstrap_entry: report.lifecycle_bootstrap_entry.clone(),
+        tick_policy: report.lifecycle_tick_policy.clone(),
+        shutdown_policy: report.lifecycle_shutdown_policy.clone(),
+        yalivia_rpc: report.lifecycle_yalivia_rpc.clone(),
+        hook_surface: report.lifecycle_hook_surface.clone(),
+        export_surface: report.lifecycle_export_surface.clone(),
+        runtime_capability_flags: report.lifecycle_runtime_capability_flags.clone(),
+    };
+    let hetero_calculate =
+        linker_hetero_calculate::derive_hetero_calculate_plan(&lifecycle, &domain_units);
+
     LinkPlan {
         schema: LINK_PLAN_SCHEMA.to_owned(),
         input: report.input.clone(),
@@ -119,15 +134,7 @@ pub fn build_link_plan(
             clang_target: report.cpu_target_clang.clone(),
             cross_compile: report.cpu_target_cross,
         },
-        lifecycle: LinkPlanLifecycle {
-            bootstrap_entry: report.lifecycle_bootstrap_entry.clone(),
-            tick_policy: report.lifecycle_tick_policy.clone(),
-            shutdown_policy: report.lifecycle_shutdown_policy.clone(),
-            yalivia_rpc: report.lifecycle_yalivia_rpc.clone(),
-            hook_surface: report.lifecycle_hook_surface.clone(),
-            export_surface: report.lifecycle_export_surface.clone(),
-            runtime_capability_flags: report.lifecycle_runtime_capability_flags.clone(),
-        },
+        lifecycle,
         envelope: LinkPlanEnvelope {
             schema: artifact.envelope.schema.clone(),
             package_count: artifact.envelope.package_count,
@@ -143,6 +150,7 @@ pub fn build_link_plan(
         lowering_plan_index_path: report.lowering_plan_index_path.clone(),
         domain_units,
         artifact_lowering_alignment,
+        hetero_calculate,
         final_stage: derive_final_stage(report, &binary_path),
     }
 }
@@ -323,6 +331,10 @@ mod tests {
         assert_eq!(plan.compiled_artifact.binary_path, "out/demo");
         assert_eq!(plan.domain_units.len(), 1);
         assert_eq!(plan.domain_units[0].kind, "host");
+        assert_eq!(plan.hetero_calculate.mode, "host-only");
+        assert!(plan.hetero_calculate.static_link);
+        assert!(plan.hetero_calculate.lifecycle_driven);
+        assert!(plan.hetero_calculate.nodes.is_empty());
         assert_eq!(plan.artifact_lowering_alignment.checked, 0);
         assert!(plan.artifact_lowering_alignment.consistent);
     }
@@ -397,11 +409,100 @@ mod tests {
             .any(|input| input == "out/nuis.lowering.plan-index.toml"));
         assert_eq!(plan.domain_units.len(), 2);
         assert_eq!(plan.domain_units[1].kind, "heterogeneous");
+        assert_eq!(plan.hetero_calculate.mode, "heterogeneous-static-lifecycle");
+        assert_eq!(
+            plan.hetero_calculate.time_order_model,
+            "timestamped-partial-order"
+        );
+        assert_eq!(
+            plan.hetero_calculate.data_order_model,
+            "deterministic-segment-order"
+        );
+        assert_eq!(
+            plan.hetero_calculate.c_world_policy,
+            "wrapped-ordinary-node-no-linker-fast-path"
+        );
+        assert_eq!(plan.hetero_calculate.nodes.len(), 1);
+        assert!(plan.hetero_calculate.validation.valid);
+        assert!(plan.hetero_calculate.validation.issues.is_empty());
+        assert_eq!(plan.hetero_calculate.nodes[0].timestamp, "t0001.shader");
+        assert_eq!(
+            plan.hetero_calculate.nodes[0].lifecycle_hook,
+            "on_hetero_submission_progress"
+        );
+        assert_eq!(
+            plan.hetero_calculate.nodes[0].wait_on,
+            vec!["t0000.nustar.bootstrap.v1".to_owned()]
+        );
+        assert!(plan.hetero_calculate.nodes[0].c_world_wrapper);
+        assert_eq!(plan.hetero_calculate.data_segments.len(), 1);
+        assert_eq!(
+            plan.hetero_calculate.data_segments[0].order_key,
+            "data:0001:shader"
+        );
         assert_eq!(
             plan.domain_units[1].artifact_payload_blob_path.as_deref(),
             Some("out/shader.ndpb")
         );
+        let lines = render_link_plan_summary(&plan);
+        assert!(lines.iter().any(
+            |line| line.contains("hetero_calculate: schema=nuis-hetero-calculate-link-plan-v1")
+        ));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("hetero_validation: checked=")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("valid=true issues=none")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("hetero_node: index=0 timestamp=t0001.shader")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("data_segment: index=0 id=seg0001.shader")));
         assert_eq!(plan.artifact_lowering_alignment.checked, 0);
         assert!(plan.artifact_lowering_alignment.consistent);
+    }
+
+    #[test]
+    fn hetero_calculate_validation_rejects_broken_time_order() {
+        let report = sample_report(
+            "window-aot-bundle",
+            vec![aot::BuildManifestDomainBuildUnit {
+                package_id: "official.kernel".to_owned(),
+                domain_family: "kernel".to_owned(),
+                abi: Some("kernel.vulkan".to_owned()),
+                machine_arch: Some("gpu".to_owned()),
+                machine_os: Some("darwin".to_owned()),
+                backend_family: Some("vulkan".to_owned()),
+                vendor: Some("cross-vendor".to_owned()),
+                device_class: Some("discrete-or-integrated-gpu".to_owned()),
+                selected_lowering_target: Some("vulkan.discrete-or-integrated-gpu".to_owned()),
+                artifact_stub_path: Some("out/kernel.stub.toml".to_owned()),
+                artifact_stub_inline: None,
+                artifact_payload_path: Some("out/kernel.payload.toml".to_owned()),
+                artifact_bridge_stub_path: Some("out/kernel.bridge.c".to_owned()),
+                artifact_ir_sidecar_path: Some("out/kernel.lowering.ir.txt".to_owned()),
+                artifact_bridge_stub_inline: None,
+                artifact_payload_blob_path: Some("out/kernel.ndpb".to_owned()),
+                artifact_payload_blob_bytes: Some(128),
+                artifact_payload_format: Some("ndpb-v2".to_owned()),
+                artifact_payload_blob_inline: None,
+                contract_family: "nustar.kernel".to_owned(),
+                packaging_role: "hetero-payload".to_owned(),
+            }],
+        );
+        let artifact = sample_artifact();
+        let mut plan = build_link_plan(&report, &artifact);
+        plan.hetero_calculate.nodes[0].timestamp = "t9999.kernel".to_owned();
+
+        let validation =
+            linker_hetero_calculate::validate_hetero_calculate_plan(&plan.hetero_calculate);
+
+        assert!(!validation.valid);
+        assert!(validation
+            .issues
+            .iter()
+            .any(|issue| issue.contains("node timestamp mismatch")));
     }
 }

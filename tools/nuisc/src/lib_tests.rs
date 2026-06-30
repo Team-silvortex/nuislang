@@ -1066,6 +1066,22 @@ fn artifact_report_summary_lines_expose_compact_overview() {
             consistent: true,
             checks: Vec::new(),
         },
+        hetero_calculate: linker::LinkPlanHeteroCalculate {
+            schema: "nuis-hetero-calculate-link-plan-v1".to_owned(),
+            mode: "host-only".to_owned(),
+            static_link: true,
+            lifecycle_driven: true,
+            time_order_model: "timestamped-partial-order".to_owned(),
+            data_order_model: "deterministic-segment-order".to_owned(),
+            c_world_policy: "wrapped-ordinary-node-no-linker-fast-path".to_owned(),
+            nodes: Vec::new(),
+            data_segments: Vec::new(),
+            validation: linker::LinkPlanHeteroValidationSummary {
+                checked: 6,
+                valid: true,
+                issues: Vec::new(),
+            },
+        },
         final_stage: linker::LinkPlanFinalStage {
             kind: "host-native-link".to_owned(),
             driver: "clang".to_owned(),
@@ -1142,6 +1158,17 @@ fn artifact_report_summary_lines_expose_compact_overview() {
     assert!(v1_link_plan_json.contains("\"checked\":0"));
     assert!(v1_link_plan_json.contains("\"mismatches\":0"));
     assert!(v1_link_plan_json.contains("\"consistent\":true"));
+    assert!(v1_link_plan_json.contains("\"hetero_calculate\":{"));
+    assert!(v1_link_plan_json.contains("\"schema\":\"nuis-hetero-calculate-link-plan-v1\""));
+    assert!(v1_link_plan_json.contains("\"static_link\":true"));
+    assert!(v1_link_plan_json.contains("\"lifecycle_driven\":true"));
+    assert!(v1_link_plan_json.contains("\"time_order_model\":\"timestamped-partial-order\""));
+    assert!(v1_link_plan_json.contains("\"data_order_model\":\"deterministic-segment-order\""));
+    assert!(v1_link_plan_json
+        .contains("\"c_world_policy\":\"wrapped-ordinary-node-no-linker-fast-path\""));
+    assert!(v1_link_plan_json.contains("\"validation\":{"));
+    assert!(v1_link_plan_json.contains("\"valid\":true"));
+    assert!(v1_link_plan_json.contains("\"issues\":[]"));
 
     let mut v2_link_plan = link_plan.clone();
     v2_link_plan.compiled_artifact.container_kind =

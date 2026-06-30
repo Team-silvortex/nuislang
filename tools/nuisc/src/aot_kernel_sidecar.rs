@@ -1,7 +1,8 @@
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
 use crate::aot_domain_profile::{
-    derived_lowering_profile_for_unit, kernel_supported_dispatch_kinds_for_profile,
+    derived_lowering_profile_for_unit, kernel_registered_feature_surfaces_for_profile,
+    kernel_registered_lane_groups_for_profile, kernel_supported_dispatch_kinds_for_profile,
     render_target_specific_backend_fields,
 };
 use crate::aot_toml::{escape_toml_string, render_string_array};
@@ -44,7 +45,76 @@ pub(crate) fn render_domain_build_unit_kernel_ir_sidecar(
             )
         ));
     }
+    if let Some(feature_surfaces) = kernel_registered_feature_surfaces_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "registered_feature_surfaces = {}\n",
+            render_string_array(
+                &feature_surfaces
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
+    if let Some(lane_groups) = kernel_registered_lane_groups_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "registered_lane_groups = {}\n",
+            render_string_array(
+                &lane_groups
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
     out.push_str(&render_target_specific_backend_fields(unit, &profile));
+    out.push_str("[lowering_capabilities]\n");
+    out.push_str("binary_role = \"linker-input-sidecar\"\n");
+    out.push_str("capability_owner = \"kernel-nustar\"\n");
+    match profile.profile_key {
+        "coreml.apple-ane" => {
+            out.push_str("frontend_ir = \"nuis-yir.kernel\"\n");
+            out.push_str("native_ir = \"coreml-program\"\n");
+            out.push_str("tensor_lowering = \"ranked-tensor-graph\"\n");
+            out.push_str("dispatch_lowering = \"ane-graph-submit\"\n");
+            out.push_str("memory_lowering = \"tensor-argument-table\"\n");
+            out.push_str("result_lowering = \"managed-result-buffer\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.tensor-lifetime\", \"time.graph-completion\", \"kernel.shape-contract\"]\n",
+            );
+        }
+        "vulkan.discrete-or-integrated-gpu" => {
+            out.push_str("frontend_ir = \"nuis-yir.kernel\"\n");
+            out.push_str("native_ir = \"spirv1.6\"\n");
+            out.push_str("tensor_lowering = \"storage-buffer-tensor-view\"\n");
+            out.push_str("dispatch_lowering = \"compute-grid-or-indirect\"\n");
+            out.push_str("memory_lowering = \"descriptor-set-storage-buffer\"\n");
+            out.push_str("result_lowering = \"storage-buffer-result\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.buffer-lifetime\", \"time.compute-fence\", \"spirv.compute-layout\"]\n",
+            );
+        }
+        "cpu-fallback.cpu-host" => {
+            out.push_str("frontend_ir = \"nuis-yir.kernel\"\n");
+            out.push_str("native_ir = \"host-simd\"\n");
+            out.push_str("tensor_lowering = \"slice-backed-tensor-view\"\n");
+            out.push_str("dispatch_lowering = \"threadpool-range-or-tile\"\n");
+            out.push_str("memory_lowering = \"host-buffer-slices\"\n");
+            out.push_str("result_lowering = \"owned-output-slice\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.slice-lifetime\", \"time.threadpool-join\", \"host.slice-bounds\"]\n",
+            );
+        }
+        _ => {
+            out.push_str("frontend_ir = \"nuis-yir.kernel\"\n");
+            out.push_str("native_ir = \"unknown\"\n");
+            out.push_str("tensor_lowering = \"unimplemented\"\n");
+            out.push_str("dispatch_lowering = \"unimplemented\"\n");
+            out.push_str("memory_lowering = \"unimplemented\"\n");
+            out.push_str("result_lowering = \"unimplemented\"\n");
+            out.push_str("validation_contracts = [\"glm.buffer-lifetime\"]\n");
+        }
+    }
     out.push_str("[dispatch_shapes]\n");
     match profile.profile_key {
         "coreml.apple-ane" => {

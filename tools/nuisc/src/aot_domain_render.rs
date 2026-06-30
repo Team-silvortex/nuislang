@@ -2,8 +2,10 @@ use nuis_artifact::BuildManifestDomainBuildUnit;
 
 use crate::aot_domain_contract::summary_for_unit as domain_build_contract_summary_for_unit;
 use crate::aot_domain_profile::{
-    derived_lowering_profile_for_unit, kernel_supported_dispatch_kinds_for_profile,
+    derived_lowering_profile_for_unit, kernel_registered_feature_surfaces_for_profile,
+    kernel_registered_lane_groups_for_profile, kernel_supported_dispatch_kinds_for_profile,
     render_target_specific_backend_fields, render_target_specific_lowering_fields,
+    shader_registered_feature_surfaces_for_profile, shader_registered_lane_groups_for_profile,
     shader_supported_stages_for_profile,
 };
 use crate::aot_toml::{escape_toml_string, render_string_array};
@@ -94,10 +96,54 @@ pub(crate) fn render_domain_build_unit_lowering_plan(
             )
         ));
     }
+    if let Some(feature_surfaces) = kernel_registered_feature_surfaces_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "registered_feature_surfaces = {}\n",
+            render_string_array(
+                &feature_surfaces
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
+    if let Some(lane_groups) = kernel_registered_lane_groups_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "registered_lane_groups = {}\n",
+            render_string_array(
+                &lane_groups
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
     if let Some(stages) = shader_supported_stages_for_profile(unit, &profile) {
         out.push_str(&format!(
             "supported_stages = {}\n",
             render_string_array(&stages.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>())
+        ));
+    }
+    if let Some(feature_surfaces) = shader_registered_feature_surfaces_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "registered_feature_surfaces = {}\n",
+            render_string_array(
+                &feature_surfaces
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
+    if let Some(lane_groups) = shader_registered_lane_groups_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "registered_lane_groups = {}\n",
+            render_string_array(
+                &lane_groups
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
         ));
     }
     out.push_str(&render_target_specific_lowering_fields(unit, &profile));

@@ -2,6 +2,7 @@ use nuis_artifact::BuildManifestDomainBuildUnit;
 
 use crate::aot_domain_profile::{
     derived_lowering_profile_for_unit, render_target_specific_lowering_fields,
+    shader_registered_feature_surfaces_for_profile, shader_registered_lane_groups_for_profile,
     shader_supported_stages_for_profile,
 };
 use crate::aot_toml::{escape_toml_string, render_string_array};
@@ -45,7 +46,98 @@ pub(crate) fn render_domain_build_unit_shader_ir_sidecar(
             )
         ));
     }
+    if let Some(feature_surfaces) = shader_registered_feature_surfaces_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "registered_feature_surfaces = {}\n",
+            render_string_array(
+                &feature_surfaces
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
+    if let Some(lane_groups) = shader_registered_lane_groups_for_profile(unit, &profile) {
+        out.push_str(&format!(
+            "registered_lane_groups = {}\n",
+            render_string_array(
+                &lane_groups
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect::<Vec<_>>()
+            )
+        ));
+    }
     out.push_str(&render_target_specific_lowering_fields(unit, &profile));
+    out.push_str("[lowering_capabilities]\n");
+    out.push_str("binary_role = \"linker-input-sidecar\"\n");
+    out.push_str("capability_owner = \"shader-nustar\"\n");
+    match profile.profile_key {
+        "metal.apple-silicon-gpu" | "metal.mac-discrete-or-integrated-gpu" => {
+            out.push_str("frontend_ir = \"nuis-yir.shader\"\n");
+            out.push_str("native_ir = \"msl2.4\"\n");
+            out.push_str("pipeline_lowering = \"metal-render-pipeline-state\"\n");
+            out.push_str("resource_lowering = \"argument-buffer-table\"\n");
+            out.push_str("dispatch_lowering = \"command-encoder-draw-dispatch\"\n");
+            out.push_str("texture_lowering = \"texture2d-sampler-argument\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.resource-lifetime\", \"time.render-pass-order\", \"shader.stage-interface\"]\n",
+            );
+        }
+        "vulkan.discrete-or-integrated-gpu" => {
+            out.push_str("frontend_ir = \"nuis-yir.shader\"\n");
+            out.push_str("native_ir = \"spirv1.6\"\n");
+            out.push_str("pipeline_lowering = \"vulkan-graphics-pipeline\"\n");
+            out.push_str("resource_lowering = \"descriptor-set-layout\"\n");
+            out.push_str("dispatch_lowering = \"renderpass-command-buffer\"\n");
+            out.push_str("texture_lowering = \"sampled-image-descriptor\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.resource-lifetime\", \"time.render-pass-order\", \"spirv.interface-layout\"]\n",
+            );
+        }
+        "directx.discrete-or-integrated-gpu" => {
+            out.push_str("frontend_ir = \"nuis-yir.shader\"\n");
+            out.push_str("native_ir = \"dxil6.8\"\n");
+            out.push_str("pipeline_lowering = \"directx-pipeline-state-object\"\n");
+            out.push_str("resource_lowering = \"root-signature-table\"\n");
+            out.push_str("dispatch_lowering = \"command-list-draw-dispatch\"\n");
+            out.push_str("texture_lowering = \"srv-sampler-pair\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.resource-lifetime\", \"time.render-pass-order\", \"dxil.signature-layout\"]\n",
+            );
+        }
+        "opengl.discrete-or-integrated-gpu" => {
+            out.push_str("frontend_ir = \"nuis-yir.shader\"\n");
+            out.push_str("native_ir = \"glsl460\"\n");
+            out.push_str("pipeline_lowering = \"linked-program-pipeline\"\n");
+            out.push_str("resource_lowering = \"uniform-and-sampler-slots\"\n");
+            out.push_str("dispatch_lowering = \"driver-managed-draw-dispatch\"\n");
+            out.push_str("texture_lowering = \"sampler-uniform-binding\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.resource-lifetime\", \"time.render-pass-order\", \"glsl.binding-slots\"]\n",
+            );
+        }
+        "cpu-fallback.cpu-host" => {
+            out.push_str("frontend_ir = \"nuis-yir.shader\"\n");
+            out.push_str("native_ir = \"host-simd\"\n");
+            out.push_str("pipeline_lowering = \"cpu-raster-pipeline\"\n");
+            out.push_str("resource_lowering = \"host-buffer-slices\"\n");
+            out.push_str("dispatch_lowering = \"threadpool-tile-dispatch\"\n");
+            out.push_str("texture_lowering = \"slice-sampler-loop\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.resource-lifetime\", \"time.tile-order\", \"host.slice-bounds\"]\n",
+            );
+        }
+        _ => {
+            out.push_str("frontend_ir = \"nuis-yir.shader\"\n");
+            out.push_str("native_ir = \"unknown\"\n");
+            out.push_str("pipeline_lowering = \"unimplemented\"\n");
+            out.push_str("resource_lowering = \"unimplemented\"\n");
+            out.push_str("dispatch_lowering = \"unimplemented\"\n");
+            out.push_str("texture_lowering = \"unimplemented\"\n");
+            out.push_str("validation_contracts = [\"glm.resource-lifetime\"]\n");
+        }
+    }
     match profile.profile_key {
         "metal.apple-silicon-gpu" | "metal.mac-discrete-or-integrated-gpu" => {
             out.push_str("ir_container = \"text.msl\"\n");

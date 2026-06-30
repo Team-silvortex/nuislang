@@ -6,7 +6,10 @@ use std::{
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
 use crate::aot_domain_contract::summary_for_unit as domain_build_contract_summary_for_unit;
-use crate::aot_domain_profile::derived_lowering_profile_for_unit;
+use crate::aot_domain_profile::{
+    derived_lowering_profile_for_unit, registered_feature_surfaces_for_profile,
+    registered_lane_groups_for_profile,
+};
 use crate::aot_domain_render::{
     render_domain_build_unit_bridge_plan, render_domain_build_unit_lowering_plan,
 };
@@ -343,6 +346,28 @@ pub(crate) fn render_domain_lowering_plan_index(units: &[&BuildManifestDomainBui
             "wake_adapter = \"{}\"\n",
             escape_toml_string(profile.wake_adapter)
         ));
+        if let Some(feature_surfaces) = registered_feature_surfaces_for_profile(unit, &profile) {
+            out.push_str(&format!(
+                "registered_feature_surfaces = {}\n",
+                render_string_array(
+                    &feature_surfaces
+                        .iter()
+                        .map(|surface| (*surface).to_owned())
+                        .collect::<Vec<_>>()
+                )
+            ));
+        }
+        if let Some(lane_groups) = registered_lane_groups_for_profile(unit, &profile) {
+            out.push_str(&format!(
+                "registered_lane_groups = {}\n",
+                render_string_array(
+                    &lane_groups
+                        .iter()
+                        .map(|lane| (*lane).to_owned())
+                        .collect::<Vec<_>>()
+                )
+            ));
+        }
         out.push_str(&format!(
             "symbol_namespace = \"{}\"\n",
             escape_toml_string(&aot_symbol_anchor::namespace(unit))
