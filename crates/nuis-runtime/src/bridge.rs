@@ -1,6 +1,6 @@
 use nuis_artifact::{
-    BridgeRegistryEntry, BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob,
-    HostBridgePlanEntry,
+    BridgeRegistryEntry, BuildManifestDomainBuildUnit, ClockDomain, ClockEdge,
+    DomainBuildUnitPayloadBlob, HostBridgePlanEntry,
 };
 
 use crate::{AdapterRegistry, DomainAdapter, LoadedExecutable, RuntimeError};
@@ -11,6 +11,8 @@ pub struct PreparedDomainExecution<'a> {
     pub adapter: &'a dyn DomainAdapter,
     pub bridge_registry_entry: Option<&'a BridgeRegistryEntry>,
     pub host_bridge_plan_entry: Option<&'a HostBridgePlanEntry>,
+    pub clock_domain: Option<&'a ClockDomain>,
+    pub clock_edges: Vec<&'a ClockEdge>,
 }
 
 impl<'a> PreparedDomainExecution<'a> {
@@ -65,6 +67,23 @@ impl BridgeExecutor {
             .host_bridge_plan_index
             .as_ref()
             .and_then(|index| index.find_by_domain_family(domain_family));
+        let clock_domain = executable
+            .clock_protocol
+            .as_ref()
+            .and_then(|protocol| protocol.find_domain(domain_family));
+        let clock_edges = executable
+            .clock_protocol
+            .as_ref()
+            .map(|protocol| {
+                protocol
+                    .happens_before_edges()
+                    .filter(|edge| {
+                        edge.to.ends_with(&format!(".{domain_family}"))
+                            || edge.source.contains(domain_family)
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
 
         if unit.is_heterogeneous() {
             if payload_blob.is_none() {
@@ -90,6 +109,8 @@ impl BridgeExecutor {
             adapter,
             bridge_registry_entry,
             host_bridge_plan_entry,
+            clock_domain,
+            clock_edges,
         })
     }
 }
@@ -231,6 +252,10 @@ mod tests {
                 host_bridge_plan_index_schema: Some("nuis-host-bridge-plan-index-v1".to_owned()),
                 host_bridge_plan_units: 1,
                 host_bridge_plan_index_inline: None,
+                clock_protocol_path: None,
+                clock_protocol_schema: None,
+                clock_protocol_domains: 0,
+                clock_protocol_inline: None,
                 artifact_hashes: vec![],
                 execution_contract_count: 1,
                 domain_build_units: vec![unit.clone()],
@@ -299,6 +324,7 @@ mod tests {
                     plan_inline: String::new(),
                 }],
             }),
+            clock_protocol: None,
         }
     }
 

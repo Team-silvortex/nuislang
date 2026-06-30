@@ -1,6 +1,7 @@
 mod artifact;
 mod bridge_registry;
 mod build_manifest;
+mod clock_protocol;
 mod domain_unit;
 mod envelope;
 mod error;
@@ -23,6 +24,9 @@ pub use bridge_registry::{
 };
 pub use build_manifest::{
     parse_build_manifest, parse_build_manifest_from_source, ArtifactHashEntry, BuildManifest,
+};
+pub use clock_protocol::{
+    parse_clock_protocol, parse_clock_protocol_from_source, ClockDomain, ClockEdge, ClockProtocol,
 };
 pub use domain_unit::{parse_domain_build_unit_blocks, BuildManifestDomainBuildUnit};
 pub use envelope::{

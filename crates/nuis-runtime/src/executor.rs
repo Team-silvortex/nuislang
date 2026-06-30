@@ -55,6 +55,25 @@ pub struct ExecutionPhaseOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ExecutionClockGate {
+    pub wait_on: Vec<String>,
+    pub emits: Vec<String>,
+}
+
+impl ExecutionClockGate {
+    pub fn is_empty(&self) -> bool {
+        self.wait_on.is_empty() && self.emits.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ExecutionClockValidation {
+    pub initial_timestamps: Vec<String>,
+    pub observed_emits: Vec<String>,
+    pub final_timestamps: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ExecutionStateSnapshot {
     pub available_handles: Vec<String>,
     pub handle_slots: Vec<ExecutionResourceBinding>,
@@ -70,6 +89,8 @@ pub struct ExecutionPhaseBinding {
     pub backend_summary: String,
     pub bridge_summary: String,
     pub ir_sidecar_summary: Option<String>,
+    pub clock_summary: Option<String>,
+    pub clock_gate: ExecutionClockGate,
     pub action: ExecutionPhaseAction,
 }
 
@@ -80,6 +101,8 @@ pub struct ExecutionPlan {
     pub adapter_id: String,
     pub backend_family: Option<String>,
     pub selected_lowering_target: Option<String>,
+    pub clock_summary: Option<String>,
+    pub clock_gate: ExecutionClockGate,
     pub phases: Vec<ExecutionPhaseBinding>,
 }
 
@@ -96,6 +119,16 @@ impl ExecutionPlan {
         if let Some(target) = &self.selected_lowering_target {
             lines.push(format!("selected_lowering_target = {target}"));
         }
+        if let Some(clock_summary) = &self.clock_summary {
+            lines.push(format!("clock_summary = {clock_summary}"));
+        }
+        if !self.clock_gate.is_empty() {
+            lines.push(format!(
+                "clock_gate = wait_on:{} emits:{}",
+                join_or_dash(&self.clock_gate.wait_on),
+                join_or_dash(&self.clock_gate.emits)
+            ));
+        }
         lines.push(format!("phase_count = {}", self.phases.len()));
 
         for phase in &self.phases {
@@ -107,6 +140,16 @@ impl ExecutionPlan {
             lines.push(format!("  bridge_summary = {}", phase.bridge_summary));
             if let Some(ir_sidecar_summary) = &phase.ir_sidecar_summary {
                 lines.push(format!("  ir_sidecar_summary = {ir_sidecar_summary}"));
+            }
+            if let Some(clock_summary) = &phase.clock_summary {
+                lines.push(format!("  clock_summary = {clock_summary}"));
+            }
+            if !phase.clock_gate.is_empty() {
+                lines.push(format!(
+                    "  clock_gate = wait_on:{} emits:{}",
+                    join_or_dash(&phase.clock_gate.wait_on),
+                    join_or_dash(&phase.clock_gate.emits)
+                ));
             }
             lines.push(format!("  action_kind = {}", phase.action.kind));
             lines.push(format!(
@@ -154,6 +197,8 @@ pub struct ExecutionPhaseContext<'a> {
     pub backend_summary: &'a str,
     pub bridge_summary: &'a str,
     pub ir_sidecar_summary: Option<&'a str>,
+    pub clock_summary: Option<&'a str>,
+    pub clock_gate: &'a ExecutionClockGate,
     pub available_handles: &'a [String],
     pub available_slots: &'a [ExecutionResourceBinding],
 }
@@ -165,6 +210,7 @@ pub struct ExecutionTraceEvent {
     pub adapter_id: String,
     pub bridge_surface: String,
     pub scheduler_binding: String,
+    pub clock_gate: ExecutionClockGate,
     pub action: ExecutionPhaseAction,
     pub outcome: ExecutionPhaseOutcome,
     pub state_before: ExecutionStateSnapshot,
@@ -179,6 +225,13 @@ pub struct ExecutionTrace {
 }
 
 impl ExecutionTrace {
+    pub fn validate_clock_gates(
+        &self,
+        initial_timestamps: &[String],
+    ) -> Result<ExecutionClockValidation, RuntimeError> {
+        validate_clock_gate_sequence(&self.events, initial_timestamps)
+    }
+
     pub fn render_summary(&self) -> String {
         let mut lines = vec![
             format!("domain_family = {}", self.domain_family),
@@ -192,6 +245,13 @@ impl ExecutionTrace {
             ));
             lines.push(format!("  bridge_surface = {}", event.bridge_surface));
             lines.push(format!("  scheduler_binding = {}", event.scheduler_binding));
+            if !event.clock_gate.is_empty() {
+                lines.push(format!(
+                    "  clock_gate = wait_on:{} emits:{}",
+                    join_or_dash(&event.clock_gate.wait_on),
+                    join_or_dash(&event.clock_gate.emits)
+                ));
+            }
             lines.push(format!("  action_kind = {}", event.action.kind));
             lines.push(format!("  outcome_status = {}", event.outcome.status));
             lines.push(format!(
@@ -270,6 +330,8 @@ impl Executor {
         let bridge_summary =
             normalized_summary(prepared.bridge_plan_text(), "bridge_plan", prepared)?;
         let ir_sidecar_summary = optional_summary(prepared.ir_sidecar_text(), prepared)?;
+        let clock_summary = execution_clock_summary(prepared);
+        let clock_gate = execution_clock_gate(prepared);
 
         let phases = phase_order
             .iter()
@@ -289,6 +351,8 @@ impl Executor {
                     backend_summary: &backend_summary,
                     bridge_summary: &bridge_summary,
                     ir_sidecar_summary: ir_sidecar_summary.as_deref(),
+                    clock_summary: clock_summary.as_deref(),
+                    clock_gate: &clock_gate,
                     available_handles: &[],
                     available_slots: &[],
                 };
@@ -301,6 +365,8 @@ impl Executor {
                     backend_summary: backend_summary.clone(),
                     bridge_summary: bridge_summary.clone(),
                     ir_sidecar_summary: ir_sidecar_summary.clone(),
+                    clock_summary: clock_summary.clone(),
+                    clock_gate: clock_gate.clone(),
                     action: prepared
                         .adapter
                         .phase_action(&ctx)
@@ -315,6 +381,8 @@ impl Executor {
             adapter_id: prepared.adapter.adapter_id().to_owned(),
             backend_family: prepared.unit.backend_family.clone(),
             selected_lowering_target: prepared.unit.selected_lowering_target.clone(),
+            clock_summary,
+            clock_gate,
             phases,
         })
     }
@@ -342,6 +410,7 @@ impl Executor {
                     adapter_id: plan.adapter_id.clone(),
                     bridge_surface: binding.bridge_surface.clone(),
                     scheduler_binding: binding.scheduler_binding.clone(),
+                    clock_gate: binding.clock_gate.clone(),
                     action,
                     outcome,
                     state_before,
@@ -398,6 +467,8 @@ impl Executor {
                     backend_summary: &binding.backend_summary,
                     bridge_summary: &binding.bridge_summary,
                     ir_sidecar_summary: binding.ir_sidecar_summary.as_deref(),
+                    clock_summary: binding.clock_summary.as_deref(),
+                    clock_gate: &binding.clock_gate,
                     available_handles: &state_before.available_handles,
                     available_slots: &state_before.handle_slots,
                 };
@@ -411,6 +482,7 @@ impl Executor {
                     adapter_id: plan.adapter_id.clone(),
                     bridge_surface: binding.bridge_surface.clone(),
                     scheduler_binding: binding.scheduler_binding.clone(),
+                    clock_gate: binding.clock_gate.clone(),
                     action,
                     outcome,
                     state_before,
@@ -458,6 +530,93 @@ fn optional_summary<'a>(
         ))),
         None => Ok(None),
     }
+}
+
+fn execution_clock_summary(prepared: &PreparedDomainExecution<'_>) -> Option<String> {
+    let domain = prepared.clock_domain?;
+    let mut fields = vec![
+        format!("clock_domain={}", domain.clock_domain_id),
+        format!("kind={}", domain.clock_kind),
+        format!("epoch={}", domain.clock_epoch_kind),
+        format!("resolution={}", domain.clock_resolution),
+        format!("bridge={}", domain.clock_bridge_default),
+        format!("hook={}", domain.lifecycle_hook),
+    ];
+    if !prepared.clock_edges.is_empty() {
+        fields.push(format!(
+            "happens_before={}",
+            prepared
+                .clock_edges
+                .iter()
+                .map(|edge| format!("{}->{}", edge.from, edge.to))
+                .collect::<Vec<_>>()
+                .join("|")
+        ));
+    }
+    Some(fields.join(" "))
+}
+
+fn execution_clock_gate(prepared: &PreparedDomainExecution<'_>) -> ExecutionClockGate {
+    let mut wait_on = Vec::new();
+    let mut emits = Vec::new();
+    let mut seen_wait = BTreeSet::new();
+    let mut seen_emit = BTreeSet::new();
+    for edge in &prepared.clock_edges {
+        for wait in edge
+            .from
+            .split('|')
+            .map(str::trim)
+            .filter(|wait| !wait.is_empty())
+        {
+            if seen_wait.insert(wait.to_owned()) {
+                wait_on.push(wait.to_owned());
+            }
+        }
+        if !edge.to.is_empty() && seen_emit.insert(edge.to.clone()) {
+            emits.push(edge.to.clone());
+        }
+    }
+    ExecutionClockGate { wait_on, emits }
+}
+
+fn validate_clock_gate_sequence(
+    events: &[ExecutionTraceEvent],
+    initial_timestamps: &[String],
+) -> Result<ExecutionClockValidation, RuntimeError> {
+    let mut satisfied = BTreeSet::new();
+    let mut final_timestamps = Vec::new();
+    for timestamp in initial_timestamps {
+        if satisfied.insert(timestamp.clone()) {
+            final_timestamps.push(timestamp.clone());
+        }
+    }
+
+    let mut observed_emits = Vec::new();
+    let mut seen_emits = BTreeSet::new();
+    for event in events {
+        for required in &event.clock_gate.wait_on {
+            if !satisfied.contains(required) {
+                return Err(RuntimeError::new(format!(
+                    "clock gate violation in phase `{}`: missing timestamp `{}`",
+                    event.phase, required
+                )));
+            }
+        }
+        for emitted in &event.clock_gate.emits {
+            if satisfied.insert(emitted.clone()) {
+                final_timestamps.push(emitted.clone());
+            }
+            if seen_emits.insert(emitted.clone()) {
+                observed_emits.push(emitted.clone());
+            }
+        }
+    }
+
+    Ok(ExecutionClockValidation {
+        initial_timestamps: initial_timestamps.to_vec(),
+        observed_emits,
+        final_timestamps,
+    })
 }
 
 fn normalize_summary(text: &str) -> String {
@@ -792,6 +951,19 @@ fn default_resource_bindings(ctx: &ExecutionPhaseContext<'_>) -> Vec<ExecutionRe
             value: ir_sidecar_summary.to_owned(),
         });
     }
+    if let Some(clock_summary) = ctx.clock_summary {
+        bindings.push(ExecutionResourceBinding {
+            key: "clock_protocol".to_owned(),
+            kind: ExecutionResourceKind::Metadata,
+            capability_label: Some(domain_resource_capability_label(
+                ctx.domain_family,
+                ctx.selected_lowering_target,
+                "clock_protocol",
+                &ExecutionResourceKind::Metadata,
+            )),
+            value: clock_summary.to_owned(),
+        });
+    }
     match ctx.domain_family {
         "network" => {
             bindings.push(ExecutionResourceBinding {
@@ -914,8 +1086,8 @@ fn phase_role(phase: &str) -> RuntimeRole {
 #[cfg(test)]
 mod tests {
     use nuis_artifact::{
-        BridgeRegistryEntry, BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob,
-        DomainBuildUnitPayloadBlobSection, HostBridgePlanEntry,
+        BridgeRegistryEntry, BuildManifestDomainBuildUnit, ClockDomain, ClockEdge,
+        DomainBuildUnitPayloadBlob, DomainBuildUnitPayloadBlobSection, HostBridgePlanEntry,
     };
 
     use crate::{
@@ -1091,6 +1263,8 @@ mod tests {
             adapter,
             bridge_registry_entry: Some(bridge_registry),
             host_bridge_plan_entry: Some(host_plan),
+            clock_domain: None,
+            clock_edges: Vec::new(),
         }
     }
 
@@ -1428,6 +1602,86 @@ mod tests {
         assert!(summary.contains(
             "resource active_session kind=Handle capability=cap.network.urlsession_socket_io.handle.active_session"
         ));
+    }
+
+    #[test]
+    fn executor_exposes_clock_protocol_as_phase_metadata_resource() {
+        let adapter = PassiveAdapter;
+        let unit = sample_network_unit();
+        let payload = sample_network_payload();
+        let host_plan = sample_network_host_plan();
+        let bridge_registry = sample_network_bridge_registry();
+        let clock_domain = ClockDomain {
+            index: 0,
+            domain_family: "network".to_owned(),
+            package_id: "official.network".to_owned(),
+            clock_domain_id: "network.clock.io.v1".to_owned(),
+            clock_kind: "io-monotonic".to_owned(),
+            clock_epoch_kind: "io-epoch".to_owned(),
+            clock_resolution: "io-ready-step".to_owned(),
+            clock_bridge_default: "global->io:bridge".to_owned(),
+            lifecycle_hook: "on_network_bridge_progress".to_owned(),
+        };
+        let clock_edge = ClockEdge {
+            index: 1,
+            from: "t0000.nuis.bootstrap.lifecycle.v1".to_owned(),
+            to: "t0001.network".to_owned(),
+            relation: "happens-before".to_owned(),
+            source: "hetero.node.0".to_owned(),
+        };
+        let mut prepared =
+            prepared_network_execution(&adapter, &payload, &host_plan, &bridge_registry, &unit);
+        prepared.clock_domain = Some(&clock_domain);
+        prepared.clock_edges = vec![&clock_edge];
+
+        let plan = Executor.plan(&prepared).unwrap();
+
+        assert!(plan
+            .clock_summary
+            .as_deref()
+            .unwrap()
+            .contains("clock_domain=network.clock.io.v1"));
+        assert!(plan.phases[0]
+            .clock_summary
+            .as_deref()
+            .unwrap()
+            .contains("t0000.nuis.bootstrap.lifecycle.v1->t0001.network"));
+        assert_eq!(
+            plan.clock_gate.wait_on,
+            vec!["t0000.nuis.bootstrap.lifecycle.v1".to_owned()]
+        );
+        assert_eq!(plan.clock_gate.emits, vec!["t0001.network".to_owned()]);
+        assert_eq!(plan.phases[0].clock_gate, plan.clock_gate);
+        let clock_binding = plan.phases[0]
+            .action
+            .resource_bindings
+            .iter()
+            .find(|binding| binding.key == "clock_protocol")
+            .expect("default phase action should expose clock protocol metadata");
+        assert_eq!(clock_binding.kind, ExecutionResourceKind::Metadata);
+        assert!(clock_binding.value.contains("bridge=global->io:bridge"));
+
+        let trace = Executor.execute_prepared_plan(&adapter, &plan).unwrap();
+        assert_eq!(trace.events[0].clock_gate, plan.clock_gate);
+        let validation = trace
+            .validate_clock_gates(&["t0000.nuis.bootstrap.lifecycle.v1".to_owned()])
+            .unwrap();
+        assert_eq!(
+            validation.initial_timestamps,
+            vec!["t0000.nuis.bootstrap.lifecycle.v1".to_owned()]
+        );
+        assert_eq!(validation.observed_emits, vec!["t0001.network".to_owned()]);
+        assert_eq!(
+            validation.final_timestamps,
+            vec![
+                "t0000.nuis.bootstrap.lifecycle.v1".to_owned(),
+                "t0001.network".to_owned()
+            ]
+        );
+        let error = trace.validate_clock_gates(&[]).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("missing timestamp `t0000.nuis.bootstrap.lifecycle.v1`"));
     }
 
     #[test]

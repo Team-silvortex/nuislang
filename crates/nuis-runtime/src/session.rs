@@ -1,6 +1,6 @@
 use nuis_artifact::{
-    BridgeRegistry, BuildManifest, BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob,
-    HostBridgePlanIndex, NuisCompiledArtifact, NuisExecutableEnvelope,
+    BridgeRegistry, BuildManifest, BuildManifestDomainBuildUnit, ClockProtocol,
+    DomainBuildUnitPayloadBlob, HostBridgePlanIndex, NuisCompiledArtifact, NuisExecutableEnvelope,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,6 +22,16 @@ pub struct HostConsumableSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClockProtocolRuntimeSummary {
+    pub schema: String,
+    pub mode: String,
+    pub domains: usize,
+    pub edges: usize,
+    pub happens_before_edges: usize,
+    pub validation_valid: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoadedExecutable {
     pub artifact: NuisCompiledArtifact,
     pub envelope: NuisExecutableEnvelope,
@@ -30,6 +40,7 @@ pub struct LoadedExecutable {
     pub domain_payload_blobs: Vec<DomainBuildUnitPayloadBlob>,
     pub bridge_registry: Option<BridgeRegistry>,
     pub host_bridge_plan_index: Option<HostBridgePlanIndex>,
+    pub clock_protocol: Option<ClockProtocol>,
 }
 
 impl LoadedExecutable {
@@ -82,6 +93,18 @@ impl LoadedExecutable {
             host_consumable_units: units.len(),
             units,
         }
+    }
+
+    pub fn clock_protocol_summary(&self) -> Option<ClockProtocolRuntimeSummary> {
+        let protocol = self.clock_protocol.as_ref()?;
+        Some(ClockProtocolRuntimeSummary {
+            schema: protocol.schema.clone(),
+            mode: protocol.mode.clone(),
+            domains: protocol.domains.len(),
+            edges: protocol.edges.len(),
+            happens_before_edges: protocol.happens_before_edges().count(),
+            validation_valid: protocol.validation_valid,
+        })
     }
 }
 
@@ -247,6 +270,10 @@ mod tests {
                 host_bridge_plan_index_schema: None,
                 host_bridge_plan_units: 0,
                 host_bridge_plan_index_inline: None,
+                clock_protocol_path: None,
+                clock_protocol_schema: None,
+                clock_protocol_domains: 0,
+                clock_protocol_inline: None,
                 artifact_hashes: vec![ArtifactHashEntry {
                     kind: "binary".to_owned(),
                     path: "/tmp/out/demo".to_owned(),
@@ -260,6 +287,7 @@ mod tests {
             domain_payload_blobs,
             bridge_registry: None,
             host_bridge_plan_index: None,
+            clock_protocol: None,
         }
     }
 

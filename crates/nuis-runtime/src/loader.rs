@@ -2,8 +2,9 @@ use std::path::Path;
 
 use nuis_artifact::{
     decode_domain_payload_blob, parse_bridge_registry, parse_build_manifest_from_source,
-    parse_host_bridge_plan_index, parse_nuis_compiled_artifact, BridgeRegistry, BuildManifest,
-    DomainBuildUnitPayloadBlob, HostBridgePlanIndex, NuisCompiledArtifact,
+    parse_clock_protocol, parse_host_bridge_plan_index, parse_nuis_compiled_artifact,
+    BridgeRegistry, BuildManifest, ClockProtocol, DomainBuildUnitPayloadBlob, HostBridgePlanIndex,
+    NuisCompiledArtifact,
 };
 
 use crate::{LoadedExecutable, RuntimeError};
@@ -30,12 +31,14 @@ impl RuntimeLoader {
         let domain_payload_blobs = self.load_domain_payload_blobs(&manifest)?;
         let bridge_registry = self.load_bridge_registry(&manifest)?;
         let host_bridge_plan_index = self.load_host_bridge_plan_index(&manifest)?;
+        let clock_protocol = self.load_clock_protocol(&manifest)?;
         Ok(LoadedExecutable {
             envelope: artifact.envelope.clone(),
             domain_units: manifest.domain_build_units.clone(),
             domain_payload_blobs,
             bridge_registry,
             host_bridge_plan_index,
+            clock_protocol,
             artifact,
             manifest,
         })
@@ -102,6 +105,35 @@ impl RuntimeLoader {
             })
     }
 
+    fn load_clock_protocol(
+        &self,
+        manifest: &BuildManifest,
+    ) -> Result<Option<ClockProtocol>, RuntimeError> {
+        let protocol = if let Some(source) = &manifest.clock_protocol_inline {
+            nuis_artifact::parse_clock_protocol_from_source(
+                source,
+                Path::new("<embedded-clock-protocol>"),
+            )
+            .map_err(|error| {
+                RuntimeError::new(format!("failed to parse embedded clock protocol: {error}"))
+            })?
+        } else if let Some(path) = &manifest.clock_protocol_path {
+            parse_clock_protocol(Path::new(path)).map_err(|error| {
+                RuntimeError::new(format!("failed to parse clock protocol: {error}"))
+            })?
+        } else if manifest.clock_protocol_schema.is_some() || manifest.clock_protocol_domains > 0 {
+            return Err(RuntimeError::new(
+                "build manifest declares clock protocol metadata but has no clock protocol artifact"
+                    .to_owned(),
+            ));
+        } else {
+            return Ok(None);
+        };
+
+        validate_loaded_clock_protocol(manifest, &protocol)?;
+        Ok(Some(protocol))
+    }
+
     fn load_domain_payload_blobs(
         &self,
         manifest: &BuildManifest,
@@ -162,6 +194,51 @@ impl RuntimeLoader {
         }
         Ok(blobs)
     }
+}
+
+fn validate_loaded_clock_protocol(
+    manifest: &BuildManifest,
+    protocol: &ClockProtocol,
+) -> Result<(), RuntimeError> {
+    if let Some(schema) = &manifest.clock_protocol_schema {
+        if schema != "nuis-clock-protocol-v1" {
+            return Err(RuntimeError::new(format!(
+                "unsupported manifest clock protocol schema `{schema}`"
+            )));
+        }
+    }
+    if protocol.schema != "nuis-clock-protocol-v1" {
+        return Err(RuntimeError::new(format!(
+            "unsupported clock protocol schema `{}`",
+            protocol.schema
+        )));
+    }
+    if !protocol.validation_valid {
+        return Err(RuntimeError::new(
+            "clock protocol validation flag is false".to_owned(),
+        ));
+    }
+    if manifest.clock_protocol_domains > 0
+        && manifest.clock_protocol_domains != protocol.domains.len()
+    {
+        return Err(RuntimeError::new(format!(
+            "clock protocol domain count mismatch: manifest={}, protocol={}",
+            manifest.clock_protocol_domains,
+            protocol.domains.len()
+        )));
+    }
+    for domain in &protocol.domains {
+        let present = manifest.domain_build_units.iter().any(|unit| {
+            unit.domain_family == domain.domain_family && unit.package_id == domain.package_id
+        });
+        if !present {
+            return Err(RuntimeError::new(format!(
+                "clock protocol domain `{}` package `{}` is not present in build manifest",
+                domain.domain_family, domain.package_id
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn decode_hex_bytes(value: &str) -> Result<Vec<u8>, String> {
@@ -239,6 +316,12 @@ cpu_target_calling_abi = "sysv64"
 cpu_target_clang = "x86_64-unknown-linux-gnu"
 cpu_target_cross = true
 
+[clock_protocol]
+clock_protocol_path = "/tmp/out/nuis.clock-protocol.toml"
+clock_protocol_schema = "nuis-clock-protocol-v1"
+clock_protocol_domains = 1
+clock_protocol_inline = "schema = \"nuis-clock-protocol-v1\"\nmode = \"host-lifecycle-clock\"\nsource = \"test\"\ndefault_time_mode = \"logical\"\nlifecycle_tick_policy = \"cooperative\"\n[validation]\nchecked = 8\nvalid = true\nissues = []\n[[clock_domain]]\nindex = 0\ndomain_family = \"cpu\"\npackage_id = \"official.cpu\"\nclock_domain_id = \"cpu.clock.host.v1\"\nclock_kind = \"host-monotonic\"\nclock_epoch_kind = \"host-epoch\"\nclock_resolution = \"cpu.tick_i64\"\nclock_bridge_default = \"global->monotonic:bridge\"\nlifecycle_hook = \"on_scheduler_tick\"\n[[clock_edge]]\nindex = 0\nfrom = \"global.clock.root.v1\"\nto = \"cpu.clock.host.v1\"\nrelation = \"global->monotonic:bridge\"\nsource = \"test\"\n"
+
 [[artifact_hash]]
 kind = "artifact"
 path = "/tmp/out/nuis.compiled.artifact"
@@ -301,6 +384,17 @@ packaging_role = "host-binary"
         assert_eq!(loaded.domain_payload_blobs.len(), 0);
         assert_eq!(loaded.bridge_registry, None);
         assert_eq!(loaded.host_bridge_plan_index, None);
+        let clock_protocol = loaded
+            .clock_protocol
+            .as_ref()
+            .expect("embedded clock protocol should load");
+        assert_eq!(clock_protocol.schema, "nuis-clock-protocol-v1");
+        assert_eq!(clock_protocol.domains.len(), 1);
+        assert_eq!(
+            clock_protocol.find_domain("cpu").unwrap().clock_domain_id,
+            "cpu.clock.host.v1"
+        );
+        assert_eq!(loaded.clock_protocol_summary().unwrap().edges, 1);
         assert_eq!(loaded.domain_units[0].domain_family, "cpu");
         assert_eq!(
             loaded.domain_units[0].selected_lowering_target.as_deref(),
@@ -308,6 +402,40 @@ packaging_role = "host-binary"
         );
         assert_eq!(loaded.manifest.execution_contract_count, 1);
         assert_eq!(loaded.manifest.artifact_hashes.len(), 1);
+    }
+
+    #[test]
+    fn loader_rejects_invalid_embedded_clock_protocol() {
+        let manifest = minimal_manifest_with_clock_protocol(
+            1,
+            "schema = \"nuis-clock-protocol-v1\"\nmode = \"host-lifecycle-clock\"\nsource = \"test\"\ndefault_time_mode = \"logical\"\nlifecycle_tick_policy = \"cooperative\"\n[validation]\nchecked = 1\nvalid = false\nissues = [\"broken\"]\n[[clock_domain]]\nindex = 0\ndomain_family = \"cpu\"\npackage_id = \"official.cpu\"\nclock_domain_id = \"cpu.clock.host.v1\"\nclock_kind = \"host-monotonic\"\nclock_epoch_kind = \"host-epoch\"\nclock_resolution = \"cpu.tick_i64\"\nclock_bridge_default = \"global->monotonic:bridge\"\nlifecycle_hook = \"on_scheduler_tick\"\n",
+        );
+        let artifact = minimal_artifact_with_manifest(&manifest);
+
+        let error = RuntimeLoader
+            .load_from_compiled_artifact(artifact)
+            .expect_err("runtime loader should reject invalid clock protocol");
+
+        assert!(error
+            .to_string()
+            .contains("clock protocol validation flag is false"));
+    }
+
+    #[test]
+    fn loader_rejects_clock_protocol_domain_count_mismatch() {
+        let manifest = minimal_manifest_with_clock_protocol(
+            2,
+            "schema = \"nuis-clock-protocol-v1\"\nmode = \"host-lifecycle-clock\"\nsource = \"test\"\ndefault_time_mode = \"logical\"\nlifecycle_tick_policy = \"cooperative\"\n[validation]\nchecked = 1\nvalid = true\nissues = []\n[[clock_domain]]\nindex = 0\ndomain_family = \"cpu\"\npackage_id = \"official.cpu\"\nclock_domain_id = \"cpu.clock.host.v1\"\nclock_kind = \"host-monotonic\"\nclock_epoch_kind = \"host-epoch\"\nclock_resolution = \"cpu.tick_i64\"\nclock_bridge_default = \"global->monotonic:bridge\"\nlifecycle_hook = \"on_scheduler_tick\"\n",
+        );
+        let artifact = minimal_artifact_with_manifest(&manifest);
+
+        let error = RuntimeLoader
+            .load_from_compiled_artifact(artifact)
+            .expect_err("runtime loader should reject clock domain count mismatch");
+
+        assert!(error
+            .to_string()
+            .contains("clock protocol domain count mismatch"));
     }
 
     #[test]
@@ -527,6 +655,108 @@ packaging_role = "hetero-contract"
                 "finalize".to_owned()
             ]
         );
+    }
+
+    fn minimal_manifest_with_clock_protocol(clock_domains: usize, clock_protocol: &str) -> String {
+        format!(
+            r#"manifest_schema = "nuis-build-manifest-v1"
+input = "/tmp/demo.ns"
+output_dir = "/tmp/out"
+packaging_mode = "native-cpu-llvm"
+path = "/tmp/out/nuis.executable.envelope.toml"
+schema = "nuis-executable-envelope-v1"
+package_count = 1
+artifact_path = "/tmp/out/nuis.compiled.artifact"
+artifact_schema = "nuis-compiled-artifact-v1"
+artifact_binary_name = "demo.bin"
+artifact_binary_bytes = 3
+lifecycle_schema = "nuis-lifecycle-contract-v1"
+lifecycle_bootstrap_entry = "nuis.bootstrap.lifecycle.v1"
+lifecycle_tick_policy = "cooperative"
+lifecycle_shutdown_policy = "graceful"
+lifecycle_yalivia_rpc = "yalivia.rpc.bootstrap.v1"
+lifecycle_hook_surface = ["on_bootstrap"]
+lifecycle_export_surface = ["tick_export"]
+lifecycle_runtime_capability_flags = ["runtime.tick"]
+function_kind = "function-node"
+graph_kind = "function-graph"
+default_time_mode = "logical"
+cpu_target_abi = "cpu.x86_64.sysv64"
+cpu_target_machine_arch = "x86_64"
+cpu_target_machine_os = "linux"
+cpu_target_object_format = "elf"
+cpu_target_calling_abi = "sysv64"
+cpu_target_clang = "x86_64-unknown-linux-gnu"
+cpu_target_cross = true
+
+[clock_protocol]
+clock_protocol_schema = "nuis-clock-protocol-v1"
+clock_protocol_domains = {clock_domains}
+clock_protocol_inline = "{clock_protocol}"
+
+[[artifact_hash]]
+kind = "artifact"
+path = "/tmp/out/nuis.compiled.artifact"
+bytes = 3
+fnv1a64 = "0x0000000000000000"
+
+[[execution_contract]]
+package_id = "official.cpu"
+domain_family = "cpu"
+
+[[domain_build_unit]]
+package_id = "official.cpu"
+domain_family = "cpu"
+selected_lowering_target = "llvm"
+contract_family = "nustar.cpu"
+packaging_role = "host-binary"
+"#,
+            clock_protocol = escape_toml_test_string(clock_protocol)
+        )
+    }
+
+    fn minimal_artifact_with_manifest(manifest: &str) -> NuisCompiledArtifact {
+        NuisCompiledArtifact {
+            schema: "nuis-compiled-artifact-v1".to_owned(),
+            packaging_mode: "native-cpu-llvm".to_owned(),
+            cpu_target_abi: "cpu.x86_64.sysv64".to_owned(),
+            cpu_target_machine_arch: "x86_64".to_owned(),
+            cpu_target_machine_os: "linux".to_owned(),
+            cpu_target_object_format: "elf".to_owned(),
+            cpu_target_calling_abi: "sysv64".to_owned(),
+            binary_name: "demo.bin".to_owned(),
+            binary_bytes: 3,
+            build_manifest_bytes: manifest.len(),
+            envelope: NuisExecutableEnvelope {
+                schema: "nuis-executable-envelope-v1".to_owned(),
+                executable_kind: "native-cpu-llvm".to_owned(),
+                package_count: 1,
+                domain_families: vec!["cpu".to_owned()],
+                contract_families: vec!["nustar.cpu".to_owned()],
+                function_kind: "function-node".to_owned(),
+                graph_kind: "function-graph".to_owned(),
+                default_time_mode: "logical".to_owned(),
+            },
+            lifecycle: NuisLifecycleContract {
+                schema: "nuis-lifecycle-contract-v1".to_owned(),
+                bootstrap_entry: "nuis.bootstrap.lifecycle.v1".to_owned(),
+                tick_policy: "cooperative".to_owned(),
+                shutdown_policy: "graceful".to_owned(),
+                yalivia_rpc: "yalivia.rpc.bootstrap.v1".to_owned(),
+                hook_surface: vec!["on_bootstrap".to_owned()],
+                export_surface: vec!["tick_export".to_owned()],
+                runtime_capability_flags: vec!["runtime.tick".to_owned()],
+            },
+            build_manifest_source: manifest.to_owned(),
+            binary_blob: b"bin".to_vec(),
+        }
+    }
+
+    fn escape_toml_test_string(value: &str) -> String {
+        value
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\n', "\\n")
     }
 
     fn hex_encode_bytes(bytes: &[u8]) -> String {

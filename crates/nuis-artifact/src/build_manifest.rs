@@ -63,6 +63,10 @@ pub struct BuildManifest {
     pub host_bridge_plan_index_schema: Option<String>,
     pub host_bridge_plan_units: usize,
     pub host_bridge_plan_index_inline: Option<String>,
+    pub clock_protocol_path: Option<String>,
+    pub clock_protocol_schema: Option<String>,
+    pub clock_protocol_domains: usize,
+    pub clock_protocol_inline: Option<String>,
     pub artifact_hashes: Vec<ArtifactHashEntry>,
     pub execution_contract_count: usize,
     pub domain_build_units: Vec<BuildManifestDomainBuildUnit>,
@@ -144,6 +148,11 @@ pub fn parse_build_manifest_from_source(
         parse_optional_toml_usize(source, "host_bridge_plan_units").unwrap_or(0);
     let host_bridge_plan_index_inline =
         parse_optional_toml_string(source, "host_bridge_plan_index_inline");
+    let clock_protocol_path = parse_optional_toml_string(source, "clock_protocol_path");
+    let clock_protocol_schema = parse_optional_toml_string(source, "clock_protocol_schema");
+    let clock_protocol_domains =
+        parse_optional_toml_usize(source, "clock_protocol_domains").unwrap_or(0);
+    let clock_protocol_inline = parse_optional_toml_string(source, "clock_protocol_inline");
     let artifact_hashes = parse_artifact_hash_blocks(source, path)?;
     let execution_contract_count = source
         .lines()
@@ -195,6 +204,10 @@ pub fn parse_build_manifest_from_source(
         host_bridge_plan_index_schema,
         host_bridge_plan_units,
         host_bridge_plan_index_inline,
+        clock_protocol_path,
+        clock_protocol_schema,
+        clock_protocol_domains,
+        clock_protocol_inline,
         artifact_hashes,
         execution_contract_count,
         domain_build_units,
