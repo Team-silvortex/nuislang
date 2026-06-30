@@ -27,6 +27,7 @@ Start in this order:
   - [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
   - [nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
   - [nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
+  - [nsld-linker-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsld-linker-frontdoor.md)
 * `NIR` safety boundary
   - [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
   - [nir-optimization-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-optimization-contract.md)
@@ -69,6 +70,10 @@ project?”, start with
 If your question is specifically “what is the shortest real native binary
 closure route today?”, start with
 [nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md).
+
+If your question is specifically “what is the current independent linker
+frontdoor?”, start with
+[nsld-linker-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsld-linker-frontdoor.md).
 
 If your question is specifically “which `nuis` frontdoor fields should I read
 or consume right now?”, start with

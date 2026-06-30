@@ -78,6 +78,22 @@ Current source-style note:
 
 ## Toolchain
 
+The visible workspace toolchain now includes:
+
+* `nuis`: front-door workflow command
+* `nuisc`: compiler core and AOT artifact producer
+* `nsld`: alpha-0.6.0 linker frontdoor for link-plan, clock protocol, and
+  heterogeneous calculate contract inspection
+* `nuis-rc`: local resident control prototype
+* `yir-*`: lower-level YIR inspection, packing, running, and export tools
+
+`nsld` is currently a separate tool boundary over `nuisc::linker`, not the
+finished self-owned object linker. The point of the split is to make linker
+ownership explicit before the implementation is fully extracted.
+
+Reference:
+[docs/reference/nsld-linker-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsld-linker-frontdoor.md)
+
 ```text
 nuis     -> front-door workflow tool
 nuis-rc  -> resident control tool (later-stage, still intentionally thin)

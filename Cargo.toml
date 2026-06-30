@@ -20,6 +20,7 @@ members = [
     "tools/nuis",
     "tools/nuis-rc",
     "tools/nuisc",
+    "tools/nsld",
     "tools/yir-export-ui-plan",
     "tools/yir-export-frame",
     "tools/yir-pack-aot",

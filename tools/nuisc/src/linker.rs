@@ -18,7 +18,7 @@ mod linker_types;
 pub use linker_alignment::build_artifact_lowering_alignment_summary;
 use linker_final_stage::derive_final_stage;
 pub use linker_hetero_calculate::render_hetero_calculate_plan_toml;
-pub use linker_render::render_link_plan_summary;
+pub use linker_render::{render_link_plan_json, render_link_plan_summary};
 pub use linker_types::{
     ArtifactLoweringAlignmentCheck, ArtifactLoweringAlignmentSummary, LinkPlan, LinkPlanArtifact,
     LinkPlanClockDomain, LinkPlanClockEdge, LinkPlanClockProtocol, LinkPlanClockValidationSummary,

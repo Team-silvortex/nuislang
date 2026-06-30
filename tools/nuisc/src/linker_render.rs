@@ -1,4 +1,8 @@
 use super::*;
+use crate::{
+    json_bool_field, json_optional_string_field, json_string_array_field, json_string_field,
+    json_usize_field,
+};
 
 pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
     let mut lines = vec![
@@ -168,4 +172,61 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
         ));
     }
     lines
+}
+
+pub fn render_link_plan_json(plan: &LinkPlan) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("toolchain_phase", "alpha-0.6.0-linker-boundary"),
+        json_string_field("schema", &plan.schema),
+        json_string_field("input", &plan.input),
+        json_string_field("output_dir", &plan.output_dir),
+        json_string_field("packaging_mode", &plan.packaging_mode),
+        json_string_field("final_stage_kind", &plan.final_stage.kind),
+        json_string_field("final_stage_driver", &plan.final_stage.driver),
+        json_string_field("final_stage_link_mode", &plan.final_stage.link_mode),
+        json_string_field("final_stage_output", &plan.final_stage.output_path),
+        json_string_array_field("final_stage_inputs", &plan.final_stage.inputs),
+        json_string_array_field("domain_families", &plan.envelope.domain_families),
+        json_usize_field("domain_unit_count", plan.domain_units.len()),
+        json_optional_string_field(
+            "artifact_container_kind",
+            plan.compiled_artifact.container_kind.as_deref(),
+        ),
+        json_usize_field(
+            "artifact_lowering_alignment_checked",
+            plan.artifact_lowering_alignment.checked,
+        ),
+        json_bool_field(
+            "artifact_lowering_alignment_consistent",
+            plan.artifact_lowering_alignment.consistent,
+        ),
+        json_string_field("clock_protocol_schema", &plan.clock_protocol.schema),
+        json_string_field("clock_protocol_mode", &plan.clock_protocol.mode),
+        json_usize_field("clock_protocol_domains", plan.clock_protocol.domains.len()),
+        json_usize_field("clock_protocol_edges", plan.clock_protocol.edges.len()),
+        json_bool_field("clock_protocol_valid", plan.clock_protocol.validation.valid),
+        json_string_field("hetero_calculate_schema", &plan.hetero_calculate.schema),
+        json_bool_field(
+            "hetero_calculate_static_link",
+            plan.hetero_calculate.static_link,
+        ),
+        json_bool_field(
+            "hetero_calculate_lifecycle_driven",
+            plan.hetero_calculate.lifecycle_driven,
+        ),
+        json_string_field(
+            "hetero_calculate_time_order_model",
+            &plan.hetero_calculate.time_order_model,
+        ),
+        json_string_field(
+            "hetero_calculate_data_order_model",
+            &plan.hetero_calculate.data_order_model,
+        ),
+        json_bool_field(
+            "hetero_calculate_valid",
+            plan.hetero_calculate.validation.valid,
+        ),
+    ];
+    format!("{{{}}}", fields.join(","))
 }
