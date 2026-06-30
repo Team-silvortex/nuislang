@@ -518,7 +518,12 @@ fn lowers_buffer_index_and_len_sugar() {
             ..
         }) if name == "first"
             && matches!(buffer.as_ref(), NirExpr::Var(var) if var == "backing")
-            && matches!(index.as_ref(), NirExpr::Int(0))
+            && matches!(
+                index.as_ref(),
+                NirExpr::Binary { lhs, rhs, .. }
+                    if matches!(lhs.as_ref(), NirExpr::Int(0))
+                        && matches!(rhs.as_ref(), NirExpr::Int(0))
+            )
     ));
 }
 
@@ -561,7 +566,12 @@ fn lowers_buffer_index_assignment_sugar() {
         module.functions[0].body.get(1),
         Some(NirStmt::Expr(NirExpr::StoreAt { buffer, index, value }))
             if matches!(buffer.as_ref(), NirExpr::Var(name) if name == "backing")
-                && matches!(index.as_ref(), NirExpr::Int(1))
+                && matches!(
+                    index.as_ref(),
+                    NirExpr::Binary { lhs, rhs, .. }
+                        if matches!(lhs.as_ref(), NirExpr::Int(0))
+                            && matches!(rhs.as_ref(), NirExpr::Int(1))
+                )
                 && matches!(value.as_ref(), NirExpr::Int(9))
     ));
 }
@@ -611,7 +621,7 @@ fn rejects_read_only_buffer_len_assignment() {
     )
     .unwrap_err();
 
-    assert!(error.contains("`buffer.len` is read-only"), "{error}");
+    assert!(error.contains("`.len` is read-only"), "{error}");
 }
 
 #[test]

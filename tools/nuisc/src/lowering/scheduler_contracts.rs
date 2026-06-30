@@ -1,5 +1,19 @@
 use super::*;
-use nuis_semantics::model::{NirAnnotation, NirAttributeValue, NirFunction};
+
+#[path = "scheduler_contracts_docs.rs"]
+mod scheduler_contracts_docs;
+#[path = "scheduler_contracts_render.rs"]
+mod scheduler_contracts_render;
+
+pub(crate) use scheduler_contracts_docs::materialize_doc_contract_nodes;
+use scheduler_contracts_render::{
+    render_bridge_capability_contract, render_clock_contract, render_lane_capability_contract,
+    render_lane_policy_contract, render_observer_branch_class_contract,
+    render_observer_role_variant_contract, render_observer_scope_class_contract,
+    render_observer_source_class_contract, render_observer_stage_class_contract,
+    render_result_capability_contract, render_result_lane_contract,
+    render_summary_capability_contract, render_summary_class_contract,
+};
 
 pub(crate) fn assign_default_lanes(module: &mut YirModule) {
     let lane_policy = load_declared_lane_policy(module);
@@ -60,49 +74,6 @@ fn project_profile_lane_for_node<'a>(family: &str, node: &'a Node) -> Option<&'a
         "shader" => Some("profile_setup"),
         "kernel" | "npu" => Some("profile_compute"),
         _ => None,
-    }
-}
-
-pub(crate) fn materialize_doc_contract_nodes(yir: &mut YirModule, module: &NirModule) {
-    let cpu_resource = yir
-        .resources
-        .iter()
-        .find(|resource| resource.kind.family() == "cpu")
-        .map(|resource| resource.name.clone())
-        .unwrap_or_else(|| "cpu0".to_owned());
-    let module_path = format!("{}.{}", module.domain, module.unit);
-    let module_docs = doc_lines_from_annotations(&module.annotations);
-    if !module_docs.is_empty() {
-        push_doc_contract_text_node(
-            yir,
-            &format!(
-                "doc_contract_module_{}",
-                sanitize_doc_contract_name(&module_path)
-            ),
-            &cpu_resource,
-            render_doc_contract("module", &module_path, None, &module_docs),
-        );
-    }
-    for function in &module.functions {
-        let docs = doc_lines_from_annotations(&function.annotations);
-        if docs.is_empty() {
-            continue;
-        }
-        let path = format!("{module_path}::{}", function.name);
-        push_doc_contract_text_node(
-            yir,
-            &format!(
-                "doc_contract_function_{}",
-                sanitize_doc_contract_name(&path)
-            ),
-            &cpu_resource,
-            render_doc_contract(
-                "function",
-                &path,
-                Some(render_function_doc_signature(function)),
-                &docs,
-            ),
-        );
     }
 }
 
@@ -284,218 +255,6 @@ pub(crate) fn materialize_registered_scheduler_contract_nodes(module: &mut YirMo
             &target,
         );
     }
-}
-
-fn doc_lines_from_annotations(annotations: &[NirAnnotation]) -> Vec<String> {
-    annotations
-        .iter()
-        .filter(|annotation| annotation.name == "doc")
-        .filter_map(|annotation| match annotation.args.first() {
-            Some(arg) if arg.name.is_none() => match &arg.value {
-                NirAttributeValue::String(value) => Some(value.clone()),
-                _ => None,
-            },
-            _ => None,
-        })
-        .collect()
-}
-
-fn render_doc_contract(
-    scope: &str,
-    path: &str,
-    signature: Option<String>,
-    docs: &[String],
-) -> String {
-    let mut fields = vec![
-        "schema=nuis-yir-doc-contract-v1".to_owned(),
-        format!("scope={scope}"),
-        format!("path={}", escape_doc_contract_value(path)),
-        format!("line_count={}", docs.len()),
-        format!("docs={}", escape_doc_contract_value(&docs.join("\\n"))),
-    ];
-    if let Some(signature) = signature {
-        fields.push(format!(
-            "signature={}",
-            escape_doc_contract_value(&signature)
-        ));
-    }
-    fields.join(";")
-}
-
-fn render_function_doc_signature(function: &NirFunction) -> String {
-    let params = function
-        .params
-        .iter()
-        .map(|param| format!("{}: {}", param.name, param.ty.name))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let return_suffix = function
-        .return_type
-        .as_ref()
-        .map(|ty| format!(" -> {}", ty.name))
-        .unwrap_or_default();
-    let async_prefix = if function.is_async { "async " } else { "" };
-    format!(
-        "{async_prefix}fn {}({params}){return_suffix}",
-        function.name
-    )
-}
-
-fn escape_doc_contract_value(value: &str) -> String {
-    value
-        .replace('\\', "\\\\")
-        .replace(';', "\\;")
-        .replace('\n', "\\n")
-}
-
-fn sanitize_doc_contract_name(value: &str) -> String {
-    value
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() {
-                ch.to_ascii_lowercase()
-            } else {
-                '_'
-            }
-        })
-        .collect()
-}
-
-fn push_doc_contract_text_node(module: &mut YirModule, name: &str, resource: &str, value: String) {
-    push_scheduler_contract_text_node(module, name, resource, value);
-}
-
-fn render_lane_policy_contract(family: &str, default_lanes: &[String]) -> String {
-    let mut lanes = BTreeSet::<String>::new();
-    let mut defaults = Vec::<String>::new();
-    for entry in default_lanes {
-        let Some((pattern, lane)) = entry.split_once('=') else {
-            continue;
-        };
-        let pattern = pattern.trim();
-        let lane = lane.trim();
-        if pattern.is_empty() || lane.is_empty() {
-            continue;
-        }
-        lanes.insert(lane.to_owned());
-        defaults.push(format!("{pattern}={lane}"));
-    }
-    format!(
-        "family={family};lanes={};defaults={}",
-        lanes.into_iter().collect::<Vec<_>>().join(","),
-        defaults.join("|")
-    )
-}
-
-fn render_clock_contract(family: &str, manifest: &NustarPackageManifest) -> String {
-    format!(
-        "family={family};domain={};kind={};epoch={};resolution={};bridge={}",
-        manifest.clock_domain_id,
-        manifest.clock_kind,
-        manifest.clock_epoch_kind,
-        manifest.clock_resolution,
-        manifest.clock_bridge_default
-    )
-}
-
-fn render_lane_capability_contract(family: &str, default_lanes: &[String]) -> String {
-    let lanes = default_lanes
-        .iter()
-        .filter_map(|entry| entry.split_once('='))
-        .map(|(_, lane)| lane.trim())
-        .filter(|lane| !lane.is_empty())
-        .collect::<BTreeSet<_>>();
-    let mut fields = vec![format!("family={family}")];
-    for lane in lanes {
-        let capability = lane_capability_for(family, lane);
-        fields.push(format!("{lane}={capability}"));
-    }
-    fields.join(";")
-}
-
-fn render_bridge_capability_contract(family: &str, manifest: &NustarPackageManifest) -> String {
-    let lane_bridge = match family {
-        "cpu" => "cpu_bind_core_lane:host_main_lane|worker_lane",
-        _ => "none",
-    };
-    format!(
-        "family={family};lane_bridge={lane_bridge};clock_bridge={}",
-        manifest.clock_bridge_default
-    )
-}
-
-fn lane_capability_for(family: &str, lane: &str) -> &'static str {
-    match (family, lane) {
-        ("cpu", "main") => "host-entry",
-        ("cpu", "mem") => "memory-ownership",
-        ("data", "control") => "control-plane",
-        ("data", "uplink") => "uplink-window",
-        ("data", "downlink") => "downlink-window",
-        ("data", "fabric") => "fabric-transfer",
-        ("shader", "setup") => "render-setup",
-        ("shader", "render") => "render-pass",
-        ("kernel", "compute") | ("npu", "compute") => "compute-dispatch",
-        (_, "contract") => "contract-metadata",
-        _ => "general",
-    }
-}
-
-fn render_result_lane_contract(family: &str) -> String {
-    let lane = match family {
-        "cpu" => "main",
-        "data" => "fabric",
-        "shader" => "setup",
-        "network" => "control",
-        "kernel" | "npu" => "compute",
-        _ => "main",
-    };
-    format!("family={family};entry={lane};probe={lane};value={lane}")
-}
-
-fn render_result_capability_contract(family: &str) -> String {
-    format!(
-        "family={family};entry=result-entry;probe=result-ready-probe;value=result-payload-value"
-    )
-}
-
-fn render_observer_role_variant_contract(family: &str) -> String {
-    format!(
-        "family={family};config_ready=config-ready-observer;send_ready=send-ready-observer;recv_ready=recv-ready-observer;connect_ready=connect-ready-observer;accept_ready=accept-ready-observer;closed=closed-observer"
-    )
-}
-
-fn render_summary_capability_contract(family: &str) -> String {
-    format!(
-        "family={family};policy=async-policy-summary;batch=async-batch-summary;windowed=async-windowed-summary"
-    )
-}
-
-fn render_summary_class_contract(family: &str) -> String {
-    format!(
-        "family={family};transport_split=transport-split-summary;transport_windowed_split=transport-windowed-split-summary;transport_session_bridge_split=transport-session-bridge-split-summary;control_split=control-split-summary;control_windowed=control-windowed-summary;control_session_bridge=control-session-bridge-summary"
-    )
-}
-
-fn render_observer_source_class_contract(family: &str) -> String {
-    format!("family={family};profile=profile-backed;result=result-backed;summary=summary-backed")
-}
-
-fn render_observer_stage_class_contract(family: &str) -> String {
-    format!(
-        "family={family};entry=observer-entry-stage;ready=observer-ready-stage;payload=observer-payload-stage;policy=observer-policy-stage;batch=observer-batch-stage;windowed=observer-windowed-stage"
-    )
-}
-
-fn render_observer_scope_class_contract(family: &str) -> String {
-    format!(
-        "family={family};local=local-scope;cross_lane=cross-lane-scope;cross_domain=cross-domain-scope;bridge_visible=bridge-visible-scope"
-    )
-}
-
-fn render_observer_branch_class_contract(family: &str) -> String {
-    format!(
-        "family={family};primary=primary-branch;secondary=secondary-branch;fallback=fallback-branch;send=send-branch;recv=recv-branch"
-    )
 }
 
 fn push_scheduler_contract_text_node(

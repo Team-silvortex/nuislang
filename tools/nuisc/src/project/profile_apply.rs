@@ -1,10 +1,27 @@
 use std::collections::BTreeMap;
 
 use crate::registry::RegisteredAbiTarget;
-use nuis_semantics::model::{AstExpr, AstModule, AstStmt};
-use yir_core::{Node, Operation, Resource, ResourceKind, YirModule};
+use nuis_semantics::model::{AstModule, AstStmt};
+use yir_core::{Operation, YirModule};
 
 use super::{backend_features_for_registered_abi_target, sanitize_ident, ProjectAbiResolution};
+
+#[path = "profile_apply_helpers.rs"]
+mod profile_apply_helpers;
+#[path = "profile_apply_targets.rs"]
+mod profile_apply_targets;
+
+pub(super) use profile_apply_helpers::{
+    collect_profile_int_bindings, ensure_project_resource, extract_profile_call, push_profile_node,
+};
+use profile_apply_helpers::{
+    expect_profile_int_arg, expect_profile_value_input_name, expect_text_arg,
+    extract_profile_int_binding,
+};
+use profile_apply_targets::{
+    kernel_target_tokens, materialize_default_kernel_target_config,
+    materialize_default_network_target_config, materialize_default_shader_target_config,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct TargetConfigTokens {
@@ -181,105 +198,6 @@ pub(super) fn target_config_tokens_for_domain(
         runtime,
         lane_width,
         backend_features: backend_features_for_registered_abi_target(domain, target).join(","),
-    }
-}
-
-fn materialize_default_kernel_target_config(
-    ast: &AstModule,
-    body: &[AstStmt],
-    module: &mut YirModule,
-    abi_resolution: Option<&ProjectAbiResolution>,
-) -> Result<(), String> {
-    let has_explicit = body.iter().any(|stmt| {
-        extract_profile_call(stmt)
-            .map(|(_, callee, _)| callee == "kernel_target_config")
-            .unwrap_or(false)
-    });
-    if has_explicit {
-        return Ok(());
-    }
-    let Some(target) = resolve_registered_abi_target("kernel", abi_resolution)? else {
-        return Ok(());
-    };
-    let tokens = target_config_tokens_for_domain("kernel", &target);
-    let name = format!(
-        "project_profile_{}_{}_kernel_target_config_auto",
-        sanitize_ident(&ast.domain),
-        sanitize_ident(&ast.unit)
-    );
-    push_profile_node(
-        module,
-        name,
-        "kernel0",
-        Operation {
-            module: "kernel".to_owned(),
-            instruction: "target_config".to_owned(),
-            args: tokens.into_args(),
-        },
-    );
-    Ok(())
-}
-
-fn materialize_default_shader_target_config(
-    ast: &AstModule,
-    module: &mut YirModule,
-    abi_resolution: Option<&ProjectAbiResolution>,
-) -> Result<(), String> {
-    let Some(target) = resolve_registered_abi_target("shader", abi_resolution)? else {
-        return Ok(());
-    };
-    let tokens = target_config_tokens_for_domain("shader", &target);
-    let name = format!(
-        "project_profile_{}_{}_shader_target_config_auto",
-        sanitize_ident(&ast.domain),
-        sanitize_ident(&ast.unit)
-    );
-    push_profile_node(
-        module,
-        name,
-        "shader0",
-        Operation {
-            module: "shader".to_owned(),
-            instruction: "target_config".to_owned(),
-            args: tokens.into_args(),
-        },
-    );
-    Ok(())
-}
-
-fn materialize_default_network_target_config(
-    ast: &AstModule,
-    module: &mut YirModule,
-    abi_resolution: Option<&ProjectAbiResolution>,
-) -> Result<(), String> {
-    let Some(target) = resolve_registered_abi_target("network", abi_resolution)? else {
-        return Ok(());
-    };
-    let tokens = target_config_tokens_for_domain("network", &target);
-    let name = format!(
-        "project_profile_{}_{}_network_target_config_auto",
-        sanitize_ident(&ast.domain),
-        sanitize_ident(&ast.unit)
-    );
-    push_profile_node(
-        module,
-        name,
-        "network0",
-        Operation {
-            module: "network".to_owned(),
-            instruction: "target_config".to_owned(),
-            args: tokens.into_args(),
-        },
-    );
-    Ok(())
-}
-
-fn kernel_target_tokens(target: &RegisteredAbiTarget) -> (String, String) {
-    match target.backend_family.as_deref() {
-        Some("coreml") => ("apple_ane".to_owned(), "coreml".to_owned()),
-        Some("cpu-fallback") => (target.machine_arch.clone(), "cpu-fallback".to_owned()),
-        Some(other) => (target.machine_arch.clone(), other.to_owned()),
-        None => (target.machine_arch.clone(), target.calling_abi.clone()),
     }
 }
 
@@ -518,133 +436,4 @@ fn apply_network_profile_stmt(
         );
     }
     Ok(())
-}
-
-pub(super) fn collect_profile_int_bindings(body: &[AstStmt]) -> BTreeMap<String, i64> {
-    let mut bindings = BTreeMap::new();
-    for stmt in body {
-        if let Some((name, value)) = extract_profile_int_binding(stmt) {
-            bindings.insert(name.to_owned(), value);
-        }
-    }
-    bindings
-}
-
-pub(super) fn extract_profile_call(stmt: &AstStmt) -> Option<(&str, &str, &[AstExpr])> {
-    match stmt {
-        AstStmt::Let { name, value, .. } | AstStmt::Const { name, value, .. } => {
-            if let AstExpr::Call {
-                callee,
-                generic_args: _,
-                args,
-            } = value
-            {
-                Some((name.as_str(), callee.as_str(), args.as_slice()))
-            } else {
-                None
-            }
-        }
-        AstStmt::Expr(AstExpr::Call {
-            callee,
-            generic_args: _,
-            args,
-        }) => Some((callee.as_str(), callee.as_str(), args.as_slice())),
-        _ => None,
-    }
-}
-
-fn extract_profile_int_binding(stmt: &AstStmt) -> Option<(&str, i64)> {
-    match stmt {
-        AstStmt::Let { name, value, .. } | AstStmt::Const { name, value, .. } => {
-            if let AstExpr::Int(value) = value {
-                Some((name.as_str(), *value))
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
-fn expect_text_arg(args: &[AstExpr], index: usize, callee: &str) -> Result<String, String> {
-    match args.get(index) {
-        Some(AstExpr::Text(value)) => Ok(value.clone()),
-        _ => Err(format!(
-            "{callee}(...) expects string literal arg {}",
-            index + 1
-        )),
-    }
-}
-
-fn expect_profile_int_arg(
-    args: &[AstExpr],
-    index: usize,
-    callee: &str,
-    int_bindings: &BTreeMap<String, i64>,
-) -> Result<i64, String> {
-    match args.get(index) {
-        Some(AstExpr::Int(value)) => Ok(*value),
-        Some(AstExpr::Var(name)) => int_bindings.get(name).copied().ok_or_else(|| {
-            format!(
-                "{callee}(...) expects integer literal or profile const arg {}, unknown `{}`",
-                index + 1,
-                name
-            )
-        }),
-        _ => Err(format!(
-            "{callee}(...) expects integer literal or profile const arg {}",
-            index + 1
-        )),
-    }
-}
-
-fn expect_profile_value_input_name(
-    ast: &AstModule,
-    args: &[AstExpr],
-    index: usize,
-    callee: &str,
-) -> Result<String, String> {
-    match args.get(index) {
-        Some(AstExpr::Var(name)) => Ok(format!(
-            "project_profile_{}_{}_{}",
-            sanitize_ident(&ast.domain),
-            sanitize_ident(&ast.unit),
-            sanitize_ident(name)
-        )),
-        _ => Err(format!(
-            "{callee}(...) expects profile value reference arg {}",
-            index + 1
-        )),
-    }
-}
-
-pub(super) fn ensure_project_resource(module: &mut YirModule, name: &str, kind: &str) {
-    if let Some(resource) = module
-        .resources
-        .iter_mut()
-        .find(|resource| resource.name == name)
-    {
-        resource.kind = ResourceKind::parse(kind);
-        return;
-    }
-    module.resources.push(Resource {
-        name: name.to_owned(),
-        kind: ResourceKind::parse(kind),
-    });
-}
-
-pub(super) fn push_profile_node(
-    module: &mut YirModule,
-    name: String,
-    resource: &str,
-    op: Operation,
-) {
-    if module.nodes.iter().any(|node| node.name == name) {
-        return;
-    }
-    module.nodes.push(Node {
-        name,
-        resource: resource.to_owned(),
-        op,
-    });
 }

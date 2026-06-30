@@ -1073,7 +1073,7 @@ fn rejects_general_iterative_while_until_loop_lowering_exists() {
     .unwrap();
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains("body does not begin with a supported step binding"));
+    assert!(error.contains("body does not begin with a supported step prefix"));
     assert!(error.contains("loop state `value`"));
 }
 
@@ -1107,7 +1107,7 @@ fn rejects_memory_address_backedge_while_until_general_loop_lowering_exists() {
     .unwrap();
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains("the first body binding `head_ref` is not a supported step"));
+    assert!(error.contains("the first body binding `head_ref` is not a supported temp/step prefix"));
     assert!(error.contains("loop state `step`"));
 }
 
