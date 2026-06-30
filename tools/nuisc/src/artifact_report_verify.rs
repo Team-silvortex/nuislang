@@ -217,6 +217,29 @@ pub(crate) fn verify_build_manifest_json(
             "lowering_plan_entries_checked",
             report.lowering_plan_entries_checked,
         ),
+        json_optional_string_field("clock_protocol_path", report.clock_protocol_path.as_deref()),
+        json_usize_field("clock_protocol_domains", report.clock_protocol_domains),
+        json_usize_field("clock_protocol_checked", report.clock_protocol_checked),
+        json_usize_field(
+            "clock_protocol_entries_checked",
+            report.clock_protocol_entries_checked,
+        ),
+        json_optional_string_field(
+            "hetero_calculate_plan_path",
+            report.hetero_calculate_plan_path.as_deref(),
+        ),
+        json_usize_field(
+            "hetero_calculate_plan_units",
+            report.hetero_calculate_plan_units,
+        ),
+        json_usize_field(
+            "hetero_calculate_plan_checked",
+            report.hetero_calculate_plan_checked,
+        ),
+        json_usize_field(
+            "hetero_calculate_plan_entries_checked",
+            report.hetero_calculate_plan_entries_checked,
+        ),
         json_optional_string_field("doc_index_path", report.doc_index_path.as_deref()),
         json_usize_field("doc_index_module_count", report.doc_index_module_count),
         json_usize_field(

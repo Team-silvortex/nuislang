@@ -103,6 +103,15 @@ pub(crate) fn build_manifest_verify_report(
         lowering_plan_units: fields.lowering_plan_units,
         lowering_plan_index_checked: domain_index_report.lowering_plan_index_checked,
         lowering_plan_entries_checked: domain_index_report.lowering_plan_entries_checked,
+        clock_protocol_path: fields.clock_protocol_path,
+        clock_protocol_domains: fields.clock_protocol_domains,
+        clock_protocol_checked: domain_index_report.clock_protocol_checked,
+        clock_protocol_entries_checked: domain_index_report.clock_protocol_entries_checked,
+        hetero_calculate_plan_path: fields.hetero_calculate_plan_path,
+        hetero_calculate_plan_units: fields.hetero_calculate_plan_units,
+        hetero_calculate_plan_checked: domain_index_report.hetero_calculate_plan_checked,
+        hetero_calculate_plan_entries_checked: domain_index_report
+            .hetero_calculate_plan_entries_checked,
         artifacts_checked,
         project_metadata_checked: project_metadata_report.project_metadata_checked,
     }

@@ -980,7 +980,7 @@ fn build_manifest_round_trips_cpu_target_metadata() {
             .unwrap();
     assert!(artifact_verify_report.lifecycle_contract_consistent);
     assert!(artifact_verify_report.lifecycle_runtime_capability_flags_consistent);
-    let report = verify_build_manifest(PathBuf::from(manifest).as_path()).unwrap();
+    let report = verify_build_manifest(PathBuf::from(&manifest).as_path()).unwrap();
     assert!(std::path::Path::new(&report.envelope_path).exists());
     assert!(std::path::Path::new(&report.artifact_path).exists());
     assert_eq!(report.envelope_schema, "nuis-executable-envelope-v1");
@@ -1143,7 +1143,7 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
     )
     .unwrap();
 
-    let report = verify_build_manifest(PathBuf::from(manifest).as_path()).unwrap();
+    let report = verify_build_manifest(PathBuf::from(&manifest).as_path()).unwrap();
     assert_eq!(report.envelope_package_count, 3);
     assert_eq!(report.execution_contracts_checked, 3);
     assert_eq!(report.domain_build_unit_count, 3);
@@ -1164,6 +1164,9 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
     assert_eq!(report.lowering_plan_units, 2);
     assert_eq!(report.lowering_plan_index_checked, 1);
     assert_eq!(report.lowering_plan_entries_checked, 2);
+    assert_eq!(report.hetero_calculate_plan_units, 2);
+    assert_eq!(report.hetero_calculate_plan_checked, 1);
+    assert_eq!(report.hetero_calculate_plan_entries_checked, 2);
     let kernel_payload = dir.join("nuis.domain.kernel.payload.toml");
     let kernel_bridge_stub = dir.join("nuis.domain.kernel.bridge.stub.txt");
     let kernel_payload_blob = dir.join("nuis.domain.kernel.payload.bin");
@@ -1173,6 +1176,7 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
     let bridge_registry = dir.join("nuis.bridge.registry.toml");
     let host_bridge_plan_index = dir.join("nuis.host-bridge.plan-index.toml");
     let lowering_plan_index = dir.join("nuis.lowering.plan-index.toml");
+    let hetero_calculate_plan = dir.join("nuis.hetero-calculate.plan.toml");
     assert!(kernel_payload.exists());
     assert!(kernel_bridge_stub.exists());
     assert!(kernel_payload_blob.exists());
@@ -1182,6 +1186,7 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
     assert!(bridge_registry.exists());
     assert!(host_bridge_plan_index.exists());
     assert!(lowering_plan_index.exists());
+    assert!(hetero_calculate_plan.exists());
     let kernel_payload_text = fs::read_to_string(&kernel_payload).unwrap();
     let kernel_bridge_stub_text = fs::read_to_string(&kernel_bridge_stub).unwrap();
     let network_payload_text = fs::read_to_string(&network_payload).unwrap();
@@ -1189,9 +1194,11 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
     let bridge_registry_text = fs::read_to_string(&bridge_registry).unwrap();
     let host_bridge_plan_index_text = fs::read_to_string(&host_bridge_plan_index).unwrap();
     let lowering_plan_index_text = fs::read_to_string(&lowering_plan_index).unwrap();
+    let hetero_calculate_plan_text = fs::read_to_string(&hetero_calculate_plan).unwrap();
     let bridge_registry_path_text = bridge_registry.display().to_string();
     let host_bridge_plan_index_path_text = host_bridge_plan_index.display().to_string();
     let lowering_plan_index_path_text = lowering_plan_index.display().to_string();
+    let hetero_calculate_plan_path_text = hetero_calculate_plan.display().to_string();
     assert_eq!(
         report.bridge_registry_path.as_deref(),
         Some(bridge_registry_path_text.as_str())
@@ -1203,6 +1210,10 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
     assert_eq!(
         report.lowering_plan_index_path.as_deref(),
         Some(lowering_plan_index_path_text.as_str())
+    );
+    assert_eq!(
+        report.hetero_calculate_plan_path.as_deref(),
+        Some(hetero_calculate_plan_path_text.as_str())
     );
     assert!(bridge_registry_text.contains("schema = \"nuis-bridge-registry-v1\""));
     assert!(bridge_registry_text.contains("bridge_count = 2"));
@@ -1293,6 +1304,26 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
     assert!(lowering_plan_index_text.contains("ir_sidecar_path = "));
     assert!(lowering_plan_index_text.contains("payload_blob_path = "));
     assert!(lowering_plan_index_text.contains("bridge_stub_path = "));
+    let manifest_text = fs::read_to_string(&manifest).unwrap();
+    assert!(manifest_text.contains("[hetero_calculate_plan]"));
+    assert!(manifest_text.contains("hetero_calculate_plan_path = "));
+    assert!(manifest_text
+        .contains("hetero_calculate_plan_schema = \"nuis-hetero-calculate-link-plan-v1\""));
+    assert!(manifest_text.contains("hetero_calculate_plan_units = 2"));
+    assert!(manifest_text.contains("hetero_calculate_plan_inline = "));
+    assert!(hetero_calculate_plan_text.contains("schema = \"nuis-hetero-calculate-link-plan-v1\""));
+    assert!(hetero_calculate_plan_text.contains("mode = \"heterogeneous-static-lifecycle\""));
+    assert!(hetero_calculate_plan_text.contains("static_link = true"));
+    assert!(hetero_calculate_plan_text.contains("lifecycle_driven = true"));
+    assert!(hetero_calculate_plan_text.contains("[validation]"));
+    assert!(hetero_calculate_plan_text.contains("valid = true"));
+    assert!(hetero_calculate_plan_text.contains("[[node]]"));
+    assert!(hetero_calculate_plan_text.contains("timestamp = \"t0001.kernel\""));
+    assert!(hetero_calculate_plan_text.contains("timestamp = \"t0002.network\""));
+    assert!(hetero_calculate_plan_text.contains("wait_on = [\"t0001.kernel\"]"));
+    assert!(hetero_calculate_plan_text.contains("[[data_segment]]"));
+    assert!(hetero_calculate_plan_text.contains("order_key = \"data:0001:kernel\""));
+    assert!(hetero_calculate_plan_text.contains("order_key = \"data:0002:network\""));
     let kernel_blob =
         super::decode_domain_build_unit_payload_blob(&fs::read(&kernel_payload_blob).unwrap())
             .unwrap();

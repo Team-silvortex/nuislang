@@ -174,6 +174,10 @@ pub(crate) fn inspect_artifact_json(
             "lowering_plan_entries_checked",
             report.lowering_plan_entries_checked,
         ));
+        fields.push(json_usize_field(
+            "hetero_calculate_plan_entries_checked",
+            report.hetero_calculate_plan_entries_checked,
+        ));
         fields.push(format!(
             "\"domain_build_verification_summary\":{}",
             domain_build_verification_summary_json(&summary)

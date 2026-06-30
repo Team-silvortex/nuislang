@@ -47,7 +47,7 @@ pub fn write_build_manifest(
         .len() as usize;
 
     let artifact_set =
-        prepare_build_manifest_artifacts(output_dir, written, &mut domain_build_units)?;
+        prepare_build_manifest_artifacts(output_dir, written, &lifecycle, &mut domain_build_units)?;
 
     write_nuis_executable_envelope(&envelope_path, &envelope)?;
     let out = render_build_manifest_source(

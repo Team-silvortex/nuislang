@@ -203,6 +203,28 @@ pub(crate) fn run_inspect_artifact(input: PathBuf, json: bool) -> Result<(), Str
             link_plan.final_stage.output_path
         );
         println!("  link_plan_domain_units: {}", link_plan.domain_units.len());
+        println!(
+            "  hetero_calculate_mode: {}",
+            link_plan.hetero_calculate.mode
+        );
+        println!(
+            "  hetero_calculate_validation: checked={} valid={} issues={}",
+            link_plan.hetero_calculate.validation.checked,
+            link_plan.hetero_calculate.validation.valid,
+            if link_plan.hetero_calculate.validation.issues.is_empty() {
+                "none".to_owned()
+            } else {
+                link_plan.hetero_calculate.validation.issues.join("; ")
+            }
+        );
+        println!(
+            "  hetero_calculate_nodes: {}",
+            link_plan.hetero_calculate.nodes.len()
+        );
+        println!(
+            "  hetero_calculate_data_segments: {}",
+            link_plan.hetero_calculate.data_segments.len()
+        );
         for unit in &report.domain_build_units {
             let verdict = domain_build_unit_verification_verdict(unit, report);
             let build_contract = domain_build_unit_effective_contract_summary(unit);

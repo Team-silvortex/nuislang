@@ -53,6 +53,14 @@ pub(crate) struct ManifestFieldVerification {
     pub lowering_plan_index_schema: Option<String>,
     pub lowering_plan_units: usize,
     pub lowering_plan_index_inline: Option<String>,
+    pub clock_protocol_path: Option<String>,
+    pub clock_protocol_schema: Option<String>,
+    pub clock_protocol_domains: usize,
+    pub clock_protocol_inline: Option<String>,
+    pub hetero_calculate_plan_path: Option<String>,
+    pub hetero_calculate_plan_schema: Option<String>,
+    pub hetero_calculate_plan_units: usize,
+    pub hetero_calculate_plan_inline: Option<String>,
 }
 
 pub(crate) fn verify_manifest_fields(
@@ -181,6 +189,28 @@ pub(crate) fn verify_manifest_fields(
         lowering_plan_index_inline: parse_optional_toml_string(
             source,
             "lowering_plan_index_inline",
+        ),
+        clock_protocol_path: parse_optional_toml_string(source, "clock_protocol_path"),
+        clock_protocol_schema: parse_optional_toml_string(source, "clock_protocol_schema"),
+        clock_protocol_domains: parse_optional_toml_usize(source, "clock_protocol_domains")
+            .unwrap_or(0),
+        clock_protocol_inline: parse_optional_toml_string(source, "clock_protocol_inline"),
+        hetero_calculate_plan_path: parse_optional_toml_string(
+            source,
+            "hetero_calculate_plan_path",
+        ),
+        hetero_calculate_plan_schema: parse_optional_toml_string(
+            source,
+            "hetero_calculate_plan_schema",
+        ),
+        hetero_calculate_plan_units: parse_optional_toml_usize(
+            source,
+            "hetero_calculate_plan_units",
+        )
+        .unwrap_or(0),
+        hetero_calculate_plan_inline: parse_optional_toml_string(
+            source,
+            "hetero_calculate_plan_inline",
         ),
     })
 }

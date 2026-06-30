@@ -1,9 +1,11 @@
-use std::path::Path;
+use std::{fs, path::Path};
 
 use crate::aot;
 
 #[path = "linker_alignment.rs"]
 mod linker_alignment;
+#[path = "linker_clock_protocol.rs"]
+mod linker_clock_protocol;
 #[path = "linker_final_stage.rs"]
 mod linker_final_stage;
 #[path = "linker_hetero_calculate.rs"]
@@ -15,13 +17,117 @@ mod linker_types;
 
 pub use linker_alignment::build_artifact_lowering_alignment_summary;
 use linker_final_stage::derive_final_stage;
+pub use linker_hetero_calculate::render_hetero_calculate_plan_toml;
 pub use linker_render::render_link_plan_summary;
 pub use linker_types::{
     ArtifactLoweringAlignmentCheck, ArtifactLoweringAlignmentSummary, LinkPlan, LinkPlanArtifact,
+    LinkPlanClockDomain, LinkPlanClockEdge, LinkPlanClockProtocol, LinkPlanClockValidationSummary,
     LinkPlanCpuTarget, LinkPlanDataSegment, LinkPlanDomainUnit, LinkPlanEnvelope,
     LinkPlanFinalStage, LinkPlanHeteroCalculate, LinkPlanHeteroNode,
     LinkPlanHeteroValidationSummary, LinkPlanLifecycle, LINK_PLAN_SCHEMA,
 };
+
+pub fn build_clock_protocol(
+    lifecycle: &LinkPlanLifecycle,
+    default_time_mode: &str,
+    domain_units: &[LinkPlanDomainUnit],
+    hetero_calculate: &LinkPlanHeteroCalculate,
+) -> LinkPlanClockProtocol {
+    linker_clock_protocol::derive_clock_protocol(
+        lifecycle,
+        default_time_mode,
+        domain_units,
+        hetero_calculate,
+    )
+}
+
+pub fn render_clock_protocol_toml(plan: &LinkPlanClockProtocol) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "schema = \"{}\"\n",
+        crate::aot_toml::escape_toml_string(&plan.schema)
+    ));
+    out.push_str(&format!(
+        "mode = \"{}\"\n",
+        crate::aot_toml::escape_toml_string(&plan.mode)
+    ));
+    out.push_str(&format!(
+        "source = \"{}\"\n",
+        crate::aot_toml::escape_toml_string(&plan.source)
+    ));
+    out.push_str(&format!(
+        "default_time_mode = \"{}\"\n",
+        crate::aot_toml::escape_toml_string(&plan.default_time_mode)
+    ));
+    out.push_str(&format!(
+        "lifecycle_tick_policy = \"{}\"\n",
+        crate::aot_toml::escape_toml_string(&plan.lifecycle_tick_policy)
+    ));
+    out.push_str("[validation]\n");
+    out.push_str(&format!("checked = {}\n", plan.validation.checked));
+    out.push_str(&format!("valid = {}\n", plan.validation.valid));
+    out.push_str(&format!(
+        "issues = {}\n",
+        crate::aot_toml::render_string_array(&plan.validation.issues)
+    ));
+    for domain in &plan.domains {
+        out.push_str("[[clock_domain]]\n");
+        out.push_str(&format!("index = {}\n", domain.index));
+        out.push_str(&format!(
+            "domain_family = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&domain.domain_family)
+        ));
+        out.push_str(&format!(
+            "package_id = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&domain.package_id)
+        ));
+        out.push_str(&format!(
+            "clock_domain_id = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&domain.clock_domain_id)
+        ));
+        out.push_str(&format!(
+            "clock_kind = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&domain.clock_kind)
+        ));
+        out.push_str(&format!(
+            "clock_epoch_kind = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&domain.clock_epoch_kind)
+        ));
+        out.push_str(&format!(
+            "clock_resolution = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&domain.clock_resolution)
+        ));
+        out.push_str(&format!(
+            "clock_bridge_default = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&domain.clock_bridge_default)
+        ));
+        out.push_str(&format!(
+            "lifecycle_hook = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&domain.lifecycle_hook)
+        ));
+    }
+    for edge in &plan.edges {
+        out.push_str("[[clock_edge]]\n");
+        out.push_str(&format!("index = {}\n", edge.index));
+        out.push_str(&format!(
+            "from = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&edge.from)
+        ));
+        out.push_str(&format!(
+            "to = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&edge.to)
+        ));
+        out.push_str(&format!(
+            "relation = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&edge.relation)
+        ));
+        out.push_str(&format!(
+            "source = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&edge.source)
+        ));
+    }
+    out
+}
 
 pub fn build_link_plan(
     report: &aot::BuildManifestVerifyReport,
@@ -119,6 +225,12 @@ pub fn build_link_plan(
     };
     let hetero_calculate =
         linker_hetero_calculate::derive_hetero_calculate_plan(&lifecycle, &domain_units);
+    let clock_protocol = linker_clock_protocol::derive_clock_protocol(
+        &lifecycle,
+        &artifact.envelope.default_time_mode,
+        &domain_units,
+        &hetero_calculate,
+    );
 
     LinkPlan {
         schema: LINK_PLAN_SCHEMA.to_owned(),
@@ -150,6 +262,7 @@ pub fn build_link_plan(
         lowering_plan_index_path: report.lowering_plan_index_path.clone(),
         domain_units,
         artifact_lowering_alignment,
+        clock_protocol,
         hetero_calculate,
         final_stage: derive_final_stage(report, &binary_path),
     }
@@ -159,6 +272,23 @@ pub fn build_link_plan_from_manifest(path: &Path) -> Result<LinkPlan, String> {
     let report = aot::verify_build_manifest(path)?;
     let artifact = aot::parse_nuis_compiled_artifact(Path::new(&report.artifact_path))?;
     Ok(build_link_plan(&report, &artifact))
+}
+
+pub fn build_hetero_calculate_plan(
+    lifecycle: &LinkPlanLifecycle,
+    domain_units: &[LinkPlanDomainUnit],
+) -> LinkPlanHeteroCalculate {
+    linker_hetero_calculate::derive_hetero_calculate_plan(lifecycle, domain_units)
+}
+
+pub fn write_hetero_calculate_plan(plan: &LinkPlan, path: &Path) -> Result<(), String> {
+    let source = render_hetero_calculate_plan_toml(&plan.hetero_calculate);
+    fs::write(path, source).map_err(|error| {
+        format!(
+            "failed to write hetero calculate link plan `{}`: {error}",
+            path.display()
+        )
+    })
 }
 
 #[cfg(test)]
@@ -187,7 +317,7 @@ mod tests {
             lifecycle_shutdown_policy: "flush".to_owned(),
             lifecycle_yalivia_rpc: "disabled".to_owned(),
             lifecycle_hook_count: 1,
-            lifecycle_hook_surface: vec!["tick".to_owned()],
+            lifecycle_hook_surface: vec!["on_scheduler_tick".to_owned()],
             lifecycle_export_count: 1,
             lifecycle_export_surface: vec!["main".to_owned()],
             lifecycle_runtime_capability_flags: vec!["cpu".to_owned()],
@@ -251,6 +381,14 @@ mod tests {
             lowering_plan_units: 1,
             lowering_plan_index_checked: 1,
             lowering_plan_entries_checked: 1,
+            clock_protocol_path: Some("out/nuis.clock-protocol.toml".to_owned()),
+            clock_protocol_domains: 2,
+            clock_protocol_checked: 1,
+            clock_protocol_entries_checked: 2,
+            hetero_calculate_plan_path: Some("out/nuis.hetero-calculate.plan.toml".to_owned()),
+            hetero_calculate_plan_units: 1,
+            hetero_calculate_plan_checked: 1,
+            hetero_calculate_plan_entries_checked: 1,
             artifacts_checked: 1,
             project_metadata_checked: 0,
         }
@@ -425,6 +563,19 @@ mod tests {
         assert_eq!(plan.hetero_calculate.nodes.len(), 1);
         assert!(plan.hetero_calculate.validation.valid);
         assert!(plan.hetero_calculate.validation.issues.is_empty());
+        assert_eq!(plan.clock_protocol.schema, "nuis-clock-protocol-v1");
+        assert_eq!(plan.clock_protocol.mode, "heterogeneous-lifecycle-clock");
+        assert!(plan.clock_protocol.validation.valid);
+        assert!(plan
+            .clock_protocol
+            .domains
+            .iter()
+            .any(|domain| domain.clock_domain_id == "shader.clock.frame.v1"));
+        assert!(plan
+            .clock_protocol
+            .edges
+            .iter()
+            .any(|edge| edge.to == "t0001.shader" && edge.relation == "happens-before"));
         assert_eq!(plan.hetero_calculate.nodes[0].timestamp, "t0001.shader");
         assert_eq!(
             plan.hetero_calculate.nodes[0].lifecycle_hook,
@@ -460,6 +611,31 @@ mod tests {
         assert!(lines
             .iter()
             .any(|line| line.contains("data_segment: index=0 id=seg0001.shader")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("clock_protocol: schema=nuis-clock-protocol-v1")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("clock_domain: index=1 domain=shader")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("clock_edge: index=2 from=t0000.nustar.bootstrap.v1")));
+        let hetero_toml = render_hetero_calculate_plan_toml(&plan.hetero_calculate);
+        assert!(hetero_toml.contains("schema = \"nuis-hetero-calculate-link-plan-v1\""));
+        assert!(hetero_toml.contains("static_link = true"));
+        assert!(hetero_toml.contains("lifecycle_driven = true"));
+        assert!(hetero_toml.contains("[validation]"));
+        assert!(hetero_toml.contains("valid = true"));
+        assert!(hetero_toml.contains("[[node]]"));
+        assert!(hetero_toml.contains("timestamp = \"t0001.shader\""));
+        assert!(hetero_toml.contains("wait_on = [\"t0000.nustar.bootstrap.v1\"]"));
+        assert!(hetero_toml.contains("[[data_segment]]"));
+        assert!(hetero_toml.contains("order_key = \"data:0001:shader\""));
+        let out_path = std::env::temp_dir().join("nuis-linker-hetero-calculate-test.toml");
+        write_hetero_calculate_plan(&plan, &out_path).unwrap();
+        let written = std::fs::read_to_string(&out_path).unwrap();
+        assert_eq!(written, hetero_toml);
+        let _ = std::fs::remove_file(out_path);
         assert_eq!(plan.artifact_lowering_alignment.checked, 0);
         assert!(plan.artifact_lowering_alignment.consistent);
     }

@@ -2,6 +2,7 @@ use super::{
     LinkPlanDataSegment, LinkPlanDomainUnit, LinkPlanHeteroCalculate, LinkPlanHeteroNode,
     LinkPlanHeteroValidationSummary, LinkPlanLifecycle,
 };
+use crate::aot_toml::{escape_toml_string, render_string_array};
 
 pub(crate) fn derive_hetero_calculate_plan(
     lifecycle: &LinkPlanLifecycle,
@@ -238,6 +239,97 @@ pub(crate) fn validate_hetero_calculate_plan(
         valid: issues.is_empty(),
         issues,
     }
+}
+
+pub fn render_hetero_calculate_plan_toml(plan: &LinkPlanHeteroCalculate) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "schema = \"{}\"\n",
+        escape_toml_string(&plan.schema)
+    ));
+    out.push_str(&format!("mode = \"{}\"\n", escape_toml_string(&plan.mode)));
+    out.push_str(&format!("static_link = {}\n", plan.static_link));
+    out.push_str(&format!("lifecycle_driven = {}\n", plan.lifecycle_driven));
+    out.push_str(&format!(
+        "time_order_model = \"{}\"\n",
+        escape_toml_string(&plan.time_order_model)
+    ));
+    out.push_str(&format!(
+        "data_order_model = \"{}\"\n",
+        escape_toml_string(&plan.data_order_model)
+    ));
+    out.push_str(&format!(
+        "c_world_policy = \"{}\"\n",
+        escape_toml_string(&plan.c_world_policy)
+    ));
+    out.push_str("[validation]\n");
+    out.push_str(&format!("checked = {}\n", plan.validation.checked));
+    out.push_str(&format!("valid = {}\n", plan.validation.valid));
+    out.push_str(&format!(
+        "issues = {}\n",
+        render_string_array(&plan.validation.issues)
+    ));
+    for node in &plan.nodes {
+        out.push_str("[[node]]\n");
+        out.push_str(&format!("index = {}\n", node.index));
+        out.push_str(&format!(
+            "timestamp = \"{}\"\n",
+            escape_toml_string(&node.timestamp)
+        ));
+        out.push_str(&format!(
+            "domain_family = \"{}\"\n",
+            escape_toml_string(&node.domain_family)
+        ));
+        out.push_str(&format!(
+            "package_id = \"{}\"\n",
+            escape_toml_string(&node.package_id)
+        ));
+        out.push_str(&format!(
+            "lifecycle_hook = \"{}\"\n",
+            escape_toml_string(&node.lifecycle_hook)
+        ));
+        out.push_str(&format!(
+            "wait_on = {}\n",
+            render_string_array(&node.wait_on)
+        ));
+        out.push_str(&format!("emits = {}\n", render_string_array(&node.emits)));
+        out.push_str(&format!(
+            "link_input = \"{}\"\n",
+            escape_toml_string(&node.link_input)
+        ));
+        out.push_str(&format!("c_world_wrapper = {}\n", node.c_world_wrapper));
+    }
+    for segment in &plan.data_segments {
+        out.push_str("[[data_segment]]\n");
+        out.push_str(&format!("index = {}\n", segment.index));
+        out.push_str(&format!(
+            "segment_id = \"{}\"\n",
+            escape_toml_string(&segment.segment_id)
+        ));
+        out.push_str(&format!(
+            "domain_family = \"{}\"\n",
+            escape_toml_string(&segment.domain_family)
+        ));
+        out.push_str(&format!(
+            "owner_package = \"{}\"\n",
+            escape_toml_string(&segment.owner_package)
+        ));
+        out.push_str(&format!(
+            "order_key = \"{}\"\n",
+            escape_toml_string(&segment.order_key)
+        ));
+        out.push_str(&format!(
+            "access_phase = \"{}\"\n",
+            escape_toml_string(&segment.access_phase)
+        ));
+        if let Some(source_path) = &segment.source_path {
+            out.push_str(&format!(
+                "source_path = \"{}\"\n",
+                escape_toml_string(source_path)
+            ));
+        }
+    }
+    out
 }
 
 fn lifecycle_hook_for_domain(unit: &LinkPlanDomainUnit) -> String {

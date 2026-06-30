@@ -71,6 +71,46 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
         plan.artifact_lowering_alignment.consistent
     ));
     lines.push(format!(
+        "clock_protocol: schema={} mode={} source={} default_time={} lifecycle_tick={} domains={} edges={}",
+        plan.clock_protocol.schema,
+        plan.clock_protocol.mode,
+        plan.clock_protocol.source,
+        plan.clock_protocol.default_time_mode,
+        plan.clock_protocol.lifecycle_tick_policy,
+        plan.clock_protocol.domains.len(),
+        plan.clock_protocol.edges.len()
+    ));
+    lines.push(format!(
+        "clock_validation: checked={} valid={} issues={}",
+        plan.clock_protocol.validation.checked,
+        plan.clock_protocol.validation.valid,
+        if plan.clock_protocol.validation.issues.is_empty() {
+            "none".to_owned()
+        } else {
+            plan.clock_protocol.validation.issues.join(";")
+        }
+    ));
+    for domain in &plan.clock_protocol.domains {
+        lines.push(format!(
+            "clock_domain: index={} domain={} package={} clock={} kind={} epoch={} resolution={} bridge={} hook={}",
+            domain.index,
+            domain.domain_family,
+            domain.package_id,
+            domain.clock_domain_id,
+            domain.clock_kind,
+            domain.clock_epoch_kind,
+            domain.clock_resolution,
+            domain.clock_bridge_default,
+            domain.lifecycle_hook
+        ));
+    }
+    for edge in &plan.clock_protocol.edges {
+        lines.push(format!(
+            "clock_edge: index={} from={} to={} relation={} source={}",
+            edge.index, edge.from, edge.to, edge.relation, edge.source
+        ));
+    }
+    lines.push(format!(
         "hetero_calculate: schema={} mode={} static_link={} lifecycle_driven={} time_order={} data_order={} c_world={}",
         plan.hetero_calculate.schema,
         plan.hetero_calculate.mode,

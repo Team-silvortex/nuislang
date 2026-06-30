@@ -15,6 +15,7 @@ pub struct LinkPlan {
     pub lowering_plan_index_path: Option<String>,
     pub domain_units: Vec<LinkPlanDomainUnit>,
     pub artifact_lowering_alignment: ArtifactLoweringAlignmentSummary,
+    pub clock_protocol: LinkPlanClockProtocol,
     pub hetero_calculate: LinkPlanHeteroCalculate,
     pub final_stage: LinkPlanFinalStage,
 }
@@ -138,6 +139,40 @@ pub struct LinkPlanHeteroCalculate {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanClockProtocol {
+    pub schema: String,
+    pub mode: String,
+    pub source: String,
+    pub default_time_mode: String,
+    pub lifecycle_tick_policy: String,
+    pub domains: Vec<LinkPlanClockDomain>,
+    pub edges: Vec<LinkPlanClockEdge>,
+    pub validation: LinkPlanClockValidationSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanClockDomain {
+    pub index: usize,
+    pub domain_family: String,
+    pub package_id: String,
+    pub clock_domain_id: String,
+    pub clock_kind: String,
+    pub clock_epoch_kind: String,
+    pub clock_resolution: String,
+    pub clock_bridge_default: String,
+    pub lifecycle_hook: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanClockEdge {
+    pub index: usize,
+    pub from: String,
+    pub to: String,
+    pub relation: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkPlanHeteroNode {
     pub index: usize,
     pub timestamp: String,
@@ -163,6 +198,13 @@ pub struct LinkPlanDataSegment {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkPlanHeteroValidationSummary {
+    pub checked: usize,
+    pub valid: bool,
+    pub issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanClockValidationSummary {
     pub checked: usize,
     pub valid: bool,
     pub issues: Vec<String>,

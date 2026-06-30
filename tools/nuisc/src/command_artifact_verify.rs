@@ -406,6 +406,36 @@ pub(crate) fn run_verify_build_manifest(manifest: PathBuf, json: bool) -> Result
             "  lowering_plan_entries_checked: {}",
             report.lowering_plan_entries_checked
         );
+        if let Some(path) = &report.clock_protocol_path {
+            println!("  clock_protocol_path: {}", path);
+        }
+        println!(
+            "  clock_protocol_domains: {}",
+            report.clock_protocol_domains
+        );
+        println!(
+            "  clock_protocol_checked: {}",
+            report.clock_protocol_checked
+        );
+        println!(
+            "  clock_protocol_entries_checked: {}",
+            report.clock_protocol_entries_checked
+        );
+        if let Some(path) = &report.hetero_calculate_plan_path {
+            println!("  hetero_calculate_plan_path: {}", path);
+        }
+        println!(
+            "  hetero_calculate_plan_units: {}",
+            report.hetero_calculate_plan_units
+        );
+        println!(
+            "  hetero_calculate_plan_checked: {}",
+            report.hetero_calculate_plan_checked
+        );
+        println!(
+            "  hetero_calculate_plan_entries_checked: {}",
+            report.hetero_calculate_plan_entries_checked
+        );
         if let Some(path) = &report.doc_index_path {
             println!("  doc_index_path: {}", path);
         }

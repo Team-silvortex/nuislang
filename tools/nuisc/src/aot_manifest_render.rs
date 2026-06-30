@@ -71,6 +71,53 @@ pub(crate) fn render_build_manifest_source(
         input.artifact_set.lowering_plan_index_inline.as_deref(),
         input.domain_build_units,
     );
+    if let Some(path) = input.artifact_set.clock_protocol_path.as_deref() {
+        out.push('\n');
+        out.push_str("[clock_protocol]\n");
+        out.push_str(&format!(
+            "clock_protocol_path = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&path.display().to_string())
+        ));
+        out.push_str("clock_protocol_schema = \"nuis-clock-protocol-v1\"\n");
+        let mut clock_domains = input
+            .domain_build_units
+            .iter()
+            .map(|unit| unit.domain_family.as_str())
+            .collect::<Vec<_>>();
+        clock_domains.sort_unstable();
+        clock_domains.dedup();
+        out.push_str(&format!(
+            "clock_protocol_domains = {}\n",
+            clock_domains.len()
+        ));
+        if let Some(source) = input.artifact_set.clock_protocol_inline.as_deref() {
+            out.push_str(&format!(
+                "clock_protocol_inline = \"{}\"\n",
+                crate::aot_toml::escape_toml_string(source)
+            ));
+        }
+    }
+    if let Some(path) = input.artifact_set.hetero_calculate_plan_path.as_deref() {
+        out.push('\n');
+        out.push_str("[hetero_calculate_plan]\n");
+        out.push_str(&format!(
+            "hetero_calculate_plan_path = \"{}\"\n",
+            crate::aot_toml::escape_toml_string(&path.display().to_string())
+        ));
+        out.push_str("hetero_calculate_plan_schema = \"nuis-hetero-calculate-link-plan-v1\"\n");
+        let units = input
+            .domain_build_units
+            .iter()
+            .filter(|unit| unit.domain_family != "cpu")
+            .count();
+        out.push_str(&format!("hetero_calculate_plan_units = {units}\n"));
+        if let Some(source) = input.artifact_set.hetero_calculate_plan_inline.as_deref() {
+            out.push_str(&format!(
+                "hetero_calculate_plan_inline = \"{}\"\n",
+                crate::aot_toml::escape_toml_string(source)
+            ));
+        }
+    }
 
     append_artifact_hash_manifest_sections(&mut out, &input.artifact_set.artifacts)?;
 
