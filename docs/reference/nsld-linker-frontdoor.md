@@ -41,6 +41,28 @@ cargo run -p nsld -- prepare <artifact-output-dir>
 cargo run -p nsld -- prepare <artifact-output-dir> --json
 cargo run -p nsld -- assemble-plan <artifact-output-dir>
 cargo run -p nsld -- assemble-plan <artifact-output-dir> --json
+cargo run -p nsld -- emit-assemble-plan <artifact-output-dir>
+cargo run -p nsld -- emit-assemble-plan <artifact-output-dir> --json
+cargo run -p nsld -- verify-assemble-plan <artifact-output-dir>
+cargo run -p nsld -- verify-assemble-plan <artifact-output-dir> --json
+cargo run -p nsld -- section-manifest <artifact-output-dir>
+cargo run -p nsld -- section-manifest <artifact-output-dir> --json
+cargo run -p nsld -- emit-section-manifest <artifact-output-dir>
+cargo run -p nsld -- emit-section-manifest <artifact-output-dir> --json
+cargo run -p nsld -- verify-section-manifest <artifact-output-dir>
+cargo run -p nsld -- verify-section-manifest <artifact-output-dir> --json
+cargo run -p nsld -- container-plan <artifact-output-dir>
+cargo run -p nsld -- container-plan <artifact-output-dir> --json
+cargo run -p nsld -- emit-container-plan <artifact-output-dir>
+cargo run -p nsld -- emit-container-plan <artifact-output-dir> --json
+cargo run -p nsld -- verify-container-plan <artifact-output-dir>
+cargo run -p nsld -- verify-container-plan <artifact-output-dir> --json
+cargo run -p nsld -- container <artifact-output-dir>
+cargo run -p nsld -- container <artifact-output-dir> --json
+cargo run -p nsld -- emit-container <artifact-output-dir>
+cargo run -p nsld -- emit-container <artifact-output-dir> --json
+cargo run -p nsld -- verify-container <artifact-output-dir>
+cargo run -p nsld -- verify-container <artifact-output-dir> --json
 cargo run -p nsld -- bundle <artifact-output-dir>
 cargo run -p nsld -- bundle <artifact-output-dir> --json
 cargo run -p nsld -- emit-bundle <artifact-output-dir>
@@ -69,12 +91,17 @@ cargo run -p nsld -- prepare <artifact-output-dir>
 cargo run -p nsld -- check <artifact-output-dir>
 ```
 
-`nsld prepare` emits and immediately verifies the three current Nsld-owned
+`nsld prepare` emits and immediately verifies the eight current Nsld-owned
 artifacts in dependency order:
 
 * `nuis.nsld.link-inputs.toml`
 * `nuis.nsld.link-units.toml`
 * `nuis.nsld.link-bundle.toml`
+* `nuis.nsld.assemble-plan.toml`
+* `nuis.nsld.section-manifest.toml`
+* `nuis.nsld.container-plan.toml`
+* `nuis.nsld.container`
+* `nuis.nsld.container.payload`
 
 This gives later linker, cache, and debugger stages one reproducible
 preparation step without hiding the lower-level `inputs`, `emit-units`, or
@@ -97,6 +124,171 @@ not replace the host finalizer. Its purpose is to make the future self-owned
 section assembly route visible and testable before relocation/container writing
 lands.
 
+`nsld emit-assemble-plan` materializes this dry-run view to:
+
+```text
+nuis.nsld.assemble-plan.toml
+```
+
+The emitted plan currently uses:
+
+```toml
+schema = "nuis-nsld-assemble-plan-v1"
+schema_version = 1
+plan_kind = "deterministic-section-assembly-plan"
+producer = "nsld"
+producer_phase = "alpha-0.6.0"
+ready = true
+bundle_id = "lb..."
+bundle_hash = "0x..."
+assemble_plan_hash = "0x..."
+section_count = 6
+blockers = []
+
+[[section]]
+order_index = 0
+section_id = "sec0000.compiled-artifact"
+section_kind = "compiled-artifact"
+source_path = "/.../nuis.compiled.artifact"
+source_hash = "0x..."
+required = true
+```
+
+`nsld verify-assemble-plan` re-computes the section plan from the current
+manifest, prepared Nsld metadata, and known sidecar/data segment paths.
+Verification fails if the file is missing, if the full content differs, or if
+`assemble_plan_hash` or `section_count` no longer match.
+
+`nsld section-manifest` derives the container-writer-facing section table from
+the assemble plan. It keeps the same deterministic section order while
+emphasizing section identity, source hashes, and `section_table_hash`.
+
+`nsld emit-section-manifest` materializes this table to:
+
+```text
+nuis.nsld.section-manifest.toml
+```
+
+The emitted manifest currently uses:
+
+```toml
+schema = "nuis-nsld-section-manifest-v1"
+schema_version = 1
+manifest_kind = "deterministic-section-manifest"
+producer = "nsld"
+producer_phase = "alpha-0.6.0"
+ready = true
+assemble_plan_hash = "0x..."
+section_count = 6
+section_table_hash = "0x..."
+blockers = []
+
+[[section]]
+order_index = 0
+section_id = "sec0000.compiled-artifact"
+section_kind = "compiled-artifact"
+source_path = "/.../nuis.compiled.artifact"
+source_hash = "0x..."
+required = true
+```
+
+`nsld verify-section-manifest` re-computes the section manifest and fails if
+the file is missing, if the full content differs, or if `section_count` or
+`section_table_hash` no longer match.
+
+`nsld container-plan` derives the first Nuis-owned binary container layout
+plan. It consumes the section manifest, records the container magic/version,
+the deterministic section table hash, the planned output path, and a
+`container_layout_hash` that future writer/linker stages can use as a stable
+layout identity.
+
+`nsld emit-container-plan` materializes this layout plan to:
+
+```text
+nuis.nsld.container-plan.toml
+```
+
+The emitted plan currently uses:
+
+```toml
+schema = "nuis-nsld-container-plan-v1"
+schema_version = 1
+plan_kind = "deterministic-container-layout-plan"
+producer = "nsld"
+producer_phase = "alpha-0.6.0"
+ready = true
+container_magic = "NUISNSLD"
+container_version = 1
+section_count = 6
+section_table_hash = "0x..."
+container_layout_hash = "0x..."
+output_path = "/.../nuis.nsld.container"
+blockers = []
+
+[[section]]
+order_index = 0
+section_id = "sec0000.compiled-artifact"
+section_kind = "compiled-artifact"
+source_path = "/.../nuis.compiled.artifact"
+source_hash = "0x..."
+required = true
+```
+
+`nsld verify-container-plan` re-computes the container plan and fails if the
+file is missing, if the full content differs, or if `section_count` or
+`container_layout_hash` no longer match.
+
+`nsld container` derives the first deterministic Nuis-owned container file
+view. It is intentionally still a metadata container shell: it records the
+container magic/version, `container_layout_hash`, `container_hash`, blockers,
+aggregate `payload_size_bytes` / `payload_hash`, and section table with
+deterministic `offset` / `size_bytes` entries without claiming to replace
+relocation, final native object linking, or host executable wrapping.
+
+`nsld emit-container` materializes this view and its contiguous payload blob
+to:
+
+```text
+nuis.nsld.container
+nuis.nsld.container.payload
+```
+
+The emitted container currently uses TOML-compatible metadata:
+
+```toml
+schema = "nuis-nsld-container-v1"
+schema_version = 1
+container_kind = "deterministic-hetero-container"
+producer = "nsld"
+producer_phase = "alpha-0.6.0"
+ready = true
+container_magic = "NUISNSLD"
+container_version = 1
+section_count = 6
+container_layout_hash = "0x..."
+container_hash = "0x..."
+payload_size_bytes = 1234
+payload_hash = "0x..."
+payload_path = "/.../nuis.nsld.container.payload"
+blockers = []
+
+[[section]]
+order_index = 0
+section_id = "sec0000.compiled-artifact"
+section_kind = "compiled-artifact"
+source_path = "/.../nuis.compiled.artifact"
+source_hash = "0x..."
+payload_hash = "0x..."
+required = true
+offset = 0
+size_bytes = 1234
+```
+
+`nsld verify-container` re-computes the container shell and payload blob. It
+fails if either file is missing, if the metadata content differs, or if
+`section_count`, `container_layout_hash`, `payload_size_bytes`, `payload_hash`,
+or `container_hash` no longer match.
+
 ## Linker Check
 
 `nsld check` is the first dedicated linker gate. It currently verifies:
@@ -114,16 +306,27 @@ lands.
   present
 * an emitted `nuis.nsld.link-bundle.toml` is still valid when that file is
   present
+* an emitted `nuis.nsld.assemble-plan.toml` is still valid when that file is
+  present
+* an emitted `nuis.nsld.section-manifest.toml` is still valid when that file is
+  present
+* an emitted `nuis.nsld.container-plan.toml` is still valid when that file is
+  present
+* an emitted `nuis.nsld.container` is still valid when that file is present
 
 The command exits with failure when any linker gate fails. JSON output is
 intended for CI and future toolchain orchestration.
 
 `nsld check` does not require `nuis.nsld.link-inputs.toml`,
-`nuis.nsld.link-units.toml`, or `nuis.nsld.link-bundle.toml` to exist. If any
-file is absent, the corresponding gate is reported as absent and the check
-still uses the core linker gates. If a file is present, it is verified with the
-same rules as `nsld verify-inputs`, `nsld verify-units`, or
-`nsld verify-bundle`; any mismatch fails the check.
+`nuis.nsld.link-units.toml`, `nuis.nsld.link-bundle.toml`, or
+`nuis.nsld.assemble-plan.toml`, `nuis.nsld.section-manifest.toml`, or
+`nuis.nsld.container-plan.toml`, or `nuis.nsld.container` to exist. If any file
+is absent, the corresponding gate is reported as absent and the check still
+uses the core linker gates. If a file is present, it is verified with the same
+rules as `nsld verify-inputs`, `nsld verify-units`, `nsld verify-bundle`,
+`nsld verify-assemble-plan`, `nsld verify-section-manifest`,
+`nsld verify-container-plan`, or `nsld verify-container`; any mismatch fails
+the check.
 
 The check report also exposes linker diagnostics for:
 
