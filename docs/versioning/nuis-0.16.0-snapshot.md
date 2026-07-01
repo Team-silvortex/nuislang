@@ -116,15 +116,15 @@ The most important current truths for `0.16.0` are:
 
 For `0.16.0`, the shortest practical route is:
 
-1. [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
-2. [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-3. [nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
-4. [nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md)
-5. [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
-6. [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
-7. [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
-8. [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-9. [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+1. [README.md](../../README.md)
+2. [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
+3. [nuis-0.16.0-compile-workflow.md](nuis-0.16.0-compile-workflow.md)
+4. [nuis-0.16.0-binary-compile-maturity.md](nuis-0.16.0-binary-compile-maturity.md)
+5. [nuis-0.16.0-generic-constraint-coverage.md](nuis-0.16.0-generic-constraint-coverage.md)
+6. [nuis-0.16.0-generic-surface-audit.md](nuis-0.16.0-generic-surface-audit.md)
+7. [docs/reference/README.md](../../docs/reference/README.md)
+8. [examples/projects/README.md](../../examples/projects/README.md)
+9. [stdlib/std/README.md](../../stdlib/std/README.md)
 
 ## `0.16.0` Focus Areas
 
@@ -149,15 +149,15 @@ If you need the shortest "show me the real thing" anchors for this snapshot,
 start with these:
 
 * frontend crossover probe:
-  [tests_generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generics.rs)
+  [tests_generics.rs](../../tools/nuisc/src/frontend/tests_generics.rs)
   proves explicit generic helper chains, control-flow specialization, and
   higher-order mapper/lambda routes together.
 * real project compile anchor:
-  [net_http_session_loop_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
+  [net_http_session_loop_bridge_recipe_demo](../../examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
   carries generic bridge cell/packet/envelope assembly through helper calls,
   lambda lifting, async/session summary shaping, and project compilation.
 * compile-harness truth:
-  [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+  [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
   checks that the real project route monomorphizes into the expected bridge
   shapes, including `__hof_...` and lifted `__lambda_...` functions.
 
@@ -190,7 +190,7 @@ cargo run -p nuis -- build <network-probe-project> <output-dir>
 ```
 
 and then compare the result against
-[../reference/network-runtime-host-validation.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-runtime-host-validation.md).
+[../reference/network-runtime-host-validation.md](../../docs/reference/network-runtime-host-validation.md).
 
 ## Rule Of Thumb
 

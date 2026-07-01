@@ -4,7 +4,7 @@ This file captures the current layering contract for the checked-in `std`
 task-facing lanes.
 
 It sits one level below
-[std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md):
+[std-mainline-layering-contract.md](std-mainline-layering-contract.md):
 that file explains the global `std` rule of thumb, while this file explains
 what the task-facing lane currently means in repository practice.
 
@@ -46,8 +46,8 @@ not as proof of a finished concurrency runtime.
 
 Current semantic references:
 
-* [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
+* [cpu-task-contract.md](cpu-task-contract.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
 
 The practical rule today is:
 
@@ -64,25 +64,25 @@ observation.
 
 If future thread/lock work begins, it should be staged beside this lane rather
 than silently folded into it. See
-[cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md).
+[cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md).
 
 ## Pure Task Layers
 
 These are the current narrow checked-in task routes.
 
-* [task_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime_recipe.ns)
-* [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
-* [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
-* [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
-* [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
-* [task_fallback_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_fallback_recipe.ns)
-* [task_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_policy_recipe.ns)
-* [task_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_batch_recipe.ns)
-* [task_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_windowed_batch_recipe.ns)
-* [task_result_family_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_family_recipe.ns)
-* [task_result_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_policy_recipe.ns)
-* [task_result_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_batch_recipe.ns)
-* [task_result_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_windowed_batch_recipe.ns)
+* [task_runtime_recipe.ns](../../stdlib/std/task_runtime_recipe.ns)
+* [task_status_recipe.ns](../../stdlib/std/task_status_recipe.ns)
+* [task_value_recipe.ns](../../stdlib/std/task_value_recipe.ns)
+* [task_compare_recipe.ns](../../stdlib/std/task_compare_recipe.ns)
+* [task_lifecycle_recipe.ns](../../stdlib/std/task_lifecycle_recipe.ns)
+* [task_fallback_recipe.ns](../../stdlib/std/task_fallback_recipe.ns)
+* [task_policy_recipe.ns](../../stdlib/std/task_policy_recipe.ns)
+* [task_batch_recipe.ns](../../stdlib/std/task_batch_recipe.ns)
+* [task_windowed_batch_recipe.ns](../../stdlib/std/task_windowed_batch_recipe.ns)
+* [task_result_family_recipe.ns](../../stdlib/std/task_result_family_recipe.ns)
+* [task_result_policy_recipe.ns](../../stdlib/std/task_result_policy_recipe.ns)
+* [task_result_batch_recipe.ns](../../stdlib/std/task_result_batch_recipe.ns)
+* [task_result_windowed_batch_recipe.ns](../../stdlib/std/task_result_windowed_batch_recipe.ns)
 
 Current role split:
 
@@ -130,8 +130,8 @@ task semantic core
 These recipes intentionally extend the pure task lane into timing and lane-aware
 observation.
 
-* [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
-* [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
+* [task_clock_recipe.ns](../../stdlib/std/task_clock_recipe.ns)
+* [task_scheduler_recipe.ns](../../stdlib/std/task_scheduler_recipe.ns)
 
 Current role split:
 
@@ -147,7 +147,7 @@ clock/tick and lane/bind-core concerns.
 
 The current wider CLI-facing composition layer for this lane is:
 
-* [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+* [task_cli_recipe.ns](../../stdlib/std/task_cli_recipe.ns)
 
 Its current role is to combine:
 
@@ -184,22 +184,22 @@ task_runtime
 
 Concrete sources:
 
-* [task_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime_recipe.ns)
-* [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
-* [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
-* [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
-* [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
-* [task_fallback_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_fallback_recipe.ns)
-* [task_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_policy_recipe.ns)
-* [task_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_batch_recipe.ns)
-* [task_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_windowed_batch_recipe.ns)
-* [task_result_family_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_family_recipe.ns)
-* [task_result_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_policy_recipe.ns)
-* [task_result_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_batch_recipe.ns)
-* [task_result_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_windowed_batch_recipe.ns)
-* [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
-* [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
-* [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+* [task_runtime_recipe.ns](../../stdlib/std/task_runtime_recipe.ns)
+* [task_status_recipe.ns](../../stdlib/std/task_status_recipe.ns)
+* [task_value_recipe.ns](../../stdlib/std/task_value_recipe.ns)
+* [task_compare_recipe.ns](../../stdlib/std/task_compare_recipe.ns)
+* [task_lifecycle_recipe.ns](../../stdlib/std/task_lifecycle_recipe.ns)
+* [task_fallback_recipe.ns](../../stdlib/std/task_fallback_recipe.ns)
+* [task_policy_recipe.ns](../../stdlib/std/task_policy_recipe.ns)
+* [task_batch_recipe.ns](../../stdlib/std/task_batch_recipe.ns)
+* [task_windowed_batch_recipe.ns](../../stdlib/std/task_windowed_batch_recipe.ns)
+* [task_result_family_recipe.ns](../../stdlib/std/task_result_family_recipe.ns)
+* [task_result_policy_recipe.ns](../../stdlib/std/task_result_policy_recipe.ns)
+* [task_result_batch_recipe.ns](../../stdlib/std/task_result_batch_recipe.ns)
+* [task_result_windowed_batch_recipe.ns](../../stdlib/std/task_result_windowed_batch_recipe.ns)
+* [task_clock_recipe.ns](../../stdlib/std/task_clock_recipe.ns)
+* [task_scheduler_recipe.ns](../../stdlib/std/task_scheduler_recipe.ns)
+* [task_cli_recipe.ns](../../stdlib/std/task_cli_recipe.ns)
 
 This cluster should currently be read as:
 
@@ -224,14 +224,14 @@ The task lane should currently be read with this split in mind:
 That is why:
 
 * `task_clock` should be read through
-  [time_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/time_runtime_recipe.ns),
-  [clock_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_runtime_recipe.ns),
+  [time_runtime_recipe.ns](../../stdlib/std/time_runtime_recipe.ns),
+  [clock_runtime_recipe.ns](../../stdlib/std/clock_runtime_recipe.ns),
   and
-  [clock_domain_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime_recipe.ns)
+  [clock_domain_runtime_recipe.ns](../../stdlib/std/clock_domain_runtime_recipe.ns)
 * `task_scheduler` should be read through
-  [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
+  [host-read-bridge.md](host-read-bridge.md)
   and
-  [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
+  [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
 
 ## Companion Expectation
 
@@ -242,20 +242,20 @@ The current checked-in task lane is expected to have direct mirrors in:
 
 Examples:
 
-* [hello_task_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_runtime_facades.ns)
-* [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
-* [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo)
-* [task_clock_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_clock_observe_demo)
-* [task_scheduler_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_scheduler_observe_demo)
-* [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo)
-* [task_fallback_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_fallback_branch_demo)
-* [task_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_policy_branch_demo)
-* [task_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_batch_branch_demo)
-* [task_windowed_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_windowed_batch_branch_demo)
-* [task_result_family_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_family_branch_demo)
-* [task_result_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo)
-* [task_result_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_batch_branch_demo)
-* [task_result_windowed_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_windowed_batch_branch_demo)
+* [hello_task_runtime_facades.ns](../../examples/ns/ffi/hello_task_runtime_facades.ns)
+* [hello_clock_test_facades.ns](../../examples/ns/ffi/hello_clock_test_facades.ns)
+* [task_runtime_demo](../../examples/projects/task/task_runtime_demo)
+* [task_clock_observe_demo](../../examples/projects/task/task_clock_observe_demo)
+* [task_scheduler_observe_demo](../../examples/projects/task/task_scheduler_observe_demo)
+* [task_lifecycle_branch_demo](../../examples/projects/task/task_lifecycle_branch_demo)
+* [task_fallback_branch_demo](../../examples/projects/task/task_fallback_branch_demo)
+* [task_policy_branch_demo](../../examples/projects/task/task_policy_branch_demo)
+* [task_batch_branch_demo](../../examples/projects/task/task_batch_branch_demo)
+* [task_windowed_batch_branch_demo](../../examples/projects/task/task_windowed_batch_branch_demo)
+* [task_result_family_branch_demo](../../examples/projects/task/task_result_family_branch_demo)
+* [task_result_policy_branch_demo](../../examples/projects/task/task_result_policy_branch_demo)
+* [task_result_batch_branch_demo](../../examples/projects/task/task_result_batch_branch_demo)
+* [task_result_windowed_batch_branch_demo](../../examples/projects/task/task_result_windowed_batch_branch_demo)
 
 ## What This Contract Does Not Promise
 
@@ -281,7 +281,7 @@ If you are extending this lane today:
 
 If you are reading this lane today:
 
-* start with [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
+* start with [cpu-task-contract.md](cpu-task-contract.md)
   if you need the semantic truth
 * start with the pure `*_recipe.ns` files if you need the narrow checked-in
   source contract
@@ -290,9 +290,9 @@ If you are reading this lane today:
 
 ## Related References
 
-* [std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
-* [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
-* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
-* [std-host-io-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-host-io-layering-contract.md)
-* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* [std-mainline-layering-contract.md](std-mainline-layering-contract.md)
+* [cpu-task-contract.md](cpu-task-contract.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
+* [host-read-bridge.md](host-read-bridge.md)
+* [std-host-io-layering-contract.md](std-host-io-layering-contract.md)
+* [docs/current-mainline-map.md](../../docs/current-mainline-map.md)

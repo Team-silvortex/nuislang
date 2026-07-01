@@ -40,7 +40,7 @@ This reference does not yet attempt to freeze:
 
 ## Front-door workflow tool
 
-[tools/nuis/src/main.rs](/Users/Shared/chroot/dev/nuislang/tools/nuis/src/main.rs)
+[tools/nuis/src/main.rs](../../tools/nuis/src/main.rs)
 
 ```text
 cargo run -p nuis -- <command>
@@ -309,18 +309,18 @@ Current `nustar` loading policy is:
   for std-owned host-boundary declarations; the function-body bridge-stub form
   remains available as an MVP compatibility path
 * the current narrow project-first bridge sample is
-  [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo),
+  [network_host_control_runtime_demo](../../examples/projects/domains/network_host_control_runtime_demo),
   whose `dump-yir` output currently shows:
   * `cpu.extern_call_i64 ... c host_network_connect_probe ...`
   * `cpu.extern_call_i64 ... c host_network_accept_probe ...`
   * `cpu.extern_call_i64 ... c host_network_close ...`
 * the current narrow transport companion is
-  [network_host_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_transport_runtime_demo),
+  [network_host_transport_runtime_demo](../../examples/projects/domains/network_host_transport_runtime_demo),
   whose `dump-yir` output currently shows:
   * `cpu.extern_call_i64 ... c host_network_send_probe ...`
   * `cpu.extern_call_i64 ... c host_network_recv_probe ...`
 * the current narrow result-facing companion is
-  [network_transport_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_demo),
+  [network_transport_result_demo](../../examples/projects/domains/network_transport_result_demo),
   which now verifies that those same host transport probes may be wrapped by:
   * `network_result(...)`
   * `network_config_ready(...)`
@@ -409,7 +409,7 @@ Read that as:
   `SKIP`, `XFAIL`, and `XPASS`
   timed tests already support `timeout_ms`, `clock_domain`, and
   `clock_policy="bridge"`; see
-  [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
+  [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
   for the current clock/bridge contract
 * `build`
   artifact generation
@@ -497,7 +497,7 @@ Important current rule:
 
 ## Core compiler
 
-[tools/nuisc/src/main.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/main.rs)
+[tools/nuisc/src/main.rs](../../tools/nuisc/src/main.rs)
 
 ```text
 cargo run -p nuisc -- <command>
@@ -527,7 +527,7 @@ subcommands:
 
 ## Parse + verify + execute
 
-[tools/yir-run/src/main.rs](/Users/Shared/chroot/dev/nuislang/tools/yir-run/src/main.rs)
+[tools/yir-run/src/main.rs](../../tools/yir-run/src/main.rs)
 
 ```text
 cargo run -p yir-run -- <module.yir>
@@ -544,7 +544,7 @@ It performs:
 
 ## Emit LLVM IR text
 
-[tools/yir-emit-llvm/src/main.rs](/Users/Shared/chroot/dev/nuislang/tools/yir-emit-llvm/src/main.rs)
+[tools/yir-emit-llvm/src/main.rs](../../tools/yir-emit-llvm/src/main.rs)
 
 ```text
 cargo run -p yir-emit-llvm -- <module.yir>
@@ -554,7 +554,7 @@ This currently lowers the `cpu` slice to LLVM IR text.
 
 ## Build AOT bundle
 
-[tools/yir-pack-aot/src/main.rs](/Users/Shared/chroot/dev/nuislang/tools/yir-pack-aot/src/main.rs)
+[tools/yir-pack-aot/src/main.rs](../../tools/yir-pack-aot/src/main.rs)
 
 ```text
 cargo run -p yir-pack-aot -- <module.yir> <output-dir> [frame-scale]
@@ -565,7 +565,7 @@ prerendered artifacts where necessary.
 
 ## Export frame
 
-[tools/yir-export-frame/src/main.rs](/Users/Shared/chroot/dev/nuislang/tools/yir-export-frame/src/main.rs)
+[tools/yir-export-frame/src/main.rs](../../tools/yir-export-frame/src/main.rs)
 
 ```text
 cargo run -p yir-export-frame -- <module.yir> <output.ppm> [scale]
@@ -575,13 +575,13 @@ This is the current reference render-artifact path.
 
 ## Export UI plan
 
-[tools/yir-export-ui-plan/src/main.rs](/Users/Shared/chroot/dev/nuislang/tools/yir-export-ui-plan/src/main.rs)
+[tools/yir-export-ui-plan/src/main.rs](../../tools/yir-export-ui-plan/src/main.rs)
 
 This extracts host-side preview plan data from current `cpu` host extension ops.
 
 ## macOS preview adapter
 
-[tools/yir-preview-macos/PreviewFrame.swift](/Users/Shared/chroot/dev/nuislang/tools/yir-preview-macos/PreviewFrame.swift)
+[tools/yir-preview-macos/PreviewFrame.swift](../../tools/yir-preview-macos/PreviewFrame.swift)
 
 This is a tool-layer adapter.
 
@@ -600,9 +600,9 @@ The current LLVM path is intentionally narrow:
 
 Current examples:
 
-* [examples/yir/cpu/ball_cpu_driver.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/ball_cpu_driver.yir)
-* [examples/yir/cpu/cpu_linked_list.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/cpu_linked_list.yir)
-* [examples/yir/cpu/cpu_linked_list_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/cpu_linked_list_rustish.yir)
+* [examples/yir/cpu/ball_cpu_driver.yir](../../examples/yir/cpu/ball_cpu_driver.yir)
+* [examples/yir/cpu/cpu_linked_list.yir](../../examples/yir/cpu/cpu_linked_list.yir)
+* [examples/yir/cpu/cpu_linked_list_rustish.yir](../../examples/yir/cpu/cpu_linked_list_rustish.yir)
 
 The current hetero render path may still package prerendered or cooked artifacts
 for non-CPU slices.

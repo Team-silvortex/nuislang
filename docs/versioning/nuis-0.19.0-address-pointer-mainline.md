@@ -13,9 +13,9 @@ baseline.
 
 For the established `0.18.*` design context, also see:
 
-* [nuis-0.18.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-pointer-mainline.md)
-* [../reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
-* [../reference/nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+* [nuis-0.18.0-address-pointer-mainline.md](nuis-0.18.0-address-pointer-mainline.md)
+* [../reference/address-surface-contract.md](../../docs/reference/address-surface-contract.md)
+* [../reference/nir-memory-model.md](../../docs/reference/nir-memory-model.md)
 
 ## Current Address Shapes
 
@@ -64,13 +64,13 @@ Current verifier truth is still:
 
 Smallest structural pointer route:
 
-* [hello_glm.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_glm.ns)
-* [hello_borrow_end.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns)
-* [hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns)
+* [hello_glm.ns](../../examples/ns/memory/hello_glm.ns)
+* [hello_borrow_end.ns](../../examples/ns/memory/hello_borrow_end.ns)
+* [hello_ref_struct.ns](../../examples/ns/types/hello_ref_struct.ns)
 
 Smallest buffer address route:
 
-* [hello_buffer_addressing.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_buffer_addressing.ns)
+* [hello_buffer_addressing.ns](../../examples/ns/memory/hello_buffer_addressing.ns)
 
 ## Current Boundary
 

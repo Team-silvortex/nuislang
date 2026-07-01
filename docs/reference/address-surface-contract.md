@@ -17,7 +17,7 @@ There are two current address families:
 
 The semantic ownership rule still lives below this surface layer in:
 
-* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+* [nir-memory-model.md](nir-memory-model.md)
 
 ## Source-Level Rule
 

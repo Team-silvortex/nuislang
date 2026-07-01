@@ -1,7 +1,7 @@
 # `nuis` Binary-Compile Maturity Spine For `0.16.0`
 
 This file is the practical companion to
-[nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md).
+[nuis-0.16.0-compile-workflow.md](nuis-0.16.0-compile-workflow.md).
 
 The workflow file answers:
 

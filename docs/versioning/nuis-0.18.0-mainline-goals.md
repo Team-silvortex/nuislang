@@ -39,7 +39,7 @@ across:
 
 Working anchor:
 
-* [nuis-0.18.0-control-flow-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-control-flow-completion-plan.md)
+* [nuis-0.18.0-control-flow-completion-plan.md](nuis-0.18.0-control-flow-completion-plan.md)
 
 First checked-in `0.18.0` examples already moving this from plan to reality:
 

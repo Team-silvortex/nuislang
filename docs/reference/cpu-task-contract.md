@@ -196,13 +196,13 @@ If you want code that fits the current system well:
   consume-once payload object
 * if future thread/lock work begins, do not read it as an in-place redefinition
   of `Task<T>`; read the staging split in
-  [cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md)
+  [cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md)
 
 ## Related References
 
-* [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
-* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
-* [nir-optimization-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-optimization-contract.md)
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
-* [cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md)
+* [yir-langref.md](yir-langref.md)
+* [yir-tools-reference.md](yir-tools-reference.md)
+* [nir-memory-model.md](nir-memory-model.md)
+* [nir-optimization-contract.md](nir-optimization-contract.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
+* [cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md)

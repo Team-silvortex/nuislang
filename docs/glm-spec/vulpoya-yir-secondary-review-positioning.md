@@ -161,9 +161,9 @@ being powerful.
 
 Read this file together with:
 
-* [glm-heterogeneous-flow-graph-positioning.md](/Users/Shared/chroot/dev/nuislang/docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md)
-* [../reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [../reference/cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
+* [glm-heterogeneous-flow-graph-positioning.md](glm-heterogeneous-flow-graph-positioning.md)
+* [../reference/yir-langref.md](../../docs/reference/yir-langref.md)
+* [../reference/cpu-task-glm-contract.md](../../docs/reference/cpu-task-glm-contract.md)
 
 If a future `vulpoya` plan and current repository behavior disagree:
 

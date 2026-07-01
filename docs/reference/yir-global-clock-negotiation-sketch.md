@@ -142,7 +142,7 @@ It must know:
 
 This sketch is tightly connected to:
 
-* [yir-hot-sync-contraction-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-hot-sync-contraction-sketch.md)
+* [yir-hot-sync-contraction-sketch.md](yir-hot-sync-contraction-sketch.md)
 
 The key connection is:
 
@@ -159,8 +159,8 @@ prove not only ownership and observer conditions, but also:
 
 The current repository already has some early anchors for this direction:
 
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
-* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
+* [host-read-bridge.md](host-read-bridge.md)
 * `clock_domain`
 * `clock_policy="bridge"`
 * `resolved_clock_domain`
@@ -192,26 +192,26 @@ contracts that can later be reused as negotiation probes.
 
 ### Best Current Clock/Test Probes
 
-* [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
+* [hello_clock_test_facades.ns](../../examples/ns/ffi/hello_clock_test_facades.ns)
   * current clearest source-level example for:
     * `clock_domain`
     * `clock_policy="bridge"`
     * timeout behavior
     * resolved bridge reporting
   * see also:
-    [examples/ns/ffi/FUTURE_CLOCK_NEGOTIATION_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/FUTURE_CLOCK_NEGOTIATION_SKETCH.md)
-* [clock_test_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_test_recipe.ns)
+    [examples/ns/ffi/FUTURE_CLOCK_NEGOTIATION_SKETCH.md](../../examples/ns/ffi/FUTURE_CLOCK_NEGOTIATION_SKETCH.md)
+* [clock_test_recipe.ns](../../stdlib/std/clock_test_recipe.ns)
   * current stdlib-side bridge summary route
-* [clock_domain_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime.ns)
+* [clock_domain_runtime.ns](../../stdlib/std/clock_domain_runtime.ns)
   * current canonical code mapping for declared/resolved domain staging
 
 ### Best Current Contract Anchors
 
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
   * current task/lane/clock relation
-* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
+* [host-read-bridge.md](host-read-bridge.md)
   * current `ClockTick` and bridge naming split
-* `nustar` manifests in [/Users/Shared/chroot/dev/nuislang/nustar-packages](/Users/Shared/chroot/dev/nuislang/nustar-packages)
+* `nustar` manifests in [nustar-packages](../../nustar-packages)
   * current per-domain local clock ownership hints
 
 ### Best Future Negotiation Targets
@@ -242,8 +242,8 @@ explicit without claiming those assumptions are already final.
 
 ## Related References
 
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
-* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
-* [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
-* [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [yir-hot-sync-contraction-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-hot-sync-contraction-sketch.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
+* [host-read-bridge.md](host-read-bridge.md)
+* [cpu-task-glm-contract.md](cpu-task-glm-contract.md)
+* [yir-langref.md](yir-langref.md)
+* [yir-hot-sync-contraction-sketch.md](yir-hot-sync-contraction-sketch.md)

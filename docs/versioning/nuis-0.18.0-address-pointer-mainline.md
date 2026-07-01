@@ -5,9 +5,9 @@ story.
 
 For the design comparison behind this current choice, also see:
 
-* [nuis-0.18.0-address-surface-options.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-surface-options.md)
-* [nuis-0.18.0-owned-borrowed-address-draft.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-owned-borrowed-address-draft.md)
-* [../reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
+* [nuis-0.18.0-address-surface-options.md](nuis-0.18.0-address-surface-options.md)
+* [nuis-0.18.0-owned-borrowed-address-draft.md](nuis-0.18.0-owned-borrowed-address-draft.md)
+* [../reference/address-surface-contract.md](../../docs/reference/address-surface-contract.md)
 
 The key rule is simple:
 
@@ -44,7 +44,7 @@ Buffer addresses:
 
 In current `NIR`, `ref` is a distinct type shape:
 
-* [crates/nuis-semantics/src/model.rs](/Users/Shared/chroot/dev/nuislang/crates/nuis-semantics/src/model.rs)
+* [crates/nuis-semantics/src/model.rs](../../crates/nuis-semantics/src/model.rs)
 * `AstTypeRef.is_ref`
 * `NirTypeRef.is_ref`
 * `NirTypeShape::Ref`
@@ -69,7 +69,7 @@ Current surface-syntax rule is still intentionally narrow:
 
 This is the current pointer-safety contract:
 
-* [docs/reference/nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+* [docs/reference/nir-memory-model.md](../../docs/reference/nir-memory-model.md)
 
 More concretely, current read/write policy is:
 
@@ -80,7 +80,7 @@ More concretely, current read/write policy is:
 
 Current front-end sugar now lives in:
 
-* [../reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
+* [../reference/address-surface-contract.md](../../docs/reference/address-surface-contract.md)
 
 Shortest current rule:
 
@@ -90,13 +90,13 @@ Shortest current rule:
 
 Smallest structural pointer route:
 
-* [hello_glm.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_glm.ns)
-* [hello_borrow_end.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns)
-* [hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns)
+* [hello_glm.ns](../../examples/ns/memory/hello_glm.ns)
+* [hello_borrow_end.ns](../../examples/ns/memory/hello_borrow_end.ns)
+* [hello_ref_struct.ns](../../examples/ns/types/hello_ref_struct.ns)
 
 Smallest buffer address route:
 
-* [hello_buffer_addressing.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_buffer_addressing.ns)
+* [hello_buffer_addressing.ns](../../examples/ns/memory/hello_buffer_addressing.ns)
 
 Current repository source-level truth:
 
@@ -137,7 +137,7 @@ So the right near-term framing is:
 
 Current checked gates for the address baseline now live in:
 
-* [memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+* [memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
 
 They intentionally cover:
 

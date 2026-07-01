@@ -11,10 +11,10 @@ It answers one narrower question:
 
 Read this together with:
 
-* [nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
-* [nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
-* [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* [examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+* [nuis-alpha-0.0.1-closeout-board.md](nuis-alpha-0.0.1-closeout-board.md)
+* [nuis-alpha-0.0.1-closeout-checklist.md](nuis-alpha-0.0.1-closeout-checklist.md)
+* [current-mainline-map.md](../../docs/current-mainline-map.md)
+* [examples-freshness-audit.md](../../docs/examples-freshness-audit.md)
 
 ## Short Verdict
 
@@ -44,9 +44,9 @@ introduced.
 
 Current read:
 
-* [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
-* [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* [nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+* [README.md](../../README.md)
+* [current-mainline-map.md](../../docs/current-mainline-map.md)
+* [nuis-alpha-0.0.1-closeout-board.md](nuis-alpha-0.0.1-closeout-board.md)
 
 Why it is ready enough:
 
@@ -59,9 +59,9 @@ Why it is ready enough:
 
 Current read:
 
-* [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-* [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
-* [examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+* [examples/projects/README.md](../../examples/projects/README.md)
+* [examples/ns/README.md](../../examples/ns/README.md)
+* [examples-freshness-audit.md](../../docs/examples-freshness-audit.md)
 
 Why it is ready enough:
 
@@ -74,10 +74,10 @@ Why it is ready enough:
 
 Current read:
 
-* [nuis-0.20.0-generic-validation-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
-* [nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
-* [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
-* [tests_lambda_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_lambda_higher_order.rs)
+* [nuis-0.20.0-generic-validation-regression-matrix.md](nuis-0.20.0-generic-validation-regression-matrix.md)
+* [nuis-0.20.0-branch-runtime-lowering-matrix.md](nuis-0.20.0-branch-runtime-lowering-matrix.md)
+* [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
+* [tests_lambda_higher_order.rs](../../tools/nuisc/src/frontend/tests_lambda_higher_order.rs)
 
 Why it is ready enough:
 

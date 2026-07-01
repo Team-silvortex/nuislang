@@ -9,10 +9,10 @@ It answers one practical question:
 
 Read this together with:
 
-* [nuis-0.19.0-generic-constraint-validator.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-generic-constraint-validator.md)
-* [nuis-0.19.0-frontend-test-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-test-map.md)
-* [nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
-* [../reference/generic-diagnostic-ownership-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/generic-diagnostic-ownership-contract.md)
+* [nuis-0.19.0-generic-constraint-validator.md](nuis-0.19.0-generic-constraint-validator.md)
+* [nuis-0.19.0-frontend-test-map.md](nuis-0.19.0-frontend-test-map.md)
+* [nuis-0.20.0-compile-gap-checklist.md](nuis-0.20.0-compile-gap-checklist.md)
+* [../reference/generic-diagnostic-ownership-contract.md](../../docs/reference/generic-diagnostic-ownership-contract.md)
 
 ## Short Rule
 
@@ -39,7 +39,7 @@ Short rule:
 
 Primary file:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
 
 Current responsibility:
 
@@ -63,11 +63,11 @@ Short rule:
 
 Primary files:
 
-* [tests_generic_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
-* [tests_generic_method_bounds_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
-* [tests_generic_method_bounds_if_bindings.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_if_bindings.rs)
-* [tests_generic_method_bounds_lambda_bindings.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_lambda_bindings.rs)
-* [tests_generic_method_bounds_nested_match.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_nested_match.rs)
+* [tests_generic_method_bounds.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
+* [tests_generic_method_bounds_control_flow.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
+* [tests_generic_method_bounds_if_bindings.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_if_bindings.rs)
+* [tests_generic_method_bounds_lambda_bindings.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_lambda_bindings.rs)
+* [tests_generic_method_bounds_nested_match.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_nested_match.rs)
 
 Current responsibility:
 
@@ -99,7 +99,7 @@ Proven today:
 
 Primary owner:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
 
 ### 2. Concrete use-site satisfaction
 
@@ -113,7 +113,7 @@ Proven today:
 
 Primary owner:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
 
 ### 3. Generic receiver method/operator/trait-call validation
 
@@ -125,7 +125,7 @@ Proven today:
 
 Primary owners:
 
-* [tests_generic_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
+* [tests_generic_method_bounds.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
 * companion control-flow and lambda files listed above
 
 ### 4. Explicit generic call context
@@ -138,7 +138,7 @@ Proven today:
 
 Primary owner:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
 
 ### 5. Struct-literal generic type-site validation
 
@@ -151,7 +151,7 @@ Proven today:
 
 Primary owner:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
 
 ### 6. `if` / `match` result-branch propagation
 
@@ -162,9 +162,9 @@ Proven today:
 
 Primary owners:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
-* [tests_generic_method_bounds_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
-* [tests_generic_method_bounds_nested_match.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_nested_match.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_method_bounds_control_flow.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
+* [tests_generic_method_bounds_nested_match.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_nested_match.rs)
 
 ### 7. Lambda-body and higher-order context preservation
 
@@ -177,8 +177,8 @@ Proven today:
 
 Primary owners:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
-* [tests_generic_method_bounds_lambda_bindings.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_lambda_bindings.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_method_bounds_lambda_bindings.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_lambda_bindings.rs)
 
 ### 8. Diagnostic-layer precedence in deep expected-type chains
 
@@ -198,7 +198,7 @@ Proven today:
 
 Primary owner:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
 
 Short rule:
 
@@ -219,9 +219,9 @@ Proven today:
 
 Primary owners:
 
-* [tests_generic_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
-* [tests_generic_method_bounds_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
-* [tests_generic_method_bounds_lambda_bindings.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_lambda_bindings.rs)
+* [tests_generic_method_bounds.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
+* [tests_generic_method_bounds_control_flow.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
+* [tests_generic_method_bounds_lambda_bindings.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_lambda_bindings.rs)
 
 Short rule:
 

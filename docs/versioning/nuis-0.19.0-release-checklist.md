@@ -9,25 +9,25 @@ mainline, not only one inherited `0.18` gate plus newer prose.
 
 ## Documentation
 
-* [ ] confirm [nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
+* [ ] confirm [nuis-0.19.0-snapshot.md](nuis-0.19.0-snapshot.md)
   still matches checked-in repository truth
-* [ ] confirm [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
+* [ ] confirm [nuis-0.19.0-mainline-goals.md](nuis-0.19.0-mainline-goals.md)
   still describes the actual current push
-* [ ] confirm [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
+* [ ] confirm [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
   still matches the real CLI/compiler frontdoor story
-* [ ] confirm [nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
+* [ ] confirm [nuis-0.19.0-workflow-capability-matrix.md](nuis-0.19.0-workflow-capability-matrix.md)
   still matches the current workflow/frontdoor/mainline route combinations
-* [ ] confirm [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+* [ ] confirm [nuis-0.19.0-mainline-regression-matrix.md](nuis-0.19.0-mainline-regression-matrix.md)
   still matches the practical current gate
-* [ ] confirm [nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
+* [ ] confirm [nuis-0.19.0-frontend-capability-matrix.md](nuis-0.19.0-frontend-capability-matrix.md)
   still matches the current frontend combination truth
-* [ ] confirm [nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
+* [ ] confirm [nuis-0.19.0-project-capability-matrix.md](nuis-0.19.0-project-capability-matrix.md)
   still matches the current project/example anchor story
-* [ ] confirm [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
+* [ ] confirm [nuis-0.19.0-address-pointer-mainline.md](nuis-0.19.0-address-pointer-mainline.md)
   still matches the honest current address/source-style story
-* [ ] confirm [README.md](/Users/Shared/chroot/dev/nuislang/README.md),
-  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md),
-  and [docs/versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md)
+* [ ] confirm [README.md](../../README.md),
+  [docs/current-mainline-map.md](../../docs/current-mainline-map.md),
+  and [docs/versioning/README.md](README.md)
   all point at the correct current anchors
 
 ## Toolchain And Validation

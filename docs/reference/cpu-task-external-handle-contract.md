@@ -24,8 +24,8 @@ The repository now has a sharper split between:
 
 That is already visible in:
 
-* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
-* [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
+* [cpu-task-memory-contract.md](cpu-task-memory-contract.md)
+* [cpu-task-payload-matrix.md](cpu-task-payload-matrix.md)
 
 But those documents are mostly about the **current allow/reject line**.
 
@@ -53,11 +53,11 @@ boundary:
 
 These already have positive examples such as:
 
-* [hello_task_glm_scalar_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_scalar_payload.ns)
-* [hello_task_glm_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_struct_payload.ns)
-* [hello_task_glm_nested_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_struct_payload.ns)
-* [hello_task_glm_text_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_text_payload.ns)
-* [hello_task_glm_nested_text_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_text_struct_payload.ns)
+* [hello_task_glm_scalar_payload.ns](../../examples/ns/memory/hello_task_glm_scalar_payload.ns)
+* [hello_task_glm_struct_payload.ns](../../examples/ns/memory/hello_task_glm_struct_payload.ns)
+* [hello_task_glm_nested_struct_payload.ns](../../examples/ns/memory/hello_task_glm_nested_struct_payload.ns)
+* [hello_task_glm_text_payload.ns](../../examples/ns/memory/hello_task_glm_text_payload.ns)
+* [hello_task_glm_nested_text_struct_payload.ns](../../examples/ns/memory/hello_task_glm_nested_text_struct_payload.ns)
 
 ### External / Resource-Bearing Side
 
@@ -81,19 +81,19 @@ when they are nested inside nominal struct payloads.
 
 Useful current negative examples:
 
-* [hello_task_glm_nested_window_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_window_struct_payload_invalid.ns)
-* [hello_task_glm_nested_marker_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_marker_struct_payload_invalid.ns)
-* [hello_task_glm_instance_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_instance_payload_invalid.ns)
-* [hello_task_glm_nested_instance_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_instance_struct_payload_invalid.ns)
+* [hello_task_glm_nested_window_struct_payload_invalid.ns](../../examples/invalid/ns/memory/hello_task_glm_nested_window_struct_payload_invalid.ns)
+* [hello_task_glm_nested_marker_struct_payload_invalid.ns](../../examples/invalid/ns/memory/hello_task_glm_nested_marker_struct_payload_invalid.ns)
+* [hello_task_glm_instance_payload_invalid.ns](../../examples/invalid/ns/memory/hello_task_glm_instance_payload_invalid.ns)
+* [hello_task_glm_nested_instance_struct_payload_invalid.ns](../../examples/invalid/ns/memory/hello_task_glm_nested_instance_struct_payload_invalid.ns)
 
 There is also a first explicit design probe:
 
-* [hello_task_glm_window_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_window_external_handle_probe_invalid.ns)
-* [hello_task_glm_window_external_handle_probe_invalid.md](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_window_external_handle_probe_invalid.md)
-* [hello_task_glm_marker_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_marker_external_handle_probe_invalid.ns)
-* [hello_task_glm_marker_external_handle_probe_invalid.md](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_marker_external_handle_probe_invalid.md)
-* [hello_task_glm_handle_table_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_handle_table_external_handle_probe_invalid.ns)
-* [hello_task_glm_handle_table_external_handle_probe_invalid.md](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_handle_table_external_handle_probe_invalid.md)
+* [hello_task_glm_window_external_handle_probe_invalid.ns](../../examples/invalid/ns/memory/hello_task_glm_window_external_handle_probe_invalid.ns)
+* [hello_task_glm_window_external_handle_probe_invalid.md](../../examples/invalid/ns/memory/hello_task_glm_window_external_handle_probe_invalid.md)
+* [hello_task_glm_marker_external_handle_probe_invalid.ns](../../examples/invalid/ns/memory/hello_task_glm_marker_external_handle_probe_invalid.ns)
+* [hello_task_glm_marker_external_handle_probe_invalid.md](../../examples/invalid/ns/memory/hello_task_glm_marker_external_handle_probe_invalid.md)
+* [hello_task_glm_handle_table_external_handle_probe_invalid.ns](../../examples/invalid/ns/memory/hello_task_glm_handle_table_external_handle_probe_invalid.ns)
+* [hello_task_glm_handle_table_external_handle_probe_invalid.md](../../examples/invalid/ns/memory/hello_task_glm_handle_table_external_handle_probe_invalid.md)
 
 These probes are intentionally still invalid today, but their field layouts are
 meant to hint at possible future task-external handle packet directions for:
@@ -179,10 +179,10 @@ conceptually when that work starts.
 
 Read this together with:
 
-* [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
-* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
-* [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
-* [cpu-task-external-handle-glm-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-glm-sketch.md)
-* [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
-* [cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md)
+* [cpu-task-contract.md](cpu-task-contract.md)
+* [cpu-task-memory-contract.md](cpu-task-memory-contract.md)
+* [cpu-task-payload-matrix.md](cpu-task-payload-matrix.md)
+* [cpu-task-external-handle-glm-sketch.md](cpu-task-external-handle-glm-sketch.md)
+* [cpu-task-glm-contract.md](cpu-task-glm-contract.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
+* [cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md)

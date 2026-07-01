@@ -10,11 +10,11 @@ It answers two questions:
 
 Use it as the practical companion to:
 
-* [nuis-0.16.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-snapshot.md)
-* [nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
-* [nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md)
-* [nuis-0.16.0-generic-constraint-gaps.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-gaps.md)
-* [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
+* [nuis-0.16.0-snapshot.md](nuis-0.16.0-snapshot.md)
+* [nuis-0.16.0-compile-workflow.md](nuis-0.16.0-compile-workflow.md)
+* [nuis-0.16.0-binary-compile-maturity.md](nuis-0.16.0-binary-compile-maturity.md)
+* [nuis-0.16.0-generic-constraint-gaps.md](nuis-0.16.0-generic-constraint-gaps.md)
+* [nuis-0.16.0-generic-surface-audit.md](nuis-0.16.0-generic-surface-audit.md)
 
 ## Short Rule
 
@@ -50,7 +50,7 @@ Covered:
 
 Primary tests:
 
-* [tests_generic_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
+* [tests_generic_method_bounds.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
 
 ### Alias-Aware Generic Receivers
 
@@ -63,7 +63,7 @@ Covered:
 
 Primary tests:
 
-* [tests_generic_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
+* [tests_generic_method_bounds.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
 
 ### Control-Flow Local Bindings
 
@@ -78,9 +78,9 @@ Covered:
 
 Primary tests:
 
-* [tests_generic_method_bounds_if_bindings.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_if_bindings.rs)
-* [tests_generic_method_bounds_nested_match.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_nested_match.rs)
-* [tests_generic_method_bounds_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
+* [tests_generic_method_bounds_if_bindings.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_if_bindings.rs)
+* [tests_generic_method_bounds_nested_match.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_nested_match.rs)
+* [tests_generic_method_bounds_control_flow.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
 
 ### Lambda And Higher-Order Synthesized Helpers
 
@@ -96,13 +96,13 @@ Covered:
 
 Primary tests:
 
-* [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
+* [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
 
 Representative demos:
 
-* [generic_lambda_method_bound_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_lambda_method_bound_hof_demo)
-* [generic_lambda_method_bound_fn3_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_lambda_method_bound_fn3_hof_demo)
-* [generic_payload_alias_method_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo)
+* [generic_lambda_method_bound_hof_demo](../../examples/projects/state/generic_lambda_method_bound_hof_demo)
+* [generic_lambda_method_bound_fn3_hof_demo](../../examples/projects/state/generic_lambda_method_bound_fn3_hof_demo)
+* [generic_payload_alias_method_hof_demo](../../examples/projects/state/generic_payload_alias_method_hof_demo)
 
 ### Call-Inferred Receivers And Locals
 
@@ -117,8 +117,8 @@ Covered:
 
 Primary tests:
 
-* [tests_generic_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
-* [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
+* [tests_generic_method_bounds.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
+* [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
 
 ### Pattern-Bound Generic Payloads And Struct Fields
 
@@ -137,7 +137,7 @@ Covered:
 
 Primary tests:
 
-* [tests_generic_method_bounds_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
+* [tests_generic_method_bounds_control_flow.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
 
 ### Destructure Bindings From Call Roots
 
@@ -150,7 +150,7 @@ Covered:
 
 Primary tests:
 
-* [tests_generic_destructure_let.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_destructure_let.rs)
+* [tests_generic_destructure_let.rs](../../tools/nuisc/src/frontend/tests_generic_destructure_let.rs)
 
 ## Covered But Still Narrow
 
@@ -195,7 +195,7 @@ Constructor matrix:
 
 Primary tests:
 
-* [tests_generic_structs.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_structs.rs)
+* [tests_generic_structs.rs](../../tools/nuisc/src/frontend/tests_generic_structs.rs)
 
 This is good enough for `0.16.0`, but it is still not “free unconstrained
 generic payload inference across arbitrary constructor and alias shapes”.

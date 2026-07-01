@@ -16,47 +16,47 @@ Current role rule:
 
 If you only want the shortest route through this subtree, start with:
 
-* [path_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_runtime_demo)
-* [file_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_runtime_demo)
-* [directory_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_runtime_demo)
+* [path_runtime_demo](path_runtime_demo)
+* [file_runtime_demo](file_runtime_demo)
+* [directory_runtime_demo](directory_runtime_demo)
 
 ## Pick By Goal
 
 * frontdoor trio:
-  [path_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_runtime_demo)
+  [path_runtime_demo](path_runtime_demo)
 * path companion micro-probe cluster:
-  [path_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_copy_demo),
-  [path_rename_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_rename_demo),
-  [path_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_remove_demo),
-  [path_parent_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_parent_demo),
-  [path_depth_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_depth_demo),
-  [path_filename_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_filename_demo),
-  [path_stem_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_stem_demo),
-  [path_extension_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_extension_demo)
+  [path_copy_demo](path_copy_demo),
+  [path_rename_demo](path_rename_demo),
+  [path_remove_demo](path_remove_demo),
+  [path_parent_demo](path_parent_demo),
+  [path_depth_demo](path_depth_demo),
+  [path_filename_demo](path_filename_demo),
+  [path_stem_demo](path_stem_demo),
+  [path_extension_demo](path_extension_demo)
 * file I/O:
-  [file_read_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo),
-  [file_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_runtime_demo),
-  [file_write_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo),
-  [file_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo),
-  [file_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_roundtrip_demo)
+  [file_read_demo](file_read_demo),
+  [file_runtime_demo](file_runtime_demo),
+  [file_write_demo](file_write_demo),
+  [file_copy_demo](file_copy_demo),
+  [file_roundtrip_demo](file_roundtrip_demo)
   as the core std filesystem contract probes,
-  [file_output_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_output_demo),
-  [filesystem_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_demo)
+  [file_output_demo](file_output_demo),
+  [filesystem_report_demo](filesystem_report_demo)
   as the filesystem/text std contract consumer,
-  [filesystem_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_file_demo)
+  [filesystem_report_file_demo](filesystem_report_file_demo)
   as the std filesystem contract consumer
 * directory and stat surfaces:
-  [directory_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_runtime_demo),
-  [directory_create_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_create_demo),
-  [directory_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_remove_demo),
-  [directory_stat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_stat_demo),
-  [stat_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/stat_runtime_demo),
-  [fs_metadata_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/fs_metadata_runtime_demo)
+  [directory_runtime_demo](directory_runtime_demo),
+  [directory_create_demo](directory_create_demo),
+  [directory_remove_demo](directory_remove_demo),
+  [directory_stat_demo](directory_stat_demo),
+  [stat_runtime_demo](stat_runtime_demo),
+  [fs_metadata_runtime_demo](fs_metadata_runtime_demo)
 * window/pipe/fabric/handle-table runtime edges:
-  [window_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/window_runtime_demo),
-  [pipe_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/pipe_runtime_demo),
-  [fabric_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/fabric_runtime_demo),
-  [handle_table_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/handle_table_runtime_demo)
+  [window_runtime_demo](window_runtime_demo),
+  [pipe_runtime_demo](pipe_runtime_demo),
+  [fabric_runtime_demo](fabric_runtime_demo),
+  [handle_table_runtime_demo](handle_table_runtime_demo)
 
 ## Reading Rule
 
@@ -71,4 +71,4 @@ If you only want the shortest route through this subtree, start with:
 * if this cluster grows further, it is the strongest candidate for a future
   grouped subrouter rather than more top-level README emphasis
 * for repo-level routing, prefer
-  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  [docs/current-mainline-map.md](../../../docs/current-mainline-map.md)

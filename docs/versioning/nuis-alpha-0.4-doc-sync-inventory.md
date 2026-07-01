@@ -32,13 +32,13 @@ sidecar, reference execution path, or probe.
 
 Use these first:
 
-* [../current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* [nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
-* [nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-* [../reference/nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)
-* [../reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
-* [../reference/nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
-* [../repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
+* [../current-mainline-map.md](../../docs/current-mainline-map.md)
+* [nuis-alpha-0.4-system-inventory.md](nuis-alpha-0.4-system-inventory.md)
+* [nuis-alpha-0.4-mainline-hardening-plan.md](nuis-alpha-0.4-mainline-hardening-plan.md)
+* [../reference/nuis-frontdoor-surface-reference.md](../../docs/reference/nuis-frontdoor-surface-reference.md)
+* [../reference/nuis-native-artifact-workflow.md](../../docs/reference/nuis-native-artifact-workflow.md)
+* [../reference/nuis-binary-format-protocol.md](../../docs/reference/nuis-binary-format-protocol.md)
+* [../repo-layout.md](../../docs/repo-layout.md)
 
 Older `0.20.*`, `0.19.*`, and `0.18.*` files remain valuable predecessor
 anchors, but they are no longer the default route into the repository.
@@ -84,8 +84,8 @@ Practical rule:
 
 Related policy:
 
-* [../repo-file-line-policy.md](/Users/Shared/chroot/dev/nuislang/docs/repo-file-line-policy.md)
-* [../repo-cleanup-candidates.md](/Users/Shared/chroot/dev/nuislang/docs/repo-cleanup-candidates.md)
+* [../repo-file-line-policy.md](../../docs/repo-file-line-policy.md)
+* [../repo-cleanup-candidates.md](../../docs/repo-cleanup-candidates.md)
 
 ## Library And Galaxy Status
 
@@ -114,12 +114,12 @@ Use examples as proof routes, not as a flat catalog.
 
 Preferred current routes:
 
-* [../../examples/projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-* [../../examples/projects/kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
-* [../../examples/projects/tooling/native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
-* [../../examples/projects/domains/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md)
-* [../../examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
-* [../../examples/yir/README.md](/Users/Shared/chroot/dev/nuislang/examples/yir/README.md)
+* [../../examples/projects/window_controls_demo](../../examples/projects/window_controls_demo)
+* [../../examples/projects/kernel_tensor_demo](../../examples/projects/kernel_tensor_demo)
+* [../../examples/projects/tooling/native_artifact_closure_demo](../../examples/projects/tooling/native_artifact_closure_demo)
+* [../../examples/projects/domains/README.md](../../examples/projects/domains/README.md)
+* [../../examples/ns/README.md](../../examples/ns/README.md)
+* [../../examples/yir/README.md](../../examples/yir/README.md)
 
 Generated snapshots under `examples/bins` are useful rebuild artifacts, not the
 canonical source of truth.

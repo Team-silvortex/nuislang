@@ -11,11 +11,11 @@ It is the current repository truth about:
 
 Read this together with:
 
-* [../../stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
-* [../reference/std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
-* [../reference/std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
-* [nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
-* [nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
+* [../../stdlib/std/README.md](../../stdlib/std/README.md)
+* [../reference/std-mainline-layering-contract.md](../../docs/reference/std-mainline-layering-contract.md)
+* [../reference/std-net-layering-contract.md](../../docs/reference/std-net-layering-contract.md)
+* [nuis-0.20.0-branch-runtime-lowering-matrix.md](nuis-0.20.0-branch-runtime-lowering-matrix.md)
+* [nuis-0.20.0-compile-gap-checklist.md](nuis-0.20.0-compile-gap-checklist.md)
 
 ## Short Rule
 
@@ -57,7 +57,7 @@ Already coherent enough:
 * `task_lifecycle_recipe`
 * task batch/result/windowed/task-cli companions
 * local lane router:
-  [../../stdlib/std/task/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/task/README.md)
+  [../../stdlib/std/task/README.md](../../stdlib/std/task/README.md)
 
 Why this is mainline:
 
@@ -79,7 +79,7 @@ Already coherent enough:
 * `json_runtime_recipe`
 * `text_json_recipe`
 * local lane router:
-  [../../stdlib/std/host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
+  [../../stdlib/std/host/README.md](../../stdlib/std/host/README.md)
 
 Why this is mainline:
 
@@ -98,7 +98,7 @@ Already coherent enough:
 * `directory_stat_recipe`
 * `cwd` / `temp` / `home` / `location`
 * local lane router:
-  [../../stdlib/std/filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
+  [../../stdlib/std/filesystem/README.md](../../stdlib/std/filesystem/README.md)
 
 Why this is mainline:
 
@@ -114,7 +114,7 @@ Already coherent enough:
 * `workflow_runtime_recipe`
 * CLI session/report/build/workflow companions
 * local lane router:
-  [../../stdlib/std/tooling/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/tooling/README.md)
+  [../../stdlib/std/tooling/README.md](../../stdlib/std/tooling/README.md)
 
 Why this is mainline:
 
@@ -200,9 +200,9 @@ The line should optimize for:
 
 If you only want the shortest route:
 
-1. read [../../stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
-2. read [../reference/std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
-3. read [../reference/std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
+1. read [../../stdlib/std/README.md](../../stdlib/std/README.md)
+2. read [../reference/std-mainline-layering-contract.md](../../docs/reference/std-mainline-layering-contract.md)
+3. read [../reference/std-net-layering-contract.md](../../docs/reference/std-net-layering-contract.md)
 4. then pick exactly one lane to normalize further
 
 Good current lane order:

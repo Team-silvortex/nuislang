@@ -5,7 +5,7 @@ This note is intentionally **forward-looking**.
 It does **not** describe current repository behavior.
 
 Instead, it marks a very small region in
-[task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo)
+[task_completed_observe_demo](./)
 as a plausible first probe for future verifier-driven async-to-sync
 contraction work.
 

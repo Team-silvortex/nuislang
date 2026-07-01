@@ -8,15 +8,15 @@ longer just empty scaffolding either.
 
 The current top-level modules are:
 
-* [core](/Users/Shared/chroot/dev/nuislang/stdlib/core/README.md)
+* [core](core/README.md)
   smallest semantics-first base surface and long-lived source contracts
-* [std](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* [std](std/README.md)
   practical systems/helper layer built on `core`
-* [pixelmagic](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
+* [pixelmagic](pixelmagic/README.md)
   official image/resource Galaxy built on `core + std`
-* [witsage](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/README.md)
+* [witsage](witsage/README.md)
   official classical ML Galaxy built on `core + std`
-* [ns-nova](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
+* [ns-nova](ns-nova/README.md)
   rendering/application framework layer and the first place where real checked-in
   `.ns` source modules are already accumulating
 
@@ -46,22 +46,22 @@ At the current repo stage:
   for stdlib modules yet
 * project manifests can now declare local stdlib galaxy dependencies such as
   `galaxy = ["pixelmagic=workspace"]`; the compiler resolves them through
-  [index.toml](/Users/Shared/chroot/dev/nuislang/stdlib/index.toml) and emits
+  [index.toml](index.toml) and emits
   `nuis.project.galaxy.txt` metadata during project compilation
 * galaxy dependencies may also declare dedicated `library_modules` for safe
   automatic project injection; `pixelmagic` now exposes its first one through
-  [pixelmagic/lib/image_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/image_contracts.ns)
+  [pixelmagic/lib/image_contracts.ns](pixelmagic/lib/image_contracts.ns)
 * stdlib package manifests now also use registry-style stable `surfaces` ids,
   so discovery vocabulary can stay stable even if concrete module filenames
   continue to evolve
 * `core` and `std` now also expose their first library-module surfaces through
-  [core/lib/prelude_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/lib/prelude_contracts.ns)
+  [core/lib/prelude_contracts.ns](core/lib/prelude_contracts.ns)
   and
-  [std/lib/task_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/task_contracts.ns),
+  [std/lib/task_contracts.ns](std/lib/task_contracts.ns),
   with additional std contract companions such as
-  [std/lib/text_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/text_contracts.ns)
+  [std/lib/text_contracts.ns](std/lib/text_contracts.ns)
 * `ns-nova` now also exposes its first library-module surface through
-  [ns-nova/lib/nova_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/lib/nova_contracts.ns)
+  [ns-nova/lib/nova_contracts.ns](ns-nova/lib/nova_contracts.ns)
   but unlike `core`, `std`, and `pixelmagic`, it is currently marked
   `manual-only` rather than auto-injected
 * explicit manifest imports such as
@@ -81,39 +81,39 @@ Asset view by layer:
   - smallest checked-in source layer
   - currently reads best as `facade + blueprint` style source assets
   - start with:
-    [basic_scalars.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/basic_scalars.ns),
-    [struct_patterns.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/struct_patterns.ns),
-    [math_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/math_runtime.ns),
-    [ref_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/ref_runtime.ns),
-    [value_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/value_blueprint.ns)
+    [basic_scalars.ns](core/basic_scalars.ns),
+    [struct_patterns.ns](core/struct_patterns.ns),
+    [math_runtime.ns](core/math_runtime.ns),
+    [ref_runtime.ns](core/ref_runtime.ns),
+    [value_blueprint.ns](core/value_blueprint.ns)
 * `std`
   - practical systems layer with many host-backed facade modules
   - now also carries project-shaped recipe modules
   - facade/recipe split is documented in
-    [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+    [stdlib/std/README.md](std/README.md)
 * `pixelmagic`
   - official image/resource Galaxy
   - current earliest checked-in package skeleton for future GPU-side image work
   - declared through
-    [stdlib/pixelmagic/module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/module.toml)
+    [stdlib/pixelmagic/module.toml](pixelmagic/module.toml)
   - see
-    [stdlib/pixelmagic/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
+    [stdlib/pixelmagic/README.md](pixelmagic/README.md)
 * `witsage`
   - official classical ML Galaxy
   - first checked-in package skeleton for feature statistics and kernel-backed model plans
   - declared through
-    [stdlib/witsage/module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/module.toml)
+    [stdlib/witsage/module.toml](witsage/module.toml)
   - see
-    [stdlib/witsage/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/README.md)
+    [stdlib/witsage/README.md](witsage/README.md)
 * `ns-nova`
   - current future framework/source-asset layer
   - currently important as an official GUI/rendering galaxy, but intentionally
     behind AOT, `std`, PixelMagic, and WitSage hardening
   - declared through
-    [stdlib/ns-nova/module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/module.toml)
+    [stdlib/ns-nova/module.toml](ns-nova/module.toml)
     with `11` checked-in source modules
   - see
-    [stdlib/ns-nova/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
+    [stdlib/ns-nova/README.md](ns-nova/README.md)
 
 Current asset types:
 
@@ -145,12 +145,12 @@ Current boundaries:
 
 ## Read In This Order
 
-* [core](/Users/Shared/chroot/dev/nuislang/stdlib/core/README.md)
-* [std](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
-* [pixelmagic](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
-* [witsage](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/README.md)
-* [ns-nova](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
+* [core](core/README.md)
+* [std](std/README.md)
+* [pixelmagic](pixelmagic/README.md)
+* [witsage](witsage/README.md)
+* [ns-nova](ns-nova/README.md)
 
 See also:
 
-* [index.toml](/Users/Shared/chroot/dev/nuislang/stdlib/index.toml)
+* [index.toml](index.toml)

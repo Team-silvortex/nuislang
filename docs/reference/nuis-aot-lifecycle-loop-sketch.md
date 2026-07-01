@@ -113,7 +113,7 @@ shell.
 ## Relationship To Launcher / Container / Linker
 
 This document depends on the layering in
-[nuis-launcher-container-linker-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-launcher-container-linker-sketch.md).
+[nuis-launcher-container-linker-sketch.md](nuis-launcher-container-linker-sketch.md).
 
 The split is:
 

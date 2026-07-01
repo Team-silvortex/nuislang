@@ -46,4 +46,4 @@ Treat this project as:
 
 For the migration direction under the stricter consume rule, see:
 
-* [FUTURE_CONSUME_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md)
+* [FUTURE_CONSUME_SKETCH.md](FUTURE_CONSUME_SKETCH.md)

@@ -50,9 +50,9 @@ Current source-asset status:
 
 * this is currently the only `stdlib` layer that already declares a canonical
   checked-in source set through
-  [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/module.toml)
+  [module.toml](module.toml)
 * the current first project library module is
-  [lib/nova_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/lib/nova_contracts.ns)
+  [lib/nova_contracts.ns](lib/nova_contracts.ns)
   which exposes the initial `NovaContracts` helper surface for project-level
   framework contracts
 * that library module currently uses `library_import_policy = "manual-only"`
@@ -67,24 +67,24 @@ Current source-asset status:
 
 See metadata:
 
-* [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/module.toml)
-* [core/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/README.md)
-* [ui/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/README.md)
-* [scene/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/README.md)
+* [module.toml](module.toml)
+* [core/README.md](core/README.md)
+* [ui/README.md](ui/README.md)
+* [scene/README.md](scene/README.md)
 
 First source modules:
 
-* [core/theme_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/theme_surface.ns)
-* [core/frame_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/frame_runtime.ns)
-* [core/texture_resource_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/texture_resource_recipe.ns)
-* [core/window_controls_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/window_controls_runtime_recipe.ns)
-* [ui/panel_selection.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/panel_selection.ns)
-* [ui/panel_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/panel_blueprint.ns)
-* [ui/window_controls_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/window_controls_recipe.ns)
-* [scene/scene_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/scene_runtime.ns)
-* [scene/efficiency_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/efficiency_runtime.ns)
-* [scene/scene_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/scene_blueprint.ns)
-* [scene/window_controls_scene_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/window_controls_scene_recipe.ns)
+* [core/theme_surface.ns](core/theme_surface.ns)
+* [core/frame_runtime.ns](core/frame_runtime.ns)
+* [core/texture_resource_recipe.ns](core/texture_resource_recipe.ns)
+* [core/window_controls_runtime_recipe.ns](core/window_controls_runtime_recipe.ns)
+* [ui/panel_selection.ns](ui/panel_selection.ns)
+* [ui/panel_blueprint.ns](ui/panel_blueprint.ns)
+* [ui/window_controls_recipe.ns](ui/window_controls_recipe.ns)
+* [scene/scene_runtime.ns](scene/scene_runtime.ns)
+* [scene/efficiency_runtime.ns](scene/efficiency_runtime.ns)
+* [scene/scene_blueprint.ns](scene/scene_blueprint.ns)
+* [scene/window_controls_scene_recipe.ns](scene/window_controls_scene_recipe.ns)
 
 Current limitation:
 
@@ -96,7 +96,7 @@ Current limitation:
 
 The current canonical project route is still:
 
-* [examples/projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+* [examples/projects/window_controls_demo](../../examples/projects/window_controls_demo)
 
 That project is not “obsolete because recipes now exist”. It is still the main
 truth source for the fully assembled end-to-end path.
@@ -105,12 +105,12 @@ The current migration split is:
 
 * already extracted into stdlib recipes
   - render/runtime orchestration patterns:
-    [core/texture_resource_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/texture_resource_recipe.ns),
-    [core/window_controls_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/window_controls_runtime_recipe.ns)
+    [core/texture_resource_recipe.ns](core/texture_resource_recipe.ns),
+    [core/window_controls_runtime_recipe.ns](core/window_controls_runtime_recipe.ns)
   - UI/selection/control packing patterns:
-    [ui/window_controls_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/window_controls_recipe.ns)
+    [ui/window_controls_recipe.ns](ui/window_controls_recipe.ns)
   - scene/runtime efficiency and assembly patterns:
-    [scene/window_controls_scene_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/window_controls_scene_recipe.ns)
+    [scene/window_controls_scene_recipe.ns](scene/window_controls_scene_recipe.ns)
 * still intentionally left in the project demo
   - full multi-domain assembly in one realistic project
   - host/window integration details

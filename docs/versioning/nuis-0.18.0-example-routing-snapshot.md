@@ -31,8 +31,8 @@ Short rule:
 The most important example-tree truths now are:
 
 * top-level routers are shorter and more honest:
-  - [examples/README.md](/Users/Shared/chroot/dev/nuislang/examples/README.md)
-  - [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+  - [examples/README.md](../../examples/README.md)
+  - [examples/projects/README.md](../../examples/projects/README.md)
   now describe frontdoor/companion/probe/legacy roles explicitly
 * subtree READMEs now agree with the current mainline map:
   - task
@@ -41,7 +41,7 @@ The most important example-tree truths now are:
   - domains
   all now describe a narrow frontdoor plus grouped companion families
 * the repository now has one explicit cleanup board:
-  - [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+  - [docs/examples-freshness-audit.md](../../docs/examples-freshness-audit.md)
   tracks subtree status, current frontdoor anchors, archived routes, and
   future cleanup targets
 * tooling first had a legacy split:
@@ -77,15 +77,15 @@ This snapshot should still avoid overclaiming:
 
 For example-tree work on the `0.18.*` line, the shortest route is:
 
-1. [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-2. [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
-3. [examples/README.md](/Users/Shared/chroot/dev/nuislang/examples/README.md)
-4. [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+1. [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
+2. [docs/examples-freshness-audit.md](../../docs/examples-freshness-audit.md)
+3. [examples/README.md](../../examples/README.md)
+4. [examples/projects/README.md](../../examples/projects/README.md)
 5. one local subtree README:
-   - [examples/projects/task/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/README.md)
-   - [examples/projects/tooling/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/README.md)
-   - [examples/projects/filesystem/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/README.md)
-   - [examples/projects/domains/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md)
+   - [examples/projects/task/README.md](../../examples/projects/task/README.md)
+   - [examples/projects/tooling/README.md](../../examples/projects/tooling/README.md)
+   - [examples/projects/filesystem/README.md](../../examples/projects/filesystem/README.md)
+   - [examples/projects/domains/README.md](../../examples/projects/domains/README.md)
 
 ## Recommended Practical Checks
 

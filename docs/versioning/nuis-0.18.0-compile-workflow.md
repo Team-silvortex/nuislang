@@ -20,10 +20,10 @@ Use it when the question is not only “what compiles?”, but:
 
 Use it together with:
 
-* [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
-* [nuis-0.18.0-control-flow-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-control-flow-completion-plan.md)
-* [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md)
-* [nuis-0.18.0-host-boundary-address-abi.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-host-boundary-address-abi.md)
+* [nuis-0.18.0-mainline-goals.md](nuis-0.18.0-mainline-goals.md)
+* [nuis-0.18.0-control-flow-completion-plan.md](nuis-0.18.0-control-flow-completion-plan.md)
+* [nuis-0.17.0-lowering-capability-map.md](nuis-0.17.0-lowering-capability-map.md)
+* [nuis-0.18.0-host-boundary-address-abi.md](nuis-0.18.0-host-boundary-address-abi.md)
 
 ## Core Rule
 
@@ -101,7 +101,7 @@ Short rule:
 
 The real frontend entry remains:
 
-* [lower_project_ast_to_nir](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/mod.rs#L157)
+* [lower_project_ast_to_nir](../../tools/nuisc/src/frontend/mod.rs#L157)
 
 The checked-in order still matters:
 
@@ -208,7 +208,7 @@ one progression:
 
 Primary compile gate:
 
-* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+* [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 Short rule:
 
@@ -233,7 +233,7 @@ The strongest current task/control-flow route is now:
 
 Primary compile gate:
 
-* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+* [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 
 Short rule:
 
@@ -262,7 +262,7 @@ Current practical reading order:
 
 Primary integration gate:
 
-* [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+* [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
 
 Short rule:
 
@@ -286,7 +286,7 @@ matters most to the honest compile story is narrower:
 
 Primary compile gate:
 
-* [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+* [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 Short rule:
 
@@ -296,18 +296,18 @@ Short rule:
 
 If you want the shortest current `0.18.0` compile story, read in this order:
 
-1. [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
-2. [nuis-0.18.0-control-flow-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-control-flow-completion-plan.md)
-3. [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
-4. [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
-5. [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
-6. [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+1. [nuis-0.18.0-mainline-goals.md](nuis-0.18.0-mainline-goals.md)
+2. [nuis-0.18.0-control-flow-completion-plan.md](nuis-0.18.0-control-flow-completion-plan.md)
+3. [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
+4. [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
+5. [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+6. [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 If you want the shortest source/project route, use:
 
-1. [examples/projects/state/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/state/README.md)
-2. [examples/projects/task/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/README.md)
-3. [examples/projects/domains/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md)
+1. [examples/projects/state/README.md](../../examples/projects/state/README.md)
+2. [examples/projects/task/README.md](../../examples/projects/task/README.md)
+3. [examples/projects/domains/README.md](../../examples/projects/domains/README.md)
 
 ## Current Honest Gate
 

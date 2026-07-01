@@ -33,12 +33,12 @@ Current truth:
 
 Primary anchors:
 
-* [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo)
-* [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo)
-* [flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo)
-* [post_flow_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo)
-* [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
-* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+* [chained_while_demo](../../examples/projects/state/chained_while_demo)
+* [match_branching_while_demo](../../examples/projects/state/match_branching_while_demo)
+* [flow_continuing_while_demo](../../examples/projects/state/flow_continuing_while_demo)
+* [post_flow_breaking_while_demo](../../examples/projects/state/post_flow_breaking_while_demo)
+* [post_flow_branching_continuing_while_demo](../../examples/projects/state/post_flow_branching_continuing_while_demo)
+* [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 Short rule:
 
@@ -57,12 +57,12 @@ Current truth:
 
 Primary anchors:
 
-* [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo)
-* [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo)
-* [task_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_demo)
-* [task_result_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo)
-* [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo)
-* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+* [task_runtime_demo](../../examples/projects/task/task_runtime_demo)
+* [task_thread_mutex_demo](../../examples/projects/task/task_thread_mutex_demo)
+* [task_recursive_async_demo](../../examples/projects/task/task_recursive_async_demo)
+* [task_result_policy_branch_demo](../../examples/projects/task/task_result_policy_branch_demo)
+* [task_status_observe_demo](../../examples/projects/task/task_status_observe_demo)
+* [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 
 Short rule:
 
@@ -79,9 +79,9 @@ Current truth:
 
 Primary anchors:
 
-* [memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
-* [address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
-* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+* [memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
+* [address-surface-contract.md](../../docs/reference/address-surface-contract.md)
+* [nir-memory-model.md](../../docs/reference/nir-memory-model.md)
 
 Short rule:
 
@@ -99,10 +99,10 @@ Current truth:
 
 Primary anchors:
 
-* [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
-* [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
-* [shared](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared)
-* [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+* [shader_profile_demo](../../examples/projects/domains/shader_profile_demo)
+* [kernel_profile_demo](../../examples/projects/domains/kernel_profile_demo)
+* [shared](../../examples/projects/domains/shared)
+* [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
 
 Short rule:
 
@@ -120,10 +120,10 @@ Current truth:
 
 Primary anchors:
 
-* [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo)
-* [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo)
-* [net_http_session_loop_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
-* [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+* [network_profile_demo](../../examples/projects/domains/network_profile_demo)
+* [net_http_client_get_recipe_demo](../../examples/projects/domains/net_http_client_get_recipe_demo)
+* [net_http_session_loop_bridge_recipe_demo](../../examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
+* [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 Short rule:
 
@@ -140,10 +140,10 @@ Current truth:
 
 Primary anchors:
 
-* [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
-* [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo)
-* [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
-* [std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+* [cli_runtime_demo](../../examples/projects/tooling/cli_runtime_demo)
+* [command_runtime_demo](../../examples/projects/tooling/command_runtime_demo)
+* [workflow_runtime_demo](../../examples/projects/tooling/workflow_runtime_demo)
+* [std-tooling-workflow-contract.md](../../docs/reference/std-tooling-workflow-contract.md)
 
 Short rule:
 
@@ -159,8 +159,8 @@ These are the shortest “already real together” project routes worth remember
 
 Anchors:
 
-* [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo)
-* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+* [chained_while_demo](../../examples/projects/state/chained_while_demo)
+* [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 ### Route B
 
@@ -168,8 +168,8 @@ Anchors:
 
 Anchors:
 
-* [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo)
-* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+* [task_runtime_demo](../../examples/projects/task/task_runtime_demo)
+* [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 
 ### Route C
 
@@ -177,9 +177,9 @@ Anchors:
 
 Anchors:
 
-* [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
-* [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
-* [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+* [shader_profile_demo](../../examples/projects/domains/shader_profile_demo)
+* [kernel_profile_demo](../../examples/projects/domains/kernel_profile_demo)
+* [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
 
 ### Route D
 
@@ -187,9 +187,9 @@ Anchors:
 
 Anchors:
 
-* [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo)
-* [net_http_session_loop_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
-* [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+* [network_profile_demo](../../examples/projects/domains/network_profile_demo)
+* [net_http_session_loop_bridge_recipe_demo](../../examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
+* [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 ### Route E
 
@@ -197,9 +197,9 @@ Anchors:
 
 Anchors:
 
-* [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
-* [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
-* [std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+* [cli_runtime_demo](../../examples/projects/tooling/cli_runtime_demo)
+* [workflow_runtime_demo](../../examples/projects/tooling/workflow_runtime_demo)
+* [std-tooling-workflow-contract.md](../../docs/reference/std-tooling-workflow-contract.md)
 
 ## Current Boundaries
 

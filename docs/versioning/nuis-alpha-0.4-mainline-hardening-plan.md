@@ -149,13 +149,13 @@ Short rule:
 
 For current work, start here:
 
-1. [../current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-2. [../reference/nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)
-3. [../reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
-4. [../reference/ffi-pointer-safety-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/ffi-pointer-safety-boundary.md)
-5. [../reference/nustar-capability-split-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nustar-capability-split-boundary.md)
-6. [../reference/std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
-7. [../reference/pixelmagic-mainline-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/pixelmagic-mainline-contract.md)
+1. [../current-mainline-map.md](../../docs/current-mainline-map.md)
+2. [../reference/nuis-frontdoor-surface-reference.md](../../docs/reference/nuis-frontdoor-surface-reference.md)
+3. [../reference/nuis-native-artifact-workflow.md](../../docs/reference/nuis-native-artifact-workflow.md)
+4. [../reference/ffi-pointer-safety-boundary.md](../../docs/reference/ffi-pointer-safety-boundary.md)
+5. [../reference/nustar-capability-split-boundary.md](../../docs/reference/nustar-capability-split-boundary.md)
+6. [../reference/std-mainline-layering-contract.md](../../docs/reference/std-mainline-layering-contract.md)
+7. [../reference/pixelmagic-mainline-contract.md](../../docs/reference/pixelmagic-mainline-contract.md)
 
 Then use older alpha and `0.20.*` docs as predecessor context, not as the
 present-tense route.

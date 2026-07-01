@@ -16,9 +16,9 @@ The repository now has a clearer split between:
 
 That split already appears in:
 
-* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
-* [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
-* [cpu-task-external-handle-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-contract.md)
+* [cpu-task-memory-contract.md](cpu-task-memory-contract.md)
+* [cpu-task-payload-matrix.md](cpu-task-payload-matrix.md)
+* [cpu-task-external-handle-contract.md](cpu-task-external-handle-contract.md)
 
 But once a handle-like payload is discussed as a future task-crossing
 candidate, a deeper question appears:
@@ -190,12 +190,12 @@ Why:
 
 Current design probes that motivate this sketch:
 
-* [hello_task_glm_window_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_window_external_handle_probe_invalid.ns)
-* [hello_task_glm_marker_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_marker_external_handle_probe_invalid.ns)
-* [hello_task_glm_handle_table_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_handle_table_external_handle_probe_invalid.ns)
-* [cpu_task_external_handle_bridge_probe.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/cpu_task_external_handle_bridge_probe.yir)
-* [data_external_handle_bridge_probe.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_external_handle_bridge_probe.yir)
-* [shader_external_handle_bridge_probe.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_external_handle_bridge_probe.yir)
+* [hello_task_glm_window_external_handle_probe_invalid.ns](../../examples/invalid/ns/memory/hello_task_glm_window_external_handle_probe_invalid.ns)
+* [hello_task_glm_marker_external_handle_probe_invalid.ns](../../examples/invalid/ns/memory/hello_task_glm_marker_external_handle_probe_invalid.ns)
+* [hello_task_glm_handle_table_external_handle_probe_invalid.ns](../../examples/invalid/ns/memory/hello_task_glm_handle_table_external_handle_probe_invalid.ns)
+* [cpu_task_external_handle_bridge_probe.yir](../../examples/yir/cpu/cpu_task_external_handle_bridge_probe.yir)
+* [data_external_handle_bridge_probe.yir](../../examples/yir/data/data_external_handle_bridge_probe.yir)
+* [shader_external_handle_bridge_probe.yir](../../examples/yir/shader/shader_external_handle_bridge_probe.yir)
 
 Those samples are still invalid today, but they help show what future
 bridge-shaped task packets, Fabric-side bridge candidates, and render-side
@@ -223,8 +223,8 @@ That approach fits the current `nuis` philosophy well:
 
 Read this together with:
 
-* [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
-* [cpu-task-external-handle-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-contract.md)
-* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
-* [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
-* [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
+* [cpu-task-glm-contract.md](cpu-task-glm-contract.md)
+* [cpu-task-external-handle-contract.md](cpu-task-external-handle-contract.md)
+* [cpu-task-memory-contract.md](cpu-task-memory-contract.md)
+* [cpu-task-payload-matrix.md](cpu-task-payload-matrix.md)
+* [yir-langref.md](yir-langref.md)

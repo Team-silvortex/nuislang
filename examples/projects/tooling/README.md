@@ -17,12 +17,12 @@ Current role rule:
 
 If you only want the shortest tooling route, start with:
 
-* [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
-* [cli_cat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_cat_demo)
-* [cli_wc_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_wc_demo)
-* [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo)
-* [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
-* [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
+* [cli_runtime_demo](cli_runtime_demo)
+* [cli_cat_demo](cli_cat_demo)
+* [cli_wc_demo](cli_wc_demo)
+* [command_runtime_demo](command_runtime_demo)
+* [workflow_runtime_demo](workflow_runtime_demo)
+* [native_artifact_closure_demo](native_artifact_closure_demo)
 
 Current runnable CLI frontdoor:
 
@@ -87,15 +87,15 @@ Seed
 
 Current exemplars:
 
-* [cli_compile_workflow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_compile_workflow_demo)
-* [cli_workflow_automation_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo)
-* [cli_build_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo)
-* [cli_project_build_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo)
-* [cli_cat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_cat_demo)
-* [cli_wc_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_wc_demo)
-* [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
-* [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
-* [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
+* [cli_compile_workflow_demo](cli_compile_workflow_demo)
+* [cli_workflow_automation_demo](cli_workflow_automation_demo)
+* [cli_build_pipeline_demo](cli_build_pipeline_demo)
+* [cli_project_build_report_demo](cli_project_build_report_demo)
+* [cli_cat_demo](cli_cat_demo)
+* [cli_wc_demo](cli_wc_demo)
+* [cli_pgm_info_demo](cli_pgm_info_demo)
+* [cli_pgm_invert_demo](cli_pgm_invert_demo)
+* [cli_pgm_threshold_demo](cli_pgm_threshold_demo)
 
 Short rule:
 
@@ -107,60 +107,60 @@ Short rule:
 ## Pick By Goal
 
 * argv and environment:
-  [argv_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/argv_runtime_demo),
-  [env_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/env_runtime_demo)
+  [argv_runtime_demo](argv_runtime_demo),
+  [env_runtime_demo](env_runtime_demo)
 * process and command execution:
-  [process_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/process_runtime_demo),
-  [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo),
-  [subprocess_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo),
-  [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
+  [process_runtime_demo](process_runtime_demo),
+  [command_runtime_demo](command_runtime_demo),
+  [subprocess_runtime_demo](subprocess_runtime_demo),
+  [native_artifact_closure_demo](native_artifact_closure_demo)
 * text, json, diagnostics:
-  [host_text_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/host_text_runtime_demo),
-  [text_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_pipeline_demo),
-  [text_report_builder_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_report_builder_demo),
-  [text_report_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_report_json_demo),
-  [time_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/time_report_demo),
-  [benchmark_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_demo),
-  [benchmark_report_count_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_count_demo),
-  [benchmark_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo)
+  [host_text_runtime_demo](host_text_runtime_demo),
+  [text_pipeline_demo](text_pipeline_demo),
+  [text_report_builder_demo](text_report_builder_demo),
+  [text_report_json_demo](text_report_json_demo),
+  [time_report_demo](time_report_demo),
+  [benchmark_report_demo](benchmark_report_demo),
+  [benchmark_report_count_demo](benchmark_report_count_demo),
+  [benchmark_report_file_demo](benchmark_report_file_demo)
   as the benchmark/text/filesystem std contract consumer,
-  [io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_report_demo)
+  [io_report_demo](io_report_demo)
   as the console/text std contract consumer,
-  [filesystem_io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/filesystem_io_report_demo)
+  [filesystem_io_report_demo](filesystem_io_report_demo)
   as the filesystem/console std contract consumer,
-  [json_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/json_runtime_demo),
-  [text_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_json_demo),
-  [text_format_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_format_runtime_demo),
-  [diagnostic_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/diagnostic_runtime_demo)
+  [json_runtime_demo](json_runtime_demo),
+  [text_json_demo](text_json_demo),
+  [text_format_runtime_demo](text_format_runtime_demo),
+  [diagnostic_runtime_demo](diagnostic_runtime_demo)
 * result and error surfaces:
-  [error_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/error_runtime_demo),
-  [result_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_runtime_demo),
-  [result_diagnostic_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_diagnostic_demo)
+  [error_runtime_demo](error_runtime_demo),
+  [result_runtime_demo](result_runtime_demo),
+  [result_diagnostic_demo](result_diagnostic_demo)
 * input and terminal I/O:
-  [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/input_runtime_demo),
-  [cli_cat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_cat_demo),
-  [cli_wc_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_wc_demo),
-  [io_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_runtime_demo)
+  [input_runtime_demo](input_runtime_demo),
+  [cli_cat_demo](cli_cat_demo),
+  [cli_wc_demo](cli_wc_demo),
+  [io_runtime_demo](io_runtime_demo)
   as the base console std contract smoke,
-  [stdin_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/stdin_runtime_demo),
-  [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/tty_runtime_demo),
-  [terminal_io_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/terminal_io_demo)
+  [stdin_runtime_demo](stdin_runtime_demo),
+  [tty_runtime_demo](tty_runtime_demo),
+  [terminal_io_demo](terminal_io_demo)
   as the terminal/stdin/TTY std contract smoke
 * file-backed image probe:
-  [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
+  [cli_pgm_info_demo](cli_pgm_info_demo)
 * file-backed image transform:
-  [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
+  [cli_pgm_invert_demo](cli_pgm_invert_demo)
 * file-backed image mask prepass:
-  [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
+  [cli_pgm_threshold_demo](cli_pgm_threshold_demo)
 * time and clock:
-  [time_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/time_runtime_demo),
-  [sleep_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/sleep_runtime_demo),
-  [clock_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/clock_runtime_demo),
-  [clock_domain_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/clock_domain_runtime_demo)
+  [time_runtime_demo](time_runtime_demo),
+  [sleep_runtime_demo](sleep_runtime_demo),
+  [clock_runtime_demo](clock_runtime_demo),
+  [clock_domain_runtime_demo](clock_domain_runtime_demo)
 * CLI session flows:
-  [cli_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_session_demo),
-  [cli_shell_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_shell_session_demo),
-  [cli_report_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_report_session_demo)
+  [cli_session_demo](cli_session_demo),
+  [cli_shell_session_demo](cli_shell_session_demo),
+  [cli_report_session_demo](cli_report_session_demo)
 
 ## Reading Rule
 
@@ -170,7 +170,7 @@ Short rule:
 * treat most entries outside the CLI/command/workflow trio as companion-only
   probes, not as equal-entry onboarding material
 * for repo-level routing, prefer
-  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  [docs/current-mainline-map.md](../../../docs/current-mainline-map.md)
 * if the question is specifically “can `nuis` compile its own native/artifact
   bundle and survive a real launch-shaped host bridge route?”, start with
-  [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
+  [native_artifact_closure_demo](native_artifact_closure_demo)

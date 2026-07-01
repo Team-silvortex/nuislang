@@ -20,11 +20,11 @@ tooling image preprocess
 
 Concrete anchors:
 
-* [tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
-* [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
-* [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
-* [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
-* [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
+* [tooling-image-preprocess-lane.md](tooling-image-preprocess-lane.md)
+* [pixelmagic_packet_bridge_demo](../../examples/projects/domains/pixelmagic_packet_bridge_demo)
+* [pixelmagic_texture_resource_demo](../../examples/projects/domains/pixelmagic_texture_resource_demo)
+* [pixelmagic_pipeline_demo](../../examples/projects/domains/pixelmagic_pipeline_demo)
+* [pixelmagic_render_demo](../../examples/projects/domains/pixelmagic_render_demo)
 
 The next half is not “many more image filters”.
 
@@ -138,8 +138,8 @@ The current YIR-side texture/resource floor already exists conceptually through:
 
 Current references:
 
-* [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [nuis-ir.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis-ir.md)
+* [yir-langref.md](yir-langref.md)
+* [nuis-ir.md](../../docs/grammar/nuis-ir.md)
 
 The important current contract is not that every one of these already has a
 finished high-level source wrapper.
@@ -163,11 +163,11 @@ PixelMagicImagePacket
 
 Current checked-in closest source-level anchor:
 
-* [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
+* [pixelmagic_texture_resource_demo](../../examples/projects/domains/pixelmagic_texture_resource_demo)
 
 Current checked-in closest project-shaped pipeline anchor:
 
-* [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
+* [pixelmagic_pipeline_demo](../../examples/projects/domains/pixelmagic_pipeline_demo)
 
 That can still be a render-style path before a compute-style path.
 
@@ -198,12 +198,12 @@ The first success condition is much smaller:
 
 If you only want the shortest current route, read:
 
-1. [tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
-2. [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
-3. [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
-4. [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
-5. [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
-6. [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
-7. [galaxy-texture-handoff-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-texture-handoff-contract.md)
-8. [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-9. [nuis-ir.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis-ir.md)
+1. [tooling-image-preprocess-lane.md](tooling-image-preprocess-lane.md)
+2. [pixelmagic_packet_bridge_demo](../../examples/projects/domains/pixelmagic_packet_bridge_demo)
+3. [pixelmagic_texture_resource_demo](../../examples/projects/domains/pixelmagic_texture_resource_demo)
+4. [pixelmagic_pipeline_demo](../../examples/projects/domains/pixelmagic_pipeline_demo)
+5. [pixelmagic_render_demo](../../examples/projects/domains/pixelmagic_render_demo)
+6. [galaxy-frontdoor-prep-sketch.md](galaxy-frontdoor-prep-sketch.md)
+7. [galaxy-texture-handoff-contract.md](galaxy-texture-handoff-contract.md)
+8. [yir-langref.md](yir-langref.md)
+9. [nuis-ir.md](../../docs/grammar/nuis-ir.md)

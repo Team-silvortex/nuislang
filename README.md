@@ -41,52 +41,52 @@ The newest `alpha-0.6.*` emphasis is:
 Current versioning entrypoints:
 
 * current `alpha-0.6.*` mainline entry:
-  [docs/versioning/nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md)
+  [docs/versioning/nuis-alpha-0.6-mainline-entry.md](docs/versioning/nuis-alpha-0.6-mainline-entry.md)
 * current mainline router:
-  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  [docs/current-mainline-map.md](docs/current-mainline-map.md)
 * `alpha-0.4.*` hardening baseline system inventory:
-  [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
+  [docs/versioning/nuis-alpha-0.4-system-inventory.md](docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * `alpha-0.4.*` hardening baseline plan:
-  [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+  [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 * `alpha-0.4.*` documentation sync baseline:
-  [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
+  [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 * long-range heterogeneous OS roadmap:
-  [docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md)
+  [docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md](docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md)
 * predecessor `alpha-0.1.*` status anchor:
-  [docs/versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
+  [docs/versioning/nuis-alpha-0.1-mainline-status.md](docs/versioning/nuis-alpha-0.1-mainline-status.md)
 * predecessor alpha closeout board:
-  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
 * predecessor alpha closeout checklist:
-  [docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
+  [docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md](docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
 * previous pre-alpha snapshot anchor:
-  [docs/versioning/nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
+  [docs/versioning/nuis-0.19.0-snapshot.md](docs/versioning/nuis-0.19.0-snapshot.md)
 * previous pre-alpha workflow anchor:
-  [docs/versioning/nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
+  [docs/versioning/nuis-0.19.0-compile-workflow.md](docs/versioning/nuis-0.19.0-compile-workflow.md)
 * predecessor ABI compile vocabulary bridge into `0.20.*`:
-  [docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+  [docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md](docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 * previous pre-alpha regression gate:
-  [docs/versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+  [docs/versioning/nuis-0.19.0-mainline-regression-matrix.md](docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
 * previous pre-alpha address/pointer anchor:
-  [docs/versioning/nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
+  [docs/versioning/nuis-0.19.0-address-pointer-mainline.md](docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
 * previous minor-line snapshot:
-  [docs/versioning/nuis-0.18.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-snapshot.md)
+  [docs/versioning/nuis-0.18.0-snapshot.md](docs/versioning/nuis-0.18.0-snapshot.md)
 * historical index:
-  [docs/versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md)
+  [docs/versioning/README.md](docs/versioning/README.md)
 
 If you want the current line first, start with
-[docs/versioning/nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md),
-then use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+[docs/versioning/nuis-alpha-0.6-mainline-entry.md](docs/versioning/nuis-alpha-0.6-mainline-entry.md),
+then use [docs/current-mainline-map.md](docs/current-mainline-map.md)
 and
-[docs/reference/nsld-linker-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsld-linker-frontdoor.md).
+[docs/reference/nsld-linker-frontdoor.md](docs/reference/nsld-linker-frontdoor.md).
 For the hardening baseline behind that current line, use
-[docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md),
-[docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+[docs/versioning/nuis-alpha-0.4-system-inventory.md](docs/versioning/nuis-alpha-0.4-system-inventory.md),
+[docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 and
-[docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md).
+[docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md).
 
 If you want the older pre-alpha history anchor after that, start with
-[`0.19.0` snapshot](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md), then use
-[docs/versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md) only when you intentionally need older lines.
+[`0.19.0` snapshot](docs/versioning/nuis-0.19.0-snapshot.md), then use
+[docs/versioning/README.md](docs/versioning/README.md) only when you intentionally need older lines.
 
 Current source-style note:
 
@@ -95,7 +95,7 @@ Current source-style note:
 * builtin names like `load_value(...)` and `store_at(...)` remain the lowered
   implementation truth in NIR/YIR-facing docs
 * source-facing contract:
-  [docs/reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
+  [docs/reference/address-surface-contract.md](docs/reference/address-surface-contract.md)
 
 ## Toolchain
 
@@ -115,7 +115,7 @@ finished self-owned object linker. The point of the split is to make linker
 ownership explicit before the implementation is fully extracted.
 
 Reference:
-[docs/reference/nsld-linker-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsld-linker-frontdoor.md)
+[docs/reference/nsld-linker-frontdoor.md](docs/reference/nsld-linker-frontdoor.md)
 
 ```text
 nuis     -> front-door workflow tool
@@ -175,7 +175,7 @@ cargo run -p nuis -- run-artifact examples/bins/native_artifact_closure_demo_pro
 ```
 
 Current native artifact closure reference:
-[docs/reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
+[docs/reference/nuis-native-artifact-workflow.md](docs/reference/nuis-native-artifact-workflow.md)
 
 The current rule of thumb should be:
 
@@ -198,20 +198,20 @@ test("slow_async", timeout_ms=25, clock_domain="global", clock_policy="bridge") 
 Timed tests already support `timeout_ms`, `clock_domain`, and
 `clock_policy="bridge"`. `nuis test` reports both declared and resolved clock
 metadata at run time. For the current contract and bridge semantics, read
-[docs/reference/cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md).
+[docs/reference/cpu-task-scheduler-clock.md](docs/reference/cpu-task-scheduler-clock.md).
 
 Current workflow reading rule:
 
 * use `nuis workflow` when you want the CLI to restate the shortest route for
   a specific input
-* use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* use [docs/current-mainline-map.md](docs/current-mainline-map.md)
   when you want the repo-wide current route
 * use
-  [docs/versioning/nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md)
+  [docs/versioning/nuis-alpha-0.6-mainline-entry.md](docs/versioning/nuis-alpha-0.6-mainline-entry.md)
   when the question is whether a lane is already current, still active, or only
   an intentional alpha boundary
 * use
-  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
   only when you intentionally need the first alpha closeout history
 
 Useful inspection commands:
@@ -325,30 +325,30 @@ Reading rule that matches this split:
 If you want the shortest path by goal:
 
 * consolidated current mainline map
-  - [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  - [docs/current-mainline-map.md](docs/current-mainline-map.md)
 * current alpha line and hardening baseline
-  - [docs/versioning/nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md)
-  - [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
-  - [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-  - [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
+  - [docs/versioning/nuis-alpha-0.6-mainline-entry.md](docs/versioning/nuis-alpha-0.6-mainline-entry.md)
+  - [docs/versioning/nuis-alpha-0.4-system-inventory.md](docs/versioning/nuis-alpha-0.4-system-inventory.md)
+  - [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+  - [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 * current user-facing project path
-  - [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-  - [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
-  - [docs/reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+  - [examples/projects/README.md](examples/projects/README.md)
+  - [docs/examples-freshness-audit.md](docs/examples-freshness-audit.md)
+  - [docs/reference/yir-tools-reference.md](docs/reference/yir-tools-reference.md)
 * current source-level language and host examples
-  - [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
-  - [examples/ns/ffi/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/README.md)
-  - [examples/ns/memory/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/README.md)
+  - [examples/ns/README.md](examples/ns/README.md)
+  - [examples/ns/ffi/README.md](examples/ns/ffi/README.md)
+  - [examples/ns/memory/README.md](examples/ns/memory/README.md)
 * current implementation-facing semantic contracts
-  - [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
+  - [docs/reference/README.md](docs/reference/README.md)
 * current `std` and framework source assets
-  - [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
-  - [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
-  - [stdlib/pixelmagic/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
-  - [stdlib/witsage/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/README.md)
-  - [stdlib/ns-nova/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
+  - [stdlib/README.md](stdlib/README.md)
+  - [stdlib/std/README.md](stdlib/std/README.md)
+  - [stdlib/pixelmagic/README.md](stdlib/pixelmagic/README.md)
+  - [stdlib/witsage/README.md](stdlib/witsage/README.md)
+  - [stdlib/ns-nova/README.md](stdlib/ns-nova/README.md)
 * quick repo map
-  - [docs/repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
+  - [docs/repo-layout.md](docs/repo-layout.md)
 
 ## Key Architectural Notes
 
@@ -365,4 +365,4 @@ Current high-signal architectural facts:
 
 Historical architecture material lives under:
 
-* [docs/historical/README.md](/Users/Shared/chroot/dev/nuislang/docs/historical/README.md)
+* [docs/historical/README.md](docs/historical/README.md)

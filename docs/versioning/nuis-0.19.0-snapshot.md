@@ -82,17 +82,17 @@ The most important current truths for `0.19.0` are:
 
 For the `0.19.0` line, the shortest practical route is:
 
-1. [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
-2. [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-3. [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
-4. [nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
-5. [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-6. [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-7. [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
-8. [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
-9. [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
-10. [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-11. [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+1. [README.md](../../README.md)
+2. [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
+3. [nuis-0.19.0-mainline-goals.md](nuis-0.19.0-mainline-goals.md)
+4. [nuis-0.19.0-snapshot.md](nuis-0.19.0-snapshot.md)
+5. [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+6. [nuis-0.20.0-abi-compile-vocabulary.md](nuis-0.20.0-abi-compile-vocabulary.md)
+7. [nuis-0.19.0-mainline-regression-matrix.md](nuis-0.19.0-mainline-regression-matrix.md)
+8. [nuis-0.19.0-address-pointer-mainline.md](nuis-0.19.0-address-pointer-mainline.md)
+9. [docs/reference/README.md](../../docs/reference/README.md)
+10. [examples/projects/README.md](../../examples/projects/README.md)
+11. [stdlib/std/README.md](../../stdlib/std/README.md)
 
 ## Concrete Anchor Cases
 
@@ -100,15 +100,15 @@ If you want the shortest “show me the real thing” route for this snapshot,
 start with:
 
 * workflow/frontdoor anchor:
-  [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
+  [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
 * state/control-flow proof:
-  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+  [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 * task/async/control-flow proof:
-  [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+  [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 * address/pointer proof:
-  [memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+  [memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
 * network/http/session proof:
-  [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+  [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 ## Recommended Practical Commands
 

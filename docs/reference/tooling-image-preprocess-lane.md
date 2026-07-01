@@ -65,7 +65,7 @@ Short rule:
 
 Anchor:
 
-* [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
+* [cli_pgm_info_demo](../../examples/projects/tooling/cli_pgm_info_demo)
 
 Current job:
 
@@ -77,7 +77,7 @@ Current job:
 
 Anchor:
 
-* [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
+* [cli_pgm_invert_demo](../../examples/projects/tooling/cli_pgm_invert_demo)
 
 Current job:
 
@@ -91,7 +91,7 @@ Current job:
 
 Anchor:
 
-* [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
+* [cli_pgm_threshold_demo](../../examples/projects/tooling/cli_pgm_threshold_demo)
 
 Current job:
 
@@ -166,23 +166,23 @@ The immediate next contract is:
 
 Current related references:
 
-* [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
-* [galaxy-texture-handoff-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-texture-handoff-contract.md)
-* [std-shader-kernel-project-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-shader-kernel-project-contract.md)
-* [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
-* [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
+* [galaxy-frontdoor-prep-sketch.md](galaxy-frontdoor-prep-sketch.md)
+* [galaxy-texture-handoff-contract.md](galaxy-texture-handoff-contract.md)
+* [std-shader-kernel-project-contract.md](std-shader-kernel-project-contract.md)
+* [pixelmagic_packet_bridge_demo](../../examples/projects/domains/pixelmagic_packet_bridge_demo)
+* [pixelmagic_pipeline_demo](../../examples/projects/domains/pixelmagic_pipeline_demo)
 
 ## Reading Order
 
 If you only need the shortest current route, read:
 
-1. [examples/projects/tooling/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/README.md)
-2. [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
-3. [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
-4. [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
-5. [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
-6. [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
-7. [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
+1. [examples/projects/tooling/README.md](../../examples/projects/tooling/README.md)
+2. [cli_pgm_info_demo](../../examples/projects/tooling/cli_pgm_info_demo)
+3. [cli_pgm_invert_demo](../../examples/projects/tooling/cli_pgm_invert_demo)
+4. [cli_pgm_threshold_demo](../../examples/projects/tooling/cli_pgm_threshold_demo)
+5. [pixelmagic_packet_bridge_demo](../../examples/projects/domains/pixelmagic_packet_bridge_demo)
+6. [pixelmagic_pipeline_demo](../../examples/projects/domains/pixelmagic_pipeline_demo)
+7. [galaxy-frontdoor-prep-sketch.md](galaxy-frontdoor-prep-sketch.md)
 
 ## Current Success Condition
 

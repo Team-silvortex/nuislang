@@ -4,7 +4,7 @@ This file captures the current layering contract for the checked-in `std`
  host-I/O lanes.
 
 It sits one level below
-[std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md):
+[std-mainline-layering-contract.md](std-mainline-layering-contract.md):
 that file explains the global `std` rule of thumb, while this file explains
 what the host-I/O lane currently means in repository practice.
 
@@ -34,7 +34,7 @@ surface yet.
 
 Current bridge reference:
 
-* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
+* [host-read-bridge.md](host-read-bridge.md)
 
 The practical rule today is:
 
@@ -53,11 +53,11 @@ These are the current narrow checked-in host-I/O routes.
 
 ### Execution And Process Surface
 
-* [argv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/argv_runtime_recipe.ns)
-* [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
-* [process_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/process_runtime_recipe.ns)
-* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
+* [argv_runtime_recipe.ns](../../stdlib/std/argv_runtime_recipe.ns)
+* [env_runtime_recipe.ns](../../stdlib/std/env_runtime_recipe.ns)
+* [process_runtime_recipe.ns](../../stdlib/std/process_runtime_recipe.ns)
+* [command_runtime_recipe.ns](../../stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](../../stdlib/std/subprocess_runtime_recipe.ns)
 
 These are the narrowest readable contracts for:
 
@@ -68,10 +68,10 @@ These are the narrowest readable contracts for:
 
 ### Input And Terminal Observation Surface
 
-* [io_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_runtime_recipe.ns)
-* [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
-* [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
-* [line_input_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_recipe.ns)
+* [io_runtime_recipe.ns](../../stdlib/std/io_runtime_recipe.ns)
+* [stdin_runtime_recipe.ns](../../stdlib/std/stdin_runtime_recipe.ns)
+* [tty_runtime_recipe.ns](../../stdlib/std/tty_runtime_recipe.ns)
+* [line_input_recipe.ns](../../stdlib/std/line_input_recipe.ns)
 
 These are the narrowest readable contracts for:
 
@@ -81,10 +81,10 @@ These are the narrowest readable contracts for:
 * line-oriented stdin use
 
 The important current wrinkle is that
-[line_input_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_runtime.ns)
+[line_input_runtime.ns](../../stdlib/std/line_input_runtime.ns)
 does not have a separate `*_runtime_recipe.ns`, but the checked-in repository
 already treats
-[line_input_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_recipe.ns)
+[line_input_recipe.ns](../../stdlib/std/line_input_recipe.ns)
 as the effective narrow pure layer for that lane.
 
 ## Wider Composition Layers
@@ -92,14 +92,14 @@ as the effective narrow pure layer for that lane.
 These recipes intentionally combine several pure host-I/O surfaces into one
 practical route.
 
-* [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
-* [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
-* [cli_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_session_recipe.ns)
-* [cli_shell_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_shell_session_recipe.ns)
-* [cli_report_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_report_session_recipe.ns)
-* [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
-* [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
-* [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
+* [input_runtime_recipe.ns](../../stdlib/std/input_runtime_recipe.ns)
+* [terminal_io_recipe.ns](../../stdlib/std/terminal_io_recipe.ns)
+* [cli_session_recipe.ns](../../stdlib/std/cli_session_recipe.ns)
+* [cli_shell_session_recipe.ns](../../stdlib/std/cli_shell_session_recipe.ns)
+* [cli_report_session_recipe.ns](../../stdlib/std/cli_report_session_recipe.ns)
+* [command_shell_recipe.ns](../../stdlib/std/command_shell_recipe.ns)
+* [cli_runtime_recipe.ns](../../stdlib/std/cli_runtime_recipe.ns)
+* [report_runtime_recipe.ns](../../stdlib/std/report_runtime_recipe.ns)
 
 Current role split:
 
@@ -138,12 +138,12 @@ io
 
 Concrete sources:
 
-* [io_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_runtime_recipe.ns)
-* [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
-* [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
-* [line_input_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_recipe.ns)
-* [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
-* [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
+* [io_runtime_recipe.ns](../../stdlib/std/io_runtime_recipe.ns)
+* [stdin_runtime_recipe.ns](../../stdlib/std/stdin_runtime_recipe.ns)
+* [tty_runtime_recipe.ns](../../stdlib/std/tty_runtime_recipe.ns)
+* [line_input_recipe.ns](../../stdlib/std/line_input_recipe.ns)
+* [input_runtime_recipe.ns](../../stdlib/std/input_runtime_recipe.ns)
+* [terminal_io_recipe.ns](../../stdlib/std/terminal_io_recipe.ns)
 
 ### Execution And Shelling
 
@@ -157,13 +157,13 @@ argv / env / process
 
 Concrete sources:
 
-* [argv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/argv_runtime_recipe.ns)
-* [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
-* [process_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/process_runtime_recipe.ns)
-* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-* [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
-* [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
+* [argv_runtime_recipe.ns](../../stdlib/std/argv_runtime_recipe.ns)
+* [env_runtime_recipe.ns](../../stdlib/std/env_runtime_recipe.ns)
+* [process_runtime_recipe.ns](../../stdlib/std/process_runtime_recipe.ns)
+* [command_runtime_recipe.ns](../../stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](../../stdlib/std/subprocess_runtime_recipe.ns)
+* [command_shell_recipe.ns](../../stdlib/std/command_shell_recipe.ns)
+* [cli_runtime_recipe.ns](../../stdlib/std/cli_runtime_recipe.ns)
 
 ### Reporting Edge
 
@@ -175,12 +175,12 @@ io
 
 Concrete sources:
 
-* [io_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_runtime_recipe.ns)
-* [diagnostic_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/diagnostic_runtime_recipe.ns)
-* [result_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_runtime_recipe.ns)
-* [error_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_runtime_recipe.ns)
-* [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
-* [result_diagnostic_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_diagnostic_recipe.ns)
+* [io_runtime_recipe.ns](../../stdlib/std/io_runtime_recipe.ns)
+* [diagnostic_runtime_recipe.ns](../../stdlib/std/diagnostic_runtime_recipe.ns)
+* [result_runtime_recipe.ns](../../stdlib/std/result_runtime_recipe.ns)
+* [error_runtime_recipe.ns](../../stdlib/std/error_runtime_recipe.ns)
+* [report_runtime_recipe.ns](../../stdlib/std/report_runtime_recipe.ns)
+* [result_diagnostic_recipe.ns](../../stdlib/std/result_diagnostic_recipe.ns)
 
 ## Companion Expectation
 
@@ -191,14 +191,14 @@ The current checked-in host-I/O lane is expected to have direct mirrors in:
 
 Examples:
 
-* [hello_io_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_io_runtime_facades.ns)
-* [hello_command_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_command_runtime_facades.ns)
-* [hello_subprocess_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_subprocess_runtime_facades.ns)
-* [hello_tty_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_tty_runtime_facades.ns)
-* [io_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_runtime_demo)
-* [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo)
-* [subprocess_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo)
-* [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/tty_runtime_demo)
+* [hello_io_runtime_facades.ns](../../examples/ns/ffi/hello_io_runtime_facades.ns)
+* [hello_command_runtime_facades.ns](../../examples/ns/ffi/hello_command_runtime_facades.ns)
+* [hello_subprocess_runtime_facades.ns](../../examples/ns/ffi/hello_subprocess_runtime_facades.ns)
+* [hello_tty_runtime_facades.ns](../../examples/ns/ffi/hello_tty_runtime_facades.ns)
+* [io_runtime_demo](../../examples/projects/tooling/io_runtime_demo)
+* [command_runtime_demo](../../examples/projects/tooling/command_runtime_demo)
+* [subprocess_runtime_demo](../../examples/projects/tooling/subprocess_runtime_demo)
+* [tty_runtime_demo](../../examples/projects/tooling/tty_runtime_demo)
 
 ## What This Contract Does Not Promise
 
@@ -227,7 +227,7 @@ If you are extending host I/O today:
 
 If you are reading host I/O today:
 
-* start with [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
+* start with [host-read-bridge.md](host-read-bridge.md)
   if you need the compiler/source boundary
 * start with the pure `*_runtime_recipe.ns` files if you need the narrow
   checked-in source contract
@@ -236,7 +236,7 @@ If you are reading host I/O today:
 
 ## Related References
 
-* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
-* [std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
-* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* [host-read-bridge.md](host-read-bridge.md)
+* [std-mainline-layering-contract.md](std-mainline-layering-contract.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
+* [docs/current-mainline-map.md](../../docs/current-mainline-map.md)

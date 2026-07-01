@@ -15,29 +15,29 @@ clearest way to inspect raw execution-graph shape and verifier behavior.
 
 Subdirectories:
 
-* [cpu](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/README.md)
-* [shader](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/README.md)
-* [kernel](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/README.md)
-* [data](/Users/Shared/chroot/dev/nuislang/examples/yir/data/README.md)
-* [demos](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/README.md)
+* [cpu](cpu/README.md)
+* [shader](shader/README.md)
+* [kernel](kernel/README.md)
+* [data](data/README.md)
+* [demos](demos/README.md)
 
 Recommended starting points:
 
-* [hello_yir.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/hello_yir.yir)
+* [hello_yir.yir](demos/hello_yir.yir)
   smallest cross-domain example
-* [window_controls_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/window_controls_demo.yir)
+* [window_controls_demo.yir](demos/window_controls_demo.yir)
   current main `cpu + data + shader` control/render demo
-* [shader_bindings_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_bindings_demo.yir)
+* [shader_bindings_demo.yir](shader/shader_bindings_demo.yir)
   current shader resource/binding geometry path
-* [shader_external_handle_bridge_probe.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_external_handle_bridge_probe.yir)
+* [shader_external_handle_bridge_probe.yir](shader/shader_external_handle_bridge_probe.yir)
   comment-only sketch probe for future render-side bridge vocabulary
-* [kernel_auto_broadcast_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_auto_broadcast_demo.yir)
+* [kernel_auto_broadcast_demo.yir](kernel/kernel_auto_broadcast_demo.yir)
   current kernel tensor/broadcast path
-* [data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_fabric_demo.yir)
+* [data_fabric_demo.yir](data/data_fabric_demo.yir)
   current typed Fabric/data surface
-* [data_external_handle_bridge_probe.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_external_handle_bridge_probe.yir)
+* [data_external_handle_bridge_probe.yir](data/data_external_handle_bridge_probe.yir)
   comment-only sketch probe for future Fabric-side external-handle bridge work
-* [cpu_task_external_handle_bridge_probe.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/cpu_task_external_handle_bridge_probe.yir)
+* [cpu_task_external_handle_bridge_probe.yir](cpu/cpu_task_external_handle_bridge_probe.yir)
   comment-only sketch probe for future task-external-handle bridge vocabulary
 
 Use:

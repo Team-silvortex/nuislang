@@ -34,8 +34,8 @@ They already participate in:
 
 Primary anchors:
 
-* [nuis-0.18.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-pointer-mainline.md)
-* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+* [nuis-0.18.0-address-pointer-mainline.md](nuis-0.18.0-address-pointer-mainline.md)
+* [nir-memory-model.md](../../docs/reference/nir-memory-model.md)
 
 ## Current Host Boundary Truth
 
@@ -77,7 +77,7 @@ surfaces such as stdin/file transport facades.
 
 Current validation anchor:
 
-* [validation.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/validation.rs)
+* [validation.rs](../../tools/nuisc/src/frontend/validation.rs)
 
 Short rule:
 

@@ -12,21 +12,21 @@ looks like the `0.16.0` line it claims to describe.
 
 ## Documentation
 
-* [ ] confirm [nuis-0.16.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-snapshot.md)
+* [ ] confirm [nuis-0.16.0-snapshot.md](nuis-0.16.0-snapshot.md)
   still matches the checked-in mainline
-* [ ] confirm [nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
+* [ ] confirm [nuis-0.16.0-compile-workflow.md](nuis-0.16.0-compile-workflow.md)
   still describes the canonical route
-* [ ] confirm [nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md)
+* [ ] confirm [nuis-0.16.0-binary-compile-maturity.md](nuis-0.16.0-binary-compile-maturity.md)
   still matches actual compiler/runtime truth
-* [ ] confirm [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
+* [ ] confirm [nuis-0.16.0-generic-constraint-coverage.md](nuis-0.16.0-generic-constraint-coverage.md)
   still matches actual frontend validation coverage
-* [ ] confirm [nuis-0.16.0-generic-constraint-gaps.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-gaps.md)
+* [ ] confirm [nuis-0.16.0-generic-constraint-gaps.md](nuis-0.16.0-generic-constraint-gaps.md)
   still reflects the remaining follow-up list honestly
-* [ ] confirm [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
+* [ ] confirm [nuis-0.16.0-generic-surface-audit.md](nuis-0.16.0-generic-surface-audit.md)
   still matches the test-backed generic crossover matrix
-* [ ] confirm [README.md](/Users/Shared/chroot/dev/nuislang/README.md),
-  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md),
-  and [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
+* [ ] confirm [README.md](../../README.md),
+  [docs/current-mainline-map.md](../../docs/current-mainline-map.md),
+  and [docs/reference/README.md](../../docs/reference/README.md)
   still point at the right current anchors
 
 ## Toolchain And Validation

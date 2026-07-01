@@ -2,14 +2,14 @@
 
 This file is the current implementation-facing reference for the `ref /
 borrow / move / free` rules enforced by
-[tools/nuisc/src/nir_verify.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/nir_verify.rs).
+[tools/nuisc/src/nir_verify.rs](../../tools/nuisc/src/nir_verify.rs).
 
 It intentionally names builtin read/write forms such as `load_value(...)` and
 `store_at(...)` because this document describes verifier/NIR truth after
 surface-syntax lowering.
 
 For preferred ordinary `.ns` source spelling, see
-[address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md).
+[address-surface-contract.md](address-surface-contract.md).
 
 It is intentionally narrower than a future full runtime memory model. Right now
 it describes the verifier contract that optimization and front-door tooling
@@ -177,13 +177,13 @@ Important current split:
 The current implementation truth is guarded by:
 
 * verifier rules in
-  [tools/nuisc/src/nir_verify.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/nir_verify.rs)
+  [tools/nuisc/src/nir_verify.rs](../../tools/nuisc/src/nir_verify.rs)
 * verifier regressions in
-  [tools/nuisc/src/nir_verify/tests.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/nir_verify/tests.rs)
+  [tools/nuisc/src/nir_verify/tests.rs](../../tools/nuisc/src/nir_verify/tests.rs)
   including conditional and loop ownership/borrow regressions
 * address-type classification in
-  [tools/nuisc/src/frontend/tests_types_async_window.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_types_async_window.rs)
+  [tools/nuisc/src/frontend/tests_types_async_window.rs](../../tools/nuisc/src/frontend/tests_types_async_window.rs)
 * source compile gates in
-  [tools/nuisc/tests/memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+  [tools/nuisc/tests/memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
 * lowering ordering checks in
-  [tools/nuisc/src/lowering/tests_async_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_runtime.rs)
+  [tools/nuisc/src/lowering/tests_async_runtime.rs](../../tools/nuisc/src/lowering/tests_async_runtime.rs)

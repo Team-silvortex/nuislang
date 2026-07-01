@@ -15,7 +15,7 @@ Its role is narrower:
 
 For the concrete internal-first implementation sequence, also see:
 
-* [nuis-0.18.0-internal-address-class-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-internal-address-class-plan.md)
+* [nuis-0.18.0-internal-address-class-plan.md](nuis-0.18.0-internal-address-class-plan.md)
 
 ## Current Baseline
 

@@ -25,11 +25,11 @@ Read the current line as:
 
 Start here:
 
-1. [../current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-2. [../reference/nsld-linker-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsld-linker-frontdoor.md)
-3. [nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
-4. [nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-5. [../reference/std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
+1. [../current-mainline-map.md](../../docs/current-mainline-map.md)
+2. [../reference/nsld-linker-frontdoor.md](../../docs/reference/nsld-linker-frontdoor.md)
+3. [nuis-alpha-0.4-system-inventory.md](nuis-alpha-0.4-system-inventory.md)
+4. [nuis-alpha-0.4-mainline-hardening-plan.md](nuis-alpha-0.4-mainline-hardening-plan.md)
+5. [../reference/std-mainline-layering-contract.md](../../docs/reference/std-mainline-layering-contract.md)
 
 ## What Is New Enough To Mention First
 
@@ -48,7 +48,7 @@ Current scope:
 
 Reference:
 
-* [../reference/nsld-linker-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsld-linker-frontdoor.md)
+* [../reference/nsld-linker-frontdoor.md](../../docs/reference/nsld-linker-frontdoor.md)
 
 ### Std Contract Smoke
 

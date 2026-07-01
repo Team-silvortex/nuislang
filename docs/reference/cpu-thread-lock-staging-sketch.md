@@ -221,9 +221,9 @@ That keeps the repository honest:
 
 ## Related References
 
-* [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
-* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
-* [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
-* [cpu-task-external-handle-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-contract.md)
-* [cpu-task-external-handle-glm-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-glm-sketch.md)
-* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+* [cpu-task-contract.md](cpu-task-contract.md)
+* [cpu-task-memory-contract.md](cpu-task-memory-contract.md)
+* [cpu-task-glm-contract.md](cpu-task-glm-contract.md)
+* [cpu-task-external-handle-contract.md](cpu-task-external-handle-contract.md)
+* [cpu-task-external-handle-glm-sketch.md](cpu-task-external-handle-glm-sketch.md)
+* [nir-memory-model.md](nir-memory-model.md)

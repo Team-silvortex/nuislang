@@ -1,14 +1,14 @@
 # `nuis` `alpha-0.0.1` Closeout Board
 
 This file is the execution board companion to
-[nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md).
+[nuis-alpha-0.0.1-closeout-checklist.md](nuis-alpha-0.0.1-closeout-checklist.md).
 
 It should now be read as a predecessor closeout board, not as the default
 current-line frontdoor.
 
 If you want the current line first, use:
 
-* [nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
+* [nuis-alpha-0.1-mainline-status.md](nuis-alpha-0.1-mainline-status.md)
 
 The checklist answers:
 
@@ -53,10 +53,10 @@ Practical meaning:
 * target:
   `nuis source/project -> nuis frontdoor -> nuisc -> NIR -> YIR -> LLVM/AOT`
 * key evidence:
-  [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
-  [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-  [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-  [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+  [README.md](../../README.md)
+  [current-mainline-map.md](../../docs/current-mainline-map.md)
+  [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+  [nuis-0.20.0-abi-compile-vocabulary.md](nuis-0.20.0-abi-compile-vocabulary.md)
 * close when:
   one default reader path exists and does not compete with older routes
 * remaining pressure:
@@ -68,9 +68,9 @@ Practical meaning:
 * priority: `must-close`
 * status: `active`
 * key evidence:
-  [nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
-  [nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
-  [alpha-mainline-boundary-index.md](/Users/Shared/chroot/dev/nuislang/docs/reference/alpha-mainline-boundary-index.md)
+  [nuis-0.20.0-frontend-cli-boundaries.md](nuis-0.20.0-frontend-cli-boundaries.md)
+  [nuis-0.20.0-compile-gap-checklist.md](nuis-0.20.0-compile-gap-checklist.md)
+  [alpha-mainline-boundary-index.md](../../docs/reference/alpha-mainline-boundary-index.md)
 * close when:
   every known failure can be named as `frontend gap`, `pipeline gap`, or
   `intentional boundary`
@@ -84,9 +84,9 @@ Practical meaning:
 * priority: `must-close`
 * status: `active`
 * key evidence:
-  [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
-  [nuis-0.20.0-generic-validation-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
-  [generic-diagnostic-ownership-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/generic-diagnostic-ownership-contract.md)
+  [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
+  [nuis-0.20.0-generic-validation-regression-matrix.md](nuis-0.20.0-generic-validation-regression-matrix.md)
+  [generic-diagnostic-ownership-contract.md](../../docs/reference/generic-diagnostic-ownership-contract.md)
 * close when:
   the currently claimed generic subset is positive-test-backed across explicit
   calls, receivers, literals, control-flow bodies, and lifted helpers
@@ -99,9 +99,9 @@ Practical meaning:
 * priority: `must-close`
 * status: `active`
 * key evidence:
-  [tests_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_control_flow.rs)
-  [control-flow-lowering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/control-flow-lowering-contract.md)
-  [nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
+  [tests_control_flow.rs](../../tools/nuisc/src/frontend/tests_control_flow.rs)
+  [control-flow-lowering-contract.md](../../docs/reference/control-flow-lowering-contract.md)
+  [nuis-0.20.0-branch-runtime-lowering-matrix.md](nuis-0.20.0-branch-runtime-lowering-matrix.md)
 * close when:
   `if`, `match`, `while`, break/continue shaping, and recursive routes all read
   as one defended lowering story
@@ -113,8 +113,8 @@ Practical meaning:
 * priority: `must-close`
 * status: `active`
 * key evidence:
-  [tests_lambda_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_lambda_higher_order.rs)
-  [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
+  [tests_lambda_higher_order.rs](../../tools/nuisc/src/frontend/tests_lambda_higher_order.rs)
+  [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
 * close when:
   current `Fn1` / `Fn2` / `Fn3` routes, helper lifting, and expected-type-based
   inference survive ordinary control-flow, `?`, and `await` contexts
@@ -126,9 +126,9 @@ Practical meaning:
 * priority: `must-close`
 * status: `active`
 * key evidence:
-  [tests_try.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_try.rs)
-  [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
-  [cpu-thread-lock-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-boundary.md)
+  [tests_try.rs](../../tools/nuisc/src/frontend/tests_try.rs)
+  [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
+  [cpu-thread-lock-boundary.md](../../docs/reference/cpu-thread-lock-boundary.md)
 * close when:
   the supported async/result composition route is explicit and regression-backed
   through nested control-flow and lifted helper positions
@@ -141,10 +141,10 @@ Practical meaning:
 * priority: `must-close`
 * status: `active`
 * key evidence:
-  [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
-  [address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
-  [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
-  [memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+  [nuis-0.19.0-address-pointer-mainline.md](nuis-0.19.0-address-pointer-mainline.md)
+  [address-surface-contract.md](../../docs/reference/address-surface-contract.md)
+  [nir-memory-model.md](../../docs/reference/nir-memory-model.md)
+  [memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
 * close when:
   the currently supported owned/borrowed pointer story compiles, verifies, and
   is described with one surface contract
@@ -158,9 +158,9 @@ Practical meaning:
 * priority: `must-close`
 * status: `active`
 * key evidence:
-  [nustar-capability-split-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nustar-capability-split-boundary.md)
-  [nustar-packages](/Users/Shared/chroot/dev/nuislang/nustar-packages)
-  [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+  [nustar-capability-split-boundary.md](../../docs/reference/nustar-capability-split-boundary.md)
+  [nustar-packages](../../nustar-packages)
+  [yir-tools-reference.md](../../docs/reference/yir-tools-reference.md)
 * close when:
   `cpu`, `data`, `shader`, `kernel`, and `network` remain explainable as
   registered capability truth instead of compiler folklore
@@ -173,8 +173,8 @@ Practical meaning:
 * priority: `must-close`
 * status: `active`
 * key evidence:
-  [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-  [nustar-abi-grain-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nustar-abi-grain-sketch.md)
+  [nuis-0.20.0-abi-compile-vocabulary.md](nuis-0.20.0-abi-compile-vocabulary.md)
+  [nustar-abi-grain-sketch.md](../../docs/reference/nustar-abi-grain-sketch.md)
 * close when:
   the active vocabulary around package registration, lowering, ABI grain, and
   concrete artifact production no longer drifts by subsystem
@@ -188,9 +188,9 @@ Practical meaning:
 * priority: `must-close`
 * status: `active`
 * key evidence:
-  [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-  [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
-  [examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+  [examples/projects/README.md](../../examples/projects/README.md)
+  [examples/ns/README.md](../../examples/ns/README.md)
+  [examples-freshness-audit.md](../../docs/examples-freshness-audit.md)
 * close when:
   the shortest examples teach the same mainline the docs and tests defend
 * remaining pressure:
@@ -201,9 +201,9 @@ Practical meaning:
 * priority: `should-close`
 * status: `active`
 * key evidence:
-  [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
-  [nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-  [std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+  [stdlib/std/README.md](../../stdlib/std/README.md)
+  [nuis-0.20.0-std-refactor-frontdoor.md](nuis-0.20.0-std-refactor-frontdoor.md)
+  [std-tooling-workflow-contract.md](../../docs/reference/std-tooling-workflow-contract.md)
 * close when:
   `std` reads as layered frontdoors instead of a flat bucket of recipes
 * remaining pressure:
@@ -215,8 +215,8 @@ Practical meaning:
 * priority: `should-close`
 * status: `active`
 * key evidence:
-  [versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md)
-  [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  [versioning/README.md](README.md)
+  [current-mainline-map.md](../../docs/current-mainline-map.md)
 * close when:
   older "current" documents no longer compete with the live route
 * remaining pressure:

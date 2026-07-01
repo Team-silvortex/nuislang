@@ -11,7 +11,7 @@ The examples in this file intentionally use builtin memory helper names such as
 the carry-recognition / lowering-contract layer.
 
 For source-facing address spelling, see
-[../reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md).
+[../reference/address-surface-contract.md](../../docs/reference/address-surface-contract.md).
 
 Current implementation truth:
 

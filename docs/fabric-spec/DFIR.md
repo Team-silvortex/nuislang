@@ -11,9 +11,9 @@ Fabric IR Algebra (legacy filename: `DFIR.md`, v0.44.b-aligned draft)
 >
 > When this file disagrees with current verifier behavior, prefer:
 >
-> * [docs/reference/yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
-> * [docs/reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-> * [docs/grammar/nuis-ir.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis-ir.md)
+> * [docs/reference/yir-reference.md](../../docs/reference/yir-reference.md)
+> * [docs/reference/yir-langref.md](../../docs/reference/yir-langref.md)
+> * [docs/grammar/nuis-ir.md](../../docs/grammar/nuis-ir.md)
 
 1 Primitive Set
 

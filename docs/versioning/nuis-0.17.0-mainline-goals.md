@@ -34,9 +34,9 @@ Short rule:
 
 Working anchor:
 
-* [nuis-0.17.0-generic-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-generic-completion-plan.md)
-* [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md)
-* [nuis-0.17.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-regression-matrix.md)
+* [nuis-0.17.0-generic-completion-plan.md](nuis-0.17.0-generic-completion-plan.md)
+* [nuis-0.17.0-compile-workflow.md](nuis-0.17.0-compile-workflow.md)
+* [nuis-0.17.0-mainline-regression-matrix.md](nuis-0.17.0-mainline-regression-matrix.md)
 
 ### 2. Lowering Completion
 

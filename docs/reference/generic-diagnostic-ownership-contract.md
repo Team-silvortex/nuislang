@@ -9,9 +9,9 @@ It answers one practical question:
 
 Read this together with:
 
-* [../versioning/nuis-0.20.0-generic-validation-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
-* [../versioning/nuis-0.19.0-generic-constraint-validator.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-generic-constraint-validator.md)
-* [control-flow-lowering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/control-flow-lowering-contract.md)
+* [../versioning/nuis-0.20.0-generic-validation-regression-matrix.md](../../docs/versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
+* [../versioning/nuis-0.19.0-generic-constraint-validator.md](../../docs/versioning/nuis-0.19.0-generic-constraint-validator.md)
+* [control-flow-lowering-contract.md](control-flow-lowering-contract.md)
 
 ## Short Rule
 

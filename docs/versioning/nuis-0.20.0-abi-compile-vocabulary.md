@@ -20,10 +20,10 @@ but:
 
 Use it together with:
 
-* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-* [nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
-* [std-shader-kernel-project-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-shader-kernel-project-contract.md)
-* [yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
+* [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+* [nuis-0.19.0-snapshot.md](nuis-0.19.0-snapshot.md)
+* [std-shader-kernel-project-contract.md](../../docs/reference/std-shader-kernel-project-contract.md)
+* [yir-reference.md](../../docs/reference/yir-reference.md)
 
 ## Core Rule
 

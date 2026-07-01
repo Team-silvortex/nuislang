@@ -4,24 +4,24 @@ This directory is the reading router for the `std` command/workflow/tooling
 lane.
 
 Keep the current recipe sources in
-[`stdlib/std`](/Users/Shared/chroot/dev/nuislang/stdlib/std) for now; this
+[`stdlib/std`](../../../stdlib/std) for now; this
 file exists to give the tooling surface one lane-shaped front door before we
 do any higher-risk filesystem reshuffle.
 
 Canonical companions:
 
 * `std` refactor frontdoor:
-  [docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
+  [docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md](../../../docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
 * tooling/workflow contract:
-  [docs/reference/std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+  [docs/reference/std-tooling-workflow-contract.md](../../../docs/reference/std-tooling-workflow-contract.md)
 * auto-injected CLI/workflow helper surface:
-  [lib/cli_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/cli_contracts.ns)
+  [lib/cli_contracts.ns](../../../stdlib/std/lib/cli_contracts.ns)
 * tooling image-preprocess bridge:
-  [docs/reference/tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
+  [docs/reference/tooling-image-preprocess-lane.md](../../../docs/reference/tooling-image-preprocess-lane.md)
 * mainline layering rule:
-  [docs/reference/std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
+  [docs/reference/std-mainline-layering-contract.md](../../../docs/reference/std-mainline-layering-contract.md)
 * shortest repo-wide route:
-  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  [docs/current-mainline-map.md](../../../docs/current-mainline-map.md)
 
 ## Current Lane Shape
 
@@ -56,17 +56,17 @@ frontdoors. They are allowed to exercise host bridges internally, but their
 process exit shape should summarize frontdoor success/failure rather than leak
 raw internal counters.
 
-* [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
-* [cli_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_session_recipe.ns)
-* [cli_report_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_report_session_recipe.ns)
-* [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
-* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-* [workflow_frontdoor_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_frontdoor_runtime_recipe.ns)
-* [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
-* [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
-* [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
-* [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
+* [cli_runtime_recipe.ns](../../../stdlib/std/cli_runtime_recipe.ns)
+* [cli_session_recipe.ns](../../../stdlib/std/cli_session_recipe.ns)
+* [cli_report_session_recipe.ns](../../../stdlib/std/cli_report_session_recipe.ns)
+* [workflow_runtime_recipe.ns](../../../stdlib/std/workflow_runtime_recipe.ns)
+* [command_runtime_recipe.ns](../../../stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](../../../stdlib/std/subprocess_runtime_recipe.ns)
+* [workflow_frontdoor_runtime_recipe.ns](../../../stdlib/std/workflow_frontdoor_runtime_recipe.ns)
+* [cli_workflow_automation_recipe.ns](../../../stdlib/std/cli_workflow_automation_recipe.ns)
+* [cli_build_pipeline_recipe.ns](../../../stdlib/std/cli_build_pipeline_recipe.ns)
+* [cli_project_build_report_recipe.ns](../../../stdlib/std/cli_project_build_report_recipe.ns)
+* [cli_compile_workflow_recipe.ns](../../../stdlib/std/cli_compile_workflow_recipe.ns)
 
 ### Probe-Style Observation Recipes
 
@@ -74,13 +74,13 @@ These are still useful current recipes, but they should be read primarily as
 host/runtime observation or shaping probes rather than as the default CLI
 artifact frontdoor.
 
-* [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
-* [command_text_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_text_builder_recipe.ns)
-* [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
-* [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
-* [host_text_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/host_text_runtime_recipe.ns)
-* [text_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_pipeline_recipe.ns)
-* [text_report_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_report_builder_recipe.ns)
+* [command_shell_recipe.ns](../../../stdlib/std/command_shell_recipe.ns)
+* [command_text_builder_recipe.ns](../../../stdlib/std/command_text_builder_recipe.ns)
+* [report_runtime_recipe.ns](../../../stdlib/std/report_runtime_recipe.ns)
+* [automation_runtime_recipe.ns](../../../stdlib/std/automation_runtime_recipe.ns)
+* [host_text_runtime_recipe.ns](../../../stdlib/std/host_text_runtime_recipe.ns)
+* [text_pipeline_recipe.ns](../../../stdlib/std/text_pipeline_recipe.ns)
+* [text_report_builder_recipe.ns](../../../stdlib/std/text_report_builder_recipe.ns)
 
 Short rule:
 
@@ -107,9 +107,9 @@ What that means in practice:
 
 Current exemplars:
 
-* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-* [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
+* [command_runtime_recipe.ns](../../../stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](../../../stdlib/std/subprocess_runtime_recipe.ns)
+* [workflow_runtime_recipe.ns](../../../stdlib/std/workflow_runtime_recipe.ns)
 
 Short rule:
 
@@ -143,82 +143,82 @@ What that means in practice:
 
 Current checked-in companion exemplars:
 
-* [cli_compile_workflow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_compile_workflow_demo)
-* [cli_workflow_automation_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo)
-* [cli_build_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo)
-* [cli_project_build_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo)
+* [cli_compile_workflow_demo](../../../examples/projects/tooling/cli_compile_workflow_demo)
+* [cli_workflow_automation_demo](../../../examples/projects/tooling/cli_workflow_automation_demo)
+* [cli_build_pipeline_demo](../../../examples/projects/tooling/cli_build_pipeline_demo)
+* [cli_project_build_report_demo](../../../examples/projects/tooling/cli_project_build_report_demo)
 
 ## Source Router
 
 ### Runtime Edge
 
-* [command_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime.ns)
-* [subprocess_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime.ns)
-* [workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime.ns)
+* [command_runtime.ns](../../../stdlib/std/command_runtime.ns)
+* [subprocess_runtime.ns](../../../stdlib/std/subprocess_runtime.ns)
+* [workflow_runtime.ns](../../../stdlib/std/workflow_runtime.ns)
 
 ### Narrow Recipe Layer
 
-* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-* [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
-* [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
-* [command_text_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_text_builder_recipe.ns)
+* [command_runtime_recipe.ns](../../../stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](../../../stdlib/std/subprocess_runtime_recipe.ns)
+* [workflow_runtime_recipe.ns](../../../stdlib/std/workflow_runtime_recipe.ns)
+* [command_shell_recipe.ns](../../../stdlib/std/command_shell_recipe.ns)
+* [command_text_builder_recipe.ns](../../../stdlib/std/command_text_builder_recipe.ns)
 * text/data builder route:
-  [host_text_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/host_text_runtime_recipe.ns)
+  [host_text_runtime_recipe.ns](../../../stdlib/std/host_text_runtime_recipe.ns)
   ->
-  [text_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_pipeline_recipe.ns)
+  [text_pipeline_recipe.ns](../../../stdlib/std/text_pipeline_recipe.ns)
   ->
-  [text_report_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_report_builder_recipe.ns)
+  [text_report_builder_recipe.ns](../../../stdlib/std/text_report_builder_recipe.ns)
 
 ### Session / Report / Automation Companions
 
-* [cli_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_session_recipe.ns)
-* [cli_shell_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_shell_session_recipe.ns)
-* [cli_report_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_report_session_recipe.ns)
-* [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
-* [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
-* [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
+* [cli_session_recipe.ns](../../../stdlib/std/cli_session_recipe.ns)
+* [cli_shell_session_recipe.ns](../../../stdlib/std/cli_shell_session_recipe.ns)
+* [cli_report_session_recipe.ns](../../../stdlib/std/cli_report_session_recipe.ns)
+* [cli_runtime_recipe.ns](../../../stdlib/std/cli_runtime_recipe.ns)
+* [report_runtime_recipe.ns](../../../stdlib/std/report_runtime_recipe.ns)
+* [automation_runtime_recipe.ns](../../../stdlib/std/automation_runtime_recipe.ns)
 * builder-to-report bridge:
-  [text_report_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_report_builder_recipe.ns)
+  [text_report_builder_recipe.ns](../../../stdlib/std/text_report_builder_recipe.ns)
   ->
-  [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
+  [report_runtime_recipe.ns](../../../stdlib/std/report_runtime_recipe.ns)
 
 ### Workflow Frontdoor Recipes
 
-* [workflow_frontdoor_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_frontdoor_runtime_recipe.ns)
-* [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
-* [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
-* [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
-* [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
+* [workflow_frontdoor_runtime_recipe.ns](../../../stdlib/std/workflow_frontdoor_runtime_recipe.ns)
+* [cli_workflow_automation_recipe.ns](../../../stdlib/std/cli_workflow_automation_recipe.ns)
+* [cli_build_pipeline_recipe.ns](../../../stdlib/std/cli_build_pipeline_recipe.ns)
+* [cli_project_build_report_recipe.ns](../../../stdlib/std/cli_project_build_report_recipe.ns)
+* [cli_compile_workflow_recipe.ns](../../../stdlib/std/cli_compile_workflow_recipe.ns)
 
 ### Image Preprocess Companions
 
-* [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
-* [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
-* [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
+* [cli_pgm_info_demo](../../../examples/projects/tooling/cli_pgm_info_demo)
+* [cli_pgm_invert_demo](../../../examples/projects/tooling/cli_pgm_invert_demo)
+* [cli_pgm_threshold_demo](../../../examples/projects/tooling/cli_pgm_threshold_demo)
 
 ## Current Reading Rule
 
 If you only want one pass:
 
-1. start with [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-2. follow into [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-3. then [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
+1. start with [command_runtime_recipe.ns](../../../stdlib/std/command_runtime_recipe.ns)
+2. follow into [subprocess_runtime_recipe.ns](../../../stdlib/std/subprocess_runtime_recipe.ns)
+3. then [workflow_runtime_recipe.ns](../../../stdlib/std/workflow_runtime_recipe.ns)
 4. then one frontdoor recipe:
-   [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
+   [cli_workflow_automation_recipe.ns](../../../stdlib/std/cli_workflow_automation_recipe.ns)
    or
-   [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
+   [cli_compile_workflow_recipe.ns](../../../stdlib/std/cli_compile_workflow_recipe.ns)
 
 ## Companion Validation Router
 
-Use [examples/projects/tooling/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/README.md)
+Use [examples/projects/tooling/README.md](../../../examples/projects/tooling/README.md)
 as the project-form companion set.
 
 Shortest grouped route:
 
-* [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
-* [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo)
-* [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
+* [cli_runtime_demo](../../../examples/projects/tooling/cli_runtime_demo)
+* [command_runtime_demo](../../../examples/projects/tooling/command_runtime_demo)
+* [workflow_runtime_demo](../../../examples/projects/tooling/workflow_runtime_demo)
 
 Current launch-shaped note:
 

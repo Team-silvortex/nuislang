@@ -28,15 +28,15 @@ Current strong points include:
 Current working anchors:
 
 * frontend:
-  [tests_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_control_flow.rs)
+  [tests_control_flow.rs](../../tools/nuisc/src/frontend/tests_control_flow.rs)
 * lowering:
-  [tests_loop_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_flow.rs)
+  [tests_loop_flow.rs](../../tools/nuisc/src/lowering/tests_loop_flow.rs)
 * lowering:
-  [tests_loop_post_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_post_flow.rs)
+  [tests_loop_post_flow.rs](../../tools/nuisc/src/lowering/tests_loop_post_flow.rs)
 * project:
-  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+  [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 * project:
-  [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+  [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 
 Current frontdoor project routes:
 
@@ -198,9 +198,9 @@ Current line note:
 Memory/carry companion note:
 
 * the current loop-memory carry boundary and next blocker breakdown now live in
-  [nuis-0.18.0-loop-memory-read-contract-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-read-contract-sketch.md)
+  [nuis-0.18.0-loop-memory-read-contract-sketch.md](nuis-0.18.0-loop-memory-read-contract-sketch.md)
   and
-  [nuis-0.18.0-loop-memory-carry-blockers.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-carry-blockers.md)
+  [nuis-0.18.0-loop-memory-carry-blockers.md](nuis-0.18.0-loop-memory-carry-blockers.md)
 
 ## Practical 0.18.0 Work Order
 
@@ -239,15 +239,15 @@ A believable `0.18.0` control-flow gate should include all of:
 The first practical gate now already includes:
 
 * frontend:
-  [tests_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_control_flow.rs)
+  [tests_control_flow.rs](../../tools/nuisc/src/frontend/tests_control_flow.rs)
 * lowering:
-  [tests_loop_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_flow.rs)
+  [tests_loop_flow.rs](../../tools/nuisc/src/lowering/tests_loop_flow.rs)
 * lowering:
-  [tests_loop_post_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_post_flow.rs)
+  [tests_loop_post_flow.rs](../../tools/nuisc/src/lowering/tests_loop_post_flow.rs)
 * state projects:
-  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+  [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 * task projects:
-  [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+  [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 
 Short rule:
 

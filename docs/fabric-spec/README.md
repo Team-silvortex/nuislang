@@ -20,11 +20,11 @@ of implementation truth.
 
 If you want the current repository behavior, prefer:
 
-* [docs/reference/yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
-* [docs/reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [docs/grammar/nuis-ir.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis-ir.md)
+* [docs/reference/yir-reference.md](../../docs/reference/yir-reference.md)
+* [docs/reference/yir-langref.md](../../docs/reference/yir-langref.md)
+* [docs/grammar/nuis-ir.md](../../docs/grammar/nuis-ir.md)
 
 ## Historical Draft
 
-* [DFIR.md](/Users/Shared/chroot/dev/nuislang/docs/fabric-spec/DFIR.md)
+* [DFIR.md](DFIR.md)
   legacy Fabric IR algebra draft kept for continuity

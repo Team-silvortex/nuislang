@@ -34,15 +34,15 @@ Current truth:
 
 Project anchors:
 
-* [if_borrow_end_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/if_borrow_end_state_demo)
-* [match_borrow_end_shared_suffix_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_borrow_end_shared_suffix_state_demo)
-* [task_result_shared_suffix_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/task_result_shared_suffix_state_demo)
-* [buffer_shared_suffix_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/buffer_shared_suffix_state_demo)
+* [if_borrow_end_state_demo](../../examples/projects/state/if_borrow_end_state_demo)
+* [match_borrow_end_shared_suffix_state_demo](../../examples/projects/state/match_borrow_end_shared_suffix_state_demo)
+* [task_result_shared_suffix_state_demo](../../examples/projects/state/task_result_shared_suffix_state_demo)
+* [buffer_shared_suffix_state_demo](../../examples/projects/state/buffer_shared_suffix_state_demo)
 
 Regression anchors:
 
-* [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
-* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+* [tests_branch_helpers.rs](../../tools/nuisc/src/lowering/tests_branch_helpers.rs)
+* [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 Working rule:
 
@@ -60,11 +60,11 @@ Current truth:
 
 Project anchor:
 
-* [task_recursive_async_shared_suffix_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_shared_suffix_demo)
+* [task_recursive_async_shared_suffix_demo](../../examples/projects/task/task_recursive_async_shared_suffix_demo)
 
 Regression anchor:
 
-* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+* [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 
 Working rule:
 
@@ -89,9 +89,9 @@ Current truth:
 
 Regression anchor:
 
-* [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
-* [hello_thread_mutex_if_lock_branch_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns)
-* [hello_thread_mutex_match_join_result_branch_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns)
+* [tests_branch_helpers.rs](../../tools/nuisc/src/lowering/tests_branch_helpers.rs)
+* [hello_thread_mutex_if_lock_branch_invalid.ns](../../examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns)
+* [hello_thread_mutex_match_join_result_branch_invalid.ns](../../examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns)
 
 Working rule:
 
@@ -116,15 +116,15 @@ Current truth:
 
 Project anchors:
 
-* [task_async_while_post_flow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_demo)
-* [task_async_while_post_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo)
-* [task_async_while_post_flow_compound_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_compound_demo)
-* [task_async_post_flow_shared_suffix_loop_control_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo)
+* [task_async_while_post_flow_demo](../../examples/projects/task/task_async_while_post_flow_demo)
+* [task_async_while_post_flow_cond_demo](../../examples/projects/task/task_async_while_post_flow_cond_demo)
+* [task_async_while_post_flow_compound_demo](../../examples/projects/task/task_async_while_post_flow_compound_demo)
+* [task_async_post_flow_shared_suffix_loop_control_demo](../../examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo)
 
 Regression anchors:
 
-* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
-* [tests_loop_post_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_post_flow.rs)
+* [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
+* [tests_loop_post_flow.rs](../../tools/nuisc/src/lowering/tests_loop_post_flow.rs)
 
 Working rule:
 
@@ -141,15 +141,15 @@ compile-and-launch smoke gate.
 
 Current native smoke anchors:
 
-* [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
-* [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
-* [task_async_while_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo)
-* [task_async_while_post_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo)
-* [task_async_post_flow_shared_suffix_loop_control_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo)
+* [flow_branching_while_demo](../../examples/projects/state/flow_branching_while_demo)
+* [post_flow_branching_while_demo](../../examples/projects/state/post_flow_branching_while_demo)
+* [task_async_while_flow_cond_demo](../../examples/projects/task/task_async_while_flow_cond_demo)
+* [task_async_while_post_flow_cond_demo](../../examples/projects/task/task_async_while_post_flow_cond_demo)
+* [task_async_post_flow_shared_suffix_loop_control_demo](../../examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo)
 
 Regression anchor:
 
-* [artifact_cli.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/artifact_cli.rs)
+* [artifact_cli.rs](../../tools/nuisc/tests/artifact_cli.rs)
 
 Useful local gate:
 
@@ -196,7 +196,7 @@ Current rejection:
 
 Regression anchor:
 
-* [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
+* [tests_branch_helpers.rs](../../tools/nuisc/src/lowering/tests_branch_helpers.rs)
 
 Current diagnostic contract:
 
@@ -224,11 +224,11 @@ Current rejection:
 
 Boundary anchor:
 
-* [bad_task_async_post_flow_shared_suffix_loop_control](/Users/Shared/chroot/dev/nuislang/examples/invalid/projects/bad_task_async_post_flow_shared_suffix_loop_control)
+* [bad_task_async_post_flow_shared_suffix_loop_control](../../examples/invalid/projects/bad_task_async_post_flow_shared_suffix_loop_control)
 
 Regression anchor:
 
-* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+* [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 
 Current diagnostic contract:
 

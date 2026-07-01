@@ -34,10 +34,10 @@ forced to be identical.
 
 Current examples:
 
-* [cpu.toml](/Users/Shared/chroot/dev/nuislang/nustar-packages/cpu.toml)
-* [network.toml](/Users/Shared/chroot/dev/nuislang/nustar-packages/network.toml)
-* [shader.toml](/Users/Shared/chroot/dev/nuislang/nustar-packages/shader.toml)
-* [kernel.toml](/Users/Shared/chroot/dev/nuislang/nustar-packages/kernel.toml)
+* [cpu.toml](../../nustar-packages/cpu.toml)
+* [network.toml](../../nustar-packages/network.toml)
+* [shader.toml](../../nustar-packages/shader.toml)
+* [kernel.toml](../../nustar-packages/kernel.toml)
 
 This keeps source-facing frontend shape stable:
 
@@ -90,13 +90,13 @@ The current repository already leans in this direction.
 
 Examples:
 
-* [cpu.toml](/Users/Shared/chroot/dev/nuislang/nustar-packages/cpu.toml) keeps
+* [cpu.toml](../../nustar-packages/cpu.toml) keeps
   one logical `official.cpu` package while registering:
   * `cpu.arm64.apple_aapcs64`
   * `cpu.arm64.linux.aapcs64`
   * `cpu.x86_64.sysv64`
   * `cpu.x86_64.win64`
-* [network.toml](/Users/Shared/chroot/dev/nuislang/nustar-packages/network.toml)
+* [network.toml](../../nustar-packages/network.toml)
   keeps one logical `official.network` package while registering:
   * host-adaptive socket target
   * Darwin arm64 socket target

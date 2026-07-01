@@ -12,11 +12,11 @@ looks like the `0.13.0` phase you meant to describe.
 
 ## Documentation
 
-* [ ] confirm [nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
+* [ ] confirm [nuis-0.13.0-snapshot.md](nuis-0.13.0-snapshot.md)
   still matches the checked-in mainline
-* [ ] confirm [README.md](/Users/Shared/chroot/dev/nuislang/README.md),
-  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md),
-  and [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
+* [ ] confirm [README.md](../../README.md),
+  [docs/current-mainline-map.md](../../docs/current-mainline-map.md),
+  and [docs/reference/README.md](../../docs/reference/README.md)
   still point at the right current anchors
 * [ ] confirm `0.13.0` wording does not overstate sketch/future-edge material as
   already promised repository behavior

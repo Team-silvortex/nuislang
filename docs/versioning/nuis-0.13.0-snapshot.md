@@ -85,11 +85,11 @@ The most important current truths for `0.13.0` are:
 
 For `0.13.0`, the shortest practical path is:
 
-1. [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
-2. [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-3. [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
-4. [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
-5. [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+1. [README.md](../../README.md)
+2. [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
+3. [docs/reference/README.md](../../docs/reference/README.md)
+4. [stdlib/std/README.md](../../stdlib/std/README.md)
+5. [examples/projects/README.md](../../examples/projects/README.md)
 
 ## `0.13.0` Focus Areas
 

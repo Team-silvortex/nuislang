@@ -6,7 +6,7 @@ and `MutexGuard<T>` work that entered the mainline before `alpha-0.0.1`.
 For present-tense `alpha-0.4.*` routing, read this as a still-relevant
 contract note under the current system inventory, not as the repo entrypoint:
 
-* [../versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
+* [../versioning/nuis-alpha-0.4-system-inventory.md](../../docs/versioning/nuis-alpha-0.4-system-inventory.md)
 
 It is not the final thread runtime or memory-visibility design.
 
@@ -30,16 +30,16 @@ Read the current line this way:
 
 Current source anchors:
 
-* [hello_thread_mutex_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns)
+* [hello_thread_mutex_observe.ns](../../examples/ns/memory/hello_thread_mutex_observe.ns)
   straight-line staged thread/lock observation
-* [hello_thread_mutex_branch_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns)
+* [hello_thread_mutex_branch_observe.ns](../../examples/ns/memory/hello_thread_mutex_branch_observe.ns)
   branch-selected guard/thread plus shared observer suffix
-* [hello_thread_mutex_branch_suffix.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns)
+* [hello_thread_mutex_branch_suffix.ns](../../examples/ns/memory/hello_thread_mutex_branch_suffix.ns)
   branch-selected guard/thread plus shared observer and shared pure suffix
 
 Current source compile regression surface:
 
-* [memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+* [memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
 
 Short rule:
 
@@ -50,7 +50,7 @@ Short rule:
 
 Current project anchor:
 
-* [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo)
+* [task_thread_mutex_demo](../../examples/projects/task/task_thread_mutex_demo)
 
 Short rule:
 
@@ -68,11 +68,11 @@ Today the checked-in control-flow boundary already accepts:
 
 Current lowering contract:
 
-* [control-flow-lowering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/control-flow-lowering-contract.md)
+* [control-flow-lowering-contract.md](control-flow-lowering-contract.md)
 
 Current lowering regression surface:
 
-* [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
+* [tests_branch_helpers.rs](../../tools/nuisc/src/lowering/tests_branch_helpers.rs)
 
 Short rule:
 
@@ -93,7 +93,7 @@ Current `GLM`/verifier truth already includes:
 
 Current verifier regression surface:
 
-* [glm_verify.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/glm_verify.rs)
+* [glm_verify.rs](../../tools/nuisc/tests/glm_verify.rs)
 
 Important checked-in examples in that file:
 
@@ -115,8 +115,8 @@ Current rejection rule:
 
 Current invalid anchors:
 
-* [hello_thread_mutex_if_lock_branch_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns)
-* [hello_thread_mutex_match_join_result_branch_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns)
+* [hello_thread_mutex_if_lock_branch_invalid.ns](../../examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns)
+* [hello_thread_mutex_match_join_result_branch_invalid.ns](../../examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns)
 
 Current diagnostic contract:
 
@@ -140,16 +140,16 @@ Still not promised today:
 
 For that broader positioning, read:
 
-* [cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md)
+* [cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md)
 
 ## Practical Reading Rule Before `alpha-0.0.1`
 
 Before `alpha`, read the thread/lock line in this order:
 
-1. source anchors in [examples/ns/memory/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/README.md)
-2. invalid anchors in [examples/invalid/ns/memory/README.md](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/README.md)
-3. ownership/lifecycle truth in [glm_verify.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/glm_verify.rs)
-4. larger staging intent in [cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md)
+1. source anchors in [examples/ns/memory/README.md](../../examples/ns/memory/README.md)
+2. invalid anchors in [examples/invalid/ns/memory/README.md](../../examples/invalid/ns/memory/README.md)
+3. ownership/lifecycle truth in [glm_verify.rs](../../tools/nuisc/tests/glm_verify.rs)
+4. larger staging intent in [cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md)
 
 That keeps the line honest:
 

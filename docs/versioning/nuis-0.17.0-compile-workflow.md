@@ -18,7 +18,7 @@ Use it when the question is not only “which command do I run?”, but
 
 For the lowering-facing complement to this file, use:
 
-* [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md)
+* [nuis-0.17.0-lowering-capability-map.md](nuis-0.17.0-lowering-capability-map.md)
 
 ## Core Rule
 
@@ -62,14 +62,14 @@ The practical consequence is:
 
 Current anchor surfaces for that rule:
 
-* [project.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project.rs)
-* [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
-* [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
+* [project.rs](../../tools/nuisc/src/project.rs)
+* [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+* [multidomain_async.rs](../../tools/nuisc/src/project/tests/multidomain_async.rs)
 
 ## Canonical Frontend Order
 
 Today the real front door is still
-[lower_project_ast_to_nir](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/mod.rs#L157).
+[lower_project_ast_to_nir](../../tools/nuisc/src/frontend/mod.rs#L157).
 
 The checked-in order is:
 
@@ -101,7 +101,7 @@ It means the current frontend no longer treats these as unrelated features:
 ## What `build_lowered_functions_and_impls(...)` Now Means
 
 The most important current integration point is
-[build_lowered_functions_and_impls](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/specialization_pipeline.rs#L19).
+[build_lowered_functions_and_impls](../../tools/nuisc/src/frontend/specialization_pipeline.rs#L19).
 
 The current responsibility split inside that pipeline is:
 
@@ -153,10 +153,10 @@ That is the new honest read for checked-in project work.
 
 The current generic rewrite spine is now carried by:
 
-* [generic_rewrite/mod.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/generic_rewrite/mod.rs)
-* [generic_rewrite/blocks.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/generic_rewrite/blocks.rs)
-* [generic_rewrite/exprs.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/generic_rewrite/exprs.rs)
-* [generic_rewrite/hoists.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/generic_rewrite/hoists.rs)
+* [generic_rewrite/mod.rs](../../tools/nuisc/src/frontend/generic_rewrite/mod.rs)
+* [generic_rewrite/blocks.rs](../../tools/nuisc/src/frontend/generic_rewrite/blocks.rs)
+* [generic_rewrite/exprs.rs](../../tools/nuisc/src/frontend/generic_rewrite/exprs.rs)
+* [generic_rewrite/hoists.rs](../../tools/nuisc/src/frontend/generic_rewrite/hoists.rs)
 
 For the current `0.17.0` line, that subsystem should be read like this:
 
@@ -176,7 +176,7 @@ This is the important new closure claim:
 `generic recursive async bodies with payload-alias higher-order lambdas are now part of the checked-in frontend story`
 
 The newest anchor for that claim is
-[tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs#L530).
+[tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs#L530).
 
 ## What Already Feels “Internalized”
 
@@ -212,8 +212,8 @@ specific helper-mediated cross-domain closures as checked-in truths:
 
 Current checked-in anchors:
 
-* [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
-* [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
+* [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+* [multidomain_async.rs](../../tools/nuisc/src/project/tests/multidomain_async.rs)
 
 For `shader`, the current practical reading order is now much clearer than it
 was earlier in the line:
@@ -269,7 +269,7 @@ Short rule:
 When a route fails, the shortest truthful reading drill is now:
 
 1. check whether the failure happens before or after
-   [lower_project_ast_to_nir](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/mod.rs#L157)
+   [lower_project_ast_to_nir](../../tools/nuisc/src/frontend/mod.rs#L157)
    completes
 2. if it is frontend-shaped, ask which stage owns it:
    lambda, higher-order, generic rewrite, match normalization, async context,
@@ -303,22 +303,22 @@ frontend generics + higher-order probes
 Current anchor families:
 
 * frontend generics:
-  [tests_generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generics.rs)
+  [tests_generics.rs](../../tools/nuisc/src/frontend/tests_generics.rs)
 * frontend higher-order:
-  [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
+  [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
 * frontend generic constraints:
-  [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
+  [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
 * frontend control flow:
-  [tests_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_control_flow.rs)
+  [tests_control_flow.rs](../../tools/nuisc/src/frontend/tests_control_flow.rs)
 * lowering async/runtime:
-  [tests_async_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_runtime.rs)
+  [tests_async_runtime.rs](../../tools/nuisc/src/lowering/tests_async_runtime.rs)
 * project compile anchors:
-  [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs),
-  [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs),
-  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+  [task_compile.rs](../../tools/nuisc/tests/task_compile.rs),
+  [network_compile.rs](../../tools/nuisc/tests/network_compile.rs),
+  [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 * project integration probes:
-  [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs),
-  [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
+  [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs),
+  [multidomain_async.rs](../../tools/nuisc/src/project/tests/multidomain_async.rs)
 
 Inside `shader_nova_contracts`, the current line now keeps these checked-in
 project truths honest:
@@ -340,7 +340,7 @@ Short rule:
 ## CLI Workflow Still Inherits `0.16.0`
 
 The operational command route remains the same default path introduced in
-[nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md):
+[nuis-0.16.0-compile-workflow.md](nuis-0.16.0-compile-workflow.md):
 
 ```text
 project-doctor -> check -> test -> build -> verify-build-manifest -> release-check

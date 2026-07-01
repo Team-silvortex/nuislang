@@ -9,13 +9,13 @@ shapes that would be too repetitive to keep duplicating in each async demo.
 
 Current shared helpers:
 
-* [shader_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/shader_task_async_shapes.ns)
+* [shader_task_async_shapes.ns](shader_task_async_shapes.ns)
   task-shaped async control helpers reused by shader async policy/fallback
   companions
-* [kernel_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/kernel_task_async_shapes.ns)
+* [kernel_task_async_shapes.ns](kernel_task_async_shapes.ns)
   task-shaped async control helpers reused by kernel async tensor
   policy/fallback companions
-* [network_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/network_task_async_shapes.ns)
+* [network_task_async_shapes.ns](network_task_async_shapes.ns)
   task-shaped async session/policy/fallback/batch/windowed and result
   policy/batch/windowed/bridge helpers reused by network companions
 
@@ -28,10 +28,10 @@ Current stable helper reading rule:
 Current reading rule:
 
 * start with the domain project route in
-  [README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md)
+  [README.md](../../../../examples/projects/domains/README.md)
 * use this folder when you want to see where shared task-shaped naming and
   helper logic are actually factored out
 * use
-  [std-shader-kernel-project-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-shader-kernel-project-contract.md)
+  [std-shader-kernel-project-contract.md](../../../../docs/reference/std-shader-kernel-project-contract.md)
   when you want the higher-level contract that explains why these helpers live
   here instead of under `std`

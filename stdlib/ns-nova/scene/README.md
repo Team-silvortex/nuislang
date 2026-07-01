@@ -18,10 +18,10 @@ but it is the natural next step after the current UI + render-skeleton work.
 
 Current source anchor:
 
-* [scene_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/scene_runtime.ns)
-* [efficiency_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/efficiency_runtime.ns)
-* [scene_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/scene_blueprint.ns)
-* [window_controls_scene_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/window_controls_scene_recipe.ns)
+* [scene_runtime.ns](scene_runtime.ns)
+* [efficiency_runtime.ns](efficiency_runtime.ns)
+* [scene_blueprint.ns](scene_blueprint.ns)
+* [window_controls_scene_recipe.ns](window_controls_scene_recipe.ns)
 
 This first scene-side source module keeps to the more stable packet/state surface:
 scene, camera, material, light, mesh, transform, node, visibility, cull, lod, streaming,

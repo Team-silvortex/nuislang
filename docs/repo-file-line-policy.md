@@ -11,7 +11,7 @@ The repository now follows a simple file-size rule:
 
 This rule is enforced by:
 
-* [tools/nuisc/tests/file_line_limit.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/file_line_limit.rs)
+* [tools/nuisc/tests/file_line_limit.rs](../tools/nuisc/tests/file_line_limit.rs)
 
 ## Why This Exists
 
@@ -31,7 +31,7 @@ The goal is:
 There are still legacy files above the `600` line default.
 
 Those files are tracked in an explicit exception budget table inside
-[tools/nuisc/tests/file_line_limit.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/file_line_limit.rs).
+[tools/nuisc/tests/file_line_limit.rs](../tools/nuisc/tests/file_line_limit.rs).
 
 Important rule:
 

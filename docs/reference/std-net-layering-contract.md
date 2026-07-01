@@ -4,7 +4,7 @@ This file captures the current contract for the first thin `std net` facade
 over the `official.network` domain.
 
 It sits below
-[network-profile-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-profile-contract.md):
+[network-profile-contract.md](network-profile-contract.md):
 that file describes the domain-owned truth, while this file describes how the
 checked-in `std` layer is expected to read and compose that truth.
 
@@ -52,7 +52,7 @@ The practical current rule is:
 * the recipe surfaces are intentionally narrow and do not yet claim a finished
   socket API
 * shared reusable status/window/session helper functions should live in
-  [StdNetContracts](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/net_contracts.ns)
+  [StdNetContracts](../../stdlib/std/lib/net_contracts.ns)
   rather than being redefined in every recipe
 * repository-stage validation still runs through companion project demos rather
   than a frozen standalone stdlib test harness
@@ -62,7 +62,7 @@ The practical current rule is:
 Use the dedicated router for the full grouped source list and the grouped
 companion validation route:
 
-* [stdlib/std/network/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/network/README.md)
+* [stdlib/std/network/README.md](../../stdlib/std/network/README.md)
 
 That router now owns:
 
@@ -120,9 +120,9 @@ The practical rule is:
 
 If you want the shortest pass:
 
-1. start with [net_endpoint_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_endpoint_recipe.ns)
+1. start with [net_endpoint_recipe.ns](../../stdlib/std/net_endpoint_recipe.ns)
 2. follow the grouped lane in
-   [stdlib/std/network/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/network/README.md)
+   [stdlib/std/network/README.md](../../stdlib/std/network/README.md)
 3. validate with the matching `examples/projects/domains/*_demo`
 
 ## Current Non-Goals

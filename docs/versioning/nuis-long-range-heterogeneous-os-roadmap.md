@@ -93,9 +93,9 @@ Likely responsibility areas:
 
 This should stay aligned with current binary and lifecycle docs:
 
-* [../reference/nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
-* [../reference/nuis-aot-lifecycle-loop-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-aot-lifecycle-loop-sketch.md)
-* [../reference/nuis-launcher-container-linker-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-launcher-container-linker-sketch.md)
+* [../reference/nuis-binary-format-protocol.md](../../docs/reference/nuis-binary-format-protocol.md)
+* [../reference/nuis-aot-lifecycle-loop-sketch.md](../../docs/reference/nuis-aot-lifecycle-loop-sketch.md)
+* [../reference/nuis-launcher-container-linker-sketch.md](../../docs/reference/nuis-launcher-container-linker-sketch.md)
 
 ## Hardware Paradigm Direction
 

@@ -67,9 +67,9 @@ The current rule of thumb is:
 
 This is now visible in the current checked-in state project anchors:
 
-* [generic_payload_alias_method_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo)
-* [generic_callable_forwarding_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo)
-* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+* [generic_payload_alias_method_hof_demo](../../examples/projects/state/generic_payload_alias_method_hof_demo)
+* [generic_callable_forwarding_hof_demo](../../examples/projects/state/generic_callable_forwarding_hof_demo)
+* [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 That is still not a claim that callable values are a fully general first-class
 surface.
@@ -94,11 +94,11 @@ The current rule of thumb is:
 
 This is now visible in the current checked-in state project anchors:
 
-* [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
-* [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
-* [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
-* [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
-* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+* [flow_branching_while_demo](../../examples/projects/state/flow_branching_while_demo)
+* [post_flow_branching_while_demo](../../examples/projects/state/post_flow_branching_while_demo)
+* [post_flow_branching_continuing_while_demo](../../examples/projects/state/post_flow_branching_continuing_while_demo)
+* [tail_recursive_branching_cross_carry_demo](../../examples/projects/state/tail_recursive_branching_cross_carry_demo)
+* [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 That is still not a claim that every loop/control form has equal project-level
 coverage.
@@ -128,12 +128,12 @@ The current rule of thumb is:
 
 This is already visible in the current `std` surface:
 
-* [net_http_client_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_recipe.ns)
-* [net_http_client_session_async_loop_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_async_loop_recipe.ns)
-* [net_http_service_lane_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_service_lane_recipe.ns)
-* [net_httpish_client_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_client_session_packet_recipe.ns)
-* [net_httpish_service_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_service_session_packet_recipe.ns)
-* [net_httpish_header_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_session_recipe.ns)
+* [net_http_client_session_recipe.ns](../../stdlib/std/net_http_client_session_recipe.ns)
+* [net_http_client_session_async_loop_recipe.ns](../../stdlib/std/net_http_client_session_async_loop_recipe.ns)
+* [net_http_service_lane_recipe.ns](../../stdlib/std/net_http_service_lane_recipe.ns)
+* [net_httpish_client_session_packet_recipe.ns](../../stdlib/std/net_httpish_client_session_packet_recipe.ns)
+* [net_httpish_service_session_packet_recipe.ns](../../stdlib/std/net_httpish_service_session_packet_recipe.ns)
+* [net_httpish_header_session_recipe.ns](../../stdlib/std/net_httpish_header_session_recipe.ns)
 
 That is still not a final public API story, but it is a real mainline
 stabilization step: new network examples now have a clearer default shape to
@@ -153,13 +153,13 @@ Even if `0.17.0` goes well, it should still avoid claiming more than is true:
 
 For the `0.17.0` line, the shortest route should be:
 
-1. [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
-2. [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-3. [nuis-0.17.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-goals.md)
-4. [nuis-0.17.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-snapshot.md)
-5. [nuis-0.17.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-release-checklist.md)
-6. [nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
-7. [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
+1. [README.md](../../README.md)
+2. [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
+3. [nuis-0.17.0-mainline-goals.md](nuis-0.17.0-mainline-goals.md)
+4. [nuis-0.17.0-snapshot.md](nuis-0.17.0-snapshot.md)
+5. [nuis-0.17.0-release-checklist.md](nuis-0.17.0-release-checklist.md)
+6. [nuis-0.16.0-compile-workflow.md](nuis-0.16.0-compile-workflow.md)
+7. [nuis-0.16.0-generic-surface-audit.md](nuis-0.16.0-generic-surface-audit.md)
 
 ## Rule Of Thumb
 

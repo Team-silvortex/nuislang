@@ -11,22 +11,22 @@ Do not use it as the only source for current implementation truth.
 
 For "what is true in checked-in code today?", prefer:
 
-* [../reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [../reference/cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
+* [../reference/yir-langref.md](../../docs/reference/yir-langref.md)
+* [../reference/cpu-task-glm-contract.md](../../docs/reference/cpu-task-glm-contract.md)
 * current verifier / `yir-core` / lowering behavior in the repository
 
 ## Reading Order
 
 Start here:
 
-* [glm-heterogeneous-flow-graph-positioning.md](/Users/Shared/chroot/dev/nuislang/docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md)
-* [vulpoya-yir-secondary-review-positioning.md](/Users/Shared/chroot/dev/nuislang/docs/glm-spec/vulpoya-yir-secondary-review-positioning.md)
+* [glm-heterogeneous-flow-graph-positioning.md](glm-heterogeneous-flow-graph-positioning.md)
+* [vulpoya-yir-secondary-review-positioning.md](vulpoya-yir-secondary-review-positioning.md)
 
 Then cross-check against implementation-facing references:
 
-* [../reference/nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
-* [../reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [../reference/cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
+* [../reference/nir-memory-model.md](../../docs/reference/nir-memory-model.md)
+* [../reference/yir-langref.md](../../docs/reference/yir-langref.md)
+* [../reference/cpu-task-glm-contract.md](../../docs/reference/cpu-task-glm-contract.md)
 
 ## Boundary
 

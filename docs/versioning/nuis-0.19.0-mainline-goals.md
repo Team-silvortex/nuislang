@@ -66,13 +66,13 @@ The goal is to make the current gate story easier to trust and rename cleanly:
   `state`, `task`, `memory`, `shader`, `network`
 * frontend regression ownership should be easier to place without reading the
   whole test tree by hand:
-  [versioning/nuis-0.19.0-frontend-test-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-test-map.md)
+  [versioning/nuis-0.19.0-frontend-test-map.md](nuis-0.19.0-frontend-test-map.md)
 * frontend capability combinations should be easier to restate without
   reconstructing them from scattered tests:
-  [versioning/nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
+  [versioning/nuis-0.19.0-frontend-capability-matrix.md](nuis-0.19.0-frontend-capability-matrix.md)
 * workflow/frontdoor/mainline compile combinations should be easier to restate
   without reconstructing them from separate command docs:
-  [versioning/nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
+  [versioning/nuis-0.19.0-workflow-capability-matrix.md](nuis-0.19.0-workflow-capability-matrix.md)
 
 Short rule:
 

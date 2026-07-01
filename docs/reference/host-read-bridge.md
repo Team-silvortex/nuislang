@@ -21,7 +21,7 @@ The second surface is what users can write against today in `.ns` source.
 
 Current canonical source:
 
-* [model.rs](/Users/Shared/chroot/dev/nuislang/crates/nuis-semantics/src/model.rs)
+* [model.rs](../../crates/nuis-semantics/src/model.rs)
 
 Current `HostReadOnly` examples include:
 
@@ -63,10 +63,10 @@ The current clock story is intentionally split:
   * classified as `HostReadOnly`
   * grouped under `ClockTick`
 * staging global-clock bridge:
-  * [clock_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_runtime.ns)
-  * [clock_domain_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime.ns)
-  * [clock_test_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_test_recipe.ns)
-  * [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
+  * [clock_runtime.ns](../../stdlib/std/clock_runtime.ns)
+  * [clock_domain_runtime.ns](../../stdlib/std/clock_domain_runtime.ns)
+  * [clock_test_recipe.ns](../../stdlib/std/clock_test_recipe.ns)
+  * [hello_clock_test_facades.ns](../../examples/ns/ffi/hello_clock_test_facades.ns)
   * `nuis test` runner metadata such as `declared_clock_domain` and
     `resolved_clock_domain`
   * compiler-aware timing bridge names such as:
@@ -94,7 +94,7 @@ classifies the current `cpu_bind_core(...)` usage as either `host_main_lane` or
 
 Current practical source layer:
 
-* [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* [stdlib/std/README.md](../../stdlib/std/README.md)
 
 Many `std` modules still work by declaring explicit host functions such as:
 
@@ -111,7 +111,7 @@ FFI function is a safe read-only probe.
 
 One concrete current example is the bootstrap `network` control bridge:
 
-* [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo)
+* [network_host_control_runtime_demo](../../examples/projects/domains/network_host_control_runtime_demo)
 
 That sample lowers `host_network_connect_probe(...)`,
 `host_network_accept_probe(...)`, and `host_network_close(...)` through

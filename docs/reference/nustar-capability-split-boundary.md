@@ -42,10 +42,10 @@ for stable package-facing facts such as:
 
 Current practical entrypoints:
 
-* [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
-* [annotation-intrinsic-stdlib-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/annotation-intrinsic-stdlib-sketch.md)
-* [nustar-abi-grain-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nustar-abi-grain-sketch.md)
-* [nustar-packages](/Users/Shared/chroot/dev/nuislang/nustar-packages)
+* [yir-tools-reference.md](yir-tools-reference.md)
+* [annotation-intrinsic-stdlib-sketch.md](annotation-intrinsic-stdlib-sketch.md)
+* [nustar-abi-grain-sketch.md](nustar-abi-grain-sketch.md)
+* [nustar-packages](../../nustar-packages)
 
 Short rule:
 

@@ -11,9 +11,9 @@ Current state:
 
 Use these first:
 
-* [../reference/yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
-* [../reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [../reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+* [../reference/yir-reference.md](../../docs/reference/yir-reference.md)
+* [../reference/yir-langref.md](../../docs/reference/yir-langref.md)
+* [../reference/yir-tools-reference.md](../../docs/reference/yir-tools-reference.md)
 
 This folder should only become the primary spec location once the repo is ready
 to freeze a more formal `YIR` document set.

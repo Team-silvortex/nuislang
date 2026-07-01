@@ -39,16 +39,16 @@ Source patterns that now exist:
 
 First source modules:
 
-* [basic_scalars.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/basic_scalars.ns)
-* [struct_patterns.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/struct_patterns.ns)
-* [math_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/math_runtime.ns)
-* [ref_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/ref_runtime.ns)
-* [value_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/value_blueprint.ns)
-* [result_patterns.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/result_patterns.ns)
+* [basic_scalars.ns](basic_scalars.ns)
+* [struct_patterns.ns](struct_patterns.ns)
+* [math_runtime.ns](math_runtime.ns)
+* [ref_runtime.ns](ref_runtime.ns)
+* [value_blueprint.ns](value_blueprint.ns)
+* [result_patterns.ns](result_patterns.ns)
 
 First auto-injectable library module:
 
-* [lib/prelude_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/lib/prelude_contracts.ns)
+* [lib/prelude_contracts.ns](lib/prelude_contracts.ns)
   exposes the initial `CorePrelude` helper surface for stdlib galaxy injection
 
 What is not true yet:
@@ -58,4 +58,4 @@ What is not true yet:
 
 See metadata:
 
-* [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/core/module.toml)
+* [module.toml](module.toml)

@@ -287,7 +287,10 @@ size_bytes = 1234
 `nsld verify-container` re-computes the container shell and payload blob. It
 fails if either file is missing, if the metadata content differs, or if
 `section_count`, `container_layout_hash`, `payload_size_bytes`, `payload_hash`,
-or `container_hash` no longer match.
+or `container_hash` no longer match. It also checks each section's
+`offset` / `size_bytes` range against that section's `payload_hash`, so a
+corrupted payload segment can be reported without waiting for later relocation
+or final native linking.
 
 ## Linker Check
 

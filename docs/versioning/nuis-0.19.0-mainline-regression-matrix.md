@@ -8,10 +8,10 @@ It exists to answer one practical question:
 
 Use it together with:
 
-* [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
-* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-* [nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
-* [nuis-0.19.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-release-checklist.md)
+* [nuis-0.19.0-mainline-goals.md](nuis-0.19.0-mainline-goals.md)
+* [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+* [nuis-0.19.0-project-capability-matrix.md](nuis-0.19.0-project-capability-matrix.md)
+* [nuis-0.19.0-release-checklist.md](nuis-0.19.0-release-checklist.md)
 
 ## Reading Rule
 
@@ -63,7 +63,7 @@ bash scripts/check-0.19-release.sh
 Primary family:
 
 * `core`:
-  [tests_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_control_flow.rs)
+  [tests_control_flow.rs](../../tools/nuisc/src/frontend/tests_control_flow.rs)
 
 Recommended command:
 
@@ -76,7 +76,7 @@ cargo test -q -p nuisc tests_control_flow
 Primary family:
 
 * `core`:
-  [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
+  [tests_branch_helpers.rs](../../tools/nuisc/src/lowering/tests_branch_helpers.rs)
 
 Recommended command:
 
@@ -100,9 +100,9 @@ Current boundary defended here:
 Primary families:
 
 * `core`:
-  [tests_loop_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_flow.rs)
+  [tests_loop_flow.rs](../../tools/nuisc/src/lowering/tests_loop_flow.rs)
 * `core`:
-  [tests_loop_post_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_post_flow.rs)
+  [tests_loop_post_flow.rs](../../tools/nuisc/src/lowering/tests_loop_post_flow.rs)
 
 Recommended commands:
 
@@ -116,7 +116,7 @@ cargo test -q -p nuisc tests_loop_post_flow
 Primary family:
 
 * `core`:
-  [tests_generic_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
+  [tests_generic_method_bounds.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
 
 Recommended command:
 
@@ -129,7 +129,7 @@ cargo test -q -p nuisc generic_method_bounds
 Primary family:
 
 * `anchor`:
-  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+  [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 Recommended command:
 
@@ -142,9 +142,9 @@ cargo test -q -p nuisc --test state_compile
 Primary family:
 
 * `anchor`:
-  [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+  [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 * current staged thread/lock project sample:
-  [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo)
+  [task_thread_mutex_demo](../../examples/projects/task/task_thread_mutex_demo)
 
 Recommended command:
 
@@ -170,7 +170,7 @@ smoke executes successfully through the staged AOT thread/lock path.
 Primary family:
 
 * `anchor`:
-  [memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+  [memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
 
 Recommended command:
 
@@ -183,7 +183,7 @@ cargo test -q -p nuisc --test memory_compile
 Primary family:
 
 * `anchor`:
-  [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+  [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
 
 Recommended command:
 
@@ -196,7 +196,7 @@ cargo test -q -p nuisc shader_nova_contracts
 Primary family:
 
 * `anchor`:
-  [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+  [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 Recommended command:
 
@@ -209,11 +209,11 @@ cargo test -q -p nuisc --test network_compile
 Primary families:
 
 * `core`:
-  [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
+  [multidomain_async.rs](../../tools/nuisc/src/project/tests/multidomain_async.rs)
 * `core`:
-  [tests_async_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_runtime.rs)
+  [tests_async_runtime.rs](../../tools/nuisc/src/lowering/tests_async_runtime.rs)
 * `core`:
-  [tests_async_network_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_network_runtime.rs)
+  [tests_async_network_runtime.rs](../../tools/nuisc/src/lowering/tests_async_network_runtime.rs)
 
 Recommended commands:
 

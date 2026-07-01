@@ -14,20 +14,20 @@ like the mainline-closure line it claims to be.
 
 ## Documentation
 
-* [ ] confirm [nuis-0.18.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-snapshot.md)
+* [ ] confirm [nuis-0.18.0-snapshot.md](nuis-0.18.0-snapshot.md)
   still matches the checked-in repository truth
-* [ ] confirm [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
+* [ ] confirm [nuis-0.18.0-mainline-goals.md](nuis-0.18.0-mainline-goals.md)
   still describes the actual current push
-* [ ] confirm [nuis-0.18.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-compile-workflow.md)
+* [ ] confirm [nuis-0.18.0-compile-workflow.md](nuis-0.18.0-compile-workflow.md)
   still matches the real frontend/project/lowering story and the current CLI
   frontdoor family
-* [ ] confirm [nuis-0.18.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-regression-matrix.md)
+* [ ] confirm [nuis-0.18.0-mainline-regression-matrix.md](nuis-0.18.0-mainline-regression-matrix.md)
   still matches the practical release gate
-* [ ] confirm [nuis-0.18.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-pointer-mainline.md)
+* [ ] confirm [nuis-0.18.0-address-pointer-mainline.md](nuis-0.18.0-address-pointer-mainline.md)
   still matches the honest current pointer/address story
-* [ ] confirm [README.md](/Users/Shared/chroot/dev/nuislang/README.md),
-  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md),
-  and [docs/versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md)
+* [ ] confirm [README.md](../../README.md),
+  [docs/current-mainline-map.md](../../docs/current-mainline-map.md),
+  and [docs/versioning/README.md](README.md)
   all point at the correct current anchors
 
 ## Toolchain And Validation

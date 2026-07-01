@@ -9,10 +9,10 @@ It answers one practical question:
 
 Read this together with:
 
-* [nuis-0.20.0-generic-validation-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
-* [nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
-* [nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
-* [../reference/control-flow-lowering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/control-flow-lowering-contract.md)
+* [nuis-0.20.0-generic-validation-regression-matrix.md](nuis-0.20.0-generic-validation-regression-matrix.md)
+* [nuis-0.20.0-branch-runtime-lowering-matrix.md](nuis-0.20.0-branch-runtime-lowering-matrix.md)
+* [nuis-0.20.0-compile-gap-checklist.md](nuis-0.20.0-compile-gap-checklist.md)
+* [../reference/control-flow-lowering-contract.md](../../docs/reference/control-flow-lowering-contract.md)
 
 ## Short Rule
 
@@ -39,7 +39,7 @@ Short rule:
 
 Primary file:
 
-* [tests_generic_structs.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_structs.rs)
+* [tests_generic_structs.rs](../../tools/nuisc/src/frontend/tests_generic_structs.rs)
 
 Current responsibility:
 
@@ -200,7 +200,7 @@ When a new receiver-generic regression appears, use this order:
    specialization, field-chain propagation, async/task wrapping, or
    branch-local error routing
 2. place the regression in
-   [tests_generic_structs.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_structs.rs)
+   [tests_generic_structs.rs](../../tools/nuisc/src/frontend/tests_generic_structs.rs)
    if the issue is still fundamentally a frontend receiver-shape problem
 3. only move it to a broader task/network/project regression family when the
    primary failure is no longer receiver specialization itself

@@ -18,7 +18,7 @@ Optimization must not invent memory or runtime semantics.
 Today that means:
 
 * ownership/lifetime correctness remains owned by
-  [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+  [nir-memory-model.md](nir-memory-model.md)
 * optimizations should prefer expression-local and function-local rewrites
 * dead-code cleanup must stay away from effectful expressions unless there is an
   explicit contract allowing it
@@ -59,16 +59,16 @@ Today that means:
 
 Current implementation source:
 
-* [model.rs](/Users/Shared/chroot/dev/nuislang/crates/nuis-semantics/src/model.rs)
+* [model.rs](../../crates/nuis-semantics/src/model.rs)
   via `nir_expr_effect_class(...)`
-* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
+* [host-read-bridge.md](host-read-bridge.md)
   for the narrower host-facing bridge names such as `clock_tick`,
   `host_main_lane`, and `worker_lane`
 
 ## What Current Passes Are Allowed To Do
 
 The current optimizer path in
-[optimize.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/optimize.rs)
+[optimize.rs](../../tools/nuisc/src/optimize.rs)
 is allowed to:
 
 * fold constant integer arithmetic

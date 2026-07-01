@@ -31,26 +31,26 @@ Relationship:
 Current source-asset status:
 
 * `WitSage` is a checked-in stdlib package skeleton through
-  [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/module.toml)
+  [module.toml](module.toml)
 * the first auto-injectable helper surface is
-  [lib/ml_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/lib/ml_contracts.ns)
+  [lib/ml_contracts.ns](lib/ml_contracts.ns)
 * `WitSage` now also exposes a kernel-facing auto-injectable surface through
-  [lib/kernel_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/lib/kernel_surface.ns),
+  [lib/kernel_surface.ns](lib/kernel_surface.ns),
   giving projects a stdlib-owned `WitSageKernelSurface` profile instead of
   requiring every example to carry a local `KernelUnit`
 * the first canonical source assets are
-  [core/dataset_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/dataset_recipe.ns),
-  [core/feature_stats_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/feature_stats_recipe.ns),
-  [core/normalization_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/normalization_recipe.ns),
-  [core/train_test_split_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/train_test_split_recipe.ns),
-  [core/linear_score_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/linear_score_recipe.ns),
-  [core/kmeans_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/kmeans_recipe.ns),
-  [core/knn_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/knn_recipe.ns),
-  [core/kernel_plan_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/kernel_plan_recipe.ns),
-  [core/confusion_matrix_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/confusion_matrix_recipe.ns),
-  [core/evaluation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/evaluation_recipe.ns),
+  [core/dataset_recipe.ns](core/dataset_recipe.ns),
+  [core/feature_stats_recipe.ns](core/feature_stats_recipe.ns),
+  [core/normalization_recipe.ns](core/normalization_recipe.ns),
+  [core/train_test_split_recipe.ns](core/train_test_split_recipe.ns),
+  [core/linear_score_recipe.ns](core/linear_score_recipe.ns),
+  [core/kmeans_recipe.ns](core/kmeans_recipe.ns),
+  [core/knn_recipe.ns](core/knn_recipe.ns),
+  [core/kernel_plan_recipe.ns](core/kernel_plan_recipe.ns),
+  [core/confusion_matrix_recipe.ns](core/confusion_matrix_recipe.ns),
+  [core/evaluation_recipe.ns](core/evaluation_recipe.ns),
   and
-  [core/pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/witsage/core/pipeline_recipe.ns)
+  [core/pipeline_recipe.ns](core/pipeline_recipe.ns)
 
 Current first responsibility:
 

@@ -50,9 +50,9 @@ So the current contract direction is:
 The registered bootstrap skeleton for `official.network` is:
 
 * package:
-  [network.toml](/Users/Shared/chroot/dev/nuislang/nustar-packages/network.toml)
+  [network.toml](../../nustar-packages/network.toml)
 * index entry:
-  [index.toml](/Users/Shared/chroot/dev/nuislang/nustar-packages/index.toml)
+  [index.toml](../../nustar-packages/index.toml)
 
 Current domain identity:
 
@@ -188,7 +188,7 @@ source extern "c" fn host_network_* ...
 
 The narrow checked-in sample for this is:
 
-* [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo)
+* [network_host_control_runtime_demo](../../examples/projects/domains/network_host_control_runtime_demo)
 
 If you inspect its `YIR`, you will currently see `cpu.extern_call_i64` nodes
 such as:
@@ -258,15 +258,15 @@ The current contract is still intentionally conservative:
 
 The first narrow checked-in transport sample for that bridge is:
 
-* [network_host_handle_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_demo)
-* [network_host_handle_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_transport_runtime_demo)
-* [network_host_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_transport_runtime_demo)
-* [network_host_open_surface_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_open_surface_runtime_demo)
+* [network_host_handle_runtime_demo](../../examples/projects/domains/network_host_handle_runtime_demo)
+* [network_host_handle_transport_runtime_demo](../../examples/projects/domains/network_host_handle_transport_runtime_demo)
+* [network_host_transport_runtime_demo](../../examples/projects/domains/network_host_transport_runtime_demo)
+* [network_host_open_surface_runtime_demo](../../examples/projects/domains/network_host_open_surface_runtime_demo)
 
 If the question is specifically "what should I run on a socket-enabled host to
 separate compile truth from runtime truth?", go straight to:
 
-* [network-runtime-host-validation.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-runtime-host-validation.md)
+* [network-runtime-host-validation.md](network-runtime-host-validation.md)
 
 The handle-facing sample currently reads:
 
@@ -299,7 +299,7 @@ The transport probe sample currently reads:
 
 The first narrow result-facing companion for those probes is:
 
-* [network_transport_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_demo)
+* [network_transport_result_demo](../../examples/projects/domains/network_transport_result_demo)
 
 That sample proves the current bridge can already be read as:
 
@@ -315,7 +315,7 @@ with stable observer-role variants:
 
 The next narrow orchestration companion is:
 
-* [network_transport_result_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_task_policy_demo)
+* [network_transport_result_task_policy_demo](../../examples/projects/domains/network_transport_result_task_policy_demo)
 
 It shows that those same transport-facing probes can already flow into:
 
@@ -326,7 +326,7 @@ It shows that those same transport-facing probes can already flow into:
 
 The next narrow split companion is:
 
-* [network_transport_result_policy_split_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_policy_split_demo)
+* [network_transport_result_policy_split_demo](../../examples/projects/domains/network_transport_result_policy_split_demo)
 
 It keeps the same transport-facing probes, but makes the split explicit:
 
@@ -353,7 +353,7 @@ sample hint for those classes through `scheduler_summary_samples`.
 
 The next narrow batch-split companion is:
 
-* [network_transport_result_batch_split_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_batch_split_demo)
+* [network_transport_result_batch_split_demo](../../examples/projects/domains/network_transport_result_batch_split_demo)
 
 It keeps the same three branches, but makes the fan-in shape more explicit as:
 
@@ -364,7 +364,7 @@ It keeps the same three branches, but makes the fan-in shape more explicit as:
 
 The next narrow windowed-split companion is:
 
-* [network_transport_result_windowed_split_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_windowed_split_demo)
+* [network_transport_result_windowed_split_demo](../../examples/projects/domains/network_transport_result_windowed_split_demo)
 
 It keeps the same three branches, but lets preview/final preserve branch
 identity as:
@@ -376,7 +376,7 @@ identity as:
 
 The next narrow fan-in companion is:
 
-* [network_transport_result_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_task_batch_demo)
+* [network_transport_result_task_batch_demo](../../examples/projects/domains/network_transport_result_task_batch_demo)
 
 It keeps the same narrow transport-facing inputs, but now collects them as:
 
@@ -387,7 +387,7 @@ It keeps the same narrow transport-facing inputs, but now collects them as:
 
 The next narrow windowed companion is:
 
-* [network_transport_result_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_task_windowed_batch_demo)
+* [network_transport_result_task_windowed_batch_demo](../../examples/projects/domains/network_transport_result_task_windowed_batch_demo)
 
 It keeps the same transport-facing inputs and shared helper layer, but now
 pushes them one step wider as:
@@ -398,7 +398,7 @@ pushes them one step wider as:
 
 The next narrow bridge companion is:
 
-* [network_transport_result_session_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_session_bridge_demo)
+* [network_transport_result_session_bridge_demo](../../examples/projects/domains/network_transport_result_session_bridge_demo)
 
 It keeps the same transport-facing probes and shared helper layer, but now
 lets the transport windowed summary meet the existing session/task side as:
@@ -409,7 +409,7 @@ lets the transport windowed summary meet the existing session/task side as:
 
 The next narrow bridge-split companion is:
 
-* [network_transport_result_session_bridge_split_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_session_bridge_split_demo)
+* [network_transport_result_session_bridge_split_demo](../../examples/projects/domains/network_transport_result_session_bridge_split_demo)
 
 It keeps the same transport-facing probes, but now lets branch identity reach
 the session side as:
@@ -460,7 +460,7 @@ use this rule:
 
 ## Related References
 
-* [network-profile-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-profile-contract.md)
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
-* [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
-* [std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
+* [network-profile-contract.md](network-profile-contract.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
+* [yir-tools-reference.md](yir-tools-reference.md)
+* [std-mainline-layering-contract.md](std-mainline-layering-contract.md)

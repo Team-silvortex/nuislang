@@ -12,10 +12,10 @@ Use it when the question is:
 
 Read it together with:
 
-* [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md)
-* [nuis-0.17.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-regression-matrix.md)
-* [../reference/std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
-* [../reference/network-domain-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-domain-contract.md)
+* [nuis-0.17.0-compile-workflow.md](nuis-0.17.0-compile-workflow.md)
+* [nuis-0.17.0-mainline-regression-matrix.md](nuis-0.17.0-mainline-regression-matrix.md)
+* [../reference/std-net-layering-contract.md](../../docs/reference/std-net-layering-contract.md)
+* [../reference/network-domain-contract.md](../../docs/reference/network-domain-contract.md)
 
 ## Reading Rule
 
@@ -49,17 +49,17 @@ What is solid now:
 
 Primary anchors:
 
-* [tests_async_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_runtime.rs)
-* [tail_recursion.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tail_recursion.rs)
-* [loop_preparation.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/loop_preparation.rs)
-* [loop_flow_nodes.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/loop_flow_nodes.rs)
-* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
-* [task_generic_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_recursive_async_demo)
-* [task_memory_session_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_policy_demo)
-* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
-* [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
-* [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
-* [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+* [tests_async_runtime.rs](../../tools/nuisc/src/lowering/tests_async_runtime.rs)
+* [tail_recursion.rs](../../tools/nuisc/src/lowering/tail_recursion.rs)
+* [loop_preparation.rs](../../tools/nuisc/src/lowering/loop_preparation.rs)
+* [loop_flow_nodes.rs](../../tools/nuisc/src/lowering/loop_flow_nodes.rs)
+* [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
+* [task_generic_recursive_async_demo](../../examples/projects/task/task_generic_recursive_async_demo)
+* [task_memory_session_policy_demo](../../examples/projects/task/task_memory_session_policy_demo)
+* [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
+* [flow_branching_while_demo](../../examples/projects/state/flow_branching_while_demo)
+* [post_flow_branching_while_demo](../../examples/projects/state/post_flow_branching_while_demo)
+* [post_flow_branching_continuing_while_demo](../../examples/projects/state/post_flow_branching_continuing_while_demo)
 
 Recommended command:
 
@@ -96,8 +96,8 @@ What is solid now:
 
 Primary anchors:
 
-* [tests_async_network_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_network_runtime.rs)
-* [network_exprs.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/network_exprs.rs)
+* [tests_async_network_runtime.rs](../../tools/nuisc/src/lowering/tests_async_network_runtime.rs)
+* [network_exprs.rs](../../tools/nuisc/src/lowering/network_exprs.rs)
 
 Named proof:
 
@@ -118,7 +118,7 @@ What is solid now:
 
 Primary anchors:
 
-* [tests_async_network_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_network_runtime.rs)
+* [tests_async_network_runtime.rs](../../tools/nuisc/src/lowering/tests_async_network_runtime.rs)
 
 Named proof:
 
@@ -139,8 +139,8 @@ What is solid now:
 
 Primary anchors:
 
-* [tests_async_network_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_network_runtime.rs)
-* [tests_loop_post_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_post_flow.rs)
+* [tests_async_network_runtime.rs](../../tools/nuisc/src/lowering/tests_async_network_runtime.rs)
+* [tests_loop_post_flow.rs](../../tools/nuisc/src/lowering/tests_loop_post_flow.rs)
 
 Named proofs:
 
@@ -170,9 +170,9 @@ What is not being claimed yet:
 
 Primary anchor:
 
-* [tests_async_network_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_network_runtime.rs)
-* [net_http_session_loop_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
-* [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+* [tests_async_network_runtime.rs](../../tools/nuisc/src/lowering/tests_async_network_runtime.rs)
+* [net_http_session_loop_bridge_recipe_demo](../../examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
+* [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 Named proof:
 

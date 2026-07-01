@@ -41,13 +41,13 @@ Today that usually means:
 
 Examples:
 
-* [task_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime_recipe.ns)
-* [io_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_runtime_recipe.ns)
-* [host_text_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/host_text_runtime_recipe.ns)
-* [json_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/json_runtime_recipe.ns)
-* [window_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/window_runtime_recipe.ns)
-* [pipe_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/pipe_runtime_recipe.ns)
-* [fabric_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/fabric_runtime_recipe.ns)
+* [task_runtime_recipe.ns](../../stdlib/std/task_runtime_recipe.ns)
+* [io_runtime_recipe.ns](../../stdlib/std/io_runtime_recipe.ns)
+* [host_text_runtime_recipe.ns](../../stdlib/std/host_text_runtime_recipe.ns)
+* [json_runtime_recipe.ns](../../stdlib/std/json_runtime_recipe.ns)
+* [window_runtime_recipe.ns](../../stdlib/std/window_runtime_recipe.ns)
+* [pipe_runtime_recipe.ns](../../stdlib/std/pipe_runtime_recipe.ns)
+* [fabric_runtime_recipe.ns](../../stdlib/std/fabric_runtime_recipe.ns)
 
 ## What The Composition Layer Is
 
@@ -56,13 +56,13 @@ surfaces into one practical route.
 
 Today that includes lanes such as:
 
-* [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
-* [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
-* [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
-* [text_json_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_json_recipe.ns)
-* [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
-* [directory_stat_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_stat_recipe.ns)
-* [window_fabric_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/window_fabric_recipe.ns)
+* [task_cli_recipe.ns](../../stdlib/std/task_cli_recipe.ns)
+* [input_runtime_recipe.ns](../../stdlib/std/input_runtime_recipe.ns)
+* [terminal_io_recipe.ns](../../stdlib/std/terminal_io_recipe.ns)
+* [text_json_recipe.ns](../../stdlib/std/text_json_recipe.ns)
+* [command_shell_recipe.ns](../../stdlib/std/command_shell_recipe.ns)
+* [directory_stat_recipe.ns](../../stdlib/std/directory_stat_recipe.ns)
+* [window_fabric_recipe.ns](../../stdlib/std/window_fabric_recipe.ns)
 
 The important current rule is:
 
@@ -87,18 +87,18 @@ task_runtime
 
 Concrete sources:
 
-* [task_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime_recipe.ns)
-* [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
-* [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
-* [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
-* [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
-* [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
-* [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
-* [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+* [task_runtime_recipe.ns](../../stdlib/std/task_runtime_recipe.ns)
+* [task_status_recipe.ns](../../stdlib/std/task_status_recipe.ns)
+* [task_value_recipe.ns](../../stdlib/std/task_value_recipe.ns)
+* [task_compare_recipe.ns](../../stdlib/std/task_compare_recipe.ns)
+* [task_lifecycle_recipe.ns](../../stdlib/std/task_lifecycle_recipe.ns)
+* [task_clock_recipe.ns](../../stdlib/std/task_clock_recipe.ns)
+* [task_scheduler_recipe.ns](../../stdlib/std/task_scheduler_recipe.ns)
+* [task_cli_recipe.ns](../../stdlib/std/task_cli_recipe.ns)
 
 Cluster contract:
 
-* [std-task-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-task-layering-contract.md)
+* [std-task-layering-contract.md](std-task-layering-contract.md)
 
 ### Host I/O
 
@@ -111,15 +111,15 @@ io
 
 Concrete sources:
 
-* [io_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_runtime_recipe.ns)
-* [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
-* [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
-* [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
-* [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
+* [io_runtime_recipe.ns](../../stdlib/std/io_runtime_recipe.ns)
+* [stdin_runtime_recipe.ns](../../stdlib/std/stdin_runtime_recipe.ns)
+* [tty_runtime_recipe.ns](../../stdlib/std/tty_runtime_recipe.ns)
+* [input_runtime_recipe.ns](../../stdlib/std/input_runtime_recipe.ns)
+* [terminal_io_recipe.ns](../../stdlib/std/terminal_io_recipe.ns)
 
 Cluster contract:
 
-* [std-host-io-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-host-io-layering-contract.md)
+* [std-host-io-layering-contract.md](std-host-io-layering-contract.md)
 
 ### Text / Data
 
@@ -135,13 +135,13 @@ host_text
 
 Concrete sources:
 
-* [host_text_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/host_text_runtime_recipe.ns)
-* [text_format_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_format_runtime_recipe.ns)
-* [json_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/json_runtime_recipe.ns)
-* [text_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_pipeline_recipe.ns)
-* [text_report_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_report_builder_recipe.ns)
-* [io_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_report_recipe.ns)
-* [text_json_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_json_recipe.ns)
+* [host_text_runtime_recipe.ns](../../stdlib/std/host_text_runtime_recipe.ns)
+* [text_format_runtime_recipe.ns](../../stdlib/std/text_format_runtime_recipe.ns)
+* [json_runtime_recipe.ns](../../stdlib/std/json_runtime_recipe.ns)
+* [text_pipeline_recipe.ns](../../stdlib/std/text_pipeline_recipe.ns)
+* [text_report_builder_recipe.ns](../../stdlib/std/text_report_builder_recipe.ns)
+* [io_report_recipe.ns](../../stdlib/std/io_report_recipe.ns)
+* [text_json_recipe.ns](../../stdlib/std/text_json_recipe.ns)
 
 ### Command / Tooling
 
@@ -153,13 +153,13 @@ command
 
 Concrete sources:
 
-* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-* [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
+* [command_runtime_recipe.ns](../../stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](../../stdlib/std/subprocess_runtime_recipe.ns)
+* [command_shell_recipe.ns](../../stdlib/std/command_shell_recipe.ns)
 
 Current forward contract:
 
-* [std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+* [std-tooling-workflow-contract.md](std-tooling-workflow-contract.md)
 
 ### Filesystem Metadata
 
@@ -172,10 +172,10 @@ fs_metadata
 
 Concrete sources:
 
-* [fs_metadata_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/fs_metadata_runtime_recipe.ns)
-* [directory_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_runtime_recipe.ns)
-* [stat_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stat_runtime_recipe.ns)
-* [directory_stat_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_stat_recipe.ns)
+* [fs_metadata_runtime_recipe.ns](../../stdlib/std/fs_metadata_runtime_recipe.ns)
+* [directory_runtime_recipe.ns](../../stdlib/std/directory_runtime_recipe.ns)
+* [stat_runtime_recipe.ns](../../stdlib/std/stat_runtime_recipe.ns)
+* [directory_stat_recipe.ns](../../stdlib/std/directory_stat_recipe.ns)
 
 ### Filesystem I/O And Reports
 
@@ -189,27 +189,27 @@ file_read / file_write / file_copy / file_roundtrip
 
 Concrete sources:
 
-* [file_read_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_read_recipe.ns)
-* [file_write_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_write_recipe.ns)
-* [file_copy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_copy_recipe.ns)
-* [file_roundtrip_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_roundtrip_recipe.ns)
-* [file_output_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_output_recipe.ns)
-* [filesystem_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_report_recipe.ns)
-* [filesystem_io_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_io_report_recipe.ns)
-* [filesystem_report_file_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_report_file_recipe.ns)
+* [file_read_recipe.ns](../../stdlib/std/file_read_recipe.ns)
+* [file_write_recipe.ns](../../stdlib/std/file_write_recipe.ns)
+* [file_copy_recipe.ns](../../stdlib/std/file_copy_recipe.ns)
+* [file_roundtrip_recipe.ns](../../stdlib/std/file_roundtrip_recipe.ns)
+* [file_output_recipe.ns](../../stdlib/std/file_output_recipe.ns)
+* [filesystem_report_recipe.ns](../../stdlib/std/filesystem_report_recipe.ns)
+* [filesystem_io_report_recipe.ns](../../stdlib/std/filesystem_io_report_recipe.ns)
+* [filesystem_report_file_recipe.ns](../../stdlib/std/filesystem_report_file_recipe.ns)
 
 Current project proof route:
 
-* [file_read_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo)
-* [file_write_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo)
-* [file_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo)
-* [file_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_roundtrip_demo)
-* [file_output_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_output_demo)
-* [directory_create_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_create_demo)
-* [directory_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_remove_demo)
-* [filesystem_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_demo)
-* [filesystem_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_file_demo)
-* [filesystem_io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/filesystem_io_report_demo)
+* [file_read_demo](../../examples/projects/filesystem/file_read_demo)
+* [file_write_demo](../../examples/projects/filesystem/file_write_demo)
+* [file_copy_demo](../../examples/projects/filesystem/file_copy_demo)
+* [file_roundtrip_demo](../../examples/projects/filesystem/file_roundtrip_demo)
+* [file_output_demo](../../examples/projects/filesystem/file_output_demo)
+* [directory_create_demo](../../examples/projects/filesystem/directory_create_demo)
+* [directory_remove_demo](../../examples/projects/filesystem/directory_remove_demo)
+* [filesystem_report_demo](../../examples/projects/filesystem/filesystem_report_demo)
+* [filesystem_report_file_demo](../../examples/projects/filesystem/filesystem_report_file_demo)
+* [filesystem_io_report_demo](../../examples/projects/tooling/filesystem_io_report_demo)
 
 Current contract rule:
 
@@ -232,15 +232,15 @@ window
 
 Concrete sources:
 
-* [window_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/window_runtime_recipe.ns)
-* [pipe_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/pipe_runtime_recipe.ns)
-* [fabric_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/fabric_runtime_recipe.ns)
-* [handle_table_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/handle_table_runtime_recipe.ns)
-* [window_fabric_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/window_fabric_recipe.ns)
+* [window_runtime_recipe.ns](../../stdlib/std/window_runtime_recipe.ns)
+* [pipe_runtime_recipe.ns](../../stdlib/std/pipe_runtime_recipe.ns)
+* [fabric_runtime_recipe.ns](../../stdlib/std/fabric_runtime_recipe.ns)
+* [handle_table_runtime_recipe.ns](../../stdlib/std/handle_table_runtime_recipe.ns)
+* [window_fabric_recipe.ns](../../stdlib/std/window_fabric_recipe.ns)
 
 Cluster contract:
 
-* [std-data-window-fabric-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-data-window-fabric-layering-contract.md)
+* [std-data-window-fabric-layering-contract.md](std-data-window-fabric-layering-contract.md)
 
 ## What This Contract Does Not Promise
 
@@ -268,28 +268,28 @@ If you are reading the repository today:
 
 * use this contract to understand how the lanes stack
 * use the cluster-specific layering contracts when one lane needs more detail
-* use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* use [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
   for the shortest repo-level route
-* use [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* use [stdlib/std/README.md](../../stdlib/std/README.md)
   for local module inventory
 
 ## Related References
 
 Global index and route:
 
-* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
-* [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
+* [docs/reference/README.md](README.md)
+* [stdlib/std/README.md](../../stdlib/std/README.md)
 
 Cluster contracts:
 
-* [std-host-io-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-host-io-layering-contract.md)
-* [std-data-window-fabric-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-data-window-fabric-layering-contract.md)
-* [std-task-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-task-layering-contract.md)
+* [std-host-io-layering-contract.md](std-host-io-layering-contract.md)
+* [std-data-window-fabric-layering-contract.md](std-data-window-fabric-layering-contract.md)
+* [std-task-layering-contract.md](std-task-layering-contract.md)
 
 Semantic boundaries:
 
-* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
-* [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
-* [nir-optimization-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-optimization-contract.md)
+* [host-read-bridge.md](host-read-bridge.md)
+* [cpu-task-contract.md](cpu-task-contract.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
+* [nir-optimization-contract.md](nir-optimization-contract.md)

@@ -12,11 +12,11 @@ to list everything that exists, but to decide:
 
 Companion current-state matrix:
 
-* [versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
-* [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+* [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
+* [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 * predecessor context:
-  [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md),
-  [versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+  [versioning/nuis-0.19.0-project-capability-matrix.md](versioning/nuis-0.19.0-project-capability-matrix.md),
+  [versioning/nuis-alpha-0.0.1-closeout-board.md](versioning/nuis-alpha-0.0.1-closeout-board.md)
 
 Current policy:
 
@@ -212,33 +212,33 @@ Operational note:
 These should remain in the shortest-path docs.
 
 * top-level projects:
-  [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo),
-  [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+  [window_controls_demo](../examples/projects/window_controls_demo),
+  [kernel_tensor_demo](../examples/projects/kernel_tensor_demo)
 * task:
-  [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo),
-  [task_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_demo),
-  [task_result_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo),
-  [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo)
+  [task_runtime_demo](../examples/projects/task/task_runtime_demo),
+  [task_recursive_async_demo](../examples/projects/task/task_recursive_async_demo),
+  [task_result_policy_branch_demo](../examples/projects/task/task_result_policy_branch_demo),
+  [task_status_observe_demo](../examples/projects/task/task_status_observe_demo)
 * tooling:
-  [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo),
-  [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo),
-  [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
+  [cli_runtime_demo](../examples/projects/tooling/cli_runtime_demo),
+  [command_runtime_demo](../examples/projects/tooling/command_runtime_demo),
+  [workflow_runtime_demo](../examples/projects/tooling/workflow_runtime_demo)
 * filesystem:
-  [path_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_runtime_demo),
-  [file_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_runtime_demo),
-  [directory_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_runtime_demo)
+  [path_runtime_demo](../examples/projects/filesystem/path_runtime_demo),
+  [file_runtime_demo](../examples/projects/filesystem/file_runtime_demo),
+  [directory_runtime_demo](../examples/projects/filesystem/directory_runtime_demo)
 * domains:
-  [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo),
-  [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo),
-  [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo),
-  [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo)
+  [shader_profile_demo](../examples/projects/domains/shader_profile_demo),
+  [kernel_profile_demo](../examples/projects/domains/kernel_profile_demo),
+  [network_profile_demo](../examples/projects/domains/network_profile_demo),
+  [net_http_client_get_recipe_demo](../examples/projects/domains/net_http_client_get_recipe_demo)
 * source/YIR anchors:
-  [hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_world.ns),
-  [hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns),
-  [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns),
-  [hello_yir.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/hello_yir.yir),
-  [data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_fabric_demo.yir),
-  [kernel_tensor_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_tensor_demo.yir)
+  [hello_world.ns](../examples/ns/core/hello_world.ns),
+  [hello_ref_struct.ns](../examples/ns/types/hello_ref_struct.ns),
+  [hello_task_glm_value_path.ns](../examples/ns/memory/hello_task_glm_value_path.ns),
+  [hello_yir.yir](../examples/yir/demos/hello_yir.yir),
+  [data_fabric_demo.yir](../examples/yir/data/data_fabric_demo.yir),
+  [kernel_tensor_demo.yir](../examples/yir/kernel/kernel_tensor_demo.yir)
 
 ### Keep Companion
 
@@ -248,117 +248,117 @@ than as front-door reading.
 Current control-flow reading rule:
 
 * sync route first:
-  [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo) ->
-  [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo) ->
-  [flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo) ->
-  [post_flow_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo) ->
-  [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+  [chained_while_demo](../examples/projects/state/chained_while_demo) ->
+  [match_branching_while_demo](../examples/projects/state/match_branching_while_demo) ->
+  [flow_continuing_while_demo](../examples/projects/state/flow_continuing_while_demo) ->
+  [post_flow_breaking_while_demo](../examples/projects/state/post_flow_breaking_while_demo) ->
+  [post_flow_branching_continuing_while_demo](../examples/projects/state/post_flow_branching_continuing_while_demo)
 * async route next:
-  [task_async_observer_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_observer_bridge_demo) ->
-  [task_async_if_expression_positions_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_if_expression_positions_demo) ->
-  [task_async_await_match_operand_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_await_match_operand_demo) ->
-  [task_async_match_call_argument_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_match_call_argument_demo) ->
-  [task_async_struct_field_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_struct_field_match_demo) ->
-  [task_async_method_receiver_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_method_receiver_match_demo) ->
-  [task_async_helper_expanded_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_helper_expanded_match_demo) ->
-  [task_async_while_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo) ->
-  [task_async_while_post_flow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_demo) ->
-  [task_async_while_post_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo) ->
-  [task_async_while_post_flow_compound_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_compound_demo)
+  [task_async_observer_bridge_demo](../examples/projects/task/task_async_observer_bridge_demo) ->
+  [task_async_if_expression_positions_demo](../examples/projects/task/task_async_if_expression_positions_demo) ->
+  [task_async_await_match_operand_demo](../examples/projects/task/task_async_await_match_operand_demo) ->
+  [task_async_match_call_argument_demo](../examples/projects/task/task_async_match_call_argument_demo) ->
+  [task_async_struct_field_match_demo](../examples/projects/task/task_async_struct_field_match_demo) ->
+  [task_async_method_receiver_match_demo](../examples/projects/task/task_async_method_receiver_match_demo) ->
+  [task_async_helper_expanded_match_demo](../examples/projects/task/task_async_helper_expanded_match_demo) ->
+  [task_async_while_flow_cond_demo](../examples/projects/task/task_async_while_flow_cond_demo) ->
+  [task_async_while_post_flow_demo](../examples/projects/task/task_async_while_post_flow_demo) ->
+  [task_async_while_post_flow_cond_demo](../examples/projects/task/task_async_while_post_flow_cond_demo) ->
+  [task_async_while_post_flow_compound_demo](../examples/projects/task/task_async_while_post_flow_compound_demo)
 * generic route after that:
-  [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo) ->
-  [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo) ->
-  [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
+  [generic_method_bound_if_binding_demo](../examples/projects/state/generic_method_bound_if_binding_demo) ->
+  [generic_method_bound_nested_match_demo](../examples/projects/state/generic_method_bound_nested_match_demo) ->
+  [generic_method_bound_guarded_nested_match_demo](../examples/projects/state/generic_method_bound_guarded_nested_match_demo)
 
 * task recursion and specialization:
-  [task_mutual_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_mutual_recursive_async_demo),
-  [task_generic_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_recursive_async_demo),
-  [task_generic_mutual_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_mutual_recursive_async_demo),
-  [task_recursive_async_result_family_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_result_family_demo),
-  [task_recursive_async_payload_alias_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_payload_alias_hof_demo),
-  [task_async_observer_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_observer_bridge_demo),
-  [task_async_if_expression_positions_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_if_expression_positions_demo),
-  [task_async_await_match_operand_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_await_match_operand_demo),
-  [task_async_match_call_argument_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_match_call_argument_demo),
-  [task_async_struct_field_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_struct_field_match_demo),
-  [task_async_method_receiver_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_method_receiver_match_demo),
-  [task_async_helper_expanded_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_helper_expanded_match_demo),
-  [task_async_while_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo),
-  [task_async_while_post_flow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_demo),
-  [task_async_while_post_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo),
-  [task_async_while_post_flow_compound_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_compound_demo)
+  [task_mutual_recursive_async_demo](../examples/projects/task/task_mutual_recursive_async_demo),
+  [task_generic_recursive_async_demo](../examples/projects/task/task_generic_recursive_async_demo),
+  [task_generic_mutual_recursive_async_demo](../examples/projects/task/task_generic_mutual_recursive_async_demo),
+  [task_recursive_async_result_family_demo](../examples/projects/task/task_recursive_async_result_family_demo),
+  [task_recursive_async_payload_alias_hof_demo](../examples/projects/task/task_recursive_async_payload_alias_hof_demo),
+  [task_async_observer_bridge_demo](../examples/projects/task/task_async_observer_bridge_demo),
+  [task_async_if_expression_positions_demo](../examples/projects/task/task_async_if_expression_positions_demo),
+  [task_async_await_match_operand_demo](../examples/projects/task/task_async_await_match_operand_demo),
+  [task_async_match_call_argument_demo](../examples/projects/task/task_async_match_call_argument_demo),
+  [task_async_struct_field_match_demo](../examples/projects/task/task_async_struct_field_match_demo),
+  [task_async_method_receiver_match_demo](../examples/projects/task/task_async_method_receiver_match_demo),
+  [task_async_helper_expanded_match_demo](../examples/projects/task/task_async_helper_expanded_match_demo),
+  [task_async_while_flow_cond_demo](../examples/projects/task/task_async_while_flow_cond_demo),
+  [task_async_while_post_flow_demo](../examples/projects/task/task_async_while_post_flow_demo),
+  [task_async_while_post_flow_cond_demo](../examples/projects/task/task_async_while_post_flow_cond_demo),
+  [task_async_while_post_flow_compound_demo](../examples/projects/task/task_async_while_post_flow_compound_demo)
 * task timeout/fallback/batch families:
-  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo),
-  [task_fallback_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_fallback_branch_demo),
-  [task_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_policy_branch_demo),
-  [task_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_batch_branch_demo),
-  [task_windowed_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_windowed_batch_branch_demo),
-  [task_result_family_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_family_branch_demo),
-  [task_result_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_batch_branch_demo),
-  [task_result_windowed_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_windowed_batch_branch_demo)
+  [task_lifecycle_branch_demo](../examples/projects/task/task_lifecycle_branch_demo),
+  [task_fallback_branch_demo](../examples/projects/task/task_fallback_branch_demo),
+  [task_policy_branch_demo](../examples/projects/task/task_policy_branch_demo),
+  [task_batch_branch_demo](../examples/projects/task/task_batch_branch_demo),
+  [task_windowed_batch_branch_demo](../examples/projects/task/task_windowed_batch_branch_demo),
+  [task_result_family_branch_demo](../examples/projects/task/task_result_family_branch_demo),
+  [task_result_batch_branch_demo](../examples/projects/task/task_result_batch_branch_demo),
+  [task_result_windowed_batch_branch_demo](../examples/projects/task/task_result_windowed_batch_branch_demo)
 * task memory/http-like routes:
-  [task_memory_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_roundtrip_demo),
-  [task_memory_result_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_branch_demo),
-  [task_memory_result_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_batch_demo),
-  [task_memory_session_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_policy_demo),
-  [task_memory_session_packet_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_packet_demo),
-  [task_httpish_response_packet_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_response_packet_demo),
-  [task_httpish_session_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_session_policy_demo),
-  [task_httpish_response_slots_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_response_slots_demo),
-  [task_httpish_header_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_header_session_demo)
+  [task_memory_roundtrip_demo](../examples/projects/task/task_memory_roundtrip_demo),
+  [task_memory_result_branch_demo](../examples/projects/task/task_memory_result_branch_demo),
+  [task_memory_result_batch_demo](../examples/projects/task/task_memory_result_batch_demo),
+  [task_memory_session_policy_demo](../examples/projects/task/task_memory_session_policy_demo),
+  [task_memory_session_packet_demo](../examples/projects/task/task_memory_session_packet_demo),
+  [task_httpish_response_packet_demo](../examples/projects/task/task_httpish_response_packet_demo),
+  [task_httpish_session_policy_demo](../examples/projects/task/task_httpish_session_policy_demo),
+  [task_httpish_response_slots_demo](../examples/projects/task/task_httpish_response_slots_demo),
+  [task_httpish_header_session_demo](../examples/projects/task/task_httpish_header_session_demo)
 * task observe/clock:
-  [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo),
-  [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_compare_observe_demo),
-  [task_clock_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_clock_observe_demo),
-  [task_scheduler_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_scheduler_observe_demo)
+  [task_completed_observe_demo](../examples/projects/task/task_completed_observe_demo),
+  [task_compare_observe_demo](../examples/projects/task/task_compare_observe_demo),
+  [task_clock_observe_demo](../examples/projects/task/task_clock_observe_demo),
+  [task_scheduler_observe_demo](../examples/projects/task/task_scheduler_observe_demo)
 * tooling companions:
-  [argv_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/argv_runtime_demo),
-  [env_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/env_runtime_demo),
-  [process_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/process_runtime_demo),
-  [subprocess_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo),
-  [host_text_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/host_text_runtime_demo),
-  [json_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/json_runtime_demo),
-  [text_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_json_demo),
-  [text_format_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_format_runtime_demo),
-  [error_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/error_runtime_demo),
-  [result_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_runtime_demo),
-  [result_diagnostic_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_diagnostic_demo),
-  [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/input_runtime_demo),
-  [io_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_runtime_demo),
-  [stdin_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/stdin_runtime_demo),
-  [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/tty_runtime_demo),
-  [terminal_io_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/terminal_io_demo),
-  [time_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/time_runtime_demo),
-  [sleep_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/sleep_runtime_demo),
-  [clock_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/clock_runtime_demo),
-  [clock_domain_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/clock_domain_runtime_demo),
-  [cli_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_session_demo),
-  [cli_shell_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_shell_session_demo),
-  [cli_report_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_report_session_demo)
+  [argv_runtime_demo](../examples/projects/tooling/argv_runtime_demo),
+  [env_runtime_demo](../examples/projects/tooling/env_runtime_demo),
+  [process_runtime_demo](../examples/projects/tooling/process_runtime_demo),
+  [subprocess_runtime_demo](../examples/projects/tooling/subprocess_runtime_demo),
+  [host_text_runtime_demo](../examples/projects/tooling/host_text_runtime_demo),
+  [json_runtime_demo](../examples/projects/tooling/json_runtime_demo),
+  [text_json_demo](../examples/projects/tooling/text_json_demo),
+  [text_format_runtime_demo](../examples/projects/tooling/text_format_runtime_demo),
+  [error_runtime_demo](../examples/projects/tooling/error_runtime_demo),
+  [result_runtime_demo](../examples/projects/tooling/result_runtime_demo),
+  [result_diagnostic_demo](../examples/projects/tooling/result_diagnostic_demo),
+  [input_runtime_demo](../examples/projects/tooling/input_runtime_demo),
+  [io_runtime_demo](../examples/projects/tooling/io_runtime_demo),
+  [stdin_runtime_demo](../examples/projects/tooling/stdin_runtime_demo),
+  [tty_runtime_demo](../examples/projects/tooling/tty_runtime_demo),
+  [terminal_io_demo](../examples/projects/tooling/terminal_io_demo),
+  [time_runtime_demo](../examples/projects/tooling/time_runtime_demo),
+  [sleep_runtime_demo](../examples/projects/tooling/sleep_runtime_demo),
+  [clock_runtime_demo](../examples/projects/tooling/clock_runtime_demo),
+  [clock_domain_runtime_demo](../examples/projects/tooling/clock_domain_runtime_demo),
+  [cli_session_demo](../examples/projects/tooling/cli_session_demo),
+  [cli_shell_session_demo](../examples/projects/tooling/cli_shell_session_demo),
+  [cli_report_session_demo](../examples/projects/tooling/cli_report_session_demo)
 * filesystem companions:
   standard-contract smoke set:
-  [file_read_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo),
-  [file_write_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo),
-  [file_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo),
-  [file_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_roundtrip_demo),
-  [file_output_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_output_demo),
-  [directory_create_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_create_demo),
-  [directory_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_remove_demo),
+  [file_read_demo](../examples/projects/filesystem/file_read_demo),
+  [file_write_demo](../examples/projects/filesystem/file_write_demo),
+  [file_copy_demo](../examples/projects/filesystem/file_copy_demo),
+  [file_roundtrip_demo](../examples/projects/filesystem/file_roundtrip_demo),
+  [file_output_demo](../examples/projects/filesystem/file_output_demo),
+  [directory_create_demo](../examples/projects/filesystem/directory_create_demo),
+  [directory_remove_demo](../examples/projects/filesystem/directory_remove_demo),
   report consumers:
-  [filesystem_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_demo),
-  [filesystem_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_file_demo),
-  [filesystem_io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/filesystem_io_report_demo),
+  [filesystem_report_demo](../examples/projects/filesystem/filesystem_report_demo),
+  [filesystem_report_file_demo](../examples/projects/filesystem/filesystem_report_file_demo),
+  [filesystem_io_report_demo](../examples/projects/tooling/filesystem_io_report_demo),
   remaining filesystem companions:
-  [fs_metadata_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/fs_metadata_runtime_demo),
-  [stat_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/stat_runtime_demo),
-  [directory_stat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_stat_demo),
-  [path_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_copy_demo),
-  [path_rename_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_rename_demo),
-  [path_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_remove_demo),
-  [window_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/window_runtime_demo),
-  [pipe_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/pipe_runtime_demo),
-  [fabric_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/fabric_runtime_demo),
-  [handle_table_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/handle_table_runtime_demo)
+  [fs_metadata_runtime_demo](../examples/projects/filesystem/fs_metadata_runtime_demo),
+  [stat_runtime_demo](../examples/projects/filesystem/stat_runtime_demo),
+  [directory_stat_demo](../examples/projects/filesystem/directory_stat_demo),
+  [path_copy_demo](../examples/projects/filesystem/path_copy_demo),
+  [path_rename_demo](../examples/projects/filesystem/path_rename_demo),
+  [path_remove_demo](../examples/projects/filesystem/path_remove_demo),
+  [window_runtime_demo](../examples/projects/filesystem/window_runtime_demo),
+  [pipe_runtime_demo](../examples/projects/filesystem/pipe_runtime_demo),
+  [fabric_runtime_demo](../examples/projects/filesystem/fabric_runtime_demo),
+  [handle_table_runtime_demo](../examples/projects/filesystem/handle_table_runtime_demo)
 * state companions:
   the majority of `examples/projects/state/*` fit here:
   loop families, match families, lambda families, recursive call-graph demos,
@@ -379,7 +379,7 @@ Next-batch candidate board:
 
 * `task probe candidate`
   path:
-  [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo)
+  [task_join_nonconsuming_probe_demo](../examples/projects/task/task_join_nonconsuming_probe_demo)
   current role:
   probe-only
   suggested next action:
@@ -389,12 +389,12 @@ Next-batch candidate board:
   still referenced by forward-looking task/GLM material
 * `network validation probe cluster`
   paths:
-  [network_host_handle_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_probe_demo),
-  [network_loopback_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_loopback_runtime_demo),
-  [net_tcp_send_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_send_runtime_probe_demo),
-  [net_tcp_socket_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_runtime_probe_demo),
-  [net_http_status_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_status_runtime_probe_demo),
-  [net_http_client_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_runtime_probe_demo)
+  [network_host_handle_runtime_probe_demo](../examples/projects/domains/network_host_handle_runtime_probe_demo),
+  [network_loopback_runtime_demo](../examples/projects/domains/network_loopback_runtime_demo),
+  [net_tcp_send_runtime_probe_demo](../examples/projects/domains/net_tcp_send_runtime_probe_demo),
+  [net_tcp_socket_runtime_probe_demo](../examples/projects/domains/net_tcp_socket_runtime_probe_demo),
+  [net_http_status_runtime_probe_demo](../examples/projects/domains/net_http_status_runtime_probe_demo),
+  [net_http_client_runtime_probe_demo](../examples/projects/domains/net_http_client_runtime_probe_demo)
   current role:
   validation-only
   suggested next action:
@@ -404,7 +404,7 @@ Next-batch candidate board:
   still used by runtime-host verification and network validation discussion
 * `network experiment candidate`
   path:
-  [net_protocol_experiment_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_experiment_recipe_demo)
+  [net_protocol_experiment_recipe_demo](../examples/projects/domains/net_protocol_experiment_recipe_demo)
   current role:
   exploration-only
   suggested next action:
@@ -438,9 +438,9 @@ Next-batch candidate board:
   the family is dense, but not yet cleanly separable by doc usage
 * `single-file mirror-heavy ns demos`
   paths:
-  [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns),
-  [shader_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_profile_demo.ns),
-  [kernel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_profile_demo.ns)
+  [window_controls_demo.ns](../examples/ns/demos/window_controls_demo.ns),
+  [shader_profile_demo.ns](../examples/ns/demos/shader_profile_demo.ns),
+  [kernel_profile_demo.ns](../examples/ns/demos/kernel_profile_demo.ns)
   current role:
   mirror-only
   suggested next action:
@@ -474,12 +474,12 @@ tooling front door.
 These were the clearest first-pass wording problems addressed in the current
 cleanup:
 
-* [examples/README.md](/Users/Shared/chroot/dev/nuislang/examples/README.md)
-* [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-* [examples/projects/task/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/README.md)
-* [examples/projects/tooling/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/README.md)
-* [examples/projects/filesystem/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/README.md)
-* [examples/projects/domains/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md)
+* [examples/README.md](../examples/README.md)
+* [examples/projects/README.md](../examples/projects/README.md)
+* [examples/projects/task/README.md](../examples/projects/task/README.md)
+* [examples/projects/tooling/README.md](../examples/projects/tooling/README.md)
+* [examples/projects/filesystem/README.md](../examples/projects/filesystem/README.md)
+* [examples/projects/domains/README.md](../examples/projects/domains/README.md)
 
 The issue in these files was mostly:
 

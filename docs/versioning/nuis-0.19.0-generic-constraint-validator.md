@@ -9,9 +9,9 @@ It answers one narrow question:
 
 Use it together with:
 
-* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-* [nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
-* [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+* [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+* [nuis-0.19.0-frontend-capability-matrix.md](nuis-0.19.0-frontend-capability-matrix.md)
+* [nuis-0.19.0-mainline-regression-matrix.md](nuis-0.19.0-mainline-regression-matrix.md)
 
 ## Short Rule
 
@@ -36,12 +36,12 @@ Current responsibility:
 
 Primary code:
 
-* [validation_trait_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/validation_trait_bounds.rs)
-* [validation_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/validation_generic_constraints.rs)
+* [validation_trait_bounds.rs](../../tools/nuisc/src/frontend/validation_trait_bounds.rs)
+* [validation_generic_constraints.rs](../../tools/nuisc/src/frontend/validation_generic_constraints.rs)
 
 Primary regression family:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
 
 Current examples of failures here:
 
@@ -65,12 +65,12 @@ Current responsibility:
 
 Primary code:
 
-* [validation_trait_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/validation_trait_bounds.rs)
-* [generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/generics.rs)
+* [validation_trait_bounds.rs](../../tools/nuisc/src/frontend/validation_trait_bounds.rs)
+* [generics.rs](../../tools/nuisc/src/frontend/generics.rs)
 
 Primary regression family:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
 
 Current supported truth:
 
@@ -95,15 +95,15 @@ Current responsibility:
 
 Primary code:
 
-* [validation_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/validation_method_bounds.rs)
+* [validation_method_bounds.rs](../../tools/nuisc/src/frontend/validation_method_bounds.rs)
 
 Primary regression families:
 
-* [tests_generic_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
-* [tests_generic_method_bounds_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
-* [tests_generic_method_bounds_if_bindings.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_if_bindings.rs)
-* [tests_generic_method_bounds_lambda_bindings.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_lambda_bindings.rs)
-* [tests_generic_method_bounds_nested_match.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_nested_match.rs)
+* [tests_generic_method_bounds.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
+* [tests_generic_method_bounds_control_flow.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
+* [tests_generic_method_bounds_if_bindings.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_if_bindings.rs)
+* [tests_generic_method_bounds_lambda_bindings.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_lambda_bindings.rs)
+* [tests_generic_method_bounds_nested_match.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_nested_match.rs)
 
 Current diagnostic truth:
 
@@ -127,13 +127,13 @@ Current responsibility:
 
 Primary code:
 
-* [validation_trait_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/validation_trait_bounds.rs)
-* [validation_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/validation_method_bounds.rs)
+* [validation_trait_bounds.rs](../../tools/nuisc/src/frontend/validation_trait_bounds.rs)
+* [validation_method_bounds.rs](../../tools/nuisc/src/frontend/validation_method_bounds.rs)
 
 Primary regression families:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
-* [tests_generic_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_generic_method_bounds.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
 
 Current examples:
 

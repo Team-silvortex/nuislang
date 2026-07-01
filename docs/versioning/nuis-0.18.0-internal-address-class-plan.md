@@ -96,8 +96,8 @@ Target:
 
 Current hotspots:
 
-* [tools/nuisc/src/nir_verify.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/nir_verify.rs)
-* [tools/nuisc/src/nir_verify/task_result_facts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/nir_verify/task_result_facts.rs)
+* [tools/nuisc/src/nir_verify.rs](../../tools/nuisc/src/nir_verify.rs)
+* [tools/nuisc/src/nir_verify/task_result_facts.rs](../../tools/nuisc/src/nir_verify/task_result_facts.rs)
 
 First upgrades:
 
@@ -132,9 +132,9 @@ Target:
 
 Primary test families:
 
-* [tools/nuisc/src/frontend/tests_types_async_window.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_types_async_window.rs)
-* [tools/nuisc/src/nir_verify/tests.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/nir_verify/tests.rs)
-* [tools/nuisc/tests/memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+* [tools/nuisc/src/frontend/tests_types_async_window.rs](../../tools/nuisc/src/frontend/tests_types_async_window.rs)
+* [tools/nuisc/src/nir_verify/tests.rs](../../tools/nuisc/src/nir_verify/tests.rs)
+* [tools/nuisc/tests/memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
 
 Needed additions:
 

@@ -18,7 +18,7 @@ and `load_at(...)` because it is specifying loop-contract shape, not the
 preferred ordinary `.ns` source spelling.
 
 For source-facing address spelling, see
-[../reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md).
+[../reference/address-surface-contract.md](../../docs/reference/address-surface-contract.md).
 
 ## Why This Exists
 

@@ -10,9 +10,9 @@ It tracks places where:
 
 Read this together with:
 
-* [nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
-* [nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
-* [nuis-0.20.x-to-alpha-bootstrap-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
+* [nuis-0.20.0-frontend-cli-boundaries.md](nuis-0.20.0-frontend-cli-boundaries.md)
+* [nuis-0.20.0-branch-runtime-lowering-matrix.md](nuis-0.20.0-branch-runtime-lowering-matrix.md)
+* [nuis-0.20.x-to-alpha-bootstrap-roadmap.md](nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
 
 ## Current Short Rule
 
@@ -68,7 +68,7 @@ Current rule:
   lowering path, alongside the corresponding `join` / `join_result` /
   `thread_join` / `thread_join_result` / `timeout` / `cancel` /
   `mutex_lock` helper routes summarized in
-  [nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
+  [nuis-0.20.0-branch-runtime-lowering-matrix.md](nuis-0.20.0-branch-runtime-lowering-matrix.md)
 
 Done when:
 
@@ -87,19 +87,19 @@ Status:
 
 Promoted source anchors:
 
-* [hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns)
-* [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
-* [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
-* [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
-* [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
-* [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
-* [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
+* [hello_task_result_control_flow.ns](../../examples/ns/memory/hello_task_result_control_flow.ns)
+* [hello_task_glm_status_path.ns](../../examples/ns/memory/hello_task_glm_status_path.ns)
+* [hello_task_glm_lifecycle_path.ns](../../examples/ns/memory/hello_task_glm_lifecycle_path.ns)
+* [hello_task_glm_value_path.ns](../../examples/ns/memory/hello_task_glm_value_path.ns)
+* [hello_task_glm_compare.ns](../../examples/ns/memory/hello_task_glm_compare.ns)
+* [hello_task_glm_observe.ns](../../examples/ns/memory/hello_task_glm_observe.ns)
+* [hello_task_glm_boundary_compare.ns](../../examples/ns/memory/hello_task_glm_boundary_compare.ns)
 
 Current protection:
 
-* [tools/nuisc/src/frontend/tests_try.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_try.rs)
-* [tools/nuisc/tests/memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
-* [tools/nuisc/tests/tooling_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/tooling_compile.rs)
+* [tools/nuisc/src/frontend/tests_try.rs](../../tools/nuisc/src/frontend/tests_try.rs)
+* [tools/nuisc/tests/memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
+* [tools/nuisc/tests/tooling_compile.rs](../../tools/nuisc/tests/tooling_compile.rs)
 
 Current note:
 
@@ -110,9 +110,9 @@ Current note:
   aggregate fix for unit enum payloads such as `Error.InvalidInput`
 * the repository now also has a checked-in project-form native artifact
   closure anchor:
-  [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
+  [native_artifact_closure_demo](../../examples/projects/tooling/native_artifact_closure_demo)
   together with an AOT compile/package/launch smoke in
-  [tools/nuisc/src/lib.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lib.rs)
+  [tools/nuisc/src/lib.rs](../../tools/nuisc/src/lib.rs)
 
 Done when:
 

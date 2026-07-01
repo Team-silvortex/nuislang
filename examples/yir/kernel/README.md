@@ -8,9 +8,9 @@ This folder contains kernel/tensor handwritten `YIR` examples:
 
 Recommended starting points:
 
-* [kernel_tensor_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_tensor_demo.yir)
+* [kernel_tensor_demo.yir](kernel_tensor_demo.yir)
   basic tensor/value route
-* [kernel_auto_broadcast_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_auto_broadcast_demo.yir)
+* [kernel_auto_broadcast_demo.yir](kernel_auto_broadcast_demo.yir)
   current broadcast path
-* [kernel_topk_axis_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_topk_axis_demo.yir)
+* [kernel_topk_axis_demo.yir](kernel_topk_axis_demo.yir)
   current axis-selection path

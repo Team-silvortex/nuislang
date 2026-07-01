@@ -5,7 +5,7 @@ This note is intentionally **forward-looking**.
 It does **not** describe current repository guarantees.
 
 Instead, it marks one small region in
-[hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
+[hello_clock_test_facades.ns](hello_clock_test_facades.ns)
 as a plausible first probe for future `YIR`-level clock negotiation work.
 
 ## Current Shape

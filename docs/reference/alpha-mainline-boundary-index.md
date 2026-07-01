@@ -5,9 +5,9 @@ mattered most before `alpha-0.0.1`.
 
 For present-tense `alpha-0.6.*` work, start with:
 
-* [../versioning/nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md)
-* [../versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
-* [../versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+* [../versioning/nuis-alpha-0.6-mainline-entry.md](../../docs/versioning/nuis-alpha-0.6-mainline-entry.md)
+* [../versioning/nuis-alpha-0.4-system-inventory.md](../../docs/versioning/nuis-alpha-0.4-system-inventory.md)
+* [../versioning/nuis-alpha-0.4-mainline-hardening-plan.md](../../docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 
 Treat the `alpha-0.4.*` files as the current hardening baseline, not as the
 present minor line.
@@ -20,9 +20,9 @@ It is the reading page for:
 
 If you want the earlier post-closeout line, use:
 
-* [../versioning/nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
-* [nuis-frontdoor-surface-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-frontdoor-surface-reference.md)
-* [nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
+* [../versioning/nuis-alpha-0.1-mainline-status.md](../../docs/versioning/nuis-alpha-0.1-mainline-status.md)
+* [nuis-frontdoor-surface-reference.md](nuis-frontdoor-surface-reference.md)
+* [nuis-native-artifact-workflow.md](nuis-native-artifact-workflow.md)
 
 ## Short Rule
 
@@ -46,10 +46,10 @@ Use this when the question is:
 
 Read:
 
-* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* [nuis-0.20.x-to-alpha-bootstrap-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
-* [nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
-* [nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
+* [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
+* [nuis-0.20.x-to-alpha-bootstrap-roadmap.md](../../docs/versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
+* [nuis-0.20.0-compile-gap-checklist.md](../../docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
+* [nuis-0.20.0-frontend-cli-boundaries.md](../../docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
 
 Short rule:
 
@@ -64,7 +64,7 @@ Use this when the question is:
 
 Read:
 
-* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+* [nir-memory-model.md](nir-memory-model.md)
 
 Short rule:
 
@@ -80,9 +80,9 @@ Use this when the question is:
 
 Read:
 
-* [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
-* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
-* [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
+* [cpu-task-glm-contract.md](cpu-task-glm-contract.md)
+* [cpu-task-memory-contract.md](cpu-task-memory-contract.md)
+* [cpu-task-payload-matrix.md](cpu-task-payload-matrix.md)
 
 Short rule:
 
@@ -98,7 +98,7 @@ Use this when the question is:
 
 Read:
 
-* [control-flow-lowering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/control-flow-lowering-contract.md)
+* [control-flow-lowering-contract.md](control-flow-lowering-contract.md)
 
 Short rule:
 
@@ -115,8 +115,8 @@ Use this when the question is:
 
 Read:
 
-* [cpu-thread-lock-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-boundary.md)
-* [cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md)
+* [cpu-thread-lock-boundary.md](cpu-thread-lock-boundary.md)
+* [cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md)
 
 Short rule:
 
@@ -132,9 +132,9 @@ Use this when the question is:
 
 Read:
 
-* [nustar-capability-split-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nustar-capability-split-boundary.md)
-* [annotation-intrinsic-stdlib-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/annotation-intrinsic-stdlib-sketch.md)
-* [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+* [nustar-capability-split-boundary.md](nustar-capability-split-boundary.md)
+* [annotation-intrinsic-stdlib-sketch.md](annotation-intrinsic-stdlib-sketch.md)
+* [yir-tools-reference.md](yir-tools-reference.md)
 
 Short rule:
 
@@ -151,9 +151,9 @@ Use this when the question is:
 
 Read:
 
-* [examples/ns/memory/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/README.md)
-* [examples/invalid/ns/memory/README.md](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/README.md)
-* [examples/projects/task/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/README.md)
+* [examples/ns/memory/README.md](../../examples/ns/memory/README.md)
+* [examples/invalid/ns/memory/README.md](../../examples/invalid/ns/memory/README.md)
+* [examples/projects/task/README.md](../../examples/projects/task/README.md)
 
 Short rule:
 
@@ -165,8 +165,8 @@ Short rule:
 
 If you need the shortest full route, use this order:
 
-1. [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-2. [alpha-mainline-boundary-index.md](/Users/Shared/chroot/dev/nuislang/docs/reference/alpha-mainline-boundary-index.md)
+1. [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
+2. [alpha-mainline-boundary-index.md](alpha-mainline-boundary-index.md)
 3. the one specific boundary doc that matches the feature you are touching
 4. the nearest positive and negative example anchors
 5. the matching regression test file

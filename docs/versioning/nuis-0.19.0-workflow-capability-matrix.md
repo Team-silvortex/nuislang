@@ -33,8 +33,8 @@ Current truth:
 
 Primary anchors:
 
-* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-* [std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+* [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+* [std-tooling-workflow-contract.md](../../docs/reference/std-tooling-workflow-contract.md)
 
 Short rule:
 
@@ -52,8 +52,8 @@ Current truth:
 
 Primary anchors:
 
-* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-* [nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
+* [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+* [nuis-0.19.0-frontend-capability-matrix.md](nuis-0.19.0-frontend-capability-matrix.md)
 
 Short rule:
 
@@ -72,9 +72,9 @@ Current truth:
 
 Primary anchors:
 
-* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-* [address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
-* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+* [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+* [address-surface-contract.md](../../docs/reference/address-surface-contract.md)
+* [nir-memory-model.md](../../docs/reference/nir-memory-model.md)
 
 Short rule:
 
@@ -91,11 +91,11 @@ Current truth:
 
 Primary anchors:
 
-* [std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
-* [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
-* [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
-* [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
-* [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
+* [std-tooling-workflow-contract.md](../../docs/reference/std-tooling-workflow-contract.md)
+* [workflow_runtime_recipe.ns](../../stdlib/std/workflow_runtime_recipe.ns)
+* [cli_workflow_automation_recipe.ns](../../stdlib/std/cli_workflow_automation_recipe.ns)
+* [cli_build_pipeline_recipe.ns](../../stdlib/std/cli_build_pipeline_recipe.ns)
+* [cli_project_build_report_recipe.ns](../../stdlib/std/cli_project_build_report_recipe.ns)
 
 Short rule:
 
@@ -113,12 +113,12 @@ Current truth:
 
 Primary anchors:
 
-* [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
-* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
-* [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
-* [memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
-* [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
-* [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+* [nuis-0.19.0-mainline-regression-matrix.md](nuis-0.19.0-mainline-regression-matrix.md)
+* [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
+* [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
+* [memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
+* [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+* [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 Short rule:
 
@@ -134,7 +134,7 @@ These are the shortest “already real together” routes worth remembering.
 
 Anchors:
 
-* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
+* [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
 
 ### Route B
 
@@ -142,8 +142,8 @@ Anchors:
 
 Anchors:
 
-* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-* [nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
+* [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+* [nuis-0.19.0-frontend-capability-matrix.md](nuis-0.19.0-frontend-capability-matrix.md)
 
 ### Route C
 
@@ -151,7 +151,7 @@ Anchors:
 
 Anchors:
 
-* [std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+* [std-tooling-workflow-contract.md](../../docs/reference/std-tooling-workflow-contract.md)
 
 ### Route D
 
@@ -159,7 +159,7 @@ Anchors:
 
 Anchors:
 
-* [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+* [nuis-0.19.0-mainline-regression-matrix.md](nuis-0.19.0-mainline-regression-matrix.md)
 
 ## Current Boundaries
 

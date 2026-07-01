@@ -5,7 +5,7 @@ organize executable artifacts in an explicitly heterogeneous world.
 
 Current protocol anchor:
 
-* [nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
+* [nuis-binary-format-protocol.md](nuis-binary-format-protocol.md)
 
 The important split is:
 

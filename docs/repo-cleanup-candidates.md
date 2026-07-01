@@ -132,8 +132,8 @@ These are not deletion targets yet, but they are the clearest next
 documentation-trim targets whenever a folder README still repeats a large local
 index that is already covered by:
 
-* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* [docs/current-mainline-map.md](current-mainline-map.md)
+* [stdlib/std/README.md](../stdlib/std/README.md)
 * local subdirectory READMEs
 
 Strong current candidates:

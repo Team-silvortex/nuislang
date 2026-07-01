@@ -8,15 +8,15 @@ exists today.
 
 Before reading these files, prefer:
 
-* [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
-* [docs/README.md](/Users/Shared/chroot/dev/nuislang/docs/README.md)
-* [docs/reference/yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
-* [docs/reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [docs/reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+* [README.md](../../README.md)
+* [docs/README.md](../../docs/README.md)
+* [docs/reference/yir-reference.md](../../docs/reference/yir-reference.md)
+* [docs/reference/yir-langref.md](../../docs/reference/yir-langref.md)
+* [docs/reference/yir-tools-reference.md](../../docs/reference/yir-tools-reference.md)
 
 ## Archived Whitepaper
 
-* [nuislang-whitepaper-v0.44b.md](/Users/Shared/chroot/dev/nuislang/docs/historical/nuislang-whitepaper-v0.44b.md)
+* [nuislang-whitepaper-v0.44b.md](nuislang-whitepaper-v0.44b.md)
   long-form historical architecture argument previously embedded in the root
   `README.md`
 

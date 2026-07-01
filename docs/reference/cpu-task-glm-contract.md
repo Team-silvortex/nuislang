@@ -200,11 +200,11 @@ an explicit negative probe for stricter task ownership semantics.
 
 Current concrete probes:
 
-* [hello_task_glm_join_nonconsuming_probe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns)
-* [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo)
-* [FUTURE_CONSUME_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md)
-* [FUTURE_LIFECYCLE_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo/FUTURE_LIFECYCLE_SKETCH.md)
-* [FUTURE_CANCEL_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cancel_branch_demo/FUTURE_CANCEL_SKETCH.md)
+* [hello_task_glm_join_nonconsuming_probe.ns](../../examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns)
+* [task_join_nonconsuming_probe_demo](../../examples/projects/task/task_join_nonconsuming_probe_demo)
+* [FUTURE_CONSUME_SKETCH.md](../../examples/projects/task/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md)
+* [FUTURE_LIFECYCLE_SKETCH.md](../../examples/projects/task/task_lifecycle_branch_demo/FUTURE_LIFECYCLE_SKETCH.md)
+* [FUTURE_CANCEL_SKETCH.md](../../examples/projects/task/task_cancel_branch_demo/FUTURE_CANCEL_SKETCH.md)
 
 ## Current Cancel And Timeout Classification
 
@@ -242,7 +242,7 @@ The current task/GLM alignment is still incomplete.
 That incompleteness matters even more for future thread/lock work: the current
 repository should not pretend that a future `Thread<T>` or `Mutex<T>` family
 can reuse the present task approximation unchanged. See the staged split in
-[cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md).
+[cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md).
 
 In particular, the repository does **not** yet fully specify:
 
@@ -270,9 +270,9 @@ If you want code that fits the current system well:
 
 Read this together with:
 
-* [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
-* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
-* [cpu-task-external-handle-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-contract.md)
-* [cpu-task-external-handle-glm-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-glm-sketch.md)
-* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+* [yir-langref.md](yir-langref.md)
+* [cpu-task-contract.md](cpu-task-contract.md)
+* [cpu-task-memory-contract.md](cpu-task-memory-contract.md)
+* [cpu-task-external-handle-contract.md](cpu-task-external-handle-contract.md)
+* [cpu-task-external-handle-glm-sketch.md](cpu-task-external-handle-glm-sketch.md)
+* [nir-memory-model.md](nir-memory-model.md)

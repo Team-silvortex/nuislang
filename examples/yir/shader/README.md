@@ -8,10 +8,10 @@ This folder contains shader-focused handwritten `YIR` examples:
 
 Recommended starting points:
 
-* [shader_bindings_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_bindings_demo.yir)
+* [shader_bindings_demo.yir](shader_bindings_demo.yir)
   binding layout, geometry input, and render-state surface
-* [shader_texture_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_texture_demo.yir)
+* [shader_texture_demo.yir](shader_texture_demo.yir)
   texture/sampler/UV path
-* [shader_external_handle_bridge_probe.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_external_handle_bridge_probe.yir)
+* [shader_external_handle_bridge_probe.yir](shader_external_handle_bridge_probe.yir)
   comment-only bridge probe for future render-packet / draw-state external-handle
   discussion

@@ -193,9 +193,9 @@ roadmap.
 
 Read this file together with:
 
-* [nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
-* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-* [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-* [cpu-thread-lock-boundary.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-boundary.md)
-* [nuis-0.19.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-release-checklist.md)
-* [nuis-0.17.0-self-hosted-mainline-gate-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-self-hosted-mainline-gate-plan.md)
+* [nuis-0.19.0-snapshot.md](nuis-0.19.0-snapshot.md)
+* [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+* [nuis-0.20.0-abi-compile-vocabulary.md](nuis-0.20.0-abi-compile-vocabulary.md)
+* [cpu-thread-lock-boundary.md](../../docs/reference/cpu-thread-lock-boundary.md)
+* [nuis-0.19.0-release-checklist.md](nuis-0.19.0-release-checklist.md)
+* [nuis-0.17.0-self-hosted-mainline-gate-plan.md](nuis-0.17.0-self-hosted-mainline-gate-plan.md)

@@ -11,18 +11,18 @@ Use it for:
 
 Canonical short map:
 
-* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* [docs/current-mainline-map.md](../../../docs/current-mainline-map.md)
   Use that file first when you want the shortest current route.
-* [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+* [docs/examples-freshness-audit.md](../../../docs/examples-freshness-audit.md)
   Use that file when the question is whether a memory example is still a
   frontdoor anchor, a compile-closure anchor, or only narrow probe detail.
 
 Related current contracts:
 
-* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
-* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
-* [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
-* [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
+* [nir-memory-model.md](../../../docs/reference/nir-memory-model.md)
+* [cpu-task-memory-contract.md](../../../docs/reference/cpu-task-memory-contract.md)
+* [cpu-task-glm-contract.md](../../../docs/reference/cpu-task-glm-contract.md)
+* [cpu-task-payload-matrix.md](../../../docs/reference/cpu-task-payload-matrix.md)
 
 Current role rule:
 
@@ -40,9 +40,9 @@ ladders.
 
 Ownership and address ladder:
 
-* [hello_glm.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_glm.ns)
-* [hello_borrow_end.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns)
-* [hello_buffer_addressing.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_buffer_addressing.ns)
+* [hello_glm.ns](hello_glm.ns)
+* [hello_borrow_end.ns](hello_borrow_end.ns)
+* [hello_buffer_addressing.ns](hello_buffer_addressing.ns)
 
 This is the shortest source-facing route for:
 
@@ -52,10 +52,10 @@ This is the shortest source-facing route for:
 
 Task compile-closure ladder:
 
-* [hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns)
-* [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
-* [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
-* [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
+* [hello_task_result_control_flow.ns](hello_task_result_control_flow.ns)
+* [hello_task_glm_status_path.ns](hello_task_glm_status_path.ns)
+* [hello_task_glm_lifecycle_path.ns](hello_task_glm_lifecycle_path.ns)
+* [hello_task_glm_value_path.ns](hello_task_glm_value_path.ns)
 
 This is the shortest source compile-closure route for:
 
@@ -66,9 +66,9 @@ This is the shortest source compile-closure route for:
 
 Thread/lock staged ladder:
 
-* [hello_thread_mutex_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns)
-* [hello_thread_mutex_branch_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns)
-* [hello_thread_mutex_branch_suffix.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns)
+* [hello_thread_mutex_observe.ns](hello_thread_mutex_observe.ns)
+* [hello_thread_mutex_branch_observe.ns](hello_thread_mutex_branch_observe.ns)
+* [hello_thread_mutex_branch_suffix.ns](hello_thread_mutex_branch_suffix.ns)
 
 This is the shortest staged thread/lock route for:
 
@@ -79,45 +79,45 @@ This is the shortest staged thread/lock route for:
 ## Companion Detail Map
 
 * payload shape
-  - [hello_task_glm_scalar_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_scalar_payload.ns)
-  - [hello_task_glm_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_struct_payload.ns)
-  - [hello_task_glm_nested_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_struct_payload.ns)
-  - [hello_task_glm_text_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_text_payload.ns)
-  - [hello_task_glm_nested_text_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_text_struct_payload.ns)
+  - [hello_task_glm_scalar_payload.ns](hello_task_glm_scalar_payload.ns)
+  - [hello_task_glm_struct_payload.ns](hello_task_glm_struct_payload.ns)
+  - [hello_task_glm_nested_struct_payload.ns](hello_task_glm_nested_struct_payload.ns)
+  - [hello_task_glm_text_payload.ns](hello_task_glm_text_payload.ns)
+  - [hello_task_glm_nested_text_struct_payload.ns](hello_task_glm_nested_text_struct_payload.ns)
 * task observation
-  - [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
-  - [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
-  - [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
-  - [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
-  - [hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns)
+  - [hello_task_glm_status_path.ns](hello_task_glm_status_path.ns)
+  - [hello_task_glm_value_path.ns](hello_task_glm_value_path.ns)
+  - [hello_task_glm_lifecycle_path.ns](hello_task_glm_lifecycle_path.ns)
+  - [hello_task_glm_compare.ns](hello_task_glm_compare.ns)
+  - [hello_task_result_control_flow.ns](hello_task_result_control_flow.ns)
 * wider local probes
-  - [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
-  - [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
-  - [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
-  - [hello_task_glm_lifecycle_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_compare.ns)
-  - [hello_task_glm_join_nonconsuming_probe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns)
+  - [hello_task_glm_origin.ns](hello_task_glm_origin.ns)
+  - [hello_task_glm_observe.ns](hello_task_glm_observe.ns)
+  - [hello_task_glm_boundary_compare.ns](hello_task_glm_boundary_compare.ns)
+  - [hello_task_glm_lifecycle_compare.ns](hello_task_glm_lifecycle_compare.ns)
+  - [hello_task_glm_join_nonconsuming_probe.ns](hello_task_glm_join_nonconsuming_probe.ns)
     - now best read as a negative probe for `join(...)` / `join_result(...)`
       double-consume, not as a still-legal shape
 * staged thread/lock observation
-  - [hello_thread_mutex_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns)
-  - [hello_thread_mutex_branch_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns)
-  - [hello_thread_mutex_branch_suffix.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns)
+  - [hello_thread_mutex_observe.ns](hello_thread_mutex_observe.ns)
+  - [hello_thread_mutex_branch_observe.ns](hello_thread_mutex_branch_observe.ns)
+  - [hello_thread_mutex_branch_suffix.ns](hello_thread_mutex_branch_suffix.ns)
 
 ## Current Compile-Closure Set
 
 These examples now survive real source compile coverage under
-[tools/nuisc/tests/memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs):
+[tools/nuisc/tests/memory_compile.rs](../../../tools/nuisc/tests/memory_compile.rs):
 
-* [hello_task_result_control_flow.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns)
-* [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
-* [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
-* [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
-* [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
-* [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
-* [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
-* [hello_thread_mutex_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns)
-* [hello_thread_mutex_branch_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns)
-* [hello_thread_mutex_branch_suffix.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns)
+* [hello_task_result_control_flow.ns](hello_task_result_control_flow.ns)
+* [hello_task_glm_status_path.ns](hello_task_glm_status_path.ns)
+* [hello_task_glm_lifecycle_path.ns](hello_task_glm_lifecycle_path.ns)
+* [hello_task_glm_value_path.ns](hello_task_glm_value_path.ns)
+* [hello_task_glm_compare.ns](hello_task_glm_compare.ns)
+* [hello_task_glm_observe.ns](hello_task_glm_observe.ns)
+* [hello_task_glm_boundary_compare.ns](hello_task_glm_boundary_compare.ns)
+* [hello_thread_mutex_observe.ns](hello_thread_mutex_observe.ns)
+* [hello_thread_mutex_branch_observe.ns](hello_thread_mutex_branch_observe.ns)
+* [hello_thread_mutex_branch_suffix.ns](hello_thread_mutex_branch_suffix.ns)
 
 Read this set as:
 
@@ -134,11 +134,11 @@ Read this set as:
   currently survives real compile coverage?"
 * use the companion detail map after you know which memory/task lane you care
   about
-* use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* use [docs/current-mainline-map.md](../../../docs/current-mainline-map.md)
   for the shortest repo-level route
-* use [docs/reference/cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
+* use [docs/reference/cpu-task-payload-matrix.md](../../../docs/reference/cpu-task-payload-matrix.md)
   when you want the current allowed/rejected payload split
-* use [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+* use [examples/projects/README.md](../../../examples/projects/README.md)
   when you want project-form task companions
 * treat the wider local probes as secondary unless you are actively working on
   task/GLM boundary behavior

@@ -12,12 +12,12 @@ The important reading rule now is:
   - probe/validation routes
   - domain recipe ladders
 * if you want the current shortest mainline path first, start with
-  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
 * if you want the current cleanup/status board for project routes, use
-  [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+  [docs/examples-freshness-audit.md](../../docs/examples-freshness-audit.md)
 * if you want the current repo-level line status that explains why some
   examples are frontdoor while others are only companions, use
-  [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
+  [docs/versioning/nuis-alpha-0.4-system-inventory.md](../../docs/versioning/nuis-alpha-0.4-system-inventory.md)
 
 Current source-style rule:
 
@@ -49,9 +49,9 @@ Current practical rule:
 
 These are the best current first-entry projects:
 
-* [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+* [window_controls_demo](window_controls_demo)
   current `cpu + data + shader` showcase and the main documented project flow
-* [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+* [kernel_tensor_demo](kernel_tensor_demo)
   current `cpu + data + kernel` showcase for the project pipeline
 
 Useful first commands:
@@ -68,16 +68,16 @@ cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/
 The folder is intentionally split by role:
 
 * showcase projects stay at the root:
-  - [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-  - [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+  - [window_controls_demo](window_controls_demo)
+  - [kernel_tensor_demo](kernel_tensor_demo)
 * grouped companions live under:
-  - [task](/Users/Shared/chroot/dev/nuislang/examples/projects/task)
-  - [tooling](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling)
-  - [state](/Users/Shared/chroot/dev/nuislang/examples/projects/state)
-  - [filesystem](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem)
-  - [domains](/Users/Shared/chroot/dev/nuislang/examples/projects/domains)
+  - [task](task)
+  - [tooling](tooling)
+  - [state](state)
+  - [filesystem](filesystem)
+  - [domains](domains)
 * shared domain helper modules live under:
-  - [domains/shared](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared)
+  - [domains/shared](domains/shared)
 
 ## Pick By Goal
 
@@ -85,45 +85,45 @@ If you are trying to orient quickly, use one representative route instead of
 reading an entire subtree.
 
 * control flow / recursion / generics:
-  [state](/Users/Shared/chroot/dev/nuislang/examples/projects/state)
+  [state](state)
   Start with:
-  [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo),
-  [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo),
-  [tail_recursive_sum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_sum_demo),
-  [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo)
+  [chained_while_demo](state/chained_while_demo),
+  [match_branching_while_demo](state/match_branching_while_demo),
+  [tail_recursive_sum_demo](state/tail_recursive_sum_demo),
+  [generic_method_bound_if_binding_demo](state/generic_method_bound_if_binding_demo)
   Practical rule:
   start with one sync control-flow ladder, then one recursion anchor, then one
   generic/control-flow ladder, instead of browsing the whole subtree
 * async tasks / task-result control:
-  [task](/Users/Shared/chroot/dev/nuislang/examples/projects/task)
+  [task](task)
   Start with:
-  [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo),
-  [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo),
-  [task_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_demo),
-  [task_result_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo),
-  [task_result_enum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_enum_demo)
+  [task_runtime_demo](task/task_runtime_demo),
+  [task_thread_mutex_demo](task/task_thread_mutex_demo),
+  [task_recursive_async_demo](task/task_recursive_async_demo),
+  [task_result_policy_branch_demo](task/task_result_policy_branch_demo),
+  [task_result_enum_demo](task/task_result_enum_demo)
 * CLI / workflow / host tooling:
-  [tooling](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling)
+  [tooling](tooling)
   Start with:
-  [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo),
-  [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo),
-  [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo),
-  [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
+  [cli_runtime_demo](tooling/cli_runtime_demo),
+  [command_runtime_demo](tooling/command_runtime_demo),
+  [workflow_runtime_demo](tooling/workflow_runtime_demo),
+  [native_artifact_closure_demo](tooling/native_artifact_closure_demo)
 * path / file / directory surfaces:
-  [filesystem](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem)
+  [filesystem](filesystem)
   Start with:
-  [path_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_runtime_demo),
-  [file_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_runtime_demo),
-  [directory_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_runtime_demo)
+  [path_runtime_demo](filesystem/path_runtime_demo),
+  [file_runtime_demo](filesystem/file_runtime_demo),
+  [directory_runtime_demo](filesystem/directory_runtime_demo)
 * profile and recipe ladders across domains:
-  [domains](/Users/Shared/chroot/dev/nuislang/examples/projects/domains)
+  [domains](domains)
   Start with:
-  [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo),
-  [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo),
-  [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo),
-  [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo),
-  [net_result_enum_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_result_enum_recipe_demo),
-  [shader_result_enum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_enum_demo)
+  [shader_profile_demo](domains/shader_profile_demo),
+  [kernel_profile_demo](domains/kernel_profile_demo),
+  [network_profile_demo](domains/network_profile_demo),
+  [net_http_client_get_recipe_demo](domains/net_http_client_get_recipe_demo),
+  [net_result_enum_recipe_demo](domains/net_result_enum_recipe_demo),
+  [shader_result_enum_demo](domains/shader_result_enum_demo)
 
 ## Control-Flow Mainline
 
@@ -131,21 +131,21 @@ If you want the current project-backed control-flow story specifically, use
 this order instead of browsing the whole tree.
 
 * sync control-flow frontdoor:
-  [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo) ->
-  [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo) ->
-  [flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo) ->
-  [post_flow_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo) ->
-  [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+  [chained_while_demo](state/chained_while_demo) ->
+  [match_branching_while_demo](state/match_branching_while_demo) ->
+  [flow_continuing_while_demo](state/flow_continuing_while_demo) ->
+  [post_flow_breaking_while_demo](state/post_flow_breaking_while_demo) ->
+  [post_flow_branching_continuing_while_demo](state/post_flow_branching_continuing_while_demo)
 * async control-flow frontdoor:
-  [task_async_observer_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_observer_bridge_demo) ->
-  [task_async_while_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo) ->
-  [task_async_while_post_flow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_demo) ->
-  [task_async_while_post_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo) ->
-  [task_async_while_post_flow_compound_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_compound_demo)
+  [task_async_observer_bridge_demo](task/task_async_observer_bridge_demo) ->
+  [task_async_while_flow_cond_demo](task/task_async_while_flow_cond_demo) ->
+  [task_async_while_post_flow_demo](task/task_async_while_post_flow_demo) ->
+  [task_async_while_post_flow_cond_demo](task/task_async_while_post_flow_cond_demo) ->
+  [task_async_while_post_flow_compound_demo](task/task_async_while_post_flow_compound_demo)
 * generic/control-flow crossover:
-  [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo) ->
-  [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo) ->
-  [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
+  [generic_method_bound_if_binding_demo](state/generic_method_bound_if_binding_demo) ->
+  [generic_method_bound_nested_match_demo](state/generic_method_bound_nested_match_demo) ->
+  [generic_method_bound_guarded_nested_match_demo](state/generic_method_bound_guarded_nested_match_demo)
 
 Practical reading rule:
 
@@ -183,9 +183,9 @@ Practical consequence:
 
 Checked-in canonical build outputs still live under:
 
-* [examples/bins](/Users/Shared/chroot/dev/nuislang/examples/bins)
+* [examples/bins](../../examples/bins)
 
 The two current canonical checked-in bundles remain:
 
-* [window_controls_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/window_controls_demo)
-* [kernel_tensor_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/kernel_tensor_demo_project/kernel_tensor_demo)
+* [window_controls_demo_project](../../examples/bins/window_controls_demo_project/window_controls_demo)
+* [kernel_tensor_demo_project](../../examples/bins/kernel_tensor_demo_project/kernel_tensor_demo)

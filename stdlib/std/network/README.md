@@ -3,20 +3,20 @@
 This directory is the reading router for the `std net` facade.
 
 Keep the actual recipe sources in
-[`stdlib/std`](/Users/Shared/chroot/dev/nuislang/stdlib/std) for now; this file
+[`stdlib/std`](../../../stdlib/std) for now; this file
 exists to give the network surface a module-shaped front door before we do any
 higher-risk filesystem reshuffle.
 
 Canonical companions:
 
 * domain-owned truth:
-  [network-profile-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-profile-contract.md)
+  [network-profile-contract.md](../../../docs/reference/network-profile-contract.md)
 * `std net` layering rule:
-  [std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
+  [std-net-layering-contract.md](../../../docs/reference/std-net-layering-contract.md)
 * auto-injected network helper surface:
-  [lib/net_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/net_contracts.ns)
+  [lib/net_contracts.ns](../../../stdlib/std/lib/net_contracts.ns)
 * shortest repo-wide route:
-  [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  [current-mainline-map.md](../../../docs/current-mainline-map.md)
 
 ## Current Lane Shape
 
@@ -63,15 +63,15 @@ Value naming rule:
 Current anchor files for this convention:
 
 * packet-first async/httpish
-  - [net_httpish_client_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_client_session_packet_recipe.ns)
-  - [net_httpish_service_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_service_session_packet_recipe.ns)
+  - [net_httpish_client_session_packet_recipe.ns](../../../stdlib/std/net_httpish_client_session_packet_recipe.ns)
+  - [net_httpish_service_session_packet_recipe.ns](../../../stdlib/std/net_httpish_service_session_packet_recipe.ns)
 * packet plus session aggregation
-  - [net_httpish_header_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_session_recipe.ns)
-  - [net_httpish_header_service_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_service_session_recipe.ns)
+  - [net_httpish_header_session_recipe.ns](../../../stdlib/std/net_httpish_header_session_recipe.ns)
+  - [net_httpish_header_service_session_recipe.ns](../../../stdlib/std/net_httpish_header_service_session_recipe.ns)
 * host-owned transport workflow helpers
-  - [net_http_client_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_recipe.ns)
-  - [net_http_client_session_async_loop_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_async_loop_recipe.ns)
-  - [net_http_service_lane_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_service_lane_recipe.ns)
+  - [net_http_client_session_recipe.ns](../../../stdlib/std/net_http_client_session_recipe.ns)
+  - [net_http_client_session_async_loop_recipe.ns](../../../stdlib/std/net_http_client_session_async_loop_recipe.ns)
+  - [net_http_service_lane_recipe.ns](../../../stdlib/std/net_http_service_lane_recipe.ns)
 
 Current narrow frontdoor for the HTTP/session cluster:
 
@@ -105,158 +105,158 @@ Current frontdoor cheat sheet:
 
 ### Profile Core
 
-* [net_endpoint_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_endpoint_recipe.ns)
+* [net_endpoint_recipe.ns](../../../stdlib/std/net_endpoint_recipe.ns)
 
 ### Transport Edge
 
-* [net_ip_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_packet_recipe.ns)
-* [net_tcp_stream_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_stream_recipe.ns)
-* [net_udp_datagram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_recipe.ns)
+* [net_ip_packet_recipe.ns](../../../stdlib/std/net_ip_packet_recipe.ns)
+* [net_tcp_stream_recipe.ns](../../../stdlib/std/net_tcp_stream_recipe.ns)
+* [net_udp_datagram_recipe.ns](../../../stdlib/std/net_udp_datagram_recipe.ns)
 
 ### Syscall Edge
 
-* [net_tcp_open_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_open_recipe.ns)
-* [net_udp_open_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_open_recipe.ns)
-* [net_udp_bind_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bind_recipe.ns)
-* [net_tcp_listener_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_listener_recipe.ns)
-* [net_owned_send_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_send_recipe.ns)
-* [net_owned_recv_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_recv_recipe.ns)
-* [net_owned_accept_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_accept_recipe.ns)
-* [net_owned_close_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_close_recipe.ns)
+* [net_tcp_open_recipe.ns](../../../stdlib/std/net_tcp_open_recipe.ns)
+* [net_udp_open_recipe.ns](../../../stdlib/std/net_udp_open_recipe.ns)
+* [net_udp_bind_recipe.ns](../../../stdlib/std/net_udp_bind_recipe.ns)
+* [net_tcp_listener_recipe.ns](../../../stdlib/std/net_tcp_listener_recipe.ns)
+* [net_owned_send_recipe.ns](../../../stdlib/std/net_owned_send_recipe.ns)
+* [net_owned_recv_recipe.ns](../../../stdlib/std/net_owned_recv_recipe.ns)
+* [net_owned_accept_recipe.ns](../../../stdlib/std/net_owned_accept_recipe.ns)
+* [net_owned_close_recipe.ns](../../../stdlib/std/net_owned_close_recipe.ns)
 
 ### Socket Edge
 
-* [net_tcp_connect_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_connect_socket_recipe.ns)
-* [net_tcp_client_flow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_client_flow_recipe.ns)
-* [net_tcp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_socket_recipe.ns)
-* [net_tcp_server_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_server_socket_recipe.ns)
-* [net_tcp_server_flow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_server_flow_recipe.ns)
-* [net_tcp_accepted_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_accepted_socket_recipe.ns)
-* [net_udp_bound_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bound_socket_recipe.ns)
-* [net_udp_datagram_flow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_flow_recipe.ns)
-* [net_udp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_socket_recipe.ns)
-* [net_ip_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_socket_recipe.ns)
+* [net_tcp_connect_socket_recipe.ns](../../../stdlib/std/net_tcp_connect_socket_recipe.ns)
+* [net_tcp_client_flow_recipe.ns](../../../stdlib/std/net_tcp_client_flow_recipe.ns)
+* [net_tcp_socket_recipe.ns](../../../stdlib/std/net_tcp_socket_recipe.ns)
+* [net_tcp_server_socket_recipe.ns](../../../stdlib/std/net_tcp_server_socket_recipe.ns)
+* [net_tcp_server_flow_recipe.ns](../../../stdlib/std/net_tcp_server_flow_recipe.ns)
+* [net_tcp_accepted_socket_recipe.ns](../../../stdlib/std/net_tcp_accepted_socket_recipe.ns)
+* [net_udp_bound_socket_recipe.ns](../../../stdlib/std/net_udp_bound_socket_recipe.ns)
+* [net_udp_datagram_flow_recipe.ns](../../../stdlib/std/net_udp_datagram_flow_recipe.ns)
+* [net_udp_socket_recipe.ns](../../../stdlib/std/net_udp_socket_recipe.ns)
+* [net_ip_socket_recipe.ns](../../../stdlib/std/net_ip_socket_recipe.ns)
 
 ### Control Edge
 
-* [net_connect_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_connect_recipe.ns)
-* [net_listen_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_listen_recipe.ns)
-* [net_close_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_close_recipe.ns)
+* [net_connect_recipe.ns](../../../stdlib/std/net_connect_recipe.ns)
+* [net_listen_recipe.ns](../../../stdlib/std/net_listen_recipe.ns)
+* [net_close_recipe.ns](../../../stdlib/std/net_close_recipe.ns)
 
 ### Protocol Edge
 
-* [net_protocol_experiment_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_experiment_recipe.ns)
-* [net_line_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_line_protocol_recipe.ns)
-* [net_datagram_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_protocol_recipe.ns)
-* [net_dnsish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_protocol_recipe.ns)
-* [net_dnsish_query_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_query_recipe.ns)
-* [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns)
-* [net_httpish_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_request_recipe.ns)
-* [net_httpish_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_response_recipe.ns)
-* [net_httpish_roundtrip_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_roundtrip_recipe.ns)
+* [net_protocol_experiment_recipe.ns](../../../stdlib/std/net_protocol_experiment_recipe.ns)
+* [net_line_protocol_recipe.ns](../../../stdlib/std/net_line_protocol_recipe.ns)
+* [net_datagram_protocol_recipe.ns](../../../stdlib/std/net_datagram_protocol_recipe.ns)
+* [net_dnsish_protocol_recipe.ns](../../../stdlib/std/net_dnsish_protocol_recipe.ns)
+* [net_dnsish_query_recipe.ns](../../../stdlib/std/net_dnsish_query_recipe.ns)
+* [net_httpish_protocol_recipe.ns](../../../stdlib/std/net_httpish_protocol_recipe.ns)
+* [net_httpish_request_recipe.ns](../../../stdlib/std/net_httpish_request_recipe.ns)
+* [net_httpish_response_recipe.ns](../../../stdlib/std/net_httpish_response_recipe.ns)
+* [net_httpish_roundtrip_recipe.ns](../../../stdlib/std/net_httpish_roundtrip_recipe.ns)
 
 ### HTTP Edge
 
-* [net_http_client_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_recipe.ns)
-* [net_http_request_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_request_builder_recipe.ns)
-* [net_http_client_headers_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_headers_recipe.ns)
-* [net_http_client_url_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_url_recipe.ns)
-* [net_http_client_body_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_body_recipe.ns)
-* [net_http_client_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_status_recipe.ns)
-* [net_http_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_request_recipe.ns)
-* [net_http_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_response_recipe.ns)
-* [net_http_client_exchange_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_exchange_recipe.ns)
-* [net_http_client_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_recipe.ns)
-* [net_http_client_lane_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_lane_recipe.ns)
-* [net_http_client_get_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_get_recipe.ns)
-* [net_http_client_post_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_post_recipe.ns)
-* [net_http_service_lane_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_service_lane_recipe.ns)
+* [net_http_client_recipe.ns](../../../stdlib/std/net_http_client_recipe.ns)
+* [net_http_request_builder_recipe.ns](../../../stdlib/std/net_http_request_builder_recipe.ns)
+* [net_http_client_headers_recipe.ns](../../../stdlib/std/net_http_client_headers_recipe.ns)
+* [net_http_client_url_recipe.ns](../../../stdlib/std/net_http_client_url_recipe.ns)
+* [net_http_client_body_recipe.ns](../../../stdlib/std/net_http_client_body_recipe.ns)
+* [net_http_client_status_recipe.ns](../../../stdlib/std/net_http_client_status_recipe.ns)
+* [net_http_request_recipe.ns](../../../stdlib/std/net_http_request_recipe.ns)
+* [net_http_response_recipe.ns](../../../stdlib/std/net_http_response_recipe.ns)
+* [net_http_client_exchange_recipe.ns](../../../stdlib/std/net_http_client_exchange_recipe.ns)
+* [net_http_client_session_recipe.ns](../../../stdlib/std/net_http_client_session_recipe.ns)
+* [net_http_client_lane_recipe.ns](../../../stdlib/std/net_http_client_lane_recipe.ns)
+* [net_http_client_get_recipe.ns](../../../stdlib/std/net_http_client_get_recipe.ns)
+* [net_http_client_post_recipe.ns](../../../stdlib/std/net_http_client_post_recipe.ns)
+* [net_http_service_lane_recipe.ns](../../../stdlib/std/net_http_service_lane_recipe.ns)
 
 ### Result Spine
 
-* [net_result_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_result_recipe.ns)
-* [net_result_bridge_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_result_bridge_recipe.ns)
+* [net_result_recipe.ns](../../../stdlib/std/net_result_recipe.ns)
+* [net_result_bridge_recipe.ns](../../../stdlib/std/net_result_bridge_recipe.ns)
 
 ### Task Spine
 
-* [net_task_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_task_policy_recipe.ns)
-* [net_task_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_task_batch_recipe.ns)
-* [net_task_windowed_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_task_windowed_recipe.ns)
-* [net_task_windowed_bridge_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_task_windowed_bridge_recipe.ns)
+* [net_task_policy_recipe.ns](../../../stdlib/std/net_task_policy_recipe.ns)
+* [net_task_batch_recipe.ns](../../../stdlib/std/net_task_batch_recipe.ns)
+* [net_task_windowed_recipe.ns](../../../stdlib/std/net_task_windowed_recipe.ns)
+* [net_task_windowed_bridge_recipe.ns](../../../stdlib/std/net_task_windowed_bridge_recipe.ns)
 
 ### Session
 
-* [net_control_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_control_session_recipe.ns)
-* [net_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_session_recipe.ns)
-* [net_owned_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_transport_session_recipe.ns)
-* [net_transport_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_path_compare_recipe.ns)
-* [net_dnsish_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_path_compare_recipe.ns)
-* [net_httpish_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_path_compare_recipe.ns)
-* [net_protocol_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_session_recipe.ns)
-* [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns)
-* [net_owned_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_datagram_session_recipe.ns)
-* [net_udp_bound_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bound_session_recipe.ns)
-* [net_tcp_listener_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_listener_session_recipe.ns)
-* [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns)
-* [net_datagram_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_pipeline_recipe.ns)
-* [net_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_exchange_session_recipe.ns)
-* [net_owned_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_dnsish_exchange_session_recipe.ns)
-* [net_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_pipeline_recipe.ns)
-* [net_owned_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_dnsish_pipeline_recipe.ns)
-* [net_httpish_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_session_recipe.ns)
-* [net_httpish_header_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_session_recipe.ns)
-* [net_httpish_header_service_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_service_session_recipe.ns)
-* [net_httpish_client_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_client_session_packet_recipe.ns)
-* [net_httpish_service_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_service_session_packet_recipe.ns)
-* [net_httpish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_exchange_session_recipe.ns)
-* [net_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_session_recipe.ns)
+* [net_control_session_recipe.ns](../../../stdlib/std/net_control_session_recipe.ns)
+* [net_transport_session_recipe.ns](../../../stdlib/std/net_transport_session_recipe.ns)
+* [net_owned_transport_session_recipe.ns](../../../stdlib/std/net_owned_transport_session_recipe.ns)
+* [net_transport_path_compare_recipe.ns](../../../stdlib/std/net_transport_path_compare_recipe.ns)
+* [net_dnsish_path_compare_recipe.ns](../../../stdlib/std/net_dnsish_path_compare_recipe.ns)
+* [net_httpish_path_compare_recipe.ns](../../../stdlib/std/net_httpish_path_compare_recipe.ns)
+* [net_protocol_session_recipe.ns](../../../stdlib/std/net_protocol_session_recipe.ns)
+* [net_datagram_session_recipe.ns](../../../stdlib/std/net_datagram_session_recipe.ns)
+* [net_owned_datagram_session_recipe.ns](../../../stdlib/std/net_owned_datagram_session_recipe.ns)
+* [net_udp_bound_session_recipe.ns](../../../stdlib/std/net_udp_bound_session_recipe.ns)
+* [net_tcp_listener_session_recipe.ns](../../../stdlib/std/net_tcp_listener_session_recipe.ns)
+* [net_datagram_exchange_session_recipe.ns](../../../stdlib/std/net_datagram_exchange_session_recipe.ns)
+* [net_datagram_pipeline_recipe.ns](../../../stdlib/std/net_datagram_pipeline_recipe.ns)
+* [net_dnsish_exchange_session_recipe.ns](../../../stdlib/std/net_dnsish_exchange_session_recipe.ns)
+* [net_owned_dnsish_exchange_session_recipe.ns](../../../stdlib/std/net_owned_dnsish_exchange_session_recipe.ns)
+* [net_dnsish_pipeline_recipe.ns](../../../stdlib/std/net_dnsish_pipeline_recipe.ns)
+* [net_owned_dnsish_pipeline_recipe.ns](../../../stdlib/std/net_owned_dnsish_pipeline_recipe.ns)
+* [net_httpish_session_recipe.ns](../../../stdlib/std/net_httpish_session_recipe.ns)
+* [net_httpish_header_session_recipe.ns](../../../stdlib/std/net_httpish_header_session_recipe.ns)
+* [net_httpish_header_service_session_recipe.ns](../../../stdlib/std/net_httpish_header_service_session_recipe.ns)
+* [net_httpish_client_session_packet_recipe.ns](../../../stdlib/std/net_httpish_client_session_packet_recipe.ns)
+* [net_httpish_service_session_packet_recipe.ns](../../../stdlib/std/net_httpish_service_session_packet_recipe.ns)
+* [net_httpish_exchange_session_recipe.ns](../../../stdlib/std/net_httpish_exchange_session_recipe.ns)
+* [net_session_recipe.ns](../../../stdlib/std/net_session_recipe.ns)
 
 ## Companion Validation Router
 
-Use [examples/projects/domains](/Users/Shared/chroot/dev/nuislang/examples/projects/domains) as the executable companion set.
+Use [examples/projects/domains](../../../examples/projects/domains) as the executable companion set.
 
 Shortest grouped route:
 
 * profile / transport
-  - [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo)
-  - [network_endpoint_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_endpoint_profile_demo)
-  - [network_host_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_transport_runtime_demo)
-  - [network_host_handle_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_transport_runtime_demo)
+  - [network_profile_demo](../../../examples/projects/domains/network_profile_demo)
+  - [network_endpoint_profile_demo](../../../examples/projects/domains/network_endpoint_profile_demo)
+  - [network_host_transport_runtime_demo](../../../examples/projects/domains/network_host_transport_runtime_demo)
+  - [network_host_handle_transport_runtime_demo](../../../examples/projects/domains/network_host_handle_transport_runtime_demo)
 * sockets / control
-  - [net_tcp_socket_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_runtime_probe_demo)
-  - [net_tcp_send_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_send_runtime_probe_demo)
-  - [network_host_open_surface_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_open_surface_runtime_demo)
-  - [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo)
-  - [network_loopback_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_loopback_runtime_demo)
+  - [net_tcp_socket_runtime_probe_demo](../../../examples/projects/domains/net_tcp_socket_runtime_probe_demo)
+  - [net_tcp_send_runtime_probe_demo](../../../examples/projects/domains/net_tcp_send_runtime_probe_demo)
+  - [network_host_open_surface_runtime_demo](../../../examples/projects/domains/network_host_open_surface_runtime_demo)
+  - [network_host_control_runtime_demo](../../../examples/projects/domains/network_host_control_runtime_demo)
+  - [network_loopback_runtime_demo](../../../examples/projects/domains/network_loopback_runtime_demo)
 * protocol / http
-  - [net_protocol_experiment_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_experiment_recipe_demo)
-  - [net_httpish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_protocol_recipe_demo)
-  - [net_httpish_client_session_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_client_session_packet_recipe_demo)
-  - [net_httpish_service_session_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_service_session_packet_recipe_demo)
-  - [net_httpish_header_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_session_recipe_demo)
-  - [net_httpish_header_service_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_service_session_recipe_demo)
-  - [net_http_client_exchange_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_exchange_recipe_demo)
-  - [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo)
-  - [net_http_client_post_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_post_recipe_demo)
-  - [net_http_client_lane_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_lane_recipe_demo)
-  - [net_http_service_lane_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_service_lane_recipe_demo)
+  - [net_protocol_experiment_recipe_demo](../../../examples/projects/domains/net_protocol_experiment_recipe_demo)
+  - [net_httpish_protocol_recipe_demo](../../../examples/projects/domains/net_httpish_protocol_recipe_demo)
+  - [net_httpish_client_session_packet_recipe_demo](../../../examples/projects/domains/net_httpish_client_session_packet_recipe_demo)
+  - [net_httpish_service_session_packet_recipe_demo](../../../examples/projects/domains/net_httpish_service_session_packet_recipe_demo)
+  - [net_httpish_header_session_recipe_demo](../../../examples/projects/domains/net_httpish_header_session_recipe_demo)
+  - [net_httpish_header_service_session_recipe_demo](../../../examples/projects/domains/net_httpish_header_service_session_recipe_demo)
+  - [net_http_client_exchange_recipe_demo](../../../examples/projects/domains/net_http_client_exchange_recipe_demo)
+  - [net_http_client_get_recipe_demo](../../../examples/projects/domains/net_http_client_get_recipe_demo)
+  - [net_http_client_post_recipe_demo](../../../examples/projects/domains/net_http_client_post_recipe_demo)
+  - [net_http_client_lane_recipe_demo](../../../examples/projects/domains/net_http_client_lane_recipe_demo)
+  - [net_http_service_lane_recipe_demo](../../../examples/projects/domains/net_http_service_lane_recipe_demo)
 * result / task / session
-  - [network_connect_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_result_demo)
-  - [network_accept_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_accept_result_demo)
-  - [network_owned_transport_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_owned_transport_result_demo)
-  - [network_owned_transport_result_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_owned_transport_result_task_policy_demo)
-  - [network_owned_transport_result_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_owned_transport_result_task_batch_demo)
-  - [network_owned_transport_result_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_owned_transport_result_task_windowed_batch_demo)
-  - [network_owned_transport_result_session_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_owned_transport_result_session_bridge_demo)
-  - [net_session_loop_control_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_loop_control_recipe_demo)
-  - [net_http_session_loop_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
-  - [net_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_recipe_demo)
+  - [network_connect_result_demo](../../../examples/projects/domains/network_connect_result_demo)
+  - [network_accept_result_demo](../../../examples/projects/domains/network_accept_result_demo)
+  - [network_owned_transport_result_demo](../../../examples/projects/domains/network_owned_transport_result_demo)
+  - [network_owned_transport_result_task_policy_demo](../../../examples/projects/domains/network_owned_transport_result_task_policy_demo)
+  - [network_owned_transport_result_task_batch_demo](../../../examples/projects/domains/network_owned_transport_result_task_batch_demo)
+  - [network_owned_transport_result_task_windowed_batch_demo](../../../examples/projects/domains/network_owned_transport_result_task_windowed_batch_demo)
+  - [network_owned_transport_result_session_bridge_demo](../../../examples/projects/domains/network_owned_transport_result_session_bridge_demo)
+  - [net_session_loop_control_recipe_demo](../../../examples/projects/domains/net_session_loop_control_recipe_demo)
+  - [net_http_session_loop_bridge_recipe_demo](../../../examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
+  - [net_session_recipe_demo](../../../examples/projects/domains/net_session_recipe_demo)
 
 ## Current Reading Rule
 
 If you only want one pass:
 
-1. start with [net_endpoint_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_endpoint_recipe.ns)
+1. start with [net_endpoint_recipe.ns](../../../stdlib/std/net_endpoint_recipe.ns)
 2. follow the grouped lane above until `session`
 3. if your target is the current HTTP/session frontdoor, prefer
    `net_http_client_session_recipe -> net_httpish_header_session_recipe -> net_http_client_lane_recipe`
@@ -264,5 +264,5 @@ If you only want one pass:
    `net_httpish_service_session_packet_recipe -> net_httpish_header_service_session_recipe -> net_http_service_lane_recipe`
 5. jump into the matching `examples/projects/domains/*_demo`
 6. return to
-   [std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
+   [std-net-layering-contract.md](../../../docs/reference/std-net-layering-contract.md)
    when you want the contract language instead of the raw source list

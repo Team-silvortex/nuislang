@@ -14,11 +14,11 @@ best first stop for current semantic truth.
 
 ## Read In This Order
 
-* [nuis-ir.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis-ir.md)
+* [nuis-ir.md](nuis-ir.md)
   current frontend/IR boundary notes and `data.fabric`-side source conventions
-* [nuis.pest](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis.pest)
+* [nuis.pest](nuis.pest)
   current parser grammar used by the frontend
-* [nuislang.bnf](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuislang.bnf)
+* [nuislang.bnf](nuislang.bnf)
   higher-level grammar sketch/reference
 
 ## Boundary
@@ -26,5 +26,5 @@ best first stop for current semantic truth.
 If grammar/front-end notes disagree with current checked-in verifier/tool
 behavior, prefer:
 
-* [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
+* [docs/reference/README.md](../../docs/reference/README.md)
 * the implementation itself

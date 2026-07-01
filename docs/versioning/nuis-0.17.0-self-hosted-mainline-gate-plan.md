@@ -39,18 +39,18 @@ Short rule:
 
 Today the repository already exposes host/tooling-oriented source surfaces:
 
-* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-* [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
-* [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
-* [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
-* [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
+* [command_runtime_recipe.ns](../../stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](../../stdlib/std/subprocess_runtime_recipe.ns)
+* [command_shell_recipe.ns](../../stdlib/std/command_shell_recipe.ns)
+* [automation_runtime_recipe.ns](../../stdlib/std/automation_runtime_recipe.ns)
+* [cli_runtime_recipe.ns](../../stdlib/std/cli_runtime_recipe.ns)
+* [report_runtime_recipe.ns](../../stdlib/std/report_runtime_recipe.ns)
 
 There are also project-form companions:
 
-* [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo)
-* [subprocess_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo)
-* [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
+* [command_runtime_demo](../../examples/projects/tooling/command_runtime_demo)
+* [subprocess_runtime_demo](../../examples/projects/tooling/subprocess_runtime_demo)
+* [cli_runtime_demo](../../examples/projects/tooling/cli_runtime_demo)
 
 These are enough to show that the direction is real.
 
@@ -274,7 +274,7 @@ The best next move is:
 
 Current contract anchor:
 
-* [std-tooling-workflow-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-tooling-workflow-contract.md)
+* [std-tooling-workflow-contract.md](../../docs/reference/std-tooling-workflow-contract.md)
 
 Short rule:
 

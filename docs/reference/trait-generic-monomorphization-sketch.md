@@ -46,9 +46,9 @@ Today the repository already has:
 
 Relevant anchors:
 
-* [model.rs](/Users/Shared/chroot/dev/nuislang/crates/nuis-semantics/src/model.rs)
-* [parser.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/parser.rs)
-* [mod.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/mod.rs)
+* [model.rs](../../crates/nuis-semantics/src/model.rs)
+* [parser.rs](../../tools/nuisc/src/frontend/parser.rs)
+* [mod.rs](../../tools/nuisc/src/frontend/mod.rs)
 
 This means the most important missing piece is not angle-bracket parsing by
 itself. The missing piece is:

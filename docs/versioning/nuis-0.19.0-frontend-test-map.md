@@ -8,7 +8,7 @@ It exists to answer one practical question quickly:
 
 Companion current-state matrix:
 
-* [nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
+* [nuis-0.19.0-frontend-capability-matrix.md](nuis-0.19.0-frontend-capability-matrix.md)
 
 ## Short Rule
 

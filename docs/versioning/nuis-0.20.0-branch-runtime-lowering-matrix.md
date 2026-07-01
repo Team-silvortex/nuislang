@@ -9,9 +9,9 @@ It describes the narrow but now well-tested shape:
 
 Use this together with:
 
-* [nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
-* [../reference/control-flow-lowering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/control-flow-lowering-contract.md)
-* [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
+* [nuis-0.20.0-compile-gap-checklist.md](nuis-0.20.0-compile-gap-checklist.md)
+* [../reference/control-flow-lowering-contract.md](../../docs/reference/control-flow-lowering-contract.md)
+* [tests_branch_helpers.rs](../../tools/nuisc/src/lowering/tests_branch_helpers.rs)
 
 ## Short Rule
 
@@ -151,7 +151,7 @@ This file is a lowering-local coverage matrix, not a full compile-route matrix.
 
 Primary lowering-local proof file:
 
-* [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
+* [tests_branch_helpers.rs](../../tools/nuisc/src/lowering/tests_branch_helpers.rs)
 
 Fast focused command:
 

@@ -18,17 +18,17 @@ automation-facing source lanes.
 
 Current narrow sources include:
 
-* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
-* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
-* [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
-* [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
-* [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
-* [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
-* [workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime.ns)
-* [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
-* [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
-* [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
-* [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
+* [command_runtime_recipe.ns](../../stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](../../stdlib/std/subprocess_runtime_recipe.ns)
+* [command_shell_recipe.ns](../../stdlib/std/command_shell_recipe.ns)
+* [cli_runtime_recipe.ns](../../stdlib/std/cli_runtime_recipe.ns)
+* [report_runtime_recipe.ns](../../stdlib/std/report_runtime_recipe.ns)
+* [automation_runtime_recipe.ns](../../stdlib/std/automation_runtime_recipe.ns)
+* [workflow_runtime.ns](../../stdlib/std/workflow_runtime.ns)
+* [workflow_runtime_recipe.ns](../../stdlib/std/workflow_runtime_recipe.ns)
+* [cli_workflow_automation_recipe.ns](../../stdlib/std/cli_workflow_automation_recipe.ns)
+* [cli_build_pipeline_recipe.ns](../../stdlib/std/cli_build_pipeline_recipe.ns)
+* [cli_project_build_report_recipe.ns](../../stdlib/std/cli_project_build_report_recipe.ns)
 
 Those lanes are real enough to prove direction.
 
@@ -91,12 +91,12 @@ checked-in compile-ladder projects.
 
 Current companion anchors:
 
-* [cli_compile_workflow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_compile_workflow_demo)
-* [cli_workflow_automation_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo)
-* [cli_build_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo)
-* [cli_project_build_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo)
+* [cli_compile_workflow_demo](../../examples/projects/tooling/cli_compile_workflow_demo)
+* [cli_workflow_automation_demo](../../examples/projects/tooling/cli_workflow_automation_demo)
+* [cli_build_pipeline_demo](../../examples/projects/tooling/cli_build_pipeline_demo)
+* [cli_project_build_report_demo](../../examples/projects/tooling/cli_project_build_report_demo)
 * image-preprocess bridge:
-  [tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
+  [tooling-image-preprocess-lane.md](tooling-image-preprocess-lane.md)
 
 ## Current Problem Statement
 
@@ -140,13 +140,13 @@ That target now has checked-in proof in `std`.
 The current sample ladder is:
 
 * base workflow proof:
-  [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
+  [workflow_runtime_recipe.ns](../../stdlib/std/workflow_runtime_recipe.ns)
 * smallest integrated toolchain-shaped proof:
-  [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
+  [cli_workflow_automation_recipe.ns](../../stdlib/std/cli_workflow_automation_recipe.ns)
 * build-oriented proof:
-  [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
+  [cli_build_pipeline_recipe.ns](../../stdlib/std/cli_build_pipeline_recipe.ns)
 * project/report-oriented proof:
-  [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
+  [cli_project_build_report_recipe.ns](../../stdlib/std/cli_project_build_report_recipe.ns)
 
 That target still implies four source-level value families.
 
@@ -167,15 +167,15 @@ Short rule:
 Current example routing for this lane:
 
 * frontdoor project route:
-  [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo),
-  [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo),
-  [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
+  [cli_runtime_demo](../../examples/projects/tooling/cli_runtime_demo),
+  [command_runtime_demo](../../examples/projects/tooling/command_runtime_demo),
+  [workflow_runtime_demo](../../examples/projects/tooling/workflow_runtime_demo)
 * image-preprocess route:
-  [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo),
-  [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo),
-  [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
+  [cli_pgm_info_demo](../../examples/projects/tooling/cli_pgm_info_demo),
+  [cli_pgm_invert_demo](../../examples/projects/tooling/cli_pgm_invert_demo),
+  [cli_pgm_threshold_demo](../../examples/projects/tooling/cli_pgm_threshold_demo)
 * companion router:
-  [examples/projects/tooling/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/README.md)
+  [examples/projects/tooling/README.md](../../examples/projects/tooling/README.md)
 * retired historical probes:
   older low-level shell/line-input/automation/report examples have been
   removed from the checked-in examples tree
@@ -218,8 +218,8 @@ The important contract is:
 
 Current checked-in anchors:
 
-* [command_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime.ns)
-* [workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime.ns)
+* [command_runtime.ns](../../stdlib/std/command_runtime.ns)
+* [workflow_runtime.ns](../../stdlib/std/workflow_runtime.ns)
 
 ## 2. Command Result
 
@@ -317,10 +317,10 @@ Short rule:
 
 Current checked-in proof:
 
-* [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
-* [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
-* [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
-* [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
+* [workflow_runtime_recipe.ns](../../stdlib/std/workflow_runtime_recipe.ns)
+* [cli_workflow_automation_recipe.ns](../../stdlib/std/cli_workflow_automation_recipe.ns)
+* [cli_build_pipeline_recipe.ns](../../stdlib/std/cli_build_pipeline_recipe.ns)
+* [cli_project_build_report_recipe.ns](../../stdlib/std/cli_project_build_report_recipe.ns)
 
 ## Layering Rule
 
@@ -395,15 +395,15 @@ session capture
 
 The three current reference samples occupy different points on that ladder:
 
-* [workflow_frontdoor_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_frontdoor_runtime_recipe.ns)
+* [workflow_frontdoor_runtime_recipe.ns](../../stdlib/std/workflow_frontdoor_runtime_recipe.ns)
   narrow grouped front-door surface reference
-* [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
+* [cli_workflow_automation_recipe.ns](../../stdlib/std/cli_workflow_automation_recipe.ns)
   smallest integrated sample
-* [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
+* [cli_build_pipeline_recipe.ns](../../stdlib/std/cli_build_pipeline_recipe.ns)
   build-oriented stage naming plus shared front-door surface
-* [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
+* [cli_project_build_report_recipe.ns](../../stdlib/std/cli_project_build_report_recipe.ns)
   project/artifact/manifest/report naming plus shared front-door surface
-* [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
+* [cli_compile_workflow_recipe.ns](../../stdlib/std/cli_compile_workflow_recipe.ns)
   front-door compile workflow naming with nested project build plan/report and
   recommendation-style workflow hints plus source-kind workflow profiles and
   debug-workflow mirror fields grouped as one front-door surface

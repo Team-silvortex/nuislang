@@ -209,13 +209,13 @@ When debugging compiler regressions, the shortest current drill is:
 
 For generic-heavy routes, the best current anchors are:
 
-* [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
-* [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
+* [nuis-0.16.0-generic-surface-audit.md](nuis-0.16.0-generic-surface-audit.md)
+* [nuis-0.16.0-generic-constraint-coverage.md](nuis-0.16.0-generic-constraint-coverage.md)
 
 For real project generic/higher-order bridge routes, the best current anchor is:
 
 * `examples/projects/domains/net_http_session_loop_bridge_recipe_demo`
-  through [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+  through [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 ## Project Triage Workflow
 
@@ -312,17 +312,17 @@ add or tighten frontend probe
 
 In concrete terms:
 
-* use [tests_generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generics.rs)
+* use [tests_generics.rs](../../tools/nuisc/src/frontend/tests_generics.rs)
   when the route is about generic propagation, alias-aware expectation, async/task crossover,
   or control-flow-local specialization
-* use [tests_loop_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_flow.rs)
-  and [tests_loop_post_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_post_flow.rs)
+* use [tests_loop_flow.rs](../../tools/nuisc/src/lowering/tests_loop_flow.rs)
+  and [tests_loop_post_flow.rs](../../tools/nuisc/src/lowering/tests_loop_post_flow.rs)
   when the route is about executable loop-family lowering truth
-* use [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
+* use [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
   when the route includes lambda or higher-order specialization
-* use [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+* use [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
   when the route should survive real `examples/projects/domains` compile entrypoints
-* use [tools/nuisc/src/frontend/mod.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/mod.rs)
+* use [tools/nuisc/src/frontend/mod.rs](../../tools/nuisc/src/frontend/mod.rs)
   diagnostic tests when the goal is stable misuse reporting rather than successful lowering
 
 The shortest honest success criterion for a compiler change is now:

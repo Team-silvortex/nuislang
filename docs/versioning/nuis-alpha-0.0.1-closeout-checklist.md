@@ -11,11 +11,11 @@ It is the compression file for one narrower question:
 
 Read this together with:
 
-* [nuis-0.20.x-to-alpha-bootstrap-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
-* [alpha-mainline-boundary-index.md](/Users/Shared/chroot/dev/nuislang/docs/reference/alpha-mainline-boundary-index.md)
-* [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* [nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
-* [nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
+* [nuis-0.20.x-to-alpha-bootstrap-roadmap.md](nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
+* [alpha-mainline-boundary-index.md](../../docs/reference/alpha-mainline-boundary-index.md)
+* [current-mainline-map.md](../../docs/current-mainline-map.md)
+* [nuis-0.20.0-compile-gap-checklist.md](nuis-0.20.0-compile-gap-checklist.md)
+* [nuis-0.20.0-frontend-cli-boundaries.md](nuis-0.20.0-frontend-cli-boundaries.md)
 
 ## Short Rule
 
@@ -51,9 +51,9 @@ The default route must stay readable as:
 
 Must be true:
 
-* [README.md](/Users/Shared/chroot/dev/nuislang/README.md) keeps one obvious
+* [README.md](../../README.md) keeps one obvious
   frontdoor workflow
-* [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* [current-mainline-map.md](../../docs/current-mainline-map.md)
   remains the canonical short router
 * `project-doctor -> check -> test -> build -> release-check` remains the
   honest default CLI path
@@ -72,11 +72,11 @@ current” in another.
 
 Must be true:
 
-* [alpha-mainline-boundary-index.md](/Users/Shared/chroot/dev/nuislang/docs/reference/alpha-mainline-boundary-index.md)
+* [alpha-mainline-boundary-index.md](../../docs/reference/alpha-mainline-boundary-index.md)
   points to the right live boundaries
-* [nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
+* [nuis-0.20.0-compile-gap-checklist.md](nuis-0.20.0-compile-gap-checklist.md)
   reflects active pipeline gaps only
-* [nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
+* [nuis-0.20.0-frontend-cli-boundaries.md](nuis-0.20.0-frontend-cli-boundaries.md)
   reflects active frontend-vs-CLI boundaries only
 * outdated “current” wording in older docs is removed, demoted, or clearly
   marked historical
@@ -101,13 +101,13 @@ Must be true for the mainline semantic spine:
 
 Current high-signal anchors already include:
 
-* [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
-* [tests_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_control_flow.rs)
-* [tests_lambda_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_lambda_higher_order.rs)
-* [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
-* [tests_try.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_try.rs)
-* [tests/memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
-* [tests/network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+* [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
+* [tests_control_flow.rs](../../tools/nuisc/src/frontend/tests_control_flow.rs)
+* [tests_lambda_higher_order.rs](../../tools/nuisc/src/frontend/tests_lambda_higher_order.rs)
+* [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
+* [tests_try.rs](../../tools/nuisc/src/frontend/tests_try.rs)
+* [tests/memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
+* [tests/network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 Done when:
 
@@ -148,7 +148,7 @@ Must be true:
   assumptions
 * `nuisc` remains able to load and explain package-level lowering/ABI truth
 * current docs for capability split and ABI grain remain aligned with checked-in
-  manifests under [nustar-packages](/Users/Shared/chroot/dev/nuislang/nustar-packages)
+  manifests under [nustar-packages](../../nustar-packages)
 
 Done when:
 

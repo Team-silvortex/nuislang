@@ -5,10 +5,10 @@ bridge modules.
 
 Current bridge modules:
 
-* [result_enum_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_enum_runtime.ns)
-* [net_result_enum_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_result_enum_recipe.ns)
-* [task_result_enum_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_enum_recipe.ns)
-* [shader_result_enum_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/shader_result_enum_recipe.ns)
+* [result_enum_runtime.ns](../../stdlib/std/result_enum_runtime.ns)
+* [net_result_enum_recipe.ns](../../stdlib/std/net_result_enum_recipe.ns)
+* [task_result_enum_recipe.ns](../../stdlib/std/task_result_enum_recipe.ns)
+* [shader_result_enum_recipe.ns](../../stdlib/std/shader_result_enum_recipe.ns)
 
 Shared contract:
 
@@ -79,8 +79,8 @@ Current practical rule:
 
 Recommended reading order:
 
-1. [stdlib/core/result_patterns.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/result_patterns.ns)
-2. [stdlib/std/result_enum_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_enum_runtime.ns)
-3. [stdlib/std/task_result_enum_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_enum_recipe.ns)
-4. [stdlib/std/net_result_enum_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_result_enum_recipe.ns)
-5. [stdlib/std/shader_result_enum_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/shader_result_enum_recipe.ns)
+1. [stdlib/core/result_patterns.ns](../../stdlib/core/result_patterns.ns)
+2. [stdlib/std/result_enum_runtime.ns](../../stdlib/std/result_enum_runtime.ns)
+3. [stdlib/std/task_result_enum_recipe.ns](../../stdlib/std/task_result_enum_recipe.ns)
+4. [stdlib/std/net_result_enum_recipe.ns](../../stdlib/std/net_result_enum_recipe.ns)
+5. [stdlib/std/shader_result_enum_recipe.ns](../../stdlib/std/shader_result_enum_recipe.ns)

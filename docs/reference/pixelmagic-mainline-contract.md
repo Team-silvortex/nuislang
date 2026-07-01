@@ -17,7 +17,7 @@ The important current rule is:
 ## Stdlib Chain
 
 The current canonical source chain in
-[stdlib/pixelmagic](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
+[stdlib/pixelmagic](../../stdlib/pixelmagic/README.md)
 is:
 
 ```text
@@ -32,14 +32,14 @@ image packet
 
 Concrete current anchors:
 
-1. [image_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_packet_recipe.ns)
-2. [image_op_contract_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_op_contract_recipe.ns)
-3. [image_resource_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_resource_recipe.ns)
-4. [texture_binding_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/texture_binding_recipe.ns)
-5. [sampling_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/sampling_recipe.ns)
-6. [shader_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/shader_packet_recipe.ns)
-7. [shader_consumer_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/shader_consumer_recipe.ns)
-8. [pixelmagic_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/pixelmagic_pipeline_recipe.ns)
+1. [image_packet_recipe.ns](../../stdlib/pixelmagic/core/image_packet_recipe.ns)
+2. [image_op_contract_recipe.ns](../../stdlib/pixelmagic/core/image_op_contract_recipe.ns)
+3. [image_resource_recipe.ns](../../stdlib/pixelmagic/core/image_resource_recipe.ns)
+4. [texture_binding_recipe.ns](../../stdlib/pixelmagic/core/texture_binding_recipe.ns)
+5. [sampling_recipe.ns](../../stdlib/pixelmagic/core/sampling_recipe.ns)
+6. [shader_packet_recipe.ns](../../stdlib/pixelmagic/core/shader_packet_recipe.ns)
+7. [shader_consumer_recipe.ns](../../stdlib/pixelmagic/core/shader_consumer_recipe.ns)
+8. [pixelmagic_pipeline_recipe.ns](../../stdlib/pixelmagic/core/pixelmagic_pipeline_recipe.ns)
 
 ## Domain Route
 
@@ -55,13 +55,13 @@ tooling preprocess
 
 Concrete current anchors:
 
-1. [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
-2. [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
-3. [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
-4. [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
-5. [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
-6. [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
-7. [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
+1. [cli_pgm_info_demo](../../examples/projects/tooling/cli_pgm_info_demo)
+2. [cli_pgm_invert_demo](../../examples/projects/tooling/cli_pgm_invert_demo)
+3. [cli_pgm_threshold_demo](../../examples/projects/tooling/cli_pgm_threshold_demo)
+4. [pixelmagic_packet_bridge_demo](../../examples/projects/domains/pixelmagic_packet_bridge_demo)
+5. [pixelmagic_texture_resource_demo](../../examples/projects/domains/pixelmagic_texture_resource_demo)
+6. [pixelmagic_pipeline_demo](../../examples/projects/domains/pixelmagic_pipeline_demo)
+7. [pixelmagic_render_demo](../../examples/projects/domains/pixelmagic_render_demo)
 
 ## Relationship Rule
 
@@ -119,10 +119,10 @@ At the current repository stage, `PixelMagic` already has:
 
 If you only want the shortest current reading route, use:
 
-1. [stdlib/pixelmagic/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/README.md)
-2. [stdlib/pixelmagic/core/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/README.md)
-3. [pixelmagic_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/pixelmagic_pipeline_recipe.ns)
-4. [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
-5. [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
-6. [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
-7. [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
+1. [stdlib/pixelmagic/README.md](../../stdlib/pixelmagic/README.md)
+2. [stdlib/pixelmagic/core/README.md](../../stdlib/pixelmagic/core/README.md)
+3. [pixelmagic_pipeline_recipe.ns](../../stdlib/pixelmagic/core/pixelmagic_pipeline_recipe.ns)
+4. [pixelmagic_packet_bridge_demo](../../examples/projects/domains/pixelmagic_packet_bridge_demo)
+5. [pixelmagic_texture_resource_demo](../../examples/projects/domains/pixelmagic_texture_resource_demo)
+6. [pixelmagic_pipeline_demo](../../examples/projects/domains/pixelmagic_pipeline_demo)
+7. [pixelmagic_render_demo](../../examples/projects/domains/pixelmagic_render_demo)

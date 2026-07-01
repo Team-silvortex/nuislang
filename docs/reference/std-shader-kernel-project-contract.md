@@ -36,9 +36,9 @@ The practical current rule is:
   already implemented as `std`-first wrapper layers
 * the current checked-in project-first reuse point is still project-local
   `cpu` helper modules rather than shared `std` wrappers, with:
-  [shader_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/shader_task_async_shapes.ns)
+  [shader_task_async_shapes.ns](../../examples/projects/domains/shared/shader_task_async_shapes.ns)
   and
-  [kernel_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/kernel_task_async_shapes.ns)
+  [kernel_task_async_shapes.ns](../../examples/projects/domains/shared/kernel_task_async_shapes.ns)
   carrying the shared task-shaped policy/fallback helpers reused by the async
   shader/kernel demos
 * inside those helper modules, treat `task_*` names as the compatibility
@@ -46,26 +46,26 @@ The practical current rule is:
   most directly against the current scheduler/result/summary contract stack
 * when you want one checked-in source sample that also reads cleanly against
   the current scheduler-contract stack, start with:
-  * [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo)
-  * [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo)
+  * [shader_async_policy_profile_demo](../../examples/projects/domains/shader_async_policy_profile_demo)
+  * [kernel_async_tensor_policy_profile_demo](../../examples/projects/domains/kernel_async_tensor_policy_profile_demo)
   Those two lanes now annotate the same high-level order directly in source:
   `placement -> result observation -> async summary -> bridge-visible finalization`
 * when you want the next wider pair that also makes `windowed` summary stages
   explicit in source and starts reusing shared task-shaped batch/windowed
   helpers, continue with:
-  * [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo)
-  * [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
+  * [shader_async_windowed_batch_profile_demo](../../examples/projects/domains/shader_async_windowed_batch_profile_demo)
+  * [kernel_async_tensor_windowed_batch_profile_demo](../../examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
   Those two lanes now read most directly as:
   `result observation -> async batch summary -> preview window -> final window`
 
 Current sample ladder:
 
 * narrow policy pair:
-  * [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo)
-  * [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo)
+  * [shader_async_policy_profile_demo](../../examples/projects/domains/shader_async_policy_profile_demo)
+  * [kernel_async_tensor_policy_profile_demo](../../examples/projects/domains/kernel_async_tensor_policy_profile_demo)
 * wider windowed pair:
-  * [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo)
-  * [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
+  * [shader_async_windowed_batch_profile_demo](../../examples/projects/domains/shader_async_windowed_batch_profile_demo)
+  * [kernel_async_tensor_windowed_batch_profile_demo](../../examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
 
 Current CLI-facing summary sample hint:
 
@@ -114,12 +114,12 @@ surface_shader.ns / kernel_unit.ns style profile source
 
 These lanes already have real current meaning through:
 
-* [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+* [yir-langref.md](yir-langref.md)
+* [yir-tools-reference.md](yir-tools-reference.md)
 * checked-in showcase projects such as
-  [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+  [window_controls_demo](../../examples/projects/window_controls_demo)
   and
-  [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+  [kernel_tensor_demo](../../examples/projects/kernel_tensor_demo)
 
 But they currently differ from the `std` pure-layer lanes in one important way:
 
@@ -140,63 +140,63 @@ That means the most honest checked-in route today is:
 
 The current narrow project-form companions are:
 
-* [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
-* [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo)
-* [shader_surface_material_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_profile_demo)
-* [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo)
-* [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo)
-* [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo)
-* [shader_surface_state_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_profile_demo)
-* [shader_surface_state_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_packet_profile_demo)
-* [shader_surface_state_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_pass_profile_demo)
-* [shader_surface_state_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_flow_profile_demo)
-* [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo)
-* [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo)
-* [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
-* [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo)
-* [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo)
-* [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
-* [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo)
-* [shader_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_result_profile_demo)
-* [shader_async_fanin_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fanin_profile_demo)
-* [shader_async_schedule_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_schedule_profile_demo)
-* [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo)
-* [shader_async_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fallback_profile_demo)
-* [shader_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_batch_profile_demo)
-* [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo)
-* [shader_result_family_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_family_profile_demo)
-* [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
-* [shader_draw_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_render_profile_demo)
-* [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo)
-* [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
-* [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
-* [kernel_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_result_profile_demo)
-* [kernel_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_result_profile_demo)
-* [kernel_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_batch_profile_demo)
-* [kernel_async_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_roundtrip_profile_demo)
-* [kernel_async_tensor_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_batch_profile_demo)
-* [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo)
-* [kernel_async_tensor_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_fallback_profile_demo)
-* [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
-* [kernel_async_tensor_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo)
-* [kernel_tensor_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_profile_demo)
-* [kernel_tensor_inspect_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_inspect_demo)
-* [kernel_tensor_slice_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_slice_demo)
-* [kernel_tensor_reshape_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_reshape_demo)
-* [kernel_tensor_broadcast_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_broadcast_demo)
-* [kernel_tensor_reduce_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_reduce_demo)
-* [kernel_tensor_select_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_select_demo)
-* [kernel_tensor_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_order_demo)
-* [kernel_tensor_axis_reduce_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_reduce_demo)
-* [kernel_tensor_axis_family_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_family_demo)
-* [kernel_tensor_axis_select_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_select_demo)
-* [kernel_tensor_axis_sort_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_sort_demo)
-* [kernel_tensor_axis_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_order_demo)
-* [kernel_tensor_axis_map_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_map_demo)
-* [kernel_tensor_axis_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_pipeline_demo)
-* [kernel_tensor_axis_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_roundtrip_demo)
-* [kernel_tensor_map_zip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_map_zip_demo)
-* [kernel_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_roundtrip_profile_demo)
+* [shader_profile_demo](../../examples/projects/domains/shader_profile_demo)
+* [shader_surface_profile_demo](../../examples/projects/domains/shader_surface_profile_demo)
+* [shader_surface_material_profile_demo](../../examples/projects/domains/shader_surface_material_profile_demo)
+* [shader_surface_material_pass_profile_demo](../../examples/projects/domains/shader_surface_material_pass_profile_demo)
+* [shader_surface_material_packet_profile_demo](../../examples/projects/domains/shader_surface_material_packet_profile_demo)
+* [shader_surface_material_panel_profile_demo](../../examples/projects/domains/shader_surface_material_panel_profile_demo)
+* [shader_surface_state_profile_demo](../../examples/projects/domains/shader_surface_state_profile_demo)
+* [shader_surface_state_packet_profile_demo](../../examples/projects/domains/shader_surface_state_packet_profile_demo)
+* [shader_surface_state_pass_profile_demo](../../examples/projects/domains/shader_surface_state_pass_profile_demo)
+* [shader_surface_state_flow_profile_demo](../../examples/projects/domains/shader_surface_state_flow_profile_demo)
+* [shader_surface_material_flow_profile_demo](../../examples/projects/domains/shader_surface_material_flow_profile_demo)
+* [shader_surface_packet_profile_demo](../../examples/projects/domains/shader_surface_packet_profile_demo)
+* [shader_surface_pass_profile_demo](../../examples/projects/domains/shader_surface_pass_profile_demo)
+* [shader_packet_profile_demo](../../examples/projects/domains/shader_packet_profile_demo)
+* [shader_packet_bridge_demo](../../examples/projects/domains/shader_packet_bridge_demo)
+* [shader_pass_profile_demo](../../examples/projects/domains/shader_pass_profile_demo)
+* [shader_frame_profile_demo](../../examples/projects/domains/shader_frame_profile_demo)
+* [shader_async_result_profile_demo](../../examples/projects/domains/shader_async_result_profile_demo)
+* [shader_async_fanin_profile_demo](../../examples/projects/domains/shader_async_fanin_profile_demo)
+* [shader_async_schedule_profile_demo](../../examples/projects/domains/shader_async_schedule_profile_demo)
+* [shader_async_policy_profile_demo](../../examples/projects/domains/shader_async_policy_profile_demo)
+* [shader_async_fallback_profile_demo](../../examples/projects/domains/shader_async_fallback_profile_demo)
+* [shader_async_batch_profile_demo](../../examples/projects/domains/shader_async_batch_profile_demo)
+* [shader_async_windowed_batch_profile_demo](../../examples/projects/domains/shader_async_windowed_batch_profile_demo)
+* [shader_result_family_profile_demo](../../examples/projects/domains/shader_result_family_profile_demo)
+* [shader_result_profile_demo](../../examples/projects/domains/shader_result_profile_demo)
+* [shader_draw_render_profile_demo](../../examples/projects/domains/shader_draw_render_profile_demo)
+* [shader_draw_profile_demo](../../examples/projects/domains/shader_draw_profile_demo)
+* [shader_render_profile_demo](../../examples/projects/domains/shader_render_profile_demo)
+* [kernel_profile_demo](../../examples/projects/domains/kernel_profile_demo)
+* [kernel_result_profile_demo](../../examples/projects/domains/kernel_result_profile_demo)
+* [kernel_async_result_profile_demo](../../examples/projects/domains/kernel_async_result_profile_demo)
+* [kernel_async_batch_profile_demo](../../examples/projects/domains/kernel_async_batch_profile_demo)
+* [kernel_async_roundtrip_profile_demo](../../examples/projects/domains/kernel_async_roundtrip_profile_demo)
+* [kernel_async_tensor_batch_profile_demo](../../examples/projects/domains/kernel_async_tensor_batch_profile_demo)
+* [kernel_async_tensor_policy_profile_demo](../../examples/projects/domains/kernel_async_tensor_policy_profile_demo)
+* [kernel_async_tensor_fallback_profile_demo](../../examples/projects/domains/kernel_async_tensor_fallback_profile_demo)
+* [kernel_async_tensor_windowed_batch_profile_demo](../../examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
+* [kernel_async_tensor_roundtrip_profile_demo](../../examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo)
+* [kernel_tensor_profile_demo](../../examples/projects/domains/kernel_tensor_profile_demo)
+* [kernel_tensor_inspect_demo](../../examples/projects/domains/kernel_tensor_inspect_demo)
+* [kernel_tensor_slice_demo](../../examples/projects/domains/kernel_tensor_slice_demo)
+* [kernel_tensor_reshape_demo](../../examples/projects/domains/kernel_tensor_reshape_demo)
+* [kernel_tensor_broadcast_demo](../../examples/projects/domains/kernel_tensor_broadcast_demo)
+* [kernel_tensor_reduce_demo](../../examples/projects/domains/kernel_tensor_reduce_demo)
+* [kernel_tensor_select_demo](../../examples/projects/domains/kernel_tensor_select_demo)
+* [kernel_tensor_order_demo](../../examples/projects/domains/kernel_tensor_order_demo)
+* [kernel_tensor_axis_reduce_demo](../../examples/projects/domains/kernel_tensor_axis_reduce_demo)
+* [kernel_tensor_axis_family_demo](../../examples/projects/domains/kernel_tensor_axis_family_demo)
+* [kernel_tensor_axis_select_demo](../../examples/projects/domains/kernel_tensor_axis_select_demo)
+* [kernel_tensor_axis_sort_demo](../../examples/projects/domains/kernel_tensor_axis_sort_demo)
+* [kernel_tensor_axis_order_demo](../../examples/projects/domains/kernel_tensor_axis_order_demo)
+* [kernel_tensor_axis_map_demo](../../examples/projects/domains/kernel_tensor_axis_map_demo)
+* [kernel_tensor_axis_pipeline_demo](../../examples/projects/domains/kernel_tensor_axis_pipeline_demo)
+* [kernel_tensor_axis_roundtrip_demo](../../examples/projects/domains/kernel_tensor_axis_roundtrip_demo)
+* [kernel_tensor_map_zip_demo](../../examples/projects/domains/kernel_tensor_map_zip_demo)
+* [kernel_roundtrip_profile_demo](../../examples/projects/domains/kernel_roundtrip_profile_demo)
 
 Current role split:
 
@@ -340,21 +340,21 @@ Current role split:
   metadata is explicitly wrapped into `KernelResult<T>` and then observed
   through `kernel_config_ready(...)` and `kernel_value(...)`
 * kernel async base:
-  [kernel_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_result_profile_demo) is the first route where
+  [kernel_async_result_profile_demo](../../examples/projects/domains/kernel_async_result_profile_demo) is the first route where
   `KernelResult<i64>` crosses a `mod cpu` async-helper boundary,
-  [kernel_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_batch_profile_demo) is the next route where multiple observations are launched and joined as one batch,
-  and [kernel_async_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_roundtrip_profile_demo) is the route where that narrower profile batch is compressed into a roundtrip seed and joined with `data_profile_send_uplink(...)` and `data_profile_send_downlink(...)`
+  [kernel_async_batch_profile_demo](../../examples/projects/domains/kernel_async_batch_profile_demo) is the next route where multiple observations are launched and joined as one batch,
+  and [kernel_async_roundtrip_profile_demo](../../examples/projects/domains/kernel_async_roundtrip_profile_demo) is the route where that narrower profile batch is compressed into a roundtrip seed and joined with `data_profile_send_uplink(...)` and `data_profile_send_downlink(...)`
 * kernel async tensor:
-  [kernel_async_tensor_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_batch_profile_demo) first compresses the tensor lane into scalar `KernelResult<i64>` observations,
-  [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo) adds explicit CPU-side priority policy and now uses a local `KernelTaskPolicySummary` / `capture_task_policy(...)` shape to make that policy read like the shared `task_policy` lane,
-  [kernel_async_tensor_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_fallback_profile_demo) adds explicit timeout fallback and now uses a local `KernelTaskFallbackSummary` / `capture_task_fallback(...)` shape to make that fallback read like the shared `task_fallback` lane,
-  [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo) splits that tensor async batch into preview-window and final-window summaries,
-  and [kernel_async_tensor_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo) compresses that tensor async batch into a roundtrip seed and joins it with `data_profile_send_uplink(...)` and `data_profile_send_downlink(...)`
+  [kernel_async_tensor_batch_profile_demo](../../examples/projects/domains/kernel_async_tensor_batch_profile_demo) first compresses the tensor lane into scalar `KernelResult<i64>` observations,
+  [kernel_async_tensor_policy_profile_demo](../../examples/projects/domains/kernel_async_tensor_policy_profile_demo) adds explicit CPU-side priority policy and now uses a local `KernelTaskPolicySummary` / `capture_task_policy(...)` shape to make that policy read like the shared `task_policy` lane,
+  [kernel_async_tensor_fallback_profile_demo](../../examples/projects/domains/kernel_async_tensor_fallback_profile_demo) adds explicit timeout fallback and now uses a local `KernelTaskFallbackSummary` / `capture_task_fallback(...)` shape to make that fallback read like the shared `task_fallback` lane,
+  [kernel_async_tensor_windowed_batch_profile_demo](../../examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo) splits that tensor async batch into preview-window and final-window summaries,
+  and [kernel_async_tensor_roundtrip_profile_demo](../../examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo) compresses that tensor async batch into a roundtrip seed and joins it with `data_profile_send_uplink(...)` and `data_profile_send_downlink(...)`
 * async branch alignment:
-  shader async starts at [shader_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_result_profile_demo), grows through [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo), [shader_async_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fallback_profile_demo), and [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo), then rejoins the wider bridge branch
+  shader async starts at [shader_async_result_profile_demo](../../examples/projects/domains/shader_async_result_profile_demo), grows through [shader_async_policy_profile_demo](../../examples/projects/domains/shader_async_policy_profile_demo), [shader_async_fallback_profile_demo](../../examples/projects/domains/shader_async_fallback_profile_demo), and [shader_async_windowed_batch_profile_demo](../../examples/projects/domains/shader_async_windowed_batch_profile_demo), then rejoins the wider bridge branch
   kernel async now mirrors that in two layers:
-  async base uses [kernel_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_result_profile_demo), [kernel_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_batch_profile_demo), and [kernel_async_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_roundtrip_profile_demo)
-  async tensor uses [kernel_async_tensor_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_batch_profile_demo), [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo), [kernel_async_tensor_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_fallback_profile_demo), [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo), and [kernel_async_tensor_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo)
+  async base uses [kernel_async_result_profile_demo](../../examples/projects/domains/kernel_async_result_profile_demo), [kernel_async_batch_profile_demo](../../examples/projects/domains/kernel_async_batch_profile_demo), and [kernel_async_roundtrip_profile_demo](../../examples/projects/domains/kernel_async_roundtrip_profile_demo)
+  async tensor uses [kernel_async_tensor_batch_profile_demo](../../examples/projects/domains/kernel_async_tensor_batch_profile_demo), [kernel_async_tensor_policy_profile_demo](../../examples/projects/domains/kernel_async_tensor_policy_profile_demo), [kernel_async_tensor_fallback_profile_demo](../../examples/projects/domains/kernel_async_tensor_fallback_profile_demo), [kernel_async_tensor_windowed_batch_profile_demo](../../examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo), and [kernel_async_tensor_roundtrip_profile_demo](../../examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo)
   the practical reading rule is:
   shader async is frame/result-first,
   kernel async is profile/tensor-summary-first
@@ -426,39 +426,39 @@ These are intentionally narrower than the showcase projects.
 ## Current Shader Branches
 
 The shader ladder is now easier to read as three local branches after
-[shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo):
+[shader_profile_demo](../../examples/projects/domains/shader_profile_demo):
 
 * surface branch:
-  [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo) ->
-  [shader_surface_material_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_profile_demo) ->
-  [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo) ->
-  [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo) ->
-  [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo) ->
-  [shader_surface_state_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_profile_demo) ->
-  [shader_surface_state_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_packet_profile_demo) ->
-  [shader_surface_state_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_pass_profile_demo) ->
-  [shader_surface_state_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_flow_profile_demo) ->
-  [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo) ->
-  [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo) ->
-  [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
+  [shader_surface_profile_demo](../../examples/projects/domains/shader_surface_profile_demo) ->
+  [shader_surface_material_profile_demo](../../examples/projects/domains/shader_surface_material_profile_demo) ->
+  [shader_surface_material_pass_profile_demo](../../examples/projects/domains/shader_surface_material_pass_profile_demo) ->
+  [shader_surface_material_packet_profile_demo](../../examples/projects/domains/shader_surface_material_packet_profile_demo) ->
+  [shader_surface_material_panel_profile_demo](../../examples/projects/domains/shader_surface_material_panel_profile_demo) ->
+  [shader_surface_state_profile_demo](../../examples/projects/domains/shader_surface_state_profile_demo) ->
+  [shader_surface_state_packet_profile_demo](../../examples/projects/domains/shader_surface_state_packet_profile_demo) ->
+  [shader_surface_state_pass_profile_demo](../../examples/projects/domains/shader_surface_state_pass_profile_demo) ->
+  [shader_surface_state_flow_profile_demo](../../examples/projects/domains/shader_surface_state_flow_profile_demo) ->
+  [shader_surface_material_flow_profile_demo](../../examples/projects/domains/shader_surface_material_flow_profile_demo) ->
+  [shader_surface_packet_profile_demo](../../examples/projects/domains/shader_surface_packet_profile_demo) ->
+  [shader_surface_pass_profile_demo](../../examples/projects/domains/shader_surface_pass_profile_demo)
 * packet branch:
-  [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo) ->
-  [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo)
+  [shader_packet_profile_demo](../../examples/projects/domains/shader_packet_profile_demo) ->
+  [shader_packet_bridge_demo](../../examples/projects/domains/shader_packet_bridge_demo)
 * bridge branch:
-  [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo) ->
-  [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo) ->
-  [shader_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_result_profile_demo) ->
-  [shader_async_fanin_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fanin_profile_demo) ->
-  [shader_async_schedule_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_schedule_profile_demo) ->
-  [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo) ->
-  [shader_async_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fallback_profile_demo) ->
-  [shader_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_batch_profile_demo) ->
-  [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo) ->
-  [shader_result_family_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_family_profile_demo) ->
-  [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo) ->
-  [shader_draw_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_render_profile_demo) ->
-  [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo) ->
-  [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
+  [shader_pass_profile_demo](../../examples/projects/domains/shader_pass_profile_demo) ->
+  [shader_frame_profile_demo](../../examples/projects/domains/shader_frame_profile_demo) ->
+  [shader_async_result_profile_demo](../../examples/projects/domains/shader_async_result_profile_demo) ->
+  [shader_async_fanin_profile_demo](../../examples/projects/domains/shader_async_fanin_profile_demo) ->
+  [shader_async_schedule_profile_demo](../../examples/projects/domains/shader_async_schedule_profile_demo) ->
+  [shader_async_policy_profile_demo](../../examples/projects/domains/shader_async_policy_profile_demo) ->
+  [shader_async_fallback_profile_demo](../../examples/projects/domains/shader_async_fallback_profile_demo) ->
+  [shader_async_batch_profile_demo](../../examples/projects/domains/shader_async_batch_profile_demo) ->
+  [shader_async_windowed_batch_profile_demo](../../examples/projects/domains/shader_async_windowed_batch_profile_demo) ->
+  [shader_result_family_profile_demo](../../examples/projects/domains/shader_result_family_profile_demo) ->
+  [shader_result_profile_demo](../../examples/projects/domains/shader_result_profile_demo) ->
+  [shader_draw_render_profile_demo](../../examples/projects/domains/shader_draw_render_profile_demo) ->
+  [shader_draw_profile_demo](../../examples/projects/domains/shader_draw_profile_demo) ->
+  [shader_render_profile_demo](../../examples/projects/domains/shader_render_profile_demo)
 
 Recommended reading order inside shader is now:
 
@@ -480,31 +480,31 @@ Host-side prep rule before bigger shader libraries:
   shader-domain render growth, which helps us avoid coupling domain execution
   to temporary host scaffolding
 * the dedicated prep sketch for that future lane lives at:
-  [galaxy-frontdoor-prep-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-frontdoor-prep-sketch.md)
-* only then move to [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+  [galaxy-frontdoor-prep-sketch.md](galaxy-frontdoor-prep-sketch.md)
+* only then move to [window_controls_demo](../../examples/projects/window_controls_demo)
 
 ## Current Axis-Aware Kernel Lane
 
 The current axis-aware tensor lane is now explicit enough to read as its own
 subgroup inside the broader `kernel` ladder:
 
-* [kernel_tensor_axis_reduce_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_reduce_demo)
+* [kernel_tensor_axis_reduce_demo](../../examples/projects/domains/kernel_tensor_axis_reduce_demo)
   introduces `kernel_reduce_sum_axis(..., "rows|cols")`
-* [kernel_tensor_axis_family_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_family_demo)
+* [kernel_tensor_axis_family_demo](../../examples/projects/domains/kernel_tensor_axis_family_demo)
   expands that into `kernel_reduce_max_axis(...)` and
   `kernel_reduce_mean_axis(...)`
-* [kernel_tensor_axis_select_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_select_demo)
+* [kernel_tensor_axis_select_demo](../../examples/projects/domains/kernel_tensor_axis_select_demo)
   introduces `kernel_argmax_axis(...)` and `kernel_argmin_axis(...)`
-* [kernel_tensor_axis_sort_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_sort_demo)
+* [kernel_tensor_axis_sort_demo](../../examples/projects/domains/kernel_tensor_axis_sort_demo)
   introduces `kernel_sort_axis(...)`
-* [kernel_tensor_axis_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_order_demo)
+* [kernel_tensor_axis_order_demo](../../examples/projects/domains/kernel_tensor_axis_order_demo)
   introduces `kernel_topk_axis(...)`
-* [kernel_tensor_axis_map_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_map_demo)
+* [kernel_tensor_axis_map_demo](../../examples/projects/domains/kernel_tensor_axis_map_demo)
   introduces `kernel_map_axis(...)`
-* [kernel_tensor_axis_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_pipeline_demo)
+* [kernel_tensor_axis_pipeline_demo](../../examples/projects/domains/kernel_tensor_axis_pipeline_demo)
   composes `kernel_map_axis(...)`, `kernel_reduce_mean_axis(...)`, and
   `kernel_topk_axis(...)` into a narrow checked-in mini-flow
-* [kernel_tensor_axis_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_roundtrip_demo)
+* [kernel_tensor_axis_roundtrip_demo](../../examples/projects/domains/kernel_tensor_axis_roundtrip_demo)
   joins that mini-flow with `data_profile_send_uplink(...)` and
   `data_profile_send_downlink(...)`
 
@@ -530,55 +530,55 @@ That keeps the growth shape aligned with the existing non-axis ladder:
 
 The repository still keeps source-shaped mirrors for these lanes:
 
-* [shader_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_profile_demo.ns)
-* [shader_surface_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_profile_demo.ns)
-* [shader_surface_material_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_material_profile_demo.ns)
-* [shader_surface_material_pass_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_material_pass_profile_demo.ns)
-* [shader_surface_material_packet_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_material_packet_profile_demo.ns)
-* [shader_surface_material_panel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_material_panel_profile_demo.ns)
-* [shader_surface_material_flow_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_material_flow_profile_demo.ns)
-* [shader_surface_packet_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_packet_profile_demo.ns)
-* [shader_surface_pass_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_pass_profile_demo.ns)
-* [shader_packet_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_packet_profile_demo.ns)
-* [shader_packet_bridge_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_packet_bridge_demo.ns)
-* [shader_pass_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_pass_profile_demo.ns)
-* [shader_frame_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_frame_profile_demo.ns)
-* [shader_async_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_result_profile_demo.ns)
-* [shader_async_fanin_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_fanin_profile_demo.ns)
-* [shader_async_schedule_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_schedule_profile_demo.ns)
-* [shader_async_policy_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_policy_profile_demo.ns)
-* [shader_async_fallback_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_fallback_profile_demo.ns)
-* [shader_async_batch_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_batch_profile_demo.ns)
-* [shader_async_windowed_batch_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_windowed_batch_profile_demo.ns)
-* [shader_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_result_profile_demo.ns)
-* [shader_draw_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_draw_profile_demo.ns)
-* [kernel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_profile_demo.ns)
-* [kernel_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_result_profile_demo.ns)
-* [kernel_async_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_result_profile_demo.ns)
-* [kernel_async_batch_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_batch_profile_demo.ns)
-* [kernel_async_tensor_batch_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_tensor_batch_profile_demo.ns)
-* [kernel_async_tensor_policy_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_tensor_policy_profile_demo.ns)
-* [kernel_async_tensor_fallback_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_tensor_fallback_profile_demo.ns)
-* [kernel_async_tensor_windowed_batch_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_tensor_windowed_batch_profile_demo.ns)
-* [kernel_async_tensor_roundtrip_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_tensor_roundtrip_profile_demo.ns)
-* [kernel_async_roundtrip_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_roundtrip_profile_demo.ns)
-* [kernel_tensor_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_profile_demo.ns)
-* [kernel_tensor_inspect_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_inspect_demo.ns)
-* [kernel_tensor_slice_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_slice_demo.ns)
-* [kernel_tensor_reshape_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_reshape_demo.ns)
-* [kernel_tensor_broadcast_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_broadcast_demo.ns)
-* [kernel_tensor_reduce_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_reduce_demo.ns)
-* [kernel_tensor_select_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_select_demo.ns)
-* [kernel_tensor_order_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_order_demo.ns)
-* [kernel_tensor_axis_reduce_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_reduce_demo.ns)
-* [kernel_tensor_axis_family_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_family_demo.ns)
-* [kernel_tensor_axis_select_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_select_demo.ns)
-* [kernel_tensor_axis_sort_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_sort_demo.ns)
-* [kernel_tensor_axis_order_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_order_demo.ns)
-* [kernel_tensor_axis_map_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_map_demo.ns)
-* [kernel_tensor_axis_pipeline_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_pipeline_demo.ns)
-* [kernel_tensor_axis_roundtrip_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_roundtrip_demo.ns)
-* [kernel_tensor_map_zip_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_map_zip_demo.ns)
+* [shader_profile_demo.ns](../../examples/ns/demos/shader_profile_demo.ns)
+* [shader_surface_profile_demo.ns](../../examples/ns/demos/shader_surface_profile_demo.ns)
+* [shader_surface_material_profile_demo.ns](../../examples/ns/demos/shader_surface_material_profile_demo.ns)
+* [shader_surface_material_pass_profile_demo.ns](../../examples/ns/demos/shader_surface_material_pass_profile_demo.ns)
+* [shader_surface_material_packet_profile_demo.ns](../../examples/ns/demos/shader_surface_material_packet_profile_demo.ns)
+* [shader_surface_material_panel_profile_demo.ns](../../examples/ns/demos/shader_surface_material_panel_profile_demo.ns)
+* [shader_surface_material_flow_profile_demo.ns](../../examples/ns/demos/shader_surface_material_flow_profile_demo.ns)
+* [shader_surface_packet_profile_demo.ns](../../examples/ns/demos/shader_surface_packet_profile_demo.ns)
+* [shader_surface_pass_profile_demo.ns](../../examples/ns/demos/shader_surface_pass_profile_demo.ns)
+* [shader_packet_profile_demo.ns](../../examples/ns/demos/shader_packet_profile_demo.ns)
+* [shader_packet_bridge_demo.ns](../../examples/ns/demos/shader_packet_bridge_demo.ns)
+* [shader_pass_profile_demo.ns](../../examples/ns/demos/shader_pass_profile_demo.ns)
+* [shader_frame_profile_demo.ns](../../examples/ns/demos/shader_frame_profile_demo.ns)
+* [shader_async_result_profile_demo.ns](../../examples/ns/demos/shader_async_result_profile_demo.ns)
+* [shader_async_fanin_profile_demo.ns](../../examples/ns/demos/shader_async_fanin_profile_demo.ns)
+* [shader_async_schedule_profile_demo.ns](../../examples/ns/demos/shader_async_schedule_profile_demo.ns)
+* [shader_async_policy_profile_demo.ns](../../examples/ns/demos/shader_async_policy_profile_demo.ns)
+* [shader_async_fallback_profile_demo.ns](../../examples/ns/demos/shader_async_fallback_profile_demo.ns)
+* [shader_async_batch_profile_demo.ns](../../examples/ns/demos/shader_async_batch_profile_demo.ns)
+* [shader_async_windowed_batch_profile_demo.ns](../../examples/ns/demos/shader_async_windowed_batch_profile_demo.ns)
+* [shader_result_profile_demo.ns](../../examples/ns/demos/shader_result_profile_demo.ns)
+* [shader_draw_profile_demo.ns](../../examples/ns/demos/shader_draw_profile_demo.ns)
+* [kernel_profile_demo.ns](../../examples/ns/demos/kernel_profile_demo.ns)
+* [kernel_result_profile_demo.ns](../../examples/ns/demos/kernel_result_profile_demo.ns)
+* [kernel_async_result_profile_demo.ns](../../examples/ns/demos/kernel_async_result_profile_demo.ns)
+* [kernel_async_batch_profile_demo.ns](../../examples/ns/demos/kernel_async_batch_profile_demo.ns)
+* [kernel_async_tensor_batch_profile_demo.ns](../../examples/ns/demos/kernel_async_tensor_batch_profile_demo.ns)
+* [kernel_async_tensor_policy_profile_demo.ns](../../examples/ns/demos/kernel_async_tensor_policy_profile_demo.ns)
+* [kernel_async_tensor_fallback_profile_demo.ns](../../examples/ns/demos/kernel_async_tensor_fallback_profile_demo.ns)
+* [kernel_async_tensor_windowed_batch_profile_demo.ns](../../examples/ns/demos/kernel_async_tensor_windowed_batch_profile_demo.ns)
+* [kernel_async_tensor_roundtrip_profile_demo.ns](../../examples/ns/demos/kernel_async_tensor_roundtrip_profile_demo.ns)
+* [kernel_async_roundtrip_profile_demo.ns](../../examples/ns/demos/kernel_async_roundtrip_profile_demo.ns)
+* [kernel_tensor_profile_demo.ns](../../examples/ns/demos/kernel_tensor_profile_demo.ns)
+* [kernel_tensor_inspect_demo.ns](../../examples/ns/demos/kernel_tensor_inspect_demo.ns)
+* [kernel_tensor_slice_demo.ns](../../examples/ns/demos/kernel_tensor_slice_demo.ns)
+* [kernel_tensor_reshape_demo.ns](../../examples/ns/demos/kernel_tensor_reshape_demo.ns)
+* [kernel_tensor_broadcast_demo.ns](../../examples/ns/demos/kernel_tensor_broadcast_demo.ns)
+* [kernel_tensor_reduce_demo.ns](../../examples/ns/demos/kernel_tensor_reduce_demo.ns)
+* [kernel_tensor_select_demo.ns](../../examples/ns/demos/kernel_tensor_select_demo.ns)
+* [kernel_tensor_order_demo.ns](../../examples/ns/demos/kernel_tensor_order_demo.ns)
+* [kernel_tensor_axis_reduce_demo.ns](../../examples/ns/demos/kernel_tensor_axis_reduce_demo.ns)
+* [kernel_tensor_axis_family_demo.ns](../../examples/ns/demos/kernel_tensor_axis_family_demo.ns)
+* [kernel_tensor_axis_select_demo.ns](../../examples/ns/demos/kernel_tensor_axis_select_demo.ns)
+* [kernel_tensor_axis_sort_demo.ns](../../examples/ns/demos/kernel_tensor_axis_sort_demo.ns)
+* [kernel_tensor_axis_order_demo.ns](../../examples/ns/demos/kernel_tensor_axis_order_demo.ns)
+* [kernel_tensor_axis_map_demo.ns](../../examples/ns/demos/kernel_tensor_axis_map_demo.ns)
+* [kernel_tensor_axis_pipeline_demo.ns](../../examples/ns/demos/kernel_tensor_axis_pipeline_demo.ns)
+* [kernel_tensor_axis_roundtrip_demo.ns](../../examples/ns/demos/kernel_tensor_axis_roundtrip_demo.ns)
+* [kernel_tensor_map_zip_demo.ns](../../examples/ns/demos/kernel_tensor_map_zip_demo.ns)
 
 Their current role is:
 
@@ -596,8 +596,8 @@ Today that validation role still belongs to the project-form companions.
 
 The current wider showcase projects are:
 
-* [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-* [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+* [window_controls_demo](../../examples/projects/window_controls_demo)
+* [kernel_tensor_demo](../../examples/projects/kernel_tensor_demo)
 
 Current role split:
 
@@ -627,11 +627,11 @@ The safe current reading order is:
 Concretely:
 
 * shader:
-  [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
+  [yir-langref.md](yir-langref.md)
   ->
-  [shader_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_profile_demo.ns)
+  [shader_profile_demo.ns](../../examples/ns/demos/shader_profile_demo.ns)
   ->
-  [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
+  [shader_profile_demo](../../examples/projects/domains/shader_profile_demo)
   ->
   surface branch
   ->
@@ -639,25 +639,25 @@ Concretely:
   ->
   bridge branch
   ->
-  [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+  [window_controls_demo](../../examples/projects/window_controls_demo)
 * kernel:
-  [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
+  [yir-langref.md](yir-langref.md)
   ->
-  [kernel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_profile_demo.ns)
+  [kernel_profile_demo.ns](../../examples/ns/demos/kernel_profile_demo.ns)
   ->
-  [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
+  [kernel_profile_demo](../../examples/projects/domains/kernel_profile_demo)
   ->
-  [kernel_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_result_profile_demo)
+  [kernel_result_profile_demo](../../examples/projects/domains/kernel_result_profile_demo)
   ->
-  [kernel_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_result_profile_demo)
+  [kernel_async_result_profile_demo](../../examples/projects/domains/kernel_async_result_profile_demo)
   ->
-  [kernel_tensor_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_profile_demo)
+  [kernel_tensor_profile_demo](../../examples/projects/domains/kernel_tensor_profile_demo)
   ->
-  [kernel_tensor_inspect_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_inspect_demo)
+  [kernel_tensor_inspect_demo](../../examples/projects/domains/kernel_tensor_inspect_demo)
   ->
-  [kernel_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_roundtrip_profile_demo)
+  [kernel_roundtrip_profile_demo](../../examples/projects/domains/kernel_roundtrip_profile_demo)
   ->
-  [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+  [kernel_tensor_demo](../../examples/projects/kernel_tensor_demo)
 
 ## What This Contract Does Not Promise
 
@@ -684,77 +684,77 @@ If you are extending `shader` or `kernel` today:
 
 If you are reading `shader` or `kernel` today:
 
-* start with [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
+* start with [yir-langref.md](yir-langref.md)
   for current domain semantics
-* use [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
+* use [shader_profile_demo](../../examples/projects/domains/shader_profile_demo)
   and
-  [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo)
+  [shader_surface_profile_demo](../../examples/projects/domains/shader_surface_profile_demo)
   and
-  [shader_surface_material_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_profile_demo)
+  [shader_surface_material_profile_demo](../../examples/projects/domains/shader_surface_material_profile_demo)
   and
-  [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo)
+  [shader_surface_material_pass_profile_demo](../../examples/projects/domains/shader_surface_material_pass_profile_demo)
   and
-  [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo)
+  [shader_surface_material_packet_profile_demo](../../examples/projects/domains/shader_surface_material_packet_profile_demo)
   and
-  [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo)
+  [shader_surface_material_panel_profile_demo](../../examples/projects/domains/shader_surface_material_panel_profile_demo)
   and
-  [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo)
+  [shader_surface_material_flow_profile_demo](../../examples/projects/domains/shader_surface_material_flow_profile_demo)
   and
-  [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo)
+  [shader_surface_packet_profile_demo](../../examples/projects/domains/shader_surface_packet_profile_demo)
   and
-  [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
+  [shader_surface_pass_profile_demo](../../examples/projects/domains/shader_surface_pass_profile_demo)
   and
-  [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo)
+  [shader_packet_profile_demo](../../examples/projects/domains/shader_packet_profile_demo)
   and
-  [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo)
+  [shader_packet_bridge_demo](../../examples/projects/domains/shader_packet_bridge_demo)
   and
-  [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
+  [shader_pass_profile_demo](../../examples/projects/domains/shader_pass_profile_demo)
   and
-  [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo)
+  [shader_frame_profile_demo](../../examples/projects/domains/shader_frame_profile_demo)
   and
-  [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
+  [shader_result_profile_demo](../../examples/projects/domains/shader_result_profile_demo)
   and
-  [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo)
+  [shader_draw_profile_demo](../../examples/projects/domains/shader_draw_profile_demo)
   and
-  [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
+  [shader_render_profile_demo](../../examples/projects/domains/shader_render_profile_demo)
   as the narrow checked-in shader validation route
-* use [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
+* use [kernel_profile_demo](../../examples/projects/domains/kernel_profile_demo)
   and
-  [kernel_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_result_profile_demo)
+  [kernel_result_profile_demo](../../examples/projects/domains/kernel_result_profile_demo)
   and
-  [kernel_tensor_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_profile_demo)
+  [kernel_tensor_profile_demo](../../examples/projects/domains/kernel_tensor_profile_demo)
   and
-  [kernel_tensor_inspect_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_inspect_demo)
+  [kernel_tensor_inspect_demo](../../examples/projects/domains/kernel_tensor_inspect_demo)
   and
-  [kernel_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_roundtrip_profile_demo)
+  [kernel_roundtrip_profile_demo](../../examples/projects/domains/kernel_roundtrip_profile_demo)
   as the narrow checked-in kernel validation route
 * move to the showcase projects only after the profile companion is clear
 
 ## Related References
 
-* [std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
-* [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
-* [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-* [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
-* [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
-* [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo)
-* [shader_surface_material_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_profile_demo)
-* [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo)
-* [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo)
-* [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo)
-* [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo)
-* [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo)
-* [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
-* [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo)
-* [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo)
-* [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
-* [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo)
-* [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
-* [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
-* [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
-* [kernel_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_result_profile_demo)
-* [kernel_tensor_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_profile_demo)
-* [kernel_tensor_inspect_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_inspect_demo)
-* [kernel_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_roundtrip_profile_demo)
-* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* [std-mainline-layering-contract.md](std-mainline-layering-contract.md)
+* [yir-langref.md](yir-langref.md)
+* [yir-tools-reference.md](yir-tools-reference.md)
+* [window_controls_demo](../../examples/projects/window_controls_demo)
+* [kernel_tensor_demo](../../examples/projects/kernel_tensor_demo)
+* [shader_profile_demo](../../examples/projects/domains/shader_profile_demo)
+* [shader_surface_profile_demo](../../examples/projects/domains/shader_surface_profile_demo)
+* [shader_surface_material_profile_demo](../../examples/projects/domains/shader_surface_material_profile_demo)
+* [shader_surface_material_pass_profile_demo](../../examples/projects/domains/shader_surface_material_pass_profile_demo)
+* [shader_surface_material_packet_profile_demo](../../examples/projects/domains/shader_surface_material_packet_profile_demo)
+* [shader_surface_material_panel_profile_demo](../../examples/projects/domains/shader_surface_material_panel_profile_demo)
+* [shader_surface_material_flow_profile_demo](../../examples/projects/domains/shader_surface_material_flow_profile_demo)
+* [shader_surface_packet_profile_demo](../../examples/projects/domains/shader_surface_packet_profile_demo)
+* [shader_surface_pass_profile_demo](../../examples/projects/domains/shader_surface_pass_profile_demo)
+* [shader_packet_profile_demo](../../examples/projects/domains/shader_packet_profile_demo)
+* [shader_packet_bridge_demo](../../examples/projects/domains/shader_packet_bridge_demo)
+* [shader_pass_profile_demo](../../examples/projects/domains/shader_pass_profile_demo)
+* [shader_frame_profile_demo](../../examples/projects/domains/shader_frame_profile_demo)
+* [shader_result_profile_demo](../../examples/projects/domains/shader_result_profile_demo)
+* [shader_render_profile_demo](../../examples/projects/domains/shader_render_profile_demo)
+* [kernel_profile_demo](../../examples/projects/domains/kernel_profile_demo)
+* [kernel_result_profile_demo](../../examples/projects/domains/kernel_result_profile_demo)
+* [kernel_tensor_profile_demo](../../examples/projects/domains/kernel_tensor_profile_demo)
+* [kernel_tensor_inspect_demo](../../examples/projects/domains/kernel_tensor_inspect_demo)
+* [kernel_roundtrip_profile_demo](../../examples/projects/domains/kernel_roundtrip_profile_demo)
+* [docs/current-mainline-map.md](../../docs/current-mainline-map.md)

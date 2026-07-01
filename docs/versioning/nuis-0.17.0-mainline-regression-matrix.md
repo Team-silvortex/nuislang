@@ -8,10 +8,10 @@ It exists to answer one practical question:
 
 Use it together with:
 
-* [nuis-0.17.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-goals.md)
-* [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md)
-* [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md)
-* [nuis-0.17.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-release-checklist.md)
+* [nuis-0.17.0-mainline-goals.md](nuis-0.17.0-mainline-goals.md)
+* [nuis-0.17.0-compile-workflow.md](nuis-0.17.0-compile-workflow.md)
+* [nuis-0.17.0-lowering-capability-map.md](nuis-0.17.0-lowering-capability-map.md)
+* [nuis-0.17.0-release-checklist.md](nuis-0.17.0-release-checklist.md)
 
 ## Reading Rule
 
@@ -73,7 +73,7 @@ Role:
 Primary family:
 
 * `core`:
-  [tests_generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generics.rs)
+  [tests_generics.rs](../../tools/nuisc/src/frontend/tests_generics.rs)
 
 Recommended command:
 
@@ -100,7 +100,7 @@ Role:
 Primary family:
 
 * `core`:
-  [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
+  [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
 
 Recommended command:
 
@@ -111,7 +111,7 @@ cargo test -q -p nuisc tests_higher_order
 Important current anchor inside this family:
 
 * `smoke`:
-  [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs#L530)
+  [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs#L530)
 
 If this fails, suspect:
 
@@ -131,7 +131,7 @@ Role:
 Primary family:
 
 * `core`:
-  [tests_generic_constraints.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_constraints.rs)
+  [tests_generic_constraints.rs](../../tools/nuisc/src/frontend/tests_generic_constraints.rs)
 
 Recommended command:
 
@@ -156,7 +156,7 @@ Role:
 Primary family:
 
 * `core`:
-  [tests_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_control_flow.rs)
+  [tests_control_flow.rs](../../tools/nuisc/src/frontend/tests_control_flow.rs)
 
 Recommended command:
 
@@ -181,9 +181,9 @@ Role:
 Primary family:
 
 * `core`:
-  [tests_async_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_runtime.rs)
+  [tests_async_runtime.rs](../../tools/nuisc/src/lowering/tests_async_runtime.rs)
 * `core`:
-  [tests_async_network_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_network_runtime.rs)
+  [tests_async_network_runtime.rs](../../tools/nuisc/src/lowering/tests_async_network_runtime.rs)
 
 Recommended command:
 
@@ -207,7 +207,7 @@ Role:
 Primary family:
 
 * `anchor`:
-  [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+  [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 
 Recommended command:
 
@@ -243,9 +243,9 @@ Role:
 Primary families:
 
 * `core`:
-  [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+  [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
 * `core`:
-  [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
+  [multidomain_async.rs](../../tools/nuisc/src/project/tests/multidomain_async.rs)
 
 Recommended commands:
 
@@ -274,7 +274,7 @@ Role:
 Primary family:
 
 * `anchor`:
-  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+  [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 Recommended command:
 
@@ -285,9 +285,9 @@ cargo test -q -p nuisc --test state_compile
 Important current anchors inside this family:
 
 * `anchor`:
-  [generic_payload_alias_method_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo)
+  [generic_payload_alias_method_hof_demo](../../examples/projects/state/generic_payload_alias_method_hof_demo)
 * `anchor`:
-  [generic_callable_forwarding_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo)
+  [generic_callable_forwarding_hof_demo](../../examples/projects/state/generic_callable_forwarding_hof_demo)
 
 This layer currently protects:
 
@@ -308,7 +308,7 @@ Role:
 Primary family:
 
 * `anchor`:
-  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+  [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 Recommended command:
 
@@ -319,13 +319,13 @@ cargo test -q -p nuisc --test state_compile
 Important current anchors inside this family:
 
 * `anchor`:
-  [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
+  [flow_branching_while_demo](../../examples/projects/state/flow_branching_while_demo)
 * `anchor`:
-  [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
+  [post_flow_branching_while_demo](../../examples/projects/state/post_flow_branching_while_demo)
 * `anchor`:
-  [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+  [post_flow_branching_continuing_while_demo](../../examples/projects/state/post_flow_branching_continuing_while_demo)
 * `anchor`:
-  [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
+  [tail_recursive_branching_cross_carry_demo](../../examples/projects/state/tail_recursive_branching_cross_carry_demo)
 
 This layer currently protects:
 
@@ -352,7 +352,7 @@ Role:
 Primary family:
 
 * `anchor`:
-  [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+  [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 Recommended command:
 
@@ -376,7 +376,7 @@ Role:
 Primary family:
 
 * `anchor`:
-  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+  [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 Recommended command:
 
@@ -397,7 +397,7 @@ Use this drill:
 2. classify the break:
    generic rewrite, higher-order closure, control-flow environment, async lowering, or project integration
 3. compare against
-   [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md)
+   [nuis-0.17.0-compile-workflow.md](nuis-0.17.0-compile-workflow.md)
    to see which stage owns the route
 4. only widen the run to all of `cargo test -q -p nuisc -p nuis` after the local category is clear
 

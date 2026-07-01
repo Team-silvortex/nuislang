@@ -9,8 +9,8 @@
 The current `YIR` reference is split into two working documents plus this
 overview:
 
-* [YIR LangRef](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [YIR Tools Reference](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+* [YIR LangRef](yir-langref.md)
+* [YIR Tools Reference](yir-tools-reference.md)
 
 This split is intentional:
 

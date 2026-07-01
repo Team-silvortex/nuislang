@@ -33,11 +33,11 @@ to be used as the main integration spine.
 
 Current entrypoints:
 
-* [../current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* [nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-* [nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-* [../reference/nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
-* [../reference/nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
+* [../current-mainline-map.md](../../docs/current-mainline-map.md)
+* [nuis-alpha-0.4-mainline-hardening-plan.md](nuis-alpha-0.4-mainline-hardening-plan.md)
+* [nuis-alpha-0.4-doc-sync-inventory.md](nuis-alpha-0.4-doc-sync-inventory.md)
+* [../reference/nuis-native-artifact-workflow.md](../../docs/reference/nuis-native-artifact-workflow.md)
+* [../reference/nuis-binary-format-protocol.md](../../docs/reference/nuis-binary-format-protocol.md)
 
 ## What Is Real Enough To Lean On
 
@@ -126,7 +126,7 @@ Current safe wording:
 The main drift pattern was not that docs were absent. It was that old anchors
 kept their front-door wording after the project moved on. The current cleanup
 anchor is
-[nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md).
+[nuis-alpha-0.4-doc-sync-inventory.md](nuis-alpha-0.4-doc-sync-inventory.md).
 
 High-priority cleanup targets:
 
@@ -148,17 +148,17 @@ Use examples as proof routes, not as an encyclopedia.
 Current preferred routes:
 
 * core project path:
-  [examples/projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+  [examples/projects/window_controls_demo](../../examples/projects/window_controls_demo)
 * kernel/tensor path:
-  [examples/projects/kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+  [examples/projects/kernel_tensor_demo](../../examples/projects/kernel_tensor_demo)
 * domain ladders:
-  [examples/projects/domains/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md)
+  [examples/projects/domains/README.md](../../examples/projects/domains/README.md)
 * tooling CLI path:
-  [examples/projects/tooling/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/README.md)
+  [examples/projects/tooling/README.md](../../examples/projects/tooling/README.md)
 * source-level anchors:
-  [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
+  [examples/ns/README.md](../../examples/ns/README.md)
 * handwritten YIR anchors:
-  [examples/yir/README.md](/Users/Shared/chroot/dev/nuislang/examples/yir/README.md)
+  [examples/yir/README.md](../../examples/yir/README.md)
 
 Demotion rule:
 

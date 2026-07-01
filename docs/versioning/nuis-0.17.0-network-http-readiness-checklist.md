@@ -11,10 +11,10 @@ Use it when the question is:
 
 Read it together with:
 
-* [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md)
-* [nuis-0.17.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-regression-matrix.md)
-* [../reference/std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
-* [../reference/network-domain-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-domain-contract.md)
+* [nuis-0.17.0-lowering-capability-map.md](nuis-0.17.0-lowering-capability-map.md)
+* [nuis-0.17.0-mainline-regression-matrix.md](nuis-0.17.0-mainline-regression-matrix.md)
+* [../reference/std-net-layering-contract.md](../../docs/reference/std-net-layering-contract.md)
+* [../reference/network-domain-contract.md](../../docs/reference/network-domain-contract.md)
 
 ## Scope
 
@@ -32,16 +32,16 @@ product surface.
 ## Documentation Truth
 
 * [ ] confirm
-  [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md)
+  [nuis-0.17.0-lowering-capability-map.md](nuis-0.17.0-lowering-capability-map.md)
   still matches the checked-in lowering/test reality
 * [ ] confirm
-  [std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
+  [std-net-layering-contract.md](../../docs/reference/std-net-layering-contract.md)
   still describes the current `std net` reading order honestly
 * [ ] confirm
-  [examples/projects/domains/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md)
+  [examples/projects/domains/README.md](../../examples/projects/domains/README.md)
   still points at the right HTTP/session bridge examples
 * [ ] confirm
-  [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  [current-mainline-map.md](../../docs/current-mainline-map.md)
   still exposes the right `0.17.0` network/http anchors
 
 ## Test-Backed Compiler Truth

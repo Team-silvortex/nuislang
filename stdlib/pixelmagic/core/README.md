@@ -6,7 +6,7 @@ Its job is to define the narrow image/resource handoff shapes that later
 shader-facing consumers can build on.
 
 The companion auto-injectable helper surface currently lives in
-[../lib/image_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/lib/image_contracts.ns).
+[../lib/image_contracts.ns](../../../stdlib/pixelmagic/lib/image_contracts.ns).
 
 Current intended responsibility:
 
@@ -25,25 +25,25 @@ Current intended responsibility:
 
 Current source anchor:
 
-* [image_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_packet_recipe.ns)
-* [image_op_contract_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_op_contract_recipe.ns)
-* [image_resource_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_resource_recipe.ns)
-* [texture_binding_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/texture_binding_recipe.ns)
-* [sampling_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/sampling_recipe.ns)
-* [shader_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/shader_packet_recipe.ns)
-* [shader_consumer_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/shader_consumer_recipe.ns)
-* [pixelmagic_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/pixelmagic_pipeline_recipe.ns)
-* [render_plan_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/render_plan_recipe.ns)
-* [grayscale_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/grayscale_recipe.ns)
-* [invert_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/invert_recipe.ns)
-* [threshold_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/threshold_recipe.ns)
-* [brightness_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/brightness_recipe.ns)
-* [contrast_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/contrast_recipe.ns)
-* [blur_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/blur_recipe.ns)
-* [edge_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/edge_recipe.ns)
-* [sharpen_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/sharpen_recipe.ns)
-* [histogram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/histogram_recipe.ns)
-* [image_stats_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/pixelmagic/core/image_stats_recipe.ns)
+* [image_packet_recipe.ns](image_packet_recipe.ns)
+* [image_op_contract_recipe.ns](image_op_contract_recipe.ns)
+* [image_resource_recipe.ns](image_resource_recipe.ns)
+* [texture_binding_recipe.ns](texture_binding_recipe.ns)
+* [sampling_recipe.ns](sampling_recipe.ns)
+* [shader_packet_recipe.ns](shader_packet_recipe.ns)
+* [shader_consumer_recipe.ns](shader_consumer_recipe.ns)
+* [pixelmagic_pipeline_recipe.ns](pixelmagic_pipeline_recipe.ns)
+* [render_plan_recipe.ns](render_plan_recipe.ns)
+* [grayscale_recipe.ns](grayscale_recipe.ns)
+* [invert_recipe.ns](invert_recipe.ns)
+* [threshold_recipe.ns](threshold_recipe.ns)
+* [brightness_recipe.ns](brightness_recipe.ns)
+* [contrast_recipe.ns](contrast_recipe.ns)
+* [blur_recipe.ns](blur_recipe.ns)
+* [edge_recipe.ns](edge_recipe.ns)
+* [sharpen_recipe.ns](sharpen_recipe.ns)
+* [histogram_recipe.ns](histogram_recipe.ns)
+* [image_stats_recipe.ns](image_stats_recipe.ns)
 
 `image_packet_recipe.ns` currently provides:
 

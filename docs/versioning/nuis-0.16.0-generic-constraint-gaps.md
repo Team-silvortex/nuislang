@@ -1,7 +1,7 @@
 # `nuis` 0.16.0 Generic Constraint Remaining-Gaps Checklist
 
 This file is the practical follow-up to
-[nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md).
+[nuis-0.16.0-generic-constraint-coverage.md](nuis-0.16.0-generic-constraint-coverage.md).
 
 The coverage file answers:
 

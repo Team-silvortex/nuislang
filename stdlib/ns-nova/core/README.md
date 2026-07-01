@@ -23,10 +23,10 @@ Concrete directions already visible in this repository:
 
 Current source anchor:
 
-* [theme_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/theme_surface.ns)
-* [frame_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/frame_runtime.ns)
-* [texture_resource_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/texture_resource_recipe.ns)
-* [window_controls_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/window_controls_runtime_recipe.ns)
+* [theme_surface.ns](theme_surface.ns)
+* [frame_runtime.ns](frame_runtime.ns)
+* [texture_resource_recipe.ns](texture_resource_recipe.ns)
+* [window_controls_runtime_recipe.ns](window_controls_runtime_recipe.ns)
 
 This file is intentionally small and compileable on its own. It is the first step toward
 turning `ns-nova-core` from pure framework contract text into real `ns` source assets.

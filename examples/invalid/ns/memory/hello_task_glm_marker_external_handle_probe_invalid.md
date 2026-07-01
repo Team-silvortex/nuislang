@@ -2,7 +2,7 @@
 
 This file is intentionally paired with:
 
-* [hello_task_glm_marker_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_marker_external_handle_probe_invalid.ns)
+* [hello_task_glm_marker_external_handle_probe_invalid.ns](hello_task_glm_marker_external_handle_probe_invalid.ns)
 
 It is a **design probe**, not a current positive example.
 

@@ -13,9 +13,9 @@ Use it when the practical question is:
 
 Use it alongside:
 
-* [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
-* [nuis-0.16.0-generic-constraint-gaps.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-gaps.md)
-* [nuis-0.16.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-release-checklist.md)
+* [nuis-0.16.0-generic-constraint-coverage.md](nuis-0.16.0-generic-constraint-coverage.md)
+* [nuis-0.16.0-generic-constraint-gaps.md](nuis-0.16.0-generic-constraint-gaps.md)
+* [nuis-0.16.0-release-checklist.md](nuis-0.16.0-release-checklist.md)
 
 ## Reading Rule
 
@@ -56,7 +56,7 @@ Interpret each row like this:
 
 Primary tests:
 
-* [tests_generic_structs.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_structs.rs)
+* [tests_generic_structs.rs](../../tools/nuisc/src/frontend/tests_generic_structs.rs)
 
 ### Struct Literals
 
@@ -91,7 +91,7 @@ Primary tests:
 
 Primary tests:
 
-* [tests_generic_structs.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_structs.rs)
+* [tests_generic_structs.rs](../../tools/nuisc/src/frontend/tests_generic_structs.rs)
 
 ## Specialization Matrix
 
@@ -169,9 +169,9 @@ Primary tests:
 
 Primary tests:
 
-* [tests_generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generics.rs)
-* [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
-* [mod.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/mod.rs)
+* [tests_generics.rs](../../tools/nuisc/src/frontend/tests_generics.rs)
+* [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
+* [mod.rs](../../tools/nuisc/src/frontend/mod.rs)
 
 ### Control-Flow Closure
 
@@ -250,9 +250,9 @@ Practical reading rule:
 
 Primary tests:
 
-* [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
-* [tests_generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generics.rs)
-* [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+* [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
+* [tests_generics.rs](../../tools/nuisc/src/frontend/tests_generics.rs)
+* [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 ## Pattern And Binding Matrix
 
@@ -270,8 +270,8 @@ Primary tests:
 
 Primary tests:
 
-* [tests_match_payload_bindings.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_match_payload_bindings.rs)
-* [tests_generic_method_bounds_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
+* [tests_match_payload_bindings.rs](../../tools/nuisc/src/frontend/tests_match_payload_bindings.rs)
+* [tests_generic_method_bounds_control_flow.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
 
 ### Struct Patterns
 
@@ -285,7 +285,7 @@ Primary tests:
 
 Primary tests:
 
-* [tests_match_struct_bindings.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_match_struct_bindings.rs)
+* [tests_match_struct_bindings.rs](../../tools/nuisc/src/frontend/tests_match_struct_bindings.rs)
 
 ### Destructure Bindings
 
@@ -301,7 +301,7 @@ Primary tests:
 
 Primary tests:
 
-* [tests_generic_destructure_let.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_destructure_let.rs)
+* [tests_generic_destructure_let.rs](../../tools/nuisc/src/frontend/tests_generic_destructure_let.rs)
 
 ## Method-Bound Matrix
 
@@ -322,9 +322,9 @@ Primary tests:
 
 Primary tests:
 
-* [tests_generic_method_bounds.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
-* [tests_generic_method_bounds_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
-* [tests_generic_destructure_let.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generic_destructure_let.rs)
+* [tests_generic_method_bounds.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds.rs)
+* [tests_generic_method_bounds_control_flow.rs](../../tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs)
+* [tests_generic_destructure_let.rs](../../tools/nuisc/src/frontend/tests_generic_destructure_let.rs)
 
 ### Lambda And Higher-Order Context
 
@@ -337,7 +337,7 @@ Primary tests:
 
 Primary tests:
 
-* [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
+* [tests_higher_order.rs](../../tools/nuisc/src/frontend/tests_higher_order.rs)
 
 ## Still Partial
 

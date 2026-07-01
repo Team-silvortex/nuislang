@@ -154,8 +154,8 @@ The important architectural rule is:
 
 Current regression anchors:
 
-* [tests.rs](/Users/Shared/chroot/dev/nuislang/crates/yir-lower-llvm/src/tests.rs)
-* [ffi_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/ffi_compile.rs)
+* [tests.rs](../../crates/yir-lower-llvm/src/tests.rs)
+* [ffi_compile.rs](../../tools/nuisc/tests/ffi_compile.rs)
 
 ## Current String Boundary
 
@@ -178,9 +178,9 @@ compiler behavior.
 
 That behavior is anchored by:
 
-* [address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
-* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
-* [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
+* [address-surface-contract.md](address-surface-contract.md)
+* [nir-memory-model.md](nir-memory-model.md)
+* [cpu-task-glm-contract.md](cpu-task-glm-contract.md)
 
 At the host edge, however, `ref` is still not a universal ABI promise.
 

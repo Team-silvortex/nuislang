@@ -20,7 +20,7 @@ the `nuis-artifact` protocol family.
 
 Implementation anchor:
 
-* [protocol.rs](/Users/Shared/chroot/dev/nuislang/crates/nuis-artifact/src/protocol.rs)
+* [protocol.rs](../../crates/nuis-artifact/src/protocol.rs)
 
 Current protocol id:
 

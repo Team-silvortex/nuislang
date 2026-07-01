@@ -8,12 +8,12 @@ It exists to answer one practical question:
 
 Use it together with:
 
-* [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
-* [nuis-0.18.0-control-flow-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-control-flow-completion-plan.md)
-* [nuis-0.18.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-compile-workflow.md)
-* [nuis-0.18.0-loop-memory-read-contract-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-read-contract-sketch.md)
-* [nuis-0.18.0-loop-memory-carry-blockers.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-carry-blockers.md)
-* [nuis-0.18.0-host-boundary-address-abi.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-host-boundary-address-abi.md)
+* [nuis-0.18.0-mainline-goals.md](nuis-0.18.0-mainline-goals.md)
+* [nuis-0.18.0-control-flow-completion-plan.md](nuis-0.18.0-control-flow-completion-plan.md)
+* [nuis-0.18.0-compile-workflow.md](nuis-0.18.0-compile-workflow.md)
+* [nuis-0.18.0-loop-memory-read-contract-sketch.md](nuis-0.18.0-loop-memory-read-contract-sketch.md)
+* [nuis-0.18.0-loop-memory-carry-blockers.md](nuis-0.18.0-loop-memory-carry-blockers.md)
+* [nuis-0.18.0-host-boundary-address-abi.md](nuis-0.18.0-host-boundary-address-abi.md)
 
 ## Reading Rule
 
@@ -82,7 +82,7 @@ Role:
 Primary family:
 
 * `core`:
-  [tests_control_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_control_flow.rs)
+  [tests_control_flow.rs](../../tools/nuisc/src/frontend/tests_control_flow.rs)
 
 Recommended command:
 
@@ -101,9 +101,9 @@ Role:
 Primary families:
 
 * `core`:
-  [tests_loop_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_flow.rs)
+  [tests_loop_flow.rs](../../tools/nuisc/src/lowering/tests_loop_flow.rs)
 * `core`:
-  [tests_loop_post_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_post_flow.rs)
+  [tests_loop_post_flow.rs](../../tools/nuisc/src/lowering/tests_loop_post_flow.rs)
 
 Recommended commands:
 
@@ -123,7 +123,7 @@ Role:
 Primary family:
 
 * `anchor`:
-  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+  [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 
 This family now protects:
 
@@ -159,7 +159,7 @@ Role:
 Primary family:
 
 * `anchor`:
-  [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+  [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
 
 This family now protects:
 
@@ -184,7 +184,7 @@ Role:
 Primary family:
 
 * `anchor`:
-  [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+  [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
 
 Recommended command:
 
@@ -203,7 +203,7 @@ Role:
 Primary family:
 
 * `anchor`:
-  [memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+  [memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
 
 This family now protects:
 
@@ -232,7 +232,7 @@ Role:
 Primary family:
 
 * `anchor`:
-  [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+  [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 
 Recommended command:
 
@@ -251,11 +251,11 @@ Role:
 Primary families:
 
 * `core`:
-  [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
+  [multidomain_async.rs](../../tools/nuisc/src/project/tests/multidomain_async.rs)
 * `core`:
-  [tests_async_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_runtime.rs)
+  [tests_async_runtime.rs](../../tools/nuisc/src/lowering/tests_async_runtime.rs)
 * `core`:
-  [tests_async_network_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_network_runtime.rs)
+  [tests_async_network_runtime.rs](../../tools/nuisc/src/lowering/tests_async_network_runtime.rs)
 
 These families now also cover:
 

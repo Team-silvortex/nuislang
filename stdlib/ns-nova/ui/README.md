@@ -24,9 +24,9 @@ This layer should absorb and formalize:
 
 Current source anchor:
 
-* [panel_selection.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/panel_selection.ns)
-* [panel_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/panel_blueprint.ns)
-* [window_controls_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/window_controls_recipe.ns)
+* [panel_selection.ns](panel_selection.ns)
+* [panel_blueprint.ns](panel_blueprint.ns)
+* [window_controls_recipe.ns](window_controls_recipe.ns)
 
 This module focuses on the more stable first slice of `ns-nova-ui`: controls, shared
 selection, and relational state helpers.

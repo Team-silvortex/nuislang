@@ -4,20 +4,20 @@ This directory is the reading router for the current
 `std filesystem/path/location` lane.
 
 Keep the actual recipe sources in
-[stdlib/std](/Users/Shared/chroot/dev/nuislang/stdlib/std) for now; this file
+[stdlib/std](../../../stdlib/std) for now; this file
 exists to give the lane a cluster-shaped front door before any higher-risk
 filesystem reshuffle.
 
 Canonical companions:
 
 * `std` layering rule:
-  [std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
+  [std-mainline-layering-contract.md](../../../docs/reference/std-mainline-layering-contract.md)
 * shortest repo-wide route:
-  [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  [current-mainline-map.md](../../../docs/current-mainline-map.md)
 * project companions:
-  [examples/projects/filesystem/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/README.md)
+  [examples/projects/filesystem/README.md](../../../examples/projects/filesystem/README.md)
 * state/location companions:
-  [examples/projects/state/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/state/README.md)
+  [examples/projects/state/README.md](../../../examples/projects/state/README.md)
 
 ## Current Lane Shape
 
@@ -46,73 +46,73 @@ Current rule:
 
 ### Path Naming Core
 
-* [path_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_runtime_recipe.ns)
+* [path_runtime_recipe.ns](../../../stdlib/std/path_runtime_recipe.ns)
 
 ### Path Structure And Name Parts
 
-* [path_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_recipe.ns)
-* [path_depth_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_depth_recipe.ns)
-* [path_filename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_recipe.ns)
-* [path_stem_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_recipe.ns)
-* [path_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_recipe.ns)
-* [path_extension_is_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_is_recipe.ns)
+* [path_parent_recipe.ns](../../../stdlib/std/path_parent_recipe.ns)
+* [path_depth_recipe.ns](../../../stdlib/std/path_depth_recipe.ns)
+* [path_filename_recipe.ns](../../../stdlib/std/path_filename_recipe.ns)
+* [path_stem_recipe.ns](../../../stdlib/std/path_stem_recipe.ns)
+* [path_extension_recipe.ns](../../../stdlib/std/path_extension_recipe.ns)
+* [path_extension_is_recipe.ns](../../../stdlib/std/path_extension_is_recipe.ns)
 
 ### File And Directory Runtime Edge
 
-* [fs_metadata_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/fs_metadata_runtime_recipe.ns)
-* [directory_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_runtime_recipe.ns)
-* [stat_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stat_runtime_recipe.ns)
-* [directory_stat_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_stat_recipe.ns)
-* [file_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_runtime_recipe.ns)
-* [file_read_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_read_recipe.ns)
-* [file_write_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_write_recipe.ns)
-* [file_copy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_copy_recipe.ns)
-* [file_roundtrip_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_roundtrip_recipe.ns)
+* [fs_metadata_runtime_recipe.ns](../../../stdlib/std/fs_metadata_runtime_recipe.ns)
+* [directory_runtime_recipe.ns](../../../stdlib/std/directory_runtime_recipe.ns)
+* [stat_runtime_recipe.ns](../../../stdlib/std/stat_runtime_recipe.ns)
+* [directory_stat_recipe.ns](../../../stdlib/std/directory_stat_recipe.ns)
+* [file_runtime_recipe.ns](../../../stdlib/std/file_runtime_recipe.ns)
+* [file_read_recipe.ns](../../../stdlib/std/file_read_recipe.ns)
+* [file_write_recipe.ns](../../../stdlib/std/file_write_recipe.ns)
+* [file_copy_recipe.ns](../../../stdlib/std/file_copy_recipe.ns)
+* [file_roundtrip_recipe.ns](../../../stdlib/std/file_roundtrip_recipe.ns)
 * current project smoke consumers:
-  [file_read_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo),
-  [file_write_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo),
-  [file_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo),
-  [file_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_roundtrip_demo),
-  [file_output_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_output_demo),
-  [directory_create_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_create_demo),
-  [directory_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_remove_demo)
+  [file_read_demo](../../../examples/projects/filesystem/file_read_demo),
+  [file_write_demo](../../../examples/projects/filesystem/file_write_demo),
+  [file_copy_demo](../../../examples/projects/filesystem/file_copy_demo),
+  [file_roundtrip_demo](../../../examples/projects/filesystem/file_roundtrip_demo),
+  [file_output_demo](../../../examples/projects/filesystem/file_output_demo),
+  [directory_create_demo](../../../examples/projects/filesystem/directory_create_demo),
+  [directory_remove_demo](../../../examples/projects/filesystem/directory_remove_demo)
 * report bridge:
-  [path_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_runtime_recipe.ns)
+  [path_runtime_recipe.ns](../../../stdlib/std/path_runtime_recipe.ns)
   ->
-  [directory_stat_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_stat_recipe.ns)
+  [directory_stat_recipe.ns](../../../stdlib/std/directory_stat_recipe.ns)
   ->
-  [file_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_runtime_recipe.ns)
+  [file_runtime_recipe.ns](../../../stdlib/std/file_runtime_recipe.ns)
   ->
-  [filesystem_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_report_recipe.ns)
+  [filesystem_report_recipe.ns](../../../stdlib/std/filesystem_report_recipe.ns)
   ->
-  [filesystem_io_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_io_report_recipe.ns)
+  [filesystem_io_report_recipe.ns](../../../stdlib/std/filesystem_io_report_recipe.ns)
   ->
-  [filesystem_report_file_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_report_file_recipe.ns)
+  [filesystem_report_file_recipe.ns](../../../stdlib/std/filesystem_report_file_recipe.ns)
   ->
-  [benchmark_report_file_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/benchmark_report_file_recipe.ns)
+  [benchmark_report_file_recipe.ns](../../../stdlib/std/benchmark_report_file_recipe.ns)
 
 ### Mutate And Output Helpers
 
-* [directory_create_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_create_recipe.ns)
-* [directory_remove_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_remove_recipe.ns)
-* [path_copy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_copy_recipe.ns)
-* [path_rename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_rename_recipe.ns)
-* [path_remove_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_remove_recipe.ns)
-* [file_read_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_read_recipe.ns)
-* [file_write_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_write_recipe.ns)
-* [file_copy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_copy_recipe.ns)
-* [file_roundtrip_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_roundtrip_recipe.ns)
-* [file_output_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_output_recipe.ns)
+* [directory_create_recipe.ns](../../../stdlib/std/directory_create_recipe.ns)
+* [directory_remove_recipe.ns](../../../stdlib/std/directory_remove_recipe.ns)
+* [path_copy_recipe.ns](../../../stdlib/std/path_copy_recipe.ns)
+* [path_rename_recipe.ns](../../../stdlib/std/path_rename_recipe.ns)
+* [path_remove_recipe.ns](../../../stdlib/std/path_remove_recipe.ns)
+* [file_read_recipe.ns](../../../stdlib/std/file_read_recipe.ns)
+* [file_write_recipe.ns](../../../stdlib/std/file_write_recipe.ns)
+* [file_copy_recipe.ns](../../../stdlib/std/file_copy_recipe.ns)
+* [file_roundtrip_recipe.ns](../../../stdlib/std/file_roundtrip_recipe.ns)
+* [file_output_recipe.ns](../../../stdlib/std/file_output_recipe.ns)
 
 ### Location Roots
 
-* [cwd_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cwd_runtime_recipe.ns)
-* [temp_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/temp_runtime_recipe.ns)
-* [home_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/home_runtime_recipe.ns)
+* [cwd_runtime_recipe.ns](../../../stdlib/std/cwd_runtime_recipe.ns)
+* [temp_runtime_recipe.ns](../../../stdlib/std/temp_runtime_recipe.ns)
+* [home_runtime_recipe.ns](../../../stdlib/std/home_runtime_recipe.ns)
 
 ### Location Bundle
 
-* [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
+* [location_runtime_recipe.ns](../../../stdlib/std/location_runtime_recipe.ns)
 
 ## Companion Validation Router
 
@@ -122,57 +122,57 @@ small path probe first.
 Shortest grouped route:
 
 * source-level anchors:
-  [hello_path_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns),
-  [hello_directory_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_runtime_facades.ns),
-  [hello_file_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_file_runtime_facades.ns),
-  [hello_cwd_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cwd_runtime_facades.ns),
-  [hello_location_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_location_runtime_facades.ns)
+  [hello_path_runtime_facades.ns](../../../examples/ns/ffi/hello_path_runtime_facades.ns),
+  [hello_directory_runtime_facades.ns](../../../examples/ns/ffi/hello_directory_runtime_facades.ns),
+  [hello_file_runtime_facades.ns](../../../examples/ns/ffi/hello_file_runtime_facades.ns),
+  [hello_cwd_runtime_facades.ns](../../../examples/ns/ffi/hello_cwd_runtime_facades.ns),
+  [hello_location_runtime_facades.ns](../../../examples/ns/ffi/hello_location_runtime_facades.ns)
 * project-form anchors:
-  [path_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_runtime_demo),
-  [file_read_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo),
-  [file_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_runtime_demo),
-  [file_write_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo),
-  [file_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo),
-  [directory_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_runtime_demo),
-  [filesystem_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_demo),
-  [filesystem_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_file_demo),
-  [benchmark_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo),
-  [filesystem_io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/filesystem_io_report_demo),
-  [cwd_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/cwd_runtime_demo),
-  [location_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/location_runtime_demo)
+  [path_runtime_demo](../../../examples/projects/filesystem/path_runtime_demo),
+  [file_read_demo](../../../examples/projects/filesystem/file_read_demo),
+  [file_runtime_demo](../../../examples/projects/filesystem/file_runtime_demo),
+  [file_write_demo](../../../examples/projects/filesystem/file_write_demo),
+  [file_copy_demo](../../../examples/projects/filesystem/file_copy_demo),
+  [directory_runtime_demo](../../../examples/projects/filesystem/directory_runtime_demo),
+  [filesystem_report_demo](../../../examples/projects/filesystem/filesystem_report_demo),
+  [filesystem_report_file_demo](../../../examples/projects/filesystem/filesystem_report_file_demo),
+  [benchmark_report_file_demo](../../../examples/projects/tooling/benchmark_report_file_demo),
+  [filesystem_io_report_demo](../../../examples/projects/tooling/filesystem_io_report_demo),
+  [cwd_runtime_demo](../../../examples/projects/state/cwd_runtime_demo),
+  [location_runtime_demo](../../../examples/projects/state/location_runtime_demo)
 
 Wider grouped route:
 
 * path mutate probes:
-  [path_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_copy_demo),
-  [path_rename_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_rename_demo),
-  [path_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_remove_demo)
+  [path_copy_demo](../../../examples/projects/filesystem/path_copy_demo),
+  [path_rename_demo](../../../examples/projects/filesystem/path_rename_demo),
+  [path_remove_demo](../../../examples/projects/filesystem/path_remove_demo)
 * directory/file probes:
-  [file_read_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo),
-  [file_write_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo),
-  [file_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo),
-  [file_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_roundtrip_demo),
-  [file_output_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_output_demo),
-  [directory_create_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_create_demo),
-  [directory_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_remove_demo),
-  [directory_stat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_stat_demo),
-  [stat_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/stat_runtime_demo),
-  [fs_metadata_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/fs_metadata_runtime_demo)
+  [file_read_demo](../../../examples/projects/filesystem/file_read_demo),
+  [file_write_demo](../../../examples/projects/filesystem/file_write_demo),
+  [file_copy_demo](../../../examples/projects/filesystem/file_copy_demo),
+  [file_roundtrip_demo](../../../examples/projects/filesystem/file_roundtrip_demo),
+  [file_output_demo](../../../examples/projects/filesystem/file_output_demo),
+  [directory_create_demo](../../../examples/projects/filesystem/directory_create_demo),
+  [directory_remove_demo](../../../examples/projects/filesystem/directory_remove_demo),
+  [directory_stat_demo](../../../examples/projects/filesystem/directory_stat_demo),
+  [stat_runtime_demo](../../../examples/projects/filesystem/stat_runtime_demo),
+  [fs_metadata_runtime_demo](../../../examples/projects/filesystem/fs_metadata_runtime_demo)
 * location roots:
-  [temp_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/temp_runtime_demo),
-  [home_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/home_runtime_demo)
+  [temp_runtime_demo](../../../examples/projects/state/temp_runtime_demo),
+  [home_runtime_demo](../../../examples/projects/state/home_runtime_demo)
 
 ## Current Reading Rule
 
 If you only want one pass:
 
-1. start with [path_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_runtime_recipe.ns)
-2. widen to [directory_stat_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_stat_recipe.ns)
-3. then read [file_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_runtime_recipe.ns)
-4. then [filesystem_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_report_recipe.ns)
-5. then [filesystem_io_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_io_report_recipe.ns)
-6. then [filesystem_report_file_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_report_file_recipe.ns)
-7. end with [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
+1. start with [path_runtime_recipe.ns](../../../stdlib/std/path_runtime_recipe.ns)
+2. widen to [directory_stat_recipe.ns](../../../stdlib/std/directory_stat_recipe.ns)
+3. then read [file_runtime_recipe.ns](../../../stdlib/std/file_runtime_recipe.ns)
+4. then [filesystem_report_recipe.ns](../../../stdlib/std/filesystem_report_recipe.ns)
+5. then [filesystem_io_report_recipe.ns](../../../stdlib/std/filesystem_io_report_recipe.ns)
+6. then [filesystem_report_file_recipe.ns](../../../stdlib/std/filesystem_report_file_recipe.ns)
+7. end with [location_runtime_recipe.ns](../../../stdlib/std/location_runtime_recipe.ns)
 
 Short rule:
 

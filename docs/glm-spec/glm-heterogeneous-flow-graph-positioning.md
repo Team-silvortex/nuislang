@@ -340,10 +340,10 @@ Read this file as the positioning layer.
 
 For current implementation truth, cross-check with:
 
-* [../reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [../reference/nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
-* [../reference/cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
-* [vulpoya-yir-secondary-review-positioning.md](/Users/Shared/chroot/dev/nuislang/docs/glm-spec/vulpoya-yir-secondary-review-positioning.md)
+* [../reference/yir-langref.md](../../docs/reference/yir-langref.md)
+* [../reference/nir-memory-model.md](../../docs/reference/nir-memory-model.md)
+* [../reference/cpu-task-glm-contract.md](../../docs/reference/cpu-task-glm-contract.md)
+* [vulpoya-yir-secondary-review-positioning.md](vulpoya-yir-secondary-review-positioning.md)
 
 If a future design note and current verifier behavior disagree:
 

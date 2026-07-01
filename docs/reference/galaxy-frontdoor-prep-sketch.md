@@ -70,27 +70,27 @@ host input summary
 Concrete current anchors:
 
 * tooling image-preprocess bridge:
-  [tooling-image-preprocess-lane.md](/Users/Shared/chroot/dev/nuislang/docs/reference/tooling-image-preprocess-lane.md)
+  [tooling-image-preprocess-lane.md](tooling-image-preprocess-lane.md)
 * host-side prep:
-  [filesystem_io_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem_io_report_recipe.ns)
+  [filesystem_io_report_recipe.ns](../../stdlib/std/filesystem_io_report_recipe.ns)
 * checked-in CPU image companions:
-  [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
-  [cli_pgm_invert_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo)
-  [cli_pgm_threshold_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo)
+  [cli_pgm_info_demo](../../examples/projects/tooling/cli_pgm_info_demo)
+  [cli_pgm_invert_demo](../../examples/projects/tooling/cli_pgm_invert_demo)
+  [cli_pgm_threshold_demo](../../examples/projects/tooling/cli_pgm_threshold_demo)
 * first checked-in `PixelMagic` seed scaffold:
-  [pixelmagic_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_profile_demo)
+  [pixelmagic_profile_demo](../../examples/projects/domains/pixelmagic_profile_demo)
 * first checked-in `PixelMagic` packet consumer scaffold:
-  [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
+  [pixelmagic_packet_bridge_demo](../../examples/projects/domains/pixelmagic_packet_bridge_demo)
 * first checked-in `PixelMagic` texture-resource handoff scaffold:
-  [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
+  [pixelmagic_texture_resource_demo](../../examples/projects/domains/pixelmagic_texture_resource_demo)
 * first checked-in `PixelMagic` project-shaped pipeline scaffold:
-  [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
+  [pixelmagic_pipeline_demo](../../examples/projects/domains/pixelmagic_pipeline_demo)
 * first checked-in `PixelMagic` single-binary render scaffold:
-  [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
+  [pixelmagic_render_demo](../../examples/projects/domains/pixelmagic_render_demo)
 * shader profile floor:
-  [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
+  [shader_profile_demo](../../examples/projects/domains/shader_profile_demo)
 * shader render floor:
-  [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
+  [shader_render_profile_demo](../../examples/projects/domains/shader_render_profile_demo)
 
 ## Recommended First Packet
 
@@ -163,23 +163,23 @@ Recommended future names:
 
 Current checked-in closest bridge:
 
-* [pixelmagic_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_packet_bridge_demo)
+* [pixelmagic_packet_bridge_demo](../../examples/projects/domains/pixelmagic_packet_bridge_demo)
 
 Current checked-in closest texture-resource handoff anchor:
 
-* [pixelmagic_texture_resource_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_texture_resource_demo)
+* [pixelmagic_texture_resource_demo](../../examples/projects/domains/pixelmagic_texture_resource_demo)
 
 Current checked-in closest project-shaped pipeline anchor:
 
-* [pixelmagic_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_pipeline_demo)
+* [pixelmagic_pipeline_demo](../../examples/projects/domains/pixelmagic_pipeline_demo)
 
 Current checked-in closest single-binary render anchor:
 
-* [pixelmagic_render_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/pixelmagic_render_demo)
+* [pixelmagic_render_demo](../../examples/projects/domains/pixelmagic_render_demo)
 
 Current next-step texture contract:
 
-* [galaxy-texture-handoff-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/galaxy-texture-handoff-contract.md)
+* [galaxy-texture-handoff-contract.md](galaxy-texture-handoff-contract.md)
 
 Recommended first reading order:
 

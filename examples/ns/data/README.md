@@ -39,13 +39,13 @@ cargo run -p nuis -- build examples/ns/data/hello_instantiate.ns /tmp/nuis_hello
 
 Project-scale `data_profile_*` flows currently live in:
 
-* `/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo/main.ns`
-* `/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo/main.ns`
+* [window_controls_demo/main.ns](../../projects/window_controls_demo/main.ns)
+* [kernel_tensor_demo/main.ns](../../projects/kernel_tensor_demo/main.ns)
 
 Reading rule:
 
 * use this README for the shortest single-file `data` route
-* use [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+* use [examples/projects/README.md](../../../examples/projects/README.md)
   for the canonical multi-file project route
 * treat project-scale `data` paths as the stronger current validation story
 

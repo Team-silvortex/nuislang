@@ -57,8 +57,8 @@ Each checklist should stay operational and include:
 
 Whenever a new minor snapshot is added:
 
-* add it to [README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md)
-* add it to [../current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* add it to [README.md](README.md)
+* add it to [../current-mainline-map.md](../../docs/current-mainline-map.md)
 * keep the newest minor line clearly marked as the current mainline anchor
 
 Older snapshot files remain historical anchors and should not be rewritten into

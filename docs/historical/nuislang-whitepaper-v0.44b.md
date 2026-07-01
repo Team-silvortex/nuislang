@@ -2,7 +2,7 @@
 
 This file preserves the long-form `NuisLang Whitepaper v0.44.b` material that previously lived inline in the repository root `README.md`.
 
-Read the top-level [README.md](/Users/Shared/chroot/dev/nuislang/README.md) first for current repository reality. Read this file when you want the broader historical design argument.
+Read the top-level [README.md](../../README.md) first for current repository reality. Read this file when you want the broader historical design argument.
 
 ---
 

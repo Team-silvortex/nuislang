@@ -6,10 +6,10 @@ Current kept bundles:
 
 Canonical current build:
 
-* [window_controls_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/window_controls_demo)
-  single-binary bundle built from multi-file project [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-* [kernel_tensor_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/kernel_tensor_demo_project/kernel_tensor_demo)
-  native bundle built from multi-file project [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+* [window_controls_demo_project](window_controls_demo_project/window_controls_demo)
+  single-binary bundle built from multi-file project [window_controls_demo](../../examples/projects/window_controls_demo)
+* [kernel_tensor_demo_project](kernel_tensor_demo_project/kernel_tensor_demo)
+  native bundle built from multi-file project [kernel_tensor_demo](../../examples/projects/kernel_tensor_demo)
 
 Notes:
 

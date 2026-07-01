@@ -306,14 +306,14 @@ candidates for hot sync contraction work.
 These are good because they already expose task/lifecycle structure clearly,
 while still staying relatively local:
 
-* [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
+* [hello_task_glm_origin.ns](../../examples/ns/memory/hello_task_glm_origin.ns)
   * smallest `spawn -> join` payload path
-* [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
+* [hello_task_glm_observe.ns](../../examples/ns/memory/hello_task_glm_observe.ns)
   * smallest `spawn -> timeout -> join_result -> task_completed -> task_value`
     observation path
-* [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
+* [hello_task_glm_compare.ns](../../examples/ns/memory/hello_task_glm_compare.ns)
   * direct-payload path beside observation path
-* [hello_task_glm_lifecycle_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_compare.ns)
+* [hello_task_glm_lifecycle_compare.ns](../../examples/ns/memory/hello_task_glm_lifecycle_compare.ns)
   * completed/timeout/cancel observation contrast
 
 ### Best Project-Shaped Candidates
@@ -321,18 +321,18 @@ while still staying relatively local:
 These are especially useful because they already sit in a more realistic
 project/front-door compilation shape:
 
-* [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo)
+* [task_completed_observe_demo](../../examples/projects/task/task_completed_observe_demo)
   * best current small project candidate for “can a completed-observe path
     collapse locally?”
   * see also:
-    [examples/projects/task/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md)
-* [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo)
+    [examples/projects/task/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md](../../examples/projects/task/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md)
+* [task_lifecycle_branch_demo](../../examples/projects/task/task_lifecycle_branch_demo)
   * useful for testing that timeout-sensitive paths do **not** contract too
     aggressively
-* [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cancel_branch_demo)
+* [task_cancel_branch_demo](../../examples/projects/task/task_cancel_branch_demo)
   * useful for testing that cancellation-sensitive paths do **not** contract
     too aggressively
-* [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo)
+* [task_join_nonconsuming_probe_demo](../../examples/projects/task/task_join_nonconsuming_probe_demo)
   * useful current negative probe when local contraction interacts with the
     now-stricter `join(...)` consume boundary
 
@@ -352,9 +352,9 @@ families.
 
 ## Related References
 
-* [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
-* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
-* [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
-* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
-* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
-* [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
+* [cpu-task-contract.md](cpu-task-contract.md)
+* [cpu-task-memory-contract.md](cpu-task-memory-contract.md)
+* [cpu-task-glm-contract.md](cpu-task-glm-contract.md)
+* [cpu-task-scheduler-clock.md](cpu-task-scheduler-clock.md)
+* [host-read-bridge.md](host-read-bridge.md)
+* [yir-langref.md](yir-langref.md)

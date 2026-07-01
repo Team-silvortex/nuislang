@@ -29,8 +29,8 @@ That means:
 * either use a fresh output directory every run
 * or make a tiny source change in the probe project before rebuilding
 
-For host validation, prefer a fresh `/private/tmp/..._out*` directory every
-time.
+For host validation, prefer a fresh `target/nuis-host-validation/..._out*`
+directory every time.
 
 ## Probe Order
 
@@ -40,20 +40,20 @@ Run the probes in this order.
 
 Project:
 
-* [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo)
+* [network_host_control_runtime_demo](../../examples/projects/domains/network_host_control_runtime_demo)
 
 Build:
 
 ```bash
 cargo run -q -p nuis -- build \
-  /Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo \
-  /private/tmp/network_host_control_runtime_demo_out
+  examples/projects/domains/network_host_control_runtime_demo \
+  target/nuis-host-validation/network_host_control_runtime_demo_out
 ```
 
 Run:
 
 ```bash
-/private/tmp/network_host_control_runtime_demo_out/network_host_control_runtime_demo
+target/nuis-host-validation/network_host_control_runtime_demo_out/network_host_control_runtime_demo
 ```
 
 Printed fields:
@@ -77,20 +77,20 @@ Read it like this:
 
 Project:
 
-* [network_host_open_surface_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_open_surface_runtime_demo)
+* [network_host_open_surface_runtime_demo](../../examples/projects/domains/network_host_open_surface_runtime_demo)
 
 Build:
 
 ```bash
 cargo run -q -p nuis -- build \
-  /Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_open_surface_runtime_demo \
-  /private/tmp/network_host_open_surface_runtime_demo_out
+  examples/projects/domains/network_host_open_surface_runtime_demo \
+  target/nuis-host-validation/network_host_open_surface_runtime_demo_out
 ```
 
 Run:
 
 ```bash
-/private/tmp/network_host_open_surface_runtime_demo_out/network_host_open_surface_runtime_demo
+target/nuis-host-validation/network_host_open_surface_runtime_demo_out/network_host_open_surface_runtime_demo
 ```
 
 Printed fields:
@@ -123,9 +123,9 @@ Read it like this:
 
 Projects:
 
-* [network_host_handle_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_demo)
-* [network_host_handle_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_transport_runtime_demo)
-* [network_loopback_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_loopback_runtime_demo)
+* [network_host_handle_runtime_demo](../../examples/projects/domains/network_host_handle_runtime_demo)
+* [network_host_handle_transport_runtime_demo](../../examples/projects/domains/network_host_handle_transport_runtime_demo)
+* [network_loopback_runtime_demo](../../examples/projects/domains/network_loopback_runtime_demo)
 
 Use these only after the first two probes.
 
@@ -170,10 +170,10 @@ We can claim meaningful runtime progress when the next host produces:
 
 After that, the next layer to verify is:
 
-* [net_tcp_send_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_send_runtime_probe_demo)
-* [net_tcp_socket_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_runtime_probe_demo)
-* [net_http_status_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_status_runtime_probe_demo)
-* [net_http_client_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_runtime_probe_demo)
+* [net_tcp_send_runtime_probe_demo](../../examples/projects/domains/net_tcp_send_runtime_probe_demo)
+* [net_tcp_socket_runtime_probe_demo](../../examples/projects/domains/net_tcp_socket_runtime_probe_demo)
+* [net_http_status_runtime_probe_demo](../../examples/projects/domains/net_http_status_runtime_probe_demo)
+* [net_http_client_runtime_probe_demo](../../examples/projects/domains/net_http_client_runtime_probe_demo)
 
 ## Minimal Command Set
 
@@ -181,16 +181,16 @@ If you only want the shortest host check:
 
 ```bash
 cargo run -q -p nuis -- build \
-  /Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo \
-  /private/tmp/network_host_control_runtime_demo_out
+  examples/projects/domains/network_host_control_runtime_demo \
+  target/nuis-host-validation/network_host_control_runtime_demo_out
 
-/private/tmp/network_host_control_runtime_demo_out/network_host_control_runtime_demo
+target/nuis-host-validation/network_host_control_runtime_demo_out/network_host_control_runtime_demo
 
 cargo run -q -p nuis -- build \
-  /Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_open_surface_runtime_demo \
-  /private/tmp/network_host_open_surface_runtime_demo_out
+  examples/projects/domains/network_host_open_surface_runtime_demo \
+  target/nuis-host-validation/network_host_open_surface_runtime_demo_out
 
-/private/tmp/network_host_open_surface_runtime_demo_out/network_host_open_surface_runtime_demo
+target/nuis-host-validation/network_host_open_surface_runtime_demo_out/network_host_open_surface_runtime_demo
 ```
 
 If both stay zero on the target host, do not spend time debugging higher-level

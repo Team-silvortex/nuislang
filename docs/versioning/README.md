@@ -9,11 +9,11 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
-* [nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md)
-* [nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
-* [nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-* [nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-* [nuis-alpha-0.1-mainline-status.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.1-mainline-status.md)
+* [nuis-alpha-0.6-mainline-entry.md](nuis-alpha-0.6-mainline-entry.md)
+* [nuis-alpha-0.4-system-inventory.md](nuis-alpha-0.4-system-inventory.md)
+* [nuis-alpha-0.4-mainline-hardening-plan.md](nuis-alpha-0.4-mainline-hardening-plan.md)
+* [nuis-alpha-0.4-doc-sync-inventory.md](nuis-alpha-0.4-doc-sync-inventory.md)
+* [nuis-alpha-0.1-mainline-status.md](nuis-alpha-0.1-mainline-status.md)
 
 Use this first when the question is:
 
@@ -31,9 +31,9 @@ Use this first when the question is:
 
 If you want the line that handed off into the current one, read:
 
-* [nuis-alpha-0.0.1-preflight-report.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-preflight-report.md)
-* [nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
-* [nuis-alpha-0.0.1-closeout-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
+* [nuis-alpha-0.0.1-preflight-report.md](nuis-alpha-0.0.1-preflight-report.md)
+* [nuis-alpha-0.0.1-closeout-board.md](nuis-alpha-0.0.1-closeout-board.md)
+* [nuis-alpha-0.0.1-closeout-checklist.md](nuis-alpha-0.0.1-closeout-checklist.md)
 
 Use this set when the question is:
 
@@ -46,23 +46,23 @@ Use this set when the question is:
 If you want the strongest pre-alpha mainline anchors that still explain the
 current repository shape, read:
 
-* [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-* [nuis-0.20.0-frontend-cli-boundaries.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-frontend-cli-boundaries.md)
-* [nuis-0.20.0-branch-runtime-lowering-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
-* [nuis-0.20.0-generic-validation-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
-* [nuis-0.20.0-receiver-generic-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-receiver-generic-regression-matrix.md)
-* [nuis-0.20.0-std-refactor-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-* [nuis-0.20.0-compile-gap-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-compile-gap-checklist.md)
-* [nuis-0.20.x-to-alpha-bootstrap-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
-* [nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
-* [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
-* [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
-* [nuis-0.19.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-release-checklist.md)
-* [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
-* [nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
-* [nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
-* [nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
-* [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
+* [nuis-0.20.0-abi-compile-vocabulary.md](nuis-0.20.0-abi-compile-vocabulary.md)
+* [nuis-0.20.0-frontend-cli-boundaries.md](nuis-0.20.0-frontend-cli-boundaries.md)
+* [nuis-0.20.0-branch-runtime-lowering-matrix.md](nuis-0.20.0-branch-runtime-lowering-matrix.md)
+* [nuis-0.20.0-generic-validation-regression-matrix.md](nuis-0.20.0-generic-validation-regression-matrix.md)
+* [nuis-0.20.0-receiver-generic-regression-matrix.md](nuis-0.20.0-receiver-generic-regression-matrix.md)
+* [nuis-0.20.0-std-refactor-frontdoor.md](nuis-0.20.0-std-refactor-frontdoor.md)
+* [nuis-0.20.0-compile-gap-checklist.md](nuis-0.20.0-compile-gap-checklist.md)
+* [nuis-0.20.x-to-alpha-bootstrap-roadmap.md](nuis-0.20.x-to-alpha-bootstrap-roadmap.md)
+* [nuis-0.19.0-snapshot.md](nuis-0.19.0-snapshot.md)
+* [nuis-0.19.0-compile-workflow.md](nuis-0.19.0-compile-workflow.md)
+* [nuis-0.19.0-mainline-goals.md](nuis-0.19.0-mainline-goals.md)
+* [nuis-0.19.0-release-checklist.md](nuis-0.19.0-release-checklist.md)
+* [nuis-0.19.0-mainline-regression-matrix.md](nuis-0.19.0-mainline-regression-matrix.md)
+* [nuis-0.19.0-workflow-capability-matrix.md](nuis-0.19.0-workflow-capability-matrix.md)
+* [nuis-0.19.0-project-capability-matrix.md](nuis-0.19.0-project-capability-matrix.md)
+* [nuis-0.19.0-frontend-capability-matrix.md](nuis-0.19.0-frontend-capability-matrix.md)
+* [nuis-0.19.0-address-pointer-mainline.md](nuis-0.19.0-address-pointer-mainline.md)
 
 Use this set when the question is:
 
@@ -83,13 +83,13 @@ Use this set when the question is:
 
 When you need the immediate predecessor rather than the current line, use:
 
-* [nuis-0.18.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-snapshot.md)
-* [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
-* [nuis-0.18.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-compile-workflow.md)
-* [nuis-0.18.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-regression-matrix.md)
-* [nuis-0.18.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-release-checklist.md)
-* [nuis-0.18.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-pointer-mainline.md)
-* [nuis-0.18.0-example-routing-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-example-routing-snapshot.md)
+* [nuis-0.18.0-snapshot.md](nuis-0.18.0-snapshot.md)
+* [nuis-0.18.0-mainline-goals.md](nuis-0.18.0-mainline-goals.md)
+* [nuis-0.18.0-compile-workflow.md](nuis-0.18.0-compile-workflow.md)
+* [nuis-0.18.0-mainline-regression-matrix.md](nuis-0.18.0-mainline-regression-matrix.md)
+* [nuis-0.18.0-release-checklist.md](nuis-0.18.0-release-checklist.md)
+* [nuis-0.18.0-address-pointer-mainline.md](nuis-0.18.0-address-pointer-mainline.md)
+* [nuis-0.18.0-example-routing-snapshot.md](nuis-0.18.0-example-routing-snapshot.md)
 
 Use this line when the question is historical comparison for:
 
@@ -104,22 +104,22 @@ These are still worth keeping, but they should not be treated as the default
 entry route anymore:
 
 * `0.17.*`
-  [nuis-0.17.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-snapshot.md),
-  [nuis-0.17.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-goals.md),
-  [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md),
-  [nuis-0.17.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-regression-matrix.md),
-  [nuis-0.17.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-release-checklist.md)
+  [nuis-0.17.0-snapshot.md](nuis-0.17.0-snapshot.md),
+  [nuis-0.17.0-mainline-goals.md](nuis-0.17.0-mainline-goals.md),
+  [nuis-0.17.0-compile-workflow.md](nuis-0.17.0-compile-workflow.md),
+  [nuis-0.17.0-mainline-regression-matrix.md](nuis-0.17.0-mainline-regression-matrix.md),
+  [nuis-0.17.0-release-checklist.md](nuis-0.17.0-release-checklist.md)
 * `0.16.*`
-  [nuis-0.16.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-snapshot.md),
-  [nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md),
-  [nuis-0.16.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-release-checklist.md),
-  [nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md),
-  [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md),
-  [nuis-0.16.0-generic-constraint-gaps.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-gaps.md),
-  [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
+  [nuis-0.16.0-snapshot.md](nuis-0.16.0-snapshot.md),
+  [nuis-0.16.0-compile-workflow.md](nuis-0.16.0-compile-workflow.md),
+  [nuis-0.16.0-release-checklist.md](nuis-0.16.0-release-checklist.md),
+  [nuis-0.16.0-binary-compile-maturity.md](nuis-0.16.0-binary-compile-maturity.md),
+  [nuis-0.16.0-generic-constraint-coverage.md](nuis-0.16.0-generic-constraint-coverage.md),
+  [nuis-0.16.0-generic-constraint-gaps.md](nuis-0.16.0-generic-constraint-gaps.md),
+  [nuis-0.16.0-generic-surface-audit.md](nuis-0.16.0-generic-surface-audit.md)
 * first minor-history anchors:
-  [nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md),
-  [nuis-0.13.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-release-checklist.md)
+  [nuis-0.13.0-snapshot.md](nuis-0.13.0-snapshot.md),
+  [nuis-0.13.0-release-checklist.md](nuis-0.13.0-release-checklist.md)
 ## Policy Anchor
 
 Use this when the question is:
@@ -129,7 +129,7 @@ Use this when the question is:
 
 Read:
 
-* [nuis-minor-snapshot-rule.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-minor-snapshot-rule.md)
+* [nuis-minor-snapshot-rule.md](nuis-minor-snapshot-rule.md)
 
 Practical rule:
 
@@ -147,8 +147,8 @@ Versioning files are anchors, not replacements for implementation truth.
 
 For exact current behavior, still prefer:
 
-* [../reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
-* [../reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+* [../reference/README.md](../../docs/reference/README.md)
+* [../reference/yir-tools-reference.md](../../docs/reference/yir-tools-reference.md)
 * current checked-in parsing, lowering, verification, and CLI code
 
 ## Expected Broader Scope Later

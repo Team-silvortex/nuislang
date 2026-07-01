@@ -11,7 +11,7 @@ It answers one narrow question:
 
 Use this checked-in example first:
 
-* [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
+* [native_artifact_closure_demo](../../examples/projects/tooling/native_artifact_closure_demo)
 
 Use this command chain:
 
@@ -109,11 +109,11 @@ Today this route proves all of these together:
 The current checked-in coverage is split deliberately:
 
 * checked-in project compile anchor:
-  [tooling_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/tooling_compile.rs)
+  [tooling_compile.rs](../../tools/nuisc/tests/tooling_compile.rs)
 * AOT compile/package/launch smoke:
-  [lib.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lib.rs)
+  [lib.rs](../../tools/nuisc/src/lib.rs)
 * representative native control-flow compile/launch smoke:
-  [artifact_cli.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/artifact_cli.rs)
+  [artifact_cli.rs](../../tools/nuisc/tests/artifact_cli.rs)
 
 Short rule:
 

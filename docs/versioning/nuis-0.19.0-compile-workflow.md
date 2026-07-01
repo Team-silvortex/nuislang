@@ -19,13 +19,13 @@ Use it when the question is not only “what compiles?”, but:
 
 Use it together with:
 
-* [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-* [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
-* [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
-* [nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
-* [nuis-0.19.0-generic-constraint-validator.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-generic-constraint-validator.md)
-* [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
-* [nuis-0.18.0-loop-memory-read-contract-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-read-contract-sketch.md)
+* [nuis-0.20.0-abi-compile-vocabulary.md](nuis-0.20.0-abi-compile-vocabulary.md)
+* [nuis-0.19.0-mainline-goals.md](nuis-0.19.0-mainline-goals.md)
+* [nuis-0.19.0-mainline-regression-matrix.md](nuis-0.19.0-mainline-regression-matrix.md)
+* [nuis-0.19.0-workflow-capability-matrix.md](nuis-0.19.0-workflow-capability-matrix.md)
+* [nuis-0.19.0-generic-constraint-validator.md](nuis-0.19.0-generic-constraint-validator.md)
+* [nuis-0.19.0-address-pointer-mainline.md](nuis-0.19.0-address-pointer-mainline.md)
+* [nuis-0.18.0-loop-memory-read-contract-sketch.md](nuis-0.18.0-loop-memory-read-contract-sketch.md)
 
 ## Core Rule
 
@@ -65,7 +65,7 @@ now also be read through the newer vocabulary anchor:
 
 That naming split is recorded in:
 
-* [nuis-0.20.0-abi-compile-vocabulary.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+* [nuis-0.20.0-abi-compile-vocabulary.md](nuis-0.20.0-abi-compile-vocabulary.md)
 
 ## Current CLI Frontdoor
 
@@ -126,7 +126,7 @@ Short rule:
 
 The real frontend entry remains:
 
-* [lower_project_ast_to_nir](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/mod.rs#L157)
+* [lower_project_ast_to_nir](../../tools/nuisc/src/frontend/mod.rs#L157)
 
 The checked-in order still matters:
 
@@ -178,11 +178,11 @@ For the current line, the practical regression route is:
 The current believable mainline should still be taught through:
 
 * control-flow/state proof:
-  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+  [state_compile.rs](../../tools/nuisc/tests/state_compile.rs)
 * async/task proof:
-  [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+  [task_compile.rs](../../tools/nuisc/tests/task_compile.rs)
   current staged thread/lock project anchor:
-  [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo)
+  [task_thread_mutex_demo](../../examples/projects/task/task_thread_mutex_demo)
   current frontdoor sample:
   `nuis project-doctor examples/projects/task/task_thread_mutex_demo`
   `nuis check examples/projects/task/task_thread_mutex_demo`
@@ -191,15 +191,15 @@ The current believable mainline should still be taught through:
   project test is explicit, frontdoor-visible, and now executes successfully
   through the staged AOT thread/lock path
 * memory/address proof:
-  [memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
+  [memory_compile.rs](../../tools/nuisc/tests/memory_compile.rs)
 * shader/helper-mediated proof:
-  [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+  [shader_nova_contracts.rs](../../tools/nuisc/src/project/tests/shader_nova_contracts.rs)
 * network/http/session proof:
-  [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+  [network_compile.rs](../../tools/nuisc/tests/network_compile.rs)
 * native artifact closure proof:
-  [native_artifact_closure_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/native_artifact_closure_demo)
+  [native_artifact_closure_demo](../../examples/projects/tooling/native_artifact_closure_demo)
   and the matching AOT compile/package/launch smoke in
-  [lib.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lib.rs)
+  [lib.rs](../../tools/nuisc/src/lib.rs)
 
 ## Rule Of Thumb
 

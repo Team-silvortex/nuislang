@@ -21,9 +21,9 @@ At the source and `NIR` surface, that core is:
 At the lower runtime side, the CPU/YIR layers already treat these as pointer
 values, not as ordinary nominal data:
 
-* [crates/yir-core/src/lib.rs](/Users/Shared/chroot/dev/nuislang/crates/yir-core/src/lib.rs)
-* [crates/yir-verify/src/lib.rs](/Users/Shared/chroot/dev/nuislang/crates/yir-verify/src/lib.rs)
-* [crates/yir-domain-cpu/src/lib.rs](/Users/Shared/chroot/dev/nuislang/crates/yir-domain-cpu/src/lib.rs)
+* [crates/yir-core/src/lib.rs](../../crates/yir-core/src/lib.rs)
+* [crates/yir-verify/src/lib.rs](../../crates/yir-verify/src/lib.rs)
+* [crates/yir-domain-cpu/src/lib.rs](../../crates/yir-domain-cpu/src/lib.rs)
 
 Short rule:
 
@@ -148,7 +148,7 @@ Short rule:
 
 For the deeper future split between owner and borrow alias semantics, also see:
 
-* [nuis-0.18.0-owned-borrowed-address-draft.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-owned-borrowed-address-draft.md)
+* [nuis-0.18.0-owned-borrowed-address-draft.md](nuis-0.18.0-owned-borrowed-address-draft.md)
 
 ## Decision Trigger For A Future Rename
 
