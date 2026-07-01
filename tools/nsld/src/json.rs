@@ -69,6 +69,10 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
             "container_loader_blockers",
             &report.container_loader_blockers,
         ),
+        json_optional_string_field(
+            "container_metadata_table_hash",
+            report.container_metadata_table_hash.as_deref(),
+        ),
         json_optional_usize_field(
             "container_external_import_count",
             report.container_external_import_count,
@@ -215,6 +219,7 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
         json_bool_field("bundle_ready", report.bundle_ready),
         json_string_field("assemble_plan_hash", &report.assemble_plan_hash),
         json_string_field("section_table_hash", &report.section_table_hash),
+        json_string_field("metadata_table_hash", &report.metadata_table_hash),
         json_string_field("container_layout_hash", &report.container_layout_hash),
         json_string_field("container_hash", &report.container_hash),
         json_usize_field("payload_size_bytes", report.payload_size_bytes),
@@ -498,6 +503,7 @@ pub(crate) fn nsld_container_emit_report_json(report: &NsldContainerEmitReport) 
         json_string_field("output_path", &report.output_path),
         json_string_field("payload_path", &report.payload_path),
         json_bool_field("ready", report.ready),
+        json_string_field("metadata_table_hash", &report.metadata_table_hash),
         json_string_field("container_layout_hash", &report.container_layout_hash),
         json_string_field("container_hash", &report.container_hash),
         json_usize_field("payload_size_bytes", report.payload_size_bytes),
@@ -519,6 +525,10 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
             &report.expected_container_layout_hash,
         ),
         json_string_field("expected_container_hash", &report.expected_container_hash),
+        json_string_field(
+            "expected_metadata_table_hash",
+            &report.expected_metadata_table_hash,
+        ),
         json_usize_field(
             "expected_payload_size_bytes",
             report.expected_payload_size_bytes,
@@ -527,12 +537,80 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
         json_string_field("expected_payload_path", &report.expected_payload_path),
         json_usize_field("expected_section_count", report.expected_section_count),
         json_string_field(
+            "expected_container_section_table_hash",
+            &report.expected_container_section_table_hash,
+        ),
+        json_string_field(
             "expected_loader_readiness",
             &report.expected_loader_readiness,
+        ),
+        json_string_field(
+            "expected_loader_entry_kind",
+            &report.expected_loader_entry_kind,
+        ),
+        json_string_field(
+            "expected_loader_entry_symbol",
+            &report.expected_loader_entry_symbol,
+        ),
+        json_string_field(
+            "expected_loader_entry_section_id",
+            &report.expected_loader_entry_section_id,
+        ),
+        json_usize_field(
+            "expected_loader_symbol_count",
+            report.expected_loader_symbol_count,
+        ),
+        json_string_field(
+            "expected_loader_symbol_table_hash",
+            &report.expected_loader_symbol_table_hash,
+        ),
+        json_string_field(
+            "expected_loader_symbol_id",
+            &report.expected_loader_symbol_id,
+        ),
+        json_string_field(
+            "expected_loader_symbol_kind",
+            &report.expected_loader_symbol_kind,
+        ),
+        json_string_field(
+            "expected_loader_symbol_name",
+            &report.expected_loader_symbol_name,
+        ),
+        json_string_field(
+            "expected_loader_symbol_section_id",
+            &report.expected_loader_symbol_section_id,
+        ),
+        json_usize_field(
+            "expected_relocation_count",
+            report.expected_relocation_count,
         ),
         json_usize_field(
             "expected_external_import_count",
             report.expected_external_import_count,
+        ),
+        json_string_field(
+            "expected_external_import_table_hash",
+            &report.expected_external_import_table_hash,
+        ),
+        json_string_field(
+            "expected_external_import_id",
+            &report.expected_external_import_id,
+        ),
+        json_string_field(
+            "expected_external_import_kind",
+            &report.expected_external_import_kind,
+        ),
+        json_string_field(
+            "expected_external_import_name",
+            &report.expected_external_import_name,
+        ),
+        json_string_field(
+            "expected_external_import_provider",
+            &report.expected_external_import_provider,
+        ),
+        json_bool_field(
+            "expected_external_import_required",
+            report.expected_external_import_required,
         ),
         json_optional_string_field(
             "actual_container_layout_hash",
@@ -542,6 +620,10 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
             "actual_container_hash",
             report.actual_container_hash.as_deref(),
         ),
+        json_optional_string_field(
+            "actual_metadata_table_hash",
+            report.actual_metadata_table_hash.as_deref(),
+        ),
         json_optional_usize_field(
             "actual_payload_size_bytes",
             report.actual_payload_size_bytes,
@@ -549,12 +631,77 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
         json_optional_string_field("actual_payload_hash", report.actual_payload_hash.as_deref()),
         json_optional_usize_field("actual_section_count", report.actual_section_count),
         json_optional_string_field(
+            "actual_container_section_table_hash",
+            report.actual_container_section_table_hash.as_deref(),
+        ),
+        json_optional_string_field(
             "actual_loader_readiness",
             report.actual_loader_readiness.as_deref(),
         ),
+        json_optional_string_field(
+            "actual_loader_entry_kind",
+            report.actual_loader_entry_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_loader_entry_symbol",
+            report.actual_loader_entry_symbol.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_loader_entry_section_id",
+            report.actual_loader_entry_section_id.as_deref(),
+        ),
+        json_optional_usize_field(
+            "actual_loader_symbol_count",
+            report.actual_loader_symbol_count,
+        ),
+        json_optional_string_field(
+            "actual_loader_symbol_table_hash",
+            report.actual_loader_symbol_table_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_loader_symbol_id",
+            report.actual_loader_symbol_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_loader_symbol_kind",
+            report.actual_loader_symbol_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_loader_symbol_name",
+            report.actual_loader_symbol_name.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_loader_symbol_section_id",
+            report.actual_loader_symbol_section_id.as_deref(),
+        ),
+        json_optional_usize_field("actual_relocation_count", report.actual_relocation_count),
         json_optional_usize_field(
             "actual_external_import_count",
             report.actual_external_import_count,
+        ),
+        json_optional_string_field(
+            "actual_external_import_table_hash",
+            report.actual_external_import_table_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_external_import_id",
+            report.actual_external_import_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_external_import_kind",
+            report.actual_external_import_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_external_import_name",
+            report.actual_external_import_name.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_external_import_provider",
+            report.actual_external_import_provider.as_deref(),
+        ),
+        json_optional_bool_field(
+            "actual_external_import_required",
+            report.actual_external_import_required,
         ),
         json_string_array_field("section_range_issues", &report.section_range_issues),
         json_string_array_field("issues", &report.issues),

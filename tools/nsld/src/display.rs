@@ -72,9 +72,10 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.container_payload_issues.len()
     );
     println!(
-        "  container_loader: readiness={} blockers={} external_imports={}",
+        "  container_loader: readiness={} blockers={} metadata_table_hash={} external_imports={}",
         optional_string_text(report.container_loader_readiness.as_deref()),
         report.container_loader_blockers.len(),
+        optional_string_text(report.container_metadata_table_hash.as_deref()),
         optional_usize_text(report.container_external_import_count)
     );
     println!(
@@ -341,6 +342,7 @@ pub(crate) fn print_nsld_prepare_report(report: &NsldPrepareReport) {
     println!("  bundle_ready: {}", report.bundle_ready);
     println!("  assemble_plan_hash: {}", report.assemble_plan_hash);
     println!("  section_table_hash: {}", report.section_table_hash);
+    println!("  metadata_table_hash: {}", report.metadata_table_hash);
     println!("  container_layout_hash: {}", report.container_layout_hash);
     println!("  container_hash: {}", report.container_hash);
     println!("  payload_size_bytes: {}", report.payload_size_bytes);
@@ -592,6 +594,7 @@ pub(crate) fn print_nsld_container_emit_report(report: &NsldContainerEmitReport)
     println!("  payload_path: {}", report.payload_path);
     println!("  ready: {}", report.ready);
     println!("  section_count: {}", report.section_count);
+    println!("  metadata_table_hash: {}", report.metadata_table_hash);
     println!("  container_layout_hash: {}", report.container_layout_hash);
     println!("  container_hash: {}", report.container_hash);
     println!("  payload_size_bytes: {}", report.payload_size_bytes);
@@ -612,6 +615,10 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
         report.expected_container_hash
     );
     println!(
+        "  expected_metadata_table_hash: {}",
+        report.expected_metadata_table_hash
+    );
+    println!(
         "  expected_payload_size_bytes: {}",
         report.expected_payload_size_bytes
     );
@@ -622,12 +629,80 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
         report.expected_section_count
     );
     println!(
+        "  expected_container_section_table_hash: {}",
+        report.expected_container_section_table_hash
+    );
+    println!(
         "  expected_loader_readiness: {}",
         report.expected_loader_readiness
     );
     println!(
+        "  expected_loader_entry_kind: {}",
+        report.expected_loader_entry_kind
+    );
+    println!(
+        "  expected_loader_entry_symbol: {}",
+        report.expected_loader_entry_symbol
+    );
+    println!(
+        "  expected_loader_entry_section_id: {}",
+        report.expected_loader_entry_section_id
+    );
+    println!(
+        "  expected_loader_symbol_count: {}",
+        report.expected_loader_symbol_count
+    );
+    println!(
+        "  expected_loader_symbol_table_hash: {}",
+        report.expected_loader_symbol_table_hash
+    );
+    println!(
+        "  expected_loader_symbol_id: {}",
+        report.expected_loader_symbol_id
+    );
+    println!(
+        "  expected_loader_symbol_kind: {}",
+        report.expected_loader_symbol_kind
+    );
+    println!(
+        "  expected_loader_symbol_name: {}",
+        report.expected_loader_symbol_name
+    );
+    println!(
+        "  expected_loader_symbol_section_id: {}",
+        report.expected_loader_symbol_section_id
+    );
+    println!(
+        "  expected_relocation_count: {}",
+        report.expected_relocation_count
+    );
+    println!(
         "  expected_external_import_count: {}",
         report.expected_external_import_count
+    );
+    println!(
+        "  expected_external_import_table_hash: {}",
+        report.expected_external_import_table_hash
+    );
+    println!(
+        "  expected_external_import_id: {}",
+        report.expected_external_import_id
+    );
+    println!(
+        "  expected_external_import_kind: {}",
+        report.expected_external_import_kind
+    );
+    println!(
+        "  expected_external_import_name: {}",
+        report.expected_external_import_name
+    );
+    println!(
+        "  expected_external_import_provider: {}",
+        report.expected_external_import_provider
+    );
+    println!(
+        "  expected_external_import_required: {}",
+        report.expected_external_import_required
     );
     println!(
         "  actual_container_layout_hash: {}",
@@ -639,6 +714,13 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
     println!(
         "  actual_container_hash: {}",
         report.actual_container_hash.as_deref().unwrap_or("missing")
+    );
+    println!(
+        "  actual_metadata_table_hash: {}",
+        report
+            .actual_metadata_table_hash
+            .as_deref()
+            .unwrap_or("missing")
     );
     println!(
         "  actual_payload_size_bytes: {}",
@@ -653,6 +735,13 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
         optional_usize_text(report.actual_section_count)
     );
     println!(
+        "  actual_container_section_table_hash: {}",
+        report
+            .actual_container_section_table_hash
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
         "  actual_loader_readiness: {}",
         report
             .actual_loader_readiness
@@ -660,8 +749,111 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
             .unwrap_or("missing")
     );
     println!(
+        "  actual_loader_entry_kind: {}",
+        report
+            .actual_loader_entry_kind
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_loader_entry_symbol: {}",
+        report
+            .actual_loader_entry_symbol
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_loader_entry_section_id: {}",
+        report
+            .actual_loader_entry_section_id
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_loader_symbol_count: {}",
+        optional_usize_text(report.actual_loader_symbol_count)
+    );
+    println!(
+        "  actual_loader_symbol_table_hash: {}",
+        report
+            .actual_loader_symbol_table_hash
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_loader_symbol_id: {}",
+        report
+            .actual_loader_symbol_id
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_loader_symbol_kind: {}",
+        report
+            .actual_loader_symbol_kind
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_loader_symbol_name: {}",
+        report
+            .actual_loader_symbol_name
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_loader_symbol_section_id: {}",
+        report
+            .actual_loader_symbol_section_id
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_relocation_count: {}",
+        optional_usize_text(report.actual_relocation_count)
+    );
+    println!(
         "  actual_external_import_count: {}",
         optional_usize_text(report.actual_external_import_count)
+    );
+    println!(
+        "  actual_external_import_table_hash: {}",
+        report
+            .actual_external_import_table_hash
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_external_import_id: {}",
+        report
+            .actual_external_import_id
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_external_import_kind: {}",
+        report
+            .actual_external_import_kind
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_external_import_name: {}",
+        report
+            .actual_external_import_name
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_external_import_provider: {}",
+        report
+            .actual_external_import_provider
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_external_import_required: {}",
+        optional_bool_text(report.actual_external_import_required)
     );
     for issue in &report.section_range_issues {
         println!("  section_range_issue: {issue}");

@@ -444,6 +444,9 @@ fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldChe
         .as_ref()
         .map(|report| report.loader_blockers.clone())
         .unwrap_or_default();
+    let container_metadata_table_hash = expected_container_report
+        .as_ref()
+        .map(|report| report.metadata_table_hash.clone());
     let container_external_import_count = expected_container_report
         .as_ref()
         .map(|report| report.external_imports.len());
@@ -621,6 +624,7 @@ fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldChe
         container_payload_issues,
         container_loader_readiness,
         container_loader_blockers,
+        container_metadata_table_hash,
         container_external_import_count,
         artifact_chain_valid,
         artifact_chain_issues,
@@ -908,6 +912,7 @@ fn nsld_prepare_report(
         bundle_ready: bundle_emit.bundle_ready,
         assemble_plan_hash: assemble_emit.assemble_plan_hash,
         section_table_hash: section_emit.section_table_hash,
+        metadata_table_hash: container_file_emit.metadata_table_hash,
         container_layout_hash: container_emit.container_layout_hash,
         container_hash: container_file_emit.container_hash,
         payload_size_bytes: container_file_emit.payload_size_bytes,
@@ -1570,6 +1575,8 @@ fn nsld_verify_container_plan_report(
 fn nsld_container_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldContainerReport {
     let container_plan = nsld_container_plan_report(manifest, plan);
     let sections = container::section_entries(&container_plan.sections, fnv1a64_hex);
+    let container_section_table_hash =
+        container::container_section_table_hash(&sections, fnv1a64_hex);
     let loader_entry_kind = "lifecycle-bootstrap".to_owned();
     let loader_entry_symbol = plan.lifecycle.bootstrap_entry.clone();
     let loader_entry_section_id = sections
@@ -1583,8 +1590,19 @@ fn nsld_container_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> Nsl
         &loader_entry_section_id,
         &sections,
     );
+    let loader_symbol_table_hash =
+        container::loader_symbol_table_hash(&loader_symbols, fnv1a64_hex);
     let relocations = Vec::new();
     let external_imports = nsld_container_external_imports(plan);
+    let external_import_table_hash =
+        container::external_import_table_hash(&external_imports, fnv1a64_hex);
+    let metadata_table_hash = container::metadata_table_hash(
+        &container_section_table_hash,
+        &loader_symbol_table_hash,
+        relocations.len(),
+        &external_import_table_hash,
+        fnv1a64_hex,
+    );
     let loader_blockers =
         nsld_container_loader_blockers(&external_imports, &container_plan.blockers);
     let loader_readiness = if !container_plan.ready || !container_plan.blockers.is_empty() {
@@ -1620,6 +1638,7 @@ fn nsld_container_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> Nsl
         ready: container_plan.ready,
         container_magic: container_plan.container_magic,
         container_version: container_plan.container_version,
+        metadata_table_hash,
         container_layout_hash: container_plan.container_layout_hash,
         container_hash,
         loader_readiness,
@@ -1627,14 +1646,17 @@ fn nsld_container_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> Nsl
         loader_entry_kind,
         loader_entry_symbol,
         loader_entry_section_id,
+        loader_symbol_table_hash,
         loader_symbols,
         relocations,
+        external_import_table_hash,
         external_imports,
         payload_size_bytes,
         payload_hash,
         payload_path: format!("{}.payload", container_plan.output_path),
         output_path: container_plan.output_path,
         section_count: container_plan.section_count,
+        container_section_table_hash,
         sections,
         blockers: container_plan.blockers,
     }
@@ -1665,6 +1687,7 @@ fn nsld_emit_container_report(
         output_path: output_path.display().to_string(),
         payload_path: payload_path.display().to_string(),
         ready: report.ready,
+        metadata_table_hash: report.metadata_table_hash,
         container_layout_hash: report.container_layout_hash,
         container_hash: report.container_hash,
         payload_size_bytes: report.payload_size_bytes,
@@ -1691,24 +1714,63 @@ fn nsld_verify_container_report(
     let (
         actual_container_layout_hash,
         actual_container_hash,
+        actual_metadata_table_hash,
         actual_payload_size_bytes,
         actual_payload_hash,
         actual_section_count,
+        actual_container_section_table_hash,
         actual_loader_readiness,
+        actual_loader_entry_kind,
+        actual_loader_entry_symbol,
+        actual_loader_entry_section_id,
+        actual_loader_symbol_count,
+        actual_loader_symbol_id,
+        actual_loader_symbol_kind,
+        actual_loader_symbol_name,
+        actual_loader_symbol_section_id,
+        actual_loader_symbol_table_hash,
+        actual_relocation_count,
         actual_external_import_count,
+        actual_external_import_table_hash,
+        actual_external_import_id,
+        actual_external_import_kind,
+        actual_external_import_name,
+        actual_external_import_provider,
+        actual_external_import_required,
     ) = match actual.as_ref() {
         Ok(source) => (
             toml_string_value(source, "container_layout_hash"),
             toml_string_value(source, "container_hash"),
+            toml_string_value(source, "metadata_table_hash"),
             toml_usize_value(source, "payload_size_bytes"),
             toml_string_value(source, "payload_hash"),
             toml_usize_value(source, "section_count"),
+            toml_string_value(source, "container_section_table_hash"),
             toml_string_value(source, "loader_readiness"),
+            toml_string_value(source, "loader_entry_kind"),
+            toml_string_value(source, "loader_entry_symbol"),
+            toml_string_value(source, "loader_entry_section_id"),
+            toml_usize_value(source, "loader_symbol_count"),
+            toml_first_table_string_value(source, "loader_symbol", "symbol_id"),
+            toml_first_table_string_value(source, "loader_symbol", "symbol_kind"),
+            toml_first_table_string_value(source, "loader_symbol", "symbol_name"),
+            toml_first_table_string_value(source, "loader_symbol", "section_id"),
+            toml_string_value(source, "loader_symbol_table_hash"),
+            toml_usize_value(source, "relocation_count"),
             toml_usize_value(source, "external_import_count"),
+            toml_string_value(source, "external_import_table_hash"),
+            toml_first_table_string_value(source, "external_import", "import_id"),
+            toml_first_table_string_value(source, "external_import", "import_kind"),
+            toml_first_table_string_value(source, "external_import", "import_name"),
+            toml_first_table_string_value(source, "external_import", "provider"),
+            toml_first_table_bool_value(source, "external_import", "required"),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None, None, None)
+            (
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None,
+            )
         }
     };
     if let Ok(actual) = actual {
@@ -1731,6 +1793,17 @@ fn nsld_verify_container_report(
                 "container_hash mismatch: expected {}, found {}",
                 expected_report.container_hash,
                 actual_container_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_metadata_table_hash.as_deref()
+            != Some(expected_report.metadata_table_hash.as_str())
+        {
+            issues.push(format!(
+                "metadata_table_hash mismatch: expected {}, found {}",
+                expected_report.metadata_table_hash,
+                actual_metadata_table_hash
                     .clone()
                     .unwrap_or_else(|| "missing".to_owned())
             ));
@@ -1762,12 +1835,123 @@ fn nsld_verify_container_report(
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
+        if actual_container_section_table_hash.as_deref()
+            != Some(expected_report.container_section_table_hash.as_str())
+        {
+            issues.push(format!(
+                "container_section_table_hash mismatch: expected {}, found {}",
+                expected_report.container_section_table_hash,
+                actual_container_section_table_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
         if actual_loader_readiness.as_deref() != Some(expected_report.loader_readiness.as_str()) {
             issues.push(format!(
                 "loader_readiness mismatch: expected {}, found {}",
                 expected_report.loader_readiness,
                 actual_loader_readiness
                     .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_loader_entry_kind.as_deref() != Some(expected_report.loader_entry_kind.as_str()) {
+            issues.push(format!(
+                "loader_entry_kind mismatch: expected {}, found {}",
+                expected_report.loader_entry_kind,
+                actual_loader_entry_kind
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_loader_entry_symbol.as_deref()
+            != Some(expected_report.loader_entry_symbol.as_str())
+        {
+            issues.push(format!(
+                "loader_entry_symbol mismatch: expected {}, found {}",
+                expected_report.loader_entry_symbol,
+                actual_loader_entry_symbol
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_loader_entry_section_id.as_deref()
+            != Some(expected_report.loader_entry_section_id.as_str())
+        {
+            issues.push(format!(
+                "loader_entry_section_id mismatch: expected {}, found {}",
+                expected_report.loader_entry_section_id,
+                actual_loader_entry_section_id
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_loader_symbol_count != Some(expected_report.loader_symbols.len()) {
+            issues.push(format!(
+                "loader_symbol_count mismatch: expected {}, found {}",
+                expected_report.loader_symbols.len(),
+                actual_loader_symbol_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if let Some(expected_symbol) = expected_report.loader_symbols.first() {
+            if actual_loader_symbol_id.as_deref() != Some(expected_symbol.symbol_id.as_str()) {
+                issues.push(format!(
+                    "loader_symbol_id mismatch: expected {}, found {}",
+                    expected_symbol.symbol_id,
+                    actual_loader_symbol_id
+                        .clone()
+                        .unwrap_or_else(|| "missing".to_owned())
+                ));
+            }
+            if actual_loader_symbol_kind.as_deref() != Some(expected_symbol.symbol_kind.as_str()) {
+                issues.push(format!(
+                    "loader_symbol_kind mismatch: expected {}, found {}",
+                    expected_symbol.symbol_kind,
+                    actual_loader_symbol_kind
+                        .clone()
+                        .unwrap_or_else(|| "missing".to_owned())
+                ));
+            }
+            if actual_loader_symbol_name.as_deref() != Some(expected_symbol.symbol_name.as_str()) {
+                issues.push(format!(
+                    "loader_symbol_name mismatch: expected {}, found {}",
+                    expected_symbol.symbol_name,
+                    actual_loader_symbol_name
+                        .clone()
+                        .unwrap_or_else(|| "missing".to_owned())
+                ));
+            }
+            if actual_loader_symbol_section_id.as_deref()
+                != Some(expected_symbol.section_id.as_str())
+            {
+                issues.push(format!(
+                    "loader_symbol_section_id mismatch: expected {}, found {}",
+                    expected_symbol.section_id,
+                    actual_loader_symbol_section_id
+                        .clone()
+                        .unwrap_or_else(|| "missing".to_owned())
+                ));
+            }
+        }
+        if actual_loader_symbol_table_hash.as_deref()
+            != Some(expected_report.loader_symbol_table_hash.as_str())
+        {
+            issues.push(format!(
+                "loader_symbol_table_hash mismatch: expected {}, found {}",
+                expected_report.loader_symbol_table_hash,
+                actual_loader_symbol_table_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_relocation_count != Some(expected_report.relocations.len()) {
+            issues.push(format!(
+                "relocation_count mismatch: expected {}, found {}",
+                expected_report.relocations.len(),
+                actual_relocation_count
+                    .map(|value| value.to_string())
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
@@ -1779,6 +1963,67 @@ fn nsld_verify_container_report(
                     .map(|value| value.to_string())
                     .unwrap_or_else(|| "missing".to_owned())
             ));
+        }
+        if actual_external_import_table_hash.as_deref()
+            != Some(expected_report.external_import_table_hash.as_str())
+        {
+            issues.push(format!(
+                "external_import_table_hash mismatch: expected {}, found {}",
+                expected_report.external_import_table_hash,
+                actual_external_import_table_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if let Some(expected_import) = expected_report.external_imports.first() {
+            if actual_external_import_id.as_deref() != Some(expected_import.import_id.as_str()) {
+                issues.push(format!(
+                    "external_import_id mismatch: expected {}, found {}",
+                    expected_import.import_id,
+                    actual_external_import_id
+                        .clone()
+                        .unwrap_or_else(|| "missing".to_owned())
+                ));
+            }
+            if actual_external_import_kind.as_deref() != Some(expected_import.import_kind.as_str())
+            {
+                issues.push(format!(
+                    "external_import_kind mismatch: expected {}, found {}",
+                    expected_import.import_kind,
+                    actual_external_import_kind
+                        .clone()
+                        .unwrap_or_else(|| "missing".to_owned())
+                ));
+            }
+            if actual_external_import_name.as_deref() != Some(expected_import.import_name.as_str())
+            {
+                issues.push(format!(
+                    "external_import_name mismatch: expected {}, found {}",
+                    expected_import.import_name,
+                    actual_external_import_name
+                        .clone()
+                        .unwrap_or_else(|| "missing".to_owned())
+                ));
+            }
+            if actual_external_import_provider.as_deref() != Some(expected_import.provider.as_str())
+            {
+                issues.push(format!(
+                    "external_import_provider mismatch: expected {}, found {}",
+                    expected_import.provider,
+                    actual_external_import_provider
+                        .clone()
+                        .unwrap_or_else(|| "missing".to_owned())
+                ));
+            }
+            if actual_external_import_required != Some(expected_import.required) {
+                issues.push(format!(
+                    "external_import_required mismatch: expected {}, found {}",
+                    expected_import.required,
+                    actual_external_import_required
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "missing".to_owned())
+                ));
+            }
         }
     }
     let mut section_range_issues = Vec::new();
@@ -1825,19 +2070,91 @@ fn nsld_verify_container_report(
         valid: issues.is_empty(),
         expected_container_layout_hash: expected_report.container_layout_hash,
         expected_container_hash: expected_report.container_hash,
+        expected_metadata_table_hash: expected_report.metadata_table_hash,
         expected_payload_size_bytes: expected_report.payload_size_bytes,
         expected_payload_hash: expected_report.payload_hash,
         expected_payload_path: expected_report.payload_path,
         expected_section_count: expected_report.section_count,
+        expected_container_section_table_hash: expected_report.container_section_table_hash,
         expected_loader_readiness: expected_report.loader_readiness,
+        expected_loader_entry_kind: expected_report.loader_entry_kind,
+        expected_loader_entry_symbol: expected_report.loader_entry_symbol,
+        expected_loader_entry_section_id: expected_report.loader_entry_section_id,
+        expected_loader_symbol_count: expected_report.loader_symbols.len(),
+        expected_loader_symbol_id: expected_report
+            .loader_symbols
+            .first()
+            .map(|symbol| symbol.symbol_id.clone())
+            .unwrap_or_default(),
+        expected_loader_symbol_kind: expected_report
+            .loader_symbols
+            .first()
+            .map(|symbol| symbol.symbol_kind.clone())
+            .unwrap_or_default(),
+        expected_loader_symbol_name: expected_report
+            .loader_symbols
+            .first()
+            .map(|symbol| symbol.symbol_name.clone())
+            .unwrap_or_default(),
+        expected_loader_symbol_section_id: expected_report
+            .loader_symbols
+            .first()
+            .map(|symbol| symbol.section_id.clone())
+            .unwrap_or_default(),
+        expected_loader_symbol_table_hash: expected_report.loader_symbol_table_hash,
+        expected_relocation_count: expected_report.relocations.len(),
         expected_external_import_count: expected_report.external_imports.len(),
+        expected_external_import_table_hash: expected_report.external_import_table_hash,
+        expected_external_import_id: expected_report
+            .external_imports
+            .first()
+            .map(|external_import| external_import.import_id.clone())
+            .unwrap_or_default(),
+        expected_external_import_kind: expected_report
+            .external_imports
+            .first()
+            .map(|external_import| external_import.import_kind.clone())
+            .unwrap_or_default(),
+        expected_external_import_name: expected_report
+            .external_imports
+            .first()
+            .map(|external_import| external_import.import_name.clone())
+            .unwrap_or_default(),
+        expected_external_import_provider: expected_report
+            .external_imports
+            .first()
+            .map(|external_import| external_import.provider.clone())
+            .unwrap_or_default(),
+        expected_external_import_required: expected_report
+            .external_imports
+            .first()
+            .map(|external_import| external_import.required)
+            .unwrap_or(false),
         actual_container_layout_hash,
         actual_container_hash,
+        actual_metadata_table_hash,
         actual_payload_size_bytes,
         actual_payload_hash,
         actual_section_count,
+        actual_container_section_table_hash,
         actual_loader_readiness,
+        actual_loader_entry_kind,
+        actual_loader_entry_symbol,
+        actual_loader_entry_section_id,
+        actual_loader_symbol_count,
+        actual_loader_symbol_id,
+        actual_loader_symbol_kind,
+        actual_loader_symbol_name,
+        actual_loader_symbol_section_id,
+        actual_loader_symbol_table_hash,
+        actual_relocation_count,
         actual_external_import_count,
+        actual_external_import_table_hash,
+        actual_external_import_id,
+        actual_external_import_kind,
+        actual_external_import_name,
+        actual_external_import_provider,
+        actual_external_import_required,
         section_range_issues,
         issues,
     }
@@ -2118,17 +2435,54 @@ fn toml_string_value(source: &str, key: &str) -> Option<String> {
         if found_key.trim() != key {
             return None;
         }
-        let value = value.trim();
-        value
-            .strip_prefix('"')
-            .and_then(|value| value.strip_suffix('"'))
-            .map(|value| {
-                value
-                    .replace("\\n", "\n")
-                    .replace("\\\"", "\"")
-                    .replace("\\\\", "\\")
-            })
+        toml_decode_string_value(value.trim())
     })
+}
+
+fn toml_first_table_string_value(source: &str, table: &str, key: &str) -> Option<String> {
+    toml_first_table_value(source, table, key).and_then(toml_decode_string_value)
+}
+
+fn toml_first_table_bool_value(source: &str, table: &str, key: &str) -> Option<bool> {
+    toml_first_table_value(source, table, key).and_then(|value| value.parse::<bool>().ok())
+}
+
+fn toml_first_table_value<'a>(source: &'a str, table: &str, key: &str) -> Option<&'a str> {
+    let header = format!("[[{table}]]");
+    let mut in_target_table = false;
+
+    for raw in source.lines() {
+        let line = raw.trim();
+        if line.starts_with("[[") && line.ends_with("]]") {
+            if in_target_table {
+                return None;
+            }
+            in_target_table = line == header;
+            continue;
+        }
+        if !in_target_table {
+            continue;
+        }
+        if let Some((found_key, value)) = line.split_once('=') {
+            if found_key.trim() == key {
+                return Some(value.trim());
+            }
+        }
+    }
+
+    None
+}
+
+fn toml_decode_string_value(value: &str) -> Option<String> {
+    value
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .map(|value| {
+            value
+                .replace("\\n", "\n")
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\")
+        })
 }
 
 fn toml_string_array_value(source: &str, key: &str) -> Vec<String> {
@@ -2170,13 +2524,13 @@ fn toml_usize_value(source: &str, key: &str) -> Option<usize> {
 mod tests {
     use super::{
         fnv1a64_hex, nsld_artifact_chain_issues, nsld_assemble_plan_report, nsld_check_report,
-        nsld_link_bundle_report, nsld_link_input_diagnostics, nsld_link_input_table_hash,
-        nsld_link_unit_report, nsld_link_unit_table_hash, nsld_prepare_report,
-        nsld_sidecar_capability_diagnostics, nsld_verify_assemble_plan_report,
+        nsld_emit_container_report, nsld_link_bundle_report, nsld_link_input_diagnostics,
+        nsld_link_input_table_hash, nsld_link_unit_report, nsld_link_unit_table_hash,
+        nsld_prepare_report, nsld_sidecar_capability_diagnostics, nsld_verify_assemble_plan_report,
         nsld_verify_container_plan_report, nsld_verify_container_report,
         nsld_verify_link_bundle_report, nsld_verify_link_inputs_report,
         nsld_verify_link_units_report, nsld_verify_section_manifest_report, parse_args, toml,
-        Command,
+        toml_first_table_bool_value, toml_first_table_string_value, Command,
     };
     use nuisc::linker::{
         ArtifactLoweringAlignmentSummary, LinkPlan, LinkPlanArtifact, LinkPlanClockProtocol,
@@ -2636,6 +2990,43 @@ mod tests {
                 input: PathBuf::from("out"),
                 json: true
             })
+        );
+    }
+
+    #[test]
+    fn scoped_toml_helpers_read_the_first_matching_table_only() {
+        let source = r#"
+[[loader_symbol]]
+symbol_id = "sym0000.loader-entry"
+section_id = "sec0000.compiled-artifact"
+
+[[external_import]]
+import_id = "imp0000.final-stage-driver"
+required = true
+
+[[section]]
+section_id = "sec9999.section-table"
+
+[[external_import]]
+import_id = "imp0001.clang-target"
+required = false
+"#;
+
+        assert_eq!(
+            toml_first_table_string_value(source, "loader_symbol", "section_id").as_deref(),
+            Some("sec0000.compiled-artifact")
+        );
+        assert_eq!(
+            toml_first_table_string_value(source, "external_import", "import_id").as_deref(),
+            Some("imp0000.final-stage-driver")
+        );
+        assert_eq!(
+            toml_first_table_bool_value(source, "external_import", "required"),
+            Some(true)
+        );
+        assert_eq!(
+            toml_first_table_string_value(source, "missing", "section_id"),
+            None
         );
     }
 
@@ -3193,6 +3584,7 @@ validation_contracts = ["glm.resource-lifetime"]
         assert!(report.bundle_ready);
         assert_ne!(report.assemble_plan_hash, "missing");
         assert_ne!(report.section_table_hash, "missing");
+        assert_ne!(report.metadata_table_hash, "missing");
         assert_ne!(report.container_layout_hash, "missing");
         assert_ne!(report.container_hash, "missing");
         assert!(report.payload_size_bytes > 0);
@@ -3454,6 +3846,27 @@ validation_contracts = ["glm.resource-lifetime"]
     }
 
     #[test]
+    fn emit_container_reports_metadata_table_hash() {
+        let dir = env::temp_dir().join(format!("nsld-container-emit-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let artifact_path = dir.join("nuis.compiled.artifact");
+        fs::write(&artifact_path, b"compiled-artifact").unwrap();
+        let mut plan = empty_link_plan();
+        plan.output_dir = dir.display().to_string();
+        plan.compiled_artifact.path = artifact_path.display().to_string();
+
+        let report = nsld_emit_container_report(Path::new("manifest.toml"), &plan).unwrap();
+        let container_source = fs::read_to_string(&report.output_path).unwrap();
+        fs::remove_dir_all(dir).unwrap();
+
+        assert!(report.metadata_table_hash.starts_with("0x"));
+        assert!(container_source.contains(&format!(
+            "metadata_table_hash = \"{}\"",
+            report.metadata_table_hash
+        )));
+    }
+
+    #[test]
     fn verify_container_accepts_matching_emitted_container() {
         let dir = env::temp_dir().join(format!("nsld-container-verify-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
@@ -3517,40 +3930,190 @@ validation_contracts = ["glm.resource-lifetime"]
             container_source.contains("loader_entry_section_id = \"sec0000.compiled-artifact\"")
         );
         assert!(container_source.contains("loader_symbol_count = 1"));
+        assert!(container_source.contains("loader_symbol_table_hash = \"0x"));
         assert!(container_source.contains("[[loader_symbol]]"));
         assert!(container_source.contains("symbol_id = \"sym0000.loader-entry\""));
         assert!(container_source.contains("symbol_name = \"main\""));
         assert!(container_source.contains("section_id = \"sec0000.compiled-artifact\""));
         assert!(container_source.contains("relocation_count = 0"));
         assert!(container_source.contains("external_import_count = 3"));
+        assert!(container_source.contains("external_import_table_hash = \"0x"));
         assert!(container_source.contains("[[external_import]]"));
         assert!(container_source.contains("import_kind = \"final-stage-driver\""));
         assert!(container_source.contains("import_kind = \"clang-target\""));
         assert!(container_source.contains("import_kind = \"c-world-policy\""));
         assert!(container_source.contains("payload_size_bytes = "));
         assert!(container_source.contains("payload_hash = \"0x"));
+        assert!(container_source.contains("container_section_table_hash = \"0x"));
+        assert!(container_source.contains("metadata_table_hash = \"0x"));
         assert!(report.valid);
         assert!(report.issues.is_empty());
         assert_eq!(report.actual_section_count, Some(5));
+        assert_eq!(
+            report.actual_container_section_table_hash.as_deref(),
+            Some(report.expected_container_section_table_hash.as_str())
+        );
         assert_eq!(
             report.actual_container_layout_hash,
             Some(prepare.container_layout_hash)
         );
         assert_eq!(report.actual_container_hash, Some(prepare.container_hash));
+        assert_eq!(
+            report.actual_metadata_table_hash.as_deref(),
+            Some(report.expected_metadata_table_hash.as_str())
+        );
         assert_eq!(report.expected_loader_readiness, "host-assisted");
         assert_eq!(
             report.actual_loader_readiness.as_deref(),
             Some("host-assisted")
         );
+        assert_eq!(report.expected_loader_entry_kind, "lifecycle-bootstrap");
+        assert_eq!(
+            report.actual_loader_entry_kind.as_deref(),
+            Some("lifecycle-bootstrap")
+        );
+        assert_eq!(report.expected_loader_entry_symbol, "main");
+        assert_eq!(report.actual_loader_entry_symbol.as_deref(), Some("main"));
+        assert_eq!(
+            report.expected_loader_entry_section_id,
+            "sec0000.compiled-artifact"
+        );
+        assert_eq!(
+            report.actual_loader_entry_section_id.as_deref(),
+            Some("sec0000.compiled-artifact")
+        );
         assert_eq!(report.expected_external_import_count, 3);
         assert_eq!(report.actual_external_import_count, Some(3));
+        assert_eq!(report.expected_loader_symbol_count, 1);
+        assert_eq!(report.actual_loader_symbol_count, Some(1));
+        assert_eq!(
+            report.actual_loader_symbol_table_hash.as_deref(),
+            Some(report.expected_loader_symbol_table_hash.as_str())
+        );
+        assert_eq!(report.expected_loader_symbol_id, "sym0000.loader-entry");
+        assert_eq!(
+            report.actual_loader_symbol_id.as_deref(),
+            Some("sym0000.loader-entry")
+        );
+        assert_eq!(report.expected_loader_symbol_kind, "lifecycle-bootstrap");
+        assert_eq!(
+            report.actual_loader_symbol_kind.as_deref(),
+            Some("lifecycle-bootstrap")
+        );
+        assert_eq!(report.expected_loader_symbol_name, "main");
+        assert_eq!(report.actual_loader_symbol_name.as_deref(), Some("main"));
+        assert_eq!(
+            report.expected_loader_symbol_section_id,
+            "sec0000.compiled-artifact"
+        );
+        assert_eq!(
+            report.actual_loader_symbol_section_id.as_deref(),
+            Some("sec0000.compiled-artifact")
+        );
+        assert_eq!(report.expected_relocation_count, 0);
+        assert_eq!(report.actual_relocation_count, Some(0));
+        assert_eq!(
+            report.actual_external_import_table_hash.as_deref(),
+            Some(report.expected_external_import_table_hash.as_str())
+        );
+        assert_eq!(
+            report.expected_external_import_id,
+            "imp0000.final-stage-driver"
+        );
+        assert_eq!(
+            report.actual_external_import_id.as_deref(),
+            Some("imp0000.final-stage-driver")
+        );
+        assert_eq!(report.expected_external_import_kind, "final-stage-driver");
+        assert_eq!(
+            report.actual_external_import_kind.as_deref(),
+            Some("final-stage-driver")
+        );
+        assert_eq!(report.expected_external_import_name, "clang");
+        assert_eq!(report.actual_external_import_name.as_deref(), Some("clang"));
+        assert_eq!(report.expected_external_import_provider, "host-toolchain");
+        assert_eq!(
+            report.actual_external_import_provider.as_deref(),
+            Some("host-toolchain")
+        );
+        assert!(report.expected_external_import_required);
+        assert_eq!(report.actual_external_import_required, Some(true));
 
         let tampered_container_source = container_source
             .replace(
                 "loader_readiness = \"host-assisted\"",
                 "loader_readiness = \"self-contained\"",
             )
-            .replace("external_import_count = 3", "external_import_count = 0");
+            .replace(
+                &format!(
+                    "metadata_table_hash = \"{}\"",
+                    report.expected_metadata_table_hash
+                ),
+                "metadata_table_hash = \"0x0000000000000000\"",
+            )
+            .replace(
+                &format!(
+                    "container_section_table_hash = \"{}\"",
+                    report.expected_container_section_table_hash
+                ),
+                "container_section_table_hash = \"0x0000000000000000\"",
+            )
+            .replace(
+                "loader_entry_kind = \"lifecycle-bootstrap\"",
+                "loader_entry_kind = \"manual-entry\"",
+            )
+            .replace(
+                "loader_entry_symbol = \"main\"",
+                "loader_entry_symbol = \"alt\"",
+            )
+            .replace(
+                "loader_entry_section_id = \"sec0000.compiled-artifact\"",
+                "loader_entry_section_id = \"sec9999.missing\"",
+            )
+            .replace("loader_symbol_count = 1", "loader_symbol_count = 0")
+            .replace(
+                &format!(
+                    "loader_symbol_table_hash = \"{}\"",
+                    report.expected_loader_symbol_table_hash
+                ),
+                "loader_symbol_table_hash = \"0x0000000000000000\"",
+            )
+            .replace(
+                "symbol_id = \"sym0000.loader-entry\"",
+                "symbol_id = \"sym9999.manual\"",
+            )
+            .replace(
+                "symbol_kind = \"lifecycle-bootstrap\"",
+                "symbol_kind = \"manual-symbol\"",
+            )
+            .replace("symbol_name = \"main\"", "symbol_name = \"alt\"")
+            .replace(
+                "section_id = \"sec0000.compiled-artifact\"",
+                "section_id = \"sec9999.missing\"",
+            )
+            .replace("relocation_count = 0", "relocation_count = 1")
+            .replace("external_import_count = 3", "external_import_count = 0")
+            .replace(
+                &format!(
+                    "external_import_table_hash = \"{}\"",
+                    report.expected_external_import_table_hash
+                ),
+                "external_import_table_hash = \"0x0000000000000000\"",
+            )
+            .replace(
+                "import_id = \"imp0000.final-stage-driver\"",
+                "import_id = \"imp9999.manual\"",
+            )
+            .replace(
+                "import_kind = \"final-stage-driver\"",
+                "import_kind = \"manual-driver\"",
+            )
+            .replace("import_name = \"clang\"", "import_name = \"manual-clang\"")
+            .replace(
+                "provider = \"host-toolchain\"",
+                "provider = \"manual-provider\"",
+            )
+            .replace("required = true", "required = false");
         fs::write(&prepare.container_path, tampered_container_source).unwrap();
         let tampered_report = nsld_verify_container_report(Path::new("manifest.toml"), &plan);
         assert!(!tampered_report.valid);
@@ -3558,7 +4121,72 @@ validation_contracts = ["glm.resource-lifetime"]
             tampered_report.actual_loader_readiness.as_deref(),
             Some("self-contained")
         );
+        assert_eq!(
+            tampered_report
+                .actual_container_section_table_hash
+                .as_deref(),
+            Some("0x0000000000000000")
+        );
+        assert_eq!(
+            tampered_report.actual_metadata_table_hash.as_deref(),
+            Some("0x0000000000000000")
+        );
+        assert_eq!(
+            tampered_report.actual_loader_entry_kind.as_deref(),
+            Some("manual-entry")
+        );
+        assert_eq!(
+            tampered_report.actual_loader_entry_symbol.as_deref(),
+            Some("alt")
+        );
+        assert_eq!(
+            tampered_report.actual_loader_entry_section_id.as_deref(),
+            Some("sec9999.missing")
+        );
         assert_eq!(tampered_report.actual_external_import_count, Some(0));
+        assert_eq!(tampered_report.actual_loader_symbol_count, Some(0));
+        assert_eq!(
+            tampered_report.actual_loader_symbol_table_hash.as_deref(),
+            Some("0x0000000000000000")
+        );
+        assert_eq!(
+            tampered_report.actual_loader_symbol_id.as_deref(),
+            Some("sym9999.manual")
+        );
+        assert_eq!(
+            tampered_report.actual_loader_symbol_kind.as_deref(),
+            Some("manual-symbol")
+        );
+        assert_eq!(
+            tampered_report.actual_loader_symbol_name.as_deref(),
+            Some("alt")
+        );
+        assert_eq!(
+            tampered_report.actual_loader_symbol_section_id.as_deref(),
+            Some("sec9999.missing")
+        );
+        assert_eq!(tampered_report.actual_relocation_count, Some(1));
+        assert_eq!(
+            tampered_report.actual_external_import_table_hash.as_deref(),
+            Some("0x0000000000000000")
+        );
+        assert_eq!(
+            tampered_report.actual_external_import_id.as_deref(),
+            Some("imp9999.manual")
+        );
+        assert_eq!(
+            tampered_report.actual_external_import_kind.as_deref(),
+            Some("manual-driver")
+        );
+        assert_eq!(
+            tampered_report.actual_external_import_name.as_deref(),
+            Some("manual-clang")
+        );
+        assert_eq!(
+            tampered_report.actual_external_import_provider.as_deref(),
+            Some("manual-provider")
+        );
+        assert_eq!(tampered_report.actual_external_import_required, Some(false));
         assert!(tampered_report
             .issues
             .iter()
@@ -3566,7 +4194,79 @@ validation_contracts = ["glm.resource-lifetime"]
         assert!(tampered_report
             .issues
             .iter()
+            .any(|issue| issue.starts_with("container_section_table_hash mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("metadata_table_hash mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("loader_entry_kind mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("loader_entry_symbol mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("loader_entry_section_id mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("loader_symbol_count mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("loader_symbol_table_hash mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("loader_symbol_id mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("loader_symbol_kind mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("loader_symbol_name mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("loader_symbol_section_id mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("relocation_count mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
             .any(|issue| issue.starts_with("external_import_count mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("external_import_table_hash mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("external_import_id mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("external_import_kind mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("external_import_name mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("external_import_provider mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("external_import_required mismatch")));
         fs::write(&prepare.container_path, container_source).unwrap();
 
         let mut corrupted_payload = payload_bytes;
@@ -3604,6 +4304,10 @@ validation_contracts = ["glm.resource-lifetime"]
             report.container_loader_readiness.as_deref(),
             Some("host-assisted")
         );
+        assert!(report
+            .container_metadata_table_hash
+            .as_deref()
+            .is_some_and(|hash| hash.starts_with("0x")));
         assert_eq!(report.container_external_import_count, Some(3));
         assert!(report
             .container_loader_blockers

@@ -111,6 +111,10 @@ table. `nsld inputs` remains accepted as the alpha-era compatibility alias.
 This gives later linker, cache, and debugger stages one reproducible
 preparation step without hiding the lower-level `inputs`, `emit-units`, or
 `emit-bundle` commands.
+The prepare report also returns the final container `metadata_table_hash`,
+`container_layout_hash`, `container_hash`, `payload_size_bytes`, and
+`payload_hash`, so later stages can key off the prepared binary-contract
+summary without re-opening every artifact.
 
 `nsld assemble-plan` is the first dry-run view of binary assembly. It consumes
 the prepared bundle state and lists the sections that a future Nsld-owned
@@ -269,7 +273,9 @@ producer_phase = "alpha-0.6.0"
 ready = true
 container_magic = "NUISNSLD"
 container_version = 1
+metadata_table_hash = "0x..."
 section_count = 6
+container_section_table_hash = "0x..."
 container_layout_hash = "0x..."
 container_hash = "0x..."
 loader_readiness = "host-assisted"
@@ -278,8 +284,10 @@ loader_entry_kind = "lifecycle-bootstrap"
 loader_entry_symbol = "nustar.bootstrap.v1"
 loader_entry_section_id = "sec0000.compiled-artifact"
 loader_symbol_count = 1
+loader_symbol_table_hash = "0x..."
 relocation_count = 0
 external_import_count = 3
+external_import_table_hash = "0x..."
 payload_size_bytes = 1234
 payload_hash = "0x..."
 payload_path = "/.../nuis.nsld.container.payload"
@@ -329,10 +337,16 @@ size_bytes = 1234
 
 `nsld verify-container` re-computes the container shell and payload blob. It
 fails if either file is missing, if the metadata content differs, or if
-`section_count`, `container_layout_hash`, loader entry fields,
-`loader_readiness`, `external_import_count`, `payload_size_bytes`,
-`payload_hash`, or `container_hash` no longer match. It also checks each
-section's
+`metadata_table_hash`, `section_count`, `container_section_table_hash`,
+`container_layout_hash`, `loader_entry_kind`, `loader_entry_symbol`,
+`loader_entry_section_id`, `loader_readiness`, `loader_symbol_count`,
+`loader_symbol_table_hash`, `relocation_count`, `external_import_count`,
+`external_import_table_hash`, `payload_size_bytes`, `payload_hash`, or
+`container_hash` no longer match. It also checks the bootstrap
+`[[loader_symbol]]` entry's `symbol_id`, `symbol_kind`, `symbol_name`, and
+`section_id`; the first
+`[[external_import]]` entry's `import_id`, `import_kind`, `import_name`,
+`provider`, and `required`; plus each section's
 `offset` / `size_bytes` range against that section's `payload_hash`, so a
 corrupted payload segment can be reported without waiting for later relocation
 or final native linking.
@@ -417,10 +431,11 @@ The check report exposes `artifact_chain_valid` and `artifact_chain_issues`
 for this prepare-order state.
 
 When `nuis.nsld.container` exists, the check report also exposes
-`container_loader_readiness`, `container_loader_blockers`, and
-`container_external_import_count`. `host-assisted` is reported as an explicit
-remaining dependency state, not as a check failure; `blocked` fails the check
-because it means the container still has unresolved assembly blockers.
+`container_loader_readiness`, `container_loader_blockers`,
+`container_metadata_table_hash`, and `container_external_import_count`.
+`host-assisted` is reported as an explicit remaining dependency state, not as a
+check failure; `blocked` fails the check because it means the container still
+has unresolved assembly blockers.
 
 The check report also exposes linker diagnostics for:
 
