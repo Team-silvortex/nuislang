@@ -16,6 +16,7 @@ boundary before the implementation is split out further.
 * heterogeneous calculate plan visibility
 * clock protocol visibility
 * lowering sidecar capability validation for domains that declare IR sidecars
+* deterministic link-unit reporting across registered domain units
 * final-stage reporting
 * the first independent CLI boundary for future linker work
 
@@ -36,6 +37,22 @@ cargo run -p nsld -- check <artifact-output-dir>
 cargo run -p nsld -- check <artifact-output-dir> --json
 cargo run -p nsld -- closure <artifact-output-dir>
 cargo run -p nsld -- closure <artifact-output-dir> --json
+cargo run -p nsld -- prepare <artifact-output-dir>
+cargo run -p nsld -- prepare <artifact-output-dir> --json
+cargo run -p nsld -- assemble-plan <artifact-output-dir>
+cargo run -p nsld -- assemble-plan <artifact-output-dir> --json
+cargo run -p nsld -- bundle <artifact-output-dir>
+cargo run -p nsld -- bundle <artifact-output-dir> --json
+cargo run -p nsld -- emit-bundle <artifact-output-dir>
+cargo run -p nsld -- emit-bundle <artifact-output-dir> --json
+cargo run -p nsld -- verify-bundle <artifact-output-dir>
+cargo run -p nsld -- verify-bundle <artifact-output-dir> --json
+cargo run -p nsld -- units <artifact-output-dir>
+cargo run -p nsld -- units <artifact-output-dir> --json
+cargo run -p nsld -- emit-units <artifact-output-dir>
+cargo run -p nsld -- emit-units <artifact-output-dir> --json
+cargo run -p nsld -- verify-units <artifact-output-dir>
+cargo run -p nsld -- verify-units <artifact-output-dir> --json
 cargo run -p nsld -- inputs <artifact-output-dir>
 cargo run -p nsld -- inputs <artifact-output-dir> --json
 cargo run -p nsld -- verify-inputs <artifact-output-dir>
@@ -44,6 +61,41 @@ cargo run -p nsld -- verify-inputs <artifact-output-dir> --json
 
 When given an output directory, `Nsld` resolves
 `nuis.build.manifest.toml` inside that directory.
+
+For the normal linker-preparation workflow, prefer:
+
+```sh
+cargo run -p nsld -- prepare <artifact-output-dir>
+cargo run -p nsld -- check <artifact-output-dir>
+```
+
+`nsld prepare` emits and immediately verifies the three current Nsld-owned
+artifacts in dependency order:
+
+* `nuis.nsld.link-inputs.toml`
+* `nuis.nsld.link-units.toml`
+* `nuis.nsld.link-bundle.toml`
+
+This gives later linker, cache, and debugger stages one reproducible
+preparation step without hiding the lower-level `inputs`, `emit-units`, or
+`emit-bundle` commands.
+
+`nsld assemble-plan` is the first dry-run view of binary assembly. It consumes
+the prepared bundle state and lists the sections that a future Nsld-owned
+container writer would need to assemble in deterministic order. It currently
+reports:
+
+* compiled artifact section
+* Nsld link input table section
+* Nsld link unit table section
+* Nsld link bundle section
+* validated lowering sidecar input sections
+* hetero data segment sections when source paths are present
+
+The command is intentionally non-mutating: it does not write a binary and does
+not replace the host finalizer. Its purpose is to make the future self-owned
+section assembly route visible and testable before relocation/container writing
+lands.
 
 ## Linker Check
 
@@ -56,9 +108,22 @@ When given an output directory, `Nsld` resolves
 * hetero calculate plan is lifecycle-driven
 * lowering sidecar capabilities are readable and link-ready for domains that
   declare `artifact_ir_sidecar_path`
+* an emitted `nuis.nsld.link-inputs.toml` is still valid when that file is
+  present
+* an emitted `nuis.nsld.link-units.toml` is still valid when that file is
+  present
+* an emitted `nuis.nsld.link-bundle.toml` is still valid when that file is
+  present
 
 The command exits with failure when any linker gate fails. JSON output is
 intended for CI and future toolchain orchestration.
+
+`nsld check` does not require `nuis.nsld.link-inputs.toml`,
+`nuis.nsld.link-units.toml`, or `nuis.nsld.link-bundle.toml` to exist. If any
+file is absent, the corresponding gate is reported as absent and the check
+still uses the core linker gates. If a file is present, it is verified with the
+same rules as `nsld verify-inputs`, `nsld verify-units`, or
+`nsld verify-bundle`; any mismatch fails the check.
 
 The check report also exposes linker diagnostics for:
 
@@ -84,6 +149,11 @@ This command is intentionally conservative. A report with `closed = false`
 does not mean the build is unusable; it means the current route still depends
 on non-Nsld stages such as the host launcher wrapper or final native link.
 
+If `nuis.nsld.link-inputs.toml` exists, closure also verifies it. A valid table
+adds `verified-link-input-table` to `internal_contracts`; an invalid table adds
+`link-input-table:*` entries to `unresolved`. If the table is absent, closure
+reports the table state as absent without treating that absence as unresolved.
+
 When every declared lowering IR sidecar has a valid capability block, closure
 adds `lowering-sidecar-capabilities` to `internal_contracts`. Domains without
 IR sidecars, such as data/fabric domains, are not treated as sidecar capability
@@ -105,6 +175,116 @@ This is not final object linking yet; it is the linker-owned input table that
 future binary assembly, cache reuse, debug-symbol correlation, and closure
 verification can consume.
 
+## Link Units
+
+`nsld units` builds the first deterministic link-unit view over the current
+link plan. It groups registered domain units by stable domain/package/role
+order and attaches any validated lowering sidecar inputs owned by that unit.
+
+Each reported unit includes:
+
+* `unit_id`: stable `luNNNN.<domain>.<package>` identity
+* `unit_kind`: currently `native-domain` or `hetero-domain`
+* domain family, package id, backend family, lowering target, and packaging
+  role
+* attached `link_input_ids` from the Nsld sidecar input table
+* clock-edge and data-segment counts visible to the unit
+* whether the unit still requires the host wrapper path
+* a deterministic order key
+
+The report also exposes `unit_table_hash`, derived from the ordered unit
+material. This is deliberately a link-contract hash, not a final object hash:
+it lets future Nsld, Nsdb, cache reuse, and hetero binary assembly detect when
+the domain-unit skeleton has changed without peeking into a Nustar's private
+lowering logic.
+
+`nsld emit-units` materializes this report to:
+
+```text
+nuis.nsld.link-units.toml
+```
+
+The emitted table currently uses:
+
+```toml
+schema = "nuis-nsld-link-unit-table-v1"
+schema_version = 1
+table_kind = "deterministic-link-units"
+producer = "nsld"
+producer_phase = "alpha-0.6.0"
+unit_count = 2
+hetero_unit_count = 1
+link_input_count = 1
+clock_edge_count = 3
+data_segment_count = 1
+unit_table_hash = "0x..."
+
+[[link_unit]]
+order_index = 1
+unit_id = "lu0001.shader.official.shader"
+unit_kind = "hetero-domain"
+domain_family = "shader"
+package_id = "official.shader"
+backend_family = "metal"
+lowering_target = "metal.apple-silicon-gpu"
+packaging_role = "hetero-contract"
+link_input_ids = ["li0000.shader.official.shader"]
+clock_edge_count = 2
+data_segment_count = 1
+requires_host_wrapper = false
+deterministic_order_key = "0001.shader.official.shader"
+```
+
+`nsld verify-units` re-computes the expected unit table from the current
+manifest and link plan. Verification fails if the file is missing, if the full
+table content differs, or if `unit_count`, `hetero_unit_count`,
+`link_input_count`, or `unit_table_hash` no longer match.
+
+## Link Bundle
+
+`nsld bundle` folds the input table, link-unit table, clock/data counts,
+final-stage mode, and artifact paths into one linker-owned bundle view. This
+is still not final object linking; it is the single manifest a future Nsld
+assembler, cache, or YIR-level debugger can consume before section assembly.
+
+`nsld emit-bundle` materializes this view to:
+
+```text
+nuis.nsld.link-bundle.toml
+```
+
+The emitted bundle currently uses:
+
+```toml
+schema = "nuis-nsld-link-bundle-v1"
+schema_version = 1
+bundle_kind = "hetero-static-link-bundle"
+producer = "nsld"
+producer_phase = "alpha-0.6.0"
+bundle_id = "lb..."
+bundle_hash = "0x..."
+bundle_ready = true
+unit_count = 2
+hetero_unit_count = 1
+link_input_count = 1
+link_input_total_bytes = 1987
+link_input_table_hash = "0x..."
+unit_table_hash = "0x..."
+clock_edge_count = 3
+data_segment_count = 1
+final_stage_link_mode = "host-toolchain-finalize"
+host_wrapper_required = true
+compiled_artifact_path = "/.../nuis.compiled.artifact"
+native_output_path = "/.../shader_profile_demo"
+issues = []
+```
+
+`nsld verify-bundle` re-computes the bundle from the current manifest and link
+plan. Verification fails if the file is missing, if the full content differs,
+or if `bundle_id` or `bundle_hash` no longer match. `bundle_ready = false`
+does not by itself mean the file is invalid; it means the bundle faithfully
+records unresolved linker inputs that future stages must not ignore.
+
 ## Link Input Table Artifact
 
 `nsld inputs` materializes the closure link input table to:
@@ -117,7 +297,10 @@ The emitted table currently uses:
 
 ```toml
 schema = "nuis-nsld-link-input-table-v1"
+schema_version = 1
 table_kind = "lowering-sidecar-link-inputs"
+producer = "nsld"
+producer_phase = "alpha-0.6.0"
 link_input_count = 1
 link_input_total_bytes = 1987
 link_input_table_hash = "0x..."
@@ -171,5 +354,7 @@ For `alpha-0.6.0`, success means:
 * `Nsld` can inspect real build outputs
 * clock protocol and hetero calculate metadata are visible from the linker
   frontdoor
+* Nsld can derive a deterministic link-unit skeleton from registered domain
+  units and validated lowering sidecars
 
 This is the beginning of linker independence, not the end of linker work.

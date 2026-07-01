@@ -1,3 +1,7 @@
+use cpu StdFsContracts;
+use cpu StdTextContracts;
+use cpu StdTimeContracts;
+
 mod cpu Main {
   extern "c" fn host_monotonic_time_ns() -> i64;
   extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
@@ -135,33 +139,34 @@ mod cpu Main {
   fn main() -> i64 {
     let summary: BenchmarkReportFileProjectSummary =
       capture_benchmark_report_file_project();
-    let total: i64 = summary.first_span_ns
-      + summary.second_span_ns
-      + summary.third_span_ns
-      + summary.min_span_ns
-      + summary.max_span_ns
-      + summary.mid_span_ns
-      + summary.avg_span_ns
-      + summary.first_sleep_ns
-      + summary.second_sleep_ns
-      + summary.third_sleep_ns
-      + summary.total_span_ns
-      + summary.total_sleep_ns
-      + summary.kv_line_handle
-      + summary.kv_line_len
-      + summary.status_line_handle
-      + summary.status_line_len
-      + summary.report_handle
-      + summary.report_len
-      + summary.pair_len
-      + summary.object_len
-      + summary.output_path_handle
-      + summary.output_file_handle
-      + summary.write_code
-      + summary.output_close_code;
+    let total: i64 = StdTimeContracts.benchmark_triplet_total(
+      summary.first_span_ns,
+      summary.second_span_ns,
+      summary.third_span_ns,
+      summary.min_span_ns,
+      summary.max_span_ns,
+      summary.mid_span_ns,
+      summary.avg_span_ns,
+      summary.total_span_ns,
+      summary.total_sleep_ns
+    ) + StdTimeContracts.time_value_or_zero(summary.first_sleep_ns)
+      + StdTimeContracts.time_value_or_zero(summary.second_sleep_ns)
+      + StdTimeContracts.time_value_or_zero(summary.third_sleep_ns)
+      + StdTextContracts.text_value_or_zero(summary.kv_line_handle)
+      + StdTextContracts.text_value_or_zero(summary.kv_line_len)
+      + StdTextContracts.text_value_or_zero(summary.status_line_handle)
+      + StdTextContracts.text_value_or_zero(summary.status_line_len)
+      + StdTextContracts.report_status_total(summary.report_handle, summary.report_len)
+      + StdTextContracts.json_shape_total(summary.pair_len, 0, summary.object_len)
+      + StdFsContracts.file_write_status_total(
+        summary.output_file_handle,
+        summary.write_code,
+        summary.output_close_code
+      )
+      + StdFsContracts.host_fs_value_or_zero(summary.output_path_handle);
     if total > 0 {
-      return 0;
+      return StdTimeContracts.time_ok();
     }
-    return 1;
+    return StdTimeContracts.time_error();
   }
 }

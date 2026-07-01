@@ -1,3 +1,6 @@
+use cpu StdFsContracts;
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_path_basename(path_handle: i64) -> i64;
@@ -88,22 +91,27 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: FilesystemReportProjectSummary = capture_filesystem_report_project();
-    return summary.joined_len
-      + summary.basename_handle
-      + summary.exists_code
-      + summary.kind_code
-      + summary.size_code
-      + summary.dir_handle
-      + summary.dir_entry_count
-      + summary.dir_close_code
-      + summary.file_handle
-      + summary.read_bytes
-      + summary.file_close_code
-      + summary.joined_line_handle
-      + summary.joined_line_len
-      + summary.file_line_handle
-      + summary.file_line_len
-      + summary.report_handle
-      + summary.report_len;
+    let total: i64 = StdFsContracts.filesystem_report_status_total(
+      summary.joined_len,
+      summary.basename_handle,
+      summary.exists_code,
+      summary.kind_code,
+      summary.size_code,
+      summary.dir_handle,
+      summary.dir_entry_count,
+      summary.dir_close_code,
+      summary.file_handle,
+      summary.read_bytes,
+      summary.file_close_code,
+      summary.report_handle,
+      summary.report_len
+    ) + StdTextContracts.text_value_or_zero(summary.joined_line_handle)
+      + StdTextContracts.text_value_or_zero(summary.joined_line_len)
+      + StdTextContracts.text_value_or_zero(summary.file_line_handle)
+      + StdTextContracts.text_value_or_zero(summary.file_line_len);
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

@@ -14,6 +14,7 @@ task/pointer rules?", read:
 If you want a short current phase summary before drilling into individual
 contracts, start with:
 
+* [../versioning/nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md)
 * [../versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * [../versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 

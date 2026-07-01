@@ -136,12 +136,12 @@ mod cpu Main {
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=15\tdocumented_modules=14\tdocumented_items=136"));
+    assert!(docs_index.contains("summary\tmodules=15\tdocumented_modules=14\tdocumented_items=140"));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=34\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=14\tvisible_libraries=14\tvisible_modules=15\tdocumented_visible_modules=14\tdocumented_visible_items=136"
+        "summary\tlibraries=14\tvisible_libraries=14\tvisible_modules=15\tdocumented_visible_modules=14\tdocumented_visible_items=140"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -358,10 +358,16 @@ mod cpu Main {
         + StdFsContracts.metadata_status_total(1, 2, 3)
         + StdFsContracts.file_io_status_total(4, 5, 0)
         + StdFsContracts.file_write_status_total(4, 9, 0)
+        + StdFsContracts.file_roundtrip_status_total(10, 11, 0, 0, 12, 13, 0)
         + StdFsContracts.file_copy_status_total(5, 9, 0)
+        + StdFsContracts.path_copy_status_total(10, 11, 12, 0, 0, 0, 1, 1)
         + StdFsContracts.directory_status_total(6, 7, 0)
         + StdFsContracts.directory_mutation_status_total(0, 1, 0, 0)
         + StdFsContracts.path_probe_status_total(0, 1, 1)
+        + StdFsContracts.filesystem_report_status_total(2, 3, 1, 2, 3, 4, 5, 0, 6, 7, 0, 8, 9)
+        + StdFsContracts.filesystem_report_file_status_total(
+          2, 3, 1, 2, 3, 4, 5, 0, 6, 7, 0, 8, 9, 10, 11, 0, 0
+        )
         + StdTextContracts.pipeline_status_total(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
         + StdTimeContracts.time_sample_total(100, 200, 300)
         + CorePrelude.one_i64()
@@ -432,7 +438,17 @@ mod cpu Main {
         .nir
         .functions
         .iter()
+        .any(|function| function.name == "StdFsContracts.file_roundtrip_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
         .any(|function| function.name == "StdFsContracts.file_copy_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdFsContracts.path_copy_status_total"));
     assert!(artifacts
         .nir
         .functions
@@ -448,6 +464,16 @@ mod cpu Main {
         .functions
         .iter()
         .any(|function| function.name == "StdFsContracts.path_probe_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdFsContracts.filesystem_report_status_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| { function.name == "StdFsContracts.filesystem_report_file_status_total" }));
     assert!(artifacts
         .nir
         .functions
@@ -1067,7 +1093,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=14\tvisible_libraries=14\tvisible_modules=15\tdocumented_visible_modules=14\tdocumented_visible_items=136"
+        "summary\tlibraries=14\tvisible_libraries=14\tvisible_modules=15\tdocumented_visible_modules=14\tdocumented_visible_items=140"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

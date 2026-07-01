@@ -1,4 +1,7 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
   extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
   extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
   extern "c" fn host_file_close(file_handle: i64) -> i64;
@@ -6,6 +9,8 @@ mod cpu Main {
   extern "c" fn host_fs_exists(path_handle: i64) -> i64;
 
   struct FileCopyProjectSummary {
+    src_path_handle: i64,
+    dst_path_handle: i64,
     src_file_handle: i64,
     write_code: i64,
     close_code: i64,
@@ -15,27 +20,39 @@ mod cpu Main {
   }
 
   fn capture_file_copy_project() -> FileCopyProjectSummary {
-    let src_file_handle: i64 = host_file_open(2103, 1);
+    let src_path_handle: i64 = host_temp_file_handle(229);
+    let dst_path_handle: i64 = host_temp_file_handle(230);
+    let src_file_handle: i64 = host_file_open(src_path_handle, 1);
     let write_code: i64 = host_file_write(src_file_handle, 777);
     let close_code: i64 = host_file_close(src_file_handle);
-    let copy_code: i64 = host_path_copy(2103, 2109);
+    let copy_code: i64 = host_path_copy(src_path_handle, dst_path_handle);
     return FileCopyProjectSummary {
+      src_path_handle: src_path_handle,
+      dst_path_handle: dst_path_handle,
       src_file_handle: src_file_handle,
       write_code: write_code,
       close_code: close_code,
       copy_code: copy_code,
-      src_exists_code: host_fs_exists(2103),
-      dst_exists_code: host_fs_exists(2109)
+      src_exists_code: host_fs_exists(src_path_handle),
+      dst_exists_code: host_fs_exists(dst_path_handle)
     };
   }
 
   fn main() -> i64 {
     let summary: FileCopyProjectSummary = capture_file_copy_project();
-    return summary.src_file_handle
-      + summary.write_code
-      + summary.close_code
-      + summary.copy_code
-      + summary.src_exists_code
-      + summary.dst_exists_code;
+    let total: i64 = StdFsContracts.path_copy_status_total(
+      summary.src_path_handle,
+      summary.dst_path_handle,
+      summary.src_file_handle,
+      summary.write_code,
+      summary.close_code,
+      summary.copy_code,
+      summary.src_exists_code,
+      summary.dst_exists_code
+    );
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

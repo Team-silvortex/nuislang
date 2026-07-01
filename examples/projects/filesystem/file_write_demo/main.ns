@@ -1,17 +1,23 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
   extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
   extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
   extern "c" fn host_file_close(file_handle: i64) -> i64;
 
   struct FileWriteProjectSummary {
+    path_handle: i64,
     file_handle: i64,
     write_code: i64,
     close_code: i64
   }
 
   fn capture_file_write_project() -> FileWriteProjectSummary {
-    let file_handle: i64 = host_file_open(2103, 1);
+    let path_handle: i64 = host_temp_file_handle(221);
+    let file_handle: i64 = host_file_open(path_handle, 1);
     return FileWriteProjectSummary {
+      path_handle: path_handle,
       file_handle: file_handle,
       write_code: host_file_write(file_handle, 777),
       close_code: host_file_close(file_handle)
@@ -20,8 +26,14 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: FileWriteProjectSummary = capture_file_write_project();
-    return summary.file_handle
-      + summary.write_code
-      + summary.close_code;
+    let total: i64 = StdFsContracts.file_write_status_total(
+      summary.file_handle,
+      summary.write_code,
+      summary.close_code
+    ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle);
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

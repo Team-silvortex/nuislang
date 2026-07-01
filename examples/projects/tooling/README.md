@@ -122,9 +122,12 @@ Short rule:
   [time_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/time_report_demo),
   [benchmark_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_demo),
   [benchmark_report_count_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_count_demo),
-  [benchmark_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo),
-  [io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_report_demo),
-  [filesystem_io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/filesystem_io_report_demo),
+  [benchmark_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo)
+  as the benchmark/text/filesystem std contract consumer,
+  [io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_report_demo)
+  as the console/text std contract consumer,
+  [filesystem_io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/filesystem_io_report_demo)
+  as the filesystem/console std contract consumer,
   [json_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/json_runtime_demo),
   [text_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_json_demo),
   [text_format_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_format_runtime_demo),
@@ -137,10 +140,12 @@ Short rule:
   [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/input_runtime_demo),
   [cli_cat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_cat_demo),
   [cli_wc_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_wc_demo),
-  [io_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_runtime_demo),
+  [io_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_runtime_demo)
+  as the base console std contract smoke,
   [stdin_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/stdin_runtime_demo),
   [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/tty_runtime_demo),
   [terminal_io_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/terminal_io_demo)
+  as the terminal/stdin/TTY std contract smoke
 * file-backed image probe:
   [cli_pgm_info_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo)
 * file-backed image transform:

@@ -4,7 +4,11 @@
 
 ## Current Status
 
-The repository is in an active architecture-building stage. The most stable current spine is:
+The repository is currently on the `alpha-0.6.*` line. It is still in an active
+architecture-building stage, but the mainline is now expected to describe one
+connected toolchain rather than a pile of promising surfaces.
+
+The most stable current spine is:
 
 ```text
 nuis source / project
@@ -20,18 +24,31 @@ The key thing that is already real today is not “all language features are don
 * `data`
 * `shader`
 * `kernel`
+* `network`
 
 That model is increasingly enforced through `YIR` contracts, project validation, per-domain `nustar` manifests, and verifier checks rather than only ad hoc frontend rules.
 
+The newest `alpha-0.6.*` emphasis is:
+
+* `nsld` as the named linker frontdoor over real build outputs, link plans,
+  clock/order metadata, closure reports, and self-checking link input tables
+* std filesystem and report examples that consume `StdFsContracts`,
+  `StdTextContracts`, `StdIoContracts`, and `StdTimeContracts` through
+  `std=workspace`
+* more examples promoted from raw probe totals to process-style `ok/error`
+  exits backed by `nuis build` and `run-artifact`
+
 Current versioning entrypoints:
 
+* current `alpha-0.6.*` mainline entry:
+  [docs/versioning/nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md)
 * current mainline router:
   [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* current `alpha-0.4.*` system inventory:
+* `alpha-0.4.*` hardening baseline system inventory:
   [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
-* current `alpha-0.4.*` hardening plan:
+* `alpha-0.4.*` hardening baseline plan:
   [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-* current `alpha-0.4.*` documentation sync inventory:
+* `alpha-0.4.*` documentation sync baseline:
   [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 * long-range heterogeneous OS roadmap:
   [docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md)
@@ -57,8 +74,12 @@ Current versioning entrypoints:
   [docs/versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md)
 
 If you want the current line first, start with
+[docs/versioning/nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md),
+then use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+and
+[docs/reference/nsld-linker-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsld-linker-frontdoor.md).
+For the hardening baseline behind that current line, use
 [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md),
-then use
 [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 and
 [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md).
@@ -186,9 +207,12 @@ Current workflow reading rule:
 * use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
   when you want the repo-wide current route
 * use
-  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+  [docs/versioning/nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md)
   when the question is whether a lane is already current, still active, or only
   an intentional alpha boundary
+* use
+  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
+  only when you intentionally need the first alpha closeout history
 
 Useful inspection commands:
 
@@ -302,7 +326,8 @@ If you want the shortest path by goal:
 
 * consolidated current mainline map
   - [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-* current alpha system inventory and hardening plan
+* current alpha line and hardening baseline
+  - [docs/versioning/nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md)
   - [docs/versioning/nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
   - [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
   - [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)

@@ -1,3 +1,5 @@
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
   extern "c" fn host_stderr_write(text_handle: i64) -> i64;
@@ -30,13 +32,20 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: IoRuntimeProjectSummary = capture_io_runtime_project();
-    return summary.primary_stdout_written
-      + summary.primary_stderr_written
-      + summary.primary_stdout_flushed
-      + summary.primary_stderr_flushed
-      + summary.secondary_stdout_written
-      + summary.secondary_stderr_written
-      + summary.secondary_stdout_flushed
-      + summary.secondary_stderr_flushed;
+    let total: i64 = StdIoContracts.console_status_total(
+      summary.primary_stdout_written,
+      summary.primary_stderr_written,
+      summary.primary_stdout_flushed,
+      summary.primary_stderr_flushed
+    ) + StdIoContracts.console_status_total(
+      summary.secondary_stdout_written,
+      summary.secondary_stderr_written,
+      summary.secondary_stdout_flushed,
+      summary.secondary_stderr_flushed
+    );
+    if total > 0 {
+      return StdIoContracts.io_ok();
+    }
+    return StdIoContracts.io_error();
   }
 }

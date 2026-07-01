@@ -1,6 +1,7 @@
 name = "filesystem_report_demo"
 entry = "main.ns"
 modules = ["main.ns"]
+galaxy = ["std=workspace"]
 abi = [
   "cpu=cpu.arm64.apple_aapcs64"
 ]

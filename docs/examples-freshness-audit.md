@@ -91,6 +91,11 @@ Completed in this pass:
 * companion routing now explicitly includes current mutate/output examples such
   as `path_copy_demo`, `path_rename_demo`, `path_remove_demo`,
   `file_output_demo`, and `directory_remove_demo`
+* file read/write/copy/roundtrip/output and directory create/remove demos now
+  consume `StdFsContracts` through `std=workspace` and return process-style
+  `fs_ok` / `fs_error` exits
+* filesystem report, report-to-file, and filesystem/console report demos now
+  act as std contract consumers instead of raw probe-total examples
 * `current-mainline-map`, filesystem README, and this audit now agree on the
   current route
 
@@ -99,6 +104,9 @@ Next likely work:
 * keep the new frontdoor-versus-micro-probe split stable before deciding
   whether the dense `path_*` family deserves a grouped subrouter or a future
   legacy/probe bucket
+* continue the std contract-consumer pattern into any remaining filesystem
+  companions only when the example can either run against temp-backed host
+  paths or clearly stays labeled as lowering-only
 
 ### Domains
 
@@ -328,11 +336,21 @@ Current control-flow reading rule:
   [cli_shell_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_shell_session_demo),
   [cli_report_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_report_session_demo)
 * filesystem companions:
+  standard-contract smoke set:
+  [file_read_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo),
+  [file_write_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo),
+  [file_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo),
+  [file_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_roundtrip_demo),
   [file_output_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_output_demo),
-  [fs_metadata_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/fs_metadata_runtime_demo),
-  [stat_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/stat_runtime_demo),
   [directory_create_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_create_demo),
   [directory_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_remove_demo),
+  report consumers:
+  [filesystem_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_demo),
+  [filesystem_report_file_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_file_demo),
+  [filesystem_io_report_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/filesystem_io_report_demo),
+  remaining filesystem companions:
+  [fs_metadata_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/fs_metadata_runtime_demo),
+  [stat_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/stat_runtime_demo),
   [directory_stat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_stat_demo),
   [path_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_copy_demo),
   [path_rename_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_rename_demo),

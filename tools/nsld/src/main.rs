@@ -4,12 +4,32 @@ use std::{
     process,
 };
 
+const NSLD_LINK_INPUT_TABLE_SCHEMA: &str = "nuis-nsld-link-input-table-v1";
+const NSLD_LINK_INPUT_TABLE_SCHEMA_VERSION: usize = 1;
+const NSLD_LINK_INPUT_TABLE_KIND: &str = "lowering-sidecar-link-inputs";
+const NSLD_LINK_INPUT_TABLE_PRODUCER: &str = "nsld";
+const NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE: &str = "alpha-0.6.0";
+const NSLD_LINK_UNIT_TABLE_SCHEMA: &str = "nuis-nsld-link-unit-table-v1";
+const NSLD_LINK_UNIT_TABLE_SCHEMA_VERSION: usize = 1;
+const NSLD_LINK_UNIT_TABLE_KIND: &str = "deterministic-link-units";
+const NSLD_LINK_BUNDLE_SCHEMA: &str = "nuis-nsld-link-bundle-v1";
+const NSLD_LINK_BUNDLE_SCHEMA_VERSION: usize = 1;
+const NSLD_LINK_BUNDLE_KIND: &str = "hetero-static-link-bundle";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
     Status,
     Plan { input: PathBuf, json: bool },
     Check { input: PathBuf, json: bool },
     Closure { input: PathBuf, json: bool },
+    Prepare { input: PathBuf, json: bool },
+    AssemblePlan { input: PathBuf, json: bool },
+    Bundle { input: PathBuf, json: bool },
+    EmitBundle { input: PathBuf, json: bool },
+    VerifyBundle { input: PathBuf, json: bool },
+    Units { input: PathBuf, json: bool },
+    EmitUnits { input: PathBuf, json: bool },
+    VerifyUnits { input: PathBuf, json: bool },
     Inputs { input: PathBuf, json: bool },
     VerifyInputs { input: PathBuf, json: bool },
 }
@@ -30,6 +50,15 @@ struct NsldCheckReport {
     lifecycle_driven: bool,
     sidecar_capability_valid: bool,
     sidecar_capability_issues: Vec<String>,
+    link_input_table_present: bool,
+    link_input_table_valid: Option<bool>,
+    link_input_table_issues: Vec<String>,
+    link_unit_table_present: bool,
+    link_unit_table_valid: Option<bool>,
+    link_unit_table_issues: Vec<String>,
+    link_bundle_present: bool,
+    link_bundle_valid: Option<bool>,
+    link_bundle_issues: Vec<String>,
     final_stage_link_mode: String,
     domains: Vec<NsldDomainDiagnostic>,
     sidecar_capabilities: Vec<NsldSidecarCapabilityDiagnostic>,
@@ -95,6 +124,8 @@ struct NsldClosureReport {
     link_input_count: usize,
     link_input_total_bytes: usize,
     link_input_table_hash: String,
+    link_input_table_present: bool,
+    link_input_table_valid: Option<bool>,
     external_dependencies: Vec<String>,
     unresolved: Vec<String>,
     host_wrapper_required: bool,
@@ -104,6 +135,142 @@ struct NsldClosureReport {
     clock_edge_count: usize,
     data_segment_count: usize,
     final_stage_link_mode: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldLinkUnitReport {
+    manifest: String,
+    unit_count: usize,
+    hetero_unit_count: usize,
+    link_input_count: usize,
+    clock_edge_count: usize,
+    data_segment_count: usize,
+    unit_table_hash: String,
+    units: Vec<NsldLinkUnitDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldLinkUnitDiagnostic {
+    order_index: usize,
+    unit_id: String,
+    unit_kind: String,
+    domain_family: String,
+    package_id: String,
+    backend_family: String,
+    lowering_target: String,
+    packaging_role: String,
+    link_input_ids: Vec<String>,
+    clock_edge_count: usize,
+    data_segment_count: usize,
+    requires_host_wrapper: bool,
+    deterministic_order_key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldLinkUnitsEmitReport {
+    manifest: String,
+    output_path: String,
+    unit_count: usize,
+    hetero_unit_count: usize,
+    link_input_count: usize,
+    unit_table_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldLinkUnitsVerifyReport {
+    manifest: String,
+    input_path: String,
+    valid: bool,
+    expected_unit_count: usize,
+    expected_hetero_unit_count: usize,
+    expected_link_input_count: usize,
+    expected_unit_table_hash: String,
+    actual_unit_count: Option<usize>,
+    actual_hetero_unit_count: Option<usize>,
+    actual_link_input_count: Option<usize>,
+    actual_unit_table_hash: Option<String>,
+    issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldLinkBundleReport {
+    manifest: String,
+    bundle_id: String,
+    bundle_hash: String,
+    bundle_ready: bool,
+    unit_count: usize,
+    hetero_unit_count: usize,
+    link_input_count: usize,
+    link_input_total_bytes: usize,
+    link_input_table_hash: String,
+    unit_table_hash: String,
+    clock_edge_count: usize,
+    data_segment_count: usize,
+    final_stage_link_mode: String,
+    host_wrapper_required: bool,
+    compiled_artifact_path: String,
+    native_output_path: String,
+    issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldLinkBundleEmitReport {
+    manifest: String,
+    output_path: String,
+    bundle_id: String,
+    bundle_hash: String,
+    bundle_ready: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldLinkBundleVerifyReport {
+    manifest: String,
+    input_path: String,
+    valid: bool,
+    expected_bundle_id: String,
+    expected_bundle_hash: String,
+    actual_bundle_id: Option<String>,
+    actual_bundle_hash: Option<String>,
+    issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldPrepareReport {
+    manifest: String,
+    valid: bool,
+    output_dir: String,
+    link_input_table_path: String,
+    link_unit_table_path: String,
+    link_bundle_path: String,
+    link_input_count: usize,
+    link_input_table_hash: String,
+    unit_count: usize,
+    unit_table_hash: String,
+    bundle_id: String,
+    bundle_hash: String,
+    bundle_ready: bool,
+    issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldAssemblePlanReport {
+    manifest: String,
+    ready: bool,
+    bundle_id: String,
+    bundle_hash: String,
+    section_count: usize,
+    sections: Vec<NsldAssembleSectionDiagnostic>,
+    blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldAssembleSectionDiagnostic {
+    order_index: usize,
+    section_id: String,
+    section_kind: String,
+    source_path: String,
+    source_hash: String,
+    required: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,6 +286,14 @@ struct NsldLinkInputDiagnostic {
     contract_count: usize,
     content_bytes: usize,
     content_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldLinkInputSummary {
+    inputs: Vec<NsldLinkInputDiagnostic>,
+    count: usize,
+    total_bytes: usize,
+    table_hash: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -201,6 +376,95 @@ fn run() -> Result<(), String> {
                 print_nsld_closure_report(&report);
             }
         }
+        Command::Prepare { input, json } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsld_prepare_report(&manifest, &plan)?;
+            if json {
+                println!("{}", nsld_prepare_report_json(&report));
+            } else {
+                print_nsld_prepare_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld prepare failed".to_owned());
+            }
+        }
+        Command::AssemblePlan { input, json } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsld_assemble_plan_report(&manifest, &plan);
+            if json {
+                println!("{}", nsld_assemble_plan_report_json(&report));
+            } else {
+                print_nsld_assemble_plan_report(&report);
+            }
+        }
+        Command::Bundle { input, json } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsld_link_bundle_report(&manifest, &plan);
+            if json {
+                println!("{}", nsld_link_bundle_report_json(&report));
+            } else {
+                print_nsld_link_bundle_report(&report);
+            }
+        }
+        Command::EmitBundle { input, json } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsld_emit_link_bundle_report(&manifest, &plan)?;
+            if json {
+                println!("{}", nsld_link_bundle_emit_report_json(&report));
+            } else {
+                print_nsld_link_bundle_emit_report(&report);
+            }
+        }
+        Command::VerifyBundle { input, json } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsld_verify_link_bundle_report(&manifest, &plan);
+            if json {
+                println!("{}", nsld_link_bundle_verify_report_json(&report));
+            } else {
+                print_nsld_link_bundle_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld link bundle verification failed".to_owned());
+            }
+        }
+        Command::Units { input, json } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsld_link_unit_report(&manifest, &plan);
+            if json {
+                println!("{}", nsld_link_unit_report_json(&report));
+            } else {
+                print_nsld_link_unit_report(&report);
+            }
+        }
+        Command::EmitUnits { input, json } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsld_emit_link_units_report(&manifest, &plan)?;
+            if json {
+                println!("{}", nsld_link_units_emit_report_json(&report));
+            } else {
+                print_nsld_link_units_emit_report(&report);
+            }
+        }
+        Command::VerifyUnits { input, json } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsld_verify_link_units_report(&manifest, &plan);
+            if json {
+                println!("{}", nsld_link_units_verify_report_json(&report));
+            } else {
+                print_nsld_link_units_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld link unit verification failed".to_owned());
+            }
+        }
         Command::Inputs { input, json } => {
             let manifest = resolve_manifest_input(&input)?;
             let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
@@ -237,9 +501,19 @@ where
     };
     match command.as_str() {
         "status" => Ok(Command::Status),
-        "plan" | "check" | "closure" | "inputs" | "verify-inputs" => {
+        "plan" | "check" | "closure" | "prepare" | "assemble-plan" | "bundle" | "emit-bundle"
+        | "verify-bundle" | "units" | "emit-units" | "verify-units" | "inputs"
+        | "verify-inputs" => {
             let is_check = command == "check";
             let is_closure = command == "closure";
+            let is_prepare = command == "prepare";
+            let is_assemble_plan = command == "assemble-plan";
+            let is_bundle = command == "bundle";
+            let is_emit_bundle = command == "emit-bundle";
+            let is_verify_bundle = command == "verify-bundle";
+            let is_units = command == "units";
+            let is_emit_units = command == "emit-units";
+            let is_verify_units = command == "verify-units";
             let is_inputs = command == "inputs";
             let is_verify_inputs = command == "verify-inputs";
             let mut json = false;
@@ -258,6 +532,22 @@ where
                 Ok(Command::Check { input, json })
             } else if is_closure {
                 Ok(Command::Closure { input, json })
+            } else if is_prepare {
+                Ok(Command::Prepare { input, json })
+            } else if is_assemble_plan {
+                Ok(Command::AssemblePlan { input, json })
+            } else if is_bundle {
+                Ok(Command::Bundle { input, json })
+            } else if is_emit_bundle {
+                Ok(Command::EmitBundle { input, json })
+            } else if is_verify_bundle {
+                Ok(Command::VerifyBundle { input, json })
+            } else if is_units {
+                Ok(Command::Units { input, json })
+            } else if is_emit_units {
+                Ok(Command::EmitUnits { input, json })
+            } else if is_verify_units {
+                Ok(Command::VerifyUnits { input, json })
             } else if is_inputs {
                 Ok(Command::Inputs { input, json })
             } else if is_verify_inputs {
@@ -286,7 +576,7 @@ fn resolve_manifest_input(input: &Path) -> Result<PathBuf, String> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  nsld status\n  nsld plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld check <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]"
+    "usage:\n  nsld status\n  nsld plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld check <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld prepare <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]"
 }
 
 fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldCheckReport {
@@ -316,6 +606,35 @@ fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldChe
         })
         .collect::<Vec<_>>();
     let sidecar_capability_valid = sidecar_capability_issues.is_empty();
+    let link_input_table_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-inputs.toml");
+    let link_input_table_present = link_input_table_path.exists();
+    let link_input_verify_report =
+        link_input_table_present.then(|| nsld_verify_link_inputs_report(manifest, plan));
+    let link_input_table_valid = link_input_verify_report.as_ref().map(|report| report.valid);
+    let link_input_table_issues = link_input_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
+    let link_unit_table_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-units.toml");
+    let link_unit_table_present = link_unit_table_path.exists();
+    let link_unit_verify_report =
+        link_unit_table_present.then(|| nsld_verify_link_units_report(manifest, plan));
+    let link_unit_table_valid = link_unit_verify_report.as_ref().map(|report| report.valid);
+    let link_unit_table_issues = link_unit_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
+    let link_bundle_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-bundle.toml");
+    let link_bundle_present = link_bundle_path.exists();
+    let link_bundle_verify_report =
+        link_bundle_present.then(|| nsld_verify_link_bundle_report(manifest, plan));
+    let link_bundle_valid = link_bundle_verify_report
+        .as_ref()
+        .map(|report| report.valid);
+    let link_bundle_issues = link_bundle_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
     let clock_edges = plan
         .clock_protocol
         .edges
@@ -379,8 +698,21 @@ fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldChe
         issues.push("sidecar capability validation failed".to_owned());
         issues.extend(sidecar_capability_issues.iter().cloned());
     }
+    if link_input_table_valid == Some(false) {
+        issues.push("link input table verification failed".to_owned());
+        issues.extend(link_input_table_issues.iter().cloned());
+    }
+    if link_unit_table_valid == Some(false) {
+        issues.push("link unit table verification failed".to_owned());
+        issues.extend(link_unit_table_issues.iter().cloned());
+    }
+    if link_bundle_valid == Some(false) {
+        issues.push("link bundle verification failed".to_owned());
+        issues.extend(link_bundle_issues.iter().cloned());
+    }
 
-    let checks = 6;
+    let checks = 6 + usize::from(link_input_table_present) + usize::from(link_unit_table_present);
+    let checks = checks + usize::from(link_bundle_present);
     let failures = issues.len();
     NsldCheckReport {
         manifest: manifest.display().to_string(),
@@ -397,6 +729,15 @@ fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldChe
         lifecycle_driven,
         sidecar_capability_valid,
         sidecar_capability_issues,
+        link_input_table_present,
+        link_input_table_valid,
+        link_input_table_issues,
+        link_unit_table_present,
+        link_unit_table_valid,
+        link_unit_table_issues,
+        link_bundle_present,
+        link_bundle_valid,
+        link_bundle_issues,
         final_stage_link_mode: plan.final_stage.link_mode.clone(),
         domains,
         sidecar_capabilities,
@@ -433,13 +774,16 @@ fn nsld_closure_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldC
         internal_contracts.push("lowering-sidecar-capabilities".to_owned());
         internal_contracts.push("link-input-sidecar-table".to_owned());
     }
-    let link_inputs = nsld_link_input_diagnostics(&sidecar_capabilities);
-    let link_input_count = link_inputs.len();
-    let link_input_total_bytes = link_inputs
-        .iter()
-        .map(|input| input.content_bytes)
-        .sum::<usize>();
-    let link_input_table_hash = nsld_link_input_table_hash(&link_inputs);
+    let link_input_summary = nsld_link_input_summary(&sidecar_capabilities);
+    let link_input_table_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-inputs.toml");
+    let link_input_verify_report = link_input_table_path
+        .exists()
+        .then(|| nsld_verify_link_inputs_report(manifest, plan));
+    let link_input_table_present = link_input_verify_report.is_some();
+    let link_input_table_valid = link_input_verify_report.as_ref().map(|report| report.valid);
+    if link_input_table_valid == Some(true) {
+        internal_contracts.push("verified-link-input-table".to_owned());
+    }
 
     let host_wrapper_required = matches!(
         plan.final_stage.link_mode.as_str(),
@@ -480,15 +824,22 @@ fn nsld_closure_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldC
             ));
         }
     }
+    if let Some(report) = &link_input_verify_report {
+        for issue in &report.issues {
+            unresolved.push(format!("link-input-table:{issue}"));
+        }
+    }
 
     NsldClosureReport {
         manifest: manifest.display().to_string(),
         closed: unresolved.is_empty(),
         internal_contracts,
-        link_inputs,
-        link_input_count,
-        link_input_total_bytes,
-        link_input_table_hash,
+        link_inputs: link_input_summary.inputs,
+        link_input_count: link_input_summary.count,
+        link_input_total_bytes: link_input_summary.total_bytes,
+        link_input_table_hash: link_input_summary.table_hash,
+        link_input_table_present,
+        link_input_table_valid,
         external_dependencies,
         unresolved,
         host_wrapper_required,
@@ -528,19 +879,14 @@ fn nsld_emit_link_inputs_report(
             invalid.join(", ")
         ));
     }
-    let link_inputs = nsld_link_input_diagnostics(&sidecar_capabilities);
-    let link_input_total_bytes = link_inputs
-        .iter()
-        .map(|input| input.content_bytes)
-        .sum::<usize>();
-    let link_input_table_hash = nsld_link_input_table_hash(&link_inputs);
+    let link_input_summary = nsld_link_input_summary(&sidecar_capabilities);
     let output_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-inputs.toml");
     fs::write(
         &output_path,
         render_nsld_link_input_table_toml(
-            &link_inputs,
-            link_input_total_bytes,
-            &link_input_table_hash,
+            &link_input_summary.inputs,
+            link_input_summary.total_bytes,
+            &link_input_summary.table_hash,
         ),
     )
     .map_err(|error| {
@@ -553,9 +899,64 @@ fn nsld_emit_link_inputs_report(
     Ok(NsldLinkInputsEmitReport {
         manifest: manifest.display().to_string(),
         output_path: output_path.display().to_string(),
-        link_input_count: link_inputs.len(),
-        link_input_total_bytes,
-        link_input_table_hash,
+        link_input_count: link_input_summary.count,
+        link_input_total_bytes: link_input_summary.total_bytes,
+        link_input_table_hash: link_input_summary.table_hash,
+    })
+}
+
+fn nsld_prepare_report(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<NsldPrepareReport, String> {
+    let input_emit = nsld_emit_link_inputs_report(manifest, plan)?;
+    let input_verify = nsld_verify_link_inputs_report(manifest, plan);
+    let unit_emit = nsld_emit_link_units_report(manifest, plan)?;
+    let unit_verify = nsld_verify_link_units_report(manifest, plan);
+    let bundle_emit = nsld_emit_link_bundle_report(manifest, plan)?;
+    let bundle_verify = nsld_verify_link_bundle_report(manifest, plan);
+
+    let mut issues = Vec::new();
+    if !input_verify.valid {
+        issues.extend(
+            input_verify
+                .issues
+                .iter()
+                .map(|issue| format!("link-inputs:{issue}")),
+        );
+    }
+    if !unit_verify.valid {
+        issues.extend(
+            unit_verify
+                .issues
+                .iter()
+                .map(|issue| format!("link-units:{issue}")),
+        );
+    }
+    if !bundle_verify.valid {
+        issues.extend(
+            bundle_verify
+                .issues
+                .iter()
+                .map(|issue| format!("link-bundle:{issue}")),
+        );
+    }
+
+    Ok(NsldPrepareReport {
+        manifest: manifest.display().to_string(),
+        valid: issues.is_empty(),
+        output_dir: plan.output_dir.clone(),
+        link_input_table_path: input_emit.output_path,
+        link_unit_table_path: unit_emit.output_path,
+        link_bundle_path: bundle_emit.output_path,
+        link_input_count: input_emit.link_input_count,
+        link_input_table_hash: input_emit.link_input_table_hash,
+        unit_count: unit_emit.unit_count,
+        unit_table_hash: unit_emit.unit_table_hash,
+        bundle_id: bundle_emit.bundle_id,
+        bundle_hash: bundle_emit.bundle_hash,
+        bundle_ready: bundle_emit.bundle_ready,
+        issues,
     })
 }
 
@@ -564,17 +965,11 @@ fn nsld_verify_link_inputs_report(
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldLinkInputsVerifyReport {
     let sidecar_capabilities = nsld_sidecar_capability_diagnostics(plan);
-    let link_inputs = nsld_link_input_diagnostics(&sidecar_capabilities);
-    let expected_link_input_count = link_inputs.len();
-    let expected_link_input_total_bytes = link_inputs
-        .iter()
-        .map(|input| input.content_bytes)
-        .sum::<usize>();
-    let expected_link_input_table_hash = nsld_link_input_table_hash(&link_inputs);
+    let link_input_summary = nsld_link_input_summary(&sidecar_capabilities);
     let expected = render_nsld_link_input_table_toml(
-        &link_inputs,
-        expected_link_input_total_bytes,
-        &expected_link_input_table_hash,
+        &link_input_summary.inputs,
+        link_input_summary.total_bytes,
+        &link_input_summary.table_hash,
     );
     let input_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-inputs.toml");
     let mut issues = Vec::new();
@@ -600,29 +995,28 @@ fn nsld_verify_link_inputs_report(
         if actual != expected {
             issues.push("link-input-table-content-mismatch".to_owned());
         }
-        if actual_link_input_count != Some(expected_link_input_count) {
+        if actual_link_input_count != Some(link_input_summary.count) {
             issues.push(format!(
                 "link_input_count mismatch: expected {}, found {}",
-                expected_link_input_count,
+                link_input_summary.count,
                 actual_link_input_count
                     .map(|value| value.to_string())
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
-        if actual_link_input_total_bytes != Some(expected_link_input_total_bytes) {
+        if actual_link_input_total_bytes != Some(link_input_summary.total_bytes) {
             issues.push(format!(
                 "link_input_total_bytes mismatch: expected {}, found {}",
-                expected_link_input_total_bytes,
+                link_input_summary.total_bytes,
                 actual_link_input_total_bytes
                     .map(|value| value.to_string())
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
-        if actual_link_input_table_hash.as_deref() != Some(expected_link_input_table_hash.as_str())
-        {
+        if actual_link_input_table_hash.as_deref() != Some(link_input_summary.table_hash.as_str()) {
             issues.push(format!(
                 "link_input_table_hash mismatch: expected {}, found {}",
-                expected_link_input_table_hash,
+                link_input_summary.table_hash,
                 actual_link_input_table_hash
                     .clone()
                     .unwrap_or_else(|| "missing".to_owned())
@@ -634,14 +1028,526 @@ fn nsld_verify_link_inputs_report(
         manifest: manifest.display().to_string(),
         input_path: input_path.display().to_string(),
         valid: issues.is_empty(),
-        expected_link_input_count,
-        expected_link_input_total_bytes,
-        expected_link_input_table_hash,
+        expected_link_input_count: link_input_summary.count,
+        expected_link_input_total_bytes: link_input_summary.total_bytes,
+        expected_link_input_table_hash: link_input_summary.table_hash,
         actual_link_input_count,
         actual_link_input_total_bytes,
         actual_link_input_table_hash,
         issues,
     }
+}
+
+fn nsld_emit_link_units_report(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<NsldLinkUnitsEmitReport, String> {
+    let report = nsld_link_unit_report(manifest, plan);
+    let output_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-units.toml");
+    fs::write(&output_path, render_nsld_link_unit_table_toml(&report)).map_err(|error| {
+        format!(
+            "failed to write nsld link unit table `{}`: {error}",
+            output_path.display()
+        )
+    })?;
+
+    Ok(NsldLinkUnitsEmitReport {
+        manifest: report.manifest,
+        output_path: output_path.display().to_string(),
+        unit_count: report.unit_count,
+        hetero_unit_count: report.hetero_unit_count,
+        link_input_count: report.link_input_count,
+        unit_table_hash: report.unit_table_hash,
+    })
+}
+
+fn nsld_verify_link_units_report(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+) -> NsldLinkUnitsVerifyReport {
+    let expected_report = nsld_link_unit_report(manifest, plan);
+    let expected = render_nsld_link_unit_table_toml(&expected_report);
+    let input_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-units.toml");
+    let mut issues = Vec::new();
+    let actual = fs::read_to_string(&input_path).map_err(|error| {
+        format!(
+            "missing_or_unreadable_link_unit_table `{}`: {error}",
+            input_path.display()
+        )
+    });
+    let (
+        actual_unit_count,
+        actual_hetero_unit_count,
+        actual_link_input_count,
+        actual_unit_table_hash,
+    ) = match actual.as_ref() {
+        Ok(source) => (
+            toml_usize_value(source, "unit_count"),
+            toml_usize_value(source, "hetero_unit_count"),
+            toml_usize_value(source, "link_input_count"),
+            toml_string_value(source, "unit_table_hash"),
+        ),
+        Err(error) => {
+            issues.push(error.clone());
+            (None, None, None, None)
+        }
+    };
+    if let Ok(actual) = actual {
+        if actual != expected {
+            issues.push("link-unit-table-content-mismatch".to_owned());
+        }
+        if actual_unit_count != Some(expected_report.unit_count) {
+            issues.push(format!(
+                "unit_count mismatch: expected {}, found {}",
+                expected_report.unit_count,
+                actual_unit_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_hetero_unit_count != Some(expected_report.hetero_unit_count) {
+            issues.push(format!(
+                "hetero_unit_count mismatch: expected {}, found {}",
+                expected_report.hetero_unit_count,
+                actual_hetero_unit_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_link_input_count != Some(expected_report.link_input_count) {
+            issues.push(format!(
+                "link_input_count mismatch: expected {}, found {}",
+                expected_report.link_input_count,
+                actual_link_input_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_unit_table_hash.as_deref() != Some(expected_report.unit_table_hash.as_str()) {
+            issues.push(format!(
+                "unit_table_hash mismatch: expected {}, found {}",
+                expected_report.unit_table_hash,
+                actual_unit_table_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+    }
+
+    NsldLinkUnitsVerifyReport {
+        manifest: manifest.display().to_string(),
+        input_path: input_path.display().to_string(),
+        valid: issues.is_empty(),
+        expected_unit_count: expected_report.unit_count,
+        expected_hetero_unit_count: expected_report.hetero_unit_count,
+        expected_link_input_count: expected_report.link_input_count,
+        expected_unit_table_hash: expected_report.unit_table_hash,
+        actual_unit_count,
+        actual_hetero_unit_count,
+        actual_link_input_count,
+        actual_unit_table_hash,
+        issues,
+    }
+}
+
+fn nsld_link_bundle_report(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+) -> NsldLinkBundleReport {
+    let sidecar_capabilities = nsld_sidecar_capability_diagnostics(plan);
+    let link_input_summary = nsld_link_input_summary(&sidecar_capabilities);
+    let unit_report = nsld_link_unit_report(manifest, plan);
+    let host_wrapper_required = matches!(
+        plan.final_stage.link_mode.as_str(),
+        "host-toolchain-finalize" | "bundle-packaging"
+    );
+    let mut issues = Vec::new();
+    if !plan.artifact_lowering_alignment.consistent {
+        issues.push("artifact-lowering-alignment-mismatch".to_owned());
+    }
+    if !plan.clock_protocol.validation.valid {
+        issues.push("clock-protocol-invalid".to_owned());
+    }
+    if !plan.hetero_calculate.validation.valid {
+        issues.push("hetero-calculate-invalid".to_owned());
+    }
+    if !plan.hetero_calculate.static_link {
+        issues.push("hetero-calculate-not-static-link".to_owned());
+    }
+    if !plan.hetero_calculate.lifecycle_driven {
+        issues.push("hetero-calculate-not-lifecycle-driven".to_owned());
+    }
+    for capability in &sidecar_capabilities {
+        for issue in &capability.issues {
+            issues.push(format!(
+                "sidecar-capability:{}:{}:{}",
+                capability.package_id, capability.domain_family, issue
+            ));
+        }
+    }
+
+    let bundle_ready = issues.is_empty();
+    let bundle_hash = nsld_link_bundle_hash(
+        &unit_report,
+        &link_input_summary,
+        plan,
+        host_wrapper_required,
+        bundle_ready,
+    );
+    let bundle_id = format!("lb.{}", bundle_hash.trim_start_matches("0x"));
+
+    NsldLinkBundleReport {
+        manifest: manifest.display().to_string(),
+        bundle_id,
+        bundle_hash,
+        bundle_ready,
+        unit_count: unit_report.unit_count,
+        hetero_unit_count: unit_report.hetero_unit_count,
+        link_input_count: link_input_summary.count,
+        link_input_total_bytes: link_input_summary.total_bytes,
+        link_input_table_hash: link_input_summary.table_hash,
+        unit_table_hash: unit_report.unit_table_hash,
+        clock_edge_count: plan.clock_protocol.edges.len(),
+        data_segment_count: plan.hetero_calculate.data_segments.len(),
+        final_stage_link_mode: plan.final_stage.link_mode.clone(),
+        host_wrapper_required,
+        compiled_artifact_path: plan.compiled_artifact.path.clone(),
+        native_output_path: plan.final_stage.output_path.clone(),
+        issues,
+    }
+}
+
+fn nsld_assemble_plan_report(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+) -> NsldAssemblePlanReport {
+    let bundle = nsld_link_bundle_report(manifest, plan);
+    let sidecar_capabilities = nsld_sidecar_capability_diagnostics(plan);
+    let link_input_summary = nsld_link_input_summary(&sidecar_capabilities);
+    let mut blockers = bundle.issues.clone();
+    let mut sections = Vec::new();
+
+    push_assemble_section(
+        &mut sections,
+        "compiled-artifact",
+        &plan.compiled_artifact.path,
+        true,
+    );
+    push_assemble_section(
+        &mut sections,
+        "nsld-link-input-table",
+        &PathBuf::from(&plan.output_dir)
+            .join("nuis.nsld.link-inputs.toml")
+            .display()
+            .to_string(),
+        true,
+    );
+    push_assemble_section(
+        &mut sections,
+        "nsld-link-unit-table",
+        &PathBuf::from(&plan.output_dir)
+            .join("nuis.nsld.link-units.toml")
+            .display()
+            .to_string(),
+        true,
+    );
+    push_assemble_section(
+        &mut sections,
+        "nsld-link-bundle",
+        &PathBuf::from(&plan.output_dir)
+            .join("nuis.nsld.link-bundle.toml")
+            .display()
+            .to_string(),
+        true,
+    );
+    for input in &link_input_summary.inputs {
+        push_assemble_section(&mut sections, "lowering-sidecar-input", &input.path, true);
+    }
+    for segment in &plan.hetero_calculate.data_segments {
+        if let Some(source_path) = &segment.source_path {
+            push_assemble_section(&mut sections, "hetero-data-segment", source_path, true);
+        } else {
+            blockers.push(format!(
+                "data-segment:{}:{}:missing-source-path",
+                segment.owner_package, segment.segment_id
+            ));
+        }
+    }
+
+    for section in &sections {
+        if section.required && section.source_hash == "missing" {
+            blockers.push(format!(
+                "section:{}:{}:missing-source",
+                section.section_kind, section.source_path
+            ));
+        }
+    }
+
+    NsldAssemblePlanReport {
+        manifest: manifest.display().to_string(),
+        ready: bundle.bundle_ready && blockers.is_empty(),
+        bundle_id: bundle.bundle_id,
+        bundle_hash: bundle.bundle_hash,
+        section_count: sections.len(),
+        sections,
+        blockers,
+    }
+}
+
+fn push_assemble_section(
+    sections: &mut Vec<NsldAssembleSectionDiagnostic>,
+    section_kind: &str,
+    source_path: &str,
+    required: bool,
+) {
+    let order_index = sections.len();
+    let source_hash = fs::read(source_path)
+        .map(|bytes| fnv1a64_hex(&bytes))
+        .unwrap_or_else(|_| "missing".to_owned());
+    sections.push(NsldAssembleSectionDiagnostic {
+        order_index,
+        section_id: format!("sec{order_index:04}.{section_kind}"),
+        section_kind: section_kind.to_owned(),
+        source_path: source_path.to_owned(),
+        source_hash,
+        required,
+    });
+}
+
+fn nsld_emit_link_bundle_report(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<NsldLinkBundleEmitReport, String> {
+    let report = nsld_link_bundle_report(manifest, plan);
+    let output_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-bundle.toml");
+    fs::write(&output_path, render_nsld_link_bundle_toml(&report)).map_err(|error| {
+        format!(
+            "failed to write nsld link bundle `{}`: {error}",
+            output_path.display()
+        )
+    })?;
+
+    Ok(NsldLinkBundleEmitReport {
+        manifest: report.manifest,
+        output_path: output_path.display().to_string(),
+        bundle_id: report.bundle_id,
+        bundle_hash: report.bundle_hash,
+        bundle_ready: report.bundle_ready,
+    })
+}
+
+fn nsld_verify_link_bundle_report(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+) -> NsldLinkBundleVerifyReport {
+    let expected_report = nsld_link_bundle_report(manifest, plan);
+    let expected = render_nsld_link_bundle_toml(&expected_report);
+    let input_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-bundle.toml");
+    let mut issues = Vec::new();
+    let actual = fs::read_to_string(&input_path).map_err(|error| {
+        format!(
+            "missing_or_unreadable_link_bundle `{}`: {error}",
+            input_path.display()
+        )
+    });
+    let (actual_bundle_id, actual_bundle_hash) = match actual.as_ref() {
+        Ok(source) => (
+            toml_string_value(source, "bundle_id"),
+            toml_string_value(source, "bundle_hash"),
+        ),
+        Err(error) => {
+            issues.push(error.clone());
+            (None, None)
+        }
+    };
+    if let Ok(actual) = actual {
+        if actual != expected {
+            issues.push("link-bundle-content-mismatch".to_owned());
+        }
+        if actual_bundle_id.as_deref() != Some(expected_report.bundle_id.as_str()) {
+            issues.push(format!(
+                "bundle_id mismatch: expected {}, found {}",
+                expected_report.bundle_id,
+                actual_bundle_id
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_bundle_hash.as_deref() != Some(expected_report.bundle_hash.as_str()) {
+            issues.push(format!(
+                "bundle_hash mismatch: expected {}, found {}",
+                expected_report.bundle_hash,
+                actual_bundle_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+    }
+
+    NsldLinkBundleVerifyReport {
+        manifest: manifest.display().to_string(),
+        input_path: input_path.display().to_string(),
+        valid: issues.is_empty(),
+        expected_bundle_id: expected_report.bundle_id,
+        expected_bundle_hash: expected_report.bundle_hash,
+        actual_bundle_id,
+        actual_bundle_hash,
+        issues,
+    }
+}
+
+fn nsld_link_bundle_hash(
+    unit_report: &NsldLinkUnitReport,
+    link_input_summary: &NsldLinkInputSummary,
+    plan: &nuisc::linker::LinkPlan,
+    host_wrapper_required: bool,
+    bundle_ready: bool,
+) -> String {
+    let material = format!(
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+        unit_report.unit_count,
+        unit_report.hetero_unit_count,
+        link_input_summary.count,
+        link_input_summary.total_bytes,
+        link_input_summary.table_hash,
+        unit_report.unit_table_hash,
+        plan.clock_protocol.edges.len(),
+        plan.hetero_calculate.data_segments.len(),
+        plan.final_stage.link_mode,
+        host_wrapper_required,
+        bundle_ready
+    );
+    fnv1a64_hex(material.as_bytes())
+}
+
+fn nsld_link_unit_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldLinkUnitReport {
+    let sidecar_capabilities = nsld_sidecar_capability_diagnostics(plan);
+    let link_input_summary = nsld_link_input_summary(&sidecar_capabilities);
+    let host_wrapper_required = matches!(
+        plan.final_stage.link_mode.as_str(),
+        "host-toolchain-finalize" | "bundle-packaging"
+    );
+    let mut units = plan.domain_units.iter().collect::<Vec<_>>();
+    units.sort_by(|left, right| {
+        left.domain_family
+            .cmp(&right.domain_family)
+            .then_with(|| left.package_id.cmp(&right.package_id))
+            .then_with(|| left.packaging_role.cmp(&right.packaging_role))
+    });
+    let units = units
+        .into_iter()
+        .enumerate()
+        .map(|(index, unit)| {
+            let link_input_ids = link_input_summary
+                .inputs
+                .iter()
+                .filter(|input| {
+                    input.domain_family == unit.domain_family && input.package_id == unit.package_id
+                })
+                .map(|input| input.input_id.clone())
+                .collect::<Vec<_>>();
+            let clock_edge_count = plan
+                .clock_protocol
+                .edges
+                .iter()
+                .filter(|edge| {
+                    edge.from.contains(&unit.domain_family) || edge.to.contains(&unit.domain_family)
+                })
+                .count();
+            let data_segment_count = plan
+                .hetero_calculate
+                .data_segments
+                .iter()
+                .filter(|segment| {
+                    segment.domain_family == unit.domain_family
+                        && segment.owner_package == unit.package_id
+                })
+                .count();
+            let unit_kind = if unit.kind == "heterogeneous" {
+                "hetero-domain"
+            } else {
+                "native-domain"
+            }
+            .to_owned();
+            let deterministic_order_key =
+                format!("{index:04}.{}.{}", unit.domain_family, unit.package_id);
+
+            NsldLinkUnitDiagnostic {
+                order_index: index,
+                unit_id: format!("lu{index:04}.{}.{}", unit.domain_family, unit.package_id),
+                unit_kind,
+                domain_family: unit.domain_family.clone(),
+                package_id: unit.package_id.clone(),
+                backend_family: unit
+                    .backend_family
+                    .clone()
+                    .unwrap_or_else(|| "none".to_owned()),
+                lowering_target: unit
+                    .selected_lowering_target
+                    .clone()
+                    .unwrap_or_else(|| "none".to_owned()),
+                packaging_role: unit.packaging_role.clone(),
+                link_input_ids,
+                clock_edge_count,
+                data_segment_count,
+                requires_host_wrapper: host_wrapper_required
+                    && (unit.domain_family == "cpu" || unit.packaging_role.contains("launcher")),
+                deterministic_order_key,
+            }
+        })
+        .collect::<Vec<_>>();
+    let unit_table_hash = nsld_link_unit_table_hash(&units);
+
+    NsldLinkUnitReport {
+        manifest: manifest.display().to_string(),
+        unit_count: units.len(),
+        hetero_unit_count: units
+            .iter()
+            .filter(|unit| unit.unit_kind == "hetero-domain")
+            .count(),
+        link_input_count: link_input_summary.count,
+        clock_edge_count: plan.clock_protocol.edges.len(),
+        data_segment_count: plan.hetero_calculate.data_segments.len(),
+        unit_table_hash,
+        units,
+    }
+}
+
+fn nsld_link_unit_table_hash(units: &[NsldLinkUnitDiagnostic]) -> String {
+    let mut material = String::new();
+    for unit in units {
+        material.push_str(&unit.order_index.to_string());
+        material.push('\t');
+        material.push_str(&unit.unit_id);
+        material.push('\t');
+        material.push_str(&unit.unit_kind);
+        material.push('\t');
+        material.push_str(&unit.domain_family);
+        material.push('\t');
+        material.push_str(&unit.package_id);
+        material.push('\t');
+        material.push_str(&unit.backend_family);
+        material.push('\t');
+        material.push_str(&unit.lowering_target);
+        material.push('\t');
+        material.push_str(&unit.packaging_role);
+        material.push('\t');
+        material.push_str(&unit.link_input_ids.join("|"));
+        material.push('\t');
+        material.push_str(&unit.clock_edge_count.to_string());
+        material.push('\t');
+        material.push_str(&unit.data_segment_count.to_string());
+        material.push('\t');
+        material.push_str(if unit.requires_host_wrapper {
+            "host-wrapper"
+        } else {
+            "self-contained"
+        });
+        material.push('\t');
+        material.push_str(&unit.deterministic_order_key);
+        material.push('\n');
+    }
+    fnv1a64_hex(material.as_bytes())
 }
 
 fn print_nsld_closure_report(report: &NsldClosureReport) {
@@ -669,6 +1575,11 @@ fn print_nsld_closure_report(report: &NsldClosureReport) {
         report.link_input_total_bytes
     );
     println!("  link_input_table_hash: {}", report.link_input_table_hash);
+    println!(
+        "  link_input_table: present={} valid={}",
+        report.link_input_table_present,
+        optional_bool_text(report.link_input_table_valid)
+    );
     for input in &report.link_inputs {
         println!(
             "  link_input: order={} id={} kind={} domain={} package={} native={} dispatch={} contracts={} bytes={} hash={} path={}",
@@ -696,6 +1607,325 @@ fn print_nsld_closure_report(report: &NsldClosureReport) {
     for item in &report.unresolved {
         println!("  unresolved_item: {item}");
     }
+}
+
+fn print_nsld_link_unit_report(report: &NsldLinkUnitReport) {
+    println!("Nsld link units");
+    println!("  manifest: {}", report.manifest);
+    println!("  unit_count: {}", report.unit_count);
+    println!("  hetero_unit_count: {}", report.hetero_unit_count);
+    println!("  link_input_count: {}", report.link_input_count);
+    println!("  clock_edge_count: {}", report.clock_edge_count);
+    println!("  data_segment_count: {}", report.data_segment_count);
+    println!("  unit_table_hash: {}", report.unit_table_hash);
+    for unit in &report.units {
+        println!(
+            "  link_unit: order={} id={} kind={} domain={} package={} backend={} target={} role={} inputs={} clock_edges={} data_segments={} host_wrapper={} order_key={}",
+            unit.order_index,
+            unit.unit_id,
+            unit.unit_kind,
+            unit.domain_family,
+            unit.package_id,
+            unit.backend_family,
+            unit.lowering_target,
+            unit.packaging_role,
+            unit.link_input_ids.join(","),
+            unit.clock_edge_count,
+            unit.data_segment_count,
+            unit.requires_host_wrapper,
+            unit.deterministic_order_key
+        );
+    }
+}
+
+fn print_nsld_link_bundle_report(report: &NsldLinkBundleReport) {
+    println!("Nsld link bundle");
+    println!("  manifest: {}", report.manifest);
+    println!("  bundle_id: {}", report.bundle_id);
+    println!("  bundle_hash: {}", report.bundle_hash);
+    println!("  bundle_ready: {}", report.bundle_ready);
+    println!("  unit_count: {}", report.unit_count);
+    println!("  hetero_unit_count: {}", report.hetero_unit_count);
+    println!("  link_input_count: {}", report.link_input_count);
+    println!(
+        "  link_input_total_bytes: {}",
+        report.link_input_total_bytes
+    );
+    println!("  link_input_table_hash: {}", report.link_input_table_hash);
+    println!("  unit_table_hash: {}", report.unit_table_hash);
+    println!("  clock_edge_count: {}", report.clock_edge_count);
+    println!("  data_segment_count: {}", report.data_segment_count);
+    println!("  final_stage_link_mode: {}", report.final_stage_link_mode);
+    println!("  host_wrapper_required: {}", report.host_wrapper_required);
+    println!(
+        "  compiled_artifact_path: {}",
+        report.compiled_artifact_path
+    );
+    println!("  native_output_path: {}", report.native_output_path);
+    for issue in &report.issues {
+        println!("  issue: {issue}");
+    }
+}
+
+fn print_nsld_link_bundle_emit_report(report: &NsldLinkBundleEmitReport) {
+    println!("Nsld link bundle emit");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  bundle_id: {}", report.bundle_id);
+    println!("  bundle_hash: {}", report.bundle_hash);
+    println!("  bundle_ready: {}", report.bundle_ready);
+}
+
+fn print_nsld_link_bundle_verify_report(report: &NsldLinkBundleVerifyReport) {
+    println!("Nsld link bundle verify");
+    println!("  manifest: {}", report.manifest);
+    println!("  input_path: {}", report.input_path);
+    println!("  valid: {}", report.valid);
+    println!("  expected_bundle_id: {}", report.expected_bundle_id);
+    println!("  expected_bundle_hash: {}", report.expected_bundle_hash);
+    println!(
+        "  actual_bundle_id: {}",
+        report.actual_bundle_id.as_deref().unwrap_or("missing")
+    );
+    println!(
+        "  actual_bundle_hash: {}",
+        report.actual_bundle_hash.as_deref().unwrap_or("missing")
+    );
+    for issue in &report.issues {
+        println!("  issue: {issue}");
+    }
+}
+
+fn print_nsld_prepare_report(report: &NsldPrepareReport) {
+    println!("Nsld prepare");
+    println!("  manifest: {}", report.manifest);
+    println!("  valid: {}", report.valid);
+    println!("  output_dir: {}", report.output_dir);
+    println!("  link_input_table: {}", report.link_input_table_path);
+    println!("  link_unit_table: {}", report.link_unit_table_path);
+    println!("  link_bundle: {}", report.link_bundle_path);
+    println!("  link_input_count: {}", report.link_input_count);
+    println!("  link_input_table_hash: {}", report.link_input_table_hash);
+    println!("  unit_count: {}", report.unit_count);
+    println!("  unit_table_hash: {}", report.unit_table_hash);
+    println!("  bundle_id: {}", report.bundle_id);
+    println!("  bundle_hash: {}", report.bundle_hash);
+    println!("  bundle_ready: {}", report.bundle_ready);
+    for issue in &report.issues {
+        println!("  issue: {issue}");
+    }
+}
+
+fn print_nsld_assemble_plan_report(report: &NsldAssemblePlanReport) {
+    println!("Nsld assemble plan");
+    println!("  manifest: {}", report.manifest);
+    println!("  ready: {}", report.ready);
+    println!("  bundle_id: {}", report.bundle_id);
+    println!("  bundle_hash: {}", report.bundle_hash);
+    println!("  section_count: {}", report.section_count);
+    for section in &report.sections {
+        println!(
+            "  section: order={} id={} kind={} required={} hash={} source={}",
+            section.order_index,
+            section.section_id,
+            section.section_kind,
+            section.required,
+            section.source_hash,
+            section.source_path
+        );
+    }
+    for blocker in &report.blockers {
+        println!("  blocker: {blocker}");
+    }
+}
+
+fn print_nsld_link_units_emit_report(report: &NsldLinkUnitsEmitReport) {
+    println!("Nsld link units emit");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  unit_count: {}", report.unit_count);
+    println!("  hetero_unit_count: {}", report.hetero_unit_count);
+    println!("  link_input_count: {}", report.link_input_count);
+    println!("  unit_table_hash: {}", report.unit_table_hash);
+}
+
+fn nsld_link_units_emit_report_json(report: &NsldLinkUnitsEmitReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_link_units_emit"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_usize_field("unit_count", report.unit_count),
+        json_usize_field("hetero_unit_count", report.hetero_unit_count),
+        json_usize_field("link_input_count", report.link_input_count),
+        json_string_field("unit_table_hash", &report.unit_table_hash),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn print_nsld_link_units_verify_report(report: &NsldLinkUnitsVerifyReport) {
+    println!("Nsld link units verify");
+    println!("  manifest: {}", report.manifest);
+    println!("  input_path: {}", report.input_path);
+    println!("  valid: {}", report.valid);
+    println!("  expected_unit_count: {}", report.expected_unit_count);
+    println!(
+        "  expected_hetero_unit_count: {}",
+        report.expected_hetero_unit_count
+    );
+    println!(
+        "  expected_link_input_count: {}",
+        report.expected_link_input_count
+    );
+    println!(
+        "  expected_unit_table_hash: {}",
+        report.expected_unit_table_hash
+    );
+    println!(
+        "  actual_unit_count: {}",
+        optional_usize_text(report.actual_unit_count)
+    );
+    println!(
+        "  actual_hetero_unit_count: {}",
+        optional_usize_text(report.actual_hetero_unit_count)
+    );
+    println!(
+        "  actual_link_input_count: {}",
+        optional_usize_text(report.actual_link_input_count)
+    );
+    println!(
+        "  actual_unit_table_hash: {}",
+        report
+            .actual_unit_table_hash
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    for issue in &report.issues {
+        println!("  issue: {issue}");
+    }
+}
+
+fn nsld_link_units_verify_report_json(report: &NsldLinkUnitsVerifyReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_link_units_verify"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("input_path", &report.input_path),
+        json_bool_field("valid", report.valid),
+        json_usize_field("expected_unit_count", report.expected_unit_count),
+        json_usize_field(
+            "expected_hetero_unit_count",
+            report.expected_hetero_unit_count,
+        ),
+        json_usize_field(
+            "expected_link_input_count",
+            report.expected_link_input_count,
+        ),
+        json_string_field("expected_unit_table_hash", &report.expected_unit_table_hash),
+        json_optional_usize_field("actual_unit_count", report.actual_unit_count),
+        json_optional_usize_field("actual_hetero_unit_count", report.actual_hetero_unit_count),
+        json_optional_usize_field("actual_link_input_count", report.actual_link_input_count),
+        json_optional_string_field(
+            "actual_unit_table_hash",
+            report.actual_unit_table_hash.as_deref(),
+        ),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn nsld_link_bundle_report_json(report: &NsldLinkBundleReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_link_bundle"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("bundle_id", &report.bundle_id),
+        json_string_field("bundle_hash", &report.bundle_hash),
+        json_bool_field("bundle_ready", report.bundle_ready),
+        json_usize_field("unit_count", report.unit_count),
+        json_usize_field("hetero_unit_count", report.hetero_unit_count),
+        json_usize_field("link_input_count", report.link_input_count),
+        json_usize_field("link_input_total_bytes", report.link_input_total_bytes),
+        json_string_field("link_input_table_hash", &report.link_input_table_hash),
+        json_string_field("unit_table_hash", &report.unit_table_hash),
+        json_usize_field("clock_edge_count", report.clock_edge_count),
+        json_usize_field("data_segment_count", report.data_segment_count),
+        json_string_field("final_stage_link_mode", &report.final_stage_link_mode),
+        json_bool_field("host_wrapper_required", report.host_wrapper_required),
+        json_string_field("compiled_artifact_path", &report.compiled_artifact_path),
+        json_string_field("native_output_path", &report.native_output_path),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn nsld_link_bundle_emit_report_json(report: &NsldLinkBundleEmitReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_link_bundle_emit"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("bundle_id", &report.bundle_id),
+        json_string_field("bundle_hash", &report.bundle_hash),
+        json_bool_field("bundle_ready", report.bundle_ready),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn nsld_link_bundle_verify_report_json(report: &NsldLinkBundleVerifyReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_link_bundle_verify"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("input_path", &report.input_path),
+        json_bool_field("valid", report.valid),
+        json_string_field("expected_bundle_id", &report.expected_bundle_id),
+        json_string_field("expected_bundle_hash", &report.expected_bundle_hash),
+        json_optional_string_field("actual_bundle_id", report.actual_bundle_id.as_deref()),
+        json_optional_string_field("actual_bundle_hash", report.actual_bundle_hash.as_deref()),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_prepare"),
+        json_string_field("manifest", &report.manifest),
+        json_bool_field("valid", report.valid),
+        json_string_field("output_dir", &report.output_dir),
+        json_string_field("link_input_table_path", &report.link_input_table_path),
+        json_string_field("link_unit_table_path", &report.link_unit_table_path),
+        json_string_field("link_bundle_path", &report.link_bundle_path),
+        json_usize_field("link_input_count", report.link_input_count),
+        json_string_field("link_input_table_hash", &report.link_input_table_hash),
+        json_usize_field("unit_count", report.unit_count),
+        json_string_field("unit_table_hash", &report.unit_table_hash),
+        json_string_field("bundle_id", &report.bundle_id),
+        json_string_field("bundle_hash", &report.bundle_hash),
+        json_bool_field("bundle_ready", report.bundle_ready),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn nsld_assemble_plan_report_json(report: &NsldAssemblePlanReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_assemble_plan"),
+        json_string_field("manifest", &report.manifest),
+        json_bool_field("ready", report.ready),
+        json_string_field("bundle_id", &report.bundle_id),
+        json_string_field("bundle_hash", &report.bundle_hash),
+        json_usize_field("section_count", report.section_count),
+        format!(
+            "\"sections\":[{}]",
+            nsld_assemble_sections_json(&report.sections)
+        ),
+        json_string_array_field("blockers", &report.blockers),
+    ];
+    format!("{{{}}}", fields.join(","))
 }
 
 fn print_nsld_link_inputs_emit_report(report: &NsldLinkInputsEmitReport) {
@@ -807,6 +2037,8 @@ fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
         json_usize_field("link_input_count", report.link_input_count),
         json_usize_field("link_input_total_bytes", report.link_input_total_bytes),
         json_string_field("link_input_table_hash", &report.link_input_table_hash),
+        json_bool_field("link_input_table_present", report.link_input_table_present),
+        json_optional_bool_field("link_input_table_valid", report.link_input_table_valid),
         json_string_array_field("external_dependencies", &report.external_dependencies),
         json_string_array_field("unresolved", &report.unresolved),
         json_bool_field("host_wrapper_required", report.host_wrapper_required),
@@ -816,6 +2048,22 @@ fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
         json_usize_field("clock_edge_count", report.clock_edge_count),
         json_usize_field("data_segment_count", report.data_segment_count),
         json_string_field("final_stage_link_mode", &report.final_stage_link_mode),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn nsld_link_unit_report_json(report: &NsldLinkUnitReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_link_units"),
+        json_string_field("manifest", &report.manifest),
+        json_usize_field("unit_count", report.unit_count),
+        json_usize_field("hetero_unit_count", report.hetero_unit_count),
+        json_usize_field("link_input_count", report.link_input_count),
+        json_usize_field("clock_edge_count", report.clock_edge_count),
+        json_usize_field("data_segment_count", report.data_segment_count),
+        json_string_field("unit_table_hash", &report.unit_table_hash),
+        format!("\"units\":[{}]", nsld_link_units_json(&report.units)),
     ];
     format!("{{{}}}", fields.join(","))
 }
@@ -973,6 +2221,24 @@ fn nsld_link_input_diagnostics(
         .collect()
 }
 
+fn nsld_link_input_summary(
+    capabilities: &[NsldSidecarCapabilityDiagnostic],
+) -> NsldLinkInputSummary {
+    let inputs = nsld_link_input_diagnostics(capabilities);
+    let count = inputs.len();
+    let total_bytes = inputs
+        .iter()
+        .map(|input| input.content_bytes)
+        .sum::<usize>();
+    let table_hash = nsld_link_input_table_hash(&inputs);
+    NsldLinkInputSummary {
+        inputs,
+        count,
+        total_bytes,
+        table_hash,
+    }
+}
+
 fn nsld_link_input_table_hash(inputs: &[NsldLinkInputDiagnostic]) -> String {
     let mut material = String::new();
     for input in inputs {
@@ -1006,8 +2272,25 @@ fn render_nsld_link_input_table_toml(
     table_hash: &str,
 ) -> String {
     let mut out = String::new();
-    out.push_str("schema = \"nuis-nsld-link-input-table-v1\"\n");
-    out.push_str("table_kind = \"lowering-sidecar-link-inputs\"\n");
+    out.push_str(&format!(
+        "schema = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_SCHEMA)
+    ));
+    out.push_str(&format!(
+        "schema_version = {NSLD_LINK_INPUT_TABLE_SCHEMA_VERSION}\n"
+    ));
+    out.push_str(&format!(
+        "table_kind = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_KIND)
+    ));
+    out.push_str(&format!(
+        "producer = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
+    ));
+    out.push_str(&format!(
+        "producer_phase = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
+    ));
     out.push_str(&format!("link_input_count = {}\n", inputs.len()));
     out.push_str(&format!("link_input_total_bytes = {total_bytes}\n"));
     out.push_str(&format!(
@@ -1050,6 +2333,178 @@ fn render_nsld_link_input_table_toml(
         ));
     }
     out
+}
+
+fn render_nsld_link_unit_table_toml(report: &NsldLinkUnitReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "schema = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_UNIT_TABLE_SCHEMA)
+    ));
+    out.push_str(&format!(
+        "schema_version = {NSLD_LINK_UNIT_TABLE_SCHEMA_VERSION}\n"
+    ));
+    out.push_str(&format!(
+        "table_kind = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_UNIT_TABLE_KIND)
+    ));
+    out.push_str(&format!(
+        "producer = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
+    ));
+    out.push_str(&format!(
+        "producer_phase = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
+    ));
+    out.push_str(&format!("unit_count = {}\n", report.unit_count));
+    out.push_str(&format!(
+        "hetero_unit_count = {}\n",
+        report.hetero_unit_count
+    ));
+    out.push_str(&format!("link_input_count = {}\n", report.link_input_count));
+    out.push_str(&format!("clock_edge_count = {}\n", report.clock_edge_count));
+    out.push_str(&format!(
+        "data_segment_count = {}\n",
+        report.data_segment_count
+    ));
+    out.push_str(&format!(
+        "unit_table_hash = \"{}\"\n",
+        escape_toml_string(&report.unit_table_hash)
+    ));
+    for unit in &report.units {
+        out.push_str("\n[[link_unit]]\n");
+        out.push_str(&format!("order_index = {}\n", unit.order_index));
+        out.push_str(&format!(
+            "unit_id = \"{}\"\n",
+            escape_toml_string(&unit.unit_id)
+        ));
+        out.push_str(&format!(
+            "unit_kind = \"{}\"\n",
+            escape_toml_string(&unit.unit_kind)
+        ));
+        out.push_str(&format!(
+            "domain_family = \"{}\"\n",
+            escape_toml_string(&unit.domain_family)
+        ));
+        out.push_str(&format!(
+            "package_id = \"{}\"\n",
+            escape_toml_string(&unit.package_id)
+        ));
+        out.push_str(&format!(
+            "backend_family = \"{}\"\n",
+            escape_toml_string(&unit.backend_family)
+        ));
+        out.push_str(&format!(
+            "lowering_target = \"{}\"\n",
+            escape_toml_string(&unit.lowering_target)
+        ));
+        out.push_str(&format!(
+            "packaging_role = \"{}\"\n",
+            escape_toml_string(&unit.packaging_role)
+        ));
+        out.push_str(&format!(
+            "link_input_ids = [{}]\n",
+            toml_string_array_literal(&unit.link_input_ids)
+        ));
+        out.push_str(&format!("clock_edge_count = {}\n", unit.clock_edge_count));
+        out.push_str(&format!(
+            "data_segment_count = {}\n",
+            unit.data_segment_count
+        ));
+        out.push_str(&format!(
+            "requires_host_wrapper = {}\n",
+            unit.requires_host_wrapper
+        ));
+        out.push_str(&format!(
+            "deterministic_order_key = \"{}\"\n",
+            escape_toml_string(&unit.deterministic_order_key)
+        ));
+    }
+    out
+}
+
+fn render_nsld_link_bundle_toml(report: &NsldLinkBundleReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "schema = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_BUNDLE_SCHEMA)
+    ));
+    out.push_str(&format!(
+        "schema_version = {NSLD_LINK_BUNDLE_SCHEMA_VERSION}\n"
+    ));
+    out.push_str(&format!(
+        "bundle_kind = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_BUNDLE_KIND)
+    ));
+    out.push_str(&format!(
+        "producer = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
+    ));
+    out.push_str(&format!(
+        "producer_phase = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
+    ));
+    out.push_str(&format!(
+        "bundle_id = \"{}\"\n",
+        escape_toml_string(&report.bundle_id)
+    ));
+    out.push_str(&format!(
+        "bundle_hash = \"{}\"\n",
+        escape_toml_string(&report.bundle_hash)
+    ));
+    out.push_str(&format!("bundle_ready = {}\n", report.bundle_ready));
+    out.push_str(&format!("unit_count = {}\n", report.unit_count));
+    out.push_str(&format!(
+        "hetero_unit_count = {}\n",
+        report.hetero_unit_count
+    ));
+    out.push_str(&format!("link_input_count = {}\n", report.link_input_count));
+    out.push_str(&format!(
+        "link_input_total_bytes = {}\n",
+        report.link_input_total_bytes
+    ));
+    out.push_str(&format!(
+        "link_input_table_hash = \"{}\"\n",
+        escape_toml_string(&report.link_input_table_hash)
+    ));
+    out.push_str(&format!(
+        "unit_table_hash = \"{}\"\n",
+        escape_toml_string(&report.unit_table_hash)
+    ));
+    out.push_str(&format!("clock_edge_count = {}\n", report.clock_edge_count));
+    out.push_str(&format!(
+        "data_segment_count = {}\n",
+        report.data_segment_count
+    ));
+    out.push_str(&format!(
+        "final_stage_link_mode = \"{}\"\n",
+        escape_toml_string(&report.final_stage_link_mode)
+    ));
+    out.push_str(&format!(
+        "host_wrapper_required = {}\n",
+        report.host_wrapper_required
+    ));
+    out.push_str(&format!(
+        "compiled_artifact_path = \"{}\"\n",
+        escape_toml_string(&report.compiled_artifact_path)
+    ));
+    out.push_str(&format!(
+        "native_output_path = \"{}\"\n",
+        escape_toml_string(&report.native_output_path)
+    ));
+    out.push_str(&format!(
+        "issues = [{}]\n",
+        toml_string_array_literal(&report.issues)
+    ));
+    out
+}
+
+fn toml_string_array_literal(values: &[String]) -> String {
+    values
+        .iter()
+        .map(|value| format!("\"{}\"", escape_toml_string(value)))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn escape_toml_string(value: &str) -> String {
@@ -1150,6 +2605,21 @@ fn print_nsld_check_report(report: &NsldCheckReport) {
         report.sidecar_capability_valid,
         report.sidecar_capability_issues.len()
     );
+    println!(
+        "  link_input_table: present={} valid={}",
+        report.link_input_table_present,
+        optional_bool_text(report.link_input_table_valid)
+    );
+    println!(
+        "  link_unit_table: present={} valid={}",
+        report.link_unit_table_present,
+        optional_bool_text(report.link_unit_table_valid)
+    );
+    println!(
+        "  link_bundle: present={} valid={}",
+        report.link_bundle_present,
+        optional_bool_text(report.link_bundle_valid)
+    );
     println!("  final_stage_link_mode: {}", report.final_stage_link_mode);
     println!("  domains: {}", report.domains.len());
     for domain in &report.domains {
@@ -1209,6 +2679,15 @@ fn print_nsld_check_report(report: &NsldCheckReport) {
     for issue in &report.issues {
         println!("  issue: {issue}");
     }
+    for issue in &report.link_input_table_issues {
+        println!("  link_input_table_issue: {issue}");
+    }
+    for issue in &report.link_unit_table_issues {
+        println!("  link_unit_table_issue: {issue}");
+    }
+    for issue in &report.link_bundle_issues {
+        println!("  link_bundle_issue: {issue}");
+    }
 }
 
 fn nsld_check_report_json(report: &NsldCheckReport) -> String {
@@ -1238,6 +2717,15 @@ fn nsld_check_report_json(report: &NsldCheckReport) -> String {
             "sidecar_capability_issues",
             &report.sidecar_capability_issues,
         ),
+        json_bool_field("link_input_table_present", report.link_input_table_present),
+        json_optional_bool_field("link_input_table_valid", report.link_input_table_valid),
+        json_string_array_field("link_input_table_issues", &report.link_input_table_issues),
+        json_bool_field("link_unit_table_present", report.link_unit_table_present),
+        json_optional_bool_field("link_unit_table_valid", report.link_unit_table_valid),
+        json_string_array_field("link_unit_table_issues", &report.link_unit_table_issues),
+        json_bool_field("link_bundle_present", report.link_bundle_present),
+        json_optional_bool_field("link_bundle_valid", report.link_bundle_valid),
+        json_string_array_field("link_bundle_issues", &report.link_bundle_issues),
         json_string_field("final_stage_link_mode", &report.final_stage_link_mode),
         format!("\"domains\":[{}]", nsld_domains_json(&report.domains)),
         format!(
@@ -1324,6 +2812,49 @@ fn nsld_link_inputs_json(inputs: &[NsldLinkInputDiagnostic]) -> String {
         .join(",")
 }
 
+fn nsld_link_units_json(units: &[NsldLinkUnitDiagnostic]) -> String {
+    units
+        .iter()
+        .map(|unit| {
+            let fields = vec![
+                json_usize_field("order_index", unit.order_index),
+                json_string_field("unit_id", &unit.unit_id),
+                json_string_field("unit_kind", &unit.unit_kind),
+                json_string_field("domain_family", &unit.domain_family),
+                json_string_field("package_id", &unit.package_id),
+                json_string_field("backend_family", &unit.backend_family),
+                json_string_field("lowering_target", &unit.lowering_target),
+                json_string_field("packaging_role", &unit.packaging_role),
+                json_string_array_field("link_input_ids", &unit.link_input_ids),
+                json_usize_field("clock_edge_count", unit.clock_edge_count),
+                json_usize_field("data_segment_count", unit.data_segment_count),
+                json_bool_field("requires_host_wrapper", unit.requires_host_wrapper),
+                json_string_field("deterministic_order_key", &unit.deterministic_order_key),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn nsld_assemble_sections_json(sections: &[NsldAssembleSectionDiagnostic]) -> String {
+    sections
+        .iter()
+        .map(|section| {
+            let fields = vec![
+                json_usize_field("order_index", section.order_index),
+                json_string_field("section_id", &section.section_id),
+                json_string_field("section_kind", &section.section_kind),
+                json_string_field("source_path", &section.source_path),
+                json_string_field("source_hash", &section.source_hash),
+                json_bool_field("required", section.required),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 fn nsld_clock_edges_json(edges: &[NsldClockEdgeDiagnostic]) -> String {
     edges
         .iter()
@@ -1362,6 +2893,13 @@ fn nsld_data_segments_json(segments: &[NsldDataSegmentDiagnostic]) -> String {
 
 fn json_bool_field(name: &str, value: bool) -> String {
     format!("\"{name}\":{value}")
+}
+
+fn json_optional_bool_field(name: &str, value: Option<bool>) -> String {
+    match value {
+        Some(value) => json_bool_field(name, value),
+        None => format!("\"{name}\":null"),
+    }
 }
 
 fn json_string_field(name: &str, value: &str) -> String {
@@ -1408,12 +2946,21 @@ fn optional_usize_text(value: Option<usize>) -> String {
         .unwrap_or_else(|| "missing".to_owned())
 }
 
+fn optional_bool_text(value: Option<bool>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "absent".to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        fnv1a64_hex, nsld_link_input_diagnostics, nsld_link_input_table_hash,
-        nsld_sidecar_capability_diagnostics, nsld_verify_link_inputs_report, parse_args,
-        render_nsld_link_input_table_toml, Command,
+        fnv1a64_hex, nsld_assemble_plan_report, nsld_link_bundle_report,
+        nsld_link_input_diagnostics, nsld_link_input_table_hash, nsld_link_unit_report,
+        nsld_link_unit_table_hash, nsld_prepare_report, nsld_sidecar_capability_diagnostics,
+        nsld_verify_link_bundle_report, nsld_verify_link_inputs_report,
+        nsld_verify_link_units_report, parse_args, render_nsld_link_bundle_toml,
+        render_nsld_link_input_table_toml, render_nsld_link_unit_table_toml, Command,
     };
     use nuisc::linker::{
         ArtifactLoweringAlignmentSummary, LinkPlan, LinkPlanArtifact, LinkPlanClockProtocol,
@@ -1473,6 +3020,142 @@ mod tests {
         assert_eq!(
             command,
             Ok(Command::Closure {
+                input: PathBuf::from("out"),
+                json: true
+            })
+        );
+    }
+
+    #[test]
+    fn parses_prepare_input_and_json_flag() {
+        let command = parse_args(
+            vec!["prepare".to_owned(), "out".to_owned(), "--json".to_owned()].into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::Prepare {
+                input: PathBuf::from("out"),
+                json: true
+            })
+        );
+    }
+
+    #[test]
+    fn parses_assemble_plan_input_and_json_flag() {
+        let command = parse_args(
+            vec![
+                "assemble-plan".to_owned(),
+                "out".to_owned(),
+                "--json".to_owned(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::AssemblePlan {
+                input: PathBuf::from("out"),
+                json: true
+            })
+        );
+    }
+
+    #[test]
+    fn parses_bundle_input_and_json_flag() {
+        let command = parse_args(
+            vec!["bundle".to_owned(), "out".to_owned(), "--json".to_owned()].into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::Bundle {
+                input: PathBuf::from("out"),
+                json: true
+            })
+        );
+    }
+
+    #[test]
+    fn parses_emit_bundle_input_and_json_flag() {
+        let command = parse_args(
+            vec![
+                "emit-bundle".to_owned(),
+                "out".to_owned(),
+                "--json".to_owned(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::EmitBundle {
+                input: PathBuf::from("out"),
+                json: true
+            })
+        );
+    }
+
+    #[test]
+    fn parses_verify_bundle_input_and_json_flag() {
+        let command = parse_args(
+            vec![
+                "verify-bundle".to_owned(),
+                "out".to_owned(),
+                "--json".to_owned(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::VerifyBundle {
+                input: PathBuf::from("out"),
+                json: true
+            })
+        );
+    }
+
+    #[test]
+    fn parses_units_input_and_json_flag() {
+        let command =
+            parse_args(vec!["units".to_owned(), "out".to_owned(), "--json".to_owned()].into_iter());
+        assert_eq!(
+            command,
+            Ok(Command::Units {
+                input: PathBuf::from("out"),
+                json: true
+            })
+        );
+    }
+
+    #[test]
+    fn parses_emit_units_input_and_json_flag() {
+        let command = parse_args(
+            vec![
+                "emit-units".to_owned(),
+                "out".to_owned(),
+                "--json".to_owned(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::EmitUnits {
+                input: PathBuf::from("out"),
+                json: true
+            })
+        );
+    }
+
+    #[test]
+    fn parses_verify_units_input_and_json_flag() {
+        let command = parse_args(
+            vec![
+                "verify-units".to_owned(),
+                "out".to_owned(),
+                "--json".to_owned(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::VerifyUnits {
                 input: PathBuf::from("out"),
                 json: true
             })
@@ -1619,6 +3302,10 @@ validation_contracts = ["glm.resource-lifetime"]
             &nsld_link_input_table_hash(&link_inputs),
         );
         assert!(table.contains("schema = \"nuis-nsld-link-input-table-v1\""));
+        assert!(table.contains("schema_version = 1"));
+        assert!(table.contains("table_kind = \"lowering-sidecar-link-inputs\""));
+        assert!(table.contains("producer = \"nsld\""));
+        assert!(table.contains("producer_phase = \"alpha-0.6.0\""));
         assert!(table.contains("link_input_count = 1"));
         assert!(table.contains("input_id = \"li0000.shader.official.shader\""));
         assert!(table.contains("native_ir = \"msl2.4\""));
@@ -1790,5 +3477,304 @@ validation_contracts = ["glm.resource-lifetime"]
             Some(sidecar_source.len())
         );
         assert_eq!(report.actual_link_input_table_hash, Some(table_hash));
+    }
+
+    #[test]
+    fn link_unit_report_attaches_registered_sidecar_inputs() {
+        let dir = env::temp_dir().join(format!("nsld-link-unit-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let sidecar_path = dir.join("shader.sidecar.toml");
+        let sidecar_source = r#"
+schema = "nuis-shader-ir-sidecar-v1"
+[lowering_capabilities]
+capability_owner = "shader-nustar"
+frontend_ir = "nuis-yir.shader"
+native_ir = "msl2.4"
+dispatch_lowering = "command-encoder-draw-dispatch"
+validation_contracts = ["glm.resource-lifetime"]
+"#;
+        fs::write(&sidecar_path, sidecar_source).unwrap();
+        let mut plan = empty_link_plan();
+        plan.domain_units.push(nuisc::linker::LinkPlanDomainUnit {
+            kind: "heterogeneous".to_owned(),
+            package_id: "official.shader".to_owned(),
+            domain_family: "shader".to_owned(),
+            abi: None,
+            machine_arch: None,
+            machine_os: None,
+            backend_family: Some("metal".to_owned()),
+            vendor: None,
+            device_class: None,
+            selected_lowering_target: Some("metal.apple-silicon-gpu".to_owned()),
+            contract_family: "nustar.shader".to_owned(),
+            packaging_role: "hetero-contract".to_owned(),
+            artifact_stub_path: None,
+            artifact_stub_inline: None,
+            artifact_payload_path: None,
+            artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: Some(sidecar_path.display().to_string()),
+            artifact_bridge_stub_inline: None,
+            artifact_payload_blob_path: None,
+            artifact_payload_blob_bytes: None,
+            artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
+        });
+
+        let report = nsld_link_unit_report(Path::new("manifest.toml"), &plan);
+        fs::remove_dir_all(dir).unwrap();
+
+        assert_eq!(report.unit_count, 1);
+        assert_eq!(report.hetero_unit_count, 1);
+        assert_eq!(report.link_input_count, 1);
+        assert_eq!(report.units[0].unit_id, "lu0000.shader.official.shader");
+        assert_eq!(report.units[0].unit_kind, "hetero-domain");
+        assert_eq!(report.units[0].backend_family, "metal");
+        assert_eq!(report.units[0].link_input_ids.len(), 1);
+        assert_eq!(
+            report.units[0].link_input_ids[0],
+            "li0000.shader.official.shader"
+        );
+        assert_eq!(
+            report.unit_table_hash,
+            nsld_link_unit_table_hash(&report.units)
+        );
+    }
+
+    #[test]
+    fn verify_link_units_accepts_matching_emitted_table() {
+        let dir = env::temp_dir().join(format!("nsld-link-unit-verify-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let sidecar_path = dir.join("shader.sidecar.toml");
+        let sidecar_source = r#"
+schema = "nuis-shader-ir-sidecar-v1"
+[lowering_capabilities]
+capability_owner = "shader-nustar"
+frontend_ir = "nuis-yir.shader"
+native_ir = "msl2.4"
+dispatch_lowering = "command-encoder-draw-dispatch"
+validation_contracts = ["glm.resource-lifetime"]
+"#;
+        fs::write(&sidecar_path, sidecar_source).unwrap();
+        let mut plan = empty_link_plan();
+        plan.output_dir = dir.display().to_string();
+        plan.domain_units.push(nuisc::linker::LinkPlanDomainUnit {
+            kind: "heterogeneous".to_owned(),
+            package_id: "official.shader".to_owned(),
+            domain_family: "shader".to_owned(),
+            abi: None,
+            machine_arch: None,
+            machine_os: None,
+            backend_family: Some("metal".to_owned()),
+            vendor: None,
+            device_class: None,
+            selected_lowering_target: Some("metal.apple-silicon-gpu".to_owned()),
+            contract_family: "nustar.shader".to_owned(),
+            packaging_role: "hetero-contract".to_owned(),
+            artifact_stub_path: None,
+            artifact_stub_inline: None,
+            artifact_payload_path: None,
+            artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: Some(sidecar_path.display().to_string()),
+            artifact_bridge_stub_inline: None,
+            artifact_payload_blob_path: None,
+            artifact_payload_blob_bytes: None,
+            artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
+        });
+        let unit_report = nsld_link_unit_report(Path::new("manifest.toml"), &plan);
+        fs::write(
+            dir.join("nuis.nsld.link-units.toml"),
+            render_nsld_link_unit_table_toml(&unit_report),
+        )
+        .unwrap();
+
+        let report = nsld_verify_link_units_report(Path::new("manifest.toml"), &plan);
+        fs::remove_dir_all(dir).unwrap();
+
+        assert!(report.valid);
+        assert!(report.issues.is_empty());
+        assert_eq!(report.actual_unit_count, Some(1));
+        assert_eq!(report.actual_hetero_unit_count, Some(1));
+        assert_eq!(report.actual_link_input_count, Some(1));
+        assert_eq!(
+            report.actual_unit_table_hash,
+            Some(unit_report.unit_table_hash)
+        );
+    }
+
+    #[test]
+    fn verify_link_bundle_accepts_matching_emitted_bundle() {
+        let dir = env::temp_dir().join(format!("nsld-link-bundle-verify-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let sidecar_path = dir.join("shader.sidecar.toml");
+        let sidecar_source = r#"
+schema = "nuis-shader-ir-sidecar-v1"
+[lowering_capabilities]
+capability_owner = "shader-nustar"
+frontend_ir = "nuis-yir.shader"
+native_ir = "msl2.4"
+dispatch_lowering = "command-encoder-draw-dispatch"
+validation_contracts = ["glm.resource-lifetime"]
+"#;
+        fs::write(&sidecar_path, sidecar_source).unwrap();
+        let mut plan = empty_link_plan();
+        plan.output_dir = dir.display().to_string();
+        plan.domain_units.push(nuisc::linker::LinkPlanDomainUnit {
+            kind: "heterogeneous".to_owned(),
+            package_id: "official.shader".to_owned(),
+            domain_family: "shader".to_owned(),
+            abi: None,
+            machine_arch: None,
+            machine_os: None,
+            backend_family: Some("metal".to_owned()),
+            vendor: None,
+            device_class: None,
+            selected_lowering_target: Some("metal.apple-silicon-gpu".to_owned()),
+            contract_family: "nustar.shader".to_owned(),
+            packaging_role: "hetero-contract".to_owned(),
+            artifact_stub_path: None,
+            artifact_stub_inline: None,
+            artifact_payload_path: None,
+            artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: Some(sidecar_path.display().to_string()),
+            artifact_bridge_stub_inline: None,
+            artifact_payload_blob_path: None,
+            artifact_payload_blob_bytes: None,
+            artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
+        });
+        let bundle_report = nsld_link_bundle_report(Path::new("manifest.toml"), &plan);
+        fs::write(
+            dir.join("nuis.nsld.link-bundle.toml"),
+            render_nsld_link_bundle_toml(&bundle_report),
+        )
+        .unwrap();
+
+        let report = nsld_verify_link_bundle_report(Path::new("manifest.toml"), &plan);
+        fs::remove_dir_all(dir).unwrap();
+
+        assert!(report.valid);
+        assert!(report.issues.is_empty());
+        assert_eq!(report.actual_bundle_id, Some(bundle_report.bundle_id));
+        assert_eq!(report.actual_bundle_hash, Some(bundle_report.bundle_hash));
+    }
+
+    #[test]
+    fn prepare_emits_and_verifies_all_linker_artifacts() {
+        let dir = env::temp_dir().join(format!("nsld-prepare-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let sidecar_path = dir.join("shader.sidecar.toml");
+        let sidecar_source = r#"
+schema = "nuis-shader-ir-sidecar-v1"
+[lowering_capabilities]
+capability_owner = "shader-nustar"
+frontend_ir = "nuis-yir.shader"
+native_ir = "msl2.4"
+dispatch_lowering = "command-encoder-draw-dispatch"
+validation_contracts = ["glm.resource-lifetime"]
+"#;
+        fs::write(&sidecar_path, sidecar_source).unwrap();
+        let mut plan = empty_link_plan();
+        plan.output_dir = dir.display().to_string();
+        plan.domain_units.push(nuisc::linker::LinkPlanDomainUnit {
+            kind: "heterogeneous".to_owned(),
+            package_id: "official.shader".to_owned(),
+            domain_family: "shader".to_owned(),
+            abi: None,
+            machine_arch: None,
+            machine_os: None,
+            backend_family: Some("metal".to_owned()),
+            vendor: None,
+            device_class: None,
+            selected_lowering_target: Some("metal.apple-silicon-gpu".to_owned()),
+            contract_family: "nustar.shader".to_owned(),
+            packaging_role: "hetero-contract".to_owned(),
+            artifact_stub_path: None,
+            artifact_stub_inline: None,
+            artifact_payload_path: None,
+            artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: Some(sidecar_path.display().to_string()),
+            artifact_bridge_stub_inline: None,
+            artifact_payload_blob_path: None,
+            artifact_payload_blob_bytes: None,
+            artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
+        });
+
+        let report = nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+
+        assert!(report.valid);
+        assert!(report.issues.is_empty());
+        assert!(Path::new(&report.link_input_table_path).exists());
+        assert!(Path::new(&report.link_unit_table_path).exists());
+        assert!(Path::new(&report.link_bundle_path).exists());
+        assert_eq!(report.link_input_count, 1);
+        assert_eq!(report.unit_count, 1);
+        assert!(report.bundle_ready);
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn assemble_plan_lists_prepared_linker_sections() {
+        let dir = env::temp_dir().join(format!("nsld-assemble-plan-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let artifact_path = dir.join("nuis.compiled.artifact");
+        fs::write(&artifact_path, b"compiled-artifact").unwrap();
+        let sidecar_path = dir.join("shader.sidecar.toml");
+        let sidecar_source = r#"
+schema = "nuis-shader-ir-sidecar-v1"
+[lowering_capabilities]
+capability_owner = "shader-nustar"
+frontend_ir = "nuis-yir.shader"
+native_ir = "msl2.4"
+dispatch_lowering = "command-encoder-draw-dispatch"
+validation_contracts = ["glm.resource-lifetime"]
+"#;
+        fs::write(&sidecar_path, sidecar_source).unwrap();
+        let mut plan = empty_link_plan();
+        plan.output_dir = dir.display().to_string();
+        plan.compiled_artifact.path = artifact_path.display().to_string();
+        plan.domain_units.push(nuisc::linker::LinkPlanDomainUnit {
+            kind: "heterogeneous".to_owned(),
+            package_id: "official.shader".to_owned(),
+            domain_family: "shader".to_owned(),
+            abi: None,
+            machine_arch: None,
+            machine_os: None,
+            backend_family: Some("metal".to_owned()),
+            vendor: None,
+            device_class: None,
+            selected_lowering_target: Some("metal.apple-silicon-gpu".to_owned()),
+            contract_family: "nustar.shader".to_owned(),
+            packaging_role: "hetero-contract".to_owned(),
+            artifact_stub_path: None,
+            artifact_stub_inline: None,
+            artifact_payload_path: None,
+            artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: Some(sidecar_path.display().to_string()),
+            artifact_bridge_stub_inline: None,
+            artifact_payload_blob_path: None,
+            artifact_payload_blob_bytes: None,
+            artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
+        });
+        nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+
+        let report = nsld_assemble_plan_report(Path::new("manifest.toml"), &plan);
+        fs::remove_dir_all(dir).unwrap();
+
+        assert!(report.ready);
+        assert!(report.blockers.is_empty());
+        assert_eq!(report.section_count, 5);
+        assert_eq!(report.sections[0].section_kind, "compiled-artifact");
+        assert_eq!(report.sections[1].section_kind, "nsld-link-input-table");
+        assert_eq!(report.sections[2].section_kind, "nsld-link-unit-table");
+        assert_eq!(report.sections[3].section_kind, "nsld-link-bundle");
+        assert_eq!(report.sections[4].section_kind, "lowering-sidecar-input");
+        assert!(report
+            .sections
+            .iter()
+            .all(|section| section.source_hash != "missing"));
     }
 }

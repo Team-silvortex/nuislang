@@ -1,3 +1,5 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
   extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
   extern "c" fn host_dir_create(path_handle: i64) -> i64;
@@ -28,10 +30,15 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: DirectoryRemoveProjectSummary = capture_directory_remove_project();
-    return summary.path_handle
-      + summary.create_code
-      + summary.exists_before_remove
-      + summary.remove_code
-      + summary.exists_after_remove;
+    let total: i64 = StdFsContracts.directory_mutation_status_total(
+      summary.create_code,
+      summary.exists_before_remove,
+      summary.remove_code,
+      summary.exists_after_remove
+    ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle);
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

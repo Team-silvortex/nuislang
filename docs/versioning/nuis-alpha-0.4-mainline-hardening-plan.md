@@ -107,6 +107,18 @@ The desired order is:
    examples
 4. only then raise ns-nova work beyond thin contracts and placeholder examples
 
+Current std hardening status:
+
+* filesystem read/write/copy/roundtrip/output and directory create/remove
+  project demos now consume `StdFsContracts` through `std=workspace`
+* filesystem report and report-to-file demos now combine `StdFsContracts` with
+  `StdTextContracts`
+* tooling report demos now include filesystem/console and
+  benchmark/text/filesystem contract consumers
+* the current success criterion for these examples is not final std API
+  stability; it is build/run-backed proof that std contracts can normalize host
+  filesystem and reporting probes into process-style exit codes
+
 ## Regression Bias
 
 Every hardening patch should prefer one of these proof shapes:
@@ -147,4 +159,3 @@ For current work, start here:
 
 Then use older alpha and `0.20.*` docs as predecessor context, not as the
 present-tense route.
-

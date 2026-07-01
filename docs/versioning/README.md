@@ -9,6 +9,7 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-alpha-0.6-mainline-entry.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.6-mainline-entry.md)
 * [nuis-alpha-0.4-system-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * [nuis-alpha-0.4-mainline-hardening-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 * [nuis-alpha-0.4-doc-sync-inventory.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
@@ -16,11 +17,12 @@ If you want the current line instead of historical backfill, start with:
 
 Use this first when the question is:
 
-* what exists and what is still soft in the current `alpha-0.4.*` toolchain
-* what the current `alpha-0.4.*` mainline should optimize for before
-  `alpha-0.7.0`
-* which documentation routes and wording are current after the alpha-0.4
-  cleanup/synchronization pass
+* what the current `alpha-0.6.*` line adds on top of the hardening baseline
+* why Nsld and std contract smoke now belong in first-read docs
+* what exists and what is still soft in the `alpha-0.4.*` hardening baseline
+* what the current mainline should optimize for before `alpha-0.7.0`
+* which documentation routes and wording are current after the alpha-0.6
+  entry refresh and alpha-0.4 cleanup/synchronization pass
 * what the `alpha-0.1.*` mainline established before this hardening pass
 * what should count as present-tense repo truth
 * which older files should now be treated as predecessor anchors
@@ -131,7 +133,8 @@ Read:
 
 Practical rule:
 
-* start at `alpha-0.4.*` inventory and hardening first
+* start at `alpha-0.6.*` mainline entry first
+* use `alpha-0.4.*` inventory and hardening as the current baseline context
 * use `alpha-0.1.*` for the first post-closeout alpha consolidation line
 * then use `0.20.*` and `0.19.*` only when you are intentionally
   reconstructing the line that led here

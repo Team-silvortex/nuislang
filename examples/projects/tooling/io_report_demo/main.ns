@@ -56,12 +56,16 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: IoReportProjectSummary = capture_io_report_project();
-    return StdTextContracts.report_status_total(summary.report_handle, summary.report_len)
+    let total: i64 = StdTextContracts.report_status_total(summary.report_handle, summary.report_len)
       + StdIoContracts.console_status_total(
         summary.stdout_written,
         summary.stderr_written,
         summary.stdout_flushed,
         summary.stderr_flushed
       );
+    if total > 0 {
+      return StdIoContracts.io_ok();
+    }
+    return StdIoContracts.io_error();
   }
 }

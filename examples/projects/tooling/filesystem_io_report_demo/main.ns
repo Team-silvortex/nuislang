@@ -1,3 +1,6 @@
+use cpu StdFsContracts;
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_path_basename(path_handle: i64) -> i64;
@@ -93,22 +96,29 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: FilesystemIoReportProjectSummary = capture_filesystem_io_report_project();
-    return summary.joined_len
-      + summary.basename_handle
-      + summary.exists_code
-      + summary.kind_code
-      + summary.size_code
-      + summary.dir_handle
-      + summary.dir_entry_count
-      + summary.dir_close_code
-      + summary.file_handle
-      + summary.read_bytes
-      + summary.file_close_code
-      + summary.report_handle
-      + summary.report_len
-      + summary.stdout_written
-      + summary.stderr_written
-      + summary.stdout_flushed
-      + summary.stderr_flushed;
+    let total: i64 = StdFsContracts.filesystem_report_status_total(
+      summary.joined_len,
+      summary.basename_handle,
+      summary.exists_code,
+      summary.kind_code,
+      summary.size_code,
+      summary.dir_handle,
+      summary.dir_entry_count,
+      summary.dir_close_code,
+      summary.file_handle,
+      summary.read_bytes,
+      summary.file_close_code,
+      summary.report_handle,
+      summary.report_len
+    ) + StdIoContracts.console_status_total(
+      summary.stdout_written,
+      summary.stderr_written,
+      summary.stdout_flushed,
+      summary.stderr_flushed
+    );
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

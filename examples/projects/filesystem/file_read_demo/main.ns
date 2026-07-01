@@ -1,18 +1,34 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
   extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
   extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
   extern "c" fn host_file_close(file_handle: i64) -> i64;
 
   struct FileReadProjectSummary {
+    path_handle: i64,
+    setup_file_handle: i64,
+    setup_write_code: i64,
+    setup_close_code: i64,
     file_handle: i64,
     read_bytes: i64,
     close_code: i64
   }
 
   fn capture_file_read_project() -> FileReadProjectSummary {
-    let file_handle: i64 = host_file_open(2103, 1);
+    let path_handle: i64 = host_temp_file_handle(223);
+    let setup_file_handle: i64 = host_file_open(path_handle, 1);
+    let setup_write_code: i64 = host_file_write(setup_file_handle, 777);
+    let setup_close_code: i64 = host_file_close(setup_file_handle);
+    let file_handle: i64 = host_file_open(path_handle, 0);
     let backing: ref Buffer = alloc_buffer(8, 0);
     return FileReadProjectSummary {
+      path_handle: path_handle,
+      setup_file_handle: setup_file_handle,
+      setup_write_code: setup_write_code,
+      setup_close_code: setup_close_code,
       file_handle: file_handle,
       read_bytes: host_file_read(file_handle, host_buffer_handle(backing), 8),
       close_code: host_file_close(file_handle)
@@ -21,8 +37,18 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: FileReadProjectSummary = capture_file_read_project();
-    return summary.file_handle
-      + summary.read_bytes
-      + summary.close_code;
+    let total: i64 = StdFsContracts.file_io_status_total(
+      summary.file_handle,
+      summary.read_bytes,
+      summary.close_code
+    ) + StdFsContracts.file_write_status_total(
+      summary.setup_file_handle,
+      summary.setup_write_code,
+      summary.setup_close_code
+    ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle);
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

@@ -65,6 +65,9 @@ alpha caution:
   real kernel tensor evaluation for kernel-focused artifact YIR sidecars
 * std source assets for text, IO, filesystem, task/thread, net, errors, and
   host-runtime facade style examples
+* std filesystem contract consumers that build and run as process-style smoke
+  demos: read, write, copy, roundtrip, output, directory create/remove,
+  filesystem report, report-to-file, and filesystem/console report routes
 * official galaxy scaffolding for `pixelmagic`, `witsage`, and `ns-nova`
 
 ## Current Integration Proofs
@@ -79,6 +82,10 @@ These are the proof shapes that matter most right now:
 * `cargo test -p nuisc galaxy_resolution --lib`
 * `cargo test -p nuisc stdlib_registry --lib`
 * `cargo test -p nuisc stdlib_docs --lib`
+* `cargo test -p nuisc compiles_filesystem_mainline_examples --test examples_mainline_compile`
+* `cargo test -p nuisc file_copy_demo --test memory_compile`
+* `cargo run -p nuis -- build examples/projects/filesystem/file_copy_demo <tmp-output>`
+* `cargo run -p nuis -- run-artifact <tmp-output>`
 * `cargo fmt --check`
 * `git diff --check`
 
@@ -171,7 +178,8 @@ The best next work before `alpha-0.7.0` is:
    wording
 3. update long-tail kernel examples away from explicit `kernel_target_config(...)`
    where automatic registered-ABI target config is now the clearer frontdoor
-4. make std IO/filesystem/text examples into a small CLI-tool proving ladder
+4. continue widening the std IO/filesystem/text CLI proving ladder from the
+   now-running filesystem smoke set into broader CLI tools
 5. make PixelMagic and WitSage prove CPU plus shader/kernel cooperation through
    real examples
 6. keep `nustar` coupling under audit so compiler code knows contract shapes,

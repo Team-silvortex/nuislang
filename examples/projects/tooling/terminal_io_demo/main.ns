@@ -1,3 +1,5 @@
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
   extern "c" fn host_stderr_write(text_handle: i64) -> i64;
@@ -42,15 +44,21 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: TerminalIoProjectSummary = capture_terminal_io_project(32, 1);
-    return summary.stdout_written
-      + summary.stderr_written
-      + summary.stdout_flushed
-      + summary.stderr_flushed
-      + summary.stdin_read_len
-      + summary.stdin_requested_len
-      + summary.tty_fd
-      + summary.tty_is_tty
-      + summary.tty_width
-      + summary.tty_height;
+    let total: i64 = StdIoContracts.terminal_status_total(
+      summary.stdout_written,
+      summary.stderr_written,
+      summary.stdout_flushed,
+      summary.stderr_flushed,
+      summary.stdin_requested_len,
+      summary.stdin_read_len,
+      summary.tty_fd,
+      summary.tty_is_tty,
+      summary.tty_width,
+      summary.tty_height
+    );
+    if total > 0 {
+      return StdIoContracts.io_ok();
+    }
+    return StdIoContracts.io_error();
   }
 }

@@ -36,6 +36,9 @@ Current practical rule:
 * only then widen or relocate that lane
 * keep net using the dedicated local router instead of re-listing every file
   as if it were just another small family
+* filesystem examples that claim run-artifact smoke value should consume
+  `StdFsContracts` through `std=workspace` and return `fs_ok` / `fs_error`
+  rather than leaking raw probe totals as process exits
 
 Current frontdoor docs:
 
@@ -70,6 +73,8 @@ Use these as the primary cluster names when placing new work:
     [host/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/host/README.md)
   - shortest lane route:
     `io_runtime_recipe -> terminal_io_recipe -> host_text_runtime_recipe -> text_format_runtime_recipe -> json_runtime_recipe -> text_pipeline_recipe -> text_report_builder_recipe -> io_report_recipe -> text_json_recipe`
+  - current project smoke:
+    `io_runtime_demo -> terminal_io_demo -> io_report_demo -> filesystem_io_report_demo`
 * task/runtime
   - local router:
     [task/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/task/README.md)
@@ -80,6 +85,8 @@ Use these as the primary cluster names when placing new work:
     [filesystem/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/filesystem/README.md)
   - shortest lane route:
     `path_runtime_recipe -> file_read_recipe -> file_write_recipe -> file_copy_recipe -> directory_stat_recipe -> file_runtime_recipe -> filesystem_report_recipe -> filesystem_io_report_recipe -> filesystem_report_file_recipe -> location_runtime_recipe`
+  - current project smoke:
+    `file_read_demo -> file_write_demo -> file_copy_demo -> file_roundtrip_demo -> file_output_demo -> directory_create_demo -> directory_remove_demo -> filesystem_report_demo -> filesystem_report_file_demo`
   - persistence companion:
     [persistence/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/persistence/README.md)
 * net/session
@@ -112,7 +119,7 @@ First auto-injectable library module:
 * [lib/fs_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/fs_contracts.ns)
   exposes the initial `StdFsContracts` helper surface for normalizing
   filesystem metadata, file read/write/copy status, directory mutation, and
-  path probe summaries
+  path/report/session probe summaries
 * [lib/cli_contracts.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/lib/cli_contracts.ns)
   exposes the initial `StdCliContracts` helper surface for normalizing
   command requests/results, workflow gates, CLI sessions, and project

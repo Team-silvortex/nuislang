@@ -73,11 +73,49 @@ mod cpu StdFsContracts {
       + host_fs_value_exit_code(close_status);
   }
 
+  /// Combines temp path/write/read handles and statuses for roundtrip recipes.
+  pub fn file_roundtrip_status_total(
+    path_handle: i64,
+    write_file_handle: i64,
+    write_status: i64,
+    write_close_status: i64,
+    read_file_handle: i64,
+    read_status: i64,
+    read_close_status: i64
+  ) -> i64 {
+    return host_fs_value_or_zero(path_handle)
+      + host_fs_value_or_zero(write_file_handle)
+      + host_fs_value_exit_code(write_status)
+      + host_fs_value_exit_code(write_close_status)
+      + host_fs_value_or_zero(read_file_handle)
+      + host_fs_value_or_zero(read_status)
+      + host_fs_value_exit_code(read_close_status);
+  }
+
   /// Combines read/write/close outcomes for copy-style filesystem recipes.
   pub fn file_copy_status_total(read_len: i64, written_len: i64, close_status: i64) -> i64 {
     return host_fs_value_or_zero(read_len)
       + host_fs_value_or_zero(written_len)
       + host_fs_value_exit_code(close_status);
+  }
+
+  /// Combines setup write, path copy, and source/destination existence probes.
+  pub fn path_copy_status_total(
+    src_path_handle: i64,
+    dst_path_handle: i64,
+    src_file_handle: i64,
+    write_status: i64,
+    close_status: i64,
+    copy_status: i64,
+    src_exists: i64,
+    dst_exists: i64
+  ) -> i64 {
+    return host_fs_value_or_zero(src_path_handle)
+      + host_fs_value_or_zero(dst_path_handle)
+      + file_write_status_total(src_file_handle, write_status, close_status)
+      + host_fs_value_exit_code(copy_status)
+      + host_fs_value_or_zero(src_exists)
+      + host_fs_value_or_zero(dst_exists);
   }
 
   /// Combines directory open/count/close outcomes into a compact directory score.
@@ -105,5 +143,67 @@ mod cpu StdFsContracts {
     return host_fs_value_or_zero(is_empty)
       + host_fs_value_or_zero(has_parent)
       + host_fs_value_or_zero(has_extension);
+  }
+
+  /// Combines path, metadata, directory, file, and report probes for filesystem reports.
+  pub fn filesystem_report_status_total(
+    joined_len: i64,
+    basename_handle: i64,
+    exists_code: i64,
+    kind_code: i64,
+    size_code: i64,
+    dir_handle: i64,
+    dir_entry_count: i64,
+    dir_close_status: i64,
+    file_handle: i64,
+    read_len: i64,
+    file_close_status: i64,
+    report_handle: i64,
+    report_len: i64
+  ) -> i64 {
+    return path_probe_status_total(0, joined_len, basename_handle)
+      + metadata_status_total(exists_code, kind_code, size_code)
+      + directory_status_total(dir_handle, dir_entry_count, dir_close_status)
+      + file_io_status_total(file_handle, read_len, file_close_status)
+      + host_fs_value_or_zero(report_handle)
+      + host_fs_value_or_zero(report_len);
+  }
+
+  /// Extends filesystem report scoring with output path/write/close probes.
+  pub fn filesystem_report_file_status_total(
+    joined_len: i64,
+    basename_handle: i64,
+    exists_code: i64,
+    kind_code: i64,
+    size_code: i64,
+    dir_handle: i64,
+    dir_entry_count: i64,
+    dir_close_status: i64,
+    source_file_handle: i64,
+    read_len: i64,
+    source_close_status: i64,
+    report_handle: i64,
+    report_len: i64,
+    output_path_handle: i64,
+    output_file_handle: i64,
+    write_status: i64,
+    output_close_status: i64
+  ) -> i64 {
+    return filesystem_report_status_total(
+      joined_len,
+      basename_handle,
+      exists_code,
+      kind_code,
+      size_code,
+      dir_handle,
+      dir_entry_count,
+      dir_close_status,
+      source_file_handle,
+      read_len,
+      source_close_status,
+      report_handle,
+      report_len
+    ) + file_write_status_total(output_file_handle, write_status, output_close_status)
+      + host_fs_value_or_zero(output_path_handle);
   }
 }
