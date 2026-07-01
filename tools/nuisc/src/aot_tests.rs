@@ -573,6 +573,13 @@ fn network_urlsession_sidecar_emits_foundation_session_templates() {
     assert!(sidecar.contains("schema = \"nuis-network-ir-sidecar-v1\""));
     assert!(sidecar.contains("transport_ir = \"foundation-url-request\""));
     assert!(sidecar.contains("transport_binding_model = \"session-task-packet\""));
+    assert!(sidecar.contains("[lowering_capabilities]"));
+    assert!(sidecar.contains("capability_owner = \"network-nustar\""));
+    assert!(sidecar.contains("frontend_ir = \"nuis-yir.network\""));
+    assert!(sidecar.contains("native_ir = \"foundation-url-request\""));
+    assert!(sidecar.contains("transport_lowering = \"session-task-packet\""));
+    assert!(sidecar.contains("dispatch_lowering = \"urlsession-task-submit\""));
+    assert!(sidecar.contains("network.session-shape"));
     assert!(sidecar.contains("[session_shapes]"));
     assert!(sidecar.contains("request = \"http-client-session\""));
     assert!(sidecar.contains("response = \"completion-callback\""));
@@ -599,6 +606,11 @@ fn network_socket_abi_sidecar_emits_poll_reactor_templates() {
     assert!(sidecar.contains("schema = \"nuis-network-ir-sidecar-v1\""));
     assert!(sidecar.contains("transport_ir = \"posix-socket\""));
     assert!(sidecar.contains("transport_binding_model = \"packet-poll-reactor\""));
+    assert!(sidecar.contains("capability_owner = \"network-nustar\""));
+    assert!(sidecar.contains("native_ir = \"posix-socket\""));
+    assert!(sidecar.contains("transport_lowering = \"packet-poll-reactor\""));
+    assert!(sidecar.contains("dispatch_lowering = \"poll-send-recv-submit\""));
+    assert!(sidecar.contains("network.packet-shape"));
     assert!(sidecar.contains("request = \"socket-reactor-session\""));
     assert!(sidecar.contains("response = \"poll-ready-response\""));
     assert!(sidecar.contains("streaming = \"fd-edge-stream\""));
@@ -623,6 +635,11 @@ fn network_winsock_sidecar_emits_iocp_templates() {
     assert!(sidecar.contains("schema = \"nuis-network-ir-sidecar-v1\""));
     assert!(sidecar.contains("transport_ir = \"winsock-overlapped\""));
     assert!(sidecar.contains("transport_binding_model = \"overlapped-packet-reactor\""));
+    assert!(sidecar.contains("capability_owner = \"network-nustar\""));
+    assert!(sidecar.contains("native_ir = \"winsock-overlapped\""));
+    assert!(sidecar.contains("transport_lowering = \"overlapped-packet-reactor\""));
+    assert!(sidecar.contains("dispatch_lowering = \"winsock-overlapped-submit\""));
+    assert!(sidecar.contains("network.overlapped-shape"));
     assert!(sidecar.contains("request = \"overlapped-client-session\""));
     assert!(sidecar.contains("response = \"iocp-completion\""));
     assert!(sidecar.contains("streaming = \"completion-port-stream\""));

@@ -19,7 +19,6 @@ use nuis_artifact::{
     parse_nuis_executable_envelope_from_source as shared_parse_nuis_executable_envelope_from_source,
     parse_nuis_lowering_index_from_source as shared_parse_nuis_lowering_index_from_source,
     render_nuis_executable_envelope as shared_render_nuis_executable_envelope,
-    write_nuis_compiled_artifact as shared_write_nuis_compiled_artifact,
     write_nuis_executable_envelope as shared_write_nuis_executable_envelope, NuisCompiledArtifact,
     NuisExecutableEnvelope,
 };
@@ -225,7 +224,9 @@ pub fn write_nuis_compiled_artifact(
     path: &Path,
     artifact: &NuisCompiledArtifact,
 ) -> Result<(), String> {
-    shared_write_nuis_compiled_artifact(path, artifact).map_err(|error| error.to_string())
+    let out = shared_encode_nuis_compiled_artifact_section_table_binary(artifact)
+        .map_err(|error| error.to_string())?;
+    fs::write(path, out).map_err(|error| format!("failed to write `{}`: {error}", path.display()))
 }
 
 pub fn parse_nuis_compiled_artifact(path: &Path) -> Result<NuisCompiledArtifact, String> {

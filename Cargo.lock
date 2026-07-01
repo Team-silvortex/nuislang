@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "nsdb"
+version = "0.1.0"
+dependencies = [
+ "nuisc",
+]
+
+[[package]]
 name = "nsld"
 version = "0.1.0"
 dependencies = [

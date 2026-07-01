@@ -34,6 +34,54 @@ pub(crate) fn render_domain_build_unit_network_ir_sidecar(
     ));
     out.push_str(&render_target_specific_lowering_fields(unit, &profile));
     out.push_str(&render_target_specific_backend_fields(unit, &profile));
+    out.push_str("[lowering_capabilities]\n");
+    out.push_str("binary_role = \"linker-input-sidecar\"\n");
+    out.push_str("capability_owner = \"network-nustar\"\n");
+    out.push_str("frontend_ir = \"nuis-yir.network\"\n");
+    match profile.profile_key {
+        "urlsession.socket-io" => {
+            out.push_str("native_ir = \"foundation-url-request\"\n");
+            out.push_str("transport_lowering = \"session-task-packet\"\n");
+            out.push_str("resource_lowering = \"session-handle-table\"\n");
+            out.push_str("dispatch_lowering = \"urlsession-task-submit\"\n");
+            out.push_str("memory_lowering = \"managed-request-response-slots\"\n");
+            out.push_str("result_lowering = \"completion-callback-response\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.network-handle-lifetime\", \"time.io-ready-order\", \"network.session-shape\"]\n",
+            );
+        }
+        "winsock.socket-io" => {
+            out.push_str("native_ir = \"winsock-overlapped\"\n");
+            out.push_str("transport_lowering = \"overlapped-packet-reactor\"\n");
+            out.push_str("resource_lowering = \"socket-completion-port-table\"\n");
+            out.push_str("dispatch_lowering = \"winsock-overlapped-submit\"\n");
+            out.push_str("memory_lowering = \"overlapped-packet-buffer\"\n");
+            out.push_str("result_lowering = \"iocp-completion-response\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.network-handle-lifetime\", \"time.iocp-completion-order\", \"network.overlapped-shape\"]\n",
+            );
+        }
+        "socket-abi.socket-io" => {
+            out.push_str("native_ir = \"posix-socket\"\n");
+            out.push_str("transport_lowering = \"packet-poll-reactor\"\n");
+            out.push_str("resource_lowering = \"fd-handle-table\"\n");
+            out.push_str("dispatch_lowering = \"poll-send-recv-submit\"\n");
+            out.push_str("memory_lowering = \"borrowed-packet-buffer-window\"\n");
+            out.push_str("result_lowering = \"poll-ready-response-token\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.fd-handle-lifetime\", \"time.poll-ready-order\", \"network.packet-shape\"]\n",
+            );
+        }
+        _ => {
+            out.push_str("native_ir = \"unknown\"\n");
+            out.push_str("transport_lowering = \"unimplemented\"\n");
+            out.push_str("resource_lowering = \"unimplemented\"\n");
+            out.push_str("dispatch_lowering = \"unimplemented\"\n");
+            out.push_str("memory_lowering = \"unimplemented\"\n");
+            out.push_str("result_lowering = \"unimplemented\"\n");
+            out.push_str("validation_contracts = [\"glm.network-handle-lifetime\"]\n");
+        }
+    }
     out.push_str("[session_shapes]\n");
     match profile.profile_key {
         "urlsession.socket-io" => {

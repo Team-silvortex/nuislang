@@ -469,14 +469,15 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
     assert!(json.contains("\"final_stage_driver\":\"clang\""));
     assert!(json.contains("\"final_stage_kind\":\"host-native-link\""));
     assert!(json.contains("\"final_stage_link_mode\":\"host-toolchain-finalize\""));
-    assert!(json.contains("\"artifact_container_kind\":\"compiled-artifact-v1\""));
-    assert!(json.contains("\"artifact_container_version\":1"));
+    assert!(json.contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\""));
+    assert!(json.contains("\"artifact_container_version\":2"));
     assert!(json.contains("\"artifact_section_table_valid\":true"));
-    assert!(json.contains("\"lowering_unit_count\":0"));
-    assert!(json.contains("\"lowering_domain_families\":[]"));
-    assert!(json.contains("\"lowering_targets\":[]"));
+    assert!(json.contains("\"lowering_unit_count\":1"));
+    assert!(json.contains("\"lowering_domain_families\":[\"cpu\"]"));
+    assert!(json.contains("\"lowering_targets\":[\"llvm\"]"));
+    assert!(json.contains("\"lowering_units\":[{"));
     assert!(json.contains("\"link_plan\":{\"schema\":\"nuis-link-plan-v1\""));
-    assert!(json.contains("\"artifact_section_count\":0"));
+    assert!(json.contains("\"artifact_section_count\":6"));
 }
 
 #[test]

@@ -84,6 +84,8 @@ The visible workspace toolchain now includes:
 * `nuisc`: compiler core and AOT artifact producer
 * `nsld`: alpha-0.6.0 linker frontdoor for link-plan, clock protocol, and
   heterogeneous calculate contract inspection
+* `nsdb`: YIR-layer debugger metadata frontdoor; native debuggers can still
+  attach to the host shell, but Nsdb owns Nuis semantic debug visibility
 * `nuis-rc`: local resident control prototype
 * `yir-*`: lower-level YIR inspection, packing, running, and export tools
 

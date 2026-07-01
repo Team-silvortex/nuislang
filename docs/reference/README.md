@@ -28,6 +28,7 @@ Start in this order:
   - [nuis-binary-format-protocol.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-binary-format-protocol.md)
   - [nuis-native-artifact-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-native-artifact-workflow.md)
   - [nsld-linker-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsld-linker-frontdoor.md)
+  - [nsdb-yir-debugger-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsdb-yir-debugger-frontdoor.md)
 * `NIR` safety boundary
   - [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
   - [nir-optimization-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-optimization-contract.md)
@@ -74,6 +75,10 @@ closure route today?”, start with
 If your question is specifically “what is the current independent linker
 frontdoor?”, start with
 [nsld-linker-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsld-linker-frontdoor.md).
+
+If your question is specifically “how should Nuis debugging work above native
+LLDB-style shell debugging?”, start with
+[nsdb-yir-debugger-frontdoor.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nsdb-yir-debugger-frontdoor.md).
 
 If your question is specifically “which `nuis` frontdoor fields should I read
 or consume right now?”, start with
