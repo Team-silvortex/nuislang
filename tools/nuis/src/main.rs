@@ -6999,6 +6999,15 @@ mod tests {
             .expect("repo root")
     }
 
+    fn checked_in_path(relative_from_manifest_dir: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(relative_from_manifest_dir)
+            .canonicalize()
+            .unwrap_or_else(|error| {
+                panic!("checked-in path `{relative_from_manifest_dir}`: {error}")
+            })
+    }
+
     fn load_stdlib_source_modules(root: &Path, module_dir: &str) -> Vec<String> {
         let module_path = root.join("stdlib").join(module_dir).join("module.toml");
         let source = fs::read_to_string(&module_path)
@@ -7073,7 +7082,7 @@ mod tests {
     }
 
     fn assert_checked_in_tooling_project_runs(project_root: &str, output_label: &str) {
-        let project_root = PathBuf::from(project_root);
+        let project_root = checked_in_path(project_root);
         let output_dir = temp_dir(output_label);
 
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
@@ -7175,9 +7184,7 @@ mod tests {
 
     #[test]
     fn resolve_run_artifact_binary_path_accepts_output_dir() {
-        let project_root = PathBuf::from(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo",
-        );
+        let project_root = checked_in_path("../../examples/projects/tooling/cli_runtime_demo");
         let output_dir = temp_dir("resolve_run_artifact_binary_path_output_dir");
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
         let binary = resolve_run_artifact_binary_path(&output_dir).expect("resolve output-dir");
@@ -7347,7 +7354,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_cli_runtime_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo",
+            "../../examples/projects/tooling/cli_runtime_demo",
             "run_artifact_cli_runtime_outputs",
         );
     }
@@ -7355,7 +7362,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_cli_session_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_session_demo",
+            "../../examples/projects/tooling/cli_session_demo",
             "run_artifact_cli_session_outputs",
         );
     }
@@ -7363,7 +7370,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_cli_report_session_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_report_session_demo",
+            "../../examples/projects/tooling/cli_report_session_demo",
             "run_artifact_cli_report_session_outputs",
         );
     }
@@ -7371,7 +7378,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_workflow_runtime_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo",
+            "../../examples/projects/tooling/workflow_runtime_demo",
             "run_artifact_workflow_runtime_outputs",
         );
     }
@@ -7379,7 +7386,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_command_runtime_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo",
+            "../../examples/projects/tooling/command_runtime_demo",
             "run_artifact_command_runtime_outputs",
         );
     }
@@ -7387,7 +7394,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_subprocess_runtime_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo",
+            "../../examples/projects/tooling/subprocess_runtime_demo",
             "run_artifact_subprocess_runtime_outputs",
         );
     }
@@ -7395,7 +7402,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_cli_compile_workflow_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_compile_workflow_demo",
+            "../../examples/projects/tooling/cli_compile_workflow_demo",
             "run_artifact_cli_compile_workflow_outputs",
         );
     }
@@ -7403,7 +7410,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_cli_build_pipeline_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_build_pipeline_demo",
+            "../../examples/projects/tooling/cli_build_pipeline_demo",
             "run_artifact_cli_build_pipeline_outputs",
         );
     }
@@ -7411,7 +7418,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_cli_workflow_automation_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_workflow_automation_demo",
+            "../../examples/projects/tooling/cli_workflow_automation_demo",
             "run_artifact_cli_workflow_automation_outputs",
         );
     }
@@ -7419,7 +7426,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_cli_project_build_report_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_project_build_report_demo",
+            "../../examples/projects/tooling/cli_project_build_report_demo",
             "run_artifact_cli_project_build_report_outputs",
         );
     }
@@ -7427,7 +7434,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_cli_pgm_info_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo",
+            "../../examples/projects/tooling/cli_pgm_info_demo",
             "run_artifact_cli_pgm_info_outputs",
         );
     }
@@ -7435,7 +7442,7 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_cli_pgm_invert_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo",
+            "../../examples/projects/tooling/cli_pgm_invert_demo",
             "run_artifact_cli_pgm_invert_outputs",
         );
     }
@@ -7443,16 +7450,14 @@ mod cpu Main {
     #[test]
     fn run_artifact_executes_checked_in_cli_pgm_threshold_project() {
         assert_checked_in_tooling_project_runs(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo",
+            "../../examples/projects/tooling/cli_pgm_threshold_demo",
             "run_artifact_cli_pgm_threshold_outputs",
         );
     }
 
     #[test]
     fn cli_pgm_info_binary_accepts_real_pgm_input_file() {
-        let project_root = PathBuf::from(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_info_demo",
-        );
+        let project_root = checked_in_path("../../examples/projects/tooling/cli_pgm_info_demo");
         let output_dir = temp_dir("cli_pgm_info_runtime_probe_outputs");
         let input_path = output_dir.join("probe.pgm");
         fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
@@ -7469,9 +7474,7 @@ mod cpu Main {
 
     #[test]
     fn cli_pgm_invert_binary_writes_inverted_pgm_output_file() {
-        let project_root = PathBuf::from(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_invert_demo",
-        );
+        let project_root = checked_in_path("../../examples/projects/tooling/cli_pgm_invert_demo");
         let output_dir = temp_dir("cli_pgm_invert_runtime_probe_outputs");
         let input_path = output_dir.join("probe_in.pgm");
         let output_path = output_dir.join("probe_out.pgm");
@@ -7493,9 +7496,8 @@ mod cpu Main {
 
     #[test]
     fn cli_pgm_threshold_binary_writes_mask_pgm_output_file() {
-        let project_root = PathBuf::from(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_pgm_threshold_demo",
-        );
+        let project_root =
+            checked_in_path("../../examples/projects/tooling/cli_pgm_threshold_demo");
         let output_dir = temp_dir("cli_pgm_threshold_runtime_probe_outputs");
         let input_path = output_dir.join("probe_in.pgm");
         let output_path = output_dir.join("probe_out.pgm");
@@ -7797,9 +7799,7 @@ mod cpu Main {
 
     #[test]
     fn build_report_json_exposes_real_heterogeneous_runtime_summary() {
-        let project_root = PathBuf::from(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo",
-        );
+        let project_root = checked_in_path("../../examples/projects/domains/shader_profile_demo");
         let output_dir = temp_dir("build_report_shader_profile_outputs");
 
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
@@ -7926,9 +7926,7 @@ mod cpu Main {
 
     #[test]
     fn run_artifact_json_exposes_real_heterogeneous_runtime_summary() {
-        let project_root = PathBuf::from(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo",
-        );
+        let project_root = checked_in_path("../../examples/projects/domains/shader_profile_demo");
         let output_dir = temp_dir("run_artifact_shader_profile_outputs");
 
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
@@ -7945,9 +7943,8 @@ mod cpu Main {
 
     #[test]
     fn build_report_json_exposes_bridge_bearing_exchange_summary() {
-        let project_root = PathBuf::from(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo",
-        );
+        let project_root =
+            checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
         let output_dir = temp_dir("build_report_shader_packet_bridge_outputs");
 
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
@@ -7972,9 +7969,8 @@ mod cpu Main {
 
     #[test]
     fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
-        let project_root = PathBuf::from(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo",
-        );
+        let project_root =
+            checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
         let output_dir = temp_dir("run_artifact_shader_packet_bridge_outputs");
 
         handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
@@ -7993,9 +7989,8 @@ mod cpu Main {
 
     #[test]
     fn unpack_artifact_support_materializes_embedded_sidecars_for_bridge_project() {
-        let project_root = PathBuf::from(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo",
-        );
+        let project_root =
+            checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
         let output_dir = temp_dir("unpack_artifact_support_bridge_build_outputs");
         let unpack_dir = temp_dir("unpack_artifact_support_bridge_unpack_outputs");
 
@@ -8029,9 +8024,8 @@ mod cpu Main {
 
     #[test]
     fn materialize_artifact_rebuilds_frontdoor_bundle_and_support_sidecars() {
-        let project_root = PathBuf::from(
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo",
-        );
+        let project_root =
+            checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
         let build_output_dir = temp_dir("materialize_artifact_bridge_build_outputs");
         let materialize_dir = temp_dir("materialize_artifact_bridge_bundle_outputs");
 

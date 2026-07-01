@@ -49,27 +49,27 @@ fn cli_compile_emits_runnable_native_control_flow_binaries() {
     for (label, project, binary_name) in [
         (
             "native_flow_branching_while",
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo",
+            "../../examples/projects/state/flow_branching_while_demo",
             "flow_branching_while_demo",
         ),
         (
             "native_post_flow_branching_while",
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo",
+            "../../examples/projects/state/post_flow_branching_while_demo",
             "post_flow_branching_while_demo",
         ),
         (
             "native_task_async_flow_while",
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo",
+            "../../examples/projects/task/task_async_while_flow_cond_demo",
             "task_async_while_flow_cond_demo",
         ),
         (
             "native_task_async_post_flow_while",
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo",
+            "../../examples/projects/task/task_async_while_post_flow_cond_demo",
             "task_async_while_post_flow_cond_demo",
         ),
         (
             "native_task_async_post_flow_shared_suffix",
-            "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo",
+            "../../examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo",
             "task_async_post_flow_shared_suffix_loop_control_demo",
         ),
     ] {
@@ -87,9 +87,7 @@ fn cli_compile_emits_runnable_native_control_flow_binaries() {
 
 #[test]
 fn cli_artifact_commands_report_benchmark_tooling_outputs() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo",
-    );
+    let project = Path::new("../../examples/projects/tooling/benchmark_report_file_demo");
     let output_dir = temp_dir("artifact_cli_benchmark_report_file_outputs");
     let output_dir_text = output_dir.display().to_string();
 

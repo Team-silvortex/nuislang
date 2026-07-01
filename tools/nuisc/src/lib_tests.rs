@@ -624,9 +624,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
 
 #[test]
 fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
-    let project_root = PathBuf::from(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo",
-    );
+    let project_root = PathBuf::from("../../examples/projects/tooling/benchmark_report_file_demo");
     let output_dir = temp_dir("benchmark_report_file_artifact_json_outputs");
 
     run(CommandKind::Compile {
@@ -1582,9 +1580,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
 
 #[test]
 fn compile_command_writes_benchmark_report_file_tooling_outputs() {
-    let project_root = PathBuf::from(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/benchmark_report_file_demo",
-    );
+    let project_root = PathBuf::from("../../examples/projects/tooling/benchmark_report_file_demo");
     let output_dir = temp_dir("compile_command_benchmark_report_file_outputs");
     let output_stem = "benchmark_report_file_demo".to_owned();
 

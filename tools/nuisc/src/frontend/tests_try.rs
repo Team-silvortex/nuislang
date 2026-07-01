@@ -1275,10 +1275,8 @@ fn lowers_match_expression_inside_try_before_await() {
 
 #[test]
 fn parses_memory_task_result_control_flow_example_into_nir() {
-    let source = fs::read_to_string(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns",
-    )
-    .expect("example source should be readable");
+    let source = fs::read_to_string("../../examples/ns/memory/hello_task_result_control_flow.ns")
+        .expect("example source should be readable");
 
     let module = parse_nuis_module(&source).expect("example source should lower to NIR");
     let choose = module

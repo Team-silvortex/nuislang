@@ -309,7 +309,7 @@ fn run() -> Result<(), String> {
                 return Err("nsld link unit verification failed".to_owned());
             }
         }
-        Command::Inputs { input, json } => {
+        Command::Inputs { input, json } | Command::EmitInputs { input, json } => {
             let manifest = resolve_manifest_input(&input)?;
             let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
             let report = nsld_emit_link_inputs_report(&manifest, &plan)?;
@@ -435,6 +435,40 @@ fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldChe
         .as_ref()
         .map(|report| report.issues.clone())
         .unwrap_or_default();
+    let expected_container_report =
+        container_present.then(|| nsld_container_report(manifest, plan));
+    let container_loader_readiness = expected_container_report
+        .as_ref()
+        .map(|report| report.loader_readiness.clone());
+    let container_loader_blockers = expected_container_report
+        .as_ref()
+        .map(|report| report.loader_blockers.clone())
+        .unwrap_or_default();
+    let container_external_import_count = expected_container_report
+        .as_ref()
+        .map(|report| report.external_imports.len());
+    let container_payload_path =
+        PathBuf::from(&plan.output_dir).join("nuis.nsld.container.payload");
+    let container_payload_present = container_payload_path.exists();
+    let mut container_payload_issues = Vec::new();
+    if container_payload_present && !container_present {
+        container_payload_issues.push("container payload is present without container".to_owned());
+    }
+    if container_present && !container_payload_present {
+        container_payload_issues
+            .push("container payload is missing for present container".to_owned());
+    }
+    let artifact_chain_issues = nsld_artifact_chain_issues(&[
+        ("nuis.nsld.link-inputs.toml", link_input_table_present),
+        ("nuis.nsld.link-units.toml", link_unit_table_present),
+        ("nuis.nsld.link-bundle.toml", link_bundle_present),
+        ("nuis.nsld.assemble-plan.toml", assemble_plan_present),
+        ("nuis.nsld.section-manifest.toml", section_manifest_present),
+        ("nuis.nsld.container-plan.toml", container_plan_present),
+        ("nuis.nsld.container", container_present),
+        ("nuis.nsld.container.payload", container_payload_present),
+    ]);
+    let artifact_chain_valid = artifact_chain_issues.is_empty();
     let clock_edges = plan
         .clock_protocol
         .edges
@@ -526,6 +560,18 @@ fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldChe
         issues.push("container verification failed".to_owned());
         issues.extend(container_issues.iter().cloned());
     }
+    if container_loader_readiness.as_deref() == Some("blocked") {
+        issues.push("container loader readiness is blocked".to_owned());
+        issues.extend(container_loader_blockers.iter().cloned());
+    }
+    if !container_payload_issues.is_empty() {
+        issues.push("container payload state is inconsistent".to_owned());
+        issues.extend(container_payload_issues.iter().cloned());
+    }
+    if !artifact_chain_valid {
+        issues.push("nsld artifact chain is incomplete".to_owned());
+        issues.extend(artifact_chain_issues.iter().cloned());
+    }
 
     let checks = 6 + usize::from(link_input_table_present) + usize::from(link_unit_table_present);
     let checks = checks + usize::from(link_bundle_present);
@@ -533,6 +579,7 @@ fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldChe
     let checks = checks + usize::from(section_manifest_present);
     let checks = checks + usize::from(container_plan_present);
     let checks = checks + usize::from(container_present);
+    let checks = checks + usize::from(container_present || container_payload_present);
     let failures = issues.len();
     NsldCheckReport {
         manifest: manifest.display().to_string(),
@@ -570,6 +617,13 @@ fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldChe
         container_present,
         container_valid,
         container_issues,
+        container_payload_present,
+        container_payload_issues,
+        container_loader_readiness,
+        container_loader_blockers,
+        container_external_import_count,
+        artifact_chain_valid,
+        artifact_chain_issues,
         final_stage_link_mode: plan.final_stage.link_mode.clone(),
         domains,
         sidecar_capabilities,
@@ -577,6 +631,25 @@ fn nsld_check_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldChe
         data_segments,
         issues,
     }
+}
+
+fn nsld_artifact_chain_issues(stages: &[(&str, bool)]) -> Vec<String> {
+    let mut first_missing_before_present = None;
+    let mut issues = Vec::new();
+
+    for (name, present) in stages {
+        if *present {
+            if let Some(missing) = first_missing_before_present {
+                issues.push(format!(
+                    "artifact `{name}` is present but prerequisite `{missing}` is missing"
+                ));
+            }
+        } else if first_missing_before_present.is_none() {
+            first_missing_before_present = Some(*name);
+        }
+    }
+
+    issues
 }
 
 fn nsld_closure_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldClosureReport {
@@ -1497,11 +1570,47 @@ fn nsld_verify_container_plan_report(
 fn nsld_container_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> NsldContainerReport {
     let container_plan = nsld_container_plan_report(manifest, plan);
     let sections = container::section_entries(&container_plan.sections, fnv1a64_hex);
+    let loader_entry_kind = "lifecycle-bootstrap".to_owned();
+    let loader_entry_symbol = plan.lifecycle.bootstrap_entry.clone();
+    let loader_entry_section_id = sections
+        .iter()
+        .find(|section| section.section_kind == "compiled-artifact")
+        .map(|section| section.section_id.clone())
+        .unwrap_or_else(|| "missing".to_owned());
+    let loader_symbols = nsld_container_loader_symbols(
+        &loader_entry_kind,
+        &loader_entry_symbol,
+        &loader_entry_section_id,
+        &sections,
+    );
+    let relocations = Vec::new();
+    let external_imports = nsld_container_external_imports(plan);
+    let loader_blockers =
+        nsld_container_loader_blockers(&external_imports, &container_plan.blockers);
+    let loader_readiness = if !container_plan.ready || !container_plan.blockers.is_empty() {
+        "blocked"
+    } else if external_imports
+        .iter()
+        .any(|external_import| external_import.required)
+    {
+        "host-assisted"
+    } else {
+        "self-contained"
+    }
+    .to_owned();
     let payload_size_bytes = container::payload_size(&sections);
     let payload_hash = container::payload_hash(&sections, fnv1a64_hex);
     let container_hash = container::file_hash(
         &container_plan,
         &sections,
+        &loader_entry_kind,
+        &loader_entry_symbol,
+        &loader_entry_section_id,
+        &loader_symbols,
+        &relocations,
+        &external_imports,
+        &loader_readiness,
+        &loader_blockers,
         payload_size_bytes,
         &payload_hash,
         fnv1a64_hex,
@@ -1513,6 +1622,14 @@ fn nsld_container_report(manifest: &Path, plan: &nuisc::linker::LinkPlan) -> Nsl
         container_version: container_plan.container_version,
         container_layout_hash: container_plan.container_layout_hash,
         container_hash,
+        loader_readiness,
+        loader_blockers,
+        loader_entry_kind,
+        loader_entry_symbol,
+        loader_entry_section_id,
+        loader_symbols,
+        relocations,
+        external_imports,
         payload_size_bytes,
         payload_hash,
         payload_path: format!("{}.payload", container_plan.output_path),
@@ -1577,6 +1694,8 @@ fn nsld_verify_container_report(
         actual_payload_size_bytes,
         actual_payload_hash,
         actual_section_count,
+        actual_loader_readiness,
+        actual_external_import_count,
     ) = match actual.as_ref() {
         Ok(source) => (
             toml_string_value(source, "container_layout_hash"),
@@ -1584,10 +1703,12 @@ fn nsld_verify_container_report(
             toml_usize_value(source, "payload_size_bytes"),
             toml_string_value(source, "payload_hash"),
             toml_usize_value(source, "section_count"),
+            toml_string_value(source, "loader_readiness"),
+            toml_usize_value(source, "external_import_count"),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None)
+            (None, None, None, None, None, None, None)
         }
     };
     if let Ok(actual) = actual {
@@ -1641,6 +1762,24 @@ fn nsld_verify_container_report(
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
+        if actual_loader_readiness.as_deref() != Some(expected_report.loader_readiness.as_str()) {
+            issues.push(format!(
+                "loader_readiness mismatch: expected {}, found {}",
+                expected_report.loader_readiness,
+                actual_loader_readiness
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_external_import_count != Some(expected_report.external_imports.len()) {
+            issues.push(format!(
+                "external_import_count mismatch: expected {}, found {}",
+                expected_report.external_imports.len(),
+                actual_external_import_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
     }
     let mut section_range_issues = Vec::new();
     let (actual_payload_file_size, actual_payload_file_hash) = match fs::read(&payload_path)
@@ -1690,14 +1829,112 @@ fn nsld_verify_container_report(
         expected_payload_hash: expected_report.payload_hash,
         expected_payload_path: expected_report.payload_path,
         expected_section_count: expected_report.section_count,
+        expected_loader_readiness: expected_report.loader_readiness,
+        expected_external_import_count: expected_report.external_imports.len(),
         actual_container_layout_hash,
         actual_container_hash,
         actual_payload_size_bytes,
         actual_payload_hash,
         actual_section_count,
+        actual_loader_readiness,
+        actual_external_import_count,
         section_range_issues,
         issues,
     }
+}
+
+fn nsld_container_external_imports(
+    plan: &nuisc::linker::LinkPlan,
+) -> Vec<container::NsldContainerExternalImport> {
+    let mut imports = Vec::new();
+    let mut push_import = |import_kind: &str, import_name: String, provider: &str| {
+        let index = imports.len();
+        imports.push(container::NsldContainerExternalImport {
+            import_id: format!("imp{index:04}.{import_kind}"),
+            import_kind: import_kind.to_owned(),
+            import_name,
+            provider: provider.to_owned(),
+            required: true,
+        });
+    };
+
+    if matches!(
+        plan.final_stage.link_mode.as_str(),
+        "host-toolchain-finalize" | "bundle-packaging"
+    ) {
+        push_import(
+            "final-stage-driver",
+            plan.final_stage.driver.clone(),
+            "host-toolchain",
+        );
+    }
+    if !plan.cpu_target.clang_target.is_empty() {
+        push_import(
+            "clang-target",
+            plan.cpu_target.clang_target.clone(),
+            "host-toolchain",
+        );
+    }
+    if plan.final_stage.link_mode == "bundle-packaging" {
+        push_import(
+            "host-launcher-wrapper",
+            "host-launcher-wrapper".to_owned(),
+            "host-toolchain",
+        );
+    }
+    if !plan.hetero_calculate.c_world_policy.is_empty()
+        && plan.hetero_calculate.c_world_policy != "none"
+    {
+        push_import(
+            "c-world-policy",
+            plan.hetero_calculate.c_world_policy.clone(),
+            "c-world-wrapper",
+        );
+    }
+
+    imports
+}
+
+fn nsld_container_loader_blockers(
+    external_imports: &[container::NsldContainerExternalImport],
+    container_blockers: &[String],
+) -> Vec<String> {
+    let mut blockers = container_blockers.to_vec();
+    blockers.extend(
+        external_imports
+            .iter()
+            .filter(|external_import| external_import.required)
+            .map(|external_import| {
+                format!(
+                    "external-import:{}:{}",
+                    external_import.import_kind, external_import.import_name
+                )
+            }),
+    );
+    blockers
+}
+
+fn nsld_container_loader_symbols(
+    loader_entry_kind: &str,
+    loader_entry_symbol: &str,
+    loader_entry_section_id: &str,
+    sections: &[container::NsldContainerSectionEntry],
+) -> Vec<container::NsldContainerLoaderSymbol> {
+    sections
+        .iter()
+        .find(|section| section.section_id == loader_entry_section_id)
+        .map(|section| {
+            vec![container::NsldContainerLoaderSymbol {
+                symbol_id: "sym0000.loader-entry".to_owned(),
+                symbol_kind: loader_entry_kind.to_owned(),
+                symbol_name: loader_entry_symbol.to_owned(),
+                section_id: section.section_id.clone(),
+                offset: section.offset,
+                size_bytes: section.size_bytes,
+                payload_hash: section.payload_hash.clone(),
+            }]
+        })
+        .unwrap_or_default()
 }
 
 fn nsld_assemble_plan_hash(
@@ -1932,13 +2169,14 @@ fn toml_usize_value(source: &str, key: &str) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::{
-        fnv1a64_hex, nsld_assemble_plan_report, nsld_link_bundle_report,
-        nsld_link_input_diagnostics, nsld_link_input_table_hash, nsld_link_unit_report,
-        nsld_link_unit_table_hash, nsld_prepare_report, nsld_sidecar_capability_diagnostics,
-        nsld_verify_assemble_plan_report, nsld_verify_container_plan_report,
-        nsld_verify_container_report, nsld_verify_link_bundle_report,
-        nsld_verify_link_inputs_report, nsld_verify_link_units_report,
-        nsld_verify_section_manifest_report, parse_args, toml, Command,
+        fnv1a64_hex, nsld_artifact_chain_issues, nsld_assemble_plan_report, nsld_check_report,
+        nsld_link_bundle_report, nsld_link_input_diagnostics, nsld_link_input_table_hash,
+        nsld_link_unit_report, nsld_link_unit_table_hash, nsld_prepare_report,
+        nsld_sidecar_capability_diagnostics, nsld_verify_assemble_plan_report,
+        nsld_verify_container_plan_report, nsld_verify_container_report,
+        nsld_verify_link_bundle_report, nsld_verify_link_inputs_report,
+        nsld_verify_link_units_report, nsld_verify_section_manifest_report, parse_args, toml,
+        Command,
     };
     use nuisc::linker::{
         ArtifactLoweringAlignmentSummary, LinkPlan, LinkPlanArtifact, LinkPlanClockProtocol,
@@ -2364,6 +2602,25 @@ mod tests {
     }
 
     #[test]
+    fn parses_emit_inputs_input_and_json_flag() {
+        let command = parse_args(
+            vec![
+                "emit-inputs".to_owned(),
+                "out".to_owned(),
+                "--json".to_owned(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::EmitInputs {
+                input: PathBuf::from("out"),
+                json: true
+            })
+        );
+    }
+
+    #[test]
     fn parses_verify_inputs_input_and_json_flag() {
         let command = parse_args(
             vec![
@@ -2379,6 +2636,35 @@ mod tests {
                 input: PathBuf::from("out"),
                 json: true
             })
+        );
+    }
+
+    #[test]
+    fn artifact_chain_accepts_contiguous_prepared_prefix() {
+        let issues = nsld_artifact_chain_issues(&[
+            ("inputs", true),
+            ("units", true),
+            ("bundle", true),
+            ("assemble", false),
+            ("section", false),
+        ]);
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn artifact_chain_rejects_later_artifact_without_prerequisite() {
+        let issues = nsld_artifact_chain_issues(&[
+            ("inputs", true),
+            ("units", false),
+            ("bundle", true),
+            ("assemble", true),
+        ]);
+        assert_eq!(
+            issues,
+            vec![
+                "artifact `bundle` is present but prerequisite `units` is missing".to_owned(),
+                "artifact `assemble` is present but prerequisite `units` is missing".to_owned(),
+            ]
         );
     }
 
@@ -3221,6 +3507,26 @@ validation_contracts = ["glm.resource-lifetime"]
         assert_eq!(fnv1a64_hex(&payload_bytes), prepare.payload_hash);
         assert!(container_source.contains("offset = 0"));
         assert!(container_source.contains("size_bytes = 17"));
+        assert!(container_source.contains("loader_readiness = \"host-assisted\""));
+        assert!(container_source.contains("external-import:final-stage-driver:clang"));
+        assert!(container_source.contains("external-import:clang-target:"));
+        assert!(container_source.contains("external-import:c-world-policy:wrapped"));
+        assert!(container_source.contains("loader_entry_kind = \"lifecycle-bootstrap\""));
+        assert!(container_source.contains("loader_entry_symbol = \"main\""));
+        assert!(
+            container_source.contains("loader_entry_section_id = \"sec0000.compiled-artifact\"")
+        );
+        assert!(container_source.contains("loader_symbol_count = 1"));
+        assert!(container_source.contains("[[loader_symbol]]"));
+        assert!(container_source.contains("symbol_id = \"sym0000.loader-entry\""));
+        assert!(container_source.contains("symbol_name = \"main\""));
+        assert!(container_source.contains("section_id = \"sec0000.compiled-artifact\""));
+        assert!(container_source.contains("relocation_count = 0"));
+        assert!(container_source.contains("external_import_count = 3"));
+        assert!(container_source.contains("[[external_import]]"));
+        assert!(container_source.contains("import_kind = \"final-stage-driver\""));
+        assert!(container_source.contains("import_kind = \"clang-target\""));
+        assert!(container_source.contains("import_kind = \"c-world-policy\""));
         assert!(container_source.contains("payload_size_bytes = "));
         assert!(container_source.contains("payload_hash = \"0x"));
         assert!(report.valid);
@@ -3231,6 +3537,37 @@ validation_contracts = ["glm.resource-lifetime"]
             Some(prepare.container_layout_hash)
         );
         assert_eq!(report.actual_container_hash, Some(prepare.container_hash));
+        assert_eq!(report.expected_loader_readiness, "host-assisted");
+        assert_eq!(
+            report.actual_loader_readiness.as_deref(),
+            Some("host-assisted")
+        );
+        assert_eq!(report.expected_external_import_count, 3);
+        assert_eq!(report.actual_external_import_count, Some(3));
+
+        let tampered_container_source = container_source
+            .replace(
+                "loader_readiness = \"host-assisted\"",
+                "loader_readiness = \"self-contained\"",
+            )
+            .replace("external_import_count = 3", "external_import_count = 0");
+        fs::write(&prepare.container_path, tampered_container_source).unwrap();
+        let tampered_report = nsld_verify_container_report(Path::new("manifest.toml"), &plan);
+        assert!(!tampered_report.valid);
+        assert_eq!(
+            tampered_report.actual_loader_readiness.as_deref(),
+            Some("self-contained")
+        );
+        assert_eq!(tampered_report.actual_external_import_count, Some(0));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("loader_readiness mismatch")));
+        assert!(tampered_report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("external_import_count mismatch")));
+        fs::write(&prepare.container_path, container_source).unwrap();
 
         let mut corrupted_payload = payload_bytes;
         corrupted_payload[0] ^= 0xff;
@@ -3246,5 +3583,35 @@ validation_contracts = ["glm.resource-lifetime"]
             .iter()
             .any(|issue| issue.starts_with("section_payload_hash mismatch")));
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn check_reports_container_loader_readiness_without_failing_host_assisted_state() {
+        let dir = env::temp_dir().join(format!("nsld-check-loader-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let artifact_path = dir.join("nuis.compiled.artifact");
+        fs::write(&artifact_path, b"compiled-artifact").unwrap();
+        let mut plan = empty_link_plan();
+        plan.output_dir = dir.display().to_string();
+        plan.compiled_artifact.path = artifact_path.display().to_string();
+
+        nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+        let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+        fs::remove_dir_all(dir).unwrap();
+
+        assert!(report.valid);
+        assert_eq!(
+            report.container_loader_readiness.as_deref(),
+            Some("host-assisted")
+        );
+        assert_eq!(report.container_external_import_count, Some(3));
+        assert!(report
+            .container_loader_blockers
+            .iter()
+            .any(|blocker| blocker == "external-import:final-stage-driver:clang"));
+        assert!(report
+            .issues
+            .iter()
+            .all(|issue| !issue.contains("container loader readiness is blocked")));
     }
 }

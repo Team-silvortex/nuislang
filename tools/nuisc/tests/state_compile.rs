@@ -25,36 +25,30 @@ fn expect_const_i64_value(
 
 #[test]
 fn compiles_generic_payload_alias_higher_order_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_higher_order_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/generic_payload_alias_higher_order_demo");
     nuisc::pipeline::compile_project(project)
         .expect("generic payload alias higher-order state project should compile");
 }
 
 #[test]
 fn compiles_generic_payload_alias_method_hof_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo",
-    );
+    let project = Path::new("../../examples/projects/state/generic_payload_alias_method_hof_demo");
     nuisc::pipeline::compile_project(project)
         .expect("generic payload alias method higher-order state project should compile");
 }
 
 #[test]
 fn compiles_generic_callable_forwarding_hof_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo",
-    );
+    let project = Path::new("../../examples/projects/state/generic_callable_forwarding_hof_demo");
     nuisc::pipeline::compile_project(project)
         .expect("generic callable forwarding higher-order state project should compile");
 }
 
 #[test]
 fn lowers_generic_callable_forwarding_hof_state_project_with_forwarded_fn2_and_fn3_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/generic_callable_forwarding_hof_demo");
 
     for prefix in [
         "__hof_relay2_",
@@ -121,17 +115,13 @@ fn lowers_generic_callable_forwarding_hof_state_project_with_forwarded_fn2_and_f
 
 #[test]
 fn compiles_glm_borrow_end_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/glm_borrow_end_state_demo",
-    );
+    let project = Path::new("../../examples/projects/state/glm_borrow_end_state_demo");
     nuisc::pipeline::compile_project(project).expect("glm borrow_end state project should compile");
 }
 
 #[test]
 fn lowers_glm_borrow_end_state_project_with_borrow_end_then_owner_write_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/glm_borrow_end_state_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/glm_borrow_end_state_demo");
 
     let borrow_ends = artifacts
         .yir
@@ -164,17 +154,13 @@ fn lowers_glm_borrow_end_state_project_with_borrow_end_then_owner_write_shape() 
 
 #[test]
 fn compiles_if_borrow_end_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/if_borrow_end_state_demo",
-    );
+    let project = Path::new("../../examples/projects/state/if_borrow_end_state_demo");
     nuisc::pipeline::compile_project(project).expect("if borrow_end state project should compile");
 }
 
 #[test]
 fn lowers_if_borrow_end_state_project_with_borrow_end_then_owner_write_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/if_borrow_end_state_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/if_borrow_end_state_demo");
 
     let borrow_ends = artifacts
         .yir
@@ -207,18 +193,16 @@ fn lowers_if_borrow_end_state_project_with_borrow_end_then_owner_write_shape() {
 
 #[test]
 fn compiles_match_borrow_end_shared_suffix_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_borrow_end_shared_suffix_state_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/match_borrow_end_shared_suffix_state_demo");
     nuisc::pipeline::compile_project(project)
         .expect("match borrow_end shared suffix state project should compile");
 }
 
 #[test]
 fn lowers_match_borrow_end_shared_suffix_state_project_with_shared_suffix_after_select_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_borrow_end_shared_suffix_state_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/match_borrow_end_shared_suffix_state_demo");
 
     let borrow_ends = artifacts
         .yir
@@ -267,18 +251,15 @@ fn lowers_match_borrow_end_shared_suffix_state_project_with_shared_suffix_after_
 
 #[test]
 fn compiles_generic_shared_suffix_if_method_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_shared_suffix_if_method_demo",
-    );
+    let project = Path::new("../../examples/projects/state/generic_shared_suffix_if_method_demo");
     nuisc::pipeline::compile_project(project)
         .expect("generic shared suffix if-method state project should compile");
 }
 
 #[test]
 fn lowers_generic_shared_suffix_if_method_state_project_with_select_then_method_suffix_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_shared_suffix_if_method_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/generic_shared_suffix_if_method_demo");
 
     let select_nodes = artifacts
         .yir
@@ -334,18 +315,15 @@ fn lowers_generic_shared_suffix_if_method_state_project_with_select_then_method_
 
 #[test]
 fn compiles_task_result_shared_suffix_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/task_result_shared_suffix_state_demo",
-    );
+    let project = Path::new("../../examples/projects/state/task_result_shared_suffix_state_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task result shared suffix state project should compile");
 }
 
 #[test]
 fn lowers_task_result_shared_suffix_state_project_with_select_then_suffix_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/task_result_shared_suffix_state_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/task_result_shared_suffix_state_demo");
 
     let lowered_ops = artifacts
         .yir
@@ -378,18 +356,15 @@ fn lowers_task_result_shared_suffix_state_project_with_select_then_suffix_shape(
 
 #[test]
 fn compiles_buffer_shared_suffix_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/buffer_shared_suffix_state_demo",
-    );
+    let project = Path::new("../../examples/projects/state/buffer_shared_suffix_state_demo");
     nuisc::pipeline::compile_project(project)
         .expect("buffer shared suffix state project should compile");
 }
 
 #[test]
 fn lowers_buffer_shared_suffix_state_project_with_select_then_store_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/buffer_shared_suffix_state_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/buffer_shared_suffix_state_demo");
 
     let lowered_ops = artifacts
         .yir
@@ -422,9 +397,8 @@ fn lowers_buffer_shared_suffix_state_project_with_select_then_store_shape() {
 
 #[test]
 fn lowers_generic_payload_alias_method_hof_state_project_with_hof_and_lambda_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/generic_payload_alias_method_hof_demo");
 
     let main = artifacts
         .nir
@@ -476,27 +450,22 @@ fn lowers_generic_payload_alias_method_hof_state_project_with_hof_and_lambda_sha
 
 #[test]
 fn compiles_ordinary_mutual_recursive_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_mutual_recursive_demo",
-    );
+    let project = Path::new("../../examples/projects/state/ordinary_mutual_recursive_demo");
     nuisc::pipeline::compile_project(project)
         .expect("ordinary mutual recursive state project should compile");
 }
 
 #[test]
 fn compiles_ordinary_recursive_scalar_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_call_graph_demo",
-    );
+    let project = Path::new("../../examples/projects/state/ordinary_recursive_call_graph_demo");
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive scalar state project should compile");
 }
 
 #[test]
 fn lowers_ordinary_recursive_scalar_state_project_with_scalar_helper_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_call_graph_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/ordinary_recursive_call_graph_demo");
 
     for lane in ["fn:step", "fn:odd", "fn:even"] {
         assert!(
@@ -541,18 +510,15 @@ fn lowers_ordinary_recursive_scalar_state_project_with_scalar_helper_shape() {
 
 #[test]
 fn compiles_ordinary_recursive_i32_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_i32_call_graph_demo",
-    );
+    let project = Path::new("../../examples/projects/state/ordinary_recursive_i32_call_graph_demo");
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive i32 state project should compile");
 }
 
 #[test]
 fn lowers_ordinary_recursive_i32_state_project_with_i32_helper_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_i32_call_graph_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/ordinary_recursive_i32_call_graph_demo");
 
     for lane in ["fn:step", "fn:odd", "fn:even"] {
         assert!(
@@ -602,18 +568,16 @@ fn lowers_ordinary_recursive_i32_state_project_with_i32_helper_shape() {
 
 #[test]
 fn compiles_ordinary_recursive_match_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_match_call_graph_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/ordinary_recursive_match_call_graph_demo");
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive match state project should compile");
 }
 
 #[test]
 fn lowers_ordinary_recursive_match_state_project_into_recursive_helper_lanes() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_match_call_graph_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/ordinary_recursive_match_call_graph_demo");
 
     let call_i64_count = artifacts
         .yir
@@ -639,18 +603,16 @@ fn lowers_ordinary_recursive_match_state_project_into_recursive_helper_lanes() {
 
 #[test]
 fn compiles_ordinary_recursive_bool_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_bool_call_graph_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/ordinary_recursive_bool_call_graph_demo");
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive bool state project should compile");
 }
 
 #[test]
 fn lowers_ordinary_recursive_bool_state_project_with_bool_helper_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_bool_call_graph_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/ordinary_recursive_bool_call_graph_demo");
 
     for lane in ["fn:flip", "fn:odd", "fn:even"] {
         assert!(
@@ -715,9 +677,8 @@ fn lowers_ordinary_recursive_bool_state_project_with_bool_helper_shape() {
 
 #[test]
 fn compiles_ordinary_recursive_higher_order_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_higher_order_call_graph_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/ordinary_recursive_higher_order_call_graph_demo");
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive higher-order state project should compile");
 }
@@ -725,7 +686,7 @@ fn compiles_ordinary_recursive_higher_order_state_project() {
 #[test]
 fn lowers_ordinary_recursive_higher_order_state_project_with_named_helper_hof_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_higher_order_call_graph_demo",
     );
 
     assert!(artifacts
@@ -776,7 +737,7 @@ fn lowers_ordinary_recursive_higher_order_state_project_with_named_helper_hof_sh
 #[test]
 fn compiles_ordinary_recursive_fn2_higher_order_state_project() {
     let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_fn2_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_fn2_higher_order_call_graph_demo",
     );
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive fn2 higher-order state project should compile");
@@ -785,7 +746,7 @@ fn compiles_ordinary_recursive_fn2_higher_order_state_project() {
 #[test]
 fn lowers_ordinary_recursive_fn2_higher_order_state_project_with_recursive_hof_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_fn2_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_fn2_higher_order_call_graph_demo",
     );
 
     assert!(artifacts
@@ -845,7 +806,7 @@ fn lowers_ordinary_recursive_fn2_higher_order_state_project_with_recursive_hof_s
 #[test]
 fn compiles_ordinary_recursive_generic_higher_order_state_project() {
     let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_higher_order_call_graph_demo",
     );
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive generic higher-order state project should compile");
@@ -854,7 +815,7 @@ fn compiles_ordinary_recursive_generic_higher_order_state_project() {
 #[test]
 fn lowers_ordinary_recursive_generic_higher_order_state_project_with_specialized_hof_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_higher_order_call_graph_demo",
     );
 
     assert!(artifacts.nir.functions.iter().any(|function| {
@@ -909,7 +870,7 @@ fn lowers_ordinary_recursive_generic_higher_order_state_project_with_specialized
 #[test]
 fn compiles_ordinary_recursive_generic_fn2_higher_order_state_project() {
     let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_fn2_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_fn2_higher_order_call_graph_demo",
     );
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive generic fn2 higher-order state project should compile");
@@ -918,7 +879,7 @@ fn compiles_ordinary_recursive_generic_fn2_higher_order_state_project() {
 #[test]
 fn lowers_ordinary_recursive_generic_fn2_higher_order_state_project_with_specialized_hof_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_fn2_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_fn2_higher_order_call_graph_demo",
     );
 
     assert!(artifacts.nir.functions.iter().any(|function| {
@@ -974,7 +935,7 @@ fn lowers_ordinary_recursive_generic_fn2_higher_order_state_project_with_special
 #[test]
 fn compiles_ordinary_recursive_generic_fn3_higher_order_state_project() {
     let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_fn3_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_fn3_higher_order_call_graph_demo",
     );
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive generic fn3 higher-order state project should compile");
@@ -983,7 +944,7 @@ fn compiles_ordinary_recursive_generic_fn3_higher_order_state_project() {
 #[test]
 fn lowers_ordinary_recursive_generic_fn3_higher_order_state_project_with_specialized_hof_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_fn3_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_fn3_higher_order_call_graph_demo",
     );
 
     assert!(artifacts.nir.functions.iter().any(|function| {
@@ -1039,7 +1000,7 @@ fn lowers_ordinary_recursive_generic_fn3_higher_order_state_project_with_special
 #[test]
 fn compiles_ordinary_recursive_generic_alias_higher_order_state_project() {
     let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_alias_higher_order_call_graph_demo",
     );
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive generic alias higher-order state project should compile");
@@ -1048,7 +1009,7 @@ fn compiles_ordinary_recursive_generic_alias_higher_order_state_project() {
 #[test]
 fn lowers_ordinary_recursive_generic_alias_higher_order_state_project_with_specialized_hof_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_alias_higher_order_call_graph_demo",
     );
 
     assert!(artifacts.nir.functions.iter().any(|function| {
@@ -1103,7 +1064,7 @@ fn lowers_ordinary_recursive_generic_alias_higher_order_state_project_with_speci
 #[test]
 fn compiles_ordinary_recursive_generic_alias_fn3_higher_order_state_project() {
     let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo",
     );
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive generic alias fn3 higher-order state project should compile");
@@ -1113,7 +1074,7 @@ fn compiles_ordinary_recursive_generic_alias_fn3_higher_order_state_project() {
 fn lowers_ordinary_recursive_generic_alias_fn3_higher_order_state_project_with_recursive_hof_shape()
 {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo",
     );
 
     assert!(artifacts.nir.functions.iter().any(|function| {
@@ -1166,9 +1127,8 @@ fn lowers_ordinary_recursive_generic_alias_fn3_higher_order_state_project_with_r
 
 #[test]
 fn compiles_ordinary_recursive_composed_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_composed_call_graph_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/ordinary_recursive_composed_call_graph_demo");
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive composed state project should compile");
 }
@@ -1176,7 +1136,7 @@ fn compiles_ordinary_recursive_composed_state_project() {
 #[test]
 fn lowers_ordinary_recursive_composed_state_project_with_composed_helper_lane_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_composed_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_composed_call_graph_demo",
     );
 
     for lane in [
@@ -1273,18 +1233,16 @@ fn lowers_ordinary_recursive_composed_state_project_with_composed_helper_lane_sh
 
 #[test]
 fn compiles_ordinary_recursive_lambda_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_lambda_call_graph_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/ordinary_recursive_lambda_call_graph_demo");
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive lambda state project should compile");
 }
 
 #[test]
 fn lowers_ordinary_recursive_lambda_state_project_with_lambda_helper_lane_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_lambda_call_graph_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/ordinary_recursive_lambda_call_graph_demo");
 
     for lane in [
         "fn:odd",
@@ -1344,18 +1302,16 @@ fn lowers_ordinary_recursive_lambda_state_project_with_lambda_helper_lane_shape(
 
 #[test]
 fn compiles_ordinary_recursive_mixed_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_mixed_call_graph_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/ordinary_recursive_mixed_call_graph_demo");
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive mixed state project should compile");
 }
 
 #[test]
 fn lowers_ordinary_recursive_mixed_state_project_with_bool_recursive_helper_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_mixed_call_graph_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/ordinary_recursive_mixed_call_graph_demo");
 
     for lane in ["fn:odd", "fn:even", "fn:is_zero", "fn:step"] {
         assert!(
@@ -1421,7 +1377,7 @@ fn lowers_ordinary_recursive_mixed_state_project_with_bool_recursive_helper_shap
 #[test]
 fn compiles_ordinary_recursive_generic_composed_state_project() {
     let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_composed_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_composed_call_graph_demo",
     );
     nuisc::pipeline::compile_project(project)
         .expect("ordinary recursive generic composed state project should compile");
@@ -1430,7 +1386,7 @@ fn compiles_ordinary_recursive_generic_composed_state_project() {
 #[test]
 fn lowers_ordinary_recursive_generic_composed_state_project_with_specialized_hof_recursive_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_composed_call_graph_demo",
+        "../../examples/projects/state/ordinary_recursive_generic_composed_call_graph_demo",
     );
 
     for function in [
@@ -1494,18 +1450,14 @@ fn lowers_ordinary_recursive_generic_composed_state_project_with_specialized_hof
 
 #[test]
 fn compiles_tail_recursive_sum_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_sum_demo",
-    );
+    let project = Path::new("../../examples/projects/state/tail_recursive_sum_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive sum state project should compile");
 }
 
 #[test]
 fn lowers_tail_recursive_sum_state_project_with_chain_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_sum_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/tail_recursive_sum_demo");
 
     let loop_node = artifacts
         .yir
@@ -1520,18 +1472,14 @@ fn lowers_tail_recursive_sum_state_project_with_chain_loop_shape() {
 
 #[test]
 fn compiles_tail_recursive_factorial_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_demo",
-    );
+    let project = Path::new("../../examples/projects/state/tail_recursive_factorial_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive factorial state project should compile");
 }
 
 #[test]
 fn lowers_tail_recursive_factorial_state_project_with_multiplicative_chain_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/tail_recursive_factorial_demo");
 
     let loop_node = artifacts
         .yir
@@ -1546,9 +1494,8 @@ fn lowers_tail_recursive_factorial_state_project_with_multiplicative_chain_shape
 
 #[test]
 fn compiles_tail_recursive_factorial_affine_mul_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_affine_mul_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/tail_recursive_factorial_affine_mul_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive factorial affine mul state project should compile");
 }
@@ -1556,9 +1503,8 @@ fn compiles_tail_recursive_factorial_affine_mul_state_project() {
 #[test]
 fn lowers_tail_recursive_factorial_affine_mul_state_project_with_affine_multiplicative_chain_shape()
 {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_affine_mul_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/tail_recursive_factorial_affine_mul_demo");
 
     let loop_node = artifacts
         .yir
@@ -1574,9 +1520,8 @@ fn lowers_tail_recursive_factorial_affine_mul_state_project_with_affine_multipli
 
 #[test]
 fn compiles_tail_recursive_factorial_scaled_mul_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_scaled_mul_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/tail_recursive_factorial_scaled_mul_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive factorial scaled mul state project should compile");
 }
@@ -1584,9 +1529,8 @@ fn compiles_tail_recursive_factorial_scaled_mul_state_project() {
 #[test]
 fn lowers_tail_recursive_factorial_scaled_mul_state_project_with_scaled_multiplicative_chain_shape()
 {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_scaled_mul_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/tail_recursive_factorial_scaled_mul_demo");
 
     let loop_node = artifacts
         .yir
@@ -1603,18 +1547,16 @@ fn lowers_tail_recursive_factorial_scaled_mul_state_project_with_scaled_multipli
 
 #[test]
 fn compiles_counted_while_multi_carry_scaled_mul_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_scaled_mul_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/counted_while_multi_carry_scaled_mul_demo");
     nuisc::pipeline::compile_project(project)
         .expect("counted while multi-carry scaled mul state project should compile");
 }
 
 #[test]
 fn lowers_counted_while_multi_carry_scaled_mul_state_project_with_multi_carry_scaled_mul_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_scaled_mul_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/counted_while_multi_carry_scaled_mul_demo");
 
     let loop_node = artifacts
         .yir
@@ -1631,9 +1573,8 @@ fn lowers_counted_while_multi_carry_scaled_mul_state_project_with_multi_carry_sc
 
 #[test]
 fn compiles_counted_while_multi_carry_state_factor_mul_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_state_factor_mul_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/counted_while_multi_carry_state_factor_mul_demo");
     nuisc::pipeline::compile_project(project)
         .expect("counted while multi-carry state-factor mul state project should compile");
 }
@@ -1641,7 +1582,7 @@ fn compiles_counted_while_multi_carry_state_factor_mul_state_project() {
 #[test]
 fn lowers_counted_while_multi_carry_state_factor_mul_state_project_with_state_factor_mul_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_state_factor_mul_demo",
+        "../../examples/projects/state/counted_while_multi_carry_state_factor_mul_demo",
     );
 
     let loop_node = artifacts
@@ -1662,7 +1603,7 @@ fn lowers_counted_while_multi_carry_state_factor_mul_state_project_with_state_fa
 #[test]
 fn compiles_counted_while_multi_carry_state_plus_invariant_factor_mul_state_project() {
     let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_state_plus_invariant_factor_mul_demo",
+        "../../examples/projects/state/counted_while_multi_carry_state_plus_invariant_factor_mul_demo",
     );
     nuisc::pipeline::compile_project(project).expect(
         "counted while multi-carry state-plus-invariant-factor mul state project should compile",
@@ -1673,7 +1614,7 @@ fn compiles_counted_while_multi_carry_state_plus_invariant_factor_mul_state_proj
 fn lowers_counted_while_multi_carry_state_plus_invariant_factor_mul_state_project_with_state_plus_invariant_factor_mul_shape(
 ) {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_state_plus_invariant_factor_mul_demo",
+        "../../examples/projects/state/counted_while_multi_carry_state_plus_invariant_factor_mul_demo",
     );
 
     let loop_node = artifacts
@@ -1694,18 +1635,15 @@ fn lowers_counted_while_multi_carry_state_plus_invariant_factor_mul_state_projec
 
 #[test]
 fn compiles_tail_recursive_cross_carry_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_cross_carry_demo",
-    );
+    let project = Path::new("../../examples/projects/state/tail_recursive_cross_carry_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive cross-carry state project should compile");
 }
 
 #[test]
 fn lowers_tail_recursive_cross_carry_state_project_with_cross_carry_chain_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_cross_carry_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/tail_recursive_cross_carry_demo");
 
     let loop_node = artifacts
         .yir
@@ -1721,18 +1659,14 @@ fn lowers_tail_recursive_cross_carry_state_project_with_cross_carry_chain_shape(
 
 #[test]
 fn compiles_tail_recursive_branching_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_demo",
-    );
+    let project = Path::new("../../examples/projects/state/tail_recursive_branching_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive branching state project should compile");
 }
 
 #[test]
 fn lowers_tail_recursive_branching_state_project_with_branching_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/tail_recursive_branching_demo");
 
     let loop_node = artifacts
         .yir
@@ -1752,18 +1686,15 @@ fn lowers_tail_recursive_branching_state_project_with_branching_cond_loop_shape(
 
 #[test]
 fn compiles_tail_recursive_keep_prev_carry_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_keep_prev_carry_demo",
-    );
+    let project = Path::new("../../examples/projects/state/tail_recursive_keep_prev_carry_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive keep-prev-carry state project should compile");
 }
 
 #[test]
 fn lowers_tail_recursive_keep_prev_carry_state_project_with_branching_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_keep_prev_carry_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/tail_recursive_keep_prev_carry_demo");
 
     let loop_node = artifacts
         .yir
@@ -1782,18 +1713,15 @@ fn lowers_tail_recursive_keep_prev_carry_state_project_with_branching_cond_loop_
 
 #[test]
 fn compiles_tail_recursive_multi_carry_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_multi_carry_demo",
-    );
+    let project = Path::new("../../examples/projects/state/tail_recursive_multi_carry_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive multi-carry state project should compile");
 }
 
 #[test]
 fn lowers_tail_recursive_multi_carry_state_project_with_multi_carry_chain_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_multi_carry_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/tail_recursive_multi_carry_demo");
 
     let loop_node = artifacts
         .yir
@@ -1809,9 +1737,8 @@ fn lowers_tail_recursive_multi_carry_state_project_with_multi_carry_chain_shape(
 
 #[test]
 fn compiles_tail_recursive_carry_condition_multi_carry_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_carry_condition_multi_carry_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/tail_recursive_carry_condition_multi_carry_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive carry-condition multi-carry state project should compile");
 }
@@ -1820,7 +1747,7 @@ fn compiles_tail_recursive_carry_condition_multi_carry_state_project() {
 fn lowers_tail_recursive_carry_condition_multi_carry_state_project_with_carry_condition_cond_loop_shape(
 ) {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_carry_condition_multi_carry_demo",
+        "../../examples/projects/state/tail_recursive_carry_condition_multi_carry_demo",
     );
 
     let loop_node = artifacts
@@ -1845,18 +1772,16 @@ fn lowers_tail_recursive_carry_condition_multi_carry_state_project_with_carry_co
 
 #[test]
 fn compiles_tail_recursive_branching_cross_carry_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/tail_recursive_branching_cross_carry_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive branching cross-carry state project should compile");
 }
 
 #[test]
 fn lowers_tail_recursive_branching_cross_carry_state_project_with_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/tail_recursive_branching_cross_carry_demo");
 
     let loop_node = artifacts
         .yir
@@ -1878,18 +1803,16 @@ fn lowers_tail_recursive_branching_cross_carry_state_project_with_cond_loop_shap
 
 #[test]
 fn compiles_tail_recursive_branching_multi_carry_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_multi_carry_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/tail_recursive_branching_multi_carry_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive branching multi-carry state project should compile");
 }
 
 #[test]
 fn lowers_tail_recursive_branching_multi_carry_state_project_with_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_multi_carry_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/tail_recursive_branching_multi_carry_demo");
 
     let loop_node = artifacts
         .yir
@@ -1913,25 +1836,20 @@ fn lowers_tail_recursive_branching_multi_carry_state_project_with_cond_loop_shap
 
 #[test]
 fn compiles_flow_branching_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/flow_branching_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("flow branching while state project should compile");
 }
 
 #[test]
 fn compiles_counted_while_state_project() {
-    let project =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_demo");
+    let project = Path::new("../../examples/projects/state/counted_while_demo");
     nuisc::pipeline::compile_project(project).expect("counted while state project should compile");
 }
 
 #[test]
 fn lowers_counted_while_state_project_with_basic_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/counted_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -1945,18 +1863,14 @@ fn lowers_counted_while_state_project_with_basic_loop_shape() {
 
 #[test]
 fn compiles_accumulating_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/accumulating_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/accumulating_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("accumulating while state project should compile");
 }
 
 #[test]
 fn lowers_accumulating_while_state_project_with_single_carry_chain_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/accumulating_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/accumulating_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -1969,16 +1883,13 @@ fn lowers_accumulating_while_state_project_with_single_carry_chain_shape() {
 
 #[test]
 fn compiles_chained_while_state_project() {
-    let project =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo");
+    let project = Path::new("../../examples/projects/state/chained_while_demo");
     nuisc::pipeline::compile_project(project).expect("chained while state project should compile");
 }
 
 #[test]
 fn lowers_chained_while_state_project_with_multi_carry_chain_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/chained_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -1992,18 +1903,14 @@ fn lowers_chained_while_state_project_with_multi_carry_chain_shape() {
 
 #[test]
 fn compiles_match_branching_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/match_branching_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("match branching while state project should compile");
 }
 
 #[test]
 fn lowers_match_branching_while_state_project_with_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/match_branching_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2020,17 +1927,14 @@ fn lowers_match_branching_while_state_project_with_cond_loop_shape() {
 
 #[test]
 fn compiles_branching_while_state_project() {
-    let project =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/state/branching_while_demo");
+    let project = Path::new("../../examples/projects/state/branching_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("branching while state project should compile");
 }
 
 #[test]
 fn lowers_branching_while_state_project_with_plain_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/branching_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/branching_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2048,18 +1952,15 @@ fn lowers_branching_while_state_project_with_plain_cond_loop_shape() {
 
 #[test]
 fn compiles_bool_match_branching_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/bool_match_branching_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/bool_match_branching_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("bool match branching while state project should compile");
 }
 
 #[test]
 fn lowers_bool_match_branching_while_state_project_with_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/bool_match_branching_while_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/bool_match_branching_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2076,18 +1977,15 @@ fn lowers_bool_match_branching_while_state_project_with_cond_loop_shape() {
 
 #[test]
 fn compiles_lambda_match_branching_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_branching_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/lambda_match_branching_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("lambda match branching while state project should compile");
 }
 
 #[test]
 fn lowers_lambda_match_branching_while_state_project_with_lambda_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_branching_while_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/lambda_match_branching_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2105,18 +2003,15 @@ fn lowers_lambda_match_branching_while_state_project_with_lambda_cond_loop_shape
 
 #[test]
 fn compiles_match_expr_branching_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_expr_branching_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/match_expr_branching_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("match expression branching while state project should compile");
 }
 
 #[test]
 fn lowers_match_expr_branching_while_state_project_with_nested_if_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_expr_branching_while_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/match_expr_branching_while_demo");
 
     let main = artifacts
         .nir
@@ -2146,9 +2041,7 @@ fn lowers_match_expr_branching_while_state_project_with_nested_if_shape() {
 
 #[test]
 fn lowers_flow_branching_while_state_project_with_flow_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/flow_branching_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2167,18 +2060,14 @@ fn lowers_flow_branching_while_state_project_with_flow_cond_loop_shape() {
 
 #[test]
 fn compiles_equality_branching_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/equality_branching_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/equality_branching_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("equality branching while state project should compile");
 }
 
 #[test]
 fn lowers_equality_branching_while_state_project_with_equality_flow_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/equality_branching_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/equality_branching_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2199,18 +2088,16 @@ fn lowers_equality_branching_while_state_project_with_equality_flow_cond_loop_sh
 
 #[test]
 fn compiles_lambda_match_flow_continuing_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_flow_continuing_while_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/lambda_match_flow_continuing_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("lambda match flow continuing while state project should compile");
 }
 
 #[test]
 fn lowers_lambda_match_flow_continuing_while_state_project_with_lambda_flow_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_flow_continuing_while_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/lambda_match_flow_continuing_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2231,9 +2118,8 @@ fn lowers_lambda_match_flow_continuing_while_state_project_with_lambda_flow_cond
 
 #[test]
 fn compiles_lambda_match_or_flow_continuing_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_or_flow_continuing_while_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/lambda_match_or_flow_continuing_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("lambda match or flow continuing while state project should compile");
 }
@@ -2241,7 +2127,7 @@ fn compiles_lambda_match_or_flow_continuing_while_state_project() {
 #[test]
 fn lowers_lambda_match_or_flow_continuing_while_state_project_with_or_flow_cond_loop_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_or_flow_continuing_while_demo",
+        "../../examples/projects/state/lambda_match_or_flow_continuing_while_demo",
     );
 
     let loop_node = artifacts
@@ -2266,18 +2152,14 @@ fn lowers_lambda_match_or_flow_continuing_while_state_project_with_or_flow_cond_
 
 #[test]
 fn compiles_match_guarded_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guarded_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/match_guarded_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("match guarded while state project should compile");
 }
 
 #[test]
 fn lowers_match_guarded_while_state_project_with_guarded_return_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guarded_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/match_guarded_while_demo");
 
     let main = artifacts
         .nir
@@ -2307,17 +2189,13 @@ fn lowers_match_guarded_while_state_project_with_guarded_return_shape() {
 
 #[test]
 fn compiles_match_guard_or_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_or_state_demo",
-    );
+    let project = Path::new("../../examples/projects/state/match_guard_or_state_demo");
     nuisc::pipeline::compile_project(project).expect("match guard-or state project should compile");
 }
 
 #[test]
 fn lowers_match_guard_or_state_project_with_guarded_return_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_or_state_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/match_guard_or_state_demo");
 
     assert!(artifacts
         .yir
@@ -2328,18 +2206,14 @@ fn lowers_match_guard_or_state_project_with_guarded_return_shape() {
 
 #[test]
 fn compiles_match_multi_guard_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_multi_guard_state_demo",
-    );
+    let project = Path::new("../../examples/projects/state/match_multi_guard_state_demo");
     nuisc::pipeline::compile_project(project)
         .expect("match multi-guard state project should compile");
 }
 
 #[test]
 fn lowers_match_multi_guard_state_project_with_guarded_return_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_multi_guard_state_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/match_multi_guard_state_demo");
 
     let main = artifacts
         .nir
@@ -2379,18 +2253,14 @@ fn lowers_match_multi_guard_state_project_with_guarded_return_shape() {
 
 #[test]
 fn compiles_match_guard_range_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_range_state_demo",
-    );
+    let project = Path::new("../../examples/projects/state/match_guard_range_state_demo");
     nuisc::pipeline::compile_project(project)
         .expect("match guard-range state project should compile");
 }
 
 #[test]
 fn lowers_match_guard_range_state_project_with_guarded_return_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_range_state_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/match_guard_range_state_demo");
 
     assert!(artifacts
         .yir
@@ -2401,18 +2271,14 @@ fn lowers_match_guard_range_state_project_with_guarded_return_shape() {
 
 #[test]
 fn compiles_flow_continuing_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/flow_continuing_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("flow continuing while state project should compile");
 }
 
 #[test]
 fn lowers_flow_continuing_while_state_project_with_continue_flow_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/flow_continuing_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2433,27 +2299,23 @@ fn lowers_flow_continuing_while_state_project_with_continue_flow_cond_loop_shape
 
 #[test]
 fn compiles_post_flow_branching_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/post_flow_branching_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("post-flow branching while state project should compile");
 }
 
 #[test]
 fn compiles_tail_recursive_post_flow_branching_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_post_flow_branching_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/tail_recursive_post_flow_branching_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive post-flow branching state project should compile");
 }
 
 #[test]
 fn compiles_tail_recursive_post_flow_dynamic_prev_carry_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_post_flow_dynamic_prev_carry_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/tail_recursive_post_flow_dynamic_prev_carry_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tail recursive post-flow dynamic prev-carry state project should compile");
 }
@@ -2462,7 +2324,7 @@ fn compiles_tail_recursive_post_flow_dynamic_prev_carry_state_project() {
 fn lowers_tail_recursive_post_flow_dynamic_prev_carry_state_project_with_recursive_post_flow_cond_loop_shape(
 ) {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_post_flow_dynamic_prev_carry_demo",
+        "../../examples/projects/state/tail_recursive_post_flow_dynamic_prev_carry_demo",
     );
 
     let loop_node = artifacts
@@ -2501,9 +2363,8 @@ fn lowers_tail_recursive_post_flow_dynamic_prev_carry_state_project_with_recursi
 #[test]
 fn lowers_tail_recursive_post_flow_branching_state_project_with_recursive_post_flow_cond_loop_shape(
 ) {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_post_flow_branching_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/tail_recursive_post_flow_branching_demo");
 
     let loop_node = artifacts
         .yir
@@ -2542,9 +2403,8 @@ fn lowers_tail_recursive_post_flow_branching_state_project_with_recursive_post_f
 
 #[test]
 fn lowers_post_flow_branching_while_state_project_with_post_flow_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/post_flow_branching_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2564,18 +2424,14 @@ fn lowers_post_flow_branching_while_state_project_with_post_flow_cond_loop_shape
 
 #[test]
 fn compiles_post_flow_breaking_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/post_flow_breaking_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("post-flow breaking while state project should compile");
 }
 
 #[test]
 fn lowers_post_flow_breaking_while_state_project_with_post_flow_break_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/post_flow_breaking_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2593,16 +2449,13 @@ fn lowers_post_flow_breaking_while_state_project_with_post_flow_break_loop_shape
 
 #[test]
 fn compiles_bounded_while_state_project() {
-    let project =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/state/bounded_while_demo");
+    let project = Path::new("../../examples/projects/state/bounded_while_demo");
     nuisc::pipeline::compile_project(project).expect("bounded while state project should compile");
 }
 
 #[test]
 fn lowers_bounded_while_state_project_with_bounded_post_flow_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/bounded_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/bounded_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2622,16 +2475,13 @@ fn lowers_bounded_while_state_project_with_bounded_post_flow_shape() {
 
 #[test]
 fn compiles_equality_while_state_project() {
-    let project =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/state/equality_while_demo");
+    let project = Path::new("../../examples/projects/state/equality_while_demo");
     nuisc::pipeline::compile_project(project).expect("equality while state project should compile");
 }
 
 #[test]
 fn lowers_equality_while_state_project_with_equality_post_flow_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/equality_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/equality_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2649,18 +2499,14 @@ fn lowers_equality_while_state_project_with_equality_post_flow_shape() {
 
 #[test]
 fn compiles_inequality_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/inequality_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/inequality_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("inequality while state project should compile");
 }
 
 #[test]
 fn lowers_inequality_while_state_project_with_inequality_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/inequality_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/inequality_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2674,18 +2520,15 @@ fn lowers_inequality_while_state_project_with_inequality_loop_shape() {
 
 #[test]
 fn compiles_post_flow_continuing_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_continuing_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/post_flow_continuing_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("post-flow continuing while state project should compile");
 }
 
 #[test]
 fn lowers_post_flow_continuing_while_state_project_with_post_flow_continue_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_continuing_while_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/post_flow_continuing_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2703,18 +2546,14 @@ fn lowers_post_flow_continuing_while_state_project_with_post_flow_continue_loop_
 
 #[test]
 fn compiles_carried_breaking_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/carried_breaking_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/carried_breaking_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("carried breaking while state project should compile");
 }
 
 #[test]
 fn lowers_carried_breaking_while_state_project_with_carried_break_flow_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/carried_breaking_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/carried_breaking_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2732,18 +2571,14 @@ fn lowers_carried_breaking_while_state_project_with_carried_break_flow_loop_shap
 
 #[test]
 fn compiles_double_branching_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/double_branching_while_demo",
-    );
+    let project = Path::new("../../examples/projects/state/double_branching_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("double branching while state project should compile");
 }
 
 #[test]
 fn lowers_double_branching_while_state_project_with_double_carry_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/double_branching_while_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/state/double_branching_while_demo");
 
     let loop_node = artifacts
         .yir
@@ -2765,9 +2600,8 @@ fn lowers_double_branching_while_state_project_with_double_carry_cond_loop_shape
 
 #[test]
 fn compiles_post_flow_branching_continuing_while_state_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/state/post_flow_branching_continuing_while_demo");
     nuisc::pipeline::compile_project(project)
         .expect("post-flow branching continuing while state project should compile");
 }
@@ -2775,9 +2609,8 @@ fn compiles_post_flow_branching_continuing_while_state_project() {
 #[test]
 fn lowers_post_flow_branching_continuing_while_state_project_with_post_flow_continue_cond_loop_shape(
 ) {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/state/post_flow_branching_continuing_while_demo");
 
     let loop_node = artifacts
         .yir

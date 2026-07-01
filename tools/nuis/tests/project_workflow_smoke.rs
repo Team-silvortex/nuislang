@@ -112,46 +112,34 @@ fn assert_project_workflow_smoke(project_path: &str, label: &str, expected_locke
 }
 
 #[test]
-fn auto_abi_tooling_project_locks_and_release_checks() {
-    assert_project_workflow_smoke(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo",
-        "tooling_project_workflow_smoke",
-        &["\"cpu="],
-    );
-}
-
-#[test]
-fn auto_abi_network_project_locks_and_release_checks() {
-    assert_project_workflow_smoke(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo",
-        "network_project_workflow_smoke",
-        &["\"cpu=", "\"network="],
-    );
-}
-
-#[test]
-fn auto_abi_shader_project_locks_and_release_checks() {
-    assert_project_workflow_smoke(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo",
-        "shader_project_workflow_smoke",
-        &["\"cpu=", "\"shader=", "\"data="],
-    );
-}
-
-#[test]
-fn auto_abi_task_project_locks_and_release_checks() {
-    assert_project_workflow_smoke(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo",
-        "task_project_workflow_smoke",
-        &["\"cpu="],
-    );
-}
-
-#[test]
-fn auto_abi_state_project_locks_and_release_checks() {
-    assert_project_workflow_smoke(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_demo",
-        "state_project_workflow_smoke",
-        &["\"cpu="],
-    );
+fn auto_abi_projects_lock_and_release_check() {
+    for (path, label, expected_locked_keys) in [
+        (
+            "../../examples/projects/tooling/cli_runtime_demo",
+            "tooling_project_workflow_smoke",
+            &["\"cpu="][..],
+        ),
+        (
+            "../../examples/projects/domains/network_profile_demo",
+            "network_project_workflow_smoke",
+            &["\"cpu=", "\"network="][..],
+        ),
+        (
+            "../../examples/projects/domains/shader_render_profile_demo",
+            "shader_project_workflow_smoke",
+            &["\"cpu=", "\"shader=", "\"data="][..],
+        ),
+        (
+            "../../examples/projects/task/task_runtime_demo",
+            "task_project_workflow_smoke",
+            &["\"cpu="][..],
+        ),
+        (
+            "../../examples/projects/state/counted_while_demo",
+            "state_project_workflow_smoke",
+            &["\"cpu="][..],
+        ),
+    ] {
+        assert_project_workflow_smoke(path, label, expected_locked_keys);
+    }
 }

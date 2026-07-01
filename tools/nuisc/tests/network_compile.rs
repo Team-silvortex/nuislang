@@ -81,261 +81,212 @@ fn expr_contains_host_callee(expr: &NirExpr, callee: &str) -> bool {
 
 #[test]
 fn compiles_httpish_protocol_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_protocol_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_httpish_protocol_recipe_demo");
     nuisc::pipeline::compile_project(project).expect("httpish protocol project should compile");
 }
 
 #[test]
 fn compiles_http_request_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_http_request_recipe_demo");
     nuisc::pipeline::compile_project(project).expect("http request project should compile");
 }
 
 #[test]
 fn compiles_http_response_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_response_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_http_response_recipe_demo");
     nuisc::pipeline::compile_project(project).expect("http response project should compile");
 }
 
 #[test]
 fn compiles_http_client_exchange_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_exchange_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_http_client_exchange_recipe_demo");
     nuisc::pipeline::compile_project(project).expect("http client exchange project should compile");
 }
 
 #[test]
 fn compiles_http_client_get_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_http_client_get_recipe_demo");
     nuisc::pipeline::compile_project(project).expect("http client get project should compile");
 }
 
 #[test]
 fn compiles_http_client_post_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_post_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_http_client_post_recipe_demo");
     nuisc::pipeline::compile_project(project).expect("http client post project should compile");
 }
 
 #[test]
 fn compiles_http_client_lane_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_lane_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_http_client_lane_recipe_demo");
     nuisc::pipeline::compile_project(project).expect("http client lane project should compile");
 }
 
 #[test]
 fn compiles_http_service_lane_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_service_lane_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_http_service_lane_recipe_demo");
     nuisc::pipeline::compile_project(project).expect("http service lane project should compile");
 }
 
 #[test]
 fn compiles_httpish_client_session_packet_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_client_session_packet_recipe_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/domains/net_httpish_client_session_packet_recipe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("httpish client session packet project should compile");
 }
 
 #[test]
 fn compiles_httpish_service_session_packet_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_service_session_packet_recipe_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/domains/net_httpish_service_session_packet_recipe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("httpish service session packet project should compile");
 }
 
 #[test]
 fn compiles_httpish_header_session_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_session_recipe_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/domains/net_httpish_header_session_recipe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("httpish header session project should compile");
 }
 
 #[test]
 fn compiles_httpish_header_service_session_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_service_session_recipe_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/domains/net_httpish_header_service_session_recipe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("httpish header service session project should compile");
 }
 
 #[test]
 fn compiles_httpish_exchange_contract_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_contract_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_httpish_exchange_contract_demo");
     nuisc::pipeline::compile_project(project)
         .expect("httpish exchange contract project should compile");
 }
 
 #[test]
 fn compiles_httpish_exchange_contract_service_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_contract_service_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/domains/net_httpish_exchange_contract_service_demo");
     nuisc::pipeline::compile_project(project)
         .expect("httpish exchange contract service project should compile");
 }
 
 #[test]
 fn compiles_httpish_exchange_blocks_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_blocks_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_httpish_exchange_blocks_demo");
     nuisc::pipeline::compile_project(project)
         .expect("httpish exchange blocks project should compile");
 }
 
 #[test]
 fn compiles_httpish_exchange_blocks_service_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_blocks_service_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/domains/net_httpish_exchange_blocks_service_demo");
     nuisc::pipeline::compile_project(project)
         .expect("httpish exchange blocks service project should compile");
 }
 
 #[test]
 fn compiles_network_host_handle_runtime_probe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_probe_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/domains/network_host_handle_runtime_probe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("network host handle runtime probe project should compile");
 }
 
 #[test]
 fn compiles_http_client_runtime_probe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_runtime_probe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_http_client_runtime_probe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("http client runtime probe project should compile");
 }
 
 #[test]
 fn compiles_tcp_socket_runtime_probe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_runtime_probe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_tcp_socket_runtime_probe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tcp socket runtime probe project should compile");
 }
 
 #[test]
 fn compiles_tcp_send_runtime_probe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_send_runtime_probe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_tcp_send_runtime_probe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("tcp send runtime probe project should compile");
 }
 
 #[test]
 fn compiles_http_status_runtime_probe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_status_runtime_probe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_http_status_runtime_probe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("http status runtime probe project should compile");
 }
 
 #[test]
 fn compiles_http_roundtrip_summary_demo_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_roundtrip_summary_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_http_roundtrip_summary_demo");
     nuisc::pipeline::compile_project(project)
         .expect("http roundtrip summary demo project should compile");
 }
 
 #[test]
 fn compiles_http_roundtrip_runtime_probe_demo_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_roundtrip_runtime_probe_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/domains/net_http_roundtrip_runtime_probe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("http roundtrip runtime probe project should compile");
 }
 
 #[test]
 fn compiles_network_loopback_runtime_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_loopback_runtime_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/network_loopback_runtime_demo");
     nuisc::pipeline::compile_project(project)
         .expect("network loopback runtime project should compile");
 }
 
 #[test]
 fn compiles_network_host_open_surface_runtime_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_open_surface_runtime_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/domains/network_host_open_surface_runtime_demo");
     nuisc::pipeline::compile_project(project)
         .expect("network host open surface runtime project should compile");
 }
 
 #[test]
 fn compiles_net_session_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_session_recipe_demo");
     nuisc::pipeline::compile_project(project).expect("net session recipe project should compile");
 }
 
 #[test]
 fn compiles_net_loop_control_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_loop_control_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_loop_control_recipe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("net loop control recipe project should compile");
 }
 
 #[test]
 fn compiles_net_session_loop_control_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_loop_control_recipe_demo",
-    );
+    let project = Path::new("../../examples/projects/domains/net_session_loop_control_recipe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("net session loop control recipe project should compile");
 }
 
 #[test]
 fn compiles_net_http_session_loop_bridge_recipe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/domains/net_http_session_loop_bridge_recipe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("net http session loop bridge recipe project should compile");
 }
 
 #[test]
 fn lowers_http_client_exchange_recipe_project_with_expected_summary_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_exchange_recipe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_http_client_exchange_recipe_demo");
 
     let capture = artifacts
         .nir
@@ -370,9 +321,8 @@ fn lowers_http_client_exchange_recipe_project_with_expected_summary_shape() {
 
 #[test]
 fn lowers_http_client_get_recipe_project_with_expected_print_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_http_client_get_recipe_demo");
 
     let print_display = artifacts
         .nir
@@ -398,9 +348,8 @@ fn lowers_http_client_get_recipe_project_with_expected_print_shape() {
 
 #[test]
 fn lowers_http_client_post_recipe_project_with_expected_print_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_post_recipe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_http_client_post_recipe_demo");
 
     let print_display = artifacts
         .nir
@@ -426,9 +375,8 @@ fn lowers_http_client_post_recipe_project_with_expected_print_shape() {
 
 #[test]
 fn lowers_http_request_recipe_project_with_expected_request_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_recipe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_http_request_recipe_demo");
 
     let capture = artifacts
         .nir
@@ -531,9 +479,8 @@ fn lowers_http_request_recipe_project_with_expected_request_shape() {
 
 #[test]
 fn lowers_http_response_recipe_project_with_expected_response_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_response_recipe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_http_response_recipe_demo");
 
     let capture = artifacts
         .nir
@@ -612,9 +559,8 @@ fn lowers_http_response_recipe_project_with_expected_response_shape() {
 
 #[test]
 fn lowers_http_roundtrip_summary_demo_with_expected_summary_call() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_roundtrip_summary_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_http_roundtrip_summary_demo");
 
     let capture = artifacts
         .nir
@@ -669,9 +615,8 @@ fn lowers_http_roundtrip_summary_demo_with_expected_summary_call() {
 
 #[test]
 fn lowers_http_roundtrip_runtime_probe_demo_with_expected_network_and_summary_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_roundtrip_runtime_probe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_http_roundtrip_runtime_probe_demo");
 
     let capture = artifacts
         .nir
@@ -736,7 +681,7 @@ fn lowers_http_roundtrip_runtime_probe_demo_with_expected_network_and_summary_sh
 #[test]
 fn lowers_httpish_client_session_packet_recipe_project_with_expected_packet_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_client_session_packet_recipe_demo",
+        "../../examples/projects/domains/net_httpish_client_session_packet_recipe_demo",
     );
 
     let capture = artifacts
@@ -818,7 +763,7 @@ fn lowers_httpish_client_session_packet_recipe_project_with_expected_packet_shap
 #[test]
 fn lowers_httpish_service_session_packet_recipe_project_with_expected_packet_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_service_session_packet_recipe_demo",
+        "../../examples/projects/domains/net_httpish_service_session_packet_recipe_demo",
     );
 
     let capture = artifacts
@@ -899,9 +844,8 @@ fn lowers_httpish_service_session_packet_recipe_project_with_expected_packet_sha
 
 #[test]
 fn lowers_httpish_header_session_recipe_project_with_expected_session_packet_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_session_recipe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_httpish_header_session_recipe_demo");
 
     let packet = artifacts
         .nir
@@ -998,9 +942,8 @@ fn lowers_httpish_header_session_recipe_project_with_expected_session_packet_sha
 
 #[test]
 fn lowers_http_client_lane_recipe_project_with_expected_client_lane_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_lane_recipe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_http_client_lane_recipe_demo");
 
     let capture = artifacts
         .nir
@@ -1087,9 +1030,8 @@ fn lowers_http_client_lane_recipe_project_with_expected_client_lane_shape() {
 
 #[test]
 fn lowers_http_service_lane_recipe_project_with_expected_service_lane_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_service_lane_recipe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_http_service_lane_recipe_demo");
 
     let capture = artifacts
         .nir
@@ -1171,9 +1113,7 @@ fn lowers_http_service_lane_recipe_project_with_expected_service_lane_shape() {
 
 #[test]
 fn lowers_net_session_recipe_project_with_expected_async_task_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_recipe_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/domains/net_session_recipe_demo");
 
     for function_name in [
         "consume_network_result",
@@ -1267,9 +1207,8 @@ fn lowers_net_session_recipe_project_with_expected_async_task_shape() {
 
 #[test]
 fn lowers_net_loop_control_recipe_project_with_expected_loop_nodes() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_loop_control_recipe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_loop_control_recipe_demo");
 
     let flow = artifacts
         .nir
@@ -1339,9 +1278,8 @@ fn lowers_net_loop_control_recipe_project_with_expected_loop_nodes() {
 
 #[test]
 fn lowers_net_session_loop_control_recipe_project_with_expected_summary_and_loop_nodes() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_loop_control_recipe_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/domains/net_session_loop_control_recipe_demo");
 
     let capture = artifacts
         .nir
@@ -1400,7 +1338,7 @@ fn lowers_net_session_loop_control_recipe_project_with_expected_summary_and_loop
 #[test]
 fn lowers_net_http_session_loop_bridge_recipe_project_with_expected_bridge_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo",
+        "../../examples/projects/domains/net_http_session_loop_bridge_recipe_demo",
     );
 
     let packet = artifacts

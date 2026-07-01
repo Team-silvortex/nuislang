@@ -77,6 +77,8 @@ cargo run -p nsld -- verify-units <artifact-output-dir>
 cargo run -p nsld -- verify-units <artifact-output-dir> --json
 cargo run -p nsld -- inputs <artifact-output-dir>
 cargo run -p nsld -- inputs <artifact-output-dir> --json
+cargo run -p nsld -- emit-inputs <artifact-output-dir>
+cargo run -p nsld -- emit-inputs <artifact-output-dir> --json
 cargo run -p nsld -- verify-inputs <artifact-output-dir>
 cargo run -p nsld -- verify-inputs <artifact-output-dir> --json
 ```
@@ -102,6 +104,9 @@ artifacts in dependency order:
 * `nuis.nsld.container-plan.toml`
 * `nuis.nsld.container`
 * `nuis.nsld.container.payload`
+
+`nsld emit-inputs` is the explicit materialization command for the link-input
+table. `nsld inputs` remains accepted as the alpha-era compatibility alias.
 
 This gives later linker, cache, and debugger stages one reproducible
 preparation step without hiding the lower-level `inputs`, `emit-units`, or
@@ -267,10 +272,48 @@ container_version = 1
 section_count = 6
 container_layout_hash = "0x..."
 container_hash = "0x..."
+loader_readiness = "host-assisted"
+loader_blockers = ["external-import:final-stage-driver:cc", "external-import:clang-target:arm64-apple-macosx", "external-import:c-world-policy:wrapped"]
+loader_entry_kind = "lifecycle-bootstrap"
+loader_entry_symbol = "nustar.bootstrap.v1"
+loader_entry_section_id = "sec0000.compiled-artifact"
+loader_symbol_count = 1
+relocation_count = 0
+external_import_count = 3
 payload_size_bytes = 1234
 payload_hash = "0x..."
 payload_path = "/.../nuis.nsld.container.payload"
 blockers = []
+
+[[loader_symbol]]
+symbol_id = "sym0000.loader-entry"
+symbol_kind = "lifecycle-bootstrap"
+symbol_name = "nustar.bootstrap.v1"
+section_id = "sec0000.compiled-artifact"
+offset = 0
+size_bytes = 1234
+payload_hash = "0x..."
+
+[[external_import]]
+import_id = "imp0000.final-stage-driver"
+import_kind = "final-stage-driver"
+import_name = "cc"
+provider = "host-toolchain"
+required = true
+
+[[external_import]]
+import_id = "imp0001.clang-target"
+import_kind = "clang-target"
+import_name = "arm64-apple-macosx"
+provider = "host-toolchain"
+required = true
+
+[[external_import]]
+import_id = "imp0002.c-world-policy"
+import_kind = "c-world-policy"
+import_name = "wrapped"
+provider = "c-world-wrapper"
+required = true
 
 [[section]]
 order_index = 0
@@ -286,11 +329,43 @@ size_bytes = 1234
 
 `nsld verify-container` re-computes the container shell and payload blob. It
 fails if either file is missing, if the metadata content differs, or if
-`section_count`, `container_layout_hash`, `payload_size_bytes`, `payload_hash`,
-or `container_hash` no longer match. It also checks each section's
+`section_count`, `container_layout_hash`, loader entry fields,
+`loader_readiness`, `external_import_count`, `payload_size_bytes`,
+`payload_hash`, or `container_hash` no longer match. It also checks each
+section's
 `offset` / `size_bytes` range against that section's `payload_hash`, so a
 corrupted payload segment can be reported without waiting for later relocation
 or final native linking.
+
+The loader entry fields and `[[loader_symbol]]` table are the first
+loader-facing bootstrap records in the Nsld container. They currently bind the
+lifecycle bootstrap symbol from the link plan to the compiled artifact section
+and its payload range; future loader/runtime work can extend that into richer
+symbol and relocation tables without changing the container's basic entry
+contract.
+
+`relocation_count` reserves the relocation table slot. It is `0` for the
+current metadata container because Nsld is not yet performing final native
+object relocation, but the count participates in the container metadata shape
+so later `[[relocation]]` entries can be added without inventing a new top-level
+container concept.
+
+`[[external_import]]` records host or compatibility dependencies still outside
+the self-owned Nsld container. Today that normally includes the host final-stage
+driver, the selected clang target, and any non-`none` C-world wrapper policy.
+These entries make the remaining non-native closure explicit to a future loader
+or release gate.
+
+`loader_readiness` summarizes that state for loader and release tooling:
+`self-contained` means the container has no required external imports,
+`host-assisted` means it is structurally loadable but still depends on host or
+compatibility providers, and `blocked` means the container has unresolved
+assembly blockers. `loader_blockers` records the exact reason strings used to
+derive that readiness.
+
+`nsld check` also exposes `container_payload_present` and
+`container_payload_issues`, so missing or orphaned payload state is visible in
+the top-level linker health report.
 
 ## Linker Check
 
@@ -316,6 +391,13 @@ or final native linking.
 * an emitted `nuis.nsld.container-plan.toml` is still valid when that file is
   present
 * an emitted `nuis.nsld.container` is still valid when that file is present
+* an emitted `nuis.nsld.container.payload` is paired with the container metadata
+  when either side exists
+* the container loader readiness can be surfaced from the top-level check when
+  a container is present
+* the emitted Nsld artifact chain is a contiguous prepared prefix, so a later
+  artifact such as `nuis.nsld.container` cannot appear without its prerequisite
+  metadata artifacts
 
 The command exits with failure when any linker gate fails. JSON output is
 intended for CI and future toolchain orchestration.
@@ -330,6 +412,15 @@ rules as `nsld verify-inputs`, `nsld verify-units`, `nsld verify-bundle`,
 `nsld verify-assemble-plan`, `nsld verify-section-manifest`,
 `nsld verify-container-plan`, or `nsld verify-container`; any mismatch fails
 the check.
+
+The check report exposes `artifact_chain_valid` and `artifact_chain_issues`
+for this prepare-order state.
+
+When `nuis.nsld.container` exists, the check report also exposes
+`container_loader_readiness`, `container_loader_blockers`, and
+`container_external_import_count`. `host-assisted` is reported as an explicit
+remaining dependency state, not as a check failure; `blocked` fails the check
+because it means the container still has unresolved assembly blockers.
 
 The check report also exposes linker diagnostics for:
 
@@ -493,7 +584,7 @@ records unresolved linker inputs that future stages must not ignore.
 
 ## Link Input Table Artifact
 
-`nsld inputs` materializes the closure link input table to:
+`nsld emit-inputs` materializes the closure link input table to:
 
 ```text
 nuis.nsld.link-inputs.toml
@@ -527,6 +618,7 @@ content_hash = "0x..."
 
 This file is still alpha-stage metadata, but it is deliberately shaped as a
 future linker/cache/debugger contract rather than a human-only report.
+`nsld inputs` remains accepted as a compatibility alias for the same operation.
 
 `nsld verify-inputs` re-computes the expected table from the current manifest
 and declared lowering sidecars, then checks the emitted

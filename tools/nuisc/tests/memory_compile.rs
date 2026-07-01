@@ -14,14 +14,13 @@ fn compiled_project(path: &str) -> nuisc::pipeline::PipelineArtifacts {
 
 #[test]
 fn compiles_hello_glm_memory_source() {
-    let source = Path::new("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_glm.ns");
+    let source = Path::new("../../examples/ns/memory/hello_glm.ns");
     nuisc::pipeline::compile_source_path(source).expect("hello_glm memory source should compile");
 }
 
 #[test]
 fn lowers_hello_glm_memory_source_with_structural_pointer_shape() {
-    let artifacts =
-        compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_glm.ns");
+    let artifacts = compiled_source("../../examples/ns/memory/hello_glm.ns");
 
     let alloc_nodes = artifacts
         .yir
@@ -66,16 +65,14 @@ fn lowers_hello_glm_memory_source_with_structural_pointer_shape() {
 
 #[test]
 fn compiles_hello_borrow_end_memory_source() {
-    let source =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns");
+    let source = Path::new("../../examples/ns/memory/hello_borrow_end.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_borrow_end memory source should compile");
 }
 
 #[test]
 fn lowers_hello_borrow_end_memory_source_with_borrow_end_then_owner_write_shape() {
-    let artifacts =
-        compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns");
+    let artifacts = compiled_source("../../examples/ns/memory/hello_borrow_end.ns");
 
     let lowered_ops = artifacts
         .yir
@@ -100,15 +97,13 @@ fn lowers_hello_borrow_end_memory_source_with_borrow_end_then_owner_write_shape(
 
 #[test]
 fn compiles_hello_ref_struct_source() {
-    let source =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns");
+    let source = Path::new("../../examples/ns/types/hello_ref_struct.ns");
     nuisc::pipeline::compile_source_path(source).expect("hello_ref_struct source should compile");
 }
 
 #[test]
 fn lowers_hello_ref_struct_source_with_ref_field_shape() {
-    let artifacts =
-        compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns");
+    let artifacts = compiled_source("../../examples/ns/types/hello_ref_struct.ns");
 
     let pair = artifacts
         .nir
@@ -131,18 +126,14 @@ fn lowers_hello_ref_struct_source_with_ref_field_shape() {
 
 #[test]
 fn compiles_hello_buffer_addressing_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_buffer_addressing.ns",
-    );
+    let source = Path::new("../../examples/ns/memory/hello_buffer_addressing.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_buffer_addressing memory source should compile");
 }
 
 #[test]
 fn lowers_hello_buffer_addressing_memory_source_with_buffer_address_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_buffer_addressing.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_buffer_addressing.ns");
 
     let alloc_buffers = artifacts
         .yir
@@ -170,9 +161,7 @@ fn lowers_hello_buffer_addressing_memory_source_with_buffer_address_shape() {
 
 #[test]
 fn lowers_hello_buffer_addressing_memory_source_with_ref_buffer_nir_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_buffer_addressing.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_buffer_addressing.ns");
 
     let main = artifacts
         .nir
@@ -194,26 +183,21 @@ fn lowers_hello_buffer_addressing_memory_source_with_ref_buffer_nir_shape() {
 
 #[test]
 fn compiles_hello_byte_buffer_memory_source() {
-    let source =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns");
+    let source = Path::new("../../examples/ns/memory/hello_byte_buffer.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_byte_buffer memory source should compile");
 }
 
 #[test]
 fn compiles_hello_task_result_control_flow_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns",
-    );
+    let source = Path::new("../../examples/ns/memory/hello_task_result_control_flow.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_task_result_control_flow memory source should compile");
 }
 
 #[test]
 fn lowers_hello_task_result_control_flow_memory_source_with_unit_error_struct_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_result_control_flow.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_task_result_control_flow.ns");
 
     assert!(
         artifacts.yir.nodes.iter().any(|node| {
@@ -232,18 +216,14 @@ fn lowers_hello_task_result_control_flow_memory_source_with_unit_error_struct_sh
 
 #[test]
 fn compiles_hello_task_glm_status_path_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns",
-    );
+    let source = Path::new("../../examples/ns/memory/hello_task_glm_status_path.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_task_glm_status_path memory source should compile");
 }
 
 #[test]
 fn lowers_hello_task_glm_status_path_memory_source_with_task_status_observer_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_task_glm_status_path.ns");
 
     let join_result_count = artifacts
         .yir
@@ -281,18 +261,14 @@ fn lowers_hello_task_glm_status_path_memory_source_with_task_status_observer_sha
 
 #[test]
 fn compiles_hello_task_glm_lifecycle_path_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns",
-    );
+    let source = Path::new("../../examples/ns/memory/hello_task_glm_lifecycle_path.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_task_glm_lifecycle_path memory source should compile");
 }
 
 #[test]
 fn lowers_hello_task_glm_lifecycle_path_memory_source_with_timeout_cancel_chain_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_task_glm_lifecycle_path.ns");
 
     let timeout_count = artifacts
         .yir
@@ -323,18 +299,14 @@ fn lowers_hello_task_glm_lifecycle_path_memory_source_with_timeout_cancel_chain_
 
 #[test]
 fn compiles_hello_task_glm_value_path_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns",
-    );
+    let source = Path::new("../../examples/ns/memory/hello_task_glm_value_path.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_task_glm_value_path memory source should compile");
 }
 
 #[test]
 fn lowers_hello_task_glm_value_path_memory_source_with_completed_value_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_task_glm_value_path.ns");
 
     let join_result_count = artifacts
         .yir
@@ -362,17 +334,14 @@ fn lowers_hello_task_glm_value_path_memory_source_with_completed_value_shape() {
 
 #[test]
 fn compiles_hello_task_glm_compare_memory_source() {
-    let source =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns");
+    let source = Path::new("../../examples/ns/memory/hello_task_glm_compare.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_task_glm_compare memory source should compile");
 }
 
 #[test]
 fn lowers_hello_task_glm_compare_memory_source_with_join_and_join_result_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_task_glm_compare.ns");
 
     let join_count = artifacts
         .yir
@@ -416,17 +385,14 @@ fn lowers_hello_task_glm_compare_memory_source_with_join_and_join_result_shape()
 
 #[test]
 fn compiles_hello_task_glm_observe_memory_source() {
-    let source =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns");
+    let source = Path::new("../../examples/ns/memory/hello_task_glm_observe.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_task_glm_observe memory source should compile");
 }
 
 #[test]
 fn lowers_hello_task_glm_observe_memory_source_with_timeout_observer_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_task_glm_observe.ns");
 
     let timeout_count = artifacts
         .yir
@@ -461,18 +427,14 @@ fn lowers_hello_task_glm_observe_memory_source_with_timeout_observer_shape() {
 
 #[test]
 fn compiles_hello_task_glm_boundary_compare_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns",
-    );
+    let source = Path::new("../../examples/ns/memory/hello_task_glm_boundary_compare.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_task_glm_boundary_compare memory source should compile");
 }
 
 #[test]
 fn lowers_hello_task_glm_boundary_compare_memory_source_with_join_timeout_cancel_boundary_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_task_glm_boundary_compare.ns");
 
     let join_count = artifacts
         .yir
@@ -524,18 +486,14 @@ fn lowers_hello_task_glm_boundary_compare_memory_source_with_join_timeout_cancel
 
 #[test]
 fn compiles_hello_thread_mutex_observe_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns",
-    );
+    let source = Path::new("../../examples/ns/memory/hello_thread_mutex_observe.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_thread_mutex_observe memory source should compile");
 }
 
 #[test]
 fn lowers_hello_thread_mutex_observe_memory_source_with_thread_and_lock_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_observe.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_thread_mutex_observe.ns");
 
     let mutex_new_count = artifacts
         .yir
@@ -609,18 +567,15 @@ fn lowers_hello_thread_mutex_observe_memory_source_with_thread_and_lock_shape() 
 
 #[test]
 fn compiles_hello_thread_mutex_branch_observe_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns",
-    );
+    let source = Path::new("../../examples/ns/memory/hello_thread_mutex_branch_observe.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_thread_mutex_branch_observe memory source should compile");
 }
 
 #[test]
 fn lowers_hello_thread_mutex_branch_observe_memory_source_with_shared_observer_branch_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_observe.ns",
-    );
+    let artifacts =
+        compiled_source("../../examples/ns/memory/hello_thread_mutex_branch_observe.ns");
 
     let mutex_new_count = artifacts
         .yir
@@ -713,18 +668,14 @@ fn lowers_hello_thread_mutex_branch_observe_memory_source_with_shared_observer_b
 
 #[test]
 fn compiles_hello_thread_mutex_branch_suffix_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns",
-    );
+    let source = Path::new("../../examples/ns/memory/hello_thread_mutex_branch_suffix.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_thread_mutex_branch_suffix memory source should compile");
 }
 
 #[test]
 fn lowers_hello_thread_mutex_branch_suffix_memory_source_with_shared_pure_suffix_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_thread_mutex_branch_suffix.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_thread_mutex_branch_suffix.ns");
 
     let mutex_lock_count = artifacts
         .yir
@@ -793,9 +744,8 @@ fn lowers_hello_thread_mutex_branch_suffix_memory_source_with_shared_pure_suffix
 #[test]
 fn rejects_hello_thread_mutex_if_lock_branch_invalid_memory_source_with_precise_branch_boundary_diagnostic(
 ) {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns",
-    );
+    let source =
+        Path::new("../../examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns");
     let error = nuisc::pipeline::compile_source_path(source).err().expect(
         "if-branch mutex lock invalid source should fail until branch-local lock lowering exists",
     );
@@ -811,7 +761,7 @@ fn rejects_hello_thread_mutex_if_lock_branch_invalid_memory_source_with_precise_
 fn rejects_hello_thread_mutex_match_join_result_branch_invalid_memory_source_with_precise_branch_boundary_diagnostic(
 ) {
     let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns",
+        "../../examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns",
     );
     let error = nuisc::pipeline::compile_source_path(source)
         .err()
@@ -826,9 +776,7 @@ fn rejects_hello_thread_mutex_match_join_result_branch_invalid_memory_source_wit
 
 #[test]
 fn lowers_hello_byte_buffer_memory_source_with_byte_intrinsic_shape() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_byte_buffer.ns");
 
     assert!(
         artifacts
@@ -871,9 +819,7 @@ fn lowers_hello_byte_buffer_memory_source_with_byte_intrinsic_shape() {
 
 #[test]
 fn lowers_hello_byte_buffer_memory_source_with_alias_resolved_ref_buffer_type() {
-    let artifacts = compiled_source(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns",
-    );
+    let artifacts = compiled_source("../../examples/ns/memory/hello_byte_buffer.ns");
 
     let main = artifacts
         .nir
@@ -895,30 +841,22 @@ fn lowers_hello_byte_buffer_memory_source_with_alias_resolved_ref_buffer_type() 
 
 #[test]
 fn compiles_stdin_runtime_demo_project_with_host_buffer_handle_bridge() {
-    compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/stdin_runtime_demo",
-    );
+    compiled_project("../../examples/projects/tooling/stdin_runtime_demo");
 }
 
 #[test]
 fn compiles_file_runtime_demo_project_with_host_buffer_handle_bridge() {
-    compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_runtime_demo",
-    );
+    compiled_project("../../examples/projects/filesystem/file_runtime_demo");
 }
 
 #[test]
 fn compiles_file_read_demo_project_with_host_buffer_handle_bridge() {
-    compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo",
-    );
+    compiled_project("../../examples/projects/filesystem/file_read_demo");
 }
 
 #[test]
 fn lowers_file_read_demo_project_with_host_file_read_bridge() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_read_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/filesystem/file_read_demo");
 
     assert!(artifacts.llvm_ir.contains("call i64 @host_file_open"));
     assert!(artifacts.llvm_ir.contains("call i64 @host_file_read"));
@@ -927,16 +865,12 @@ fn lowers_file_read_demo_project_with_host_file_read_bridge() {
 
 #[test]
 fn compiles_file_write_demo_project_with_host_file_write_bridge() {
-    compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo",
-    );
+    compiled_project("../../examples/projects/filesystem/file_write_demo");
 }
 
 #[test]
 fn lowers_file_write_demo_project_with_host_file_write_bridge() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_write_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/filesystem/file_write_demo");
 
     assert!(artifacts.llvm_ir.contains("call i64 @host_file_open"));
     assert!(artifacts.llvm_ir.contains("call i64 @host_file_write"));
@@ -945,16 +879,12 @@ fn lowers_file_write_demo_project_with_host_file_write_bridge() {
 
 #[test]
 fn compiles_file_copy_demo_project_with_host_file_copy_bridge() {
-    compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo",
-    );
+    compiled_project("../../examples/projects/filesystem/file_copy_demo");
 }
 
 #[test]
 fn lowers_file_copy_demo_project_with_host_path_copy_bridge() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_copy_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/filesystem/file_copy_demo");
 
     assert!(artifacts.llvm_ir.contains("call i64 @host_file_open"));
     assert!(artifacts.llvm_ir.contains("call i64 @host_file_write"));
@@ -964,16 +894,13 @@ fn lowers_file_copy_demo_project_with_host_path_copy_bridge() {
 
 #[test]
 fn compiles_filesystem_report_file_demo_project_with_host_file_output_bridge() {
-    compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_file_demo",
-    );
+    compiled_project("../../examples/projects/filesystem/filesystem_report_file_demo");
 }
 
 #[test]
 fn lowers_filesystem_report_file_demo_project_with_host_report_file_bridge() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/filesystem_report_file_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/filesystem/filesystem_report_file_demo");
 
     assert!(artifacts.llvm_ir.contains("call i64 @host_file_read"));
     assert!(artifacts.llvm_ir.contains("call i64 @host_text_concat"));
@@ -985,16 +912,12 @@ fn lowers_filesystem_report_file_demo_project_with_host_report_file_bridge() {
 
 #[test]
 fn compiles_stdin_file_input_runtime_demo_project_with_host_buffer_handle_bridge() {
-    compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/input_runtime_demo",
-    );
+    compiled_project("../../examples/projects/tooling/input_runtime_demo");
 }
 
 #[test]
 fn compiles_terminal_io_demo_project_with_host_buffer_handle_bridge() {
-    compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/terminal_io_demo",
-    );
+    compiled_project("../../examples/projects/tooling/terminal_io_demo");
 }
 
 #[test]

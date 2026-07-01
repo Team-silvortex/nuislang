@@ -14,6 +14,19 @@ The current goal is:
 
 Latest audit result:
 
+* `alpha-0.6.*` cleanup pass removed local generated `.nuis/cache` state from
+  `examples/projects/**`, reducing that subtree from roughly `85M` to `4.3M`
+* repository text now has no checked-in developer-home absolute paths, file URI
+  references, or macOS private temp path references outside ignored build outputs
+* Markdown links resolve as repo-relative links, with no remaining absolute
+  workspace links
+* the largest remaining cleanup pressure is structural, not stale generated
+  files:
+  - `tools/nuis/src/main.rs` is still close to `10k` lines
+  - `tools/nsld/src/main.rs` is down to roughly `3.2k` lines after CLI,
+    display, JSON, container, TOML, reports, and link-unit extraction
+  - several `crates/yir-*` libraries are well over the local file-size policy
+    and should be split by domain/lowering responsibility before beta
 * `examples/projects/state/` currently has no orphaned project companion
   directories with zero doc/test/source references
 * `examples/projects/task/` currently has no orphaned project companion
@@ -182,6 +195,11 @@ Practical rule:
 * do not re-introduce checked-in bundles for single-file `.ns` or handwritten
   `YIR` demos
 * continue treating per-project `.nuis/` caches as local-only generated state
+* if a local run recreates `examples/**/.nuis/cache`, it is safe to delete and
+  should remain ignored rather than staged
+* repeated smoke/compile tests should prefer table-driven case lists; the first
+  pass consolidated FFI, project-workflow, memory, network, state, task, and
+  tooling checks while keeping their build/lowering coverage intact
 
 ## Decision Needed
 

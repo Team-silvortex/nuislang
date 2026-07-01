@@ -35,189 +35,126 @@ fn assert_success(output: &std::process::Output, context: &str) {
     );
 }
 
-#[test]
-fn libc_usleep_demo_builds_and_runs_as_native_artifact() {
-    let _guard = CLI_SMOKE_LOCK.lock().unwrap();
-    let output_dir = temp_dir("libc_usleep_demo");
-    let output_dir_text = output_dir.display().to_string();
-
-    let build = run_nuis(&[
-        "build",
-        "--cpu-abi",
-        "cpu.arm64.apple_aapcs64",
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_usleep_demo.ns",
-        &output_dir_text,
-    ]);
-    assert_success(&build, "nuis build libc_usleep_demo");
-
-    let build_stdout = String::from_utf8_lossy(&build.stdout);
-    assert!(build_stdout.contains("ready_to_run: true"));
-    assert!(output_dir.join("libc_usleep_demo").exists());
-    assert!(output_dir.join("nuis.build.manifest.toml").exists());
-    let yir = fs::read_to_string(output_dir.join("libc_usleep_demo.yir")).unwrap();
-    assert!(yir.contains("libc getpid"));
-    assert!(yir.contains("libc usleep"));
-    let llvm_ir = fs::read_to_string(output_dir.join("libc_usleep_demo.ll")).unwrap();
-    assert!(llvm_ir.contains("declare i32 @getpid()"));
-    assert!(llvm_ir.contains("declare i32 @usleep(i32)"));
-
-    let run = run_nuis(&["run-artifact", &output_dir_text]);
-    assert_success(&run, "nuis run-artifact libc_usleep_demo");
-    let run_stdout = String::from_utf8_lossy(&run.stdout);
-    assert!(run_stdout.contains("exit_status: 0"));
+struct FfiSmokeCase {
+    name: &'static str,
+    source: &'static str,
+    artifact: &'static str,
+    yir_contains: &'static [&'static str],
+    llvm_contains: &'static [&'static str],
+    stdout_contains: &'static [&'static str],
+    expect_manifest: bool,
 }
 
-#[test]
-fn libc_puts_demo_builds_and_prints_as_native_artifact() {
-    let _guard = CLI_SMOKE_LOCK.lock().unwrap();
-    let output_dir = temp_dir("libc_puts_demo");
-    let output_dir_text = output_dir.display().to_string();
-
-    let build = run_nuis(&[
-        "build",
-        "--cpu-abi",
-        "cpu.arm64.apple_aapcs64",
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_puts_demo.ns",
-        &output_dir_text,
-    ]);
-    assert_success(&build, "nuis build libc_puts_demo");
-
-    let build_stdout = String::from_utf8_lossy(&build.stdout);
-    assert!(build_stdout.contains("ready_to_run: true"));
-    assert!(output_dir.join("libc_puts_demo").exists());
-    let yir = fs::read_to_string(output_dir.join("libc_puts_demo.yir")).unwrap();
-    assert!(yir.contains("libc puts"));
-    let llvm_ir = fs::read_to_string(output_dir.join("libc_puts_demo.ll")).unwrap();
-    assert!(llvm_ir.contains("declare i32 @puts(ptr)"));
-    assert!(llvm_ir.contains("call i32 @puts(ptr"));
-
-    let run = run_nuis(&["run-artifact", &output_dir_text]);
-    assert_success(&run, "nuis run-artifact libc_puts_demo");
-    let run_stdout = String::from_utf8_lossy(&run.stdout);
-    assert!(run_stdout.contains("nuis libc puts bridge"));
-    assert!(run_stdout.contains("exit_status: 0"));
-}
-
-#[test]
-fn libc_strlen_demo_builds_and_runs_as_native_artifact() {
-    let _guard = CLI_SMOKE_LOCK.lock().unwrap();
-    let output_dir = temp_dir("libc_strlen_demo");
-    let output_dir_text = output_dir.display().to_string();
-
-    let build = run_nuis(&[
-        "build",
-        "--cpu-abi",
-        "cpu.arm64.apple_aapcs64",
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_strlen_demo.ns",
-        &output_dir_text,
-    ]);
-    assert_success(&build, "nuis build libc_strlen_demo");
-
-    let build_stdout = String::from_utf8_lossy(&build.stdout);
-    assert!(build_stdout.contains("ready_to_run: true"));
-    assert!(output_dir.join("libc_strlen_demo").exists());
-    let yir = fs::read_to_string(output_dir.join("libc_strlen_demo.yir")).unwrap();
-    assert!(yir.contains("libc strlen"));
-    let llvm_ir = fs::read_to_string(output_dir.join("libc_strlen_demo.ll")).unwrap();
-    assert!(llvm_ir.contains("declare i64 @strlen(ptr)"));
-    assert!(llvm_ir.contains("call i64 @strlen(ptr"));
-
-    let run = run_nuis(&["run-artifact", &output_dir_text]);
-    assert_success(&run, "nuis run-artifact libc_strlen_demo");
-    let run_stdout = String::from_utf8_lossy(&run.stdout);
-    assert!(run_stdout.contains("exit_status: 0"));
-}
+const FFI_SMOKE_CASES: &[FfiSmokeCase] = &[
+    FfiSmokeCase {
+        name: "libc_usleep_demo",
+        source: "../../examples/ns/ffi/libc_usleep_demo.ns",
+        artifact: "libc_usleep_demo",
+        yir_contains: &["libc getpid", "libc usleep"],
+        llvm_contains: &["declare i32 @getpid()", "declare i32 @usleep(i32)"],
+        stdout_contains: &["exit_status: 0"],
+        expect_manifest: true,
+    },
+    FfiSmokeCase {
+        name: "libc_puts_demo",
+        source: "../../examples/ns/ffi/libc_puts_demo.ns",
+        artifact: "libc_puts_demo",
+        yir_contains: &["libc puts"],
+        llvm_contains: &["declare i32 @puts(ptr)", "call i32 @puts(ptr"],
+        stdout_contains: &["nuis libc puts bridge", "exit_status: 0"],
+        expect_manifest: false,
+    },
+    FfiSmokeCase {
+        name: "libc_strlen_demo",
+        source: "../../examples/ns/ffi/libc_strlen_demo.ns",
+        artifact: "libc_strlen_demo",
+        yir_contains: &["libc strlen"],
+        llvm_contains: &["declare i64 @strlen(ptr)", "call i64 @strlen(ptr"],
+        stdout_contains: &["exit_status: 0"],
+        expect_manifest: false,
+    },
+    FfiSmokeCase {
+        name: "libc_write_demo",
+        source: "../../examples/ns/ffi/libc_write_demo.ns",
+        artifact: "libc_write_demo",
+        yir_contains: &["libc strlen", "libc write"],
+        llvm_contains: &["declare i64 @write(i32, ptr, i64)", "call i64 @write(i32"],
+        stdout_contains: &["nuis libc write bridge", "exit_status: 0"],
+        expect_manifest: false,
+    },
+    FfiSmokeCase {
+        name: "libc_close_demo",
+        source: "../../examples/ns/ffi/libc_close_demo.ns",
+        artifact: "libc_close_demo",
+        yir_contains: &["libc close"],
+        llvm_contains: &["declare i32 @close(i32)", "call i32 @close(i32"],
+        stdout_contains: &["exit_status: 0"],
+        expect_manifest: false,
+    },
+    FfiSmokeCase {
+        name: "libc_read_buffer_demo",
+        source: "../../examples/ns/ffi/libc_read_buffer_demo.ns",
+        artifact: "libc_read_buffer_demo",
+        yir_contains: &["libc read"],
+        llvm_contains: &["declare i64 @read(i32, ptr, i64)", "call i64 @read(i32"],
+        stdout_contains: &["exit_status: 0"],
+        expect_manifest: false,
+    },
+];
 
 #[test]
-fn libc_write_demo_builds_and_writes_as_native_artifact() {
+fn ffi_libc_demos_build_and_run_as_native_artifacts() {
     let _guard = CLI_SMOKE_LOCK.lock().unwrap();
-    let output_dir = temp_dir("libc_write_demo");
-    let output_dir_text = output_dir.display().to_string();
 
-    let build = run_nuis(&[
-        "build",
-        "--cpu-abi",
-        "cpu.arm64.apple_aapcs64",
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_write_demo.ns",
-        &output_dir_text,
-    ]);
-    assert_success(&build, "nuis build libc_write_demo");
+    for case in FFI_SMOKE_CASES {
+        let output_dir = temp_dir(case.name);
+        let output_dir_text = output_dir.display().to_string();
 
-    let build_stdout = String::from_utf8_lossy(&build.stdout);
-    assert!(build_stdout.contains("ready_to_run: true"));
-    assert!(output_dir.join("libc_write_demo").exists());
-    let yir = fs::read_to_string(output_dir.join("libc_write_demo.yir")).unwrap();
-    assert!(yir.contains("libc strlen"));
-    assert!(yir.contains("libc write"));
-    let llvm_ir = fs::read_to_string(output_dir.join("libc_write_demo.ll")).unwrap();
-    assert!(llvm_ir.contains("declare i64 @write(i32, ptr, i64)"));
-    assert!(llvm_ir.contains("call i64 @write(i32"));
+        let build = run_nuis(&[
+            "build",
+            "--cpu-abi",
+            "cpu.arm64.apple_aapcs64",
+            case.source,
+            &output_dir_text,
+        ]);
+        assert_success(&build, &format!("nuis build {}", case.name));
 
-    let run = run_nuis(&["run-artifact", &output_dir_text]);
-    assert_success(&run, "nuis run-artifact libc_write_demo");
-    let run_stdout = String::from_utf8_lossy(&run.stdout);
-    assert!(run_stdout.contains("nuis libc write bridge"));
-    assert!(run_stdout.contains("exit_status: 0"));
-}
+        let build_stdout = String::from_utf8_lossy(&build.stdout);
+        assert!(build_stdout.contains("ready_to_run: true"));
+        assert!(output_dir.join(case.artifact).exists());
+        if case.expect_manifest {
+            assert!(output_dir.join("nuis.build.manifest.toml").exists());
+        }
 
-#[test]
-fn libc_close_demo_builds_and_runs_as_native_artifact() {
-    let _guard = CLI_SMOKE_LOCK.lock().unwrap();
-    let output_dir = temp_dir("libc_close_demo");
-    let output_dir_text = output_dir.display().to_string();
+        let yir = fs::read_to_string(output_dir.join(format!("{}.yir", case.artifact))).unwrap();
+        for expected in case.yir_contains {
+            assert!(
+                yir.contains(expected),
+                "{} missing yir marker {expected}",
+                case.name
+            );
+        }
 
-    let build = run_nuis(&[
-        "build",
-        "--cpu-abi",
-        "cpu.arm64.apple_aapcs64",
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_close_demo.ns",
-        &output_dir_text,
-    ]);
-    assert_success(&build, "nuis build libc_close_demo");
+        let llvm_ir = fs::read_to_string(output_dir.join(format!("{}.ll", case.artifact))).unwrap();
+        for expected in case.llvm_contains {
+            assert!(
+                llvm_ir.contains(expected),
+                "{} missing llvm marker {expected}",
+                case.name
+            );
+        }
 
-    let build_stdout = String::from_utf8_lossy(&build.stdout);
-    assert!(build_stdout.contains("ready_to_run: true"));
-    assert!(output_dir.join("libc_close_demo").exists());
-    let yir = fs::read_to_string(output_dir.join("libc_close_demo.yir")).unwrap();
-    assert!(yir.contains("libc close"));
-    let llvm_ir = fs::read_to_string(output_dir.join("libc_close_demo.ll")).unwrap();
-    assert!(llvm_ir.contains("declare i32 @close(i32)"));
-    assert!(llvm_ir.contains("call i32 @close(i32"));
-
-    let run = run_nuis(&["run-artifact", &output_dir_text]);
-    assert_success(&run, "nuis run-artifact libc_close_demo");
-    let run_stdout = String::from_utf8_lossy(&run.stdout);
-    assert!(run_stdout.contains("exit_status: 0"));
-}
-
-#[test]
-fn libc_read_buffer_demo_builds_and_runs_as_native_artifact() {
-    let _guard = CLI_SMOKE_LOCK.lock().unwrap();
-    let output_dir = temp_dir("libc_read_buffer_demo");
-    let output_dir_text = output_dir.display().to_string();
-
-    let build = run_nuis(&[
-        "build",
-        "--cpu-abi",
-        "cpu.arm64.apple_aapcs64",
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/libc_read_buffer_demo.ns",
-        &output_dir_text,
-    ]);
-    assert_success(&build, "nuis build libc_read_buffer_demo");
-
-    let build_stdout = String::from_utf8_lossy(&build.stdout);
-    assert!(build_stdout.contains("ready_to_run: true"));
-    assert!(output_dir.join("libc_read_buffer_demo").exists());
-    let yir = fs::read_to_string(output_dir.join("libc_read_buffer_demo.yir")).unwrap();
-    assert!(yir.contains("libc read"));
-    let llvm_ir = fs::read_to_string(output_dir.join("libc_read_buffer_demo.ll")).unwrap();
-    assert!(llvm_ir.contains("declare i64 @read(i32, ptr, i64)"));
-    assert!(llvm_ir.contains("call i64 @read(i32"));
-
-    let run = run_nuis(&["run-artifact", &output_dir_text]);
-    assert_success(&run, "nuis run-artifact libc_read_buffer_demo");
-    let run_stdout = String::from_utf8_lossy(&run.stdout);
-    assert!(run_stdout.contains("exit_status: 0"));
+        let run = run_nuis(&["run-artifact", &output_dir_text]);
+        assert_success(&run, &format!("nuis run-artifact {}", case.name));
+        let run_stdout = String::from_utf8_lossy(&run.stdout);
+        for expected in case.stdout_contains {
+            assert!(
+                run_stdout.contains(expected),
+                "{} missing stdout marker {expected}",
+                case.name
+            );
+        }
+    }
 }
 
 #[test]
@@ -230,7 +167,7 @@ fn clock_test_facade_builds_and_runs_as_native_artifact() {
         "build",
         "--cpu-abi",
         "cpu.arm64.apple_aapcs64",
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns",
+        "../../examples/ns/ffi/hello_clock_test_facades.ns",
         &output_dir_text,
     ]);
     assert_success(&build, "nuis build hello_clock_test_facades");

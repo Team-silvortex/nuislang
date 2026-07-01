@@ -1,7 +1,8 @@
 use super::{
     container::{
-        NsldContainerEmitReport, NsldContainerPlanEmitReport, NsldContainerPlanReport,
-        NsldContainerPlanVerifyReport, NsldContainerReport, NsldContainerSectionEntry,
+        NsldContainerEmitReport, NsldContainerExternalImport, NsldContainerLoaderSymbol,
+        NsldContainerPlanEmitReport, NsldContainerPlanReport, NsldContainerPlanVerifyReport,
+        NsldContainerRelocationEntry, NsldContainerReport, NsldContainerSectionEntry,
         NsldContainerVerifyReport,
     },
     reports::*,
@@ -55,6 +56,25 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
         json_bool_field("container_present", report.container_present),
         json_optional_bool_field("container_valid", report.container_valid),
         json_string_array_field("container_issues", &report.container_issues),
+        json_bool_field(
+            "container_payload_present",
+            report.container_payload_present,
+        ),
+        json_string_array_field("container_payload_issues", &report.container_payload_issues),
+        json_optional_string_field(
+            "container_loader_readiness",
+            report.container_loader_readiness.as_deref(),
+        ),
+        json_string_array_field(
+            "container_loader_blockers",
+            &report.container_loader_blockers,
+        ),
+        json_optional_usize_field(
+            "container_external_import_count",
+            report.container_external_import_count,
+        ),
+        json_bool_field("artifact_chain_valid", report.artifact_chain_valid),
+        json_string_array_field("artifact_chain_issues", &report.artifact_chain_issues),
         json_string_field("final_stage_link_mode", &report.final_stage_link_mode),
         format!("\"domains\":[{}]", domains_json(&report.domains)),
         format!(
@@ -385,6 +405,23 @@ pub(crate) fn nsld_container_report_json(report: &NsldContainerReport) -> String
         json_usize_field("container_version", report.container_version),
         json_string_field("container_layout_hash", &report.container_layout_hash),
         json_string_field("container_hash", &report.container_hash),
+        json_string_field("loader_readiness", &report.loader_readiness),
+        json_string_array_field("loader_blockers", &report.loader_blockers),
+        json_string_field("loader_entry_kind", &report.loader_entry_kind),
+        json_string_field("loader_entry_symbol", &report.loader_entry_symbol),
+        json_string_field("loader_entry_section_id", &report.loader_entry_section_id),
+        format!(
+            "\"loader_symbols\":[{}]",
+            nsld_container_loader_symbols_json(&report.loader_symbols)
+        ),
+        format!(
+            "\"relocations\":[{}]",
+            nsld_container_relocations_json(&report.relocations)
+        ),
+        format!(
+            "\"external_imports\":[{}]",
+            nsld_container_external_imports_json(&report.external_imports)
+        ),
         json_usize_field("payload_size_bytes", report.payload_size_bytes),
         json_string_field("payload_hash", &report.payload_hash),
         json_string_field("output_path", &report.output_path),
@@ -397,6 +434,60 @@ pub(crate) fn nsld_container_report_json(report: &NsldContainerReport) -> String
         json_string_array_field("blockers", &report.blockers),
     ];
     format!("{{{}}}", fields.join(","))
+}
+
+fn nsld_container_loader_symbols_json(symbols: &[NsldContainerLoaderSymbol]) -> String {
+    symbols
+        .iter()
+        .map(|symbol| {
+            let fields = vec![
+                json_string_field("symbol_id", &symbol.symbol_id),
+                json_string_field("symbol_kind", &symbol.symbol_kind),
+                json_string_field("symbol_name", &symbol.symbol_name),
+                json_string_field("section_id", &symbol.section_id),
+                json_usize_field("offset", symbol.offset),
+                json_usize_field("size_bytes", symbol.size_bytes),
+                json_string_field("payload_hash", &symbol.payload_hash),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn nsld_container_relocations_json(relocations: &[NsldContainerRelocationEntry]) -> String {
+    relocations
+        .iter()
+        .map(|relocation| {
+            let fields = vec![
+                json_string_field("relocation_id", &relocation.relocation_id),
+                json_string_field("relocation_kind", &relocation.relocation_kind),
+                json_string_field("source_section_id", &relocation.source_section_id),
+                json_usize_field("source_offset", relocation.source_offset),
+                json_string_field("target_symbol_id", &relocation.target_symbol_id),
+                json_isize_field("addend", relocation.addend),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn nsld_container_external_imports_json(imports: &[NsldContainerExternalImport]) -> String {
+    imports
+        .iter()
+        .map(|external_import| {
+            let fields = vec![
+                json_string_field("import_id", &external_import.import_id),
+                json_string_field("import_kind", &external_import.import_kind),
+                json_string_field("import_name", &external_import.import_name),
+                json_string_field("provider", &external_import.provider),
+                json_bool_field("required", external_import.required),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 pub(crate) fn nsld_container_emit_report_json(report: &NsldContainerEmitReport) -> String {
@@ -435,6 +526,14 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
         json_string_field("expected_payload_hash", &report.expected_payload_hash),
         json_string_field("expected_payload_path", &report.expected_payload_path),
         json_usize_field("expected_section_count", report.expected_section_count),
+        json_string_field(
+            "expected_loader_readiness",
+            &report.expected_loader_readiness,
+        ),
+        json_usize_field(
+            "expected_external_import_count",
+            report.expected_external_import_count,
+        ),
         json_optional_string_field(
             "actual_container_layout_hash",
             report.actual_container_layout_hash.as_deref(),
@@ -449,6 +548,14 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
         ),
         json_optional_string_field("actual_payload_hash", report.actual_payload_hash.as_deref()),
         json_optional_usize_field("actual_section_count", report.actual_section_count),
+        json_optional_string_field(
+            "actual_loader_readiness",
+            report.actual_loader_readiness.as_deref(),
+        ),
+        json_optional_usize_field(
+            "actual_external_import_count",
+            report.actual_external_import_count,
+        ),
         json_string_array_field("section_range_issues", &report.section_range_issues),
         json_string_array_field("issues", &report.issues),
     ];
@@ -729,6 +836,10 @@ fn json_string_field(name: &str, value: &str) -> String {
 }
 
 fn json_usize_field(name: &str, value: usize) -> String {
+    format!("\"{name}\":{value}")
+}
+
+fn json_isize_field(name: &str, value: isize) -> String {
     format!("\"{name}\":{value}")
 }
 

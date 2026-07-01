@@ -9,53 +9,43 @@ fn compiled_project(path: &str) -> nuisc::pipeline::PipelineArtifacts {
 
 #[test]
 fn compiles_task_recursive_async_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_recursive_async_demo");
     nuisc::pipeline::compile_project(project).expect("task recursive async project should compile");
 }
 
 #[test]
 fn compiles_task_recursive_async_keep_prev_carry_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_keep_prev_carry_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/task/task_recursive_async_keep_prev_carry_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task recursive async keep-prev-carry project should compile");
 }
 
 #[test]
 fn compiles_task_recursive_async_shared_suffix_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_shared_suffix_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_recursive_async_shared_suffix_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task recursive async shared-suffix project should compile");
 }
 
 #[test]
 fn compiles_task_mutual_recursive_async_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_mutual_recursive_async_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_mutual_recursive_async_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task mutual recursive async project should compile");
 }
 
 #[test]
 fn compiles_task_generic_recursive_async_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_recursive_async_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_generic_recursive_async_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task generic recursive async project should compile");
 }
 
 #[test]
 fn lowers_task_recursive_async_keep_prev_carry_project_with_cond_chain_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_keep_prev_carry_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_recursive_async_keep_prev_carry_demo");
 
     let loop_node = artifacts
         .yir
@@ -75,9 +65,8 @@ fn lowers_task_recursive_async_keep_prev_carry_project_with_cond_chain_shape() {
 #[test]
 fn lowers_task_recursive_async_shared_suffix_project_with_select_then_suffix_then_recursive_call_shape(
 ) {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_shared_suffix_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_recursive_async_shared_suffix_demo");
 
     let accumulate = artifacts
         .nir
@@ -185,9 +174,8 @@ fn lowers_task_recursive_async_shared_suffix_project_with_select_then_suffix_the
 
 #[test]
 fn lowers_task_generic_recursive_async_project_with_specialized_async_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_recursive_async_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_generic_recursive_async_demo");
 
     let specialized = artifacts
         .nir
@@ -218,45 +206,38 @@ fn lowers_task_generic_recursive_async_project_with_specialized_async_loop_shape
 
 #[test]
 fn compiles_task_generic_mutual_recursive_async_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_mutual_recursive_async_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/task/task_generic_mutual_recursive_async_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task generic mutual recursive async project should compile");
 }
 
 #[test]
 fn compiles_task_recursive_async_result_family_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_result_family_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_recursive_async_result_family_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task recursive async result family project should compile");
 }
 
 #[test]
 fn compiles_task_recursive_async_payload_alias_hof_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_payload_alias_hof_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/task/task_recursive_async_payload_alias_hof_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task recursive async payload alias hof project should compile");
 }
 
 #[test]
 fn compiles_task_async_observer_bridge_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_observer_bridge_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_async_observer_bridge_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async observer bridge project should compile");
 }
 
 #[test]
 fn lowers_task_async_observer_bridge_project_with_await_and_task_observer_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_observer_bridge_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_observer_bridge_demo");
 
     let orchestrate = artifacts
         .nir
@@ -330,18 +311,15 @@ fn lowers_task_async_observer_bridge_project_with_await_and_task_observer_shape(
 
 #[test]
 fn compiles_task_async_if_expression_positions_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_if_expression_positions_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_async_if_expression_positions_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async if-expression positions project should compile");
 }
 
 #[test]
 fn lowers_task_async_if_expression_positions_project_with_async_if_expression_family() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_if_expression_positions_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_if_expression_positions_demo");
 
     let branch_pick = artifacts
         .nir
@@ -523,18 +501,15 @@ fn lowers_task_async_if_expression_positions_project_with_async_if_expression_fa
 
 #[test]
 fn compiles_task_async_await_match_operand_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_await_match_operand_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_async_await_match_operand_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async await-match operand project should compile");
 }
 
 #[test]
 fn lowers_task_async_await_match_operand_project_with_expression_position_async_control_flow() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_await_match_operand_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_await_match_operand_demo");
 
     let branch_pick = artifacts
         .nir
@@ -633,18 +608,15 @@ fn lowers_task_async_await_match_operand_project_with_expression_position_async_
 
 #[test]
 fn compiles_task_async_match_call_argument_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_match_call_argument_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_async_match_call_argument_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async match call-argument project should compile");
 }
 
 #[test]
 fn lowers_task_async_match_call_argument_project_with_async_call_argument_control_flow() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_match_call_argument_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_match_call_argument_demo");
 
     let call_pick = artifacts
         .nir
@@ -717,18 +689,15 @@ fn lowers_task_async_match_call_argument_project_with_async_call_argument_contro
 
 #[test]
 fn compiles_task_async_struct_field_match_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_struct_field_match_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_async_struct_field_match_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async struct-field match project should compile");
 }
 
 #[test]
 fn lowers_task_async_struct_field_match_project_with_async_struct_field_control_flow() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_struct_field_match_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_struct_field_match_demo");
 
     let packetize = artifacts
         .nir
@@ -830,18 +799,15 @@ fn lowers_task_async_struct_field_match_project_with_async_struct_field_control_
 
 #[test]
 fn compiles_task_async_method_receiver_match_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_method_receiver_match_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_async_method_receiver_match_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async method-receiver match project should compile");
 }
 
 #[test]
 fn lowers_task_async_method_receiver_match_project_with_async_method_receiver_control_flow() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_method_receiver_match_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_method_receiver_match_demo");
 
     let apply = artifacts
         .nir
@@ -914,18 +880,15 @@ fn lowers_task_async_method_receiver_match_project_with_async_method_receiver_co
 
 #[test]
 fn compiles_task_async_helper_expanded_match_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_helper_expanded_match_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_async_helper_expanded_match_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async helper-expanded match project should compile");
 }
 
 #[test]
 fn lowers_task_async_helper_expanded_match_project_with_nested_helper_expanded_control_flow() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_helper_expanded_match_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_helper_expanded_match_demo");
 
     let expand = artifacts
         .nir
@@ -1008,18 +971,15 @@ fn lowers_task_async_helper_expanded_match_project_with_nested_helper_expanded_c
 
 #[test]
 fn compiles_task_async_while_flow_cond_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_async_while_flow_cond_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async while flow-cond project should compile");
 }
 
 #[test]
 fn lowers_task_async_while_flow_cond_project_with_async_flow_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_while_flow_cond_demo");
 
     let accumulate = artifacts
         .nir
@@ -1066,18 +1026,15 @@ fn lowers_task_async_while_flow_cond_project_with_async_flow_cond_loop_shape() {
 
 #[test]
 fn compiles_task_async_while_post_flow_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_async_while_post_flow_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async while post-flow project should compile");
 }
 
 #[test]
 fn lowers_task_async_while_post_flow_project_with_async_post_flow_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_while_post_flow_demo");
 
     let accumulate = artifacts
         .nir
@@ -1122,18 +1079,15 @@ fn lowers_task_async_while_post_flow_project_with_async_post_flow_loop_shape() {
 
 #[test]
 fn compiles_task_async_while_post_flow_cond_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_async_while_post_flow_cond_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async while post-flow cond project should compile");
 }
 
 #[test]
 fn lowers_task_async_while_post_flow_cond_project_with_async_post_flow_cond_loop_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_while_post_flow_cond_demo");
 
     let accumulate = artifacts
         .nir
@@ -1180,27 +1134,24 @@ fn lowers_task_async_while_post_flow_cond_project_with_async_post_flow_cond_loop
 
 #[test]
 fn compiles_task_async_while_post_flow_compound_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_compound_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/task/task_async_while_post_flow_compound_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async while post-flow compound project should compile");
 }
 
 #[test]
 fn compiles_task_async_post_flow_recursive_branching_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_recursive_branching_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/task/task_async_post_flow_recursive_branching_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async post-flow recursive branching project should compile");
 }
 
 #[test]
 fn compiles_task_async_post_flow_keep_prev_carry_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_keep_prev_carry_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/task/task_async_post_flow_keep_prev_carry_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task async post-flow keep-prev-carry project should compile");
 }
@@ -1208,7 +1159,7 @@ fn compiles_task_async_post_flow_keep_prev_carry_project() {
 #[test]
 fn compiles_task_async_post_flow_shared_suffix_loop_control_project() {
     let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo",
+        "../../examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo",
     );
     nuisc::pipeline::compile_project(project)
         .expect("task async post-flow shared-suffix loop-control project should compile");
@@ -1216,9 +1167,8 @@ fn compiles_task_async_post_flow_shared_suffix_loop_control_project() {
 
 #[test]
 fn rejects_task_async_memory_project_with_precise_sibling_carry_diagnostic() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_memory_unsupported_demo",
-    );
+    let project =
+        Path::new("../../examples/projects/task/task_async_post_flow_memory_unsupported_demo");
     let error = nuisc::pipeline::compile_project(project)
         .err()
         .expect("task async memory project should fail until lowering exists");
@@ -1229,7 +1179,7 @@ fn rejects_task_async_memory_project_with_precise_sibling_carry_diagnostic() {
 #[test]
 fn rejects_task_async_post_flow_shared_suffix_loop_control_project_with_precise_shape_diagnostic() {
     let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/invalid/projects/bad_task_async_post_flow_shared_suffix_loop_control",
+        "../../examples/invalid/projects/bad_task_async_post_flow_shared_suffix_loop_control",
     );
     let error = nuisc::pipeline::compile_project(project).err().expect(
         "task async post-flow shared-suffix loop-control project should fail until lowering exists",
@@ -1245,7 +1195,7 @@ fn rejects_task_async_post_flow_shared_suffix_loop_control_project_with_precise_
 #[test]
 fn lowers_task_async_post_flow_shared_suffix_loop_control_project_with_cond_chain_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo",
+        "../../examples/projects/task/task_async_post_flow_shared_suffix_loop_control_demo",
     );
 
     let accumulate = artifacts
@@ -1293,7 +1243,7 @@ fn lowers_task_async_post_flow_shared_suffix_loop_control_project_with_cond_chai
 #[test]
 fn lowers_task_async_post_flow_recursive_branching_project_with_post_flow_recursive_shape() {
     let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_recursive_branching_demo",
+        "../../examples/projects/task/task_async_post_flow_recursive_branching_demo",
     );
 
     let loop_node = artifacts
@@ -1321,9 +1271,8 @@ fn lowers_task_async_post_flow_recursive_branching_project_with_post_flow_recurs
 
 #[test]
 fn lowers_task_async_post_flow_keep_prev_carry_project_with_post_flow_recursive_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_keep_prev_carry_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_post_flow_keep_prev_carry_demo");
 
     let loop_node = artifacts
         .yir
@@ -1349,9 +1298,8 @@ fn lowers_task_async_post_flow_keep_prev_carry_project_with_post_flow_recursive_
 
 #[test]
 fn lowers_task_async_while_post_flow_compound_project_with_async_post_flow_compound_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_compound_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_async_while_post_flow_compound_demo");
 
     let accumulate = artifacts
         .nir
@@ -1400,16 +1348,13 @@ fn lowers_task_async_while_post_flow_compound_project_with_async_post_flow_compo
 
 #[test]
 fn compiles_task_runtime_project() {
-    let project =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo");
+    let project = Path::new("../../examples/projects/task/task_runtime_demo");
     nuisc::pipeline::compile_project(project).expect("task runtime project should compile");
 }
 
 #[test]
 fn lowers_task_runtime_project_with_completed_timeout_and_cancelled_shapes() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_runtime_demo");
 
     let capture_lifecycle = artifacts
         .nir
@@ -1485,17 +1430,13 @@ fn lowers_task_runtime_project_with_completed_timeout_and_cancelled_shapes() {
 
 #[test]
 fn compiles_task_status_observe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_status_observe_demo");
     nuisc::pipeline::compile_project(project).expect("task status observe project should compile");
 }
 
 #[test]
 fn lowers_task_status_observe_project_with_status_observer_shapes() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_status_observe_demo");
 
     for (name, predicate) in [
         ("capture_completed", "completed"),
@@ -1574,18 +1515,14 @@ fn lowers_task_status_observe_project_with_status_observer_shapes() {
 
 #[test]
 fn compiles_task_completed_observe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_completed_observe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task completed observe project should compile");
 }
 
 #[test]
 fn lowers_task_completed_observe_project_with_join_result_and_task_value_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_completed_observe_demo");
 
     let main = artifacts
         .nir
@@ -1622,17 +1559,13 @@ fn lowers_task_completed_observe_project_with_join_result_and_task_value_shape()
 
 #[test]
 fn compiles_task_compare_observe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_compare_observe_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_compare_observe_demo");
     nuisc::pipeline::compile_project(project).expect("task compare observe project should compile");
 }
 
 #[test]
 fn lowers_task_compare_observe_project_with_direct_and_observed_join_shapes() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_compare_observe_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_compare_observe_demo");
 
     let capture_direct = artifacts
         .nir
@@ -1681,45 +1614,36 @@ fn lowers_task_compare_observe_project_with_direct_and_observed_join_shapes() {
 
 #[test]
 fn compiles_task_memory_roundtrip_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_roundtrip_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_memory_roundtrip_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task memory roundtrip project should compile");
 }
 
 #[test]
 fn compiles_task_memory_result_branch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_branch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_memory_result_branch_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task memory result branch project should compile");
 }
 
 #[test]
 fn compiles_task_memory_result_batch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_batch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_memory_result_batch_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task memory result batch project should compile");
 }
 
 #[test]
 fn compiles_task_memory_session_policy_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_policy_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_memory_session_policy_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task memory session policy project should compile");
 }
 
 #[test]
 fn lowers_task_memory_session_policy_project_with_task_memory_session_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_policy_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_memory_session_policy_demo");
 
     let capture_session = artifacts
         .nir
@@ -1815,27 +1739,21 @@ fn lowers_task_memory_session_policy_project_with_task_memory_session_shape() {
 
 #[test]
 fn compiles_task_memory_session_packet_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_packet_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_memory_session_packet_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task memory session packet project should compile");
 }
 
 #[test]
 fn compiles_task_result_policy_branch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_result_policy_branch_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task result policy branch project should compile");
 }
 
 #[test]
 fn lowers_task_result_policy_branch_project_with_branch_selection_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_result_policy_branch_demo");
 
     let select_value = artifacts
         .nir
@@ -1906,17 +1824,13 @@ fn lowers_task_result_policy_branch_project_with_branch_selection_shape() {
 
 #[test]
 fn compiles_task_fallback_branch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_fallback_branch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_fallback_branch_demo");
     nuisc::pipeline::compile_project(project).expect("task fallback branch project should compile");
 }
 
 #[test]
 fn lowers_task_fallback_branch_project_with_timeout_fallback_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_fallback_branch_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_fallback_branch_demo");
 
     let select_value = artifacts
         .nir
@@ -1993,18 +1907,14 @@ fn lowers_task_fallback_branch_project_with_timeout_fallback_shape() {
 
 #[test]
 fn compiles_task_result_family_branch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_family_branch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_result_family_branch_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task result family branch project should compile");
 }
 
 #[test]
 fn lowers_task_result_family_branch_project_with_result_family_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_family_branch_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_result_family_branch_demo");
 
     let capture = artifacts
         .nir
@@ -2092,17 +2002,13 @@ fn lowers_task_result_family_branch_project_with_result_family_shape() {
 
 #[test]
 fn compiles_task_batch_branch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_batch_branch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_batch_branch_demo");
     nuisc::pipeline::compile_project(project).expect("task batch branch project should compile");
 }
 
 #[test]
 fn lowers_task_batch_branch_project_with_batch_summary_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_batch_branch_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_batch_branch_demo");
 
     let capture_batch = artifacts
         .nir
@@ -2159,18 +2065,14 @@ fn lowers_task_batch_branch_project_with_batch_summary_shape() {
 
 #[test]
 fn compiles_task_result_batch_branch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_batch_branch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_result_batch_branch_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task result batch branch project should compile");
 }
 
 #[test]
 fn lowers_task_result_batch_branch_project_with_result_batch_summary_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_batch_branch_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_result_batch_branch_demo");
 
     let capture_batch = artifacts
         .nir
@@ -2211,18 +2113,15 @@ fn lowers_task_result_batch_branch_project_with_result_batch_summary_shape() {
 
 #[test]
 fn compiles_task_windowed_batch_branch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_windowed_batch_branch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_windowed_batch_branch_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task windowed batch branch project should compile");
 }
 
 #[test]
 fn lowers_task_windowed_batch_branch_project_with_windowed_summary_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_windowed_batch_branch_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_windowed_batch_branch_demo");
 
     let capture_batch = artifacts
         .nir
@@ -2302,18 +2201,15 @@ fn lowers_task_windowed_batch_branch_project_with_windowed_summary_shape() {
 
 #[test]
 fn compiles_task_result_windowed_batch_branch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_windowed_batch_branch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_result_windowed_batch_branch_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task result windowed batch branch project should compile");
 }
 
 #[test]
 fn lowers_task_result_windowed_batch_branch_project_with_result_windowed_summary_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_windowed_batch_branch_demo",
-    );
+    let artifacts =
+        compiled_project("../../examples/projects/task/task_result_windowed_batch_branch_demo");
 
     let capture_batch = artifacts
         .nir
@@ -2394,18 +2290,14 @@ fn lowers_task_result_windowed_batch_branch_project_with_result_windowed_summary
 
 #[test]
 fn compiles_task_lifecycle_branch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_lifecycle_branch_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task lifecycle branch project should compile");
 }
 
 #[test]
 fn lowers_task_lifecycle_branch_project_with_timeout_branch_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_lifecycle_branch_demo");
 
     let main = artifacts
         .nir
@@ -2463,17 +2355,13 @@ fn lowers_task_lifecycle_branch_project_with_timeout_branch_shape() {
 
 #[test]
 fn compiles_task_cancel_branch_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cancel_branch_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_cancel_branch_demo");
     nuisc::pipeline::compile_project(project).expect("task cancel branch project should compile");
 }
 
 #[test]
 fn lowers_task_cancel_branch_project_with_cancelled_branch_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cancel_branch_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_cancel_branch_demo");
 
     let main = artifacts
         .nir
@@ -2533,24 +2421,19 @@ fn lowers_task_cancel_branch_project_with_cancelled_branch_shape() {
 
 #[test]
 fn compiles_task_cli_tooling_project() {
-    let project =
-        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cli_tooling_demo");
+    let project = Path::new("../../examples/projects/task/task_cli_tooling_demo");
     nuisc::pipeline::compile_project(project).expect("task cli tooling project should compile");
 }
 
 #[test]
 fn compiles_task_thread_mutex_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_thread_mutex_demo");
     nuisc::pipeline::compile_project(project).expect("task thread/mutex project should compile");
 }
 
 #[test]
 fn lowers_task_cli_tooling_project_with_timeout_and_host_io_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cli_tooling_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_cli_tooling_demo");
 
     let main = artifacts
         .nir
@@ -2643,9 +2526,7 @@ fn lowers_task_cli_tooling_project_with_timeout_and_host_io_shape() {
 
 #[test]
 fn lowers_task_thread_mutex_project_with_thread_and_lock_shape() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_thread_mutex_demo");
 
     let capture = artifacts
         .nir
@@ -2797,18 +2678,14 @@ fn lowers_task_thread_mutex_project_with_thread_and_lock_shape() {
 
 #[test]
 fn compiles_task_scheduler_observe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_scheduler_observe_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_scheduler_observe_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task scheduler observe project should compile");
 }
 
 #[test]
 fn lowers_task_scheduler_observe_project_with_scheduler_and_timeout_shapes() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_scheduler_observe_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_scheduler_observe_demo");
 
     let capture = artifacts
         .nir
@@ -2858,17 +2735,13 @@ fn lowers_task_scheduler_observe_project_with_scheduler_and_timeout_shapes() {
 
 #[test]
 fn compiles_task_clock_observe_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_clock_observe_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_clock_observe_demo");
     nuisc::pipeline::compile_project(project).expect("task clock observe project should compile");
 }
 
 #[test]
 fn lowers_task_clock_observe_project_with_clock_host_observer_shapes() {
-    let artifacts = compiled_project(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_clock_observe_demo",
-    );
+    let artifacts = compiled_project("../../examples/projects/task/task_clock_observe_demo");
 
     let capture = artifacts
         .nir
@@ -2921,36 +2794,28 @@ fn lowers_task_clock_observe_project_with_clock_host_observer_shapes() {
 
 #[test]
 fn compiles_task_httpish_response_packet_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_response_packet_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_httpish_response_packet_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task httpish response packet project should compile");
 }
 
 #[test]
 fn compiles_task_httpish_session_policy_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_session_policy_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_httpish_session_policy_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task httpish session policy project should compile");
 }
 
 #[test]
 fn compiles_task_httpish_response_slots_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_response_slots_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_httpish_response_slots_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task httpish response slots project should compile");
 }
 
 #[test]
 fn compiles_task_httpish_header_session_project() {
-    let project = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_header_session_demo",
-    );
+    let project = Path::new("../../examples/projects/task/task_httpish_header_session_demo");
     nuisc::pipeline::compile_project(project)
         .expect("task httpish header session project should compile");
 }

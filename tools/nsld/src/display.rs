@@ -66,6 +66,22 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.container_present,
         optional_bool_text(report.container_valid)
     );
+    println!(
+        "  container_payload: present={} issues={}",
+        report.container_payload_present,
+        report.container_payload_issues.len()
+    );
+    println!(
+        "  container_loader: readiness={} blockers={} external_imports={}",
+        optional_string_text(report.container_loader_readiness.as_deref()),
+        report.container_loader_blockers.len(),
+        optional_usize_text(report.container_external_import_count)
+    );
+    println!(
+        "  artifact_chain: valid={} issues={}",
+        report.artifact_chain_valid,
+        report.artifact_chain_issues.len()
+    );
     println!("  final_stage_link_mode: {}", report.final_stage_link_mode);
     println!("  domains: {}", report.domains.len());
     for domain in &report.domains {
@@ -145,6 +161,15 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     }
     for issue in &report.container_issues {
         println!("  container_issue: {issue}");
+    }
+    for issue in &report.container_payload_issues {
+        println!("  container_payload_issue: {issue}");
+    }
+    for blocker in &report.container_loader_blockers {
+        println!("  container_loader_blocker: {blocker}");
+    }
+    for issue in &report.artifact_chain_issues {
+        println!("  artifact_chain_issue: {issue}");
     }
 }
 
@@ -490,6 +515,52 @@ pub(crate) fn print_nsld_container_report(report: &NsldContainerReport) {
     println!("  container_version: {}", report.container_version);
     println!("  container_layout_hash: {}", report.container_layout_hash);
     println!("  container_hash: {}", report.container_hash);
+    println!("  loader_readiness: {}", report.loader_readiness);
+    for blocker in &report.loader_blockers {
+        println!("  loader_blocker: {blocker}");
+    }
+    println!("  loader_entry_kind: {}", report.loader_entry_kind);
+    println!("  loader_entry_symbol: {}", report.loader_entry_symbol);
+    println!(
+        "  loader_entry_section_id: {}",
+        report.loader_entry_section_id
+    );
+    println!("  loader_symbols: {}", report.loader_symbols.len());
+    for symbol in &report.loader_symbols {
+        println!(
+            "  loader_symbol: id={} kind={} name={} section={} offset={} size={} payload_hash={}",
+            symbol.symbol_id,
+            symbol.symbol_kind,
+            symbol.symbol_name,
+            symbol.section_id,
+            symbol.offset,
+            symbol.size_bytes,
+            symbol.payload_hash
+        );
+    }
+    println!("  relocations: {}", report.relocations.len());
+    for relocation in &report.relocations {
+        println!(
+            "  relocation: id={} kind={} source={} offset={} target={} addend={}",
+            relocation.relocation_id,
+            relocation.relocation_kind,
+            relocation.source_section_id,
+            relocation.source_offset,
+            relocation.target_symbol_id,
+            relocation.addend
+        );
+    }
+    println!("  external_imports: {}", report.external_imports.len());
+    for external_import in &report.external_imports {
+        println!(
+            "  external_import: id={} kind={} name={} provider={} required={}",
+            external_import.import_id,
+            external_import.import_kind,
+            external_import.import_name,
+            external_import.provider,
+            external_import.required
+        );
+    }
     println!("  payload_size_bytes: {}", report.payload_size_bytes);
     println!("  payload_hash: {}", report.payload_hash);
     println!("  output_path: {}", report.output_path);
@@ -551,6 +622,14 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
         report.expected_section_count
     );
     println!(
+        "  expected_loader_readiness: {}",
+        report.expected_loader_readiness
+    );
+    println!(
+        "  expected_external_import_count: {}",
+        report.expected_external_import_count
+    );
+    println!(
         "  actual_container_layout_hash: {}",
         report
             .actual_container_layout_hash
@@ -572,6 +651,17 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
     println!(
         "  actual_section_count: {}",
         optional_usize_text(report.actual_section_count)
+    );
+    println!(
+        "  actual_loader_readiness: {}",
+        report
+            .actual_loader_readiness
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_external_import_count: {}",
+        optional_usize_text(report.actual_external_import_count)
     );
     for issue in &report.section_range_issues {
         println!("  section_range_issue: {issue}");
@@ -700,6 +790,10 @@ fn optional_usize_text(value: Option<usize>) -> String {
     value
         .map(|value| value.to_string())
         .unwrap_or_else(|| "missing".to_owned())
+}
+
+fn optional_string_text(value: Option<&str>) -> String {
+    value.unwrap_or("missing").to_owned()
 }
 
 fn optional_bool_text(value: Option<bool>) -> String {
