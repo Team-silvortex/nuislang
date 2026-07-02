@@ -1,0 +1,4 @@
+name = "hetero_proxy_benchmark_demo"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["std=workspace"]

@@ -86,6 +86,15 @@ AOT bundle manifests mirror the same contract with:
 * `host_ffi_symbols=<symbol>@<abi>:<signature>;...`
 * `host_ffi_symbol_hashes=<symbol>:fnv1a64:<hex>;...`
 
+Project metadata mirrors the same policy earlier in
+`nuis.project.host_ffi.txt`. Each extern row keeps the source-facing
+`signature=fn <name>(...) -> <type>` for humans, and also records
+`signature_pattern=<ret>(<args>)`, `signature_hash=fnv1a64:<hex>`, and
+`policy=signature-whitelist-required` for tools. This is the project-level
+audit trail used by heterogeneous proxy tests before the final AOT bundle is
+packed. `nuisc verify-build-manifest` checks these project-level rows and
+rejects signature hash drift before reporting the build manifest as verified.
+
 The packer verifies these two lines against each other before writing the
 bundle manifest, so ABI drift, signature drift, and hash drift are caught at
 pack time.

@@ -50,6 +50,28 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
     if let Some(path) = &plan.lowering_plan_index_path {
         lines.push(format!("lowering_plan_index: {path}"));
     }
+    lines.push(format!(
+        "host_ffi: symbols={} policies={} policy={} validation={} index={}",
+        plan.host_ffi.symbol_count,
+        plan.host_ffi.policy_count,
+        plan.host_ffi.policy,
+        if plan.host_ffi.validation.valid {
+            "valid"
+        } else {
+            "invalid"
+        },
+        plan.host_ffi.index_path.as_deref().unwrap_or("none")
+    ));
+    for group in &plan.host_ffi.abi_groups {
+        lines.push(format!(
+            "host_ffi_abi: abi={} symbols={} policies={} valid={} entries={}",
+            group.abi,
+            group.symbol_count,
+            group.policy_count,
+            group.validation.valid,
+            group.symbols.join(",")
+        ));
+    }
     if let Some(kind) = &plan.compiled_artifact.container_kind {
         lines.push(format!(
             "artifact_container: kind={} version={} sections={} valid={}",
@@ -189,6 +211,42 @@ pub fn render_link_plan_json(plan: &LinkPlan) -> String {
         json_string_array_field("final_stage_inputs", &plan.final_stage.inputs),
         json_string_array_field("domain_families", &plan.envelope.domain_families),
         json_usize_field("domain_unit_count", plan.domain_units.len()),
+        json_optional_string_field("host_ffi_index_path", plan.host_ffi.index_path.as_deref()),
+        json_usize_field("host_ffi_symbol_count", plan.host_ffi.symbol_count),
+        json_usize_field("host_ffi_policy_count", plan.host_ffi.policy_count),
+        json_string_field("host_ffi_policy", &plan.host_ffi.policy),
+        json_usize_field(
+            "host_ffi_validation_checked",
+            plan.host_ffi.validation.checked,
+        ),
+        json_bool_field("host_ffi_validation_valid", plan.host_ffi.validation.valid),
+        json_bool_field(
+            "host_ffi_link_allowed",
+            plan.host_ffi.validation.link_allowed,
+        ),
+        json_string_array_field(
+            "host_ffi_validation_issues",
+            &plan.host_ffi.validation.issues,
+        ),
+        json_string_array_field("host_ffi_validation_notes", &plan.host_ffi.validation.notes),
+        format!(
+            "\"host_ffi_abi_groups\":[{}]",
+            plan.host_ffi
+                .abi_groups
+                .iter()
+                .map(render_host_ffi_abi_group_json)
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        format!(
+            "\"host_ffi_entries\":[{}]",
+            plan.host_ffi
+                .entries
+                .iter()
+                .map(render_host_ffi_entry_json)
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
         json_optional_string_field(
             "artifact_container_kind",
             plan.compiled_artifact.container_kind.as_deref(),
@@ -227,6 +285,59 @@ pub fn render_link_plan_json(plan: &LinkPlan) -> String {
             "hetero_calculate_valid",
             plan.hetero_calculate.validation.valid,
         ),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn render_host_ffi_abi_group_json(group: &LinkPlanHostFfiAbiGroup) -> String {
+    let entries = group
+        .entries
+        .iter()
+        .map(render_host_ffi_abi_entry_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = vec![
+        json_string_field("abi", &group.abi),
+        json_usize_field("symbol_count", group.symbol_count),
+        json_usize_field("policy_count", group.policy_count),
+        json_string_array_field("symbols", &group.symbols),
+        format!(
+            "\"validation\":{}",
+            render_host_ffi_validation_json(&group.validation)
+        ),
+        format!("\"entries\":[{}]", entries),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn render_host_ffi_validation_json(validation: &LinkPlanHostFfiValidationSummary) -> String {
+    let fields = vec![
+        json_usize_field("checked", validation.checked),
+        json_bool_field("valid", validation.valid),
+        json_bool_field("link_allowed", validation.link_allowed),
+        json_string_array_field("issues", &validation.issues),
+        json_string_array_field("notes", &validation.notes),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn render_host_ffi_abi_entry_json(entry: &LinkPlanHostFfiAbiEntry) -> String {
+    let fields = vec![
+        json_string_field("symbol", &entry.symbol),
+        json_string_field("signature_pattern", &entry.signature_pattern),
+        json_string_field("signature_hash", &entry.signature_hash),
+        json_string_field("policy", &entry.policy),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn render_host_ffi_entry_json(entry: &LinkPlanHostFfiEntry) -> String {
+    let fields = vec![
+        json_string_field("abi", &entry.abi),
+        json_string_field("symbol", &entry.symbol),
+        json_string_field("signature_pattern", &entry.signature_pattern),
+        json_string_field("signature_hash", &entry.signature_hash),
+        json_string_field("policy", &entry.policy),
     ];
     format!("{{{}}}", fields.join(","))
 }

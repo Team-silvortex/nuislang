@@ -13,11 +13,59 @@ pub struct LinkPlan {
     pub bridge_registry_path: Option<String>,
     pub host_bridge_plan_index_path: Option<String>,
     pub lowering_plan_index_path: Option<String>,
+    pub host_ffi: LinkPlanHostFfiFootprint,
     pub domain_units: Vec<LinkPlanDomainUnit>,
     pub artifact_lowering_alignment: ArtifactLoweringAlignmentSummary,
     pub clock_protocol: LinkPlanClockProtocol,
     pub hetero_calculate: LinkPlanHeteroCalculate,
     pub final_stage: LinkPlanFinalStage,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanHostFfiFootprint {
+    pub index_path: Option<String>,
+    pub symbol_count: usize,
+    pub policy_count: usize,
+    pub policy: String,
+    pub abi_groups: Vec<LinkPlanHostFfiAbiGroup>,
+    pub entries: Vec<LinkPlanHostFfiEntry>,
+    pub validation: LinkPlanHostFfiValidationSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanHostFfiAbiGroup {
+    pub abi: String,
+    pub symbol_count: usize,
+    pub policy_count: usize,
+    pub symbols: Vec<String>,
+    pub entries: Vec<LinkPlanHostFfiAbiEntry>,
+    pub validation: LinkPlanHostFfiValidationSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanHostFfiAbiEntry {
+    pub symbol: String,
+    pub signature_pattern: String,
+    pub signature_hash: String,
+    pub policy: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanHostFfiEntry {
+    pub abi: String,
+    pub symbol: String,
+    pub signature_pattern: String,
+    pub signature_hash: String,
+    pub policy: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanHostFfiValidationSummary {
+    pub checked: usize,
+    pub valid: bool,
+    pub link_allowed: bool,
+    pub issues: Vec<String>,
+    pub notes: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

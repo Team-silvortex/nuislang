@@ -1,6 +1,11 @@
-use std::{fs, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::Path,
+};
 
 use crate::aot;
+use crate::host_ffi_index::host_ffi_index_footprint;
 
 #[path = "linker_alignment.rs"]
 mod linker_alignment;
@@ -24,7 +29,9 @@ pub use linker_types::{
     LinkPlanClockDomain, LinkPlanClockEdge, LinkPlanClockProtocol, LinkPlanClockValidationSummary,
     LinkPlanCpuTarget, LinkPlanDataSegment, LinkPlanDomainUnit, LinkPlanEnvelope,
     LinkPlanFinalStage, LinkPlanHeteroCalculate, LinkPlanHeteroNode,
-    LinkPlanHeteroValidationSummary, LinkPlanLifecycle, LINK_PLAN_SCHEMA,
+    LinkPlanHeteroValidationSummary, LinkPlanHostFfiAbiEntry, LinkPlanHostFfiAbiGroup,
+    LinkPlanHostFfiEntry, LinkPlanHostFfiFootprint, LinkPlanHostFfiValidationSummary,
+    LinkPlanLifecycle, LINK_PLAN_SCHEMA,
 };
 
 pub fn build_clock_protocol(
@@ -231,6 +238,34 @@ pub fn build_link_plan(
         &domain_units,
         &hetero_calculate,
     );
+    let host_ffi_footprint = host_ffi_index_footprint(report.project_host_ffi_index.as_deref());
+    let host_ffi_entries = host_ffi_footprint
+        .entries
+        .into_iter()
+        .map(|entry| LinkPlanHostFfiEntry {
+            abi: entry.abi,
+            symbol: entry.symbol,
+            signature_pattern: entry.signature_pattern,
+            signature_hash: entry.signature_hash,
+            policy: entry.policy,
+        })
+        .collect::<Vec<_>>();
+    let host_ffi_validation = validate_host_ffi_footprint(
+        host_ffi_footprint.symbol_count,
+        host_ffi_footprint.policy_count,
+        &host_ffi_footprint.policy,
+        &host_ffi_entries,
+    );
+    let host_ffi_abi_groups = derive_host_ffi_abi_groups(&host_ffi_entries);
+    let host_ffi = LinkPlanHostFfiFootprint {
+        index_path: host_ffi_footprint.index_path,
+        symbol_count: host_ffi_footprint.symbol_count,
+        policy_count: host_ffi_footprint.policy_count,
+        policy: host_ffi_footprint.policy,
+        abi_groups: host_ffi_abi_groups,
+        validation: host_ffi_validation,
+        entries: host_ffi_entries,
+    };
 
     LinkPlan {
         schema: LINK_PLAN_SCHEMA.to_owned(),
@@ -260,6 +295,7 @@ pub fn build_link_plan(
         bridge_registry_path: report.bridge_registry_path.clone(),
         host_bridge_plan_index_path: report.host_bridge_plan_index_path.clone(),
         lowering_plan_index_path: report.lowering_plan_index_path.clone(),
+        host_ffi,
         domain_units,
         artifact_lowering_alignment,
         clock_protocol,
@@ -272,6 +308,149 @@ pub fn build_link_plan_from_manifest(path: &Path) -> Result<LinkPlan, String> {
     let report = aot::verify_build_manifest(path)?;
     let artifact = aot::parse_nuis_compiled_artifact(Path::new(&report.artifact_path))?;
     Ok(build_link_plan(&report, &artifact))
+}
+
+fn validate_host_ffi_footprint(
+    symbol_count: usize,
+    policy_count: usize,
+    policy: &str,
+    entries: &[LinkPlanHostFfiEntry],
+) -> LinkPlanHostFfiValidationSummary {
+    let mut issues = Vec::new();
+    let mut notes = Vec::new();
+    if symbol_count != entries.len() {
+        issues.push(format!(
+            "host_ffi symbol_count {symbol_count} does not match parsed entries {}",
+            entries.len()
+        ));
+    }
+    if policy_count != entries.len() {
+        issues.push(format!(
+            "host_ffi policy_count {policy_count} does not match parsed entries {}",
+            entries.len()
+        ));
+    }
+    let mut seen_signatures = BTreeSet::new();
+    let mut signatures_by_symbol: BTreeMap<(&str, &str), BTreeSet<&str>> = BTreeMap::new();
+    for entry in entries {
+        let key = (
+            entry.abi.as_str(),
+            entry.symbol.as_str(),
+            entry.signature_pattern.as_str(),
+        );
+        signatures_by_symbol
+            .entry((entry.abi.as_str(), entry.symbol.as_str()))
+            .or_default()
+            .insert(entry.signature_pattern.as_str());
+        if !seen_signatures.insert(key) {
+            issues.push(format!(
+                "host_ffi duplicate whitelist entry for ABI `{}` symbol `{}` signature `{}`",
+                entry.abi, entry.symbol, entry.signature_pattern
+            ));
+        }
+        if entry.policy != policy {
+            issues.push(format!(
+                "host_ffi entry `{}` uses policy `{}` but link plan policy is `{policy}`",
+                entry.symbol, entry.policy
+            ));
+        }
+    }
+    for ((abi, symbol), signatures) in signatures_by_symbol {
+        if signatures.len() > 1 {
+            notes.push(format!(
+                "host_ffi ABI `{abi}` symbol `{symbol}` has {} whitelisted signatures",
+                signatures.len()
+            ));
+        }
+    }
+    let valid = issues.is_empty();
+    LinkPlanHostFfiValidationSummary {
+        checked: entries.len(),
+        valid,
+        link_allowed: valid,
+        issues,
+        notes,
+    }
+}
+
+fn derive_host_ffi_abi_groups(entries: &[LinkPlanHostFfiEntry]) -> Vec<LinkPlanHostFfiAbiGroup> {
+    let mut groups: BTreeMap<&str, Vec<&LinkPlanHostFfiEntry>> = BTreeMap::new();
+    for entry in entries {
+        groups.entry(entry.abi.as_str()).or_default().push(entry);
+    }
+    groups
+        .into_iter()
+        .map(|(abi, entries)| {
+            let abi_entries = entries
+                .iter()
+                .map(|entry| LinkPlanHostFfiAbiEntry {
+                    symbol: entry.symbol.clone(),
+                    signature_pattern: entry.signature_pattern.clone(),
+                    signature_hash: entry.signature_hash.clone(),
+                    policy: entry.policy.clone(),
+                })
+                .collect::<Vec<_>>();
+            LinkPlanHostFfiAbiGroup {
+                abi: abi.to_owned(),
+                symbol_count: entries.len(),
+                policy_count: entries
+                    .iter()
+                    .filter(|entry| !entry.policy.is_empty())
+                    .count(),
+                symbols: entries
+                    .iter()
+                    .map(|entry| format!("{}:{}", entry.symbol, entry.signature_pattern))
+                    .collect(),
+                validation: validate_host_ffi_abi_group(abi, &abi_entries),
+                entries: abi_entries,
+            }
+        })
+        .collect()
+}
+
+fn validate_host_ffi_abi_group(
+    abi: &str,
+    entries: &[LinkPlanHostFfiAbiEntry],
+) -> LinkPlanHostFfiValidationSummary {
+    let mut issues = Vec::new();
+    let mut notes = Vec::new();
+    let mut seen_signatures = BTreeSet::new();
+    let mut signatures_by_symbol: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    for entry in entries {
+        let key = (entry.symbol.as_str(), entry.signature_pattern.as_str());
+        signatures_by_symbol
+            .entry(entry.symbol.as_str())
+            .or_default()
+            .insert(entry.signature_pattern.as_str());
+        if !seen_signatures.insert(key) {
+            issues.push(format!(
+                "host_ffi ABI `{abi}` duplicate symbol `{}` signature `{}`",
+                entry.symbol, entry.signature_pattern
+            ));
+        }
+        if entry.policy != crate::aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY {
+            issues.push(format!(
+                "host_ffi ABI `{abi}` symbol `{}` uses unsupported policy `{}`",
+                entry.symbol, entry.policy
+            ));
+        }
+    }
+    for (symbol, signatures) in signatures_by_symbol {
+        if signatures.len() > 1 {
+            notes.push(format!(
+                "host_ffi ABI `{abi}` symbol `{symbol}` has {} whitelisted signatures",
+                signatures.len()
+            ));
+        }
+    }
+    let valid = issues.is_empty();
+    LinkPlanHostFfiValidationSummary {
+        checked: entries.len(),
+        valid,
+        link_allowed: valid,
+        issues,
+        notes,
+    }
 }
 
 pub fn build_hetero_calculate_plan(
@@ -294,6 +473,91 @@ pub fn write_hetero_calculate_plan(plan: &LinkPlan, path: &Path) -> Result<(), S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sample_host_ffi_entry(symbol: &str) -> LinkPlanHostFfiEntry {
+        sample_host_ffi_entry_with_signature(symbol, "i64(i64)")
+    }
+
+    fn sample_host_ffi_entry_with_signature(
+        symbol: &str,
+        signature_pattern: &str,
+    ) -> LinkPlanHostFfiEntry {
+        LinkPlanHostFfiEntry {
+            abi: "c".to_owned(),
+            symbol: symbol.to_owned(),
+            signature_pattern: signature_pattern.to_owned(),
+            signature_hash: "fnv1a64:test".to_owned(),
+            policy: crate::aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY.to_owned(),
+        }
+    }
+
+    #[test]
+    fn host_ffi_validation_rejects_duplicate_whitelist_entries() {
+        let entries = vec![
+            sample_host_ffi_entry("host_sleep_ns"),
+            sample_host_ffi_entry("host_sleep_ns"),
+        ];
+
+        let validation = validate_host_ffi_footprint(
+            2,
+            2,
+            crate::aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY,
+            &entries,
+        );
+
+        assert_eq!(validation.checked, 2);
+        assert!(!validation.valid);
+        assert!(!validation.link_allowed);
+        assert!(validation
+            .issues
+            .iter()
+            .any(|issue| issue.contains("duplicate whitelist entry")));
+    }
+
+    #[test]
+    fn host_ffi_validation_notes_multi_signature_symbol_without_rejecting() {
+        let entries = vec![
+            sample_host_ffi_entry_with_signature("host_probe", "i64()"),
+            sample_host_ffi_entry_with_signature("host_probe", "i64(i64)"),
+        ];
+
+        let validation = validate_host_ffi_footprint(
+            2,
+            2,
+            crate::aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY,
+            &entries,
+        );
+
+        assert_eq!(validation.checked, 2);
+        assert!(validation.valid);
+        assert!(validation.link_allowed);
+        assert!(validation.issues.is_empty());
+        assert!(validation
+            .notes
+            .iter()
+            .any(|note| note.contains("has 2 whitelisted signatures")));
+    }
+
+    #[test]
+    fn host_ffi_abi_group_validation_tracks_local_notes() {
+        let entries = vec![
+            sample_host_ffi_entry_with_signature("host_probe", "i64()"),
+            sample_host_ffi_entry_with_signature("host_probe", "i64(i64)"),
+        ];
+
+        let groups = derive_host_ffi_abi_groups(&entries);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].abi, "c");
+        assert_eq!(groups[0].entries.len(), 2);
+        assert!(groups[0].validation.valid);
+        assert!(groups[0].validation.link_allowed);
+        assert!(groups[0]
+            .validation
+            .notes
+            .iter()
+            .any(|note| note.contains("has 2 whitelisted signatures")));
+    }
 
     fn sample_report(
         packaging_mode: &str,
@@ -369,6 +633,7 @@ mod tests {
             project_documented_galaxy_library_module_count: 0,
             project_documented_galaxy_item_count: 0,
             project_packet_index: None,
+            project_host_ffi_index: None,
             bridge_registry_path: Some("out/nuis.bridge.registry.toml".to_owned()),
             bridge_registry_units: 1,
             bridge_registry_checked: 1,

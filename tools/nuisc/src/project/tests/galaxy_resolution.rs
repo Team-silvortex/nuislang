@@ -69,7 +69,8 @@ mod cpu Main {
             "lib/cli_contracts.ns".to_owned(),
             "lib/net_contracts.ns".to_owned(),
             "lib/text_contracts.ns".to_owned(),
-            "lib/time_contracts.ns".to_owned()
+            "lib/time_contracts.ns".to_owned(),
+            "lib/hetero_contracts.ns".to_owned()
         ]
     );
 
@@ -129,19 +130,19 @@ mod cpu Main {
     assert!(galaxy_index.contains("documented_items="));
     assert!(galaxy_index.contains("std\tpackage=nuis.std\tdirect=false"));
     assert!(galaxy_index.contains(
-        "library_modules=lib/task_contracts.ns, lib/io_contracts.ns, lib/fs_contracts.ns, lib/cli_contracts.ns, lib/net_contracts.ns, lib/text_contracts.ns, lib/time_contracts.ns"
+        "library_modules=lib/task_contracts.ns, lib/io_contracts.ns, lib/fs_contracts.ns, lib/cli_contracts.ns, lib/net_contracts.ns, lib/text_contracts.ns, lib/time_contracts.ns, lib/hetero_contracts.ns"
     ));
     assert!(galaxy_index.contains("library_import_policy=project-auto"));
     assert!(galaxy_index.contains("blockers=<none>"));
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=15\tdocumented_modules=14\tdocumented_items=140"));
+    assert!(docs_index.contains("summary\tmodules=16\tdocumented_modules=15\tdocumented_items=170"));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=34\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=14\tvisible_libraries=14\tvisible_modules=15\tdocumented_visible_modules=14\tdocumented_visible_items=140"
+        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=170"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -174,6 +175,9 @@ mod cpu Main {
         "library\tstd\tlib/time_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
+        "library\tstd\tlib/hetero_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
         "library\tcore\tlib/prelude_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
@@ -190,6 +194,7 @@ mod cpu Main {
     assert!(imports_index.contains("visible\tcpu\tStdFsContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tStdTextContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tStdTimeContracts\tdoc_items="));
+    assert!(imports_index.contains("visible\tcpu\tStdHeteroContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tcpu\tPixelMagicContracts\tdoc_items="));
     assert!(imports_index.contains("visible\tshader\tPixelMagicSurfaceContracts\tdoc_items="));
     assert!(imports_index.contains("import_policy=project-auto"));
@@ -343,6 +348,7 @@ use cpu StdFsContracts;
 use cpu StdTaskContracts;
 use cpu StdTextContracts;
 use cpu StdTimeContracts;
+use cpu StdHeteroContracts;
 
 mod cpu Main {
   fn main() -> i64 {
@@ -370,6 +376,15 @@ mod cpu Main {
         )
         + StdTextContracts.pipeline_status_total(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
         + StdTimeContracts.time_sample_total(100, 200, 300)
+        + StdHeteroContracts.hetero_test_total(
+          1,
+          StdHeteroContracts.backend_c_ffi_proxy(),
+          StdHeteroContracts.proxy_c_ffi(),
+          true,
+          true,
+          0,
+          0
+        )
         + CorePrelude.one_i64()
     );
   }
@@ -484,6 +499,11 @@ mod cpu Main {
         .functions
         .iter()
         .any(|function| function.name == "StdTimeContracts.time_sample_total"));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "StdHeteroContracts.hetero_test_total"));
     assert!(artifacts
         .nir
         .functions
@@ -1093,7 +1113,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=14\tvisible_libraries=14\tvisible_modules=15\tdocumented_visible_modules=14\tdocumented_visible_items=140"
+        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=170"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

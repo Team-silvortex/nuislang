@@ -13,7 +13,8 @@ surfaces = [
   "surface.std.cli-workflow-contracts.v1",
   "surface.std.net-session-contracts.v1",
   "surface.std.text-json-contracts.v1",
-  "surface.std.time-benchmark-contracts.v1"
+  "surface.std.time-benchmark-contracts.v1",
+  "surface.std.hetero-test-benchmark-contracts.v1"
 ]
 
 library_modules = [
@@ -23,7 +24,8 @@ library_modules = [
   "lib/cli_contracts.ns",
   "lib/net_contracts.ns",
   "lib/text_contracts.ns",
-  "lib/time_contracts.ns"
+  "lib/time_contracts.ns",
+  "lib/hetero_contracts.ns"
 ]
 
 library_import_policy = "project-auto"
@@ -142,6 +144,7 @@ source_modules = [
   "benchmark_report_recipe.ns",
   "benchmark_report_count_recipe.ns",
   "benchmark_report_file_recipe.ns",
+  "hetero_proxy_benchmark_recipe.ns",
   "cwd_runtime.ns",
   "cwd_runtime_recipe.ns",
   "temp_runtime.ns",

@@ -1,5 +1,7 @@
 use std::{fs, path::Path};
 
+use crate::host_ffi_index::verify_host_ffi_index_source;
+
 pub(crate) struct ProjectMetadataVerifyReport {
     pub doc_index_checked: usize,
     pub project_metadata_checked: usize,
@@ -31,6 +33,7 @@ pub(crate) fn verify_project_metadata_artifacts(
     project_documented_galaxy_library_module_count: usize,
     project_documented_galaxy_item_count: usize,
     project_packet_index: Option<&str>,
+    project_host_ffi_index: Option<&str>,
 ) -> Result<ProjectMetadataVerifyReport, String> {
     let doc_index_checked = verify_doc_index(
         manifest_path,
@@ -118,6 +121,11 @@ pub(crate) fn verify_project_metadata_artifacts(
     }
     if let Some(packet_index) = project_packet_index {
         read_project_index("packet", packet_index, manifest_path)?;
+        project_metadata_checked += 1;
+    }
+    if let Some(host_ffi_index) = project_host_ffi_index {
+        let host_ffi_source = read_project_index("host_ffi", host_ffi_index, manifest_path)?;
+        verify_host_ffi_index_source(host_ffi_index, &host_ffi_source)?;
         project_metadata_checked += 1;
     }
     Ok(ProjectMetadataVerifyReport {

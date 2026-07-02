@@ -135,6 +135,10 @@ First auto-injectable library module:
 * [lib/time_contracts.ns](lib/time_contracts.ns)
   exposes the initial `StdTimeContracts` helper surface for normalizing wall
   time, monotonic time, sleep, clock-domain, and benchmark span probes
+* [lib/hetero_contracts.ns](lib/hetero_contracts.ns)
+  exposes the initial `StdHeteroContracts` helper surface for normalizing
+  heterogeneous backend ids, C FFI proxy whitelist checks, accepted/rejected
+  proxy status codes, proxy manifest totals, and benchmark/test probe totals
 
 Intended scope:
 
@@ -229,6 +233,10 @@ Recipe modules:
   - [cli_build_pipeline_recipe.ns](cli_build_pipeline_recipe.ns)
   - [cli_project_build_report_recipe.ns](cli_project_build_report_recipe.ns)
   - [cli_compile_workflow_recipe.ns](cli_compile_workflow_recipe.ns)
+  - [hetero_proxy_benchmark_recipe.ns](hetero_proxy_benchmark_recipe.ns)
+    models a portable heterogeneous benchmark route where a real C FFI host
+    bridge acts as the backend proxy under a whitelist signature check, while
+    rejected signatures are recorded without dispatching through the host bridge
 * net/runtime staging
   - grouped rule:
     `profile core -> transport edge -> syscall edge -> socket edge -> control edge -> protocol edge -> http edge -> result spine -> task spine -> session`

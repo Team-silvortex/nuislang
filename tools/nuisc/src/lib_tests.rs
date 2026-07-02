@@ -303,6 +303,7 @@ fn domain_build_unit_verification_verdict_marks_cpu_unit_consistent() {
         project_documented_galaxy_library_module_count: 0,
         project_documented_galaxy_item_count: 0,
         project_packet_index: None,
+        project_host_ffi_index: None,
         bridge_registry_path: None,
         bridge_registry_units: 0,
         bridge_registry_checked: 0,
@@ -619,6 +620,10 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
     assert!(json.contains("\"kind\":\"nuis_doc_index\""));
     assert!(json.contains("\"module_count\":1"));
     assert!(json.contains("\"link_plan\":{"));
+    assert!(json.contains("\"host_ffi\":{"));
+    assert!(json.contains("\"symbol_count\":0"));
+    assert!(json.contains("\"policy_count\":0"));
+    assert!(json.contains("\"policy\":\"signature-whitelist-required\""));
     assert!(json.contains("\"final_stage_driver\":\"clang\""));
 }
 
@@ -654,13 +659,15 @@ fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
     assert!(inspect_json.contains("\"kind\":\"nuis_artifact_inspect\""));
     assert!(inspect_json.contains("\"binary_name\":\"benchmark_report_file_demo\""));
     assert!(inspect_json.contains("\"packaging_mode\":\"native-cpu-llvm\""));
-    assert!(inspect_json.contains("\"artifact_container_kind\":\"compiled-artifact-v1\""));
+    assert!(
+        inspect_json.contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\"")
+    );
     assert!(inspect_json.contains("\"domain_build_units\":["));
     assert!(inspect_json.contains("\"domain_build_contracts\":["));
     assert!(inspect_json.contains("\"link_plan\":{"));
-    assert!(inspect_json.contains("\"artifact_container_version\":1"));
-    assert!(inspect_json.contains("\"artifact_section_count\":0"));
-    assert!(inspect_json.contains("\"lowering_unit_count\":0"));
+    assert!(inspect_json.contains("\"artifact_container_version\":2"));
+    assert!(inspect_json.contains("\"artifact_section_count\":6"));
+    assert!(inspect_json.contains("\"lowering_unit_count\":1"));
     assert!(inspect_json.contains("\"final_stage_driver\":\"clang\""));
 
     let verify_manifest_json = verify_build_manifest_json(&manifest_path, &manifest_verify);
@@ -669,18 +676,20 @@ fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
         verify_manifest_json.contains("\"artifact_binary_name\":\"benchmark_report_file_demo\"")
     );
     assert!(verify_manifest_json.contains("\"project_metadata_checked\":"));
+    assert!(verify_manifest_json.contains("\"project_host_ffi_index\":"));
+    assert!(verify_manifest_json.contains("\"project_host_ffi_symbol_count\":"));
+    assert!(verify_manifest_json.contains("\"project_host_ffi_policy_count\":"));
     assert!(verify_manifest_json.contains("\"domain_build_verification_summary\":{"));
     assert!(verify_manifest_json.contains("\"all_units_consistent\":true"));
 
     let verify_artifact_json_text = verify_artifact_json(&artifact_path, &artifact_verify);
     assert!(verify_artifact_json_text.contains("\"kind\":\"nuis_artifact_verify\""));
     assert!(verify_artifact_json_text.contains("\"binary_name\":\"benchmark_report_file_demo\""));
-    assert!(
-        verify_artifact_json_text.contains("\"artifact_container_kind\":\"compiled-artifact-v1\"")
-    );
-    assert!(verify_artifact_json_text.contains("\"artifact_container_version\":1"));
-    assert!(verify_artifact_json_text.contains("\"artifact_section_count\":0"));
-    assert!(verify_artifact_json_text.contains("\"lowering_unit_count\":0"));
+    assert!(verify_artifact_json_text
+        .contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\""));
+    assert!(verify_artifact_json_text.contains("\"artifact_container_version\":2"));
+    assert!(verify_artifact_json_text.contains("\"artifact_section_count\":6"));
+    assert!(verify_artifact_json_text.contains("\"lowering_unit_count\":1"));
     assert!(verify_artifact_json_text.contains("\"artifact_roundtrip_verified\":true"));
     assert!(verify_artifact_json_text.contains("\"lifecycle_contract_consistent\":true"));
 
@@ -736,8 +745,10 @@ galaxy = ["pixelmagic=workspace"]
     assert!(json.contains("\"kind\":\"nuis_project_metadata\""));
     assert!(json.contains("\"source_kind\":\"project-source\""));
     assert!(json.contains("\"project_name\":\"inspect_project_metadata_source_json\""));
-    assert!(json.contains("\"imports_library_count\":10"));
+    assert!(json.contains("\"imports_library_count\":15"));
     assert!(json.contains("\"galaxy_count\":3"));
+    assert!(json.contains("\"host_ffi_symbol_count\":0"));
+    assert!(json.contains("\"host_ffi_policy_count\":0"));
 }
 
 #[test]
@@ -784,6 +795,37 @@ mod cpu Main {
 }
 
 #[test]
+fn inspect_project_metadata_reports_host_ffi_footprint_for_proxy_output() {
+    let project_root = PathBuf::from("../../examples/projects/tooling/hetero_proxy_benchmark_demo");
+    let output_dir = temp_dir("inspect_project_metadata_hetero_proxy_outputs");
+
+    run(CommandKind::Compile {
+        input: project_root,
+        output_dir: output_dir.clone(),
+        verbose_cache: false,
+        cpu_abi: None,
+        target: None,
+    })
+    .unwrap();
+
+    let summary = inspect_project_metadata(&output_dir).unwrap();
+    assert_eq!(summary.source_kind, "build-output-dir");
+    assert_eq!(summary.host_ffi_symbol_count, 2);
+    assert_eq!(summary.host_ffi_policy_count, 2);
+    assert!(summary
+        .host_ffi_index_path
+        .as_deref()
+        .is_some_and(|path| path.ends_with("nuis.project.host_ffi.txt")));
+
+    let json = inspect_project_metadata_json(&summary);
+    assert!(json.contains("\"host_ffi_symbol_count\":2"));
+    assert!(json.contains("\"host_ffi_policy_count\":2"));
+
+    let compact = render_project_metadata_compact_summary(&summary);
+    assert!(compact.contains("host_ffi=2/2"));
+}
+
+#[test]
 fn project_metadata_render_helpers_expose_summary_and_paths() {
     let summary = ProjectMetadataSummary {
         source_kind: "build-manifest".to_owned(),
@@ -807,6 +849,9 @@ fn project_metadata_render_helpers_expose_summary_and_paths() {
         documented_galaxy_count: 2,
         documented_galaxy_library_module_count: 5,
         documented_galaxy_item_count: 10,
+        host_ffi_index_path: Some("/tmp/demo/build/nuis.project.host_ffi.txt".to_owned()),
+        host_ffi_symbol_count: 2,
+        host_ffi_policy_count: 2,
     };
     let compact = render_project_metadata_compact_summary(&summary);
     assert!(compact.contains("source_kind=build-manifest"));
@@ -814,6 +859,7 @@ fn project_metadata_render_helpers_expose_summary_and_paths() {
     assert!(compact.contains("docs=4/3/12"));
     assert!(compact.contains("imports=6/5/7/4/10"));
     assert!(compact.contains("galaxies=3/2/5/10"));
+    assert!(compact.contains("host_ffi=2/2"));
 
     let paths = render_project_metadata_paths(&summary);
     assert!(paths.contains("project_root=/tmp/demo"));
@@ -823,6 +869,7 @@ fn project_metadata_render_helpers_expose_summary_and_paths() {
     assert!(paths.contains("docs_index_path=/tmp/demo/build/nuis.project.docs.txt"));
     assert!(paths.contains("imports_index_path=/tmp/demo/build/nuis.project.imports.txt"));
     assert!(paths.contains("galaxy_index_path=/tmp/demo/build/nuis.project.galaxy.txt"));
+    assert!(paths.contains("host_ffi_index_path=/tmp/demo/build/nuis.project.host_ffi.txt"));
 }
 
 #[test]
@@ -1043,6 +1090,21 @@ fn artifact_report_summary_lines_expose_compact_overview() {
         bridge_registry_path: None,
         host_bridge_plan_index_path: None,
         lowering_plan_index_path: None,
+        host_ffi: linker::LinkPlanHostFfiFootprint {
+            index_path: None,
+            symbol_count: 0,
+            policy_count: 0,
+            policy: "signature-whitelist-required".to_owned(),
+            abi_groups: Vec::new(),
+            entries: Vec::new(),
+            validation: linker::LinkPlanHostFfiValidationSummary {
+                checked: 0,
+                valid: true,
+                link_allowed: true,
+                issues: Vec::new(),
+                notes: Vec::new(),
+            },
+        },
         domain_units: vec![linker::LinkPlanDomainUnit {
             kind: "host".to_owned(),
             package_id: "official.cpu".to_owned(),
@@ -1613,7 +1675,7 @@ fn compile_command_writes_benchmark_report_file_tooling_outputs() {
     let manifest_report = aot::verify_build_manifest(&manifest_path).unwrap();
     assert_eq!(manifest_report.artifact_binary_name, output_stem);
     assert_eq!(manifest_report.artifact_schema, "nuis-compiled-artifact-v1");
-    assert!(manifest_report.project_metadata_checked >= 2);
+    assert!(manifest_report.project_metadata_checked >= 6);
 
     let host_ffi_text = fs::read_to_string(output_dir.join("nuis.project.host_ffi.txt")).unwrap();
     assert!(host_ffi_text.contains("host_monotonic_time_ns"));
@@ -1638,6 +1700,160 @@ fn compile_command_writes_benchmark_report_file_tooling_outputs() {
         status.success(),
         "expected compiled benchmark report binary to exit successfully"
     );
+}
+
+#[test]
+fn compile_command_writes_hetero_proxy_benchmark_host_ffi_policy_outputs() {
+    let source =
+        fs::read_to_string("../../examples/projects/tooling/hetero_proxy_benchmark_demo/main.ns")
+            .unwrap();
+    let project_root = write_temp_project_fixture(
+        "hetero_proxy_benchmark_demo",
+        r#"
+name = "hetero_proxy_benchmark_demo"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["std=workspace"]
+"#
+        .trim_start(),
+        &source,
+    );
+    let output_dir = temp_dir("compile_command_hetero_proxy_benchmark_outputs");
+    let output_stem = "hetero_proxy_benchmark_demo".to_owned();
+
+    run(CommandKind::Compile {
+        input: project_root,
+        output_dir: output_dir.clone(),
+        verbose_cache: false,
+        cpu_abi: None,
+        target: None,
+    })
+    .unwrap();
+
+    for path in [
+        output_dir.join(format!("{output_stem}.ll")),
+        output_dir.join(&output_stem),
+        output_dir.join("nuis.build.manifest.toml"),
+        output_dir.join("nuis.compiled.artifact"),
+        output_dir.join("nuis.project.host_ffi.txt"),
+        output_dir.join("nuis.project.plan.txt"),
+    ] {
+        assert!(path.exists(), "expected output `{}`", path.display());
+    }
+
+    let manifest_path = output_dir.join("nuis.build.manifest.toml");
+    let manifest_text = fs::read_to_string(&manifest_path).unwrap();
+    assert!(manifest_text.contains("name = \"hetero_proxy_benchmark_demo\""));
+    assert!(manifest_text.contains("packaging_mode = \"native-cpu-llvm\""));
+    assert!(manifest_text.contains("host_ffi_index = "));
+
+    let host_ffi_text = fs::read_to_string(output_dir.join("nuis.project.host_ffi.txt")).unwrap();
+    assert!(host_ffi_text.contains("host_monotonic_time_ns"));
+    assert!(host_ffi_text.contains("host_sleep_ns"));
+    assert!(host_ffi_text.contains("signature_pattern=i64()"));
+    assert!(host_ffi_text.contains("signature_pattern=i64(i64)"));
+    assert!(host_ffi_text.contains("signature_hash=fnv1a64:"));
+    assert!(host_ffi_text.contains("policy=signature-whitelist-required"));
+
+    let manifest_report = aot::verify_build_manifest(&manifest_path).unwrap();
+    assert_eq!(manifest_report.artifact_binary_name, output_stem);
+    assert_eq!(manifest_report.artifact_schema, "nuis-compiled-artifact-v1");
+    assert!(manifest_report.project_metadata_checked >= 6);
+    let verify_manifest_json = verify_build_manifest_json(&manifest_path, &manifest_report);
+    assert!(verify_manifest_json.contains("\"project_host_ffi_index\":"));
+    assert!(verify_manifest_json.contains("\"project_host_ffi_symbol_count\":2"));
+    assert!(verify_manifest_json.contains("\"project_host_ffi_policy_count\":2"));
+    let artifact = load_nuis_compiled_artifact(&manifest_path).unwrap();
+    let link_plan = linker::build_link_plan(&manifest_report, &artifact);
+    let link_plan_json = linker::render_link_plan_json(&link_plan);
+    assert!(link_plan_json.contains("\"host_ffi_symbol_count\":2"));
+    assert!(link_plan_json.contains("\"host_ffi_policy_count\":2"));
+    assert!(link_plan_json.contains("\"host_ffi_policy\":\"signature-whitelist-required\""));
+    assert!(link_plan_json.contains("\"host_ffi_validation_checked\":2"));
+    assert!(link_plan_json.contains("\"host_ffi_validation_valid\":true"));
+    assert!(link_plan_json.contains("\"host_ffi_link_allowed\":true"));
+    assert!(link_plan_json.contains("\"host_ffi_validation_issues\":[]"));
+    assert!(link_plan_json.contains("\"host_ffi_validation_notes\":[]"));
+    assert!(link_plan_json.contains("\"host_ffi_abi_groups\":[{"));
+    assert!(link_plan_json.contains("\"abi\":\"c\""));
+    assert!(link_plan_json.contains("\"symbols\":[\"host_monotonic_time_ns:i64()\""));
+    assert!(link_plan_json.contains("\"validation\":{\"checked\":2,\"valid\":true"));
+    assert!(link_plan_json.contains("\"entries\":[{\"symbol\":\"host_monotonic_time_ns\""));
+    assert!(link_plan_json.contains("\"host_ffi_entries\":[{"));
+    assert!(link_plan_json.contains("\"symbol\":\"host_monotonic_time_ns\""));
+    assert!(link_plan_json.contains("\"symbol\":\"host_sleep_ns\""));
+    assert!(link_plan_json.contains("\"signature_pattern\":\"i64(i64)\""));
+
+    let artifact_report =
+        aot::verify_nuis_compiled_artifact(output_dir.join("nuis.compiled.artifact").as_path())
+            .unwrap();
+    assert_eq!(artifact_report.binary_name, output_stem);
+    assert_eq!(artifact_report.packaging_mode, "native-cpu-llvm");
+    assert!(artifact_report.lifecycle_contract_consistent);
+    assert!(artifact_report.artifact_roundtrip_verified);
+
+    let status = Command::new(output_dir.join(&output_stem))
+        .status()
+        .expect("expected compiled hetero proxy benchmark binary to launch");
+    assert!(
+        status.success(),
+        "expected compiled hetero proxy benchmark binary to exit successfully"
+    );
+}
+
+#[test]
+fn verify_build_manifest_rejects_drifted_host_ffi_signature_hash() {
+    let project_root = write_temp_project_fixture(
+        "drifted_host_ffi_signature_hash",
+        r#"
+name = "drifted_host_ffi_signature_hash"
+entry = "main.ns"
+modules = ["main.ns"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
+
+  fn main() -> i64 {
+    let started: i64 = host_monotonic_time_ns();
+    let slept: i64 = host_sleep_ns(1);
+    let ended: i64 = host_monotonic_time_ns();
+    if slept < 0 {
+      return 1;
+    }
+    if ended < started {
+      return 1;
+    }
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("compile_command_hetero_proxy_benchmark_drift_outputs");
+
+    run(CommandKind::Compile {
+        input: project_root,
+        output_dir: output_dir.clone(),
+        verbose_cache: false,
+        cpu_abi: None,
+        target: None,
+    })
+    .unwrap();
+
+    let host_ffi_path = output_dir.join("nuis.project.host_ffi.txt");
+    let host_ffi_text = fs::read_to_string(&host_ffi_path).unwrap();
+    let damaged = host_ffi_text.replacen("signature_hash=fnv1a64:", "signature_hash=fnv1a64:0", 1);
+    fs::write(&host_ffi_path, damaged).unwrap();
+
+    let manifest_path = output_dir.join("nuis.build.manifest.toml");
+    let error = match aot::verify_build_manifest(&manifest_path) {
+        Ok(_) => panic!("expected drifted host ffi signature hash to be rejected"),
+        Err(error) => error,
+    };
+    assert!(error.contains("project host_ffi index"));
+    assert!(error.contains("signature hash mismatch"));
 }
 
 #[test]

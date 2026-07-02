@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use crate::{
-    aot, json_string_field, json_usize_field, load_nuis_compiled_artifact, project,
+    aot,
+    host_ffi_index::{host_ffi_policy_count_from_index, host_ffi_symbol_count_from_index},
+    json_string_field, json_usize_field, load_nuis_compiled_artifact, project,
     reconstruct_manifest_report_from_artifact,
 };
 
@@ -28,6 +30,9 @@ pub(crate) struct ProjectMetadataSummary {
     pub(crate) documented_galaxy_count: usize,
     pub(crate) documented_galaxy_library_module_count: usize,
     pub(crate) documented_galaxy_item_count: usize,
+    pub(crate) host_ffi_index_path: Option<String>,
+    pub(crate) host_ffi_symbol_count: usize,
+    pub(crate) host_ffi_policy_count: usize,
 }
 
 pub(crate) fn project_metadata_summary_from_manifest_report(
@@ -70,6 +75,13 @@ pub(crate) fn project_metadata_summary_from_manifest_report(
         documented_galaxy_library_module_count: report
             .project_documented_galaxy_library_module_count,
         documented_galaxy_item_count: report.project_documented_galaxy_item_count,
+        host_ffi_index_path: report.project_host_ffi_index.clone(),
+        host_ffi_symbol_count: host_ffi_symbol_count_from_index(
+            report.project_host_ffi_index.as_deref(),
+        ),
+        host_ffi_policy_count: host_ffi_policy_count_from_index(
+            report.project_host_ffi_index.as_deref(),
+        ),
     }
 }
 
@@ -80,6 +92,7 @@ pub(crate) fn inspect_project_metadata_from_source(
     let docs_summary = project::project_docs_summary(&loaded_project);
     let imports_summary = project::project_imports_summary(&loaded_project);
     let galaxy_summary = project::project_galaxy_summary(&loaded_project);
+    let host_ffi_symbol_count = project_host_ffi_symbol_count_from_source(&loaded_project);
     Ok(ProjectMetadataSummary {
         source_kind: "project-source".to_owned(),
         project_name: Some(loaded_project.manifest.name.clone()),
@@ -102,6 +115,9 @@ pub(crate) fn inspect_project_metadata_from_source(
         documented_galaxy_count: galaxy_summary.documented_galaxies,
         documented_galaxy_library_module_count: galaxy_summary.documented_library_modules,
         documented_galaxy_item_count: galaxy_summary.documented_items,
+        host_ffi_index_path: None,
+        host_ffi_symbol_count,
+        host_ffi_policy_count: host_ffi_symbol_count,
     })
 }
 
@@ -321,6 +337,8 @@ pub(crate) fn inspect_project_metadata_json(summary: &ProjectMetadataSummary) ->
             "documented_galaxy_item_count",
             summary.documented_galaxy_item_count,
         ),
+        json_usize_field("host_ffi_symbol_count", summary.host_ffi_symbol_count),
+        json_usize_field("host_ffi_policy_count", summary.host_ffi_policy_count),
     ];
     if let Some(value) = &summary.project_name {
         fields.push(json_string_field("project_name", value));
@@ -345,6 +363,9 @@ pub(crate) fn inspect_project_metadata_json(summary: &ProjectMetadataSummary) ->
     }
     if let Some(value) = &summary.galaxy_index_path {
         fields.push(json_string_field("galaxy_index_path", value));
+    }
+    if let Some(value) = &summary.host_ffi_index_path {
+        fields.push(json_string_field("host_ffi_index_path", value));
     }
     format!("{{{}}}", fields.join(","))
 }
@@ -397,12 +418,19 @@ pub(crate) fn render_project_metadata_summary(summary: &ProjectMetadataSummary) 
     if let Some(value) = &summary.galaxy_index_path {
         lines.push(format!("  galaxy_index_path: {}", value));
     }
+    lines.push(format!(
+        "  host_ffi: symbols={} policies={}",
+        summary.host_ffi_symbol_count, summary.host_ffi_policy_count
+    ));
+    if let Some(value) = &summary.host_ffi_index_path {
+        lines.push(format!("  host_ffi_index_path: {}", value));
+    }
     lines.join("\n")
 }
 
 pub(crate) fn render_project_metadata_compact_summary(summary: &ProjectMetadataSummary) -> String {
     format!(
-        "project metadata summary: source_kind={} project={} docs={}/{}/{} imports={}/{}/{}/{}/{} galaxies={}/{}/{}/{}",
+        "project metadata summary: source_kind={} project={} docs={}/{}/{} imports={}/{}/{}/{}/{} galaxies={}/{}/{}/{} host_ffi={}/{}",
         summary.source_kind,
         summary.project_name.as_deref().unwrap_or("<none>"),
         summary.docs_module_count,
@@ -416,7 +444,9 @@ pub(crate) fn render_project_metadata_compact_summary(summary: &ProjectMetadataS
         summary.galaxy_count,
         summary.documented_galaxy_count,
         summary.documented_galaxy_library_module_count,
-        summary.documented_galaxy_item_count
+        summary.documented_galaxy_item_count,
+        summary.host_ffi_symbol_count,
+        summary.host_ffi_policy_count
     )
 }
 
@@ -443,5 +473,24 @@ pub(crate) fn render_project_metadata_paths(summary: &ProjectMetadataSummary) ->
     if let Some(value) = &summary.galaxy_index_path {
         lines.push(format!("galaxy_index_path={}", value));
     }
+    if let Some(value) = &summary.host_ffi_index_path {
+        lines.push(format!("host_ffi_index_path={}", value));
+    }
     lines.join("\n")
+}
+
+fn project_host_ffi_symbol_count_from_source(project: &project::LoadedProject) -> usize {
+    project
+        .modules
+        .iter()
+        .map(|module| {
+            module.ast.externs.len()
+                + module
+                    .ast
+                    .extern_interfaces
+                    .iter()
+                    .map(|interface| interface.methods.len())
+                    .sum::<usize>()
+        })
+        .sum()
 }

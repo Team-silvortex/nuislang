@@ -225,6 +225,44 @@ pub(crate) fn run_inspect_artifact(input: PathBuf, json: bool) -> Result<(), Str
             "  hetero_calculate_data_segments: {}",
             link_plan.hetero_calculate.data_segments.len()
         );
+        if let Some(path) = link_plan.host_ffi.index_path.as_deref() {
+            println!("  host_ffi_index_path: {}", path);
+        }
+        println!(
+            "  host_ffi_symbol_count: {}",
+            link_plan.host_ffi.symbol_count
+        );
+        println!(
+            "  host_ffi_policy_count: {}",
+            link_plan.host_ffi.policy_count
+        );
+        println!("  host_ffi_policy: {}", link_plan.host_ffi.policy);
+        println!(
+            "  host_ffi_validation: checked={} valid={} link_allowed={} issues={} notes={}",
+            link_plan.host_ffi.validation.checked,
+            link_plan.host_ffi.validation.valid,
+            link_plan.host_ffi.validation.link_allowed,
+            if link_plan.host_ffi.validation.issues.is_empty() {
+                "none".to_owned()
+            } else {
+                link_plan.host_ffi.validation.issues.join("; ")
+            },
+            if link_plan.host_ffi.validation.notes.is_empty() {
+                "none".to_owned()
+            } else {
+                link_plan.host_ffi.validation.notes.join("; ")
+            }
+        );
+        for group in &link_plan.host_ffi.abi_groups {
+            println!(
+                "  host_ffi_abi: abi={} symbols={} policies={} valid={} entries={}",
+                group.abi,
+                group.symbol_count,
+                group.policy_count,
+                group.validation.valid,
+                group.symbols.join(",")
+            );
+        }
         for unit in &report.domain_build_units {
             let verdict = domain_build_unit_verification_verdict(unit, report);
             let build_contract = domain_build_unit_effective_contract_summary(unit);

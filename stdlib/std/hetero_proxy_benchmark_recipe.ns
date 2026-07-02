@@ -1,0 +1,130 @@
+use cpu StdHeteroContracts;
+
+mod cpu Main {
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
+
+  struct HeteroProxyBenchmarkSeed {
+    symbol_hash: i64,
+    signature_hash: i64,
+    whitelist_hash: i64,
+    warmup_iters: i64,
+    measure_iters: i64,
+    sleep_ns: i64
+  }
+
+  struct HeteroProxyBenchmarkSummary {
+    started_ns: i64,
+    ended_ns: i64,
+    dispatch_code: i64,
+    result_code: i64,
+    whitelist_ok: bool,
+    rejected_whitelist_ok: bool,
+    proxy_total: i64,
+    rejection_total: i64,
+    manifest_total: i64,
+    benchmark_total: i64,
+    test_total: i64
+  }
+
+  fn default_seed() -> HeteroProxyBenchmarkSeed {
+    return HeteroProxyBenchmarkSeed {
+      symbol_hash: 41001,
+      signature_hash: 51001,
+      whitelist_hash: 51001,
+      warmup_iters: 1,
+      measure_iters: 1,
+      sleep_ns: 1000
+    };
+  }
+
+  fn capture_hetero_proxy_benchmark(seed: HeteroProxyBenchmarkSeed) -> HeteroProxyBenchmarkSummary {
+    let whitelist_ok: bool = StdHeteroContracts.c_ffi_signature_allowed(
+      seed.symbol_hash,
+      seed.signature_hash,
+      seed.whitelist_hash
+    );
+    let rejected_whitelist_ok: bool = StdHeteroContracts.c_ffi_signature_allowed(
+      seed.symbol_hash,
+      seed.signature_hash + 1,
+      seed.whitelist_hash
+    );
+    let started_ns: i64 = host_monotonic_time_ns();
+    let dispatch_code: i64 = host_sleep_ns(seed.sleep_ns);
+    let ended_ns: i64 = host_monotonic_time_ns();
+    let result_code: i64 = StdHeteroContracts.proxy_exit_code(
+      true,
+      whitelist_ok,
+      dispatch_code,
+      ended_ns - started_ns
+    );
+    let proxy_total: i64 = StdHeteroContracts.c_ffi_proxy_total(
+      seed.symbol_hash,
+      seed.signature_hash,
+      seed.whitelist_hash,
+      dispatch_code,
+      result_code
+    );
+    let rejection_total: i64 = StdHeteroContracts.c_ffi_proxy_rejection_total(
+      seed.symbol_hash,
+      seed.signature_hash + 1,
+      seed.whitelist_hash
+    );
+    let manifest_total: i64 = StdHeteroContracts.proxy_manifest_total(
+      StdHeteroContracts.backend_c_ffi_proxy(),
+      StdHeteroContracts.proxy_c_ffi(),
+      StdHeteroContracts.policy_hash_signature_whitelist(),
+      seed.symbol_hash,
+      seed.signature_hash,
+      61001
+    );
+    let benchmark_total: i64 = StdHeteroContracts.benchmark_proxy_total(
+      seed.warmup_iters,
+      seed.measure_iters,
+      started_ns,
+      ended_ns,
+      proxy_total
+    ) + StdHeteroContracts.benchmark_proxy_pair_total(
+      proxy_total,
+      rejection_total,
+      manifest_total,
+      started_ns,
+      ended_ns
+    );
+    return HeteroProxyBenchmarkSummary {
+      started_ns: started_ns,
+      ended_ns: ended_ns,
+      dispatch_code: dispatch_code,
+      result_code: result_code,
+      whitelist_ok: whitelist_ok,
+      rejected_whitelist_ok: rejected_whitelist_ok,
+      proxy_total: proxy_total,
+      rejection_total: rejection_total,
+      manifest_total: manifest_total,
+      benchmark_total: benchmark_total,
+      test_total: StdHeteroContracts.hetero_test_total(
+        1,
+        StdHeteroContracts.backend_c_ffi_proxy(),
+        StdHeteroContracts.proxy_c_ffi(),
+        true,
+        whitelist_ok,
+        dispatch_code,
+        result_code
+      )
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: HeteroProxyBenchmarkSummary = capture_hetero_proxy_benchmark(default_seed());
+    if !summary.whitelist_ok {
+      return StdHeteroContracts.hetero_error();
+    }
+    if summary.rejected_whitelist_ok {
+      return StdHeteroContracts.hetero_error();
+    }
+    if summary.benchmark_total > 0 {
+      return StdHeteroContracts.hetero_ok();
+    }
+    return StdHeteroContracts.hetero_error();
+  }
+}

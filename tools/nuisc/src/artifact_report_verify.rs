@@ -1,4 +1,5 @@
 use super::*;
+use crate::host_ffi_index::{host_ffi_policy_count_from_index, host_ffi_symbol_count_from_index};
 
 pub(crate) fn verify_artifact_json(
     input: &Path,
@@ -300,6 +301,18 @@ pub(crate) fn verify_build_manifest_json(
         json_usize_field(
             "project_documented_galaxy_item_count",
             report.project_documented_galaxy_item_count,
+        ),
+        json_optional_string_field(
+            "project_host_ffi_index",
+            report.project_host_ffi_index.as_deref(),
+        ),
+        json_usize_field(
+            "project_host_ffi_symbol_count",
+            host_ffi_symbol_count_from_index(report.project_host_ffi_index.as_deref()),
+        ),
+        json_usize_field(
+            "project_host_ffi_policy_count",
+            host_ffi_policy_count_from_index(report.project_host_ffi_index.as_deref()),
         ),
         format!(
             "\"domain_build_unit_verdicts\":[{}]",

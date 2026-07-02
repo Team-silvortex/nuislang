@@ -8,6 +8,7 @@ use crate::domain_build_report::{
     domain_build_unit_verification_verdict, evaluate_domain_build_contract_drift,
 };
 use crate::execution_inspect::verdict_status;
+use crate::host_ffi_index::host_ffi_index_footprint;
 use crate::project_metadata_report::resolve_build_manifest_path;
 
 pub(crate) fn run_verify_artifact(input: PathBuf, json: bool) -> Result<(), String> {
@@ -502,6 +503,19 @@ pub(crate) fn run_verify_build_manifest(manifest: PathBuf, json: bool) -> Result
             "  project_documented_galaxy_item_count: {}",
             report.project_documented_galaxy_item_count
         );
+        let host_ffi_footprint = host_ffi_index_footprint(report.project_host_ffi_index.as_deref());
+        if let Some(path) = host_ffi_footprint.index_path.as_deref() {
+            println!("  project_host_ffi_index: {}", path);
+        }
+        println!(
+            "  project_host_ffi_symbol_count: {}",
+            host_ffi_footprint.symbol_count
+        );
+        println!(
+            "  project_host_ffi_policy_count: {}",
+            host_ffi_footprint.policy_count
+        );
+        println!("  project_host_ffi_policy: {}", host_ffi_footprint.policy);
         for unit in &report.domain_build_units {
             let payload_blob_bytes = unit
                 .artifact_payload_blob_bytes

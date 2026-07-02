@@ -79,6 +79,7 @@ mod execution_inspect;
 mod execution_inspect_report;
 pub mod fmt;
 pub mod frontend;
+mod host_ffi_index;
 mod inspect_report;
 mod json_report;
 #[cfg(test)]

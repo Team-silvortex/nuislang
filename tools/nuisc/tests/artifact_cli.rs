@@ -156,3 +156,95 @@ fn cli_artifact_commands_report_benchmark_tooling_outputs() {
     assert!(verify_artifact_stdout.contains("\"binary_name\":\"benchmark_report_file_demo\""));
     assert!(verify_artifact_stdout.contains("\"artifact_roundtrip_verified\":true"));
 }
+
+#[test]
+fn cli_artifact_commands_report_hetero_proxy_host_ffi_footprint() {
+    let project = Path::new("../../examples/projects/tooling/hetero_proxy_benchmark_demo");
+    let output_dir = temp_dir("artifact_cli_hetero_proxy_outputs");
+    let output_dir_text = output_dir.display().to_string();
+
+    let compile = run_nuisc(&["compile", &project.display().to_string(), &output_dir_text]);
+    assert_success(&compile, "nuisc compile hetero proxy benchmark");
+
+    let manifest_path = output_dir.join("nuis.build.manifest.toml");
+    assert!(
+        manifest_path.exists(),
+        "expected {}",
+        manifest_path.display()
+    );
+
+    let inspect_json = run_nuisc(&[
+        "inspect-artifact",
+        "--json",
+        &manifest_path.display().to_string(),
+    ]);
+    assert_success(&inspect_json, "nuisc inspect-artifact --json hetero proxy");
+    let inspect_json_stdout = String::from_utf8_lossy(&inspect_json.stdout);
+    assert!(inspect_json_stdout.contains("\"binary_name\":\"hetero_proxy_benchmark_demo\""));
+    assert!(inspect_json_stdout.contains("\"host_ffi\":{"));
+    assert!(inspect_json_stdout.contains("\"symbol_count\":2"));
+    assert!(inspect_json_stdout.contains("\"policy_count\":2"));
+    assert!(inspect_json_stdout.contains("\"policy\":\"signature-whitelist-required\""));
+
+    let inspect_text = run_nuisc(&["inspect-artifact", &manifest_path.display().to_string()]);
+    assert_success(&inspect_text, "nuisc inspect-artifact hetero proxy");
+    let inspect_text_stdout = String::from_utf8_lossy(&inspect_text.stdout);
+    assert!(inspect_text_stdout.contains("host_ffi_symbol_count: 2"));
+    assert!(inspect_text_stdout.contains("host_ffi_policy_count: 2"));
+    assert!(inspect_text_stdout.contains("host_ffi_policy: signature-whitelist-required"));
+    assert!(inspect_text_stdout.contains(
+        "host_ffi_validation: checked=2 valid=true link_allowed=true issues=none notes=none"
+    ));
+    assert!(inspect_text_stdout.contains("host_ffi_abi: abi=c symbols=2 policies=2 valid=true"));
+
+    let report_json = run_nuisc(&[
+        "artifact-report",
+        "--json",
+        &manifest_path.display().to_string(),
+    ]);
+    assert_success(&report_json, "nuisc artifact-report --json hetero proxy");
+    let report_json_stdout = String::from_utf8_lossy(&report_json.stdout);
+    assert!(report_json_stdout.contains("\"kind\":\"nuis_artifact_report\""));
+    assert!(report_json_stdout.contains("\"project_host_ffi_symbol_count\":2"));
+    assert!(report_json_stdout.contains("\"project_host_ffi_policy_count\":2"));
+    assert!(report_json_stdout.contains("\"host_ffi\":{\"index_path\":"));
+    assert!(report_json_stdout.contains("\"validation\":{\"checked\":2,\"valid\":true"));
+    assert!(report_json_stdout.contains("\"link_allowed\":true"));
+    assert!(report_json_stdout.contains("\"notes\":[]"));
+    assert!(report_json_stdout.contains("\"abi_groups\":[{"));
+    assert!(report_json_stdout.contains("\"symbols\":[\"host_monotonic_time_ns:i64()\""));
+    assert!(report_json_stdout.contains("\"validation\":{\"checked\":2,\"valid\":true"));
+    assert!(report_json_stdout.contains("\"entries\":[{\"symbol\":\"host_monotonic_time_ns\""));
+    assert!(report_json_stdout.contains("\"entries\":[{"));
+    assert!(report_json_stdout.contains("\"symbol\":\"host_monotonic_time_ns\""));
+    assert!(report_json_stdout.contains("\"symbol\":\"host_sleep_ns\""));
+
+    let verify_manifest_json = run_nuisc(&[
+        "verify-build-manifest",
+        "--json",
+        &manifest_path.display().to_string(),
+    ]);
+    assert_success(
+        &verify_manifest_json,
+        "nuisc verify-build-manifest --json hetero proxy",
+    );
+    let verify_manifest_json_stdout = String::from_utf8_lossy(&verify_manifest_json.stdout);
+    assert!(verify_manifest_json_stdout
+        .contains("\"artifact_binary_name\":\"hetero_proxy_benchmark_demo\""));
+    assert!(verify_manifest_json_stdout.contains("\"project_host_ffi_symbol_count\":2"));
+    assert!(verify_manifest_json_stdout.contains("\"project_host_ffi_policy_count\":2"));
+
+    let verify_manifest_text = run_nuisc(&[
+        "verify-build-manifest",
+        &manifest_path.display().to_string(),
+    ]);
+    assert_success(
+        &verify_manifest_text,
+        "nuisc verify-build-manifest hetero proxy",
+    );
+    let verify_manifest_text_stdout = String::from_utf8_lossy(&verify_manifest_text.stdout);
+    assert!(verify_manifest_text_stdout.contains("project_host_ffi_symbol_count: 2"));
+    assert!(verify_manifest_text_stdout.contains("project_host_ffi_policy_count: 2"));
+    assert!(verify_manifest_text_stdout
+        .contains("project_host_ffi_policy: signature-whitelist-required"));
+}

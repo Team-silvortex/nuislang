@@ -60,6 +60,10 @@ const TOOLING_PROJECTS: &[(&str, &str)] = &[
         "../../examples/projects/tooling/benchmark_report_file_demo",
     ),
     (
+        "hetero proxy benchmark",
+        "../../examples/projects/tooling/hetero_proxy_benchmark_demo",
+    ),
+    (
         "cli pgm info",
         "../../examples/projects/tooling/cli_pgm_info_demo",
     ),

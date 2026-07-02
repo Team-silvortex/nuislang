@@ -69,6 +69,7 @@ pub struct BuildManifestVerifyReport {
     pub project_documented_galaxy_library_module_count: usize,
     pub project_documented_galaxy_item_count: usize,
     pub project_packet_index: Option<String>,
+    pub project_host_ffi_index: Option<String>,
     pub bridge_registry_path: Option<String>,
     pub bridge_registry_units: usize,
     pub bridge_registry_checked: usize,

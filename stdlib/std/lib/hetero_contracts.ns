@@ -1,0 +1,283 @@
+/// Heterogeneous test and benchmark helpers exposed through the standard contracts.
+mod cpu StdHeteroContracts {
+  /// Encodes a successful heterogeneous probe.
+  pub fn hetero_ok() -> i64 {
+    return 0;
+  }
+
+  /// Encodes a failed heterogeneous probe.
+  pub fn hetero_error() -> i64 {
+    return 1;
+  }
+
+  /// CPU backend identifier used by portable std probes.
+  pub fn backend_cpu() -> i64 {
+    return 1;
+  }
+
+  /// Shader backend identifier used by portable std probes.
+  pub fn backend_shader() -> i64 {
+    return 2;
+  }
+
+  /// Kernel backend identifier used by portable std probes.
+  pub fn backend_kernel() -> i64 {
+    return 3;
+  }
+
+  /// Network backend identifier used by portable std probes.
+  pub fn backend_network() -> i64 {
+    return 4;
+  }
+
+  /// C FFI proxy backend identifier for host-backed heterogeneous execution.
+  pub fn backend_c_ffi_proxy() -> i64 {
+    return 5;
+  }
+
+  /// Direct native dispatch proxy kind.
+  pub fn proxy_direct() -> i64 {
+    return 1;
+  }
+
+  /// C ABI whitelist-backed proxy kind.
+  pub fn proxy_c_ffi() -> i64 {
+    return 2;
+  }
+
+  /// Host bridge proxy kind for portable test/benchmark fixtures.
+  pub fn proxy_host_bridge() -> i64 {
+    return 3;
+  }
+
+  /// Signature whitelist policy identifier for host FFI proxy manifests.
+  pub fn policy_signature_whitelist() -> i64 {
+    return 1;
+  }
+
+  /// Hash-signature whitelist policy identifier for host FFI proxy manifests.
+  pub fn policy_hash_signature_whitelist() -> i64 {
+    return 2;
+  }
+
+  /// Ready proxy status code.
+  pub fn proxy_status_ready() -> i64 {
+    return 0;
+  }
+
+  /// Failed proxy status code.
+  pub fn proxy_status_failed() -> i64 {
+    return 1;
+  }
+
+  /// Whitelist-rejected proxy status code.
+  pub fn proxy_status_rejected() -> i64 {
+    return 2;
+  }
+
+  /// Unregistered proxy status code.
+  pub fn proxy_status_unregistered() -> i64 {
+    return 3;
+  }
+
+  /// Returns true when a backend/proxy id is non-zero and positive.
+  pub fn positive_id(value: i64) -> bool {
+    return value > 0;
+  }
+
+  /// Returns the non-negative probe value or zero when the host reported failure.
+  pub fn nonnegative_or_zero(value: i64) -> i64 {
+    if value >= 0 {
+      return value;
+    }
+    return 0;
+  }
+
+  /// Returns true when a C FFI signature matches the registered whitelist hash.
+  pub fn c_ffi_signature_allowed(
+    symbol_hash: i64,
+    signature_hash: i64,
+    whitelist_hash: i64
+  ) -> bool {
+    if symbol_hash <= 0 {
+      return false;
+    }
+    if signature_hash <= 0 {
+      return false;
+    }
+    if whitelist_hash <= 0 {
+      return false;
+    }
+    return signature_hash == whitelist_hash;
+  }
+
+  /// Returns true when a positive C FFI signature is explicitly rejected by the whitelist.
+  pub fn c_ffi_signature_rejected(
+    symbol_hash: i64,
+    signature_hash: i64,
+    whitelist_hash: i64
+  ) -> bool {
+    if symbol_hash <= 0 {
+      return false;
+    }
+    if signature_hash <= 0 {
+      return false;
+    }
+    if whitelist_hash <= 0 {
+      return false;
+    }
+    return signature_hash != whitelist_hash;
+  }
+
+  /// Returns true when a proxy is registered, whitelisted, and dispatched.
+  pub fn proxy_ready(registered: bool, whitelist_ok: bool, dispatch_code: i64) -> bool {
+    if !registered {
+      return false;
+    }
+    if !whitelist_ok {
+      return false;
+    }
+    return dispatch_code >= 0;
+  }
+
+  /// Converts a proxy execution status into a stable status code.
+  pub fn proxy_status_code(
+    registered: bool,
+    whitelist_ok: bool,
+    dispatch_code: i64,
+    result_code: i64
+  ) -> i64 {
+    if !registered {
+      return proxy_status_unregistered();
+    }
+    if !whitelist_ok {
+      return proxy_status_rejected();
+    }
+    if dispatch_code < 0 {
+      return proxy_status_failed();
+    }
+    if result_code < 0 {
+      return proxy_status_failed();
+    }
+    return proxy_status_ready();
+  }
+
+  /// Converts a proxy execution status into a process-style exit code.
+  pub fn proxy_exit_code(
+    registered: bool,
+    whitelist_ok: bool,
+    dispatch_code: i64,
+    result_code: i64
+  ) -> i64 {
+    if !registered {
+      return hetero_error();
+    }
+    if !whitelist_ok {
+      return hetero_error();
+    }
+    if dispatch_code < 0 {
+      return hetero_error();
+    }
+    if result_code < 0 {
+      return hetero_error();
+    }
+    return hetero_ok();
+  }
+
+  /// Compact C FFI proxy score used by std tests and benchmark fixtures.
+  pub fn c_ffi_proxy_total(
+    symbol_hash: i64,
+    signature_hash: i64,
+    whitelist_hash: i64,
+    dispatch_code: i64,
+    result_code: i64
+  ) -> i64 {
+    let allowed: bool = c_ffi_signature_allowed(symbol_hash, signature_hash, whitelist_hash);
+    let ready_bonus: i64 = proxy_exit_code(true, allowed, dispatch_code, result_code);
+    return nonnegative_or_zero(symbol_hash)
+      + nonnegative_or_zero(signature_hash)
+      + nonnegative_or_zero(whitelist_hash)
+      + nonnegative_or_zero(dispatch_code)
+      + nonnegative_or_zero(result_code)
+      + ready_bonus;
+  }
+
+  /// Compact rejected C FFI proxy score used to prove deny paths do not dispatch.
+  pub fn c_ffi_proxy_rejection_total(
+    symbol_hash: i64,
+    signature_hash: i64,
+    whitelist_hash: i64
+  ) -> i64 {
+    if c_ffi_signature_rejected(symbol_hash, signature_hash, whitelist_hash) {
+      return nonnegative_or_zero(symbol_hash)
+        + nonnegative_or_zero(signature_hash)
+        + nonnegative_or_zero(whitelist_hash)
+        + proxy_status_rejected();
+    }
+    return hetero_error();
+  }
+
+  /// Compact proxy manifest score shared by std probes and future linker metadata.
+  pub fn proxy_manifest_total(
+    backend_code: i64,
+    proxy_kind: i64,
+    policy_code: i64,
+    symbol_hash: i64,
+    signature_hash: i64,
+    registry_hash: i64
+  ) -> i64 {
+    return nonnegative_or_zero(backend_code)
+      + nonnegative_or_zero(proxy_kind)
+      + nonnegative_or_zero(policy_code)
+      + nonnegative_or_zero(symbol_hash)
+      + nonnegative_or_zero(signature_hash)
+      + nonnegative_or_zero(registry_hash);
+  }
+
+  /// Compact benchmark score for a proxied heterogeneous execution span.
+  pub fn benchmark_proxy_total(
+    warmup_iters: i64,
+    measure_iters: i64,
+    started_ns: i64,
+    ended_ns: i64,
+    proxy_total: i64
+  ) -> i64 {
+    return nonnegative_or_zero(warmup_iters)
+      + nonnegative_or_zero(measure_iters)
+      + nonnegative_or_zero(ended_ns - started_ns)
+      + nonnegative_or_zero(proxy_total);
+  }
+
+  /// Compact benchmark score that records both accepted and rejected proxy paths.
+  pub fn benchmark_proxy_pair_total(
+    accepted_total: i64,
+    rejected_total: i64,
+    manifest_total: i64,
+    started_ns: i64,
+    ended_ns: i64
+  ) -> i64 {
+    return nonnegative_or_zero(accepted_total)
+      + nonnegative_or_zero(rejected_total)
+      + nonnegative_or_zero(manifest_total)
+      + nonnegative_or_zero(ended_ns - started_ns);
+  }
+
+  /// Compact heterogeneous test score spanning domain, backend, proxy, and result status.
+  pub fn hetero_test_total(
+    domain_code: i64,
+    backend_code: i64,
+    proxy_kind: i64,
+    registered: bool,
+    whitelist_ok: bool,
+    dispatch_code: i64,
+    result_code: i64
+  ) -> i64 {
+    let exit_code: i64 = proxy_exit_code(registered, whitelist_ok, dispatch_code, result_code);
+    return nonnegative_or_zero(domain_code)
+      + nonnegative_or_zero(backend_code)
+      + nonnegative_or_zero(proxy_kind)
+      + nonnegative_or_zero(dispatch_code)
+      + nonnegative_or_zero(result_code)
+      + exit_code;
+  }
+}

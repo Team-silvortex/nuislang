@@ -122,8 +122,9 @@ Short rule:
   [time_report_demo](time_report_demo),
   [benchmark_report_demo](benchmark_report_demo),
   [benchmark_report_count_demo](benchmark_report_count_demo),
-  [benchmark_report_file_demo](benchmark_report_file_demo)
-  as the benchmark/text/filesystem std contract consumer,
+  [benchmark_report_file_demo](benchmark_report_file_demo),
+  [hetero_proxy_benchmark_demo](hetero_proxy_benchmark_demo)
+  as the benchmark/text/filesystem/heterogeneous proxy std contract consumers,
   [io_report_demo](io_report_demo)
   as the console/text std contract consumer,
   [filesystem_io_report_demo](filesystem_io_report_demo)

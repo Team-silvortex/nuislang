@@ -133,6 +133,89 @@ pub(crate) fn link_plan_hetero_calculate_json(plan: &linker::LinkPlanHeteroCalcu
     format!("{{{}}}", fields.join(","))
 }
 
+pub(crate) fn link_plan_host_ffi_json(footprint: &linker::LinkPlanHostFfiFootprint) -> String {
+    let entries = footprint
+        .entries
+        .iter()
+        .map(link_plan_host_ffi_entry_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let abi_groups = footprint
+        .abi_groups
+        .iter()
+        .map(link_plan_host_ffi_abi_group_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = vec![
+        json_optional_string_field("index_path", footprint.index_path.as_deref()),
+        json_usize_field("symbol_count", footprint.symbol_count),
+        json_usize_field("policy_count", footprint.policy_count),
+        json_string_field("policy", &footprint.policy),
+        format!(
+            "\"validation\":{}",
+            link_plan_host_ffi_validation_json(&footprint.validation)
+        ),
+        format!("\"abi_groups\":[{}]", abi_groups),
+        format!("\"entries\":[{}]", entries),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn link_plan_host_ffi_abi_group_json(group: &linker::LinkPlanHostFfiAbiGroup) -> String {
+    let entries = group
+        .entries
+        .iter()
+        .map(link_plan_host_ffi_abi_entry_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = vec![
+        json_string_field("abi", &group.abi),
+        json_usize_field("symbol_count", group.symbol_count),
+        json_usize_field("policy_count", group.policy_count),
+        json_string_array_field("symbols", &group.symbols),
+        format!(
+            "\"validation\":{}",
+            link_plan_host_ffi_validation_json(&group.validation)
+        ),
+        format!("\"entries\":[{}]", entries),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn link_plan_host_ffi_abi_entry_json(entry: &linker::LinkPlanHostFfiAbiEntry) -> String {
+    let fields = vec![
+        json_string_field("symbol", &entry.symbol),
+        json_string_field("signature_pattern", &entry.signature_pattern),
+        json_string_field("signature_hash", &entry.signature_hash),
+        json_string_field("policy", &entry.policy),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn link_plan_host_ffi_validation_json(
+    validation: &linker::LinkPlanHostFfiValidationSummary,
+) -> String {
+    let fields = vec![
+        json_usize_field("checked", validation.checked),
+        json_bool_field("valid", validation.valid),
+        json_bool_field("link_allowed", validation.link_allowed),
+        json_string_array_field("issues", &validation.issues),
+        json_string_array_field("notes", &validation.notes),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn link_plan_host_ffi_entry_json(entry: &linker::LinkPlanHostFfiEntry) -> String {
+    let fields = vec![
+        json_string_field("abi", &entry.abi),
+        json_string_field("symbol", &entry.symbol),
+        json_string_field("signature_pattern", &entry.signature_pattern),
+        json_string_field("signature_hash", &entry.signature_hash),
+        json_string_field("policy", &entry.policy),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
 pub(crate) fn link_plan_json(plan: &linker::LinkPlan) -> String {
     let domain_units = plan
         .domain_units
@@ -187,6 +270,7 @@ pub(crate) fn link_plan_json(plan: &linker::LinkPlan) -> String {
             "\"hetero_calculate\":{}",
             link_plan_hetero_calculate_json(&plan.hetero_calculate)
         ),
+        format!("\"host_ffi\":{}", link_plan_host_ffi_json(&plan.host_ffi)),
         json_usize_field("domain_unit_count", plan.domain_units.len()),
         format!("\"domain_units\":[{}]", domain_units),
     ];

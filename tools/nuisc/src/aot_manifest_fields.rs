@@ -41,6 +41,7 @@ pub(crate) struct ManifestFieldVerification {
     pub project_documented_galaxy_library_module_count: usize,
     pub project_documented_galaxy_item_count: usize,
     pub project_packet_index: Option<String>,
+    pub project_host_ffi_index: Option<String>,
     pub bridge_registry_path: Option<String>,
     pub bridge_registry_schema: Option<String>,
     pub bridge_registry_units: usize,
@@ -161,6 +162,7 @@ pub(crate) fn verify_manifest_fields(
         )
         .unwrap_or(0),
         project_packet_index: parse_optional_toml_string(source, "packet_index"),
+        project_host_ffi_index: parse_optional_toml_string(source, "host_ffi_index"),
         bridge_registry_path: parse_optional_toml_string(source, "bridge_registry_path"),
         bridge_registry_schema: parse_optional_toml_string(source, "bridge_registry_schema"),
         bridge_registry_units: parse_optional_toml_usize(source, "bridge_registry_units")

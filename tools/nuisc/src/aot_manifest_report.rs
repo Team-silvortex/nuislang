@@ -91,6 +91,7 @@ pub(crate) fn build_manifest_verify_report(
             .project_documented_galaxy_library_module_count,
         project_documented_galaxy_item_count: fields.project_documented_galaxy_item_count,
         project_packet_index: fields.project_packet_index,
+        project_host_ffi_index: fields.project_host_ffi_index,
         bridge_registry_path: fields.bridge_registry_path,
         bridge_registry_units: fields.bridge_registry_units,
         bridge_registry_checked: domain_index_report.bridge_registry_checked,

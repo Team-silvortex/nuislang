@@ -81,6 +81,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         fields.project_documented_galaxy_library_module_count,
         fields.project_documented_galaxy_item_count,
         fields.project_packet_index.as_deref(),
+        fields.project_host_ffi_index.as_deref(),
     )?;
     Ok(build_manifest_verify_report(
         core,

@@ -168,6 +168,7 @@ mod tests {
                 "surface.std.net-session-contracts.v1".to_owned(),
                 "surface.std.text-json-contracts.v1".to_owned(),
                 "surface.std.time-benchmark-contracts.v1".to_owned(),
+                "surface.std.hetero-test-benchmark-contracts.v1".to_owned(),
             ]
         );
         assert_eq!(
@@ -180,6 +181,7 @@ mod tests {
                 "lib/net_contracts.ns".to_owned(),
                 "lib/text_contracts.ns".to_owned(),
                 "lib/time_contracts.ns".to_owned(),
+                "lib/hetero_contracts.ns".to_owned(),
             ]
         );
     }
