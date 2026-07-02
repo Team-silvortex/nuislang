@@ -1,196 +1,9 @@
 use std::fs;
 
+pub(crate) use super::container_model::*;
+pub(crate) use super::container_render::{render_container_plan_toml, render_container_toml};
+
 use super::reports::NsldAssembleSectionDiagnostic;
-
-const CONTAINER_PLAN_SCHEMA: &str = "nuis-nsld-container-plan-v1";
-const CONTAINER_PLAN_SCHEMA_VERSION: usize = 1;
-const CONTAINER_PLAN_KIND: &str = "deterministic-container-layout-plan";
-const CONTAINER_SCHEMA: &str = "nuis-nsld-container-v1";
-const CONTAINER_SCHEMA_VERSION: usize = 1;
-const CONTAINER_KIND: &str = "deterministic-hetero-container";
-const PRODUCER: &str = "nsld";
-const PRODUCER_PHASE: &str = "alpha-0.6.0";
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NsldContainerPlanReport {
-    pub(crate) manifest: String,
-    pub(crate) ready: bool,
-    pub(crate) container_magic: String,
-    pub(crate) container_version: usize,
-    pub(crate) section_count: usize,
-    pub(crate) section_table_hash: String,
-    pub(crate) container_layout_hash: String,
-    pub(crate) output_path: String,
-    pub(crate) sections: Vec<NsldAssembleSectionDiagnostic>,
-    pub(crate) blockers: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NsldContainerPlanEmitReport {
-    pub(crate) manifest: String,
-    pub(crate) output_path: String,
-    pub(crate) ready: bool,
-    pub(crate) container_layout_hash: String,
-    pub(crate) section_count: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NsldContainerPlanVerifyReport {
-    pub(crate) manifest: String,
-    pub(crate) input_path: String,
-    pub(crate) valid: bool,
-    pub(crate) expected_container_layout_hash: String,
-    pub(crate) expected_section_count: usize,
-    pub(crate) actual_container_layout_hash: Option<String>,
-    pub(crate) actual_section_count: Option<usize>,
-    pub(crate) issues: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NsldContainerReport {
-    pub(crate) manifest: String,
-    pub(crate) ready: bool,
-    pub(crate) container_magic: String,
-    pub(crate) container_version: usize,
-    pub(crate) metadata_table_hash: String,
-    pub(crate) container_layout_hash: String,
-    pub(crate) container_hash: String,
-    pub(crate) loader_readiness: String,
-    pub(crate) loader_blockers: Vec<String>,
-    pub(crate) loader_entry_kind: String,
-    pub(crate) loader_entry_symbol: String,
-    pub(crate) loader_entry_section_id: String,
-    pub(crate) loader_symbol_table_hash: String,
-    pub(crate) loader_symbols: Vec<NsldContainerLoaderSymbol>,
-    pub(crate) relocations: Vec<NsldContainerRelocationEntry>,
-    pub(crate) external_import_table_hash: String,
-    pub(crate) external_imports: Vec<NsldContainerExternalImport>,
-    pub(crate) payload_size_bytes: usize,
-    pub(crate) payload_hash: String,
-    pub(crate) output_path: String,
-    pub(crate) payload_path: String,
-    pub(crate) section_count: usize,
-    pub(crate) container_section_table_hash: String,
-    pub(crate) sections: Vec<NsldContainerSectionEntry>,
-    pub(crate) blockers: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NsldContainerExternalImport {
-    pub(crate) import_id: String,
-    pub(crate) import_kind: String,
-    pub(crate) import_name: String,
-    pub(crate) provider: String,
-    pub(crate) required: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NsldContainerLoaderSymbol {
-    pub(crate) symbol_id: String,
-    pub(crate) symbol_kind: String,
-    pub(crate) symbol_name: String,
-    pub(crate) section_id: String,
-    pub(crate) offset: usize,
-    pub(crate) size_bytes: usize,
-    pub(crate) payload_hash: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NsldContainerRelocationEntry {
-    pub(crate) relocation_id: String,
-    pub(crate) relocation_kind: String,
-    pub(crate) source_section_id: String,
-    pub(crate) source_offset: usize,
-    pub(crate) target_symbol_id: String,
-    pub(crate) addend: isize,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NsldContainerSectionEntry {
-    pub(crate) order_index: usize,
-    pub(crate) section_id: String,
-    pub(crate) section_kind: String,
-    pub(crate) source_path: String,
-    pub(crate) source_hash: String,
-    pub(crate) payload_hash: String,
-    pub(crate) required: bool,
-    pub(crate) offset: usize,
-    pub(crate) size_bytes: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NsldContainerEmitReport {
-    pub(crate) manifest: String,
-    pub(crate) output_path: String,
-    pub(crate) payload_path: String,
-    pub(crate) ready: bool,
-    pub(crate) metadata_table_hash: String,
-    pub(crate) container_layout_hash: String,
-    pub(crate) container_hash: String,
-    pub(crate) payload_size_bytes: usize,
-    pub(crate) payload_hash: String,
-    pub(crate) section_count: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NsldContainerVerifyReport {
-    pub(crate) manifest: String,
-    pub(crate) input_path: String,
-    pub(crate) valid: bool,
-    pub(crate) expected_container_layout_hash: String,
-    pub(crate) expected_container_hash: String,
-    pub(crate) expected_metadata_table_hash: String,
-    pub(crate) expected_payload_size_bytes: usize,
-    pub(crate) expected_payload_hash: String,
-    pub(crate) expected_payload_path: String,
-    pub(crate) expected_section_count: usize,
-    pub(crate) expected_container_section_table_hash: String,
-    pub(crate) expected_loader_readiness: String,
-    pub(crate) expected_loader_entry_kind: String,
-    pub(crate) expected_loader_entry_symbol: String,
-    pub(crate) expected_loader_entry_section_id: String,
-    pub(crate) expected_loader_symbol_count: usize,
-    pub(crate) expected_loader_symbol_id: String,
-    pub(crate) expected_loader_symbol_kind: String,
-    pub(crate) expected_loader_symbol_name: String,
-    pub(crate) expected_loader_symbol_section_id: String,
-    pub(crate) expected_loader_symbol_table_hash: String,
-    pub(crate) expected_relocation_count: usize,
-    pub(crate) expected_external_import_count: usize,
-    pub(crate) expected_external_import_table_hash: String,
-    pub(crate) expected_external_import_id: String,
-    pub(crate) expected_external_import_kind: String,
-    pub(crate) expected_external_import_name: String,
-    pub(crate) expected_external_import_provider: String,
-    pub(crate) expected_external_import_required: bool,
-    pub(crate) actual_container_layout_hash: Option<String>,
-    pub(crate) actual_container_hash: Option<String>,
-    pub(crate) actual_metadata_table_hash: Option<String>,
-    pub(crate) actual_payload_size_bytes: Option<usize>,
-    pub(crate) actual_payload_hash: Option<String>,
-    pub(crate) actual_section_count: Option<usize>,
-    pub(crate) actual_container_section_table_hash: Option<String>,
-    pub(crate) actual_loader_readiness: Option<String>,
-    pub(crate) actual_loader_entry_kind: Option<String>,
-    pub(crate) actual_loader_entry_symbol: Option<String>,
-    pub(crate) actual_loader_entry_section_id: Option<String>,
-    pub(crate) actual_loader_symbol_count: Option<usize>,
-    pub(crate) actual_loader_symbol_id: Option<String>,
-    pub(crate) actual_loader_symbol_kind: Option<String>,
-    pub(crate) actual_loader_symbol_name: Option<String>,
-    pub(crate) actual_loader_symbol_section_id: Option<String>,
-    pub(crate) actual_loader_symbol_table_hash: Option<String>,
-    pub(crate) actual_relocation_count: Option<usize>,
-    pub(crate) actual_external_import_count: Option<usize>,
-    pub(crate) actual_external_import_table_hash: Option<String>,
-    pub(crate) actual_external_import_id: Option<String>,
-    pub(crate) actual_external_import_kind: Option<String>,
-    pub(crate) actual_external_import_name: Option<String>,
-    pub(crate) actual_external_import_provider: Option<String>,
-    pub(crate) actual_external_import_required: Option<bool>,
-    pub(crate) section_range_issues: Vec<String>,
-    pub(crate) issues: Vec<String>,
-}
 
 pub(crate) fn payload_size(sections: &[NsldContainerSectionEntry]) -> usize {
     sections
@@ -261,6 +74,164 @@ pub(crate) fn payload_hash(
     hash_bytes(&payload_bytes(sections))
 }
 
+pub(crate) fn external_imports(plan: &nuisc::linker::LinkPlan) -> Vec<NsldContainerExternalImport> {
+    let mut imports = Vec::new();
+    let mut push_import = |import_kind: &str, import_name: String, provider: &str| {
+        let index = imports.len();
+        imports.push(NsldContainerExternalImport {
+            import_id: format!("imp{index:04}.{import_kind}"),
+            import_kind: import_kind.to_owned(),
+            import_name,
+            provider: provider.to_owned(),
+            required: true,
+        });
+    };
+
+    if matches!(
+        plan.final_stage.link_mode.as_str(),
+        "host-toolchain-finalize" | "bundle-packaging"
+    ) {
+        push_import(
+            "final-stage-driver",
+            plan.final_stage.driver.clone(),
+            "host-toolchain",
+        );
+    }
+    if !plan.cpu_target.clang_target.is_empty() {
+        push_import(
+            "clang-target",
+            plan.cpu_target.clang_target.clone(),
+            "host-toolchain",
+        );
+    }
+    if plan.final_stage.link_mode == "bundle-packaging" {
+        push_import(
+            "host-launcher-wrapper",
+            "host-launcher-wrapper".to_owned(),
+            "host-toolchain",
+        );
+    }
+    if !plan.hetero_calculate.c_world_policy.is_empty()
+        && plan.hetero_calculate.c_world_policy != "none"
+    {
+        push_import(
+            "c-world-policy",
+            plan.hetero_calculate.c_world_policy.clone(),
+            "c-world-wrapper",
+        );
+    }
+
+    imports
+}
+
+pub(crate) fn loader_blockers(
+    external_imports: &[NsldContainerExternalImport],
+    container_blockers: &[String],
+) -> Vec<String> {
+    let mut blockers = container_blockers.to_vec();
+    blockers.extend(
+        external_imports
+            .iter()
+            .filter(|external_import| external_import.required)
+            .map(|external_import| {
+                format!(
+                    "external-import:{}:{}",
+                    external_import.import_kind, external_import.import_name
+                )
+            }),
+    );
+    blockers
+}
+
+pub(crate) fn loader_symbols(
+    loader_entry_kind: &str,
+    loader_entry_symbol: &str,
+    loader_entry_section_id: &str,
+    sections: &[NsldContainerSectionEntry],
+) -> Vec<NsldContainerLoaderSymbol> {
+    sections
+        .iter()
+        .find(|section| section.section_id == loader_entry_section_id)
+        .map(|section| {
+            vec![NsldContainerLoaderSymbol {
+                symbol_id: "sym0000.loader-entry".to_owned(),
+                symbol_kind: loader_entry_kind.to_owned(),
+                symbol_name: loader_entry_symbol.to_owned(),
+                section_id: section.section_id.clone(),
+                offset: section.offset,
+                size_bytes: section.size_bytes,
+                payload_hash: section.payload_hash.clone(),
+            }]
+        })
+        .unwrap_or_default()
+}
+
+pub(crate) fn hetero_loader_symbols(
+    nodes: &[nuisc::linker::LinkPlanHeteroNode],
+    sections: &[NsldContainerSectionEntry],
+    start_index: usize,
+) -> Vec<NsldContainerLoaderSymbol> {
+    let mut symbols = Vec::new();
+    for (node_index, node) in nodes.iter().enumerate() {
+        if let Some(section) = sections
+            .iter()
+            .find(|section| section.source_path == node.link_input)
+            .or_else(|| {
+                sections
+                    .iter()
+                    .filter(|section| section.section_kind == "lowering-sidecar-input")
+                    .nth(node_index)
+            })
+        {
+            let index = start_index + symbols.len();
+            symbols.push(NsldContainerLoaderSymbol {
+                symbol_id: format!(
+                    "sym{index:04}.hetero-node.{}.{}",
+                    node.domain_family, node.package_id
+                ),
+                symbol_kind: "hetero-node-dispatch".to_owned(),
+                symbol_name: node.timestamp.clone(),
+                section_id: section.section_id.clone(),
+                offset: section.offset,
+                size_bytes: section.size_bytes,
+                payload_hash: section.payload_hash.clone(),
+            });
+        }
+    }
+    symbols
+}
+
+pub(crate) fn relocations(
+    loader_symbols: &[NsldContainerLoaderSymbol],
+) -> Vec<NsldContainerRelocationEntry> {
+    loader_symbols
+        .iter()
+        .enumerate()
+        .map(|(index, symbol)| NsldContainerRelocationEntry {
+            relocation_id: format!("rel{index:04}.{}", relocation_id_suffix(symbol)),
+            relocation_kind: relocation_kind_for_symbol(symbol).to_owned(),
+            source_section_id: symbol.section_id.clone(),
+            source_offset: symbol.offset,
+            target_symbol_id: symbol.symbol_id.clone(),
+            addend: 0,
+        })
+        .collect()
+}
+
+fn relocation_id_suffix(symbol: &NsldContainerLoaderSymbol) -> &'static str {
+    match symbol.symbol_kind.as_str() {
+        "hetero-node-dispatch" => "hetero-node",
+        _ => "lifecycle-entry",
+    }
+}
+
+fn relocation_kind_for_symbol(symbol: &NsldContainerLoaderSymbol) -> &'static str {
+    match symbol.symbol_kind.as_str() {
+        "hetero-node-dispatch" => "hetero-node-binding",
+        _ => "lifecycle-entry-binding",
+    }
+}
+
 pub(crate) fn loader_symbol_table_hash(
     symbols: &[NsldContainerLoaderSymbol],
     hash_bytes: fn(&[u8]) -> String,
@@ -305,6 +276,28 @@ pub(crate) fn external_import_table_hash(
     hash_bytes(material.as_bytes())
 }
 
+pub(crate) fn relocation_table_hash(
+    relocations: &[NsldContainerRelocationEntry],
+    hash_bytes: fn(&[u8]) -> String,
+) -> String {
+    let mut material = String::new();
+    for relocation in relocations {
+        material.push_str(&relocation.relocation_id);
+        material.push('\t');
+        material.push_str(&relocation.relocation_kind);
+        material.push('\t');
+        material.push_str(&relocation.source_section_id);
+        material.push('\t');
+        material.push_str(&relocation.source_offset.to_string());
+        material.push('\t');
+        material.push_str(&relocation.target_symbol_id);
+        material.push('\t');
+        material.push_str(&relocation.addend.to_string());
+        material.push('\n');
+    }
+    hash_bytes(material.as_bytes())
+}
+
 pub(crate) fn container_section_table_hash(
     sections: &[NsldContainerSectionEntry],
     hash_bytes: fn(&[u8]) -> String,
@@ -336,12 +329,12 @@ pub(crate) fn container_section_table_hash(
 pub(crate) fn metadata_table_hash(
     container_section_table_hash: &str,
     loader_symbol_table_hash: &str,
-    relocation_count: usize,
+    relocation_table_hash: &str,
     external_import_table_hash: &str,
     hash_bytes: fn(&[u8]) -> String,
 ) -> String {
     let material = format!(
-        "{container_section_table_hash}\t{loader_symbol_table_hash}\t{relocation_count}\t{external_import_table_hash}\n"
+        "{container_section_table_hash}\t{loader_symbol_table_hash}\t{relocation_table_hash}\t{external_import_table_hash}\n"
     );
     hash_bytes(material.as_bytes())
 }
@@ -487,287 +480,4 @@ pub(crate) fn payload_range_issues(
         }
     }
     issues
-}
-
-pub(crate) fn render_container_plan_toml(report: &NsldContainerPlanReport) -> String {
-    let mut out = String::new();
-    out.push_str(&format!(
-        "schema = \"{}\"\n",
-        escape_toml_string(CONTAINER_PLAN_SCHEMA)
-    ));
-    out.push_str(&format!(
-        "schema_version = {CONTAINER_PLAN_SCHEMA_VERSION}\n"
-    ));
-    out.push_str(&format!(
-        "plan_kind = \"{}\"\n",
-        escape_toml_string(CONTAINER_PLAN_KIND)
-    ));
-    out.push_str(&format!(
-        "producer = \"{}\"\n",
-        escape_toml_string(PRODUCER)
-    ));
-    out.push_str(&format!(
-        "producer_phase = \"{}\"\n",
-        escape_toml_string(PRODUCER_PHASE)
-    ));
-    out.push_str(&format!("ready = {}\n", report.ready));
-    out.push_str(&format!(
-        "container_magic = \"{}\"\n",
-        escape_toml_string(&report.container_magic)
-    ));
-    out.push_str(&format!(
-        "container_version = {}\n",
-        report.container_version
-    ));
-    out.push_str(&format!("section_count = {}\n", report.section_count));
-    out.push_str(&format!(
-        "section_table_hash = \"{}\"\n",
-        escape_toml_string(&report.section_table_hash)
-    ));
-    out.push_str(&format!(
-        "container_layout_hash = \"{}\"\n",
-        escape_toml_string(&report.container_layout_hash)
-    ));
-    out.push_str(&format!(
-        "output_path = \"{}\"\n",
-        escape_toml_string(&report.output_path)
-    ));
-    out.push_str(&format!(
-        "blockers = [{}]\n",
-        toml_string_array_literal(&report.blockers)
-    ));
-    for section in &report.sections {
-        out.push_str("\n[[section]]\n");
-        out.push_str(&format!("order_index = {}\n", section.order_index));
-        out.push_str(&format!(
-            "section_id = \"{}\"\n",
-            escape_toml_string(&section.section_id)
-        ));
-        out.push_str(&format!(
-            "section_kind = \"{}\"\n",
-            escape_toml_string(&section.section_kind)
-        ));
-        out.push_str(&format!(
-            "source_path = \"{}\"\n",
-            escape_toml_string(&section.source_path)
-        ));
-        out.push_str(&format!(
-            "source_hash = \"{}\"\n",
-            escape_toml_string(&section.source_hash)
-        ));
-        out.push_str(&format!("required = {}\n", section.required));
-    }
-    out
-}
-
-pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
-    let mut out = String::new();
-    out.push_str(&format!(
-        "schema = \"{}\"\n",
-        escape_toml_string(CONTAINER_SCHEMA)
-    ));
-    out.push_str(&format!("schema_version = {CONTAINER_SCHEMA_VERSION}\n"));
-    out.push_str(&format!(
-        "container_kind = \"{}\"\n",
-        escape_toml_string(CONTAINER_KIND)
-    ));
-    out.push_str(&format!(
-        "producer = \"{}\"\n",
-        escape_toml_string(PRODUCER)
-    ));
-    out.push_str(&format!(
-        "producer_phase = \"{}\"\n",
-        escape_toml_string(PRODUCER_PHASE)
-    ));
-    out.push_str(&format!("ready = {}\n", report.ready));
-    out.push_str(&format!(
-        "container_magic = \"{}\"\n",
-        escape_toml_string(&report.container_magic)
-    ));
-    out.push_str(&format!(
-        "container_version = {}\n",
-        report.container_version
-    ));
-    out.push_str(&format!(
-        "metadata_table_hash = \"{}\"\n",
-        escape_toml_string(&report.metadata_table_hash)
-    ));
-    out.push_str(&format!("section_count = {}\n", report.section_count));
-    out.push_str(&format!(
-        "container_section_table_hash = \"{}\"\n",
-        escape_toml_string(&report.container_section_table_hash)
-    ));
-    out.push_str(&format!(
-        "container_layout_hash = \"{}\"\n",
-        escape_toml_string(&report.container_layout_hash)
-    ));
-    out.push_str(&format!(
-        "container_hash = \"{}\"\n",
-        escape_toml_string(&report.container_hash)
-    ));
-    out.push_str(&format!(
-        "loader_readiness = \"{}\"\n",
-        escape_toml_string(&report.loader_readiness)
-    ));
-    out.push_str(&format!(
-        "loader_blockers = [{}]\n",
-        toml_string_array_literal(&report.loader_blockers)
-    ));
-    out.push_str(&format!(
-        "loader_entry_kind = \"{}\"\n",
-        escape_toml_string(&report.loader_entry_kind)
-    ));
-    out.push_str(&format!(
-        "loader_entry_symbol = \"{}\"\n",
-        escape_toml_string(&report.loader_entry_symbol)
-    ));
-    out.push_str(&format!(
-        "loader_entry_section_id = \"{}\"\n",
-        escape_toml_string(&report.loader_entry_section_id)
-    ));
-    out.push_str(&format!(
-        "loader_symbol_count = {}\n",
-        report.loader_symbols.len()
-    ));
-    out.push_str(&format!(
-        "loader_symbol_table_hash = \"{}\"\n",
-        escape_toml_string(&report.loader_symbol_table_hash)
-    ));
-    out.push_str(&format!(
-        "relocation_count = {}\n",
-        report.relocations.len()
-    ));
-    out.push_str(&format!(
-        "external_import_count = {}\n",
-        report.external_imports.len()
-    ));
-    out.push_str(&format!(
-        "external_import_table_hash = \"{}\"\n",
-        escape_toml_string(&report.external_import_table_hash)
-    ));
-    out.push_str(&format!(
-        "payload_size_bytes = {}\n",
-        report.payload_size_bytes
-    ));
-    out.push_str(&format!(
-        "payload_hash = \"{}\"\n",
-        escape_toml_string(&report.payload_hash)
-    ));
-    out.push_str(&format!(
-        "payload_path = \"{}\"\n",
-        escape_toml_string(&report.payload_path)
-    ));
-    out.push_str(&format!(
-        "blockers = [{}]\n",
-        toml_string_array_literal(&report.blockers)
-    ));
-    for symbol in &report.loader_symbols {
-        out.push_str("\n[[loader_symbol]]\n");
-        out.push_str(&format!(
-            "symbol_id = \"{}\"\n",
-            escape_toml_string(&symbol.symbol_id)
-        ));
-        out.push_str(&format!(
-            "symbol_kind = \"{}\"\n",
-            escape_toml_string(&symbol.symbol_kind)
-        ));
-        out.push_str(&format!(
-            "symbol_name = \"{}\"\n",
-            escape_toml_string(&symbol.symbol_name)
-        ));
-        out.push_str(&format!(
-            "section_id = \"{}\"\n",
-            escape_toml_string(&symbol.section_id)
-        ));
-        out.push_str(&format!("offset = {}\n", symbol.offset));
-        out.push_str(&format!("size_bytes = {}\n", symbol.size_bytes));
-        out.push_str(&format!(
-            "payload_hash = \"{}\"\n",
-            escape_toml_string(&symbol.payload_hash)
-        ));
-    }
-    for relocation in &report.relocations {
-        out.push_str("\n[[relocation]]\n");
-        out.push_str(&format!(
-            "relocation_id = \"{}\"\n",
-            escape_toml_string(&relocation.relocation_id)
-        ));
-        out.push_str(&format!(
-            "relocation_kind = \"{}\"\n",
-            escape_toml_string(&relocation.relocation_kind)
-        ));
-        out.push_str(&format!(
-            "source_section_id = \"{}\"\n",
-            escape_toml_string(&relocation.source_section_id)
-        ));
-        out.push_str(&format!("source_offset = {}\n", relocation.source_offset));
-        out.push_str(&format!(
-            "target_symbol_id = \"{}\"\n",
-            escape_toml_string(&relocation.target_symbol_id)
-        ));
-        out.push_str(&format!("addend = {}\n", relocation.addend));
-    }
-    for external_import in &report.external_imports {
-        out.push_str("\n[[external_import]]\n");
-        out.push_str(&format!(
-            "import_id = \"{}\"\n",
-            escape_toml_string(&external_import.import_id)
-        ));
-        out.push_str(&format!(
-            "import_kind = \"{}\"\n",
-            escape_toml_string(&external_import.import_kind)
-        ));
-        out.push_str(&format!(
-            "import_name = \"{}\"\n",
-            escape_toml_string(&external_import.import_name)
-        ));
-        out.push_str(&format!(
-            "provider = \"{}\"\n",
-            escape_toml_string(&external_import.provider)
-        ));
-        out.push_str(&format!("required = {}\n", external_import.required));
-    }
-    for section in &report.sections {
-        out.push_str("\n[[section]]\n");
-        out.push_str(&format!("order_index = {}\n", section.order_index));
-        out.push_str(&format!(
-            "section_id = \"{}\"\n",
-            escape_toml_string(&section.section_id)
-        ));
-        out.push_str(&format!(
-            "section_kind = \"{}\"\n",
-            escape_toml_string(&section.section_kind)
-        ));
-        out.push_str(&format!(
-            "source_path = \"{}\"\n",
-            escape_toml_string(&section.source_path)
-        ));
-        out.push_str(&format!(
-            "source_hash = \"{}\"\n",
-            escape_toml_string(&section.source_hash)
-        ));
-        out.push_str(&format!(
-            "payload_hash = \"{}\"\n",
-            escape_toml_string(&section.payload_hash)
-        ));
-        out.push_str(&format!("required = {}\n", section.required));
-        out.push_str(&format!("offset = {}\n", section.offset));
-        out.push_str(&format!("size_bytes = {}\n", section.size_bytes));
-    }
-    out
-}
-
-fn toml_string_array_literal(values: &[String]) -> String {
-    values
-        .iter()
-        .map(|value| format!("\"{}\"", escape_toml_string(value)))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-fn escape_toml_string(value: &str) -> String {
-    value
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
 }

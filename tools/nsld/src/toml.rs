@@ -12,6 +12,11 @@ use super::{
     NSLD_SECTION_MANIFEST_SCHEMA_VERSION,
 };
 
+pub(crate) use super::toml_read::{
+    first_table_bool_value, first_table_isize_value, first_table_string_value,
+    first_table_usize_value, string_array_value, string_value, usize_value,
+};
+
 pub(crate) fn render_link_input_table(
     inputs: &[NsldLinkInputDiagnostic],
     total_bytes: usize,

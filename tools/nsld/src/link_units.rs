@@ -1,12 +1,20 @@
+pub(crate) use super::link_inputs_pipeline::{
+    nsld_emit_link_inputs_report, nsld_verify_link_inputs_report,
+};
+
 use super::{
     fnv1a64_hex,
     reports::{
         NsldDomainDiagnostic, NsldLinkInputDiagnostic, NsldLinkInputSummary,
-        NsldLinkUnitDiagnostic, NsldLinkUnitReport, NsldSidecarCapabilityDiagnostic,
+        NsldLinkUnitDiagnostic, NsldLinkUnitReport, NsldLinkUnitsEmitReport,
+        NsldLinkUnitsVerifyReport, NsldSidecarCapabilityDiagnostic,
     },
-    toml_string_array_value, toml_string_value,
+    toml,
 };
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 pub(crate) fn nsld_link_unit_report(
     manifest: &Path,
@@ -101,6 +109,118 @@ pub(crate) fn nsld_link_unit_report(
         data_segment_count: plan.hetero_calculate.data_segments.len(),
         unit_table_hash,
         units,
+    }
+}
+
+pub(crate) fn nsld_emit_link_units_report(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<NsldLinkUnitsEmitReport, String> {
+    let report = nsld_link_unit_report(manifest, plan);
+    let output_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-units.toml");
+    fs::write(&output_path, toml::render_link_unit_table(&report)).map_err(|error| {
+        format!(
+            "failed to write nsld link unit table `{}`: {error}",
+            output_path.display()
+        )
+    })?;
+
+    Ok(NsldLinkUnitsEmitReport {
+        manifest: report.manifest,
+        output_path: output_path.display().to_string(),
+        unit_count: report.unit_count,
+        hetero_unit_count: report.hetero_unit_count,
+        link_input_count: report.link_input_count,
+        unit_table_hash: report.unit_table_hash,
+    })
+}
+
+pub(crate) fn nsld_verify_link_units_report(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+) -> NsldLinkUnitsVerifyReport {
+    let expected_report = nsld_link_unit_report(manifest, plan);
+    let expected = toml::render_link_unit_table(&expected_report);
+    let input_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-units.toml");
+    let mut issues = Vec::new();
+    let actual = fs::read_to_string(&input_path).map_err(|error| {
+        format!(
+            "missing_or_unreadable_link_unit_table `{}`: {error}",
+            input_path.display()
+        )
+    });
+    let (
+        actual_unit_count,
+        actual_hetero_unit_count,
+        actual_link_input_count,
+        actual_unit_table_hash,
+    ) = match actual.as_ref() {
+        Ok(source) => (
+            toml::usize_value(source, "unit_count"),
+            toml::usize_value(source, "hetero_unit_count"),
+            toml::usize_value(source, "link_input_count"),
+            toml::string_value(source, "unit_table_hash"),
+        ),
+        Err(error) => {
+            issues.push(error.clone());
+            (None, None, None, None)
+        }
+    };
+    if let Ok(actual) = actual {
+        if actual != expected {
+            issues.push("link-unit-table-content-mismatch".to_owned());
+        }
+        if actual_unit_count != Some(expected_report.unit_count) {
+            issues.push(format!(
+                "unit_count mismatch: expected {}, found {}",
+                expected_report.unit_count,
+                actual_unit_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_hetero_unit_count != Some(expected_report.hetero_unit_count) {
+            issues.push(format!(
+                "hetero_unit_count mismatch: expected {}, found {}",
+                expected_report.hetero_unit_count,
+                actual_hetero_unit_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_link_input_count != Some(expected_report.link_input_count) {
+            issues.push(format!(
+                "link_input_count mismatch: expected {}, found {}",
+                expected_report.link_input_count,
+                actual_link_input_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_unit_table_hash.as_deref() != Some(expected_report.unit_table_hash.as_str()) {
+            issues.push(format!(
+                "unit_table_hash mismatch: expected {}, found {}",
+                expected_report.unit_table_hash,
+                actual_unit_table_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+    }
+
+    NsldLinkUnitsVerifyReport {
+        manifest: manifest.display().to_string(),
+        input_path: input_path.display().to_string(),
+        valid: issues.is_empty(),
+        expected_unit_count: expected_report.unit_count,
+        expected_hetero_unit_count: expected_report.hetero_unit_count,
+        expected_link_input_count: expected_report.link_input_count,
+        expected_unit_table_hash: expected_report.unit_table_hash,
+        actual_unit_count,
+        actual_hetero_unit_count,
+        actual_link_input_count,
+        actual_unit_table_hash,
+        issues,
     }
 }
 
@@ -208,14 +328,14 @@ pub(crate) fn nsld_sidecar_capability_diagnostics(
             };
 
             let capability_owner =
-                toml_string_value(&source, "capability_owner").unwrap_or_else(|| "missing".to_owned());
+                toml::string_value(&source, "capability_owner").unwrap_or_else(|| "missing".to_owned());
             let frontend_ir =
-                toml_string_value(&source, "frontend_ir").unwrap_or_else(|| "missing".to_owned());
+                toml::string_value(&source, "frontend_ir").unwrap_or_else(|| "missing".to_owned());
             let native_ir =
-                toml_string_value(&source, "native_ir").unwrap_or_else(|| "missing".to_owned());
+                toml::string_value(&source, "native_ir").unwrap_or_else(|| "missing".to_owned());
             let dispatch_lowering =
-                toml_string_value(&source, "dispatch_lowering").unwrap_or_else(|| "missing".to_owned());
-            let validation_contracts = toml_string_array_value(&source, "validation_contracts");
+                toml::string_value(&source, "dispatch_lowering").unwrap_or_else(|| "missing".to_owned());
+            let validation_contracts = toml::string_array_value(&source, "validation_contracts");
             let mut issues = Vec::new();
             let expected_owner = format!("{}-nustar", unit.domain_family);
             if capability_owner != expected_owner {

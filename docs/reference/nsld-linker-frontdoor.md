@@ -253,6 +253,11 @@ container magic/version, `container_layout_hash`, `container_hash`, blockers,
 aggregate `payload_size_bytes` / `payload_hash`, and section table with
 deterministic `offset` / `size_bytes` entries without claiming to replace
 relocation, final native object linking, or host executable wrapping.
+The preview report exposes `metadata_table_hash`,
+`container_section_table_hash`, `loader_symbol_table_hash`,
+`relocation_table_hash`, and `external_import_table_hash` so loader, release,
+and debugger tooling can key off the same table summaries before
+`emit-container` writes files.
 
 `nsld emit-container` materializes this view and its contiguous payload blob
 to:
@@ -283,9 +288,10 @@ loader_blockers = ["external-import:final-stage-driver:cc", "external-import:cla
 loader_entry_kind = "lifecycle-bootstrap"
 loader_entry_symbol = "nustar.bootstrap.v1"
 loader_entry_section_id = "sec0000.compiled-artifact"
-loader_symbol_count = 1
+loader_symbol_count = 2
 loader_symbol_table_hash = "0x..."
-relocation_count = 0
+relocation_count = 2
+relocation_table_hash = "0x..."
 external_import_count = 3
 external_import_table_hash = "0x..."
 payload_size_bytes = 1234
@@ -301,6 +307,22 @@ section_id = "sec0000.compiled-artifact"
 offset = 0
 size_bytes = 1234
 payload_hash = "0x..."
+
+[[relocation]]
+relocation_id = "rel0000.lifecycle-entry"
+relocation_kind = "lifecycle-entry-binding"
+source_section_id = "sec0000.compiled-artifact"
+source_offset = 0
+target_symbol_id = "sym0000.loader-entry"
+addend = 0
+
+[[relocation]]
+relocation_id = "rel0001.hetero-node"
+relocation_kind = "hetero-node-binding"
+source_section_id = "sec0004.lowering-sidecar-input"
+source_offset = 1234
+target_symbol_id = "sym0001.hetero-node.shader.official.shader"
+addend = 0
 
 [[external_import]]
 import_id = "imp0000.final-stage-driver"
@@ -340,14 +362,17 @@ fails if either file is missing, if the metadata content differs, or if
 `metadata_table_hash`, `section_count`, `container_section_table_hash`,
 `container_layout_hash`, `loader_entry_kind`, `loader_entry_symbol`,
 `loader_entry_section_id`, `loader_readiness`, `loader_symbol_count`,
-`loader_symbol_table_hash`, `relocation_count`, `external_import_count`,
-`external_import_table_hash`, `payload_size_bytes`, `payload_hash`, or
-`container_hash` no longer match. It also checks the bootstrap
-`[[loader_symbol]]` entry's `symbol_id`, `symbol_kind`, `symbol_name`, and
-`section_id`; the first
-`[[external_import]]` entry's `import_id`, `import_kind`, `import_name`,
-`provider`, and `required`; plus each section's
-`offset` / `size_bytes` range against that section's `payload_hash`, so a
+`loader_symbol_table_hash`, `relocation_count`, `relocation_table_hash`,
+`external_import_count`, `external_import_table_hash`, `payload_size_bytes`,
+`payload_hash`, or `container_hash` no longer match. It also parses and checks
+every `[[section]]`, `[[loader_symbol]]`, `[[relocation]]`, and
+`[[external_import]]` table entry by index. Field-level table diagnostics are
+grouped into `container_section_issues`, `loader_symbol_issues`,
+`relocation_issues`, and `external_import_issues`; malformed entries report
+missing or invalid fields such as
+`relocation[0].relocation_kind missing` or
+`relocation[0].source_offset invalid`. Section payload ranges are checked
+separately in `section_range_issues` against each section's `payload_hash`, so a
 corrupted payload segment can be reported without waiting for later relocation
 or final native linking.
 
@@ -358,11 +383,15 @@ and its payload range; future loader/runtime work can extend that into richer
 symbol and relocation tables without changing the container's basic entry
 contract.
 
-`relocation_count` reserves the relocation table slot. It is `0` for the
-current metadata container because Nsld is not yet performing final native
-object relocation, but the count participates in the container metadata shape
-so later `[[relocation]]` entries can be added without inventing a new top-level
-container concept.
+`relocation_count` and `relocation_table_hash` describe the loader-facing
+relocation table. The current metadata container emits a deterministic
+`lifecycle-entry-binding` record that binds the compiled artifact bootstrap
+section to the loader entry symbol. When heterogeneous link-plan nodes are
+present, it also emits `hetero-node-binding` records that bind each node's
+`link_input` section to a loader-visible dispatch symbol. These are not final
+native object relocations yet; they are Nsld-owned loader relocation seeds that
+future Mach-O, ELF, PE, shader, and kernel relocation phases can extend without
+inventing a new top-level container concept.
 
 `[[external_import]]` records host or compatibility dependencies still outside
 the self-owned Nsld container. Today that normally includes the host final-stage
@@ -482,6 +511,12 @@ Closure also reports `link_input_count`, `link_input_total_bytes`, and
 `link_input_table_hash`. The table hash is derived from the ordered linker
 input identities and their content hashes, so a future linker/cache/debugger
 can cheaply detect whether the complete heterogeneous input set is unchanged.
+
+Closure also reports the expected container `container_metadata_table_hash`
+and `container_loader_readiness`. These are derived from the current link plan
+and do not require `nuis.nsld.container` to have been emitted yet; they give
+route-planning tools the same container fingerprint used by `container`,
+`emit-container`, `prepare`, and `check`.
 
 This is not final object linking yet; it is the linker-owned input table that
 future binary assembly, cache reuse, debug-symbol correlation, and closure

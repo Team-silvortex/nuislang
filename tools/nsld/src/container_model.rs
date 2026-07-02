@@ -1,0 +1,201 @@
+use super::reports::NsldAssembleSectionDiagnostic;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerPlanReport {
+    pub(crate) manifest: String,
+    pub(crate) ready: bool,
+    pub(crate) container_magic: String,
+    pub(crate) container_version: usize,
+    pub(crate) section_count: usize,
+    pub(crate) section_table_hash: String,
+    pub(crate) container_layout_hash: String,
+    pub(crate) output_path: String,
+    pub(crate) sections: Vec<NsldAssembleSectionDiagnostic>,
+    pub(crate) blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerPlanEmitReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) ready: bool,
+    pub(crate) container_layout_hash: String,
+    pub(crate) section_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerPlanVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_container_layout_hash: String,
+    pub(crate) expected_section_count: usize,
+    pub(crate) actual_container_layout_hash: Option<String>,
+    pub(crate) actual_section_count: Option<usize>,
+    pub(crate) issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerReport {
+    pub(crate) manifest: String,
+    pub(crate) ready: bool,
+    pub(crate) container_magic: String,
+    pub(crate) container_version: usize,
+    pub(crate) metadata_table_hash: String,
+    pub(crate) container_layout_hash: String,
+    pub(crate) container_hash: String,
+    pub(crate) loader_readiness: String,
+    pub(crate) loader_blockers: Vec<String>,
+    pub(crate) loader_entry_kind: String,
+    pub(crate) loader_entry_symbol: String,
+    pub(crate) loader_entry_section_id: String,
+    pub(crate) loader_symbol_table_hash: String,
+    pub(crate) loader_symbols: Vec<NsldContainerLoaderSymbol>,
+    pub(crate) relocation_table_hash: String,
+    pub(crate) relocations: Vec<NsldContainerRelocationEntry>,
+    pub(crate) external_import_table_hash: String,
+    pub(crate) external_imports: Vec<NsldContainerExternalImport>,
+    pub(crate) payload_size_bytes: usize,
+    pub(crate) payload_hash: String,
+    pub(crate) output_path: String,
+    pub(crate) payload_path: String,
+    pub(crate) section_count: usize,
+    pub(crate) container_section_table_hash: String,
+    pub(crate) sections: Vec<NsldContainerSectionEntry>,
+    pub(crate) blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerExternalImport {
+    pub(crate) import_id: String,
+    pub(crate) import_kind: String,
+    pub(crate) import_name: String,
+    pub(crate) provider: String,
+    pub(crate) required: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerLoaderSymbol {
+    pub(crate) symbol_id: String,
+    pub(crate) symbol_kind: String,
+    pub(crate) symbol_name: String,
+    pub(crate) section_id: String,
+    pub(crate) offset: usize,
+    pub(crate) size_bytes: usize,
+    pub(crate) payload_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerRelocationEntry {
+    pub(crate) relocation_id: String,
+    pub(crate) relocation_kind: String,
+    pub(crate) source_section_id: String,
+    pub(crate) source_offset: usize,
+    pub(crate) target_symbol_id: String,
+    pub(crate) addend: isize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerSectionEntry {
+    pub(crate) order_index: usize,
+    pub(crate) section_id: String,
+    pub(crate) section_kind: String,
+    pub(crate) source_path: String,
+    pub(crate) source_hash: String,
+    pub(crate) payload_hash: String,
+    pub(crate) required: bool,
+    pub(crate) offset: usize,
+    pub(crate) size_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerEmitReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) payload_path: String,
+    pub(crate) ready: bool,
+    pub(crate) metadata_table_hash: String,
+    pub(crate) container_layout_hash: String,
+    pub(crate) container_hash: String,
+    pub(crate) payload_size_bytes: usize,
+    pub(crate) payload_hash: String,
+    pub(crate) section_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_container_layout_hash: String,
+    pub(crate) expected_container_hash: String,
+    pub(crate) expected_metadata_table_hash: String,
+    pub(crate) expected_payload_size_bytes: usize,
+    pub(crate) expected_payload_hash: String,
+    pub(crate) expected_payload_path: String,
+    pub(crate) expected_section_count: usize,
+    pub(crate) expected_container_section_table_hash: String,
+    pub(crate) expected_loader_readiness: String,
+    pub(crate) expected_loader_entry_kind: String,
+    pub(crate) expected_loader_entry_symbol: String,
+    pub(crate) expected_loader_entry_section_id: String,
+    pub(crate) expected_loader_symbol_count: usize,
+    pub(crate) expected_loader_symbol_id: String,
+    pub(crate) expected_loader_symbol_kind: String,
+    pub(crate) expected_loader_symbol_name: String,
+    pub(crate) expected_loader_symbol_section_id: String,
+    pub(crate) expected_loader_symbol_table_hash: String,
+    pub(crate) expected_relocation_count: usize,
+    pub(crate) expected_relocation_table_hash: String,
+    pub(crate) expected_relocation_id: String,
+    pub(crate) expected_relocation_kind: String,
+    pub(crate) expected_relocation_source_section_id: String,
+    pub(crate) expected_relocation_source_offset: usize,
+    pub(crate) expected_relocation_target_symbol_id: String,
+    pub(crate) expected_relocation_addend: isize,
+    pub(crate) expected_external_import_count: usize,
+    pub(crate) expected_external_import_table_hash: String,
+    pub(crate) expected_external_import_id: String,
+    pub(crate) expected_external_import_kind: String,
+    pub(crate) expected_external_import_name: String,
+    pub(crate) expected_external_import_provider: String,
+    pub(crate) expected_external_import_required: bool,
+    pub(crate) actual_container_layout_hash: Option<String>,
+    pub(crate) actual_container_hash: Option<String>,
+    pub(crate) actual_metadata_table_hash: Option<String>,
+    pub(crate) actual_payload_size_bytes: Option<usize>,
+    pub(crate) actual_payload_hash: Option<String>,
+    pub(crate) actual_section_count: Option<usize>,
+    pub(crate) actual_container_section_table_hash: Option<String>,
+    pub(crate) actual_loader_readiness: Option<String>,
+    pub(crate) actual_loader_entry_kind: Option<String>,
+    pub(crate) actual_loader_entry_symbol: Option<String>,
+    pub(crate) actual_loader_entry_section_id: Option<String>,
+    pub(crate) actual_loader_symbol_count: Option<usize>,
+    pub(crate) actual_loader_symbol_id: Option<String>,
+    pub(crate) actual_loader_symbol_kind: Option<String>,
+    pub(crate) actual_loader_symbol_name: Option<String>,
+    pub(crate) actual_loader_symbol_section_id: Option<String>,
+    pub(crate) actual_loader_symbol_table_hash: Option<String>,
+    pub(crate) actual_relocation_count: Option<usize>,
+    pub(crate) actual_relocation_table_hash: Option<String>,
+    pub(crate) actual_relocation_id: Option<String>,
+    pub(crate) actual_relocation_kind: Option<String>,
+    pub(crate) actual_relocation_source_section_id: Option<String>,
+    pub(crate) actual_relocation_source_offset: Option<usize>,
+    pub(crate) actual_relocation_target_symbol_id: Option<String>,
+    pub(crate) actual_relocation_addend: Option<isize>,
+    pub(crate) actual_external_import_count: Option<usize>,
+    pub(crate) actual_external_import_table_hash: Option<String>,
+    pub(crate) actual_external_import_id: Option<String>,
+    pub(crate) actual_external_import_kind: Option<String>,
+    pub(crate) actual_external_import_name: Option<String>,
+    pub(crate) actual_external_import_provider: Option<String>,
+    pub(crate) actual_external_import_required: Option<bool>,
+    pub(crate) container_section_issues: Vec<String>,
+    pub(crate) section_range_issues: Vec<String>,
+    pub(crate) loader_symbol_issues: Vec<String>,
+    pub(crate) relocation_issues: Vec<String>,
+    pub(crate) external_import_issues: Vec<String>,
+    pub(crate) issues: Vec<String>,
+}
