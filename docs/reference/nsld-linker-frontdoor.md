@@ -417,6 +417,8 @@ the top-level linker health report.
 * artifact lowering alignment is consistent
 * clock protocol validation passed
 * hetero calculate validation passed
+* host FFI validation passed and `host_ffi.link_allowed` remains true
+* host FFI ABI groups expose per-ABI entries and local validation summaries
 * hetero calculate plan is static-link
 * hetero calculate plan is lifecycle-driven
 * lowering sidecar capabilities are readable and link-ready for domains that
@@ -444,6 +446,13 @@ the top-level linker health report.
 
 The command exits with failure when any linker gate fails. JSON output is
 intended for CI and future toolchain orchestration.
+
+Host FFI is treated as static linker input, not as a dynamic fast path. The
+current link plan carries parsed host FFI entries, ABI groups, validation
+issues/notes, and the derived `link_allowed` decision. Duplicate whitelist
+entries or policy/count drift are blocking issues. Multiple signatures for the
+same ABI symbol are reported as notes so the linker can surface overload-like
+shape without rejecting an otherwise valid registered footprint.
 
 `nsld check` does not require `nuis.nsld.link-inputs.toml`,
 `nuis.nsld.link-units.toml`, `nuis.nsld.link-bundle.toml`, or

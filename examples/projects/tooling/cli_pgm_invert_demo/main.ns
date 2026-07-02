@@ -1,3 +1,5 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_argv_at(index: i64) -> i64;
@@ -131,7 +133,7 @@ mod cpu Main {
     let bytes_read: i64 =
       host_file_read(input_file, host_buffer_handle(input_buffer), read_len);
     let input_close: i64 = host_file_close(input_file);
-    if input_close <= 0 {
+    if !StdFsContracts.close_ok(input_close) || input_close == 0 {
       return 22;
     }
     if sample_error_code(input_buffer, bytes_read) > 0 {
@@ -150,7 +152,8 @@ mod cpu Main {
     if write_output_file(output_file, input_buffer) <= 0 {
       return 25;
     }
-    if host_file_close(output_file) <= 0 {
+    let output_close: i64 = host_file_close(output_file);
+    if !StdFsContracts.close_ok(output_close) || output_close == 0 {
       return 26;
     }
     return 0;

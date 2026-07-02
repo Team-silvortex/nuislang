@@ -1,3 +1,6 @@
+use cpu StdCliContracts;
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_line_read(prompt_handle: i64) -> i64;
@@ -83,9 +86,23 @@ mod cpu Main {
   fn main() -> i64 {
     let summary: CliReportSessionProjectSummary =
       capture_cli_report_session_project(509, 0);
-    if summary.stdout_code > 0 || summary.stderr_code > 0 || summary.diag_code > 0 {
-      return 0;
+    let session_total: i64 = StdCliContracts.cli_session_total(
+      summary.argv_count,
+      summary.line_handle,
+      summary.line_len,
+      summary.tick_ns,
+      summary.completed == 1,
+      summary.timed_out == 1
+    );
+    let io_total: i64 = StdIoContracts.console_status_total(
+      summary.stdout_code,
+      summary.stderr_code,
+      summary.stdout_flushed,
+      summary.stderr_flushed
+    );
+    if session_total > 0 && io_total > 0 && summary.diag_code >= 0 {
+      return StdCliContracts.cli_ok();
     }
-    return 1;
+    return StdCliContracts.cli_error();
   }
 }

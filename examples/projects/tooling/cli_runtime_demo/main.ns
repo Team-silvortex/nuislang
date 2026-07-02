@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_env_has(key_handle: i64) -> i64;
@@ -48,9 +50,6 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: CliRuntimeSummary = capture_cli_runtime();
-    if summary.stdout_code > 0 {
-      return 0;
-    }
-    return 1;
+    return StdCliContracts.success_exit_code(summary.stdout_code > 0);
   }
 }

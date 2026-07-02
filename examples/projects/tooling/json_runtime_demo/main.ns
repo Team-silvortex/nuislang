@@ -1,3 +1,5 @@
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
   extern "c" fn host_json_array_len(item_count: i64) -> i64;
@@ -25,11 +27,27 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: JsonRuntimeProjectSummary = capture_json_runtime_project();
-    return summary.primary_pair_len
-      + summary.primary_array_len
-      + summary.primary_object_len
-      + summary.secondary_pair_len
-      + summary.secondary_array_len
-      + summary.secondary_object_len;
+    let total: i64 = StdTextContracts.json_shape_total(
+      summary.primary_pair_len,
+      summary.primary_array_len,
+      summary.primary_object_len
+    ) + StdTextContracts.json_shape_total(
+      summary.secondary_pair_len,
+      summary.secondary_array_len,
+      summary.secondary_object_len
+    );
+    if !StdTextContracts.json_pair_ready(summary.primary_pair_len) {
+      return StdTextContracts.text_error();
+    }
+    if !StdTextContracts.json_container_shape_ok(
+      summary.primary_array_len,
+      summary.primary_object_len
+    ) {
+      return StdTextContracts.text_error();
+    }
+    if total > 0 {
+      return StdTextContracts.text_ok();
+    }
+    return StdTextContracts.text_error();
   }
 }

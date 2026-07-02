@@ -45,6 +45,40 @@ mod cpu StdTextContracts {
       + text_value_or_zero(object_len);
   }
 
+  /// Returns true when a JSON pair probe produced a non-empty payload.
+  pub fn json_pair_ready(pair_len: i64) -> bool {
+    return pair_len > 0;
+  }
+
+  /// Returns true when JSON array/object probes produced valid non-negative lengths.
+  pub fn json_container_shape_ok(array_len: i64, object_len: i64) -> bool {
+    if array_len < 0 {
+      return false;
+    }
+    return object_len >= 0;
+  }
+
+  /// Returns true when a measured text length agrees with its computed length.
+  pub fn text_length_consistent(computed_len: i64, measured_len: i64) -> bool {
+    if computed_len < 0 {
+      return false;
+    }
+    return computed_len == measured_len;
+  }
+
+  /// Encodes JSON shape and text length consistency into a compact validation score.
+  pub fn json_text_validation_total(
+    pair_len: i64,
+    array_len: i64,
+    object_len: i64,
+    computed_len: i64,
+    measured_len: i64
+  ) -> i64 {
+    return encode_text_gate(json_pair_ready(pair_len))
+      + encode_text_gate(json_container_shape_ok(array_len, object_len))
+      + encode_text_gate(text_length_consistent(computed_len, measured_len));
+  }
+
   /// Combines formatted text handles and measured length into a compact score.
   pub fn format_status_total(
     single_handle: i64,
@@ -59,6 +93,33 @@ mod cpu StdTextContracts {
   /// Combines report handle/length probes into a compact report score.
   pub fn report_status_total(report_handle: i64, report_len: i64) -> i64 {
     return text_value_or_zero(report_handle) + text_value_or_zero(report_len);
+  }
+
+  /// Returns true when a report handle and measured length are both usable.
+  pub fn report_ready(report_handle: i64, report_len: i64) -> bool {
+    if report_handle < 0 {
+      return false;
+    }
+    return report_len > 0;
+  }
+
+  /// Returns true when a measured text payload is non-empty.
+  pub fn text_nonempty(text_len: i64) -> bool {
+    return text_len > 0;
+  }
+
+  /// Encodes a text validation gate as one point when it passes.
+  pub fn encode_text_gate(passed: bool) -> i64 {
+    if passed {
+      return 1;
+    }
+    return 0;
+  }
+
+  /// Encodes report readiness and non-empty content into a compact validation score.
+  pub fn report_validation_total(report_handle: i64, report_len: i64) -> i64 {
+    return encode_text_gate(report_ready(report_handle, report_len))
+      + encode_text_gate(text_nonempty(report_len));
   }
 
   /// Combines text, formatting, pipeline, and JSON probes for text pipeline recipes.

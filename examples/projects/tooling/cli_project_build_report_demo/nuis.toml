@@ -1,3 +1,4 @@
 name = "cli_project_build_report_demo"
 entry = "main.ns"
 modules = ["main.ns"]
+galaxy = ["std=workspace"]

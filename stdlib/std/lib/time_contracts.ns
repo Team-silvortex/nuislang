@@ -46,6 +46,73 @@ mod cpu StdTimeContracts {
       + time_value_or_zero(scale_ppm);
   }
 
+  /// Returns true when benchmark iteration counts describe a measured run.
+  pub fn benchmark_iterations_ok(warmup_iters: i64, measure_iters: i64) -> bool {
+    if warmup_iters < 0 {
+      return false;
+    }
+    return measure_iters > 0;
+  }
+
+  /// Returns true when one benchmark span is non-negative and covers requested sleep.
+  pub fn benchmark_span_ok(span_ns: i64, sleep_ns: i64) -> bool {
+    if span_ns < 0 {
+      return false;
+    }
+    if sleep_ns < 0 {
+      return false;
+    }
+    return span_ns >= sleep_ns;
+  }
+
+  /// Returns true when min/mid/max are ordered and total equals their sum.
+  pub fn benchmark_triplet_order_ok(
+    min_span_ns: i64,
+    mid_span_ns: i64,
+    max_span_ns: i64,
+    total_span_ns: i64
+  ) -> bool {
+    if min_span_ns > mid_span_ns {
+      return false;
+    }
+    if mid_span_ns > max_span_ns {
+      return false;
+    }
+    return total_span_ns == min_span_ns + mid_span_ns + max_span_ns;
+  }
+
+  /// Returns true when the total span covers all requested sleep durations.
+  pub fn benchmark_total_covers_sleep(total_span_ns: i64, total_sleep_ns: i64) -> bool {
+    if total_span_ns < 0 {
+      return false;
+    }
+    if total_sleep_ns < 0 {
+      return false;
+    }
+    return total_span_ns >= total_sleep_ns;
+  }
+
+  /// Encodes benchmark quality gates into a compact validation score.
+  pub fn benchmark_validation_total(
+    iterations_ok: bool,
+    spans_ok: bool,
+    order_ok: bool,
+    sleep_covered: bool
+  ) -> i64 {
+    return encode_benchmark_gate(iterations_ok)
+      + encode_benchmark_gate(spans_ok)
+      + encode_benchmark_gate(order_ok)
+      + encode_benchmark_gate(sleep_covered);
+  }
+
+  /// Encodes a benchmark validation gate as one point when it passes.
+  pub fn encode_benchmark_gate(passed: bool) -> i64 {
+    if passed {
+      return 1;
+    }
+    return 0;
+  }
+
   /// Combines three benchmark span and sleep probes into a compact score.
   pub fn benchmark_triplet_total(
     first_span_ns: i64,

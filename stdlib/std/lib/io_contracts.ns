@@ -47,6 +47,47 @@ mod cpu StdIoContracts {
     return flush_exit_code(flush_status);
   }
 
+  /// Returns true when a write count covers the measured payload length.
+  pub fn write_covers_payload(write_count: i64, payload_len: i64) -> bool {
+    if write_count < 0 {
+      return false;
+    }
+    if payload_len < 0 {
+      return false;
+    }
+    return write_count >= payload_len;
+  }
+
+  /// Returns true when a write completed and its flush status succeeded.
+  pub fn write_flush_ok(write_count: i64, flush_status: i64) -> bool {
+    if !byte_count_ok(write_count) {
+      return false;
+    }
+    return flush_status >= 0;
+  }
+
+  /// Encodes an IO validation gate as one point when it passes.
+  pub fn encode_io_gate(passed: bool) -> i64 {
+    if passed {
+      return 1;
+    }
+    return 0;
+  }
+
+  /// Scores whether stdout/stderr writes covered a report and both flushes succeeded.
+  pub fn console_report_validation_total(
+    report_len: i64,
+    stdout_written: i64,
+    stderr_written: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64
+  ) -> i64 {
+    return encode_io_gate(write_covers_payload(stdout_written, report_len))
+      + encode_io_gate(write_covers_payload(stderr_written, report_len))
+      + encode_io_gate(write_flush_ok(stdout_written, stdout_flushed))
+      + encode_io_gate(write_flush_ok(stderr_written, stderr_flushed));
+  }
+
   /// Produces a compact score for stdout/stderr write and flush probes.
   pub fn console_status_total(
     stdout_written: i64,

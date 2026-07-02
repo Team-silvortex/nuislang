@@ -1,3 +1,6 @@
+use cpu StdIoContracts;
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_wall_time_ns() -> i64;
   extern "c" fn host_monotonic_time_ns() -> i64;
@@ -35,7 +38,8 @@ mod cpu Main {
     pair_len: i64,
     object_len: i64,
     stdout_written: i64,
-    stdout_flushed: i64
+    stdout_flushed: i64,
+    validation_total: i64
   }
 
   fn build_time_report_seed(
@@ -103,6 +107,17 @@ mod cpu Main {
     let first_block: i64 = append_line(seed.title_handle, kv_line_handle, seed.newline_handle);
     let second_block: i64 = append_line(first_block, status_line_handle, seed.newline_handle);
     let report_handle: i64 = host_text_concat(second_block, seed.footer_handle);
+    let report_len: i64 = host_text_measure(report_handle);
+    let stdout_written: i64 = host_stdout_write(report_handle);
+    let stdout_flushed: i64 = host_stdout_flush();
+    let validation_total: i64 = StdTextContracts.report_validation_total(
+      report_handle,
+      report_len
+    ) + StdIoContracts.encode_io_gate(
+      StdIoContracts.write_covers_payload(stdout_written, report_len)
+    ) + StdIoContracts.encode_io_gate(
+      StdIoContracts.write_flush_ok(stdout_written, stdout_flushed)
+    );
     return TimeReportSummary {
       wall_ns: wall_ns,
       monotonic_ns: monotonic_ns,
@@ -112,11 +127,12 @@ mod cpu Main {
       status_line_handle: status_line_handle,
       status_line_len: host_text_measure(status_line_handle),
       report_handle: report_handle,
-      report_len: host_text_measure(report_handle),
+      report_len: report_len,
       pair_len: host_json_pair_len(seed.key_handle, seed.value_handle),
       object_len: host_json_object_len(3),
-      stdout_written: host_stdout_write(report_handle),
-      stdout_flushed: host_stdout_flush()
+      stdout_written: stdout_written,
+      stdout_flushed: stdout_flushed,
+      validation_total: validation_total
     };
   }
 
@@ -157,7 +173,8 @@ mod cpu Main {
       + summary.pair_len
       + summary.object_len
       + summary.stdout_written
-      + summary.stdout_flushed;
+      + summary.stdout_flushed
+      + summary.validation_total;
   }
 
   fn main() {

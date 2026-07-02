@@ -1,3 +1,4 @@
 name = "cli_workflow_automation_demo"
 entry = "main.ns"
 modules = ["main.ns"]
+galaxy = ["std=workspace"]

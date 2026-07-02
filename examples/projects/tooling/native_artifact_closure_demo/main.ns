@@ -1,3 +1,5 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
   extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
   extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
@@ -30,13 +32,19 @@ mod cpu Main {
 
   fn main() -> i64 {
     let report: ArtifactClosureReport = capture_artifact_closure_report();
-    if report.open_handle == report.open_handle {
-      return 0;
+    let total: i64 = StdFsContracts.path_copy_status_total(
+      2103,
+      2109,
+      report.open_handle,
+      report.write_code,
+      report.close_code,
+      report.copy_code,
+      1,
+      report.exists_code
+    ) + StdFsContracts.host_fs_value_or_zero(report.read_code);
+    if total > 0 {
+      return StdFsContracts.fs_ok();
     }
-    return report.read_code
-      + report.write_code
-      + report.close_code
-      + report.copy_code
-      + report.exists_code;
+    return StdFsContracts.fs_error();
   }
 }

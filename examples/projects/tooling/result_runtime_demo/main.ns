@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_result_is_ok(tag_handle: i64) -> i64;
   extern "c" fn host_result_value(tag_handle: i64) -> i64;
@@ -216,29 +218,32 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: ResultProjectSummary = capture_result_project();
-    return summary.primary_state_code
-      + summary.primary.is_ok
-      + summary.primary.value_handle
-      + summary.primary.error_handle
-      + summary.primary_envelope.error.stable_code
-      + summary.primary_envelope.error.message_handle
-      + summary.primary_envelope.error.severity_code
-      + summary.primary_envelope.error.family_code
-      + summary.primary_envelope.error.retryable
-      + summary.primary_envelope.diagnostic.message_handle
-      + summary.primary_envelope.diagnostic.severity_code
-      + summary.primary_envelope.diagnostic.family_code
-      + summary.secondary_state_code
-      + summary.secondary.is_ok
-      + summary.secondary.value_handle
-      + summary.secondary.error_handle
-      + summary.secondary_envelope.error.stable_code
-      + summary.secondary_envelope.error.message_handle
-      + summary.secondary_envelope.error.severity_code
-      + summary.secondary_envelope.error.family_code
-      + summary.secondary_envelope.error.retryable
-      + summary.secondary_envelope.diagnostic.message_handle
-      + summary.secondary_envelope.diagnostic.severity_code
-      + summary.secondary_envelope.diagnostic.family_code;
+    let total: i64 = StdCliContracts.result_status_total(
+      summary.primary_state_code,
+      summary.primary.is_ok,
+      summary.primary.value_handle,
+      summary.primary.error_handle
+    ) + StdCliContracts.error_status_total(
+      summary.primary_envelope.error.stable_code,
+      summary.primary_envelope.error.message_handle,
+      summary.primary_envelope.error.severity_code,
+      summary.primary_envelope.error.family_code,
+      summary.primary_envelope.error.retryable
+    ) + StdCliContracts.result_status_total(
+      summary.secondary_state_code,
+      summary.secondary.is_ok,
+      summary.secondary.value_handle,
+      summary.secondary.error_handle
+    ) + StdCliContracts.error_status_total(
+      summary.secondary_envelope.error.stable_code,
+      summary.secondary_envelope.error.message_handle,
+      summary.secondary_envelope.error.severity_code,
+      summary.secondary_envelope.error.family_code,
+      summary.secondary_envelope.error.retryable
+    );
+    if total > 0 {
+      return StdCliContracts.cli_ok();
+    }
+    return StdCliContracts.cli_error();
   }
 }

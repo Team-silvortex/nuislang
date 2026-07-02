@@ -95,6 +95,22 @@ audit trail used by heterogeneous proxy tests before the final AOT bundle is
 packed. `nuisc verify-build-manifest` checks these project-level rows and
 rejects signature hash drift before reporting the build manifest as verified.
 
+The linker-facing plan consumes the same project host FFI index as structured
+data. Its `host_ffi` footprint contains the original index path, symbol and
+policy counts, parsed entries, ABI groups, and validation summaries. The
+top-level validation exposes `valid`, `link_allowed`, `issues`, and `notes`.
+`link_allowed` is intentionally conservative: issues such as duplicate
+`abi+symbol+signature` whitelist entries, policy drift, or count drift block
+linking; notes such as multiple whitelisted signatures for the same
+`abi+symbol` stay visible without blocking. ABI groups repeat this validation
+locally so `nsld` can reason about each host ABI lane without reparsing the
+text index.
+
+This is still not a dynamic C escape hatch. The linker consumes a static,
+manifest-verified whitelist footprint. It does not invent new C ABI authority,
+does not special-case libc, and does not bypass the registered `nustar`
+capability model.
+
 The packer verifies these two lines against each other before writing the
 bundle manifest, so ABI drift, signature drift, and hash drift are caught at
 pack time.

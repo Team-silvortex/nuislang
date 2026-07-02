@@ -1,3 +1,5 @@
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
 
@@ -27,9 +29,15 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: StdinProjectSummary = capture_stdin_project(32, 16);
-    return summary.primary_requested_len
-      + summary.primary_read_len
-      + summary.secondary_requested_len
-      + summary.secondary_read_len;
+    let total: i64 = StdIoContracts.stdin_status_total(
+      summary.primary_requested_len,
+      summary.primary_read_len,
+      summary.secondary_requested_len,
+      summary.secondary_read_len
+    );
+    if total > 0 {
+      return StdIoContracts.io_ok();
+    }
+    return StdIoContracts.io_error();
   }
 }

@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_result_is_ok(tag_handle: i64) -> i64;
   extern "c" fn host_result_value(tag_handle: i64) -> i64;
@@ -193,19 +195,28 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: ResultDiagnosticProjectSummary = capture_result_diagnostic_project();
-    return summary.result.is_ok
-      + summary.result.value_handle
-      + summary.result.error_handle
-      + summary.envelope.error.stable_code
-      + summary.envelope.error.message_handle
-      + summary.envelope.error.severity_code
-      + summary.envelope.error.family_code
-      + summary.envelope.error.retryable
-      + summary.envelope.diagnostic.label_handle
-      + summary.envelope.diagnostic.span_handle
-      + summary.envelope.diagnostic.message_handle
-      + summary.envelope.diagnostic.severity_code
-      + summary.envelope.diagnostic.family_code
-      + summary.envelope.diagnostic.emit_code;
+    let total: i64 = StdCliContracts.result_status_total(
+      0,
+      summary.result.is_ok,
+      summary.result.value_handle,
+      summary.result.error_handle
+    ) + StdCliContracts.error_status_total(
+      summary.envelope.error.stable_code,
+      summary.envelope.error.message_handle,
+      summary.envelope.error.severity_code,
+      summary.envelope.error.family_code,
+      summary.envelope.error.retryable
+    ) + StdCliContracts.diagnostic_status_total(
+      summary.envelope.diagnostic.label_handle,
+      summary.envelope.diagnostic.span_handle,
+      summary.envelope.diagnostic.message_handle,
+      summary.envelope.diagnostic.severity_code,
+      summary.envelope.diagnostic.family_code,
+      summary.envelope.diagnostic.emit_code
+    );
+    if total > 0 {
+      return StdCliContracts.cli_ok();
+    }
+    return StdCliContracts.cli_error();
   }
 }

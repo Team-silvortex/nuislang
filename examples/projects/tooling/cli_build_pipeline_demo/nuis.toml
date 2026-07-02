@@ -1,3 +1,4 @@
 name = "cli_build_pipeline_demo"
 entry = "main.ns"
 modules = ["main.ns"]
+galaxy = ["std=workspace"]

@@ -17,26 +17,39 @@ mod cpu Main {
     measured_len: i64,
     pair_len: i64,
     array_len: i64,
-    object_len: i64
+    object_len: i64,
+    validation_total: i64
   }
 
   fn capture_text_json_project() -> TextJsonProjectSummary {
     let merged_handle: i64 = host_text_concat(11, 19);
+    let merged_len: i64 = host_text_concat_len(11, 19);
+    let measured_len: i64 = host_text_measure(merged_handle);
+    let pair_len: i64 = host_json_pair_len(601, 709);
+    let array_len: i64 = host_json_array_len(3);
+    let object_len: i64 = host_json_object_len(2);
     return TextJsonProjectSummary {
       lhs_len: host_text_len(11),
       rhs_len: host_text_len(19),
       merged_handle: merged_handle,
-      merged_len: host_text_concat_len(11, 19),
-      measured_len: host_text_measure(merged_handle),
-      pair_len: host_json_pair_len(601, 709),
-      array_len: host_json_array_len(3),
-      object_len: host_json_object_len(2)
+      merged_len: merged_len,
+      measured_len: measured_len,
+      pair_len: pair_len,
+      array_len: array_len,
+      object_len: object_len,
+      validation_total: StdTextContracts.json_text_validation_total(
+        pair_len,
+        array_len,
+        object_len,
+        merged_len,
+        measured_len
+      )
     };
   }
 
   fn main() -> i64 {
     let summary: TextJsonProjectSummary = capture_text_json_project();
-    return StdTextContracts.concat_status_total(
+    let total: i64 = StdTextContracts.concat_status_total(
       summary.lhs_len,
       summary.rhs_len,
       summary.merged_handle
@@ -46,6 +59,10 @@ mod cpu Main {
         summary.pair_len,
         summary.array_len,
         summary.object_len
-      );
+      ) + summary.validation_total;
+    if summary.validation_total < 3 {
+      return StdTextContracts.text_error();
+    }
+    return total;
   }
 }

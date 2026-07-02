@@ -1,3 +1,5 @@
+use cpu StdTimeContracts;
+
 mod cpu Main {
   extern "c" fn host_wall_time_ns() -> i64;
   extern "c" fn host_monotonic_time_ns() -> i64;
@@ -19,6 +21,14 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: TimeProjectSummary = capture_time_project(1000);
-    return summary.wall_ns + summary.monotonic_ns + summary.slept_ns;
+    let total: i64 = StdTimeContracts.time_sample_total(
+      summary.wall_ns,
+      summary.monotonic_ns,
+      summary.slept_ns
+    );
+    if total > 0 {
+      return StdTimeContracts.time_ok();
+    }
+    return StdTimeContracts.time_error();
   }
 }

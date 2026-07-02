@@ -1,3 +1,6 @@
+use cpu StdFsContracts;
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_argv_at(index: i64) -> i64;
@@ -10,6 +13,7 @@ mod cpu Main {
   struct InputProjectSummary {
     argv_count: i64,
     path_handle: i64,
+    file_handle: i64,
     file_read_len: i64,
     file_close_code: i64,
     stdin_read_len: i64,
@@ -34,6 +38,7 @@ mod cpu Main {
     return InputProjectSummary {
       argv_count: argv_count,
       path_handle: path_handle,
+      file_handle: file_handle,
       file_read_len: file_read_len,
       file_close_code: host_file_close(file_handle),
       stdin_read_len: stdin_read_len,
@@ -43,10 +48,17 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: InputProjectSummary = capture_input_project(64);
-    return summary.argv_count
-      + summary.file_read_len
-      + summary.file_close_code
-      + summary.stdin_read_len
-      + summary.stdin_is_tty;
+    let total: i64 = StdFsContracts.file_io_status_total(
+      summary.file_handle,
+      summary.file_read_len,
+      summary.file_close_code
+    ) + StdIoContracts.read_progress_score(64, summary.stdin_read_len)
+      + StdIoContracts.tty_value_or_zero(summary.stdin_is_tty)
+      + StdFsContracts.host_fs_value_or_zero(summary.path_handle)
+      + StdFsContracts.host_fs_value_or_zero(summary.argv_count);
+    if total > 0 {
+      return StdIoContracts.io_ok();
+    }
+    return StdIoContracts.io_error();
   }
 }

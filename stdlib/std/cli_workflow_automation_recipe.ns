@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_line_read(prompt_handle: i64) -> i64;
@@ -835,7 +837,13 @@ mod cpu Main {
       + summarize_workflow_step_report(report.fourth)
       + report.first_failure_handle
       + encode_bool(report.overall_success)
-      + report.executed_steps;
+      + report.executed_steps
+      + StdCliContracts.workflow_validation_total(
+        report.executed_steps,
+        4,
+        report.first_failure_handle,
+        report.overall_success
+      );
   }
 
   fn summarize_cli_summary(summary: CliSummary) -> i64 {

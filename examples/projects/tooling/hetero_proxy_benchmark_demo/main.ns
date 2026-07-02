@@ -14,6 +14,9 @@ mod cpu Main {
     proxy_total: i64,
     rejection_total: i64,
     manifest_total: i64,
+    abi_group_total: i64,
+    validation_total: i64,
+    link_allowed: bool,
     benchmark_total: i64,
     test_total: i64
   }
@@ -73,6 +76,38 @@ mod cpu Main {
       signature_hash,
       registry_hash_host_ffi_proxy()
     );
+    let abi_group_registered: bool = StdHeteroContracts.proxy_abi_group_registered(1, 1);
+    let policy_ok: bool = StdHeteroContracts.proxy_policy_hash_whitelist_ok(
+      StdHeteroContracts.policy_hash_signature_whitelist()
+    );
+    let duplicate_rejected: bool = StdHeteroContracts.proxy_duplicate_signature_rejected(
+      symbol_hash,
+      signature_hash,
+      signature_hash + 1
+    );
+    let multi_signature_note: bool = StdHeteroContracts.proxy_multi_signature_noted(
+      symbol_hash,
+      2
+    );
+    let link_allowed: bool = StdHeteroContracts.proxy_link_allowed(
+      abi_group_registered,
+      policy_ok,
+      duplicate_rejected,
+      0
+    );
+    let abi_group_total: i64 = StdHeteroContracts.proxy_abi_group_total(
+      StdHeteroContracts.backend_c_ffi_proxy(),
+      1,
+      1,
+      1,
+      1
+    );
+    let validation_total: i64 = StdHeteroContracts.proxy_validation_total(
+      true,
+      link_allowed,
+      0,
+      1
+    );
     let benchmark_total: i64 = StdHeteroContracts.benchmark_proxy_total(
       1,
       1,
@@ -82,7 +117,7 @@ mod cpu Main {
     ) + StdHeteroContracts.benchmark_proxy_pair_total(
       proxy_total,
       rejection_total,
-      manifest_total,
+      manifest_total + abi_group_total + validation_total,
       started_ns,
       ended_ns
     );
@@ -96,6 +131,9 @@ mod cpu Main {
       proxy_total: proxy_total,
       rejection_total: rejection_total,
       manifest_total: manifest_total,
+      abi_group_total: abi_group_total,
+      validation_total: validation_total,
+      link_allowed: link_allowed && multi_signature_note,
       benchmark_total: benchmark_total,
       test_total: StdHeteroContracts.hetero_test_total(
         1,
@@ -138,6 +176,15 @@ mod cpu Main {
       return StdHeteroContracts.hetero_error();
     }
     if summary.rejection_total <= 0 {
+      return StdHeteroContracts.hetero_error();
+    }
+    if !summary.link_allowed {
+      return StdHeteroContracts.hetero_error();
+    }
+    if summary.abi_group_total <= 0 {
+      return StdHeteroContracts.hetero_error();
+    }
+    if summary.validation_total <= 0 {
       return StdHeteroContracts.hetero_error();
     }
     return StdHeteroContracts.hetero_ok();

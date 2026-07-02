@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
   extern "c" fn host_command_status(command_handle: i64) -> i64;
@@ -64,9 +66,23 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: CommandRuntimeProjectSummary = capture_command_runtime_project();
-    if summary.primary_handle > 0 && summary.secondary_handle > 0 {
-      return 0;
+    let primary_total: i64 = StdCliContracts.command_result_total(
+      summary.primary_handle,
+      summary.primary_status,
+      summary.primary_wait,
+      summary.primary_wait_exit,
+      StdCliContracts.command_succeeded(summary.primary_handle, summary.primary_wait_exit)
+    );
+    let secondary_total: i64 = StdCliContracts.command_result_total(
+      summary.secondary_handle,
+      summary.secondary_status,
+      summary.secondary_wait,
+      summary.secondary_wait_exit,
+      StdCliContracts.command_succeeded(summary.secondary_handle, summary.secondary_wait_exit)
+    );
+    if primary_total > 0 && secondary_total > 0 {
+      return StdCliContracts.cli_ok();
     }
-    return 1;
+    return StdCliContracts.cli_error();
   }
 }

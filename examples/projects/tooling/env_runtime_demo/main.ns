@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_env_has(key_handle: i64) -> i64;
   extern "c" fn host_env_get(key_handle: i64) -> i64;
@@ -20,9 +22,15 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: EnvProjectSummary = capture_env_project(101, 202);
-    return summary.primary_present
-      + summary.primary_value_handle
-      + summary.fallback_present
-      + summary.fallback_value_handle;
+    let total: i64 = StdCliContracts.env_status_total(
+      summary.primary_present,
+      summary.primary_value_handle,
+      summary.fallback_present,
+      summary.fallback_value_handle
+    );
+    if total >= 0 {
+      return StdCliContracts.cli_ok();
+    }
+    return StdCliContracts.cli_error();
   }
 }

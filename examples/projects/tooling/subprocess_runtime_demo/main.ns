@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
   extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
@@ -78,9 +80,23 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: SubprocessRuntimeProjectSummary = capture_subprocess_runtime_project();
-    if summary.primary_handle > 0 && summary.secondary_handle > 0 {
-      return 0;
+    let primary_total: i64 = StdCliContracts.command_result_total(
+      summary.primary_handle,
+      summary.primary_signal,
+      summary.primary_join,
+      summary.primary_join_exit,
+      StdCliContracts.command_succeeded(summary.primary_handle, summary.primary_join_exit)
+    );
+    let secondary_total: i64 = StdCliContracts.command_result_total(
+      summary.secondary_handle,
+      summary.secondary_signal,
+      summary.secondary_join,
+      summary.secondary_join_exit,
+      StdCliContracts.command_succeeded(summary.secondary_handle, summary.secondary_join_exit)
+    );
+    if primary_total > 0 && secondary_total > 0 {
+      return StdCliContracts.cli_ok();
     }
-    return 1;
+    return StdCliContracts.cli_error();
   }
 }

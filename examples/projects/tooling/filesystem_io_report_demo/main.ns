@@ -1,5 +1,6 @@
 use cpu StdFsContracts;
 use cpu StdIoContracts;
+use cpu StdTextContracts;
 
 mod cpu Main {
   extern "c" fn host_path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
@@ -37,7 +38,8 @@ mod cpu Main {
     stdout_written: i64,
     stderr_written: i64,
     stdout_flushed: i64,
-    stderr_flushed: i64
+    stderr_flushed: i64,
+    validation_total: i64
   }
 
   fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
@@ -73,6 +75,21 @@ mod cpu Main {
     let first_block: i64 = append_line(title_line_handle, joined_line_handle, 10);
     let second_block: i64 = append_line(first_block, status_line_handle, 10);
     let report_handle: i64 = host_text_concat(second_block, 1801);
+    let report_len: i64 = host_text_measure(report_handle);
+    let stdout_written: i64 = host_stdout_write(report_handle);
+    let stderr_written: i64 = host_stderr_write(report_handle);
+    let stdout_flushed: i64 = host_stdout_flush();
+    let stderr_flushed: i64 = host_stderr_flush();
+    let validation_total: i64 = StdTextContracts.report_validation_total(
+      report_handle,
+      report_len
+    ) + StdIoContracts.console_report_validation_total(
+      report_len,
+      stdout_written,
+      stderr_written,
+      stdout_flushed,
+      stderr_flushed
+    );
     return FilesystemIoReportProjectSummary {
       joined_len: joined_len,
       basename_handle: basename_handle,
@@ -86,11 +103,12 @@ mod cpu Main {
       read_bytes: read_bytes,
       file_close_code: host_file_close(file_handle),
       report_handle: report_handle,
-      report_len: host_text_measure(report_handle),
-      stdout_written: host_stdout_write(report_handle),
-      stderr_written: host_stderr_write(report_handle),
-      stdout_flushed: host_stdout_flush(),
-      stderr_flushed: host_stderr_flush()
+      report_len: report_len,
+      stdout_written: stdout_written,
+      stderr_written: stderr_written,
+      stdout_flushed: stdout_flushed,
+      stderr_flushed: stderr_flushed,
+      validation_total: validation_total
     };
   }
 
@@ -115,7 +133,10 @@ mod cpu Main {
       summary.stderr_written,
       summary.stdout_flushed,
       summary.stderr_flushed
-    );
+    ) + summary.validation_total;
+    if summary.validation_total < 6 {
+      return StdFsContracts.fs_error();
+    }
     if total > 0 {
       return StdFsContracts.fs_ok();
     }

@@ -1,3 +1,5 @@
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
@@ -24,7 +26,8 @@ mod cpu Main {
     measured_len: i64,
     pair_len: i64,
     array_len: i64,
-    object_len: i64
+    object_len: i64,
+    validation_total: i64
   }
 
   fn build_text_json_seed(
@@ -47,15 +50,27 @@ mod cpu Main {
 
   fn capture_text_json(seed: TextJsonSeed) -> TextJsonSummary {
     let merged_handle: i64 = host_text_concat(seed.lhs_handle, seed.rhs_handle);
+    let merged_len: i64 = host_text_concat_len(seed.lhs_handle, seed.rhs_handle);
+    let measured_len: i64 = host_text_measure(merged_handle);
+    let pair_len: i64 = host_json_pair_len(seed.key_handle, seed.value_handle);
+    let array_len: i64 = host_json_array_len(seed.item_count);
+    let object_len: i64 = host_json_object_len(seed.field_count);
     return TextJsonSummary {
       lhs_len: host_text_len(seed.lhs_handle),
       rhs_len: host_text_len(seed.rhs_handle),
       merged_handle: merged_handle,
-      merged_len: host_text_concat_len(seed.lhs_handle, seed.rhs_handle),
-      measured_len: host_text_measure(merged_handle),
-      pair_len: host_json_pair_len(seed.key_handle, seed.value_handle),
-      array_len: host_json_array_len(seed.item_count),
-      object_len: host_json_object_len(seed.field_count)
+      merged_len: merged_len,
+      measured_len: measured_len,
+      pair_len: pair_len,
+      array_len: array_len,
+      object_len: object_len,
+      validation_total: StdTextContracts.json_text_validation_total(
+        pair_len,
+        array_len,
+        object_len,
+        merged_len,
+        measured_len
+      )
     };
   }
 
@@ -83,7 +98,8 @@ mod cpu Main {
       + summary.measured_len
       + summary.pair_len
       + summary.array_len
-      + summary.object_len;
+      + summary.object_len
+      + summary.validation_total;
   }
 
   fn main() {

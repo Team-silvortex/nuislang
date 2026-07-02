@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_line_read(prompt_handle: i64) -> i64;
@@ -613,6 +615,15 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: WorkflowSummary = capture_summary(build_seed());
+    let validation_total: i64 = StdCliContracts.workflow_validation_total(
+      summary.workflow.executed_steps,
+      4,
+      summary.workflow.first_failure_handle,
+      summary.workflow.overall_success
+    );
+    if validation_total < 3 {
+      return 1;
+    }
     return summary_exit_code(summary);
   }
 }

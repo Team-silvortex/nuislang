@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_process_id() -> i64;
   extern "c" fn host_process_status() -> i64;
@@ -20,6 +22,14 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: ProcessProjectSummary = capture_process_project();
-    return summary.pid + summary.status + summary.exit_code;
+    let total: i64 = StdCliContracts.process_status_total(
+      summary.pid,
+      summary.status,
+      summary.exit_code
+    );
+    if StdCliContracts.process_status_ok(summary.pid, summary.status, summary.exit_code) {
+      return StdCliContracts.success_exit_code(total > 0);
+    }
+    return StdCliContracts.cli_error();
   }
 }

@@ -34,6 +34,102 @@ mod cpu StdCliContracts {
     return cli_error();
   }
 
+  /// Returns true when a host handle or count is non-negative.
+  pub fn host_value_ok(value: i64) -> bool {
+    return value >= 0;
+  }
+
+  /// Returns the non-negative host value or zero when unavailable.
+  pub fn host_value_or_zero(value: i64) -> i64 {
+    if host_value_ok(value) {
+      return value;
+    }
+    return 0;
+  }
+
+  /// Produces a compact score for argv count and selected argument handles.
+  pub fn argv_status_total(argv_count: i64, first_handle: i64, second_handle: i64) -> i64 {
+    return host_value_or_zero(argv_count)
+      + host_value_or_zero(first_handle)
+      + host_value_or_zero(second_handle);
+  }
+
+  /// Produces a compact score for primary/fallback environment probes.
+  pub fn env_status_total(
+    primary_present: i64,
+    primary_value_handle: i64,
+    fallback_present: i64,
+    fallback_value_handle: i64
+  ) -> i64 {
+    return host_value_or_zero(primary_present)
+      + host_value_or_zero(primary_value_handle)
+      + host_value_or_zero(fallback_present)
+      + host_value_or_zero(fallback_value_handle);
+  }
+
+  /// Returns true when process id, status, and exit code probes are available.
+  pub fn process_status_ok(pid: i64, status: i64, exit_code: i64) -> bool {
+    if pid <= 0 {
+      return false;
+    }
+    if status < 0 {
+      return false;
+    }
+    return exit_code >= 0;
+  }
+
+  /// Produces a compact score for process id/status/exit probes.
+  pub fn process_status_total(pid: i64, status: i64, exit_code: i64) -> i64 {
+    return host_value_or_zero(pid)
+      + host_value_or_zero(status)
+      + host_value_or_zero(exit_code);
+  }
+
+  /// Produces a compact score for an error code/message/severity/family probe.
+  pub fn error_status_total(
+    stable_code: i64,
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64,
+    retryable: i64
+  ) -> i64 {
+    return host_value_or_zero(stable_code)
+      + host_value_or_zero(message_handle)
+      + host_value_or_zero(severity_code)
+      + host_value_or_zero(family_code)
+      + host_value_or_zero(retryable);
+  }
+
+  /// Produces a compact score for a diagnostic label/span/emit probe.
+  pub fn diagnostic_status_total(
+    label_handle: i64,
+    span_handle: i64,
+    message_handle: i64,
+    severity_code: i64,
+    family_code: i64,
+    emit_code: i64
+  ) -> i64 {
+    return host_value_or_zero(label_handle)
+      + host_value_or_zero(span_handle)
+      + host_value_or_zero(message_handle)
+      + host_value_or_zero(severity_code)
+      + host_value_or_zero(family_code)
+      + host_value_or_zero(emit_code);
+  }
+
+  /// Produces a compact score for a host result tag/value/error probe.
+  pub fn result_status_total(
+    state_code: i64,
+    is_ok: i64,
+    value_handle: i64,
+    error_handle: i64
+  ) -> i64 {
+    return host_value_or_zero(state_code)
+      + host_value_or_zero(is_ok)
+      + host_value_or_zero(value_handle)
+      + host_value_or_zero(error_handle);
+  }
+
   /// Produces a compact score for a command request.
   pub fn command_request_total(
     program_handle: i64,
@@ -53,6 +149,47 @@ mod cpu StdCliContracts {
     succeeded: bool
   ) -> i64 {
     return command_handle + status + wait_code + wait_exit + encode_success(succeeded);
+  }
+
+  /// Returns true when a command handle represents a launched host command.
+  pub fn command_launched(command_handle: i64) -> bool {
+    return command_handle != 0;
+  }
+
+  /// Returns true when a launched command reached a successful wait exit.
+  pub fn command_succeeded(command_handle: i64, wait_exit: i64) -> bool {
+    if !command_launched(command_handle) {
+      return false;
+    }
+    return wait_exit == 0;
+  }
+
+  /// Returns true when a workflow executed at least the expected number of steps.
+  pub fn workflow_executed_steps_ok(executed_steps: i64, expected_steps: i64) -> bool {
+    if expected_steps < 0 {
+      return false;
+    }
+    return executed_steps >= expected_steps;
+  }
+
+  /// Returns true when success and first-failure metadata agree.
+  pub fn workflow_failure_marker_ok(overall_success: bool, first_failure_handle: i64) -> bool {
+    if overall_success {
+      return first_failure_handle == 0;
+    }
+    return first_failure_handle != 0;
+  }
+
+  /// Scores workflow execution, failure marker, and final success gates.
+  pub fn workflow_validation_total(
+    executed_steps: i64,
+    expected_steps: i64,
+    first_failure_handle: i64,
+    overall_success: bool
+  ) -> i64 {
+    return encode_success(workflow_executed_steps_ok(executed_steps, expected_steps))
+      + encode_success(workflow_failure_marker_ok(overall_success, first_failure_handle))
+      + encode_success(overall_success);
   }
 
   /// Produces a compact score for one workflow step report.

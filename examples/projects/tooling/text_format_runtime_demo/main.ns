@@ -1,3 +1,5 @@
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_text_format_i64(pattern_handle: i64, value: i64) -> i64;
   extern "c" fn host_text_format_pair(pattern_handle: i64, lhs: i64, rhs: i64) -> i64;
@@ -27,11 +29,18 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: TextFormatRuntimeProjectSummary = capture_text_format_runtime_project();
-    return summary.primary_single_handle
-      + summary.primary_pair_handle
-      + summary.primary_pair_len
-      + summary.secondary_single_handle
-      + summary.secondary_pair_handle
-      + summary.secondary_pair_len;
+    let total: i64 = StdTextContracts.format_status_total(
+      summary.primary_single_handle,
+      summary.primary_pair_handle,
+      summary.primary_pair_len
+    ) + StdTextContracts.format_status_total(
+      summary.secondary_single_handle,
+      summary.secondary_pair_handle,
+      summary.secondary_pair_len
+    );
+    if total > 0 {
+      return StdTextContracts.text_ok();
+    }
+    return StdTextContracts.text_error();
   }
 }

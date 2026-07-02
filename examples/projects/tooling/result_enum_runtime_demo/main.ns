@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_result_is_ok(tag_handle: i64) -> i64;
   extern "c" fn host_result_value(tag_handle: i64) -> i64;
@@ -269,6 +271,10 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: ResultEnumProjectSummary = capture_result_enum_project();
-    return summary.success_score + summary.fallback_score;
+    let total: i64 = summary.success_score + summary.fallback_score;
+    if total > 0 {
+      return StdCliContracts.cli_ok();
+    }
+    return StdCliContracts.cli_error();
   }
 }

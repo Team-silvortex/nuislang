@@ -1,3 +1,6 @@
+use cpu StdFsContracts;
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_argv_at(index: i64) -> i64;
@@ -100,7 +103,7 @@ mod cpu Main {
     }
     let bytes_read: i64 = host_file_read(file_handle, host_buffer_handle(buffer), read_len);
     let close_code: i64 = host_file_close(file_handle);
-    if bytes_read < 0 || close_code <= 0 {
+    if !StdFsContracts.host_fs_value_ok(bytes_read) || close_code <= 0 {
       return emit_error(3);
     }
     let started_ns: i64 = host_monotonic_time_ns();
@@ -113,7 +116,7 @@ mod cpu Main {
     };
     let wrote: i64 = host_stdout_write(summary_text(summary));
     let flushed: i64 = host_stdout_flush();
-    if wrote <= 0 || flushed <= 0 {
+    if !StdIoContracts.write_flush_ok(wrote, flushed) || wrote == 0 || flushed == 0 {
       return 4;
     }
     return 0;

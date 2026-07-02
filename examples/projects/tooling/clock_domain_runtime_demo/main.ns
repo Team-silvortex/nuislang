@@ -1,3 +1,5 @@
+use cpu StdTimeContracts;
+
 mod cpu Main {
   struct ClockDomainProjectSummary {
     monotonic_code: i64,
@@ -17,9 +19,11 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: ClockDomainProjectSummary = capture_clock_domain_project();
-    return summary.monotonic_code
-      + summary.wall_code
-      + summary.global_code
-      + summary.resolved_global_code;
+    return StdTimeContracts.clock_domain_total(
+      summary.global_code,
+      summary.monotonic_code,
+      summary.resolved_global_code,
+      summary.wall_code
+    );
   }
 }

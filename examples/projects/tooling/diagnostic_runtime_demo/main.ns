@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_diag_label(message_handle: i64) -> i64;
   extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
@@ -114,17 +116,24 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: DiagnosticProjectSummary = capture_diagnostic_project();
-    return summary.primary.label_handle
-      + summary.primary.span_handle
-      + summary.primary.message_handle
-      + summary.primary.severity_code
-      + summary.primary.family_code
-      + summary.primary.emit_code
-      + summary.secondary.label_handle
-      + summary.secondary.span_handle
-      + summary.secondary.message_handle
-      + summary.secondary.severity_code
-      + summary.secondary.family_code
-      + summary.secondary.emit_code;
+    let total: i64 = StdCliContracts.diagnostic_status_total(
+      summary.primary.label_handle,
+      summary.primary.span_handle,
+      summary.primary.message_handle,
+      summary.primary.severity_code,
+      summary.primary.family_code,
+      summary.primary.emit_code
+    ) + StdCliContracts.diagnostic_status_total(
+      summary.secondary.label_handle,
+      summary.secondary.span_handle,
+      summary.secondary.message_handle,
+      summary.secondary.severity_code,
+      summary.secondary.family_code,
+      summary.secondary.emit_code
+    );
+    if total > 0 {
+      return StdCliContracts.cli_ok();
+    }
+    return StdCliContracts.cli_error();
   }
 }

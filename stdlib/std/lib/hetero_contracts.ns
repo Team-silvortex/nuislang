@@ -234,6 +234,95 @@ mod cpu StdHeteroContracts {
       + nonnegative_or_zero(registry_hash);
   }
 
+  /// Returns true when a hash-signature policy is usable by the host proxy whitelist.
+  pub fn proxy_policy_hash_whitelist_ok(policy_code: i64) -> bool {
+    return policy_code == policy_hash_signature_whitelist();
+  }
+
+  /// Returns true when a proxy ABI group has at least one symbol and one policy.
+  pub fn proxy_abi_group_registered(symbol_count: i64, policy_count: i64) -> bool {
+    if symbol_count <= 0 {
+      return false;
+    }
+    return policy_count > 0;
+  }
+
+  /// Returns true when a duplicate proxy signature should reject the link group.
+  pub fn proxy_duplicate_signature_rejected(
+    symbol_hash: i64,
+    signature_hash: i64,
+    previous_signature_hash: i64
+  ) -> bool {
+    if symbol_hash <= 0 {
+      return false;
+    }
+    if signature_hash <= 0 {
+      return false;
+    }
+    return signature_hash == previous_signature_hash;
+  }
+
+  /// Returns true when one symbol intentionally exposes multiple registered signatures.
+  pub fn proxy_multi_signature_noted(symbol_hash: i64, signature_count: i64) -> bool {
+    if symbol_hash <= 0 {
+      return false;
+    }
+    return signature_count > 1;
+  }
+
+  /// Returns true when a proxy group is registered, policy-valid, and duplicate-free.
+  pub fn proxy_link_allowed(
+    registered: bool,
+    policy_ok: bool,
+    duplicate_rejected: bool,
+    issue_count: i64
+  ) -> bool {
+    if !registered {
+      return false;
+    }
+    if !policy_ok {
+      return false;
+    }
+    if duplicate_rejected {
+      return false;
+    }
+    return issue_count <= 0;
+  }
+
+  /// Compact ABI group score shared by heterogeneous std tests and linker metadata.
+  pub fn proxy_abi_group_total(
+    abi_code: i64,
+    symbol_count: i64,
+    policy_count: i64,
+    entry_count: i64,
+    note_count: i64
+  ) -> i64 {
+    return nonnegative_or_zero(abi_code)
+      + nonnegative_or_zero(symbol_count)
+      + nonnegative_or_zero(policy_count)
+      + nonnegative_or_zero(entry_count)
+      + nonnegative_or_zero(note_count);
+  }
+
+  /// Compact validation score for a proxy group after whitelist and duplicate checks.
+  pub fn proxy_validation_total(
+    checked: bool,
+    link_allowed: bool,
+    issue_count: i64,
+    note_count: i64
+  ) -> i64 {
+    if checked && link_allowed {
+      return 30 + nonnegative_or_zero(issue_count) + nonnegative_or_zero(note_count);
+    }
+    if checked {
+      return 10 + nonnegative_or_zero(issue_count) + nonnegative_or_zero(note_count);
+    }
+    if link_allowed {
+      return 20 + nonnegative_or_zero(issue_count) + nonnegative_or_zero(note_count);
+    }
+    return nonnegative_or_zero(issue_count) + nonnegative_or_zero(note_count);
+  }
+
   /// Compact benchmark score for a proxied heterogeneous execution span.
   pub fn benchmark_proxy_total(
     warmup_iters: i64,

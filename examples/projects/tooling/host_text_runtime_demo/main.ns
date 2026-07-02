@@ -1,3 +1,5 @@
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
@@ -21,6 +23,14 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: HostTextProjectSummary = capture_host_text_project(11, 19);
-    return summary.lhs_len + summary.rhs_len + summary.merged_handle + summary.merged_len;
+    let total: i64 = StdTextContracts.concat_status_total(
+      summary.lhs_len,
+      summary.rhs_len,
+      summary.merged_handle
+    ) + StdTextContracts.text_value_or_zero(summary.merged_len);
+    if total > 0 {
+      return StdTextContracts.text_ok();
+    }
+    return StdTextContracts.text_error();
   }
 }

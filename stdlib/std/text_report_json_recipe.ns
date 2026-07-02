@@ -1,3 +1,5 @@
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
@@ -34,7 +36,8 @@ mod cpu Main {
     report_measured_len: i64,
     pair_len: i64,
     array_len: i64,
-    object_len: i64
+    object_len: i64,
+    validation_total: i64
   }
 
   fn build_text_report_json_seed(
@@ -98,6 +101,11 @@ mod cpu Main {
     let first_block: i64 = append_line(title_line_handle, kv_line_handle, seed.newline_handle);
     let second_block: i64 = append_line(first_block, status_line_handle, seed.newline_handle);
     let report_handle: i64 = host_text_concat(second_block, seed.footer_handle);
+    let report_len: i64 = host_text_measure(report_handle);
+    let report_concat_len: i64 = host_text_concat_len(second_block, seed.footer_handle);
+    let pair_len: i64 = host_json_pair_len(seed.key_handle, seed.value_handle);
+    let array_len: i64 = host_json_array_len(3);
+    let object_len: i64 = host_json_object_len(4);
     return TextReportJsonSummary {
       title_len: host_text_len(seed.title_handle),
       value_len: host_text_len(seed.value_handle),
@@ -108,12 +116,22 @@ mod cpu Main {
       status_line_handle: status_line_handle,
       status_line_len: host_text_measure(status_line_handle),
       report_handle: report_handle,
-      report_len: host_text_measure(report_handle),
-      report_concat_len: host_text_concat_len(second_block, seed.footer_handle),
-      report_measured_len: host_text_measure(report_handle),
-      pair_len: host_json_pair_len(seed.key_handle, seed.value_handle),
-      array_len: host_json_array_len(3),
-      object_len: host_json_object_len(4)
+      report_len: report_len,
+      report_concat_len: report_concat_len,
+      report_measured_len: report_len,
+      pair_len: pair_len,
+      array_len: array_len,
+      object_len: object_len,
+      validation_total: StdTextContracts.report_validation_total(
+        report_handle,
+        report_len
+      ) + StdTextContracts.json_text_validation_total(
+        pair_len,
+        array_len,
+        object_len,
+        report_concat_len,
+        report_len
+      )
     };
   }
 
@@ -154,7 +172,8 @@ mod cpu Main {
       + summary.report_measured_len
       + summary.pair_len
       + summary.array_len
-      + summary.object_len;
+      + summary.object_len
+      + summary.validation_total;
   }
 
   fn main() {

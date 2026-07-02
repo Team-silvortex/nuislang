@@ -38,7 +38,8 @@ mod cpu Main {
     output_path_handle: i64,
     output_file_handle: i64,
     write_code: i64,
-    output_close_code: i64
+    output_close_code: i64,
+    file_validation_total: i64
   }
 
   fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
@@ -108,6 +109,14 @@ mod cpu Main {
     let output_file_handle: i64 = host_file_open(output_path_handle, 1);
     let write_code: i64 = host_file_write(output_file_handle, report_handle);
     let output_close_code: i64 = host_file_close(output_file_handle);
+    let report_len: i64 = host_text_measure(report_handle);
+    let file_validation_total: i64 = StdFsContracts.file_report_output_validation_total(
+      output_path_handle,
+      output_file_handle,
+      report_len,
+      write_code,
+      output_close_code
+    );
     return BenchmarkReportFileProjectSummary {
       first_span_ns: first_span_ns,
       second_span_ns: second_span_ns,
@@ -126,13 +135,14 @@ mod cpu Main {
       status_line_handle: status_line_handle,
       status_line_len: host_text_measure(status_line_handle),
       report_handle: report_handle,
-      report_len: host_text_measure(report_handle),
+      report_len: report_len,
       pair_len: host_json_pair_len(1601, 1602),
       object_len: host_json_object_len(5),
       output_path_handle: output_path_handle,
       output_file_handle: output_file_handle,
       write_code: write_code,
-      output_close_code: output_close_code
+      output_close_code: output_close_code,
+      file_validation_total: file_validation_total
     };
   }
 
@@ -163,7 +173,11 @@ mod cpu Main {
         summary.write_code,
         summary.output_close_code
       )
-      + StdFsContracts.host_fs_value_or_zero(summary.output_path_handle);
+      + StdFsContracts.host_fs_value_or_zero(summary.output_path_handle)
+      + summary.file_validation_total;
+    if summary.file_validation_total < 4 {
+      return StdTimeContracts.time_error();
+    }
     if total > 0 {
       return StdTimeContracts.time_ok();
     }

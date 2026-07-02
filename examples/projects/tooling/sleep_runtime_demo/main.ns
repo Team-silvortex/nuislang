@@ -1,3 +1,5 @@
+use cpu StdTimeContracts;
+
 mod cpu Main {
   extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
 
@@ -15,6 +17,9 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: SleepProjectSummary = capture_sleep_project(1000, 2000);
-    return summary.primary_slept_ns + summary.secondary_slept_ns;
+    if StdTimeContracts.duration_exit_code(summary.primary_slept_ns) == StdTimeContracts.time_error() {
+      return StdTimeContracts.time_error();
+    }
+    return StdTimeContracts.duration_exit_code(summary.secondary_slept_ns);
   }
 }

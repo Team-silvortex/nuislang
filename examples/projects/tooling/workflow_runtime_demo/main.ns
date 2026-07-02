@@ -35,7 +35,9 @@ mod cpu Main {
     first: WorkflowStepReport,
     second: WorkflowStepReport,
     first_failure_handle: i64,
-    overall_success: bool
+    overall_success: bool,
+    executed_steps: i64,
+    validation_total: i64
   }
 
   fn build_command_request(program_handle: i64, argv_handle: i64) -> CommandRequest {
@@ -120,26 +122,55 @@ mod cpu Main {
       first.result.succeeded && second.result.succeeded
     );
     if first.result.succeeded == false {
+      let executed_steps: i64 =
+        StdCliContracts.encode_success(first.executed) + StdCliContracts.encode_success(second.executed);
       return WorkflowReport {
         first: first,
         second: second,
         first_failure_handle: first.name_handle + gate_total,
-        overall_success: false
+        overall_success: false,
+        executed_steps: executed_steps,
+        validation_total: StdCliContracts.workflow_validation_total(
+          executed_steps,
+          1,
+          first.name_handle + gate_total,
+          false
+        )
       };
     }
     if second.result.succeeded == false {
+      let executed_steps: i64 =
+        StdCliContracts.encode_success(first.executed) + StdCliContracts.encode_success(second.executed);
       return WorkflowReport {
         first: first,
         second: second,
         first_failure_handle: second.name_handle + gate_total,
-        overall_success: false
+        overall_success: false,
+        executed_steps: executed_steps,
+        validation_total: StdCliContracts.workflow_validation_total(
+          executed_steps,
+          2,
+          second.name_handle + gate_total,
+          false
+        )
       };
     }
+    let executed_steps: i64 =
+      StdCliContracts.encode_success(first.executed) + StdCliContracts.encode_success(second.executed);
+    let overall_success: bool =
+      StdCliContracts.success_exit_code(gate_total > 0) == StdCliContracts.cli_ok();
     return WorkflowReport {
       first: first,
       second: second,
       first_failure_handle: 0,
-      overall_success: StdCliContracts.success_exit_code(gate_total > 0) == StdCliContracts.cli_ok()
+      overall_success: overall_success,
+      executed_steps: executed_steps,
+      validation_total: StdCliContracts.workflow_validation_total(
+        executed_steps,
+        2,
+        0,
+        overall_success
+      )
     };
   }
 
@@ -163,6 +194,9 @@ mod cpu Main {
 
   fn main() -> i64 {
     let report: WorkflowReport = capture_workflow_runtime_project();
+    if report.validation_total < 3 {
+      return StdCliContracts.cli_error();
+    }
     return StdCliContracts.success_exit_code(report.overall_success);
   }
 }

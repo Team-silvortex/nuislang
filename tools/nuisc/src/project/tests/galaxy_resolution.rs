@@ -137,12 +137,12 @@ mod cpu Main {
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=16\tdocumented_modules=15\tdocumented_items=170"));
+    assert!(docs_index.contains("summary\tmodules=16\tdocumented_modules=15\tdocumented_items=215"));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=34\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=170"
+        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=215"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -1113,7 +1113,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=170"
+        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=215"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

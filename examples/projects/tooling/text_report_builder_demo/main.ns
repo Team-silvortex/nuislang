@@ -12,7 +12,8 @@ mod cpu Main {
     status_line_handle: i64,
     status_line_len: i64,
     report_handle: i64,
-    report_len: i64
+    report_len: i64,
+    validation_total: i64
   }
 
   fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
@@ -42,6 +43,7 @@ mod cpu Main {
     let first_block: i64 = append_line(title_line_handle, kv_line_handle, 10);
     let second_block: i64 = append_line(first_block, status_line_handle, 10);
     let report_handle: i64 = host_text_concat(second_block, 1801);
+    let report_len: i64 = host_text_measure(report_handle);
     return TextReportBuilderProjectSummary {
       title_line_handle: title_line_handle,
       title_line_len: host_text_measure(title_line_handle),
@@ -50,18 +52,24 @@ mod cpu Main {
       status_line_handle: status_line_handle,
       status_line_len: host_text_measure(status_line_handle),
       report_handle: report_handle,
-      report_len: host_text_measure(report_handle)
+      report_len: report_len,
+      validation_total: StdTextContracts.report_validation_total(report_handle, report_len)
     };
   }
 
   fn main() -> i64 {
     let summary: TextReportBuilderProjectSummary = capture_text_report_builder_project();
-    return StdTextContracts.text_value_or_zero(summary.title_line_handle)
+    let total: i64 = StdTextContracts.text_value_or_zero(summary.title_line_handle)
       + StdTextContracts.text_value_or_zero(summary.title_line_len)
       + StdTextContracts.text_value_or_zero(summary.kv_line_handle)
       + StdTextContracts.text_value_or_zero(summary.kv_line_len)
       + StdTextContracts.text_value_or_zero(summary.status_line_handle)
       + StdTextContracts.text_value_or_zero(summary.status_line_len)
-      + StdTextContracts.report_status_total(summary.report_handle, summary.report_len);
+      + StdTextContracts.report_status_total(summary.report_handle, summary.report_len)
+      + summary.validation_total;
+    if summary.validation_total < 2 {
+      return StdTextContracts.text_error();
+    }
+    return total;
   }
 }

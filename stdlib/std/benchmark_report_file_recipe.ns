@@ -1,3 +1,5 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
   extern "c" fn host_monotonic_time_ns() -> i64;
   extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
@@ -153,6 +155,7 @@ mod cpu Main {
     let output_file_handle: i64 = host_file_open(output_path_handle, seed.write_flags);
     let write_code: i64 = host_file_write(output_file_handle, report_handle);
     let output_close_code: i64 = host_file_close(output_file_handle);
+    let report_len: i64 = host_text_measure(report_handle);
     return BenchmarkReportFileSummary {
       first_span_ns: first_span_ns,
       second_span_ns: second_span_ns,
@@ -171,7 +174,7 @@ mod cpu Main {
       status_line_handle: status_line_handle,
       status_line_len: host_text_measure(status_line_handle),
       report_handle: report_handle,
-      report_len: host_text_measure(report_handle),
+      report_len: report_len,
       pair_len: host_json_pair_len(seed.key_handle, seed.value_handle),
       object_len: host_json_object_len(5),
       output_path_handle: output_path_handle,
@@ -207,7 +210,14 @@ mod cpu Main {
       + summary.output_path_handle
       + summary.output_file_handle
       + summary.write_code
-      + summary.output_close_code;
+      + summary.output_close_code
+      + StdFsContracts.file_report_output_validation_total(
+        summary.output_path_handle,
+        summary.output_file_handle,
+        summary.report_len,
+        summary.write_code,
+        summary.output_close_code
+      );
   }
 
   fn main() {

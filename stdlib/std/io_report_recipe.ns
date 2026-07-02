@@ -1,3 +1,6 @@
+use cpu StdIoContracts;
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
@@ -85,12 +88,25 @@ mod cpu Main {
       space_handle: 32,
       newline_handle: 10
     });
+    let report_validation_total: i64 = StdTextContracts.report_validation_total(
+      summary.report_handle,
+      summary.report_len
+    );
+    let console_validation_total: i64 = StdIoContracts.console_report_validation_total(
+      summary.report_len,
+      summary.stdout_written,
+      summary.stderr_written,
+      summary.stdout_flushed,
+      summary.stderr_flushed
+    );
     return summary.report_handle
       + summary.report_len
       + summary.stdout_written
       + summary.stderr_written
       + summary.stdout_flushed
-      + summary.stderr_flushed;
+      + summary.stderr_flushed
+      + report_validation_total
+      + console_validation_total;
   }
 
   fn main() {

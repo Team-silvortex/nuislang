@@ -1,3 +1,5 @@
+use cpu StdCliContracts;
+
 mod cpu Main {
   extern "c" fn host_error_code(kind_handle: i64) -> i64;
   extern "c" fn host_error_message(kind_handle: i64) -> i64;
@@ -117,15 +119,22 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: ErrorProjectSummary = capture_error_project();
-    return summary.primary.stable_code
-      + summary.primary.message_handle
-      + summary.primary.severity_code
-      + summary.primary.family_code
-      + summary.primary.retryable
-      + summary.secondary.stable_code
-      + summary.secondary.message_handle
-      + summary.secondary.severity_code
-      + summary.secondary.family_code
-      + summary.secondary.retryable;
+    let total: i64 = StdCliContracts.error_status_total(
+      summary.primary.stable_code,
+      summary.primary.message_handle,
+      summary.primary.severity_code,
+      summary.primary.family_code,
+      summary.primary.retryable
+    ) + StdCliContracts.error_status_total(
+      summary.secondary.stable_code,
+      summary.secondary.message_handle,
+      summary.secondary.severity_code,
+      summary.secondary.family_code,
+      summary.secondary.retryable
+    );
+    if total > 0 {
+      return StdCliContracts.cli_ok();
+    }
+    return StdCliContracts.cli_error();
   }
 }

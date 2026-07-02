@@ -59,6 +59,60 @@ mod cpu StdFsContracts {
     return host_fs_value_exit_code(written_len);
   }
 
+  /// Returns true when a file handle is usable by host filesystem calls.
+  pub fn file_handle_ok(file_handle: i64) -> bool {
+    return file_handle >= 0;
+  }
+
+  /// Returns true when a file read covers the requested byte length.
+  pub fn read_covers_request(requested_len: i64, read_len: i64) -> bool {
+    if requested_len < 0 {
+      return false;
+    }
+    if read_len < 0 {
+      return false;
+    }
+    return read_len >= requested_len;
+  }
+
+  /// Returns true when a file write covers the measured payload length.
+  pub fn write_covers_payload(payload_len: i64, written_len: i64) -> bool {
+    if payload_len < 0 {
+      return false;
+    }
+    if written_len < 0 {
+      return false;
+    }
+    return written_len >= payload_len;
+  }
+
+  /// Returns true when a file close status is successful.
+  pub fn close_ok(close_status: i64) -> bool {
+    return close_status >= 0;
+  }
+
+  /// Encodes a filesystem validation gate as one point when it passes.
+  pub fn encode_fs_gate(passed: bool) -> i64 {
+    if passed {
+      return 1;
+    }
+    return 0;
+  }
+
+  /// Scores whether a file report output path, handle, write, and close succeeded.
+  pub fn file_report_output_validation_total(
+    output_path_handle: i64,
+    output_file_handle: i64,
+    report_len: i64,
+    written_len: i64,
+    close_status: i64
+  ) -> i64 {
+    return encode_fs_gate(output_path_handle >= 0)
+      + encode_fs_gate(file_handle_ok(output_file_handle))
+      + encode_fs_gate(write_covers_payload(report_len, written_len))
+      + encode_fs_gate(close_ok(close_status));
+  }
+
   /// Combines open/read/close outcomes into a compact file I/O score.
   pub fn file_io_status_total(open_handle: i64, read_len: i64, close_status: i64) -> i64 {
     return host_fs_value_or_zero(open_handle)

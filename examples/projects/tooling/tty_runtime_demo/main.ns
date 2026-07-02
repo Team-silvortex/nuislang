@@ -1,3 +1,5 @@
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_tty_isatty(fd: i64) -> i64;
   extern "c" fn host_tty_width(fd: i64) -> i64;
@@ -29,13 +31,20 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: TtyProjectSummary = capture_tty_project(0, 1);
-    return summary.primary_fd
-      + summary.primary_is_tty
-      + summary.primary_width
-      + summary.primary_height
-      + summary.secondary_fd
-      + summary.secondary_is_tty
-      + summary.secondary_width
-      + summary.secondary_height;
+    let total: i64 = StdIoContracts.tty_status_total(
+      summary.primary_fd,
+      summary.primary_is_tty,
+      summary.primary_width,
+      summary.primary_height
+    ) + StdIoContracts.tty_status_total(
+      summary.secondary_fd,
+      summary.secondary_is_tty,
+      summary.secondary_width,
+      summary.secondary_height
+    );
+    if total > 0 {
+      return StdIoContracts.io_ok();
+    }
+    return StdIoContracts.io_error();
   }
 }

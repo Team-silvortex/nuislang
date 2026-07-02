@@ -1,3 +1,6 @@
+use cpu StdFsContracts;
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_argv_at(index: i64) -> i64;
@@ -57,11 +60,14 @@ mod cpu Main {
 
   fn summarize_input_runtime(seed: InputRuntimeSeed) -> i64 {
     let summary: InputRuntimeSummary = capture_input_runtime(seed);
-    return summary.argv_count
-      + summary.file_read_len
-      + summary.file_close_code
-      + summary.stdin_read_len
-      + summary.stdin_is_tty;
+    return StdFsContracts.file_io_status_total(
+      summary.file_handle,
+      summary.file_read_len,
+      summary.file_close_code
+    ) + StdIoContracts.read_progress_score(seed.read_len, summary.stdin_read_len)
+      + StdIoContracts.tty_value_or_zero(summary.stdin_is_tty)
+      + StdFsContracts.host_fs_value_or_zero(summary.path_handle)
+      + StdFsContracts.host_fs_value_or_zero(summary.argv_count);
   }
 
   fn main() {

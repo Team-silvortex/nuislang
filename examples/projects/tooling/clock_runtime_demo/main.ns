@@ -1,3 +1,5 @@
+use cpu StdTimeContracts;
+
 mod cpu Main {
   extern "c" fn host_clock_domain_id() -> i64;
   extern "c" fn host_clock_epoch_ns() -> i64;
@@ -21,6 +23,15 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: ClockProjectSummary = capture_clock_project();
-    return summary.domain_id + summary.epoch_ns + summary.tick + summary.scale_ppm;
+    let total: i64 = StdTimeContracts.clock_domain_total(
+      summary.domain_id,
+      summary.epoch_ns,
+      summary.tick,
+      summary.scale_ppm
+    );
+    if total > 0 {
+      return StdTimeContracts.time_ok();
+    }
+    return StdTimeContracts.time_error();
   }
 }
