@@ -31,6 +31,7 @@ Start in this order:
   - [nuis-native-artifact-workflow.md](nuis-native-artifact-workflow.md)
   - [toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md)
   - [nsld-linker-frontdoor.md](nsld-linker-frontdoor.md)
+  - [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md)
   - [nsdb-yir-debugger-frontdoor.md](nsdb-yir-debugger-frontdoor.md)
 * `NIR` safety boundary
   - [nir-memory-model.md](nir-memory-model.md)
@@ -78,6 +79,10 @@ closure route today?”, start with
 If your question is specifically “what is the current independent linker
 frontdoor?”, start with
 [nsld-linker-frontdoor.md](nsld-linker-frontdoor.md).
+
+If your question is specifically “what remains between the current Nsld
+container and a runnable Nuis-owned heterogeneous executable?”, start with
+[nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md).
 
 If your question is specifically “how should Nuis debugging work above native
 LLDB-style shell debugging?”, start with

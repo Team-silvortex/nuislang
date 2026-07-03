@@ -108,6 +108,7 @@ fn artifact_chain_accepts_contiguous_prepared_prefix() {
         ("bundle", true),
         ("assemble", false),
         ("section", false),
+        ("object", false),
     ]);
     assert!(issues.is_empty());
 }
@@ -119,12 +120,16 @@ fn artifact_chain_rejects_later_artifact_without_prerequisite() {
         ("units", false),
         ("bundle", true),
         ("assemble", true),
+        ("section", true),
+        ("object", true),
     ]);
     assert_eq!(
         issues,
         vec![
             "artifact `bundle` is present but prerequisite `units` is missing".to_owned(),
             "artifact `assemble` is present but prerequisite `units` is missing".to_owned(),
+            "artifact `section` is present but prerequisite `units` is missing".to_owned(),
+            "artifact `object` is present but prerequisite `units` is missing".to_owned(),
         ]
     );
 }
@@ -262,6 +267,9 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     fs::remove_dir_all(dir).unwrap();
 
     assert!(report.valid);
+    assert!(report.object_plan_present);
+    assert_eq!(report.object_plan_valid, Some(true));
+    assert!(report.object_plan_issues.is_empty());
     assert!(report.container_section_issues.is_empty());
     assert!(report.container_loader_symbol_issues.is_empty());
     assert!(report.container_relocation_issues.is_empty());
@@ -270,6 +278,9 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     assert!(report_json.contains("\"container_loader_symbol_issues\":[]"));
     assert!(report_json.contains("\"container_relocation_issues\":[]"));
     assert!(report_json.contains("\"container_external_import_issues\":[]"));
+    assert!(report_json.contains("\"object_plan_present\":true"));
+    assert!(report_json.contains("\"object_plan_valid\":true"));
+    assert!(report_json.contains("\"object_plan_issues\":[]"));
     assert_eq!(
         report.container_loader_readiness.as_deref(),
         Some("host-assisted")

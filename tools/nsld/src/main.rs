@@ -41,6 +41,7 @@ mod main_link_table_tests;
 mod main_test_support;
 #[cfg(test)]
 mod main_tests;
+mod object_plan;
 mod prepare;
 mod protocol;
 mod reports;
@@ -59,6 +60,7 @@ use context::load_link_input_context;
 use display::*;
 use json::*;
 use link_units::*;
+use object_plan::*;
 use prepare::*;
 use std::{env, process};
 fn main() {
@@ -167,6 +169,36 @@ fn run() -> Result<(), String> {
             }
             if !report.valid {
                 return Err("nsld section manifest verification failed".to_owned());
+            }
+        }
+        Command::ObjectPlan { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_object_plan_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_object_plan_report_json(&report));
+            } else {
+                print_nsld_object_plan_report(&report);
+            }
+        }
+        Command::EmitObjectPlan { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_object_plan_report(&ctx.manifest, &ctx.plan)?;
+            if json {
+                println!("{}", nsld_object_plan_emit_report_json(&report));
+            } else {
+                print_nsld_object_plan_emit_report(&report);
+            }
+        }
+        Command::VerifyObjectPlan { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_object_plan_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_object_plan_verify_report_json(&report));
+            } else {
+                print_nsld_object_plan_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld object plan verification failed".to_owned());
             }
         }
         Command::ContainerPlan { input, json } => {

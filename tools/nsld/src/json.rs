@@ -44,6 +44,9 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
         json_bool_field("section_manifest_present", report.section_manifest_present),
         json_optional_bool_field("section_manifest_valid", report.section_manifest_valid),
         json_string_array_field("section_manifest_issues", &report.section_manifest_issues),
+        json_bool_field("object_plan_present", report.object_plan_present),
+        json_optional_bool_field("object_plan_valid", report.object_plan_valid),
+        json_string_array_field("object_plan_issues", &report.object_plan_issues),
         json_bool_field("container_plan_present", report.container_plan_present),
         json_optional_bool_field("container_plan_valid", report.container_plan_valid),
         json_string_array_field("container_plan_issues", &report.container_plan_issues),
@@ -214,6 +217,7 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
         json_string_field("link_bundle_path", &report.link_bundle_path),
         json_string_field("assemble_plan_path", &report.assemble_plan_path),
         json_string_field("section_manifest_path", &report.section_manifest_path),
+        json_string_field("object_plan_path", &report.object_plan_path),
         json_string_field("container_plan_path", &report.container_plan_path),
         json_string_field("container_path", &report.container_path),
         json_string_field("container_payload_path", &report.container_payload_path),
@@ -226,6 +230,7 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
         json_bool_field("bundle_ready", report.bundle_ready),
         json_string_field("assemble_plan_hash", &report.assemble_plan_hash),
         json_string_field("section_table_hash", &report.section_table_hash),
+        json_string_field("object_plan_hash", &report.object_plan_hash),
         json_string_field("metadata_table_hash", &report.metadata_table_hash),
         json_string_field("container_layout_hash", &report.container_layout_hash),
         json_string_field("container_hash", &report.container_hash),
@@ -344,6 +349,68 @@ pub(crate) fn nsld_section_manifest_verify_report_json(
             "actual_section_table_hash",
             report.actual_section_table_hash.as_deref(),
         ),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_object_plan_report_json(report: &NsldObjectPlanReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_object_plan"),
+        json_string_field("manifest", &report.manifest),
+        json_bool_field("ready", report.ready),
+        json_string_field("target_arch", &report.target_arch),
+        json_string_field("target_os", &report.target_os),
+        json_string_field("object_format", &report.object_format),
+        json_string_field("calling_abi", &report.calling_abi),
+        json_string_field("clang_target", &report.clang_target),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("source_container_path", &report.source_container_path),
+        json_string_field("source_payload_path", &report.source_payload_path),
+        json_usize_field("section_count", report.section_count),
+        json_string_field("section_table_hash", &report.section_table_hash),
+        json_string_field("object_plan_hash", &report.object_plan_hash),
+        json_string_field("emission_status", &report.emission_status),
+        format!(
+            "\"object_sections\":[{}]",
+            nsld_object_sections_json(&report.object_sections)
+        ),
+        json_string_array_field("blockers", &report.blockers),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_object_plan_emit_report_json(report: &NsldObjectPlanEmitReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_object_plan_emit"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_bool_field("ready", report.ready),
+        json_string_field("object_plan_hash", &report.object_plan_hash),
+        json_usize_field("section_count", report.section_count),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_object_plan_verify_report_json(report: &NsldObjectPlanVerifyReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_object_plan_verify"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("input_path", &report.input_path),
+        json_bool_field("valid", report.valid),
+        json_string_field(
+            "expected_object_plan_hash",
+            &report.expected_object_plan_hash,
+        ),
+        json_usize_field("expected_section_count", report.expected_section_count),
+        json_optional_string_field(
+            "actual_object_plan_hash",
+            report.actual_object_plan_hash.as_deref(),
+        ),
+        json_optional_usize_field("actual_section_count", report.actual_section_count),
         json_string_array_field("issues", &report.issues),
     ];
     format!("{{{}}}", fields.join(","))

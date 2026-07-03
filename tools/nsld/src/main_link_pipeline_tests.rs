@@ -59,13 +59,16 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(Path::new(&report.link_bundle_path).exists());
     assert!(Path::new(&report.assemble_plan_path).exists());
     assert!(Path::new(&report.section_manifest_path).exists());
+    assert!(Path::new(&report.object_plan_path).exists());
     assert!(Path::new(&report.container_plan_path).exists());
     assert!(Path::new(&report.container_path).exists());
+    assert!(dir.join("nuis.nsld.object-plan.toml").exists());
     assert_eq!(report.link_input_count, 1);
     assert_eq!(report.unit_count, 1);
     assert!(report.bundle_ready);
     assert_ne!(report.assemble_plan_hash, "missing");
     assert_ne!(report.section_table_hash, "missing");
+    assert_ne!(report.object_plan_hash, "missing");
     assert_ne!(report.metadata_table_hash, "missing");
     assert_ne!(report.container_layout_hash, "missing");
     assert_ne!(report.container_hash, "missing");

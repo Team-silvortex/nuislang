@@ -29,6 +29,9 @@ pub(crate) struct NsldCheckReport {
     pub(crate) section_manifest_present: bool,
     pub(crate) section_manifest_valid: Option<bool>,
     pub(crate) section_manifest_issues: Vec<String>,
+    pub(crate) object_plan_present: bool,
+    pub(crate) object_plan_valid: Option<bool>,
+    pub(crate) object_plan_issues: Vec<String>,
     pub(crate) container_plan_present: bool,
     pub(crate) container_plan_valid: Option<bool>,
     pub(crate) container_plan_issues: Vec<String>,
@@ -234,6 +237,7 @@ pub(crate) struct NsldPrepareReport {
     pub(crate) link_bundle_path: String,
     pub(crate) assemble_plan_path: String,
     pub(crate) section_manifest_path: String,
+    pub(crate) object_plan_path: String,
     pub(crate) container_plan_path: String,
     pub(crate) container_path: String,
     pub(crate) container_payload_path: String,
@@ -246,6 +250,7 @@ pub(crate) struct NsldPrepareReport {
     pub(crate) bundle_ready: bool,
     pub(crate) assemble_plan_hash: String,
     pub(crate) section_table_hash: String,
+    pub(crate) object_plan_hash: String,
     pub(crate) metadata_table_hash: String,
     pub(crate) container_layout_hash: String,
     pub(crate) container_hash: String,
@@ -326,6 +331,60 @@ pub(crate) struct NsldSectionManifestVerifyReport {
     pub(crate) expected_section_table_hash: String,
     pub(crate) actual_section_count: Option<usize>,
     pub(crate) actual_section_table_hash: Option<String>,
+    pub(crate) issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectPlanReport {
+    pub(crate) manifest: String,
+    pub(crate) ready: bool,
+    pub(crate) target_arch: String,
+    pub(crate) target_os: String,
+    pub(crate) object_format: String,
+    pub(crate) calling_abi: String,
+    pub(crate) clang_target: String,
+    pub(crate) output_path: String,
+    pub(crate) source_container_path: String,
+    pub(crate) source_payload_path: String,
+    pub(crate) section_count: usize,
+    pub(crate) section_table_hash: String,
+    pub(crate) object_plan_hash: String,
+    pub(crate) emission_status: String,
+    pub(crate) object_sections: Vec<NsldObjectSectionDiagnostic>,
+    pub(crate) blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectSectionDiagnostic {
+    pub(crate) order_index: usize,
+    pub(crate) source_section_id: String,
+    pub(crate) source_section_kind: String,
+    pub(crate) object_section_name: String,
+    pub(crate) object_section_role: String,
+    pub(crate) source_path: String,
+    pub(crate) source_hash: String,
+    pub(crate) payload_offset_seed: usize,
+    pub(crate) required: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectPlanEmitReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) ready: bool,
+    pub(crate) object_plan_hash: String,
+    pub(crate) section_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectPlanVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_object_plan_hash: String,
+    pub(crate) expected_section_count: usize,
+    pub(crate) actual_object_plan_hash: Option<String>,
+    pub(crate) actual_section_count: Option<usize>,
     pub(crate) issues: Vec<String>,
 }
 

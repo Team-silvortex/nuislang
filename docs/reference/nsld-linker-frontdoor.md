@@ -11,6 +11,9 @@ boundary before the implementation is split out further.
 Longer-term, `Nsld` should be read as a CLI adapter over a future reusable
 linker core / galaxy capability boundary, not as a CLI-only tool. See
 [toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md).
+For the current gap between the deterministic Nsld container and a runnable
+Nuis-owned heterogeneous executable, see
+[nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md).
 
 ## Current Role
 
@@ -56,6 +59,12 @@ cargo run -p nsld -- emit-section-manifest <artifact-output-dir>
 cargo run -p nsld -- emit-section-manifest <artifact-output-dir> --json
 cargo run -p nsld -- verify-section-manifest <artifact-output-dir>
 cargo run -p nsld -- verify-section-manifest <artifact-output-dir> --json
+cargo run -p nsld -- object-plan <artifact-output-dir>
+cargo run -p nsld -- object-plan <artifact-output-dir> --json
+cargo run -p nsld -- emit-object-plan <artifact-output-dir>
+cargo run -p nsld -- emit-object-plan <artifact-output-dir> --json
+cargo run -p nsld -- verify-object-plan <artifact-output-dir>
+cargo run -p nsld -- verify-object-plan <artifact-output-dir> --json
 cargo run -p nsld -- container-plan <artifact-output-dir>
 cargo run -p nsld -- container-plan <artifact-output-dir> --json
 cargo run -p nsld -- emit-container-plan <artifact-output-dir>
@@ -98,7 +107,7 @@ cargo run -p nsld -- prepare <artifact-output-dir>
 cargo run -p nsld -- check <artifact-output-dir>
 ```
 
-`nsld prepare` emits and immediately verifies the eight current Nsld-owned
+`nsld prepare` emits and immediately verifies the nine current Nsld-owned
 artifacts in dependency order:
 
 * `nuis.nsld.link-inputs.toml`
@@ -106,6 +115,7 @@ artifacts in dependency order:
 * `nuis.nsld.link-bundle.toml`
 * `nuis.nsld.assemble-plan.toml`
 * `nuis.nsld.section-manifest.toml`
+* `nuis.nsld.object-plan.toml`
 * `nuis.nsld.container-plan.toml`
 * `nuis.nsld.container`
 * `nuis.nsld.container.payload`
@@ -209,6 +219,11 @@ required = true
 `nsld verify-section-manifest` re-computes the section manifest and fails if
 the file is missing, if the full content differs, or if `section_count` or
 `section_table_hash` no longer match.
+
+`nsld object-plan` derives the first object-writer-facing plan from the section
+manifest. It maps each Nsld section to a stable object section name and role
+while keeping native byte emission and relocation application explicitly
+blocked behind `plan-only` status.
 
 `nsld container-plan` derives the first Nuis-owned binary container layout
 plan. It consumes the section manifest, records the container magic/version,
@@ -438,6 +453,8 @@ the top-level linker health report.
   present
 * an emitted `nuis.nsld.section-manifest.toml` is still valid when that file is
   present
+* an emitted `nuis.nsld.object-plan.toml` is still valid when that file is
+  present
 * an emitted `nuis.nsld.container-plan.toml` is still valid when that file is
   present
 * an emitted `nuis.nsld.container` is still valid when that file is present
@@ -461,8 +478,9 @@ shape without rejecting an otherwise valid registered footprint.
 
 `nsld check` does not require `nuis.nsld.link-inputs.toml`,
 `nuis.nsld.link-units.toml`, `nuis.nsld.link-bundle.toml`, or
-`nuis.nsld.assemble-plan.toml`, `nuis.nsld.section-manifest.toml`, or
-`nuis.nsld.container-plan.toml`, or `nuis.nsld.container` to exist. If any file
+`nuis.nsld.assemble-plan.toml`, `nuis.nsld.section-manifest.toml`,
+`nuis.nsld.object-plan.toml`, `nuis.nsld.container-plan.toml`, or
+`nuis.nsld.container` to exist. If any file
 is absent, the corresponding gate is reported as absent and the check still
 uses the core linker gates. If a file is present, it is verified with the same
 rules as `nsld verify-inputs`, `nsld verify-units`, `nsld verify-bundle`,

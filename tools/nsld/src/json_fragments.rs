@@ -4,7 +4,7 @@ use super::{
     reports::{
         NsldAssembleSectionDiagnostic, NsldClockEdgeDiagnostic, NsldDataSegmentDiagnostic,
         NsldDomainDiagnostic, NsldLinkInputDiagnostic, NsldLinkUnitDiagnostic,
-        NsldSidecarCapabilityDiagnostic,
+        NsldObjectSectionDiagnostic, NsldSidecarCapabilityDiagnostic,
     },
 };
 
@@ -88,6 +88,27 @@ pub(crate) fn nsld_container_sections_json(sections: &[NsldContainerSectionEntry
                 json_bool_field("required", section.required),
                 json_usize_field("offset", section.offset),
                 json_usize_field("size_bytes", section.size_bytes),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+pub(crate) fn nsld_object_sections_json(sections: &[NsldObjectSectionDiagnostic]) -> String {
+    sections
+        .iter()
+        .map(|section| {
+            let fields = vec![
+                json_usize_field("order_index", section.order_index),
+                json_string_field("source_section_id", &section.source_section_id),
+                json_string_field("source_section_kind", &section.source_section_kind),
+                json_string_field("object_section_name", &section.object_section_name),
+                json_string_field("object_section_role", &section.object_section_role),
+                json_string_field("source_path", &section.source_path),
+                json_string_field("source_hash", &section.source_hash),
+                json_usize_field("payload_offset_seed", section.payload_offset_seed),
+                json_bool_field("required", section.required),
             ];
             format!("{{{}}}", fields.join(","))
         })

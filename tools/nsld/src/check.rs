@@ -11,6 +11,7 @@ use super::{
         nsld_domain_diagnostics, nsld_sidecar_capability_diagnostics,
         nsld_verify_link_inputs_report, nsld_verify_link_units_report,
     },
+    object_plan::nsld_verify_object_plan_report,
     reports::{NsldCheckReport, NsldClockEdgeDiagnostic, NsldDataSegmentDiagnostic},
 };
 use std::path::{Path, PathBuf};
@@ -97,6 +98,17 @@ pub(crate) fn nsld_check_report(
         .as_ref()
         .map(|report| report.issues.clone())
         .unwrap_or_default();
+    let object_plan_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.object-plan.toml");
+    let object_plan_present = object_plan_path.exists();
+    let object_plan_verify_report =
+        object_plan_present.then(|| nsld_verify_object_plan_report(manifest, plan));
+    let object_plan_valid = object_plan_verify_report
+        .as_ref()
+        .map(|report| report.valid);
+    let object_plan_issues = object_plan_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
     let container_plan_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.container-plan.toml");
     let container_plan_present = container_plan_path.exists();
     let container_plan_verify_report =
@@ -165,6 +177,7 @@ pub(crate) fn nsld_check_report(
         ("nuis.nsld.link-bundle.toml", link_bundle_present),
         ("nuis.nsld.assemble-plan.toml", assemble_plan_present),
         ("nuis.nsld.section-manifest.toml", section_manifest_present),
+        ("nuis.nsld.object-plan.toml", object_plan_present),
         ("nuis.nsld.container-plan.toml", container_plan_present),
         ("nuis.nsld.container", container_present),
         ("nuis.nsld.container.payload", container_payload_present),
@@ -253,6 +266,10 @@ pub(crate) fn nsld_check_report(
         issues.push("section manifest verification failed".to_owned());
         issues.extend(section_manifest_issues.iter().cloned());
     }
+    if object_plan_valid == Some(false) {
+        issues.push("object plan verification failed".to_owned());
+        issues.extend(object_plan_issues.iter().cloned());
+    }
     if container_plan_valid == Some(false) {
         issues.push("container plan verification failed".to_owned());
         issues.extend(container_plan_issues.iter().cloned());
@@ -278,6 +295,7 @@ pub(crate) fn nsld_check_report(
     let checks = checks + usize::from(link_bundle_present);
     let checks = checks + usize::from(assemble_plan_present);
     let checks = checks + usize::from(section_manifest_present);
+    let checks = checks + usize::from(object_plan_present);
     let checks = checks + usize::from(container_plan_present);
     let checks = checks + usize::from(container_present);
     let checks = checks + usize::from(container_present || container_payload_present);
@@ -312,6 +330,9 @@ pub(crate) fn nsld_check_report(
         section_manifest_present,
         section_manifest_valid,
         section_manifest_issues,
+        object_plan_present,
+        object_plan_valid,
+        object_plan_issues,
         container_plan_present,
         container_plan_valid,
         container_plan_issues,

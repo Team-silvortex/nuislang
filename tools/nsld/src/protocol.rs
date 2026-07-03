@@ -15,6 +15,9 @@ pub(crate) const NSLD_ASSEMBLE_PLAN_KIND: &str = "deterministic-section-assembly
 pub(crate) const NSLD_SECTION_MANIFEST_SCHEMA: &str = "nuis-nsld-section-manifest-v1";
 pub(crate) const NSLD_SECTION_MANIFEST_SCHEMA_VERSION: usize = 1;
 pub(crate) const NSLD_SECTION_MANIFEST_KIND: &str = "deterministic-section-manifest";
+pub(crate) const NSLD_OBJECT_PLAN_SCHEMA: &str = "nuis-nsld-object-plan-v1";
+pub(crate) const NSLD_OBJECT_PLAN_SCHEMA_VERSION: usize = 1;
+pub(crate) const NSLD_OBJECT_PLAN_KIND: &str = "deterministic-object-emission-plan";
 
 pub(crate) fn fnv1a64_hex(bytes: &[u8]) -> String {
     const FNV_OFFSET: u64 = 0xcbf29ce484222325;

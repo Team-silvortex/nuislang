@@ -182,6 +182,63 @@ fn parses_verify_section_manifest_input_and_json_flag() {
 }
 
 #[test]
+fn parses_object_plan_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "object-plan".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::ObjectPlan {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_emit_object_plan_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "emit-object-plan".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::EmitObjectPlan {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_verify_object_plan_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "verify-object-plan".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::VerifyObjectPlan {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
 fn parses_container_plan_input_and_json_flag() {
     let command = parse_args(
         vec![

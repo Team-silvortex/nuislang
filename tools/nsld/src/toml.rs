@@ -1,14 +1,15 @@
 use super::{
     reports::{
         NsldAssemblePlanReport, NsldLinkBundleReport, NsldLinkInputDiagnostic, NsldLinkUnitReport,
-        NsldSectionManifestReport,
+        NsldObjectPlanReport, NsldSectionManifestReport,
     },
     NSLD_ASSEMBLE_PLAN_KIND, NSLD_ASSEMBLE_PLAN_SCHEMA, NSLD_ASSEMBLE_PLAN_SCHEMA_VERSION,
     NSLD_LINK_BUNDLE_KIND, NSLD_LINK_BUNDLE_SCHEMA, NSLD_LINK_BUNDLE_SCHEMA_VERSION,
     NSLD_LINK_INPUT_TABLE_KIND, NSLD_LINK_INPUT_TABLE_PRODUCER,
     NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE, NSLD_LINK_INPUT_TABLE_SCHEMA,
     NSLD_LINK_INPUT_TABLE_SCHEMA_VERSION, NSLD_LINK_UNIT_TABLE_KIND, NSLD_LINK_UNIT_TABLE_SCHEMA,
-    NSLD_LINK_UNIT_TABLE_SCHEMA_VERSION, NSLD_SECTION_MANIFEST_KIND, NSLD_SECTION_MANIFEST_SCHEMA,
+    NSLD_LINK_UNIT_TABLE_SCHEMA_VERSION, NSLD_OBJECT_PLAN_KIND, NSLD_OBJECT_PLAN_SCHEMA,
+    NSLD_OBJECT_PLAN_SCHEMA_VERSION, NSLD_SECTION_MANIFEST_KIND, NSLD_SECTION_MANIFEST_SCHEMA,
     NSLD_SECTION_MANIFEST_SCHEMA_VERSION,
 };
 
@@ -366,6 +367,113 @@ pub(crate) fn render_section_manifest(report: &NsldSectionManifestReport) -> Str
         out.push_str(&format!(
             "source_hash = \"{}\"\n",
             escape_toml_string(&section.source_hash)
+        ));
+        out.push_str(&format!("required = {}\n", section.required));
+    }
+    out
+}
+
+pub(crate) fn render_object_plan(report: &NsldObjectPlanReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "schema = \"{}\"\n",
+        escape_toml_string(NSLD_OBJECT_PLAN_SCHEMA)
+    ));
+    out.push_str(&format!(
+        "schema_version = {NSLD_OBJECT_PLAN_SCHEMA_VERSION}\n"
+    ));
+    out.push_str(&format!(
+        "plan_kind = \"{}\"\n",
+        escape_toml_string(NSLD_OBJECT_PLAN_KIND)
+    ));
+    out.push_str(&format!(
+        "producer = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
+    ));
+    out.push_str(&format!(
+        "producer_phase = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
+    ));
+    out.push_str(&format!("ready = {}\n", report.ready));
+    out.push_str(&format!(
+        "target_arch = \"{}\"\n",
+        escape_toml_string(&report.target_arch)
+    ));
+    out.push_str(&format!(
+        "target_os = \"{}\"\n",
+        escape_toml_string(&report.target_os)
+    ));
+    out.push_str(&format!(
+        "object_format = \"{}\"\n",
+        escape_toml_string(&report.object_format)
+    ));
+    out.push_str(&format!(
+        "calling_abi = \"{}\"\n",
+        escape_toml_string(&report.calling_abi)
+    ));
+    out.push_str(&format!(
+        "clang_target = \"{}\"\n",
+        escape_toml_string(&report.clang_target)
+    ));
+    out.push_str(&format!(
+        "output_path = \"{}\"\n",
+        escape_toml_string(&report.output_path)
+    ));
+    out.push_str(&format!(
+        "source_container_path = \"{}\"\n",
+        escape_toml_string(&report.source_container_path)
+    ));
+    out.push_str(&format!(
+        "source_payload_path = \"{}\"\n",
+        escape_toml_string(&report.source_payload_path)
+    ));
+    out.push_str(&format!("section_count = {}\n", report.section_count));
+    out.push_str(&format!(
+        "section_table_hash = \"{}\"\n",
+        escape_toml_string(&report.section_table_hash)
+    ));
+    out.push_str(&format!(
+        "object_plan_hash = \"{}\"\n",
+        escape_toml_string(&report.object_plan_hash)
+    ));
+    out.push_str(&format!(
+        "emission_status = \"{}\"\n",
+        escape_toml_string(&report.emission_status)
+    ));
+    out.push_str(&format!(
+        "blockers = [{}]\n",
+        toml_string_array_literal(&report.blockers)
+    ));
+    for section in &report.object_sections {
+        out.push_str("\n[[object_section]]\n");
+        out.push_str(&format!("order_index = {}\n", section.order_index));
+        out.push_str(&format!(
+            "source_section_id = \"{}\"\n",
+            escape_toml_string(&section.source_section_id)
+        ));
+        out.push_str(&format!(
+            "source_section_kind = \"{}\"\n",
+            escape_toml_string(&section.source_section_kind)
+        ));
+        out.push_str(&format!(
+            "object_section_name = \"{}\"\n",
+            escape_toml_string(&section.object_section_name)
+        ));
+        out.push_str(&format!(
+            "object_section_role = \"{}\"\n",
+            escape_toml_string(&section.object_section_role)
+        ));
+        out.push_str(&format!(
+            "source_path = \"{}\"\n",
+            escape_toml_string(&section.source_path)
+        ));
+        out.push_str(&format!(
+            "source_hash = \"{}\"\n",
+            escape_toml_string(&section.source_hash)
+        ));
+        out.push_str(&format!(
+            "payload_offset_seed = {}\n",
+            section.payload_offset_seed
         ));
         out.push_str(&format!("required = {}\n", section.required));
     }

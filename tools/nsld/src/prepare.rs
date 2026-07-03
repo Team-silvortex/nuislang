@@ -12,6 +12,7 @@ use super::{
         nsld_emit_link_inputs_report, nsld_emit_link_units_report, nsld_verify_link_inputs_report,
         nsld_verify_link_units_report,
     },
+    object_plan::{nsld_emit_object_plan_report, nsld_verify_object_plan_report},
     reports::NsldPrepareReport,
 };
 use std::path::Path;
@@ -30,6 +31,8 @@ pub(crate) fn nsld_prepare_report(
     let assemble_verify = nsld_verify_assemble_plan_report(manifest, plan);
     let section_emit = nsld_emit_section_manifest_report(manifest, plan)?;
     let section_verify = nsld_verify_section_manifest_report(manifest, plan);
+    let object_plan_emit = nsld_emit_object_plan_report(manifest, plan)?;
+    let object_plan_verify = nsld_verify_object_plan_report(manifest, plan);
     let container_emit = nsld_emit_container_plan_report(manifest, plan)?;
     let container_verify = nsld_verify_container_plan_report(manifest, plan);
     let container_file_emit = nsld_emit_container_report(manifest, plan)?;
@@ -76,6 +79,14 @@ pub(crate) fn nsld_prepare_report(
                 .map(|issue| format!("section-manifest:{issue}")),
         );
     }
+    if !object_plan_verify.valid {
+        issues.extend(
+            object_plan_verify
+                .issues
+                .iter()
+                .map(|issue| format!("object-plan:{issue}")),
+        );
+    }
     if !container_verify.valid {
         issues.extend(
             container_verify
@@ -102,6 +113,7 @@ pub(crate) fn nsld_prepare_report(
         link_bundle_path: bundle_emit.output_path,
         assemble_plan_path: assemble_emit.output_path,
         section_manifest_path: section_emit.output_path,
+        object_plan_path: object_plan_emit.output_path,
         container_plan_path: container_emit.output_path,
         container_path: container_file_emit.output_path,
         container_payload_path: container_file_emit.payload_path,
@@ -114,6 +126,7 @@ pub(crate) fn nsld_prepare_report(
         bundle_ready: bundle_emit.bundle_ready,
         assemble_plan_hash: assemble_emit.assemble_plan_hash,
         section_table_hash: section_emit.section_table_hash,
+        object_plan_hash: object_plan_emit.object_plan_hash,
         metadata_table_hash: container_file_emit.metadata_table_hash,
         container_layout_hash: container_emit.container_layout_hash,
         container_hash: container_file_emit.container_hash,

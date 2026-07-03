@@ -168,6 +168,7 @@ pub(crate) fn print_nsld_prepare_report(report: &NsldPrepareReport) {
     println!("  link_bundle: {}", report.link_bundle_path);
     println!("  assemble_plan: {}", report.assemble_plan_path);
     println!("  section_manifest: {}", report.section_manifest_path);
+    println!("  object_plan: {}", report.object_plan_path);
     println!("  container_plan: {}", report.container_plan_path);
     println!("  container: {}", report.container_path);
     println!("  container_payload: {}", report.container_payload_path);
@@ -180,6 +181,7 @@ pub(crate) fn print_nsld_prepare_report(report: &NsldPrepareReport) {
     println!("  bundle_ready: {}", report.bundle_ready);
     println!("  assemble_plan_hash: {}", report.assemble_plan_hash);
     println!("  section_table_hash: {}", report.section_table_hash);
+    println!("  object_plan_hash: {}", report.object_plan_hash);
     println!("  metadata_table_hash: {}", report.metadata_table_hash);
     println!("  container_layout_hash: {}", report.container_layout_hash);
     println!("  container_hash: {}", report.container_hash);
@@ -287,6 +289,77 @@ pub(crate) fn print_nsld_section_manifest_verify_report(report: &NsldSectionMani
             .actual_section_table_hash
             .as_deref()
             .unwrap_or("missing")
+    );
+    for issue in &report.issues {
+        println!("  issue: {issue}");
+    }
+}
+
+pub(crate) fn print_nsld_object_plan_report(report: &NsldObjectPlanReport) {
+    println!("Nsld object plan");
+    println!("  manifest: {}", report.manifest);
+    println!("  ready: {}", report.ready);
+    println!("  target_arch: {}", report.target_arch);
+    println!("  target_os: {}", report.target_os);
+    println!("  object_format: {}", report.object_format);
+    println!("  calling_abi: {}", report.calling_abi);
+    println!("  clang_target: {}", report.clang_target);
+    println!("  output_path: {}", report.output_path);
+    println!("  source_container_path: {}", report.source_container_path);
+    println!("  source_payload_path: {}", report.source_payload_path);
+    println!("  section_count: {}", report.section_count);
+    println!("  section_table_hash: {}", report.section_table_hash);
+    println!("  object_plan_hash: {}", report.object_plan_hash);
+    println!("  emission_status: {}", report.emission_status);
+    for section in &report.object_sections {
+        println!(
+            "  object_section: index={} source={} kind={} object={} role={} offset_seed={} hash={}",
+            section.order_index,
+            section.source_section_id,
+            section.source_section_kind,
+            section.object_section_name,
+            section.object_section_role,
+            section.payload_offset_seed,
+            section.source_hash
+        );
+    }
+    for blocker in &report.blockers {
+        println!("  blocker: {blocker}");
+    }
+}
+
+pub(crate) fn print_nsld_object_plan_emit_report(report: &NsldObjectPlanEmitReport) {
+    println!("Nsld object plan emit");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  ready: {}", report.ready);
+    println!("  object_plan_hash: {}", report.object_plan_hash);
+    println!("  section_count: {}", report.section_count);
+}
+
+pub(crate) fn print_nsld_object_plan_verify_report(report: &NsldObjectPlanVerifyReport) {
+    println!("Nsld object plan verify");
+    println!("  manifest: {}", report.manifest);
+    println!("  input_path: {}", report.input_path);
+    println!("  valid: {}", report.valid);
+    println!(
+        "  expected_object_plan_hash: {}",
+        report.expected_object_plan_hash
+    );
+    println!(
+        "  expected_section_count: {}",
+        report.expected_section_count
+    );
+    println!(
+        "  actual_object_plan_hash: {}",
+        report
+            .actual_object_plan_hash
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_section_count: {}",
+        optional_usize_text(report.actual_section_count)
     );
     for issue in &report.issues {
         println!("  issue: {issue}");
