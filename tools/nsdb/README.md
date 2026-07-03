@@ -1,0 +1,38 @@
+# Nsdb
+
+`nsdb` is the Nuis YIR-level debugger metadata front-door.
+
+It is currently a compact CLI prototype over linker/YIR metadata inspection.
+Native debuggers may still attach to the host shell binary, but `nsdb` owns the
+Nuis semantic debug view: YIR domains, clock edges, data segments, lowering
+units, sidecars, and future GLM/runtime state views.
+
+## Boundary
+
+The long-term shape is:
+
+```text
+nsdb core capability -> CLI adapter
+```
+
+The CLI is a front door, not the durable debugger protocol.
+
+## Core Responsibilities
+
+Future `nsdb-core` or equivalent galaxy-style capability should own:
+
+* YIR debug metadata loading and validation
+* timestamped event and clock-edge views
+* YIR frame, slot, symbol, and value mapping
+* heterogeneous node traces and semantic replay queries
+* GLM and memory-state inspection surfaces when those contracts are ready
+
+The CLI should format those capabilities for humans and scripts, but it should
+not be the only way to access them.
+
+## Current Alpha Rule
+
+When adding debugger behavior, prefer structured metadata and query-shaped
+helpers before terminal formatting. This keeps `nsdb` usable later from IDE
+surfaces, `yalivia`, future Nuis OS debugging shells, and automated verifier
+flows without pretending that command-line text is the protocol.

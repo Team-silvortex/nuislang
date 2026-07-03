@@ -31,9 +31,8 @@ Current runnable CLI frontdoor:
 * `cli_cat_demo` now turns that same host bridge into a minimal practical
   file-to-stdout CLI, so the tooling lane now has a tiny real text utility
 * `cli_wc_demo` now adds a first performance-oriented text/file stats seed over
-  the same host bridge, currently anchored on byte count plus text-bridge
-  length verification while general synchronous scan loops are still being
-  tightened in lowering
+  the same host bridge, currently anchored on byte count, text length, ASCII
+  line count, ASCII word count, and scan timing
 * `cli_session_demo` and `cli_report_session_demo` now also fit the same launch
   path, while still representing the interactive/session-oriented lane
 * `workflow_runtime_demo` now fits the same launch path as the workflow-shaped
@@ -134,6 +133,8 @@ Short rule:
   [text_json_demo](text_json_demo),
   [text_format_runtime_demo](text_format_runtime_demo),
   [diagnostic_runtime_demo](diagnostic_runtime_demo)
+  as the lower-level text/json/format probes that now include generated text
+  length, line-count, and word-count observation
 * result and error surfaces:
   [error_runtime_demo](error_runtime_demo),
   [result_runtime_demo](result_runtime_demo),

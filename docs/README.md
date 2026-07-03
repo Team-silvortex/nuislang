@@ -22,6 +22,7 @@ There is also a practical split inside the current tree:
 If you want to understand the repository as it exists today, start here:
 
 * [current-mainline-map.md](current-mainline-map.md)
+* [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
 * [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
 * [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
 * [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
@@ -34,16 +35,16 @@ If you want to understand the repository as it exists today, start here:
 * [repo-layout.md](repo-layout.md)
 
 If your immediate question is “what is the canonical compile route today?”,
-start with the `alpha-0.6.*` mainline entry, then the frontdoor/native artifact
+start with the `alpha-0.7.*` mainline entry, then the std/frontdoor/native artifact
 reference pair before drilling into deeper reference material.
 
 If your immediate question is “which docs are current, which are predecessor
-anchors, and what wording is safe?”, read the `alpha-0.6.*` mainline entry
+anchors, and what wording is safe?”, read the `alpha-0.7.*` mainline entry
 first, then the `alpha-0.4.*` documentation sync baseline before editing broad
 docs.
 
 If your immediate question is “what is the current minor-line history anchor?”,
-start with the `alpha-0.6.*` mainline entry, then use the `alpha-0.4.*`
+start with the `alpha-0.7.*` mainline entry, then use the `alpha-0.4.*`
 inventory and hardening plan as baseline context. Use `alpha-0.1.*`, `0.20.*`,
 and `0.19.*` only when you intentionally need predecessor lines.
 

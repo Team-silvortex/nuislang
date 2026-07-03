@@ -8,6 +8,10 @@ contract logic in `nuisc::linker`. It does not yet claim to be the final
 self-owned object linker. Its job is to give linker work a stable tool
 boundary before the implementation is split out further.
 
+Longer-term, `Nsld` should be read as a CLI adapter over a future reusable
+linker core / galaxy capability boundary, not as a CLI-only tool. See
+[toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md).
+
 ## Current Role
 
 `Nsld` currently owns:
@@ -26,6 +30,7 @@ boundary before the implementation is split out further.
 * replacement of the host toolchain wrapper
 * binary section assembly independent from `nuisc`
 * stable linker script or relocation formats
+* finished `nsld-core` galaxy-style API for direct compiler/runtime consumers
 
 ## Commands
 

@@ -170,7 +170,7 @@ Demotion rule:
 
 ## Next Mainline Work
 
-The best next work before `alpha-0.7.0` is:
+The best next work during `alpha-0.7.*` is:
 
 1. tighten artifact-to-runtime execution probes around YIR sidecars and
    host-consumable domain units

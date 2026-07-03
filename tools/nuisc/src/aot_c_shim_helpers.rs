@@ -203,6 +203,8 @@ pub(crate) fn render_registered_host_ffi_body(
         "host_env_get" => ("nuis_host_env_get", 1),
         "host_text_handle" => ("nuis_host_text_handle", 1),
         "host_text_len" => ("nuis_host_text_len_value", 1),
+        "host_text_line_count" => ("nuis_host_text_line_count", 1),
+        "host_text_word_count" => ("nuis_host_text_word_count", 1),
         "host_text_concat" => ("nuis_host_text_concat", 2),
         "host_serialize_text_into" => ("nuis_host_serialize_text_into", 3),
         "host_serialize_i64_into" => ("nuis_host_serialize_i64_into", 3),

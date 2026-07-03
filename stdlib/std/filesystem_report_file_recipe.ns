@@ -14,6 +14,8 @@ mod cpu Main {
   extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
 
   struct FilesystemReportFileSeed {
     base_path_handle: i64,
@@ -46,6 +48,8 @@ mod cpu Main {
     source_close_code: i64,
     report_handle: i64,
     report_len: i64,
+    report_lines: i64,
+    report_words: i64,
     output_path_handle: i64,
     output_file_handle: i64,
     write_code: i64,
@@ -135,6 +139,8 @@ mod cpu Main {
       source_close_code: source_close_code,
       report_handle: report_handle,
       report_len: host_text_measure(report_handle),
+      report_lines: host_text_line_count(report_handle),
+      report_words: host_text_word_count(report_handle),
       output_path_handle: output_path_handle,
       output_file_handle: output_file_handle,
       write_code: write_code,
@@ -158,6 +164,8 @@ mod cpu Main {
       + summary.source_close_code
       + summary.report_handle
       + summary.report_len
+      + summary.report_lines
+      + summary.report_words
       + summary.output_path_handle
       + summary.output_file_handle
       + summary.write_code

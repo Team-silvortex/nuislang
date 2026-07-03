@@ -1,3 +1,7 @@
+use cpu StdFsContracts;
+use cpu StdIoContracts;
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_fs_exists(path_handle: i64) -> i64;
@@ -48,13 +52,18 @@ mod cpu Main {
     let size: i64 = host_fs_size(seed.base_path_handle);
     let json_pair_len: i64 = host_json_pair_len(seed.key_handle, seed.value_handle);
     let json_object_len: i64 = host_json_object_len(2);
+    let json_len: i64 = StdTextContracts.json_shape_total(
+      json_pair_len,
+      0,
+      json_object_len
+    );
     let diag_label: i64 = host_diag_label(seed.label_handle);
     let diag_span: i64 = host_diag_span(0, joined_len);
     return ReportSummary {
       joined_len: joined_len,
       exists: exists,
       size: size,
-      json_len: json_pair_len + json_object_len,
+      json_len: json_len,
       diag_code: host_diag_emit(diag_label, diag_span, 1),
       stdout_code: host_stdout_write(seed.label_handle)
     };
@@ -75,12 +84,11 @@ mod cpu Main {
       value_handle
     );
     let summary: ReportSummary = summarize_report(seed);
-    return summary.joined_len
-      + summary.exists
-      + summary.size
+    return StdFsContracts.host_fs_value_or_zero(summary.joined_len)
+      + StdFsContracts.metadata_status_total(summary.exists, 0, summary.size)
       + summary.json_len
       + summary.diag_code
-      + summary.stdout_code;
+      + StdIoContracts.byte_count_or_zero(summary.stdout_code);
   }
 
   fn main() {

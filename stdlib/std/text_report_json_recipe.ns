@@ -5,6 +5,8 @@ mod cpu Main {
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
   extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
   extern "c" fn host_json_array_len(item_count: i64) -> i64;
   extern "c" fn host_json_object_len(field_count: i64) -> i64;
@@ -34,6 +36,8 @@ mod cpu Main {
     report_len: i64,
     report_concat_len: i64,
     report_measured_len: i64,
+    report_lines: i64,
+    report_words: i64,
     pair_len: i64,
     array_len: i64,
     object_len: i64,
@@ -119,6 +123,8 @@ mod cpu Main {
       report_len: report_len,
       report_concat_len: report_concat_len,
       report_measured_len: report_len,
+      report_lines: host_text_line_count(report_handle),
+      report_words: host_text_word_count(report_handle),
       pair_len: pair_len,
       array_len: array_len,
       object_len: object_len,
@@ -170,6 +176,8 @@ mod cpu Main {
       + summary.report_len
       + summary.report_concat_len
       + summary.report_measured_len
+      + summary.report_lines
+      + summary.report_words
       + summary.pair_len
       + summary.array_len
       + summary.object_len

@@ -4,6 +4,8 @@ use cpu StdTextContracts;
 mod cpu Main {
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
   extern "c" fn host_stderr_write(text_handle: i64) -> i64;
   extern "c" fn host_stdout_flush() -> i64;
@@ -24,6 +26,8 @@ mod cpu Main {
   struct IoReportSummary {
     report_handle: i64,
     report_len: i64,
+    report_lines: i64,
+    report_words: i64,
     stdout_written: i64,
     stderr_written: i64,
     stdout_flushed: i64,
@@ -69,6 +73,8 @@ mod cpu Main {
     return IoReportSummary {
       report_handle: report_handle,
       report_len: host_text_measure(report_handle),
+      report_lines: host_text_line_count(report_handle),
+      report_words: host_text_word_count(report_handle),
       stdout_written: host_stdout_write(report_handle),
       stderr_written: host_stderr_write(report_handle),
       stdout_flushed: host_stdout_flush(),
@@ -101,6 +107,8 @@ mod cpu Main {
     );
     return summary.report_handle
       + summary.report_len
+      + summary.report_lines
+      + summary.report_words
       + summary.stdout_written
       + summary.stderr_written
       + summary.stdout_flushed

@@ -88,6 +88,40 @@ Short rule:
   `build -> artifact-doctor -> run-artifact`
 * probe-style recipes are still current, but should not be mistaken for the
   default user-facing CLI frontdoor
+* text observation recipes now include reusable length, concat, line-count, and
+  word-count probes before feeding report/JSON shaping
+* text pipeline probes now attach those statistics to the generated pipeline
+  handle itself, not a detached sample literal
+* format runtime probes now apply the same text statistics to generated pair
+  handles, not only to report handles
+* text+JSON probes now keep computed/measured length consistency alongside
+  line-count and word-count statistics for merged text handles
+* JSON runtime and report runtime recipes reuse the standard JSON shape helper
+  instead of scoring pair/array/object lengths ad hoc
+* report runtime recipes now keep filesystem, JSON, and stdout scoring routed
+  through their own std contracts before combining the report summary
+* IO runtime and terminal IO recipes now reuse the standard console/terminal
+  status helpers instead of adding write/read/TTY probes ad hoc
+* CLI session and report-session recipes now combine session progress through
+  `StdCliContracts` and console status through `StdIoContracts`
+* command text and shell session probes now observe generated argv/env command
+  text with the same length, line-count, and word-count helpers
+* report builder probes now apply those text statistics to generated report
+  handles, not only to source literals
+* report+JSON probes preserve the same generated-report statistics while also
+  validating JSON shape and text length consistency
+* benchmark report probes reuse the same generated-report statistics without
+  folding text concerns into the time contract itself
+* count-aware benchmark reports keep the same generated-report statistics while
+  varying the active sample window
+* file-output benchmark reports keep the same generated-report statistics while
+  validating filesystem write/close behavior separately
+* IO and filesystem IO reports reuse the same generated-report statistics while
+  leaving console and filesystem validation in their own contracts
+* time reports reuse the same generated-report statistics while preserving the
+  time sample contract as a separate concern
+* filesystem report recipes also expose generated-report statistics even when
+  they are recipe-only rather than project-frontdoor entries
 
 ## Current Authoring Shape
 

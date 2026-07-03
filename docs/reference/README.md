@@ -14,6 +14,7 @@ task/pointer rules?", read:
 If you want a short current phase summary before drilling into individual
 contracts, start with:
 
+* [../versioning/nuis-alpha-0.7-mainline-entry.md](../../docs/versioning/nuis-alpha-0.7-mainline-entry.md)
 * [../versioning/nuis-alpha-0.6-mainline-entry.md](../../docs/versioning/nuis-alpha-0.6-mainline-entry.md)
 * [../versioning/nuis-alpha-0.4-system-inventory.md](../../docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * [../versioning/nuis-alpha-0.4-doc-sync-inventory.md](../../docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
@@ -28,6 +29,7 @@ Start in this order:
   - [yir-tools-reference.md](yir-tools-reference.md)
   - [nuis-binary-format-protocol.md](nuis-binary-format-protocol.md)
   - [nuis-native-artifact-workflow.md](nuis-native-artifact-workflow.md)
+  - [toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md)
   - [nsld-linker-frontdoor.md](nsld-linker-frontdoor.md)
   - [nsdb-yir-debugger-frontdoor.md](nsdb-yir-debugger-frontdoor.md)
 * `NIR` safety boundary
@@ -80,6 +82,10 @@ frontdoor?”, start with
 If your question is specifically “how should Nuis debugging work above native
 LLDB-style shell debugging?”, start with
 [nsdb-yir-debugger-frontdoor.md](nsdb-yir-debugger-frontdoor.md).
+
+If your question is specifically “should linker/debugger capabilities be CLI
+commands or reusable galaxy-style toolchain APIs?”, start with
+[toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md).
 
 If your question is specifically “which `nuis` frontdoor fields should I read
 or consume right now?”, start with

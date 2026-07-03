@@ -4,7 +4,7 @@ This file is the short current-state anchor for the `alpha-0.4.*` line.
 
 It is not a broad feature wishlist.
 
-It is the working rule for the stretch before `alpha-0.7.0`:
+It remains the working rule for the `alpha-0.7.*` hardening stretch:
 
 `make the existing system harder to break, easier to prove, and more useful before opening large new fronts`
 
@@ -23,7 +23,7 @@ Short rule:
 
 `alpha-0.4.*` is where existing pieces should start feeling like one toolchain instead of many promising islands`
 
-## Mainline Priority Before `alpha-0.7.0`
+## Mainline Priority During `alpha-0.7.*`
 
 The main task is to improve what already exists.
 

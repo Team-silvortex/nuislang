@@ -12,10 +12,18 @@ Current scope:
   constant baseline, deserialize-text bridge, number-to-text bridge,
   text concat bridge, and the bridge-backed scan seed
 
-This is intentionally not a full `wc` yet.
+This is intentionally still a compact `wc` seed, but it now performs a real
+single-buffer ASCII scan for:
 
-The missing `lines/words` scan is currently blocked more by synchronous loop
-lowering shape limits than by runtime surface coverage.
+* `bytes`
+* `text_len`
+* `lines`
+* `words`
+* `scan_ns`
+
+The scan treats space, tab, newline, and carriage return as word separators.
+Unicode-aware tokenization is intentionally left to the future text layer rather
+than hidden inside this CLI smoke demo.
 
 Quick compare:
 
@@ -39,7 +47,7 @@ actually starts:
 * `bridge`: deserialize-text bridge cost
 * `number_text`: integer render + text handle path
 * `concat`: text concat + text handle path
-* `scan`: bridge plus the current tiny stats seed
+* `scan`: bridge plus the current tiny ASCII line/word stats seed
 
 Current caveat:
 

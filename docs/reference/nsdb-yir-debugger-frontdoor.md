@@ -6,6 +6,10 @@ It is intentionally not an `lldb` clone. Native debuggers can still attach to
 the host executable shell when the final binary is Mach-O, PE, or ELF, but that
 view is expected to be low-level and incomplete for Nuis semantics.
 
+Longer-term, `Nsdb` should be read as a CLI adapter over a future reusable
+YIR-debug core / galaxy capability boundary, not as a CLI-only tool. See
+[toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md).
+
 `Nsdb` should instead consume the metadata that `Nsld` organizes:
 
 * domain units

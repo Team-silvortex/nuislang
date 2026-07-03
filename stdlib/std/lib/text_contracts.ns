@@ -90,6 +90,24 @@ mod cpu StdTextContracts {
       + text_value_or_zero(pair_len);
   }
 
+  /// Returns true when text statistics are usable non-negative probes.
+  pub fn text_stats_ready(text_len: i64, line_count: i64, word_count: i64) -> bool {
+    if text_len < 0 {
+      return false;
+    }
+    if line_count < 0 {
+      return false;
+    }
+    return word_count >= 0;
+  }
+
+  /// Combines text length, line count, and word count into a compact score.
+  pub fn text_stats_total(text_len: i64, line_count: i64, word_count: i64) -> i64 {
+    return text_value_or_zero(text_len)
+      + text_value_or_zero(line_count)
+      + text_value_or_zero(word_count);
+  }
+
   /// Combines report handle/length probes into a compact report score.
   pub fn report_status_total(report_handle: i64, report_len: i64) -> i64 {
     return text_value_or_zero(report_handle) + text_value_or_zero(report_len);
@@ -134,6 +152,8 @@ mod cpu StdTextContracts {
     pair_len: i64,
     pipeline_handle: i64,
     pipeline_len: i64,
+    pipeline_lines: i64,
+    pipeline_words: i64,
     json_pair_len: i64,
     json_array_len: i64,
     json_object_len: i64
@@ -143,6 +163,7 @@ mod cpu StdTextContracts {
       + text_value_or_zero(chained_handle)
       + format_status_total(single_handle, pair_handle, pair_len)
       + report_status_total(pipeline_handle, pipeline_len)
+      + text_stats_total(pipeline_len, pipeline_lines, pipeline_words)
       + json_shape_total(json_pair_len, json_array_len, json_object_len);
   }
 }

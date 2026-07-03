@@ -4293,6 +4293,8 @@ fn c_shim_source_includes_native_serialization_hooks() {
     };
     let shim = c_shim_source(&ast);
     assert!(shim.contains("static int64_t nuis_host_serialize_text_into("));
+    assert!(shim.contains("static int64_t nuis_host_text_line_count("));
+    assert!(shim.contains("static int64_t nuis_host_text_word_count("));
     assert!(shim.contains("static int64_t nuis_host_serialize_i64_into("));
     assert!(shim.contains("static int64_t nuis_host_serialize_bool_into("));
     assert!(shim.contains("static int64_t nuis_host_serialize_byte_into("));

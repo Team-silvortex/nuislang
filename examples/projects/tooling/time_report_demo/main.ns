@@ -8,6 +8,8 @@ mod cpu Main {
   extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
   extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
   extern "c" fn host_json_object_len(field_count: i64) -> i64;
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
@@ -23,6 +25,8 @@ mod cpu Main {
     status_line_len: i64,
     report_handle: i64,
     report_len: i64,
+    report_lines: i64,
+    report_words: i64,
     pair_len: i64,
     object_len: i64,
     stdout_written: i64,
@@ -77,6 +81,8 @@ mod cpu Main {
       status_line_len: host_text_measure(status_line_handle),
       report_handle: report_handle,
       report_len: report_len,
+      report_lines: host_text_line_count(report_handle),
+      report_words: host_text_word_count(report_handle),
       pair_len: host_json_pair_len(1601, 1602),
       object_len: host_json_object_len(3),
       stdout_written: stdout_written,
@@ -96,10 +102,22 @@ mod cpu Main {
       + StdTextContracts.text_value_or_zero(summary.status_line_handle)
       + StdTextContracts.text_value_or_zero(summary.status_line_len)
       + StdTextContracts.report_status_total(summary.report_handle, summary.report_len)
+      + StdTextContracts.text_stats_total(
+        summary.report_len,
+        summary.report_lines,
+        summary.report_words
+      )
       + StdTextContracts.json_shape_total(summary.pair_len, 0, summary.object_len)
       + StdIoContracts.write_flush_exit_code(summary.stdout_written, summary.stdout_flushed)
       + summary.validation_total;
     if summary.validation_total < 4 {
+      return StdTimeContracts.time_error();
+    }
+    if !StdTextContracts.text_stats_ready(
+      summary.report_len,
+      summary.report_lines,
+      summary.report_words
+    ) {
       return StdTimeContracts.time_error();
     }
     if total > 0 {

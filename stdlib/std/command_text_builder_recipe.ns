@@ -1,5 +1,10 @@
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
 
   struct CommandTextSeed {
     command_handle: i64,
@@ -14,8 +19,17 @@ mod cpu Main {
 
   struct CommandTextSummary {
     argv_tail_handle: i64,
+    argv_tail_len: i64,
+    argv_tail_lines: i64,
+    argv_tail_words: i64,
     env_prefix_handle: i64,
-    combined_shell_handle: i64
+    env_prefix_len: i64,
+    env_prefix_lines: i64,
+    env_prefix_words: i64,
+    combined_shell_handle: i64,
+    combined_shell_len: i64,
+    combined_shell_lines: i64,
+    combined_shell_words: i64
   }
 
   fn build_seed(
@@ -70,8 +84,17 @@ mod cpu Main {
     let combined_shell_handle: i64 = host_text_concat(shell_command, argv_tail_handle);
     return CommandTextSummary {
       argv_tail_handle: argv_tail_handle,
+      argv_tail_len: host_text_measure(argv_tail_handle),
+      argv_tail_lines: host_text_line_count(argv_tail_handle),
+      argv_tail_words: host_text_word_count(argv_tail_handle),
       env_prefix_handle: env_prefix_handle,
-      combined_shell_handle: combined_shell_handle
+      env_prefix_len: host_text_measure(env_prefix_handle),
+      env_prefix_lines: host_text_line_count(env_prefix_handle),
+      env_prefix_words: host_text_word_count(env_prefix_handle),
+      combined_shell_handle: combined_shell_handle,
+      combined_shell_len: host_text_measure(combined_shell_handle),
+      combined_shell_lines: host_text_line_count(combined_shell_handle),
+      combined_shell_words: host_text_word_count(combined_shell_handle)
     };
   }
 
@@ -96,7 +119,24 @@ mod cpu Main {
       equals_handle
     );
     let summary: CommandTextSummary = summarize_runtime(seed);
-    return summary.argv_tail_handle + summary.env_prefix_handle + summary.combined_shell_handle;
+    return summary.argv_tail_handle
+      + StdTextContracts.text_stats_total(
+        summary.argv_tail_len,
+        summary.argv_tail_lines,
+        summary.argv_tail_words
+      )
+      + summary.env_prefix_handle
+      + StdTextContracts.text_stats_total(
+        summary.env_prefix_len,
+        summary.env_prefix_lines,
+        summary.env_prefix_words
+      )
+      + summary.combined_shell_handle
+      + StdTextContracts.text_stats_total(
+        summary.combined_shell_len,
+        summary.combined_shell_lines,
+        summary.combined_shell_words
+      );
   }
 
   fn main() {

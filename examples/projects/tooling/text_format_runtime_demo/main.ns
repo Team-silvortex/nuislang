@@ -4,14 +4,20 @@ mod cpu Main {
   extern "c" fn host_text_format_i64(pattern_handle: i64, value: i64) -> i64;
   extern "c" fn host_text_format_pair(pattern_handle: i64, lhs: i64, rhs: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
 
   struct TextFormatRuntimeProjectSummary {
     primary_single_handle: i64,
     primary_pair_handle: i64,
     primary_pair_len: i64,
+    primary_pair_lines: i64,
+    primary_pair_words: i64,
     secondary_single_handle: i64,
     secondary_pair_handle: i64,
-    secondary_pair_len: i64
+    secondary_pair_len: i64,
+    secondary_pair_lines: i64,
+    secondary_pair_words: i64
   }
 
   fn capture_text_format_runtime_project() -> TextFormatRuntimeProjectSummary {
@@ -21,9 +27,13 @@ mod cpu Main {
       primary_single_handle: host_text_format_i64(811, 13),
       primary_pair_handle: primary_pair_handle,
       primary_pair_len: host_text_measure(primary_pair_handle),
+      primary_pair_lines: host_text_line_count(primary_pair_handle),
+      primary_pair_words: host_text_word_count(primary_pair_handle),
       secondary_single_handle: host_text_format_i64(907, 34),
       secondary_pair_handle: secondary_pair_handle,
-      secondary_pair_len: host_text_measure(secondary_pair_handle)
+      secondary_pair_len: host_text_measure(secondary_pair_handle),
+      secondary_pair_lines: host_text_line_count(secondary_pair_handle),
+      secondary_pair_words: host_text_word_count(secondary_pair_handle)
     };
   }
 
@@ -33,11 +43,33 @@ mod cpu Main {
       summary.primary_single_handle,
       summary.primary_pair_handle,
       summary.primary_pair_len
+    ) + StdTextContracts.text_stats_total(
+      summary.primary_pair_len,
+      summary.primary_pair_lines,
+      summary.primary_pair_words
     ) + StdTextContracts.format_status_total(
       summary.secondary_single_handle,
       summary.secondary_pair_handle,
       summary.secondary_pair_len
+    ) + StdTextContracts.text_stats_total(
+      summary.secondary_pair_len,
+      summary.secondary_pair_lines,
+      summary.secondary_pair_words
     );
+    if !StdTextContracts.text_stats_ready(
+      summary.primary_pair_len,
+      summary.primary_pair_lines,
+      summary.primary_pair_words
+    ) {
+      return StdTextContracts.text_error();
+    }
+    if !StdTextContracts.text_stats_ready(
+      summary.secondary_pair_len,
+      summary.secondary_pair_lines,
+      summary.secondary_pair_words
+    ) {
+      return StdTextContracts.text_error();
+    }
     if total > 0 {
       return StdTextContracts.text_ok();
     }

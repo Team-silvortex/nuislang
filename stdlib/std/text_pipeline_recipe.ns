@@ -3,6 +3,8 @@ mod cpu Main {
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
   extern "c" fn host_text_format_i64(pattern_handle: i64, value: i64) -> i64;
   extern "c" fn host_text_format_pair(pattern_handle: i64, lhs: i64, rhs: i64) -> i64;
   extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
@@ -31,6 +33,8 @@ mod cpu Main {
     primary_pair_len: i64,
     pipeline_handle: i64,
     pipeline_len: i64,
+    pipeline_lines: i64,
+    pipeline_words: i64,
     pair_len: i64,
     array_len: i64,
     object_len: i64
@@ -81,6 +85,8 @@ mod cpu Main {
       primary_pair_len: primary_pair_len,
       pipeline_handle: pipeline_handle,
       pipeline_len: host_text_measure(pipeline_handle),
+      pipeline_lines: host_text_line_count(pipeline_handle),
+      pipeline_words: host_text_word_count(pipeline_handle),
       pair_len: host_json_pair_len(seed.key_handle, primary_single_handle),
       array_len: host_json_array_len(seed.item_count),
       object_len: host_json_object_len(seed.field_count)
@@ -118,6 +124,8 @@ mod cpu Main {
       + summary.primary_pair_len
       + summary.pipeline_handle
       + summary.pipeline_len
+      + summary.pipeline_lines
+      + summary.pipeline_words
       + summary.pair_len
       + summary.array_len
       + summary.object_len;

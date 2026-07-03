@@ -26,10 +26,14 @@ mod cpu Main {
     offset: i64,
     len: i64
   ) -> i64;
+  extern "c" fn host_text_line_count(text_handle: String) -> i64;
+  extern "c" fn host_text_word_count(text_handle: String) -> i64;
 
   struct WcSummary {
     byte_count: i64,
     text_len: i64,
+    line_count: i64,
+    word_count: i64,
     scan_ns: i64
   }
 
@@ -64,6 +68,8 @@ mod cpu Main {
     return WcSummary {
       byte_count: byte_count,
       text_len: text_len(restored),
+      line_count: host_text_line_count(restored),
+      word_count: host_text_word_count(restored),
       scan_ns: 0
     };
   }
@@ -77,9 +83,13 @@ mod cpu Main {
   fn summary_text(summary: WcSummary) -> i64 {
     let bytes_line: i64 = kv_line(text_from_literal("bytes"), text_i64(summary.byte_count));
     let text_len_line: i64 = kv_line(text_from_literal("text_len"), text_i64(summary.text_len));
+    let lines_line: i64 = kv_line(text_from_literal("lines"), text_i64(summary.line_count));
+    let words_line: i64 = kv_line(text_from_literal("words"), text_i64(summary.word_count));
     let scan_line: i64 = kv_line(text_from_literal("scan_ns"), text_i64(summary.scan_ns));
     let with_text_len: i64 = host_text_concat(bytes_line, text_len_line);
-    return host_text_concat(with_text_len, scan_line);
+    let with_lines: i64 = host_text_concat(with_text_len, lines_line);
+    let with_words: i64 = host_text_concat(with_lines, words_line);
+    return host_text_concat(with_words, scan_line);
   }
 
   fn emit_usage() -> i64 {
@@ -112,6 +122,8 @@ mod cpu Main {
     let summary: WcSummary = WcSummary {
       byte_count: measured.byte_count,
       text_len: measured.text_len,
+      line_count: measured.line_count,
+      word_count: measured.word_count,
       scan_ns: ended_ns - started_ns
     };
     let wrote: i64 = host_stdout_write(summary_text(summary));
@@ -162,7 +174,7 @@ mod cpu Main {
       0
     );
     let summary: WcSummary = scan_counts(buffer, written);
-    return summary.byte_count + summary.text_len;
+    return summary.byte_count + summary.text_len + summary.line_count + summary.word_count;
   }
 
   fn main() -> i64 {

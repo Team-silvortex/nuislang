@@ -2,10 +2,18 @@ mod cpu Main {
   extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: String) -> i64;
+  extern "c" fn host_text_word_count(text_handle: String) -> i64;
 
   struct HostText {
     handle: i64,
     len: i64
+  }
+
+  struct HostTextStats {
+    text_len: i64,
+    line_count: i64,
+    word_count: i64
   }
 
   fn build_host_text(handle: i64) -> HostText {
@@ -15,12 +23,22 @@ mod cpu Main {
     };
   }
 
+  fn build_host_text_stats(text: String) -> HostTextStats {
+    return HostTextStats {
+      text_len: text_len(text),
+      line_count: host_text_line_count(text),
+      word_count: host_text_word_count(text)
+    };
+  }
+
   fn summarize_host_text(lhs_handle: i64, rhs_handle: i64) -> i64 {
     let lhs: HostText = build_host_text(lhs_handle);
     let rhs: HostText = build_host_text(rhs_handle);
     let merged_handle: i64 = host_text_concat(lhs.handle, rhs.handle);
     let merged_len: i64 = host_text_concat_len(lhs.handle, rhs.handle);
-    return lhs.len + rhs.len + merged_handle + merged_len;
+    let stats: HostTextStats = build_host_text_stats("alpha beta\ngamma delta\n");
+    return lhs.len + rhs.len + merged_handle + merged_len
+      + stats.text_len + stats.line_count + stats.word_count;
   }
 
   fn main() {

@@ -1,3 +1,5 @@
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
   extern "c" fn host_stderr_write(text_handle: i64) -> i64;
@@ -24,7 +26,12 @@ mod cpu Main {
 
   fn summarize_console(stdout_handle: i64, stderr_handle: i64) -> i64 {
     let status: IoStatus = write_console(stdout_handle, stderr_handle);
-    return status.stdout_written + status.stderr_written + status.stdout_flushed + status.stderr_flushed;
+    return StdIoContracts.console_status_total(
+      status.stdout_written,
+      status.stderr_written,
+      status.stdout_flushed,
+      status.stderr_flushed
+    );
   }
 
   fn main() {

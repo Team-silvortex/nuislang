@@ -3,6 +3,8 @@ use cpu StdTextContracts;
 mod cpu Main {
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
 
   struct TextReportBuilderProjectSummary {
     title_line_handle: i64,
@@ -13,6 +15,8 @@ mod cpu Main {
     status_line_len: i64,
     report_handle: i64,
     report_len: i64,
+    report_lines: i64,
+    report_words: i64,
     validation_total: i64
   }
 
@@ -53,6 +57,8 @@ mod cpu Main {
       status_line_len: host_text_measure(status_line_handle),
       report_handle: report_handle,
       report_len: report_len,
+      report_lines: host_text_line_count(report_handle),
+      report_words: host_text_word_count(report_handle),
       validation_total: StdTextContracts.report_validation_total(report_handle, report_len)
     };
   }
@@ -66,7 +72,19 @@ mod cpu Main {
       + StdTextContracts.text_value_or_zero(summary.status_line_handle)
       + StdTextContracts.text_value_or_zero(summary.status_line_len)
       + StdTextContracts.report_status_total(summary.report_handle, summary.report_len)
+      + StdTextContracts.text_stats_total(
+        summary.report_len,
+        summary.report_lines,
+        summary.report_words
+      )
       + summary.validation_total;
+    if !StdTextContracts.text_stats_ready(
+      summary.report_len,
+      summary.report_lines,
+      summary.report_words
+    ) {
+      return StdTextContracts.text_error();
+    }
     if summary.validation_total < 2 {
       return StdTextContracts.text_error();
     }

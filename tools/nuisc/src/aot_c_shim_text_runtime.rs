@@ -147,6 +147,40 @@ static int64_t nuis_host_text_len_value(int64_t handle) {
     return (int64_t)nuis_host_text_lookup_len(handle);
 }
 
+static int64_t nuis_host_text_line_count(int64_t handle) {
+    const char* text = nuis_host_text_lookup(handle);
+    size_t len = nuis_host_text_lookup_len(handle);
+    int64_t count = 0;
+    if (text == NULL) return 0;
+    for (size_t i = 0; i < len; i += 1) {
+        if (text[i] == '\n') {
+            count += 1;
+        }
+    }
+    return count;
+}
+
+static int nuis_host_text_is_ascii_ws(unsigned char ch) {
+    return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r';
+}
+
+static int64_t nuis_host_text_word_count(int64_t handle) {
+    const char* text = nuis_host_text_lookup(handle);
+    size_t len = nuis_host_text_lookup_len(handle);
+    int64_t count = 0;
+    int in_word = 0;
+    if (text == NULL) return 0;
+    for (size_t i = 0; i < len; i += 1) {
+        if (nuis_host_text_is_ascii_ws((unsigned char)text[i])) {
+            in_word = 0;
+        } else if (!in_word) {
+            count += 1;
+            in_word = 1;
+        }
+    }
+    return count;
+}
+
 static int64_t nuis_host_text_concat(int64_t lhs_handle, int64_t rhs_handle) {
     const char* lhs = nuis_host_text_lookup(lhs_handle);
     const char* rhs = nuis_host_text_lookup(rhs_handle);

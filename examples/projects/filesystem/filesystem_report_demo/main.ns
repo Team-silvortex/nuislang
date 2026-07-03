@@ -15,6 +15,8 @@ mod cpu Main {
   extern "c" fn host_file_close(file_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
 
   struct FilesystemReportProjectSummary {
     joined_len: i64,
@@ -33,7 +35,9 @@ mod cpu Main {
     file_line_handle: i64,
     file_line_len: i64,
     report_handle: i64,
-    report_len: i64
+    report_len: i64,
+    report_lines: i64,
+    report_words: i64
   }
 
   fn build_line_prefix(label_handle: i64, colon_handle: i64, space_handle: i64) -> i64 {
@@ -85,7 +89,9 @@ mod cpu Main {
       file_line_handle: file_line_handle,
       file_line_len: host_text_measure(file_line_handle),
       report_handle: report_handle,
-      report_len: host_text_measure(report_handle)
+      report_len: host_text_measure(report_handle),
+      report_lines: host_text_line_count(report_handle),
+      report_words: host_text_word_count(report_handle)
     };
   }
 
@@ -109,7 +115,19 @@ mod cpu Main {
       + StdTextContracts.text_value_or_zero(summary.joined_line_len)
       + StdTextContracts.text_value_or_zero(summary.file_line_handle)
       + StdTextContracts.text_value_or_zero(summary.file_line_len);
-    if total > 0 {
+    let text_total: i64 = StdTextContracts.text_stats_total(
+      summary.report_len,
+      summary.report_lines,
+      summary.report_words
+    );
+    if !StdTextContracts.text_stats_ready(
+      summary.report_len,
+      summary.report_lines,
+      summary.report_words
+    ) {
+      return StdFsContracts.fs_error();
+    }
+    if total + text_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

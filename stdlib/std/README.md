@@ -74,7 +74,7 @@ Use these as the primary cluster names when placing new work:
   - shortest lane route:
     `io_runtime_recipe -> terminal_io_recipe -> host_text_runtime_recipe -> text_format_runtime_recipe -> json_runtime_recipe -> text_pipeline_recipe -> text_report_builder_recipe -> io_report_recipe -> text_json_recipe`
   - current project smoke:
-    `io_runtime_demo -> terminal_io_demo -> io_report_demo -> filesystem_io_report_demo`
+    `io_runtime_demo -> terminal_io_demo -> host_text_runtime_demo -> text_pipeline_demo -> io_report_demo -> filesystem_io_report_demo`
 * task/runtime
   - local router:
     [task/README.md](task/README.md)
@@ -133,8 +133,9 @@ First auto-injectable library module:
   owned-transport lifecycle values, and session/task bridge totals
 * [lib/text_contracts.ns](lib/text_contracts.ns)
   exposes the initial `StdTextContracts` helper surface for normalizing text
-  handles, measured lengths, report readiness, formatted report probes, JSON
-  shape lengths, JSON/text consistency gates, and text pipeline summaries
+  handles, measured lengths, line/word statistics, report readiness, formatted
+  report probes, JSON shape lengths, JSON/text consistency gates, and text
+  pipeline summaries
 * [lib/time_contracts.ns](lib/time_contracts.ns)
   exposes the initial `StdTimeContracts` helper surface for normalizing wall
   time, monotonic time, sleep, clock-domain, benchmark span probes, and

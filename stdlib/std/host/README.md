@@ -127,6 +127,10 @@ Shortest grouped route:
   [benchmark_report_count_demo](../../../examples/projects/tooling/benchmark_report_count_demo),
   [benchmark_report_file_demo](../../../examples/projects/tooling/benchmark_report_file_demo)
 
+The current host text route covers handle length, concat, concat length, and
+the first reusable ASCII line/word statistic probes through
+`StdTextContracts.text_stats_*`.
+
 Wider grouped route:
 
 * stdin and tty probes:

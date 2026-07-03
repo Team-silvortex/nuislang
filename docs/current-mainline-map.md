@@ -7,24 +7,27 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `alpha-0.6.*` reading route, use this order:
+If you only need the shortest current `alpha-0.7.*` reading route, use this order:
 
-1. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
-2. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-3. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
-4. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-5. [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-6. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-7. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-8. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-9. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-10. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
-11. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
-12. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
-13. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
-14. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-15. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-16. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
+1. [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
+2. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
+3. [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md)
+4. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+5. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
+6. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
+7. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+8. [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
+9. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+10. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+11. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+12. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+13. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
+14. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
+15. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
+16. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
+17. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+18. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
+19. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
 
 Short rule:
 
@@ -34,7 +37,9 @@ Short rule:
 
 * repo status and current toolchain spine:
   [README.md](../README.md)
-* current `alpha-0.6.*` entry:
+* current `alpha-0.7.*` entry:
+  [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
+* predecessor `alpha-0.6.*` linker/std smoke entry:
   [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
 * `alpha-0.4.*` hardening baseline plan:
   [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
@@ -106,7 +111,8 @@ Use this section as a router, not as a full inventory.
 * frontdoor and native artifact closure:
   [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md),
   [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md),
-  [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+  [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md),
+  [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md)
   current native control-flow smoke gate:
   [artifact_cli.rs](../tools/nuisc/tests/artifact_cli.rs)
   current host-YIR runtime probe:

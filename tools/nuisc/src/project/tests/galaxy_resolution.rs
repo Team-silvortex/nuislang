@@ -137,12 +137,12 @@ mod cpu Main {
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=16\tdocumented_modules=15\tdocumented_items=215"));
+    assert!(docs_index.contains("summary\tmodules=16\tdocumented_modules=15\tdocumented_items=217"));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=34\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=215"
+        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=217"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -374,7 +374,7 @@ mod cpu Main {
         + StdFsContracts.filesystem_report_file_status_total(
           2, 3, 1, 2, 3, 4, 5, 0, 6, 7, 0, 8, 9, 10, 11, 0, 0
         )
-        + StdTextContracts.pipeline_status_total(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
+        + StdTextContracts.pipeline_status_total(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
         + StdTimeContracts.time_sample_total(100, 200, 300)
         + StdHeteroContracts.hetero_test_total(
           1,
@@ -1113,7 +1113,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=215"
+        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=217"
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

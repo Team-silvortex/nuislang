@@ -1,3 +1,6 @@
+use cpu StdCliContracts;
+use cpu StdIoContracts;
+
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_line_read(prompt_handle: i64) -> i64;
@@ -99,17 +102,20 @@ mod cpu Main {
       timeout_limit
     );
     let summary: CliSessionSummary = capture_cli_session(seed);
-    return summary.argv_count
-      + summary.line_handle
-      + summary.line_len
-      + summary.completed
-      + summary.timed_out
-      + summary.selected_value
-      + summary.stdout_code
-      + summary.stderr_code
-      + summary.stdout_flushed
-      + summary.stderr_flushed
-      + summary.tick_ns;
+    return StdCliContracts.cli_session_total(
+      summary.argv_count,
+      summary.line_handle,
+      summary.line_len,
+      summary.tick_ns,
+      summary.completed == 1,
+      summary.timed_out == 1
+    ) + summary.selected_value
+      + StdIoContracts.console_status_total(
+        summary.stdout_code,
+        summary.stderr_code,
+        summary.stdout_flushed,
+        summary.stderr_flushed
+      );
   }
 
   fn main() {

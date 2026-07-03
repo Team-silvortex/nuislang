@@ -4,7 +4,7 @@
 
 ## Current Status
 
-The repository is currently on the `alpha-0.6.*` line. It is still in an active
+The repository is currently on the `alpha-0.7.*` line. It is still in an active
 architecture-building stage, but the mainline is now expected to describe one
 connected toolchain rather than a pile of promising surfaces.
 
@@ -28,19 +28,21 @@ The key thing that is already real today is not “all language features are don
 
 That model is increasingly enforced through `YIR` contracts, project validation, per-domain `nustar` manifests, and verifier checks rather than only ad hoc frontend rules.
 
-The newest `alpha-0.6.*` emphasis is:
+The newest `alpha-0.7.*` emphasis is:
 
-* `nsld` as the named linker frontdoor over real build outputs, link plans,
-  clock/order metadata, closure reports, and self-checking link input tables
-* std filesystem and report examples that consume `StdFsContracts`,
-  `StdTextContracts`, `StdIoContracts`, and `StdTimeContracts` through
-  `std=workspace`
-* more examples promoted from raw probe totals to process-style `ok/error`
-  exits backed by `nuis build` and `run-artifact`
+* std-backed tooling demos as the default smoke surface across CLI, IO,
+  filesystem, text/JSON, time/benchmark, result/diagnostic, and hetero proxy
+  lanes
+* examples promoted from raw probe totals to contract-level `ok/error` exits
+  while still preserving report totals for inspection
+* continued linker/lowering pressure through `nsld`, native artifacts, and
+  heterogeneous closure metadata
 
 Current versioning entrypoints:
 
-* current `alpha-0.6.*` mainline entry:
+* current `alpha-0.7.*` mainline entry:
+  [docs/versioning/nuis-alpha-0.7-mainline-entry.md](docs/versioning/nuis-alpha-0.7-mainline-entry.md)
+* predecessor `alpha-0.6.*` linker/std smoke entry:
   [docs/versioning/nuis-alpha-0.6-mainline-entry.md](docs/versioning/nuis-alpha-0.6-mainline-entry.md)
 * current mainline router:
   [docs/current-mainline-map.md](docs/current-mainline-map.md)
@@ -74,10 +76,10 @@ Current versioning entrypoints:
   [docs/versioning/README.md](docs/versioning/README.md)
 
 If you want the current line first, start with
-[docs/versioning/nuis-alpha-0.6-mainline-entry.md](docs/versioning/nuis-alpha-0.6-mainline-entry.md),
+[docs/versioning/nuis-alpha-0.7-mainline-entry.md](docs/versioning/nuis-alpha-0.7-mainline-entry.md),
 then use [docs/current-mainline-map.md](docs/current-mainline-map.md)
 and
-[docs/reference/nsld-linker-frontdoor.md](docs/reference/nsld-linker-frontdoor.md).
+[docs/reference/std-mainline-layering-contract.md](docs/reference/std-mainline-layering-contract.md).
 For the hardening baseline behind that current line, use
 [docs/versioning/nuis-alpha-0.4-system-inventory.md](docs/versioning/nuis-alpha-0.4-system-inventory.md),
 [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
@@ -113,9 +115,13 @@ The visible workspace toolchain now includes:
 `nsld` is currently a separate tool boundary over `nuisc::linker`, not the
 finished self-owned object linker. The point of the split is to make linker
 ownership explicit before the implementation is fully extracted.
+Longer-term, `nsld` and `nsdb` should be CLI adapters over reusable
+galaxy-style core toolchain capabilities, not CLI-only command surfaces.
 
 Reference:
-[docs/reference/nsld-linker-frontdoor.md](docs/reference/nsld-linker-frontdoor.md)
+[docs/reference/nsld-linker-frontdoor.md](docs/reference/nsld-linker-frontdoor.md),
+[docs/reference/nsdb-yir-debugger-frontdoor.md](docs/reference/nsdb-yir-debugger-frontdoor.md),
+[docs/reference/toolchain-galaxy-core-boundary.md](docs/reference/toolchain-galaxy-core-boundary.md)
 
 ```text
 nuis     -> front-door workflow tool
@@ -207,7 +213,7 @@ Current workflow reading rule:
 * use [docs/current-mainline-map.md](docs/current-mainline-map.md)
   when you want the repo-wide current route
 * use
-  [docs/versioning/nuis-alpha-0.6-mainline-entry.md](docs/versioning/nuis-alpha-0.6-mainline-entry.md)
+  [docs/versioning/nuis-alpha-0.7-mainline-entry.md](docs/versioning/nuis-alpha-0.7-mainline-entry.md)
   when the question is whether a lane is already current, still active, or only
   an intentional alpha boundary
 * use
@@ -327,6 +333,7 @@ If you want the shortest path by goal:
 * consolidated current mainline map
   - [docs/current-mainline-map.md](docs/current-mainline-map.md)
 * current alpha line and hardening baseline
+  - [docs/versioning/nuis-alpha-0.7-mainline-entry.md](docs/versioning/nuis-alpha-0.7-mainline-entry.md)
   - [docs/versioning/nuis-alpha-0.6-mainline-entry.md](docs/versioning/nuis-alpha-0.6-mainline-entry.md)
   - [docs/versioning/nuis-alpha-0.4-system-inventory.md](docs/versioning/nuis-alpha-0.4-system-inventory.md)
   - [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)

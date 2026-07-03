@@ -42,9 +42,9 @@ If you only want the shortest route through this subtree, start with:
   as the core std filesystem contract probes,
   [file_output_demo](file_output_demo),
   [filesystem_report_demo](filesystem_report_demo)
-  as the filesystem/text std contract consumer,
+  as the filesystem/text generated-report stats consumer,
   [filesystem_report_file_demo](filesystem_report_file_demo)
-  as the std filesystem contract consumer
+  as the filesystem/text report-file stats consumer
 * directory and stat surfaces:
   [directory_runtime_demo](directory_runtime_demo),
   [directory_create_demo](directory_create_demo),

@@ -64,6 +64,22 @@ const TOOLING_PROJECTS: &[(&str, &str)] = &[
         "../../examples/projects/tooling/hetero_proxy_benchmark_demo",
     ),
     (
+        "host text runtime",
+        "../../examples/projects/tooling/host_text_runtime_demo",
+    ),
+    (
+        "text pipeline",
+        "../../examples/projects/tooling/text_pipeline_demo",
+    ),
+    (
+        "text report builder",
+        "../../examples/projects/tooling/text_report_builder_demo",
+    ),
+    (
+        "text report json",
+        "../../examples/projects/tooling/text_report_json_demo",
+    ),
+    (
         "cli pgm info",
         "../../examples/projects/tooling/cli_pgm_info_demo",
     ),

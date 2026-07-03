@@ -2,6 +2,8 @@ mod cpu Main {
   extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: String) -> i64;
+  extern "c" fn host_text_word_count(text_handle: String) -> i64;
 
   struct HostTextRecipeSeed {
     lhs_handle: i64,
@@ -14,17 +16,24 @@ mod cpu Main {
     rhs_len: i64,
     merged_handle: i64,
     merged_len: i64,
-    chained_handle: i64
+    chained_handle: i64,
+    sample_len: i64,
+    sample_lines: i64,
+    sample_words: i64
   }
 
   fn capture_host_text_recipe(seed: HostTextRecipeSeed) -> HostTextRecipeSummary {
     let merged_handle: i64 = host_text_concat(seed.lhs_handle, seed.rhs_handle);
+    let sample: String = "alpha beta\ngamma delta\n";
     return HostTextRecipeSummary {
       lhs_len: host_text_len(seed.lhs_handle),
       rhs_len: host_text_len(seed.rhs_handle),
       merged_handle: merged_handle,
       merged_len: host_text_concat_len(seed.lhs_handle, seed.rhs_handle),
-      chained_handle: host_text_concat(merged_handle, seed.tail_handle)
+      chained_handle: host_text_concat(merged_handle, seed.tail_handle),
+      sample_len: text_len(sample),
+      sample_lines: host_text_line_count(sample),
+      sample_words: host_text_word_count(sample)
     };
   }
 
@@ -38,7 +47,10 @@ mod cpu Main {
       + summary.rhs_len
       + summary.merged_handle
       + summary.merged_len
-      + summary.chained_handle;
+      + summary.chained_handle
+      + summary.sample_len
+      + summary.sample_lines
+      + summary.sample_words;
   }
 
   fn main() {

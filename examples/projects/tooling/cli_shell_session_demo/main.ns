@@ -1,11 +1,15 @@
 use cpu StdCliContracts;
 use cpu StdIoContracts;
+use cpu StdTextContracts;
 
 mod cpu Main {
   extern "c" fn host_argv_at(index: i64) -> i64;
   extern "c" fn host_line_read(prompt_handle: i64) -> i64;
   extern "c" fn host_line_len(line_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
   extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
   extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
   extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
@@ -20,7 +24,13 @@ mod cpu Main {
     line_handle: i64,
     line_len: i64,
     argv_tail_handle: i64,
+    argv_tail_len: i64,
+    argv_tail_lines: i64,
+    argv_tail_words: i64,
     env_prefix_handle: i64,
+    env_prefix_len: i64,
+    env_prefix_lines: i64,
+    env_prefix_words: i64,
     command_wait_exit: i64,
     child_join_exit: i64,
     stdout_code: i64,
@@ -52,7 +62,13 @@ mod cpu Main {
       line_handle: line_handle,
       line_len: line_len,
       argv_tail_handle: argv_tail_handle,
+      argv_tail_len: host_text_measure(argv_tail_handle),
+      argv_tail_lines: host_text_line_count(argv_tail_handle),
+      argv_tail_words: host_text_word_count(argv_tail_handle),
       env_prefix_handle: env_prefix_handle,
+      env_prefix_len: host_text_measure(env_prefix_handle),
+      env_prefix_lines: host_text_line_count(env_prefix_handle),
+      env_prefix_words: host_text_word_count(env_prefix_handle),
       command_wait_exit: host_command_wait_exit(command_handle),
       child_join_exit: host_subprocess_join_exit(child_handle),
       stdout_code: host_stdout_write(1901),
@@ -69,7 +85,17 @@ mod cpu Main {
     let total: i64 = summary.line_handle
       + summary.line_len
       + summary.argv_tail_handle
+      + StdTextContracts.text_stats_total(
+        summary.argv_tail_len,
+        summary.argv_tail_lines,
+        summary.argv_tail_words
+      )
       + summary.env_prefix_handle
+      + StdTextContracts.text_stats_total(
+        summary.env_prefix_len,
+        summary.env_prefix_lines,
+        summary.env_prefix_words
+      )
       + summary.command_wait_exit
       + summary.child_join_exit
       + summary.stdout_code
@@ -84,6 +110,20 @@ mod cpu Main {
       summary.stderr_flushed
     );
     if total > 0 && io_total > 0 {
+      if !StdTextContracts.text_stats_ready(
+        summary.argv_tail_len,
+        summary.argv_tail_lines,
+        summary.argv_tail_words
+      ) {
+        return StdCliContracts.cli_error();
+      }
+      if !StdTextContracts.text_stats_ready(
+        summary.env_prefix_len,
+        summary.env_prefix_lines,
+        summary.env_prefix_words
+      ) {
+        return StdCliContracts.cli_error();
+      }
       return StdCliContracts.success_exit_code(
         summary.command_wait_exit == 0 && summary.child_join_exit == 0
       );

@@ -1,7 +1,7 @@
 use nuisc::linker::{
     ArtifactLoweringAlignmentSummary, LinkPlan, LinkPlanArtifact, LinkPlanClockProtocol,
     LinkPlanCpuTarget, LinkPlanEnvelope, LinkPlanFinalStage, LinkPlanHeteroCalculate,
-    LinkPlanLifecycle,
+    LinkPlanHostFfiFootprint, LinkPlanHostFfiValidationSummary, LinkPlanLifecycle,
 };
 
 pub(crate) fn empty_link_plan() -> LinkPlan {
@@ -56,6 +56,21 @@ pub(crate) fn empty_link_plan() -> LinkPlan {
         bridge_registry_path: None,
         host_bridge_plan_index_path: None,
         lowering_plan_index_path: None,
+        host_ffi: LinkPlanHostFfiFootprint {
+            index_path: None,
+            symbol_count: 0,
+            policy_count: 0,
+            policy: "signature-whitelist-required".to_owned(),
+            abi_groups: Vec::new(),
+            entries: Vec::new(),
+            validation: LinkPlanHostFfiValidationSummary {
+                checked: 0,
+                valid: true,
+                link_allowed: true,
+                issues: Vec::new(),
+                notes: Vec::new(),
+            },
+        },
         domain_units: Vec::new(),
         artifact_lowering_alignment: ArtifactLoweringAlignmentSummary {
             checked: 0,

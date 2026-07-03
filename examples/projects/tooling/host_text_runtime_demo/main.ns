@@ -4,20 +4,29 @@ mod cpu Main {
   extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: String) -> i64;
+  extern "c" fn host_text_word_count(text_handle: String) -> i64;
 
   struct HostTextProjectSummary {
     lhs_len: i64,
     rhs_len: i64,
     merged_handle: i64,
-    merged_len: i64
+    merged_len: i64,
+    sample_len: i64,
+    sample_lines: i64,
+    sample_words: i64
   }
 
   fn capture_host_text_project(lhs_handle: i64, rhs_handle: i64) -> HostTextProjectSummary {
+    let sample: String = "alpha beta\ngamma delta\n";
     return HostTextProjectSummary {
       lhs_len: host_text_len(lhs_handle),
       rhs_len: host_text_len(rhs_handle),
       merged_handle: host_text_concat(lhs_handle, rhs_handle),
-      merged_len: host_text_concat_len(lhs_handle, rhs_handle)
+      merged_len: host_text_concat_len(lhs_handle, rhs_handle),
+      sample_len: text_len(sample),
+      sample_lines: host_text_line_count(sample),
+      sample_words: host_text_word_count(sample)
     };
   }
 
@@ -27,7 +36,19 @@ mod cpu Main {
       summary.lhs_len,
       summary.rhs_len,
       summary.merged_handle
-    ) + StdTextContracts.text_value_or_zero(summary.merged_len);
+    ) + StdTextContracts.text_value_or_zero(summary.merged_len)
+      + StdTextContracts.text_stats_total(
+        summary.sample_len,
+        summary.sample_lines,
+        summary.sample_words
+      );
+    if !StdTextContracts.text_stats_ready(
+      summary.sample_len,
+      summary.sample_lines,
+      summary.sample_words
+    ) {
+      return StdTextContracts.text_error();
+    }
     if total > 0 {
       return StdTextContracts.text_ok();
     }

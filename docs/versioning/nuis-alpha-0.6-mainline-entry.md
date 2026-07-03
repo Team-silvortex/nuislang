@@ -1,27 +1,28 @@
 # `nuis` `alpha-0.6.*` Mainline Entry
 
-This file is the current short entry point for the `alpha-0.6.*` line.
+This file is the predecessor short entry point for the `alpha-0.6.*` line.
 
 It does not replace the `alpha-0.4.*` inventory and hardening documents. Those
 remain the baseline for the current hardening philosophy. This file records what
-changed enough in `alpha-0.6.*` that first-read docs should no longer call
-`alpha-0.4.*` the current line.
+changed enough in `alpha-0.6.*` that first-read docs at the time stopped calling
+`alpha-0.4.*` the current line. Present-tense work should now start with the
+`alpha-0.7.*` entry.
 
 Short rule:
 
 `alpha-0.6.*` is where the toolchain starts naming linker ownership explicitly while std examples begin proving contract-backed CLI behavior.`
 
-## Current Line Shape
+## Line Shape
 
-Read the current line as:
+Read this predecessor line as:
 
 * `alpha-0.4.*` hardening baseline still applies
 * `alpha-0.6.*` adds the first dedicated Nsld linker frontdoor
 * std filesystem examples now include build/run-backed contract consumers
-* current docs should say `alpha-0.6.*` for present-tense work and link older
-  alpha docs as predecessor/baseline context
+* current docs should say `alpha-0.7.*` for present-tense work and link this
+  file as predecessor context
 
-## Current Front Doors
+## Predecessor Front Doors
 
 Start here:
 
@@ -35,7 +36,7 @@ Start here:
 
 ### Nsld
 
-`Nsld` is now the named linker toolchain member for current work.
+`Nsld` became the named linker toolchain member in this line.
 
 Current scope:
 
@@ -52,8 +53,8 @@ Reference:
 
 ### Std Contract Smoke
 
-The current std work has moved beyond source-only helpers for the filesystem
-lane.
+The std work moved beyond source-only helpers for the filesystem lane in this
+line.
 
 Current smoke set:
 
@@ -106,5 +107,5 @@ Safe wording:
   current truth
 * say `runs` only for examples that are exercised by `nuis build` and
   `run-artifact`
-* say `current line` for `alpha-0.6.*`; say `baseline` or `predecessor` for
-  `alpha-0.4.*`, `alpha-0.1.*`, and earlier
+* say `predecessor line` for `alpha-0.6.*`; say `baseline` or `predecessor`
+  for `alpha-0.4.*`, `alpha-0.1.*`, and earlier

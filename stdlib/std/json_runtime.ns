@@ -1,3 +1,5 @@
+use cpu StdTextContracts;
+
 mod cpu Main {
   extern "c" fn host_json_object_len(field_count: i64) -> i64;
   extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
@@ -19,7 +21,11 @@ mod cpu Main {
 
   fn summarize_json_shape(key_handle: i64, value_handle: i64, item_count: i64, field_count: i64) -> i64 {
     let shape: JsonShape = build_json_shape(key_handle, value_handle, item_count, field_count);
-    return shape.pair_len + shape.array_len + shape.object_len;
+    return StdTextContracts.json_shape_total(
+      shape.pair_len,
+      shape.array_len,
+      shape.object_len
+    );
   }
 
   fn main() {

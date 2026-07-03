@@ -2,6 +2,7 @@ mod assembly;
 mod check;
 mod cli;
 mod closure;
+mod commands;
 mod container;
 mod container_model;
 mod container_pipeline;
@@ -11,6 +12,7 @@ mod container_pipeline_tables;
 mod container_pipeline_verify;
 mod container_render;
 mod container_verify;
+mod context;
 mod display;
 mod display_check;
 mod display_container;
@@ -40,38 +42,25 @@ mod main_test_support;
 #[cfg(test)]
 mod main_tests;
 mod prepare;
+mod protocol;
 mod reports;
 mod toml;
 mod toml_read;
 
+pub(crate) use protocol::*;
+
 use assembly::*;
 use check::*;
-use cli::{parse_args, resolve_manifest_input, Command};
+use cli::{parse_args, Command};
 use closure::*;
+use commands::{run_plan_command, run_status_command};
 use container_pipeline::*;
+use context::load_link_input_context;
 use display::*;
 use json::*;
 use link_units::*;
 use prepare::*;
 use std::{env, process};
-
-const NSLD_LINK_INPUT_TABLE_SCHEMA: &str = "nuis-nsld-link-input-table-v1";
-const NSLD_LINK_INPUT_TABLE_SCHEMA_VERSION: usize = 1;
-const NSLD_LINK_INPUT_TABLE_KIND: &str = "lowering-sidecar-link-inputs";
-const NSLD_LINK_INPUT_TABLE_PRODUCER: &str = "nsld";
-const NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE: &str = "alpha-0.6.0";
-const NSLD_LINK_UNIT_TABLE_SCHEMA: &str = "nuis-nsld-link-unit-table-v1";
-const NSLD_LINK_UNIT_TABLE_SCHEMA_VERSION: usize = 1;
-const NSLD_LINK_UNIT_TABLE_KIND: &str = "deterministic-link-units";
-const NSLD_LINK_BUNDLE_SCHEMA: &str = "nuis-nsld-link-bundle-v1";
-const NSLD_LINK_BUNDLE_SCHEMA_VERSION: usize = 1;
-const NSLD_LINK_BUNDLE_KIND: &str = "hetero-static-link-bundle";
-const NSLD_ASSEMBLE_PLAN_SCHEMA: &str = "nuis-nsld-assemble-plan-v1";
-const NSLD_ASSEMBLE_PLAN_SCHEMA_VERSION: usize = 1;
-const NSLD_ASSEMBLE_PLAN_KIND: &str = "deterministic-section-assembly-plan";
-const NSLD_SECTION_MANIFEST_SCHEMA: &str = "nuis-nsld-section-manifest-v1";
-const NSLD_SECTION_MANIFEST_SCHEMA_VERSION: usize = 1;
-const NSLD_SECTION_MANIFEST_KIND: &str = "deterministic-section-manifest";
 fn main() {
     if let Err(error) = run() {
         eprintln!("{error}");
@@ -82,34 +71,14 @@ fn main() {
 fn run() -> Result<(), String> {
     match parse_args(env::args().skip(1))? {
         Command::Status => {
-            println!("Nsld linker front-door");
-            println!("  tool: nsld");
-            println!("  phase: alpha-0.6.0 linker boundary");
-            println!(
-                "  current_role: link-plan inspection and hetero clock/link contract surfacing"
-            );
-            println!("  implementation: reuses nuisc::linker while linker ownership is split out");
-            println!("  final_link_status: host-toolchain wrapper is still used for native launcher finalization");
+            run_status_command();
         }
         Command::Plan { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            if json {
-                println!("{}", nuisc::linker::render_link_plan_json(&plan));
-            } else {
-                println!("Nsld link plan");
-                println!("  input: {}", input.display());
-                println!("  manifest: {}", manifest.display());
-                println!("  role: alpha-0.6.0 linker front-door");
-                for line in nuisc::linker::render_link_plan_summary(&plan) {
-                    println!("  {line}");
-                }
-            }
+            run_plan_command(&input, json)?;
         }
         Command::Check { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_check_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_check_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", json::check_report_json(&report));
             } else {
@@ -120,9 +89,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::Closure { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_closure_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_closure_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_closure_report_json(&report));
             } else {
@@ -130,9 +98,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::Prepare { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_prepare_report(&manifest, &plan)?;
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_prepare_report(&ctx.manifest, &ctx.plan)?;
             if json {
                 println!("{}", nsld_prepare_report_json(&report));
             } else {
@@ -143,9 +110,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::AssemblePlan { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_assemble_plan_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_assemble_plan_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_assemble_plan_report_json(&report));
             } else {
@@ -153,9 +119,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::EmitAssemblePlan { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_emit_assemble_plan_report(&manifest, &plan)?;
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_assemble_plan_report(&ctx.manifest, &ctx.plan)?;
             if json {
                 println!("{}", nsld_assemble_plan_emit_report_json(&report));
             } else {
@@ -163,9 +128,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::VerifyAssemblePlan { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_verify_assemble_plan_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_assemble_plan_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_assemble_plan_verify_report_json(&report));
             } else {
@@ -176,9 +140,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::SectionManifest { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_section_manifest_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_section_manifest_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_section_manifest_report_json(&report));
             } else {
@@ -186,9 +149,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::EmitSectionManifest { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_emit_section_manifest_report(&manifest, &plan)?;
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_section_manifest_report(&ctx.manifest, &ctx.plan)?;
             if json {
                 println!("{}", nsld_section_manifest_emit_report_json(&report));
             } else {
@@ -196,9 +158,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::VerifySectionManifest { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_verify_section_manifest_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_section_manifest_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_section_manifest_verify_report_json(&report));
             } else {
@@ -209,9 +170,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::ContainerPlan { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_container_plan_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_container_plan_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_container_plan_report_json(&report));
             } else {
@@ -219,9 +179,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::EmitContainerPlan { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_emit_container_plan_report(&manifest, &plan)?;
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_container_plan_report(&ctx.manifest, &ctx.plan)?;
             if json {
                 println!("{}", nsld_container_plan_emit_report_json(&report));
             } else {
@@ -229,9 +188,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::VerifyContainerPlan { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_verify_container_plan_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_container_plan_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_container_plan_verify_report_json(&report));
             } else {
@@ -242,9 +200,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::Container { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_container_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_container_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_container_report_json(&report));
             } else {
@@ -252,9 +209,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::EmitContainer { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_emit_container_report(&manifest, &plan)?;
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_container_report(&ctx.manifest, &ctx.plan)?;
             if json {
                 println!("{}", nsld_container_emit_report_json(&report));
             } else {
@@ -262,9 +218,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::VerifyContainer { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_verify_container_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_container_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_container_verify_report_json(&report));
             } else {
@@ -275,9 +230,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::Bundle { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_link_bundle_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_link_bundle_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_link_bundle_report_json(&report));
             } else {
@@ -285,9 +239,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::EmitBundle { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_emit_link_bundle_report(&manifest, &plan)?;
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_link_bundle_report(&ctx.manifest, &ctx.plan)?;
             if json {
                 println!("{}", nsld_link_bundle_emit_report_json(&report));
             } else {
@@ -295,9 +248,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::VerifyBundle { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_verify_link_bundle_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_link_bundle_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_link_bundle_verify_report_json(&report));
             } else {
@@ -308,9 +260,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::Units { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_link_unit_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_link_unit_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_link_unit_report_json(&report));
             } else {
@@ -318,9 +269,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::EmitUnits { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_emit_link_units_report(&manifest, &plan)?;
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_link_units_report(&ctx.manifest, &ctx.plan)?;
             if json {
                 println!("{}", nsld_link_units_emit_report_json(&report));
             } else {
@@ -328,9 +278,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::VerifyUnits { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_verify_link_units_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_link_units_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_link_units_verify_report_json(&report));
             } else {
@@ -341,9 +290,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::Inputs { input, json } | Command::EmitInputs { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_emit_link_inputs_report(&manifest, &plan)?;
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_link_inputs_report(&ctx.manifest, &ctx.plan)?;
             if json {
                 println!("{}", nsld_link_inputs_emit_report_json(&report));
             } else {
@@ -351,9 +299,8 @@ fn run() -> Result<(), String> {
             }
         }
         Command::VerifyInputs { input, json } => {
-            let manifest = resolve_manifest_input(&input)?;
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsld_verify_link_inputs_report(&manifest, &plan);
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_link_inputs_report(&ctx.manifest, &ctx.plan);
             if json {
                 println!("{}", nsld_link_inputs_verify_report_json(&report));
             } else {
@@ -365,15 +312,4 @@ fn run() -> Result<(), String> {
         }
     }
     Ok(())
-}
-
-fn fnv1a64_hex(bytes: &[u8]) -> String {
-    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
-    const FNV_PRIME: u64 = 0x100000001b3;
-    let mut hash = FNV_OFFSET;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(FNV_PRIME);
-    }
-    format!("0x{hash:016x}")
 }
