@@ -4,7 +4,8 @@ use super::{
     reports::{
         NsldAssembleSectionDiagnostic, NsldClockEdgeDiagnostic, NsldDataSegmentDiagnostic,
         NsldDomainDiagnostic, NsldLinkInputDiagnostic, NsldLinkUnitDiagnostic,
-        NsldObjectSectionDiagnostic, NsldSidecarCapabilityDiagnostic,
+        NsldObjectRelocationSeedDiagnostic, NsldObjectSectionDiagnostic,
+        NsldSidecarCapabilityDiagnostic,
     },
 };
 
@@ -107,8 +108,34 @@ pub(crate) fn nsld_object_sections_json(sections: &[NsldObjectSectionDiagnostic]
                 json_string_field("object_section_role", &section.object_section_role),
                 json_string_field("source_path", &section.source_path),
                 json_string_field("source_hash", &section.source_hash),
+                json_usize_field("source_size_bytes", section.source_size_bytes),
                 json_usize_field("payload_offset_seed", section.payload_offset_seed),
+                json_usize_field("file_offset_seed", section.file_offset_seed),
+                json_usize_field("file_size_seed", section.file_size_seed),
+                json_usize_field("alignment", section.alignment),
                 json_bool_field("required", section.required),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+pub(crate) fn nsld_object_relocation_seeds_json(
+    seeds: &[NsldObjectRelocationSeedDiagnostic],
+) -> String {
+    seeds
+        .iter()
+        .map(|seed| {
+            let fields = vec![
+                json_usize_field("order_index", seed.order_index),
+                json_string_field("relocation_seed_id", &seed.relocation_seed_id),
+                json_string_field("relocation_seed_kind", &seed.relocation_seed_kind),
+                json_string_field("source_section_id", &seed.source_section_id),
+                json_usize_field("source_offset_seed", seed.source_offset_seed),
+                json_string_field("target_symbol", &seed.target_symbol),
+                json_isize_field("addend", seed.addend),
+                json_bool_field("native_relocation_ready", seed.native_relocation_ready),
             ];
             format!("{{{}}}", fields.join(","))
         })

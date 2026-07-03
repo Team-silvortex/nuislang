@@ -2,6 +2,7 @@ use super::container;
 
 #[derive(Clone, Copy)]
 pub(crate) enum TomlFieldKind {
+    Array,
     Bool,
     Isize,
     String,
@@ -394,6 +395,7 @@ fn toml_block_value<'a>(block: &'a [&'a str], key: &str) -> Option<&'a str> {
 
 fn toml_field_kind_matches(value: &str, kind: TomlFieldKind) -> bool {
     match kind {
+        TomlFieldKind::Array => value.starts_with('[') && value.ends_with(']'),
         TomlFieldKind::Bool => value.parse::<bool>().is_ok(),
         TomlFieldKind::Isize => value.parse::<isize>().is_ok(),
         TomlFieldKind::String => toml_decode_string_value(value).is_some(),

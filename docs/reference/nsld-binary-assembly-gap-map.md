@@ -151,8 +151,23 @@ application are still separate future layers.
 
 The plan already assigns each Nsld section a writer-facing object section
 record with a stable object section name, object section role, source section
-id, source hash, and payload offset seed. The future byte writer should consume
-that mapping instead of rediscovering object layout from the section manifest.
+id, source hash, source size, alignment, payload offset seed, file offset seed,
+and file size seed. The future byte writer should consume that mapping instead
+of rediscovering object layout from the section manifest.
+It also emits `[[object_relocation_seed]]` records, which are Nsld-owned
+relocation intent seeds and not yet native Mach-O, ELF, PE, shader, or kernel
+relocation records.
+The plan also exposes a writer summary with `writer_target_id`,
+`writer_status`, and `unsupported_features`, so future byte-emission commands
+can distinguish "target known, writer blocked" from "target unknown".
+`verify-object-plan` now validates required object-section and relocation-seed
+fields plus semantic drift in both tables.
+`object-writer-readiness` exposes the same information as a command-level
+readiness gate before any future `emit-object` command attempts byte emission.
+`emit-object` is currently wired as a structured blocked command: it reports the
+planned output path and blockers, but it does not write platform object bytes.
+It does write `nuis.nsld.object.blocked.toml`, which is a diagnostic artifact
+for the blocked state rather than a native object file.
 
 ## Success Boundary
 

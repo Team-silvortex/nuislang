@@ -310,17 +310,45 @@ pub(crate) fn print_nsld_object_plan_report(report: &NsldObjectPlanReport) {
     println!("  section_count: {}", report.section_count);
     println!("  section_table_hash: {}", report.section_table_hash);
     println!("  object_plan_hash: {}", report.object_plan_hash);
+    println!("  object_layout_hash: {}", report.object_layout_hash);
+    println!("  relocation_seed_count: {}", report.relocation_seed_count);
+    println!(
+        "  relocation_seed_table_hash: {}",
+        report.relocation_seed_table_hash
+    );
+    println!("  writer_target_id: {}", report.writer_target_id);
+    println!("  writer_status: {}", report.writer_status);
+    if !report.unsupported_features.is_empty() {
+        println!(
+            "  unsupported_features: {}",
+            report.unsupported_features.join(", ")
+        );
+    }
     println!("  emission_status: {}", report.emission_status);
     for section in &report.object_sections {
         println!(
-            "  object_section: index={} source={} kind={} object={} role={} offset_seed={} hash={}",
+            "  object_section: index={} source={} kind={} object={} role={} file_offset_seed={} file_size_seed={} align={} hash={}",
             section.order_index,
             section.source_section_id,
             section.source_section_kind,
             section.object_section_name,
             section.object_section_role,
-            section.payload_offset_seed,
+            section.file_offset_seed,
+            section.file_size_seed,
+            section.alignment,
             section.source_hash
+        );
+    }
+    for seed in &report.relocation_seeds {
+        println!(
+            "  relocation_seed: index={} id={} kind={} source={} offset_seed={} target={} ready={}",
+            seed.order_index,
+            seed.relocation_seed_id,
+            seed.relocation_seed_kind,
+            seed.source_section_id,
+            seed.source_offset_seed,
+            seed.target_symbol,
+            seed.native_relocation_ready
         );
     }
     for blocker in &report.blockers {
@@ -363,6 +391,36 @@ pub(crate) fn print_nsld_object_plan_verify_report(report: &NsldObjectPlanVerify
     );
     for issue in &report.issues {
         println!("  issue: {issue}");
+    }
+}
+
+pub(crate) fn print_nsld_object_writer_readiness_report(report: &NsldObjectWriterReadinessReport) {
+    println!("Nsld object writer readiness");
+    println!("  manifest: {}", report.manifest);
+    println!("  writer_target_id: {}", report.writer_target_id);
+    println!("  writer_status: {}", report.writer_status);
+    println!("  object_plan_hash: {}", report.object_plan_hash);
+    println!("  section_count: {}", report.section_count);
+    println!("  can_emit_object: {}", report.can_emit_object);
+    for feature in &report.unsupported_features {
+        println!("  unsupported_feature: {feature}");
+    }
+    for blocker in &report.blockers {
+        println!("  blocker: {blocker}");
+    }
+}
+
+pub(crate) fn print_nsld_object_emit_report(report: &NsldObjectEmitReport) {
+    println!("Nsld object emit");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  blocked_report_path: {}", report.blocked_report_path);
+    println!("  writer_target_id: {}", report.writer_target_id);
+    println!("  object_plan_hash: {}", report.object_plan_hash);
+    println!("  emitted: {}", report.emitted);
+    println!("  can_emit_object: {}", report.can_emit_object);
+    for blocker in &report.blockers {
+        println!("  blocker: {blocker}");
     }
 }
 

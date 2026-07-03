@@ -16,6 +16,8 @@ pub(crate) enum Command {
     ObjectPlan { input: PathBuf, json: bool },
     EmitObjectPlan { input: PathBuf, json: bool },
     VerifyObjectPlan { input: PathBuf, json: bool },
+    ObjectWriterReadiness { input: PathBuf, json: bool },
+    EmitObject { input: PathBuf, json: bool },
     ContainerPlan { input: PathBuf, json: bool },
     EmitContainerPlan { input: PathBuf, json: bool },
     VerifyContainerPlan { input: PathBuf, json: bool },
@@ -55,6 +57,8 @@ where
         | "object-plan"
         | "emit-object-plan"
         | "verify-object-plan"
+        | "object-writer-readiness"
+        | "emit-object"
         | "container-plan"
         | "emit-container-plan"
         | "verify-container-plan"
@@ -82,6 +86,8 @@ where
             let is_object_plan = command == "object-plan";
             let is_emit_object_plan = command == "emit-object-plan";
             let is_verify_object_plan = command == "verify-object-plan";
+            let is_object_writer_readiness = command == "object-writer-readiness";
+            let is_emit_object = command == "emit-object";
             let is_container_plan = command == "container-plan";
             let is_emit_container_plan = command == "emit-container-plan";
             let is_verify_container_plan = command == "verify-container-plan";
@@ -133,6 +139,10 @@ where
                 Ok(Command::EmitObjectPlan { input, json })
             } else if is_verify_object_plan {
                 Ok(Command::VerifyObjectPlan { input, json })
+            } else if is_object_writer_readiness {
+                Ok(Command::ObjectWriterReadiness { input, json })
+            } else if is_emit_object {
+                Ok(Command::EmitObject { input, json })
             } else if is_container_plan {
                 Ok(Command::ContainerPlan { input, json })
             } else if is_emit_container_plan {
@@ -187,7 +197,7 @@ pub(crate) fn resolve_manifest_input(input: &Path) -> Result<PathBuf, String> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  nsld status\n  nsld plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld check <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld prepare <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld section-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-section-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-section-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld object-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-object-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-object-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld container-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-container-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-container-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld container <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-container <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-container <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]"
+    "usage:\n  nsld status\n  nsld plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld check <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld prepare <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld section-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-section-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-section-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld object-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-object-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-object-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld object-writer-readiness <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-object <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld container-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-container-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-container-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld container <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-container <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-container <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld emit-inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsld verify-inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]"
 }
 
 #[cfg(test)]

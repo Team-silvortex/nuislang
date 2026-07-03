@@ -65,6 +65,10 @@ cargo run -p nsld -- emit-object-plan <artifact-output-dir>
 cargo run -p nsld -- emit-object-plan <artifact-output-dir> --json
 cargo run -p nsld -- verify-object-plan <artifact-output-dir>
 cargo run -p nsld -- verify-object-plan <artifact-output-dir> --json
+cargo run -p nsld -- object-writer-readiness <artifact-output-dir>
+cargo run -p nsld -- object-writer-readiness <artifact-output-dir> --json
+cargo run -p nsld -- emit-object <artifact-output-dir>
+cargo run -p nsld -- emit-object <artifact-output-dir> --json
 cargo run -p nsld -- container-plan <artifact-output-dir>
 cargo run -p nsld -- container-plan <artifact-output-dir> --json
 cargo run -p nsld -- emit-container-plan <artifact-output-dir>
@@ -222,8 +226,26 @@ the file is missing, if the full content differs, or if `section_count` or
 
 `nsld object-plan` derives the first object-writer-facing plan from the section
 manifest. It maps each Nsld section to a stable object section name and role
-while keeping native byte emission and relocation application explicitly
-blocked behind `plan-only` status.
+and now records deterministic writer layout seeds such as source size,
+alignment, planned file offset seed, and planned file size seed while keeping
+native byte emission and relocation application explicitly blocked behind
+`plan-only` status.
+The report also includes `writer_target_id`, `writer_status`, and
+`unsupported_features` so future byte writers can consume the plan without
+guessing target support.
+`[[object_relocation_seed]]` entries describe Nsld-owned relocation intent
+before it is lowered into Mach-O, ELF, PE, shader, or kernel relocation forms.
+`nsld verify-object-plan` checks the plan hash, section count,
+`[[object_section]]` field presence/types, `[[object_relocation_seed]]` field
+presence/types, and mapping/seed drift.
+`nsld object-writer-readiness` is a non-mutating readiness view over the same
+plan. It reports whether object emission is currently allowed for the selected
+writer target.
+`nsld emit-object` already exists as a structured frontdoor, but in the current
+alpha it intentionally reports `emitted = false` and exits with failure while
+the object byte emitter and native relocation applier are still blocked.
+When blocked, it writes `nuis.nsld.object.blocked.toml` so CI and later linker
+stages can consume the failed emission state without scraping stderr.
 
 `nsld container-plan` derives the first Nuis-owned binary container layout
 plan. It consumes the section manifest, records the container magic/version,

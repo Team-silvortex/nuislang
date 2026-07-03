@@ -201,6 +201,27 @@ fn run() -> Result<(), String> {
                 return Err("nsld object plan verification failed".to_owned());
             }
         }
+        Command::ObjectWriterReadiness { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_object_writer_readiness_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_object_writer_readiness_report_json(&report));
+            } else {
+                print_nsld_object_writer_readiness_report(&report);
+            }
+        }
+        Command::EmitObject { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_object_report(&ctx.manifest, &ctx.plan)?;
+            if json {
+                println!("{}", nsld_object_emit_report_json(&report));
+            } else {
+                print_nsld_object_emit_report(&report);
+            }
+            if !report.emitted {
+                return Err("nsld object emission is not ready".to_owned());
+            }
+        }
         Command::ContainerPlan { input, json } => {
             let ctx = load_link_input_context(&input)?;
             let report = nsld_container_plan_report(&ctx.manifest, &ctx.plan);
