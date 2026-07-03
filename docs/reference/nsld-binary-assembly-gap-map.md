@@ -166,8 +166,22 @@ fields plus semantic drift in both tables.
 readiness gate before any future `emit-object` command attempts byte emission.
 `emit-object` is currently wired as a structured blocked command: it reports the
 planned output path and blockers, but it does not write platform object bytes.
-It does write `nuis.nsld.object.blocked.toml`, which is a diagnostic artifact
-for the blocked state rather than a native object file.
+It does write `nuis.nsld.object-writer-input.toml`, which is the future byte
+writer's deterministic input snapshot, plus `nuis.nsld.object.blocked.toml`,
+which is a diagnostic artifact for the blocked state rather than a native
+object file.
+`verify-object-writer-input` closes that snapshot loop by validating the writer
+input hashes, section and relocation-seed counts, and required writer table
+field types before a future byte writer consumes it.
+`object-writer-dry-run` then gives the future byte writer's preflight view:
+planned object path, writer input validity, consumed section/relocation counts,
+and blockers, still without writing platform object bytes.
+`emit-object-writer-dry-run` materializes that preflight view as
+`nuis.nsld.object-writer-dry-run.toml`, and `verify-object-writer-dry-run`
+keeps it locked to the current object plan and writer input snapshot.
+`object-byte-layout` adds the next deterministic layer: byte offsets, byte
+sizes, alignment, total byte span, and `byte_layout_hash`, materialized as
+`nuis.nsld.object-byte-layout.toml` before native object bytes exist.
 
 ## Success Boundary
 

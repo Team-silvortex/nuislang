@@ -1,4 +1,5 @@
 pub(crate) use super::json_container::*;
+pub(crate) use super::json_object::*;
 
 use super::{json_fields::*, json_fragments::*, reports::*};
 
@@ -350,115 +351,6 @@ pub(crate) fn nsld_section_manifest_verify_report_json(
             report.actual_section_table_hash.as_deref(),
         ),
         json_string_array_field("issues", &report.issues),
-    ];
-    format!("{{{}}}", fields.join(","))
-}
-
-pub(crate) fn nsld_object_plan_report_json(report: &NsldObjectPlanReport) -> String {
-    let fields = vec![
-        json_string_field("tool", "nsld"),
-        json_string_field("kind", "nsld_object_plan"),
-        json_string_field("manifest", &report.manifest),
-        json_bool_field("ready", report.ready),
-        json_string_field("target_arch", &report.target_arch),
-        json_string_field("target_os", &report.target_os),
-        json_string_field("object_format", &report.object_format),
-        json_string_field("calling_abi", &report.calling_abi),
-        json_string_field("clang_target", &report.clang_target),
-        json_string_field("output_path", &report.output_path),
-        json_string_field("source_container_path", &report.source_container_path),
-        json_string_field("source_payload_path", &report.source_payload_path),
-        json_usize_field("section_count", report.section_count),
-        json_string_field("section_table_hash", &report.section_table_hash),
-        json_string_field("object_plan_hash", &report.object_plan_hash),
-        json_string_field("object_layout_hash", &report.object_layout_hash),
-        json_usize_field("relocation_seed_count", report.relocation_seed_count),
-        json_string_field(
-            "relocation_seed_table_hash",
-            &report.relocation_seed_table_hash,
-        ),
-        json_string_field("writer_target_id", &report.writer_target_id),
-        json_string_field("writer_status", &report.writer_status),
-        json_string_array_field("unsupported_features", &report.unsupported_features),
-        json_string_field("emission_status", &report.emission_status),
-        format!(
-            "\"object_sections\":[{}]",
-            nsld_object_sections_json(&report.object_sections)
-        ),
-        format!(
-            "\"relocation_seeds\":[{}]",
-            nsld_object_relocation_seeds_json(&report.relocation_seeds)
-        ),
-        json_string_array_field("blockers", &report.blockers),
-    ];
-    format!("{{{}}}", fields.join(","))
-}
-
-pub(crate) fn nsld_object_plan_emit_report_json(report: &NsldObjectPlanEmitReport) -> String {
-    let fields = vec![
-        json_string_field("tool", "nsld"),
-        json_string_field("kind", "nsld_object_plan_emit"),
-        json_string_field("manifest", &report.manifest),
-        json_string_field("output_path", &report.output_path),
-        json_bool_field("ready", report.ready),
-        json_string_field("object_plan_hash", &report.object_plan_hash),
-        json_usize_field("section_count", report.section_count),
-    ];
-    format!("{{{}}}", fields.join(","))
-}
-
-pub(crate) fn nsld_object_plan_verify_report_json(report: &NsldObjectPlanVerifyReport) -> String {
-    let fields = vec![
-        json_string_field("tool", "nsld"),
-        json_string_field("kind", "nsld_object_plan_verify"),
-        json_string_field("manifest", &report.manifest),
-        json_string_field("input_path", &report.input_path),
-        json_bool_field("valid", report.valid),
-        json_string_field(
-            "expected_object_plan_hash",
-            &report.expected_object_plan_hash,
-        ),
-        json_usize_field("expected_section_count", report.expected_section_count),
-        json_optional_string_field(
-            "actual_object_plan_hash",
-            report.actual_object_plan_hash.as_deref(),
-        ),
-        json_optional_usize_field("actual_section_count", report.actual_section_count),
-        json_string_array_field("issues", &report.issues),
-    ];
-    format!("{{{}}}", fields.join(","))
-}
-
-pub(crate) fn nsld_object_writer_readiness_report_json(
-    report: &NsldObjectWriterReadinessReport,
-) -> String {
-    let fields = vec![
-        json_string_field("tool", "nsld"),
-        json_string_field("kind", "nsld_object_writer_readiness"),
-        json_string_field("manifest", &report.manifest),
-        json_string_field("writer_target_id", &report.writer_target_id),
-        json_string_field("writer_status", &report.writer_status),
-        json_string_field("object_plan_hash", &report.object_plan_hash),
-        json_usize_field("section_count", report.section_count),
-        json_bool_field("can_emit_object", report.can_emit_object),
-        json_string_array_field("unsupported_features", &report.unsupported_features),
-        json_string_array_field("blockers", &report.blockers),
-    ];
-    format!("{{{}}}", fields.join(","))
-}
-
-pub(crate) fn nsld_object_emit_report_json(report: &NsldObjectEmitReport) -> String {
-    let fields = vec![
-        json_string_field("tool", "nsld"),
-        json_string_field("kind", "nsld_object_emit"),
-        json_string_field("manifest", &report.manifest),
-        json_string_field("output_path", &report.output_path),
-        json_string_field("blocked_report_path", &report.blocked_report_path),
-        json_string_field("writer_target_id", &report.writer_target_id),
-        json_string_field("object_plan_hash", &report.object_plan_hash),
-        json_bool_field("emitted", report.emitted),
-        json_bool_field("can_emit_object", report.can_emit_object),
-        json_string_array_field("blockers", &report.blockers),
     ];
     format!("{{{}}}", fields.join(","))
 }

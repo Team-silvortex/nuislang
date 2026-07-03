@@ -69,6 +69,20 @@ cargo run -p nsld -- object-writer-readiness <artifact-output-dir>
 cargo run -p nsld -- object-writer-readiness <artifact-output-dir> --json
 cargo run -p nsld -- emit-object <artifact-output-dir>
 cargo run -p nsld -- emit-object <artifact-output-dir> --json
+cargo run -p nsld -- verify-object-writer-input <artifact-output-dir>
+cargo run -p nsld -- verify-object-writer-input <artifact-output-dir> --json
+cargo run -p nsld -- object-writer-dry-run <artifact-output-dir>
+cargo run -p nsld -- object-writer-dry-run <artifact-output-dir> --json
+cargo run -p nsld -- emit-object-writer-dry-run <artifact-output-dir>
+cargo run -p nsld -- emit-object-writer-dry-run <artifact-output-dir> --json
+cargo run -p nsld -- verify-object-writer-dry-run <artifact-output-dir>
+cargo run -p nsld -- verify-object-writer-dry-run <artifact-output-dir> --json
+cargo run -p nsld -- object-byte-layout <artifact-output-dir>
+cargo run -p nsld -- object-byte-layout <artifact-output-dir> --json
+cargo run -p nsld -- emit-object-byte-layout <artifact-output-dir>
+cargo run -p nsld -- emit-object-byte-layout <artifact-output-dir> --json
+cargo run -p nsld -- verify-object-byte-layout <artifact-output-dir>
+cargo run -p nsld -- verify-object-byte-layout <artifact-output-dir> --json
 cargo run -p nsld -- container-plan <artifact-output-dir>
 cargo run -p nsld -- container-plan <artifact-output-dir> --json
 cargo run -p nsld -- emit-container-plan <artifact-output-dir>
@@ -244,8 +258,25 @@ writer target.
 `nsld emit-object` already exists as a structured frontdoor, but in the current
 alpha it intentionally reports `emitted = false` and exits with failure while
 the object byte emitter and native relocation applier are still blocked.
-When blocked, it writes `nuis.nsld.object.blocked.toml` so CI and later linker
-stages can consume the failed emission state without scraping stderr.
+It still writes `nuis.nsld.object-writer-input.toml`, a byte-writer input
+snapshot that contains section layout seeds and relocation seeds.
+`nsld verify-object-writer-input` checks that this snapshot still matches the
+current object plan hashes, section count, relocation seed count, and required
+writer table field types.
+`nsld object-writer-dry-run` is a non-mutating writer preflight report. It
+summarizes the writer input path, planned native object path, section and
+relocation seed counts, whether the writer input is valid, and the blockers
+that still prevent real byte emission.
+`nsld emit-object-writer-dry-run` writes this preflight state to
+`nuis.nsld.object-writer-dry-run.toml`; `nsld verify-object-writer-dry-run`
+checks that artifact against the current writer input and object plan state.
+`nsld object-byte-layout` then derives the deterministic byte-level section
+layout: file offsets, byte sizes, alignment, total byte span, and a
+`byte_layout_hash`. `emit-object-byte-layout` writes
+`nuis.nsld.object-byte-layout.toml`, and `verify-object-byte-layout` checks it
+before any future platform-specific object writer emits bytes.
+When blocked, it also writes `nuis.nsld.object.blocked.toml` so CI and later
+linker stages can consume the failed emission state without scraping stderr.
 
 `nsld container-plan` derives the first Nuis-owned binary container layout
 plan. It consumes the section manifest, records the container magic/version,

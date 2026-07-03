@@ -18,13 +18,17 @@ mod display_check;
 mod display_container;
 mod display_container_verify;
 mod display_link_tables;
+mod display_object;
 mod json;
 mod json_container;
 mod json_fields;
 mod json_fragments;
+mod json_object;
 mod link_bundle_pipeline;
 mod link_inputs_pipeline;
 mod link_units;
+#[cfg(test)]
+mod main_cli_object_tests;
 #[cfg(test)]
 mod main_cli_tests;
 #[cfg(test)]
@@ -41,10 +45,16 @@ mod main_link_table_tests;
 mod main_test_support;
 #[cfg(test)]
 mod main_tests;
+mod object_byte_layout;
+mod object_layout;
 mod object_plan;
+mod object_plan_verify;
+mod object_render;
+mod object_writer_input;
 mod prepare;
 mod protocol;
 mod reports;
+mod reports_object;
 mod toml;
 mod toml_read;
 
@@ -60,7 +70,9 @@ use context::load_link_input_context;
 use display::*;
 use json::*;
 use link_units::*;
+use object_byte_layout::*;
 use object_plan::*;
+use object_writer_input::*;
 use prepare::*;
 use std::{env, process};
 fn main() {
@@ -220,6 +232,78 @@ fn run() -> Result<(), String> {
             }
             if !report.emitted {
                 return Err("nsld object emission is not ready".to_owned());
+            }
+        }
+        Command::VerifyObjectWriterInput { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_object_writer_input_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_object_writer_input_verify_report_json(&report));
+            } else {
+                print_nsld_object_writer_input_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld object writer input verification failed".to_owned());
+            }
+        }
+        Command::ObjectWriterDryRun { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_object_writer_dry_run_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_object_writer_dry_run_report_json(&report));
+            } else {
+                print_nsld_object_writer_dry_run_report(&report);
+            }
+        }
+        Command::EmitObjectWriterDryRun { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_object_writer_dry_run_report(&ctx.manifest, &ctx.plan)?;
+            if json {
+                println!("{}", nsld_object_writer_dry_run_emit_report_json(&report));
+            } else {
+                print_nsld_object_writer_dry_run_emit_report(&report);
+            }
+        }
+        Command::VerifyObjectWriterDryRun { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_object_writer_dry_run_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_object_writer_dry_run_verify_report_json(&report));
+            } else {
+                print_nsld_object_writer_dry_run_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld object writer dry run verification failed".to_owned());
+            }
+        }
+        Command::ObjectByteLayout { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_object_byte_layout_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_object_byte_layout_report_json(&report));
+            } else {
+                print_nsld_object_byte_layout_report(&report);
+            }
+        }
+        Command::EmitObjectByteLayout { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_object_byte_layout_report(&ctx.manifest, &ctx.plan)?;
+            if json {
+                println!("{}", nsld_object_byte_layout_emit_report_json(&report));
+            } else {
+                print_nsld_object_byte_layout_emit_report(&report);
+            }
+        }
+        Command::VerifyObjectByteLayout { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_object_byte_layout_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_object_byte_layout_verify_report_json(&report));
+            } else {
+                print_nsld_object_byte_layout_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld object byte layout verification failed".to_owned());
             }
         }
         Command::ContainerPlan { input, json } => {

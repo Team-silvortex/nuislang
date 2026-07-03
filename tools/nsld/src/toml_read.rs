@@ -19,6 +19,16 @@ pub(crate) fn usize_value(source: &str, key: &str) -> Option<usize> {
     })
 }
 
+pub(crate) fn bool_value(source: &str, key: &str) -> Option<bool> {
+    source.lines().find_map(|raw| {
+        let line = raw.trim();
+        let (found_key, value) = line.split_once('=')?;
+        (found_key.trim() == key)
+            .then(|| value.trim().parse::<bool>().ok())
+            .flatten()
+    })
+}
+
 pub(crate) fn first_table_string_value(source: &str, table: &str, key: &str) -> Option<String> {
     first_table_value(source, table, key).and_then(decode_string_value)
 }
