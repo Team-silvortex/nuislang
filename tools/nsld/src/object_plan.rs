@@ -9,6 +9,9 @@ use super::{
         object_section_table_mismatch_issues, relocation_seed_entries,
         relocation_seed_table_field_issues, relocation_seed_table_mismatch_issues,
     },
+    object_writer_backend::{
+        object_writer_backend, object_writer_backend_readiness, object_writer_blockers,
+    },
     reports::{
         NsldObjectEmitReport, NsldObjectPlanEmitReport, NsldObjectPlanReport,
         NsldObjectPlanVerifyReport, NsldObjectWriterReadinessReport,
@@ -34,16 +37,12 @@ pub(crate) fn nsld_object_plan_report(
         .join("nuis.nsld.container.payload")
         .display()
         .to_string();
-    let unsupported_features = vec![
-        "object-byte-emitter".to_owned(),
-        "native-relocation-applier".to_owned(),
-    ];
-    let mut blockers = section_manifest.blockers.clone();
-    blockers.extend(
-        unsupported_features
-            .iter()
-            .map(|feature| format!("{feature}:not-implemented")),
+    let backend = object_writer_backend(
+        &plan.cpu_target.machine_arch,
+        &plan.cpu_target.machine_os,
+        &plan.cpu_target.object_format,
     );
+    let blockers = object_writer_blockers(&backend, &section_manifest.blockers);
     let object_sections = object_section_layout(&section_manifest.sections);
     let relocation_seeds = object_relocation_seeds(&object_sections);
     let object_layout_hash = nsld_object_layout_hash(&object_sections);
@@ -79,13 +78,9 @@ pub(crate) fn nsld_object_plan_report(
         object_layout_hash,
         relocation_seed_count: relocation_seeds.len(),
         relocation_seed_table_hash,
-        writer_target_id: writer_target_id(
-            &plan.cpu_target.machine_arch,
-            &plan.cpu_target.machine_os,
-            &plan.cpu_target.object_format,
-        ),
-        writer_status: "blocked".to_owned(),
-        unsupported_features,
+        writer_target_id: backend.target_id,
+        writer_status: backend.status,
+        unsupported_features: backend.unsupported_features,
         emission_status: "plan-only".to_owned(),
         object_sections,
         relocation_seeds,
@@ -189,17 +184,22 @@ pub(crate) fn nsld_object_writer_readiness_report(
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldObjectWriterReadinessReport {
     let object_plan = nsld_object_plan_report(manifest, plan);
+    let backend = object_writer_backend(
+        &object_plan.target_arch,
+        &object_plan.target_os,
+        &object_plan.object_format,
+    );
+    let readiness =
+        object_writer_backend_readiness(&backend, object_plan.ready, &object_plan.blockers);
     NsldObjectWriterReadinessReport {
         manifest: object_plan.manifest,
-        writer_target_id: object_plan.writer_target_id,
-        writer_status: object_plan.writer_status,
+        writer_target_id: readiness.target_id,
+        writer_status: readiness.status,
         object_plan_hash: object_plan.object_plan_hash,
         section_count: object_plan.section_count,
-        can_emit_object: object_plan.ready
-            && object_plan.unsupported_features.is_empty()
-            && object_plan.blockers.is_empty(),
-        unsupported_features: object_plan.unsupported_features,
-        blockers: object_plan.blockers,
+        can_emit_object: readiness.can_emit_object,
+        unsupported_features: readiness.unsupported_features,
+        blockers: readiness.blockers,
     }
 }
 
@@ -251,10 +251,6 @@ pub(crate) fn nsld_emit_object_report(
     Ok(report)
 }
 
-fn writer_target_id(machine_arch: &str, machine_os: &str, object_format: &str) -> String {
-    format!("{machine_arch}-{machine_os}-{object_format}")
-}
-
 #[cfg(test)]
 mod tests {
     use super::{nsld_object_plan_report, nsld_verify_object_plan_report};
@@ -272,7 +268,7 @@ mod tests {
         assert_eq!(report.object_format, "mach-o");
         assert_eq!(report.emission_status, "plan-only");
         assert_eq!(report.writer_target_id, "arm64-macos-mach-o");
-        assert_eq!(report.writer_status, "blocked");
+        assert_eq!(report.writer_status, "recognized-blocked");
         assert_eq!(
             report.unsupported_features,
             vec![
@@ -422,7 +418,7 @@ mod tests {
         let report = super::nsld_object_writer_readiness_report(Path::new("manifest.toml"), &plan);
 
         assert!(!report.can_emit_object);
-        assert_eq!(report.writer_status, "blocked");
+        assert_eq!(report.writer_status, "recognized-blocked");
         assert!(report
             .unsupported_features
             .contains(&"object-byte-emitter".to_owned()));

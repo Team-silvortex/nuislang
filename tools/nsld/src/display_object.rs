@@ -345,3 +345,73 @@ pub(crate) fn print_nsld_object_byte_layout_verify_report(
         println!("  issue: {issue}");
     }
 }
+
+pub(crate) fn print_nsld_object_file_layout_report(report: &NsldObjectFileLayoutReport) {
+    println!("Nsld object file layout");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  writer_target_id: {}", report.writer_target_id);
+    println!("  backend_kind: {}", report.backend_kind);
+    println!("  object_format: {}", report.object_format);
+    println!("  object_plan_hash: {}", report.object_plan_hash);
+    println!("  byte_layout_hash: {}", report.byte_layout_hash);
+    println!("  file_layout_hash: {}", report.file_layout_hash);
+    println!("  record_count: {}", report.record_count);
+    println!("  total_file_size_bytes: {}", report.total_file_size_bytes);
+    println!("  layout_ready: {}", report.layout_ready);
+    for record in &report.records {
+        println!(
+            "  file_layout_record: index={} id={} kind={} offset={} size={} align={}",
+            record.order_index,
+            record.record_id,
+            record.record_kind,
+            record.file_offset,
+            record.size_bytes,
+            record.alignment
+        );
+    }
+    for blocker in &report.blockers {
+        println!("  blocker: {blocker}");
+    }
+}
+
+pub(crate) fn print_nsld_object_file_layout_emit_report(report: &NsldObjectFileLayoutEmitReport) {
+    println!("Nsld object file layout emit");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  layout_ready: {}", report.layout_ready);
+    println!("  file_layout_hash: {}", report.file_layout_hash);
+    println!("  record_count: {}", report.record_count);
+    println!("  total_file_size_bytes: {}", report.total_file_size_bytes);
+}
+
+pub(crate) fn print_nsld_object_file_layout_verify_report(
+    report: &NsldObjectFileLayoutVerifyReport,
+) {
+    println!("Nsld object file layout verify");
+    println!("  manifest: {}", report.manifest);
+    println!("  input_path: {}", report.input_path);
+    println!("  valid: {}", report.valid);
+    println!(
+        "  expected_file_layout_hash: {}",
+        report.expected_file_layout_hash
+    );
+    println!(
+        "  actual_file_layout_hash: {}",
+        report
+            .actual_file_layout_hash
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_record_count: {}",
+        optional_usize_text(report.actual_record_count)
+    );
+    println!(
+        "  actual_total_file_size_bytes: {}",
+        optional_usize_text(report.actual_total_file_size_bytes)
+    );
+    for issue in &report.issues {
+        println!("  issue: {issue}");
+    }
+}

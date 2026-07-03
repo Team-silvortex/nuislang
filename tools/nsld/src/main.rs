@@ -46,10 +46,16 @@ mod main_test_support;
 #[cfg(test)]
 mod main_tests;
 mod object_byte_layout;
+mod object_file_layout;
 mod object_layout;
+mod object_macho_header;
+mod object_macho_load_commands;
+mod object_macho_relocations;
+mod object_macho_symbols;
 mod object_plan;
 mod object_plan_verify;
 mod object_render;
+mod object_writer_backend;
 mod object_writer_input;
 mod prepare;
 mod protocol;
@@ -71,6 +77,7 @@ use display::*;
 use json::*;
 use link_units::*;
 use object_byte_layout::*;
+use object_file_layout::*;
 use object_plan::*;
 use object_writer_input::*;
 use prepare::*;
@@ -304,6 +311,36 @@ fn run() -> Result<(), String> {
             }
             if !report.valid {
                 return Err("nsld object byte layout verification failed".to_owned());
+            }
+        }
+        Command::ObjectFileLayout { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_object_file_layout_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_object_file_layout_report_json(&report));
+            } else {
+                print_nsld_object_file_layout_report(&report);
+            }
+        }
+        Command::EmitObjectFileLayout { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_object_file_layout_report(&ctx.manifest, &ctx.plan)?;
+            if json {
+                println!("{}", nsld_object_file_layout_emit_report_json(&report));
+            } else {
+                print_nsld_object_file_layout_emit_report(&report);
+            }
+        }
+        Command::VerifyObjectFileLayout { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_object_file_layout_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_object_file_layout_verify_report_json(&report));
+            } else {
+                print_nsld_object_file_layout_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld object file layout verification failed".to_owned());
             }
         }
         Command::ContainerPlan { input, json } => {

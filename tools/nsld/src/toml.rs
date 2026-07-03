@@ -13,8 +13,8 @@ use super::{
 };
 
 pub(crate) use super::object_render::{
-    render_object_byte_layout, render_object_emit_blocked, render_object_plan,
-    render_object_writer_dry_run, render_object_writer_input,
+    render_object_byte_layout, render_object_emit_blocked, render_object_file_layout,
+    render_object_plan, render_object_writer_dry_run, render_object_writer_input,
 };
 pub(crate) use super::toml_read::{
     bool_value, first_table_bool_value, first_table_isize_value, first_table_string_value,

@@ -213,3 +213,54 @@ pub(crate) struct NsldObjectByteLayoutVerifyReport {
     pub(crate) actual_total_size_bytes: Option<usize>,
     pub(crate) issues: Vec<String>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectFileLayoutReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) writer_target_id: String,
+    pub(crate) backend_kind: String,
+    pub(crate) object_format: String,
+    pub(crate) object_plan_hash: String,
+    pub(crate) byte_layout_hash: String,
+    pub(crate) file_layout_hash: String,
+    pub(crate) record_count: usize,
+    pub(crate) total_file_size_bytes: usize,
+    pub(crate) layout_ready: bool,
+    pub(crate) records: Vec<NsldObjectFileLayoutRecordDiagnostic>,
+    pub(crate) blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectFileLayoutRecordDiagnostic {
+    pub(crate) order_index: usize,
+    pub(crate) record_id: String,
+    pub(crate) record_kind: String,
+    pub(crate) file_offset: usize,
+    pub(crate) size_bytes: usize,
+    pub(crate) alignment: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectFileLayoutEmitReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) layout_ready: bool,
+    pub(crate) file_layout_hash: String,
+    pub(crate) record_count: usize,
+    pub(crate) total_file_size_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectFileLayoutVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_file_layout_hash: String,
+    pub(crate) expected_record_count: usize,
+    pub(crate) expected_total_file_size_bytes: usize,
+    pub(crate) actual_file_layout_hash: Option<String>,
+    pub(crate) actual_record_count: Option<usize>,
+    pub(crate) actual_total_file_size_bytes: Option<usize>,
+    pub(crate) issues: Vec<String>,
+}

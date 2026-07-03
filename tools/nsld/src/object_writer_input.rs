@@ -6,6 +6,7 @@ use super::{
         toml_block_bool_value, toml_block_isize_value, toml_block_string_value,
         toml_block_usize_value, toml_table_blocks,
     },
+    object_writer_backend::{object_writer_backend, object_writer_backend_readiness},
     reports::{
         NsldObjectRelocationSeedDiagnostic, NsldObjectSectionDiagnostic,
         NsldObjectWriterDryRunEmitReport, NsldObjectWriterDryRunReport,
@@ -145,10 +146,13 @@ pub(crate) fn nsld_object_writer_dry_run_report(
                 .map(|issue| format!("object-writer-input:{issue}")),
         );
     }
-    let can_emit_object = object_plan.ready
-        && verify.valid
-        && object_plan.unsupported_features.is_empty()
-        && blockers.is_empty();
+    let backend = object_writer_backend(
+        &object_plan.target_arch,
+        &object_plan.target_os,
+        &object_plan.object_format,
+    );
+    let readiness =
+        object_writer_backend_readiness(&backend, object_plan.ready && verify.valid, &blockers);
 
     NsldObjectWriterDryRunReport {
         manifest: manifest.display().to_string(),
@@ -157,15 +161,15 @@ pub(crate) fn nsld_object_writer_dry_run_report(
             .join(format!("nuis.nsld.{}", object_plan.object_format))
             .display()
             .to_string(),
-        writer_target_id: object_plan.writer_target_id,
+        writer_target_id: readiness.target_id,
         object_plan_hash: object_plan.object_plan_hash,
         object_layout_hash: object_plan.object_layout_hash,
         relocation_seed_table_hash: object_plan.relocation_seed_table_hash,
         section_count: object_plan.section_count,
         relocation_seed_count: object_plan.relocation_seed_count,
         writer_input_valid: verify.valid,
-        can_emit_object,
-        dry_run_ready: can_emit_object,
+        can_emit_object: readiness.can_emit_object,
+        dry_run_ready: readiness.can_emit_object,
         blockers,
     }
 }

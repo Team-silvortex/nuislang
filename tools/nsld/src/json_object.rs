@@ -311,3 +311,75 @@ pub(crate) fn nsld_object_byte_layout_verify_report_json(
     ];
     format!("{{{}}}", fields.join(","))
 }
+
+pub(crate) fn nsld_object_file_layout_report_json(report: &NsldObjectFileLayoutReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_object_file_layout"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("writer_target_id", &report.writer_target_id),
+        json_string_field("backend_kind", &report.backend_kind),
+        json_string_field("object_format", &report.object_format),
+        json_string_field("object_plan_hash", &report.object_plan_hash),
+        json_string_field("byte_layout_hash", &report.byte_layout_hash),
+        json_string_field("file_layout_hash", &report.file_layout_hash),
+        json_usize_field("record_count", report.record_count),
+        json_usize_field("total_file_size_bytes", report.total_file_size_bytes),
+        json_bool_field("layout_ready", report.layout_ready),
+        format!(
+            "\"records\":[{}]",
+            nsld_object_file_layout_records_json(&report.records)
+        ),
+        json_string_array_field("blockers", &report.blockers),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_object_file_layout_emit_report_json(
+    report: &NsldObjectFileLayoutEmitReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_object_file_layout_emit"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_bool_field("layout_ready", report.layout_ready),
+        json_string_field("file_layout_hash", &report.file_layout_hash),
+        json_usize_field("record_count", report.record_count),
+        json_usize_field("total_file_size_bytes", report.total_file_size_bytes),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_object_file_layout_verify_report_json(
+    report: &NsldObjectFileLayoutVerifyReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_object_file_layout_verify"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("input_path", &report.input_path),
+        json_bool_field("valid", report.valid),
+        json_string_field(
+            "expected_file_layout_hash",
+            &report.expected_file_layout_hash,
+        ),
+        json_usize_field("expected_record_count", report.expected_record_count),
+        json_usize_field(
+            "expected_total_file_size_bytes",
+            report.expected_total_file_size_bytes,
+        ),
+        json_optional_string_field(
+            "actual_file_layout_hash",
+            report.actual_file_layout_hash.as_deref(),
+        ),
+        json_optional_usize_field("actual_record_count", report.actual_record_count),
+        json_optional_usize_field(
+            "actual_total_file_size_bytes",
+            report.actual_total_file_size_bytes,
+        ),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}

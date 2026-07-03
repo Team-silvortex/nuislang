@@ -4,8 +4,8 @@ use super::{
     reports::{
         NsldAssembleSectionDiagnostic, NsldClockEdgeDiagnostic, NsldDataSegmentDiagnostic,
         NsldDomainDiagnostic, NsldLinkInputDiagnostic, NsldLinkUnitDiagnostic,
-        NsldObjectRelocationSeedDiagnostic, NsldObjectSectionDiagnostic,
-        NsldSidecarCapabilityDiagnostic,
+        NsldObjectFileLayoutRecordDiagnostic, NsldObjectRelocationSeedDiagnostic,
+        NsldObjectSectionDiagnostic, NsldSidecarCapabilityDiagnostic,
     },
 };
 
@@ -136,6 +136,26 @@ pub(crate) fn nsld_object_relocation_seeds_json(
                 json_string_field("target_symbol", &seed.target_symbol),
                 json_isize_field("addend", seed.addend),
                 json_bool_field("native_relocation_ready", seed.native_relocation_ready),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+pub(crate) fn nsld_object_file_layout_records_json(
+    records: &[NsldObjectFileLayoutRecordDiagnostic],
+) -> String {
+    records
+        .iter()
+        .map(|record| {
+            let fields = vec![
+                json_usize_field("order_index", record.order_index),
+                json_string_field("record_id", &record.record_id),
+                json_string_field("record_kind", &record.record_kind),
+                json_usize_field("file_offset", record.file_offset),
+                json_usize_field("size_bytes", record.size_bytes),
+                json_usize_field("alignment", record.alignment),
             ];
             format!("{{{}}}", fields.join(","))
         })

@@ -228,3 +228,60 @@ fn parses_verify_object_byte_layout_input_and_json_flag() {
         })
     );
 }
+
+#[test]
+fn parses_object_file_layout_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "object-file-layout".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::ObjectFileLayout {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_emit_object_file_layout_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "emit-object-file-layout".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::EmitObjectFileLayout {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_verify_object_file_layout_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "verify-object-file-layout".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::VerifyObjectFileLayout {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}

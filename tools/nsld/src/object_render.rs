@@ -1,5 +1,5 @@
 use super::{
-    reports::NsldObjectByteLayoutReport,
+    reports::{NsldObjectByteLayoutReport, NsldObjectFileLayoutReport},
     reports::{NsldObjectEmitReport, NsldObjectPlanReport, NsldObjectWriterDryRunReport},
     toml::{escape_toml_string, toml_string_array_literal},
     NSLD_LINK_INPUT_TABLE_PRODUCER, NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE, NSLD_OBJECT_PLAN_KIND,
@@ -464,6 +464,79 @@ pub(crate) fn render_object_byte_layout(report: &NsldObjectByteLayoutReport) -> 
             "source_hash = \"{}\"\n",
             escape_toml_string(&section.source_hash)
         ));
+    }
+    out
+}
+
+pub(crate) fn render_object_file_layout(report: &NsldObjectFileLayoutReport) -> String {
+    let mut out = String::new();
+    out.push_str("schema = \"nuis-nsld-object-file-layout-v1\"\n");
+    out.push_str("schema_version = 1\n");
+    out.push_str("kind = \"object-file-layout\"\n");
+    out.push_str(&format!(
+        "producer = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
+    ));
+    out.push_str(&format!(
+        "producer_phase = \"{}\"\n",
+        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
+    ));
+    out.push_str(&format!(
+        "manifest = \"{}\"\n",
+        escape_toml_string(&report.manifest)
+    ));
+    out.push_str(&format!(
+        "output_path = \"{}\"\n",
+        escape_toml_string(&report.output_path)
+    ));
+    out.push_str(&format!(
+        "writer_target_id = \"{}\"\n",
+        escape_toml_string(&report.writer_target_id)
+    ));
+    out.push_str(&format!(
+        "backend_kind = \"{}\"\n",
+        escape_toml_string(&report.backend_kind)
+    ));
+    out.push_str(&format!(
+        "object_format = \"{}\"\n",
+        escape_toml_string(&report.object_format)
+    ));
+    out.push_str(&format!(
+        "object_plan_hash = \"{}\"\n",
+        escape_toml_string(&report.object_plan_hash)
+    ));
+    out.push_str(&format!(
+        "byte_layout_hash = \"{}\"\n",
+        escape_toml_string(&report.byte_layout_hash)
+    ));
+    out.push_str(&format!(
+        "file_layout_hash = \"{}\"\n",
+        escape_toml_string(&report.file_layout_hash)
+    ));
+    out.push_str(&format!("record_count = {}\n", report.record_count));
+    out.push_str(&format!(
+        "total_file_size_bytes = {}\n",
+        report.total_file_size_bytes
+    ));
+    out.push_str(&format!("layout_ready = {}\n", report.layout_ready));
+    out.push_str(&format!(
+        "blockers = [{}]\n",
+        toml_string_array_literal(&report.blockers)
+    ));
+    for record in &report.records {
+        out.push_str("\n[[file_layout_record]]\n");
+        out.push_str(&format!("order_index = {}\n", record.order_index));
+        out.push_str(&format!(
+            "record_id = \"{}\"\n",
+            escape_toml_string(&record.record_id)
+        ));
+        out.push_str(&format!(
+            "record_kind = \"{}\"\n",
+            escape_toml_string(&record.record_kind)
+        ));
+        out.push_str(&format!("file_offset = {}\n", record.file_offset));
+        out.push_str(&format!("size_bytes = {}\n", record.size_bytes));
+        out.push_str(&format!("alignment = {}\n", record.alignment));
     }
     out
 }
