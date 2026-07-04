@@ -1,0 +1,4 @@
+name = "file_roundtrip_demo"
+entry = "main.ns"
+modules = ["main.ns"]
+galaxy = ["std=workspace"]

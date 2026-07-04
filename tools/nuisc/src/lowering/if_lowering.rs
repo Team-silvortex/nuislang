@@ -42,6 +42,16 @@ pub(super) fn lower_if_pair(
         return Ok(LoweredIfOutcome::Continued);
     }
 
+    if let Some(lowered) = lower_guard_return_with_surviving_binding(
+        &condition_name,
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(lowered);
+    }
+
     if then_body.len() != 1 || else_body.len() != 1 {
         if else_body.is_empty() {
             if let Some(then_branch) = prepare_terminal_branch(then_body, &state.pure_helpers) {
@@ -334,4 +344,30 @@ pub(super) fn lower_if_pair(
         }
         _ => Err(unsupported_if_shape_message(then_body, else_body)),
     }
+}
+
+fn lower_guard_return_with_surviving_binding(
+    condition_name: &str,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<LoweredIfOutcome>, String> {
+    let Some(PreparedTerminalBranch::Return(returned)) =
+        prepare_terminal_branch(then_body, &state.pure_helpers)
+    else {
+        return Ok(None);
+    };
+    let pure_helpers = state.pure_helpers.clone();
+    let Some((surviving_name, surviving_value)) =
+        lower_binding_if_chain(else_body, state, bindings, &pure_helpers)?
+    else {
+        return Ok(None);
+    };
+    let returned_name = lower_expr(&returned, state, bindings)?;
+    lower_guard_return(condition_name.to_owned(), returned_name, state);
+    Ok(Some(LoweredIfOutcome::Bind {
+        name: surviving_name,
+        value: surviving_value,
+    }))
 }

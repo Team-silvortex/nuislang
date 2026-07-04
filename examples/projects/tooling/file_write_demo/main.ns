@@ -1,0 +1,52 @@
+use cpu StdFsContracts;
+
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+
+  struct FileWriteProjectSummary {
+    path_handle: i64,
+    file_handle: i64,
+    payload_len: i64,
+    written_bytes: i64,
+    close_code: i64
+  }
+
+  fn capture_file_write_project(prefix_handle: i64, text_handle: i64, flags: i64) -> FileWriteProjectSummary {
+    let path_handle: i64 = host_temp_file_handle(prefix_handle);
+    let file_handle: i64 = host_file_open(path_handle, flags);
+    let payload_len: i64 = host_text_len(text_handle);
+    return FileWriteProjectSummary {
+      path_handle: path_handle,
+      file_handle: file_handle,
+      payload_len: payload_len,
+      written_bytes: host_file_write(file_handle, text_handle),
+      close_code: host_file_close(file_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: FileWriteProjectSummary = capture_file_write_project(221, 777, 1537);
+    let total: i64 = StdFsContracts.file_write_status_total(
+      summary.file_handle,
+      summary.written_bytes,
+      summary.close_code
+    ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle);
+    if !StdFsContracts.file_handle_ok(summary.file_handle) {
+      return StdFsContracts.fs_error();
+    }
+    if !StdFsContracts.write_covers_payload(summary.payload_len, summary.written_bytes) {
+      return StdFsContracts.fs_error();
+    }
+    if !StdFsContracts.close_ok(summary.close_code) {
+      return StdFsContracts.fs_error();
+    }
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
+  }
+}

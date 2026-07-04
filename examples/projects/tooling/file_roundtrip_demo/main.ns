@@ -1,0 +1,73 @@
+use cpu StdFsContracts;
+
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+
+  struct FileRoundtripProjectSummary {
+    path_handle: i64,
+    write_file_handle: i64,
+    payload_len: i64,
+    write_code: i64,
+    write_close_code: i64,
+    read_file_handle: i64,
+    read_len: i64,
+    read_code: i64,
+    read_close_code: i64
+  }
+
+  fn capture_file_roundtrip_project(
+    prefix_handle: i64,
+    text_handle: i64,
+    write_flags: i64,
+    read_flags: i64,
+    read_len: i64
+  ) -> FileRoundtripProjectSummary {
+    let path_handle: i64 = host_temp_file_handle(prefix_handle);
+    let write_file_handle: i64 = host_file_open(path_handle, write_flags);
+    let payload_len: i64 = host_text_len(text_handle);
+    let write_code: i64 = host_file_write(write_file_handle, text_handle);
+    let write_close_code: i64 = host_file_close(write_file_handle);
+    let read_file_handle: i64 = host_file_open(path_handle, read_flags);
+    let backing: ref Buffer = alloc_buffer(payload_len, 0);
+    return FileRoundtripProjectSummary {
+      path_handle: path_handle,
+      write_file_handle: write_file_handle,
+      payload_len: payload_len,
+      write_code: write_code,
+      write_close_code: write_close_code,
+      read_file_handle: read_file_handle,
+      read_len: payload_len,
+      read_code: host_file_read(read_file_handle, host_buffer_handle(backing), payload_len),
+      read_close_code: host_file_close(read_file_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: FileRoundtripProjectSummary =
+      capture_file_roundtrip_project(2221, 777, 1537, 0, 16);
+    let total: i64 = StdFsContracts.file_roundtrip_status_total(
+      summary.path_handle,
+      summary.write_file_handle,
+      summary.write_code,
+      summary.write_close_code,
+      summary.read_file_handle,
+      summary.read_code,
+      summary.read_close_code
+    );
+    if !StdFsContracts.write_covers_payload(summary.payload_len, summary.write_code) {
+      return StdFsContracts.fs_error();
+    }
+    if !StdFsContracts.read_covers_request(summary.read_len, summary.read_code) {
+      return StdFsContracts.fs_error();
+    }
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
+  }
+}

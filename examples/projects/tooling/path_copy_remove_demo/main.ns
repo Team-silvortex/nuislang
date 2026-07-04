@@ -1,0 +1,106 @@
+use cpu StdFsContracts;
+
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+  extern "c" fn host_fs_size(path_handle: i64) -> i64;
+  extern "c" fn host_path_copy(src_handle: i64, dst_handle: i64) -> i64;
+  extern "c" fn host_path_remove(path_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+
+  struct PathCopyRemoveProjectSummary {
+    src_path_handle: i64,
+    dst_path_handle: i64,
+    src_file_handle: i64,
+    payload_len: i64,
+    write_status: i64,
+    close_status: i64,
+    copy_status: i64,
+    src_exists: i64,
+    dst_exists: i64,
+    dst_size: i64,
+    src_remove_status: i64,
+    dst_remove_status: i64,
+    src_exists_after_remove: i64,
+    dst_exists_after_remove: i64
+  }
+
+  fn capture_path_copy_remove_project(
+    src_prefix_handle: i64,
+    dst_prefix_handle: i64,
+    payload_handle: i64,
+    write_flags: i64
+  ) -> PathCopyRemoveProjectSummary {
+    let src_path_handle: i64 = host_temp_file_handle(src_prefix_handle);
+    let dst_path_handle: i64 = host_temp_file_handle(dst_prefix_handle);
+    let src_file_handle: i64 = host_file_open(src_path_handle, write_flags);
+    let payload_len: i64 = host_text_len(payload_handle);
+    let write_status: i64 = host_file_write(src_file_handle, payload_handle);
+    let close_status: i64 = host_file_close(src_file_handle);
+    let copy_status: i64 = host_path_copy(src_path_handle, dst_path_handle);
+    let src_exists: i64 = host_fs_exists(src_path_handle);
+    let dst_exists: i64 = host_fs_exists(dst_path_handle);
+    let dst_size: i64 = host_fs_size(dst_path_handle);
+    let src_remove_status: i64 = host_path_remove(src_path_handle);
+    let dst_remove_status: i64 = host_path_remove(dst_path_handle);
+    return PathCopyRemoveProjectSummary {
+      src_path_handle: src_path_handle,
+      dst_path_handle: dst_path_handle,
+      src_file_handle: src_file_handle,
+      payload_len: payload_len,
+      write_status: write_status,
+      close_status: close_status,
+      copy_status: copy_status,
+      src_exists: src_exists,
+      dst_exists: dst_exists,
+      dst_size: dst_size,
+      src_remove_status: src_remove_status,
+      dst_remove_status: dst_remove_status,
+      src_exists_after_remove: host_fs_exists(src_path_handle),
+      dst_exists_after_remove: host_fs_exists(dst_path_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: PathCopyRemoveProjectSummary =
+      capture_path_copy_remove_project(2411, 2412, 9001, 1537);
+    let total: i64 = StdFsContracts.path_copy_status_total(
+      summary.src_path_handle,
+      summary.dst_path_handle,
+      summary.src_file_handle,
+      summary.write_status,
+      summary.close_status,
+      summary.copy_status,
+      summary.src_exists,
+      summary.dst_exists
+    );
+    if !StdFsContracts.write_covers_payload(summary.payload_len, summary.write_status) {
+      return StdFsContracts.fs_error();
+    }
+    if summary.copy_status <= 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.dst_size < summary.payload_len {
+      return StdFsContracts.fs_error();
+    }
+    if summary.src_remove_status <= 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.dst_remove_status <= 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.src_exists_after_remove != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.dst_exists_after_remove != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
+  }
+}

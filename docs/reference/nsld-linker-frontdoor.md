@@ -85,6 +85,18 @@ cargo run -p nsld -- emit-object-byte-layout <artifact-output-dir>
 cargo run -p nsld -- emit-object-byte-layout <artifact-output-dir> --json
 cargo run -p nsld -- verify-object-byte-layout <artifact-output-dir>
 cargo run -p nsld -- verify-object-byte-layout <artifact-output-dir> --json
+cargo run -p nsld -- object-file-layout <artifact-output-dir>
+cargo run -p nsld -- object-file-layout <artifact-output-dir> --json
+cargo run -p nsld -- emit-object-file-layout <artifact-output-dir>
+cargo run -p nsld -- emit-object-file-layout <artifact-output-dir> --json
+cargo run -p nsld -- verify-object-file-layout <artifact-output-dir>
+cargo run -p nsld -- verify-object-file-layout <artifact-output-dir> --json
+cargo run -p nsld -- object-image-dry-run <artifact-output-dir>
+cargo run -p nsld -- object-image-dry-run <artifact-output-dir> --json
+cargo run -p nsld -- emit-object-image-dry-run <artifact-output-dir>
+cargo run -p nsld -- emit-object-image-dry-run <artifact-output-dir> --json
+cargo run -p nsld -- verify-object-image-dry-run <artifact-output-dir>
+cargo run -p nsld -- verify-object-image-dry-run <artifact-output-dir> --json
 cargo run -p nsld -- container-plan <artifact-output-dir>
 cargo run -p nsld -- container-plan <artifact-output-dir> --json
 cargo run -p nsld -- emit-container-plan <artifact-output-dir>
@@ -280,8 +292,22 @@ layout: file offsets, byte sizes, alignment, total byte span, and a
 `byte_layout_hash`. `emit-object-byte-layout` writes
 `nuis.nsld.object-byte-layout.toml`, and `verify-object-byte-layout` checks it
 before any future platform-specific object writer emits bytes.
-When blocked, it also writes `nuis.nsld.object.blocked.toml` so CI and later
-linker stages can consume the failed emission state without scraping stderr.
+`nsld object-file-layout` wraps that byte layout in the selected native object
+container family and records file-level records, final offsets, and a
+`file_layout_hash`. `emit-object-file-layout` writes
+`nuis.nsld.object-file-layout.toml`, and `verify-object-file-layout` keeps that
+file-level contract locked to the current byte layout.
+`nsld object-image-dry-run` is the current native-image boundary. It asks the
+registered object-image backend to encode the selected file layout into an
+in-memory image without treating it as a final emitted object. Today the
+Mach-O arm64 backend can construct dry-run bytes; ELF and COFF slots are
+registered but intentionally report `not-implemented`. `emit-object-image-dry-run`
+writes both `nuis.nsld.object-image-dry-run.toml` and
+`nuis.nsld.object-image-dry-run.bin`, while `verify-object-image-dry-run`
+checks the report, image size, and image hash.
+The `emit-object` frontdoor also writes `nuis.nsld.object.blocked.toml` while
+real object emission is blocked, so CI and later linker stages can consume the
+failed emission state without scraping stderr.
 
 `nsld container-plan` derives the first Nuis-owned binary container layout
 plan. It consumes the section manifest, records the container magic/version,

@@ -417,6 +417,28 @@ pub(crate) fn infer_nir_expr_type(
             }
             struct_field_type(&base_ty, field, struct_table)
         }
+        NirExpr::VariantIs { .. } => Some(bool_type()),
+        NirExpr::VariantFieldAccess {
+            base,
+            variant,
+            field,
+        } => {
+            let base_ty = infer_nir_expr_type(base, bindings, signatures, struct_table)?;
+            let variant_ty = if variant
+                .rsplit_once('.')
+                .is_some_and(|(parent, _)| parent == base_ty.name)
+            {
+                NirTypeRef {
+                    name: variant.clone(),
+                    generic_args: base_ty.generic_args,
+                    is_optional: false,
+                    is_ref: false,
+                }
+            } else {
+                named_type(variant)
+            };
+            struct_field_type(&variant_ty, field, struct_table)
+        }
         NirExpr::Binary { op, lhs, rhs } => {
             let lhs_ty = infer_nir_expr_type(lhs, bindings, signatures, struct_table)?;
             let rhs_ty = infer_nir_expr_type(rhs, bindings, signatures, struct_table)?;

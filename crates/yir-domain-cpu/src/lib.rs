@@ -1,8 +1,9 @@
-use std::env;
+use std::{collections::BTreeMap, env};
 
 use yir_core::{
     DataHandleTable, DataMarker, ExecutionState, InstructionSemantics, Node, RegisteredMod,
-    RenderPipeline, Resource, StructValue, SurfaceTarget, TaskLifecycleState, Value, Viewport,
+    RenderPipeline, Resource, StructValue, SurfaceTarget, TaskLifecycleState, Value,
+    VariantUnionValue, Viewport,
 };
 
 pub struct CpuMod;
@@ -975,6 +976,24 @@ impl RegisteredMod for CpuMod {
                 if node.op.args.len() != 2 {
                     return Err(format!(
                         "node `{}` expects `cpu.field <name> <resource> <struct> <field_name>`",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+            }
+            "variant_is" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.variant_is <name> <resource> <value> <variant_name>`",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+            }
+            "variant_field" => {
+                if node.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.variant_field <name> <resource> <value> <variant_name> <field_name>`",
                         node.name
                     ));
                 }
@@ -2236,6 +2255,60 @@ impl RegisteredMod for CpuMod {
                         )
                     })
             }
+            "variant_is" => {
+                let value = state.expect_value(&node.op.args[0])?;
+                Ok(Value::Bool(match value {
+                    Value::Struct(struct_value) => struct_value.type_name == node.op.args[1],
+                    Value::VariantUnion(union) => union.active_variant == node.op.args[1],
+                    other => {
+                        return Err(format!(
+                            "node `{}` expects variant-shaped value from `{}`, got {}",
+                            node.name, node.op.args[0], other
+                        ))
+                    }
+                }))
+            }
+            "variant_field" => {
+                let value = state.expect_value(&node.op.args[0])?;
+                let variant_name = &node.op.args[1];
+                let field_name = &node.op.args[2];
+                let struct_value = match value {
+                    Value::Struct(struct_value) if &struct_value.type_name == variant_name => {
+                        struct_value
+                    }
+                    Value::Struct(struct_value) => {
+                        return Err(format!(
+                            "node `{}` expects variant `{}` from `{}`, got `{}`",
+                            node.name, variant_name, node.op.args[0], struct_value.type_name
+                        ))
+                    }
+                    Value::VariantUnion(union) => {
+                        union.variants.get(variant_name).ok_or_else(|| {
+                            format!(
+                                "node `{}` reads missing variant `{}` from union `{}`",
+                                node.name, variant_name, union.parent_type_name
+                            )
+                        })?
+                    }
+                    other => {
+                        return Err(format!(
+                            "node `{}` expects variant-shaped value from `{}`, got {}",
+                            node.name, node.op.args[0], other
+                        ))
+                    }
+                };
+                struct_value
+                    .fields
+                    .iter()
+                    .find(|(name, _)| name == field_name)
+                    .map(|(_, value)| value.clone())
+                    .ok_or_else(|| {
+                        format!(
+                            "node `{}` reads missing field `{}` from variant `{}`",
+                            node.name, field_name, variant_name
+                        )
+                    })
+            }
             "null" => Ok(Value::Pointer(None)),
             "borrow" | "move_ptr" => Ok(Value::Pointer(state.expect_pointer(&node.op.args[0])?)),
             "param_bool" => Ok(Value::Bool(false)),
@@ -2986,10 +3059,26 @@ impl RegisteredMod for CpuMod {
                     + state.expect_int(&node.op.args[2])?,
             )),
             "select" => {
-                let cond = state.expect_int(&node.op.args[0])?;
-                let then_value = state.expect_int(&node.op.args[1])?;
-                let else_value = state.expect_int(&node.op.args[2])?;
-                Ok(Value::Int(if cond != 0 { then_value } else { else_value }))
+                let cond = match state.expect_value(&node.op.args[0])? {
+                    Value::Bool(value) => *value,
+                    Value::Int(value) => *value != 0,
+                    other => {
+                        return Err(format!(
+                            "node `{}` expects bool or i64 select condition, got {}",
+                            node.name, other
+                        ))
+                    }
+                };
+                let then_value = state.expect_value(&node.op.args[1])?;
+                let else_value = state.expect_value(&node.op.args[2])?;
+                if let Some(union) = select_variant_union(cond, then_value, else_value) {
+                    return Ok(Value::VariantUnion(union));
+                }
+                Ok(if cond {
+                    then_value.clone()
+                } else {
+                    else_value.clone()
+                })
             }
             "cast_bool_to_i64" => Ok(Value::Int(if state.expect_bool(&node.op.args[0])? {
                 1
@@ -4102,9 +4191,248 @@ fn execute_extern_i32(abi: &str, symbol: &str, args: &[i64]) -> Result<i32, Stri
     Ok(value as i32)
 }
 
+fn variant_parent_name(type_name: &str) -> Option<&str> {
+    type_name.rsplit_once('.').map(|(parent, _)| parent)
+}
+
+fn struct_as_variant_union(
+    struct_value: &StructValue,
+    active_variant: String,
+) -> Option<VariantUnionValue> {
+    let parent_type_name = variant_parent_name(&struct_value.type_name)?.to_owned();
+    let mut variants = BTreeMap::new();
+    variants.insert(struct_value.type_name.clone(), struct_value.clone());
+    Some(VariantUnionValue {
+        parent_type_name,
+        active_variant,
+        variants,
+    })
+}
+
+fn merge_variant_maps(
+    lhs: &BTreeMap<String, StructValue>,
+    rhs: &BTreeMap<String, StructValue>,
+) -> BTreeMap<String, StructValue> {
+    let mut merged = lhs.clone();
+    for (name, value) in rhs {
+        merged.entry(name.clone()).or_insert_with(|| value.clone());
+    }
+    merged
+}
+
+fn select_variant_union(
+    cond: bool,
+    then_value: &Value,
+    else_value: &Value,
+) -> Option<VariantUnionValue> {
+    match (then_value, else_value) {
+        (Value::Struct(then_struct), Value::Struct(else_struct))
+            if then_struct.type_name != else_struct.type_name =>
+        {
+            let then_parent = variant_parent_name(&then_struct.type_name)?;
+            let else_parent = variant_parent_name(&else_struct.type_name)?;
+            if then_parent != else_parent {
+                return None;
+            }
+            let then_union = struct_as_variant_union(
+                then_struct,
+                if cond {
+                    then_struct.type_name.clone()
+                } else {
+                    else_struct.type_name.clone()
+                },
+            )?;
+            let else_union =
+                struct_as_variant_union(else_struct, then_union.active_variant.clone())?;
+            Some(VariantUnionValue {
+                parent_type_name: then_parent.to_owned(),
+                active_variant: then_union.active_variant,
+                variants: merge_variant_maps(&then_union.variants, &else_union.variants),
+            })
+        }
+        (Value::VariantUnion(then_union), Value::VariantUnion(else_union)) => {
+            if then_union.parent_type_name != else_union.parent_type_name {
+                return None;
+            }
+            Some(VariantUnionValue {
+                parent_type_name: then_union.parent_type_name.clone(),
+                active_variant: if cond {
+                    then_union.active_variant.clone()
+                } else {
+                    else_union.active_variant.clone()
+                },
+                variants: merge_variant_maps(&then_union.variants, &else_union.variants),
+            })
+        }
+        (Value::VariantUnion(union), Value::Struct(struct_value))
+        | (Value::Struct(struct_value), Value::VariantUnion(union)) => {
+            let parent = variant_parent_name(&struct_value.type_name)?;
+            if parent != union.parent_type_name {
+                return None;
+            }
+            let mut variants = union.variants.clone();
+            variants
+                .entry(struct_value.type_name.clone())
+                .or_insert_with(|| struct_value.clone());
+            let active_variant = if matches!(then_value, Value::VariantUnion(_)) {
+                if cond {
+                    union.active_variant.clone()
+                } else {
+                    struct_value.type_name.clone()
+                }
+            } else if cond {
+                struct_value.type_name.clone()
+            } else {
+                union.active_variant.clone()
+            };
+            Some(VariantUnionValue {
+                parent_type_name: union.parent_type_name.clone(),
+                active_variant,
+                variants,
+            })
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yir_core::{Operation, ResourceKind};
+
+    fn cpu_resource() -> Resource {
+        Resource {
+            name: "cpu0".to_owned(),
+            kind: ResourceKind::parse("cpu.main"),
+        }
+    }
+
+    fn cpu_node(name: &str, instruction: &str, args: Vec<&str>) -> Node {
+        Node {
+            name: name.to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse(
+                instruction,
+                args.into_iter().map(str::to_owned).collect::<Vec<_>>(),
+            )
+            .unwrap(),
+        }
+    }
+
+    #[test]
+    fn execute_variant_is_and_variant_field_on_enum_structs() {
+        let cpu = CpuMod;
+        let resource = cpu_resource();
+        let mut state = ExecutionState::default();
+        state.values.insert(
+            "result".to_owned(),
+            Value::Struct(StructValue {
+                type_name: "Result.Ok".to_owned(),
+                fields: vec![("value".to_owned(), Value::Int(42))],
+            }),
+        );
+
+        let is_ok = cpu
+            .execute(
+                &cpu_node("is_ok", "cpu.variant_is", vec!["result", "Result.Ok"]),
+                &resource,
+                &mut state,
+            )
+            .expect("variant_is should execute");
+        assert_eq!(is_ok, Value::Bool(true));
+
+        let payload = cpu
+            .execute(
+                &cpu_node(
+                    "payload",
+                    "cpu.variant_field",
+                    vec!["result", "Result.Ok", "value"],
+                ),
+                &resource,
+                &mut state,
+            )
+            .expect("variant_field should execute");
+        assert_eq!(payload, Value::Int(42));
+
+        let wrong_variant = cpu
+            .execute(
+                &cpu_node(
+                    "wrong_payload",
+                    "cpu.variant_field",
+                    vec!["result", "Result.Err", "value"],
+                ),
+                &resource,
+                &mut state,
+            )
+            .expect_err("wrong variant access should fail");
+        assert!(wrong_variant.contains("expects variant `Result.Err`"));
+    }
+
+    #[test]
+    fn execute_select_between_enum_variants_preserves_union_payloads() {
+        let cpu = CpuMod;
+        let resource = cpu_resource();
+        let mut state = ExecutionState::default();
+        state.values.insert("cond".to_owned(), Value::Bool(true));
+        state.values.insert(
+            "ok".to_owned(),
+            Value::Struct(StructValue {
+                type_name: "Result.Ok".to_owned(),
+                fields: vec![("value".to_owned(), Value::Int(7))],
+            }),
+        );
+        state.values.insert(
+            "err".to_owned(),
+            Value::Struct(StructValue {
+                type_name: "Result.Err".to_owned(),
+                fields: vec![("value".to_owned(), Value::Int(99))],
+            }),
+        );
+
+        let selected = cpu
+            .execute(
+                &cpu_node("selected", "cpu.select", vec!["cond", "ok", "err"]),
+                &resource,
+                &mut state,
+            )
+            .expect("select should execute");
+        state.values.insert("selected".to_owned(), selected);
+
+        let is_ok = cpu
+            .execute(
+                &cpu_node("is_ok", "cpu.variant_is", vec!["selected", "Result.Ok"]),
+                &resource,
+                &mut state,
+            )
+            .expect("variant_is should execute");
+        assert_eq!(is_ok, Value::Bool(true));
+
+        let ok_payload = cpu
+            .execute(
+                &cpu_node(
+                    "ok_payload",
+                    "cpu.variant_field",
+                    vec!["selected", "Result.Ok", "value"],
+                ),
+                &resource,
+                &mut state,
+            )
+            .expect("selected Ok payload should stay available");
+        assert_eq!(ok_payload, Value::Int(7));
+
+        let err_payload = cpu
+            .execute(
+                &cpu_node(
+                    "err_payload",
+                    "cpu.variant_field",
+                    vec!["selected", "Result.Err", "value"],
+                ),
+                &resource,
+                &mut state,
+            )
+            .expect("non-active Err payload should stay available for guarded select lowering");
+        assert_eq!(err_payload, Value::Int(99));
+    }
 
     #[test]
     fn parse_carry_branch_source_accepts_keep_prev_carry_kind() {

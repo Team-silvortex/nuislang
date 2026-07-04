@@ -2,9 +2,7 @@ use data FabricPlane;
 use shader SurfaceShader;
 
 mod cpu Main {
-  extern "c" fn host_error_code(kind_handle: i64) -> i64;
-  extern "c" fn host_error_message(kind_handle: i64) -> i64;
-  extern "c" fn host_error_severity(kind_handle: i64) -> i64;
+  type FabricBindings = HandleTable<FabricPlaneBindings>;
 
   enum Result<T, E> {
     Ok(T),
@@ -126,6 +124,18 @@ mod cpu Main {
     return 0;
   }
 
+  fn host_error_code(kind_handle: i64) -> i64 {
+    return kind_handle + 9000;
+  }
+
+  fn host_error_message(kind_handle: i64) -> i64 {
+    return kind_handle + 90;
+  }
+
+  fn host_error_severity(kind_handle: i64) -> i64 {
+    return severity_code(classify_error_severity(kind_handle));
+  }
+
   fn build_error_code(kind_handle: i64) -> ErrorCode {
     let family: ErrorFamily = classify_error_family(kind_handle);
     return ErrorCode {
@@ -239,24 +249,6 @@ mod cpu Main {
     }
   }
 
-  fn draw_metric_from_pass(
-    result: Result<Pass, ErrorEnvelope>,
-    packet: Window<SurfaceShaderPacket>,
-    packet_field_count: i64
-  ) -> Result<i64, ErrorEnvelope> {
-    match result {
-      Result.Ok(pass_value) => {
-        let draw_result: ShaderResult<Frame> = shader_result(
-          shader_profile_draw_instanced("SurfaceShader", pass_value, packet)
-        );
-        return map_ok_metric(lift_frame_result(draw_result, packet_field_count));
-      }
-      Result.Err(error) => {
-        return Result.Err(error);
-      }
-    }
-  }
-
   fn capture_shader_result_enum_project() -> ShaderResultEnumProjectSummary {
     cpu_bind_core(0);
     cpu_window(320, 200, "shader_result_enum_demo");
@@ -289,6 +281,7 @@ mod cpu Main {
       shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius);
 
     data_profile_bind_core("FabricPlane");
+    let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
     let gpu_packet_draw: ShaderPacketWindow =
       data_profile_send_uplink("FabricPlane", render_controls);
     let gpu_packet_render: ShaderPacketWindow =
@@ -298,11 +291,17 @@ mod cpu Main {
       lift_pass_result(shader_result(shader_profile_begin_pass("SurfaceShader"))),
       packet_tag
     );
-    let draw_metric: Result<i64, ErrorEnvelope> = draw_metric_from_pass(
-      lift_pass_result(shader_result(shader_profile_begin_pass("SurfaceShader"))),
-      gpu_packet_draw,
-      packet_field_count
+    let draw_pass_raw: ShaderResult<Pass> =
+      shader_result(shader_profile_begin_pass("SurfaceShader"));
+    let draw_result_raw: ShaderResult<Frame> = shader_result(
+      shader_profile_draw_instanced(
+        "SurfaceShader",
+        shader_value(draw_pass_raw),
+        gpu_packet_draw
+      )
     );
+    let draw_metric: Result<i64, ErrorEnvelope> =
+      map_ok_metric(lift_frame_result(draw_result_raw, packet_field_count));
     let frame_result_raw: ShaderResult<Frame> =
       shader_result(shader_profile_render("SurfaceShader", gpu_packet_render));
     let frame_metric_result: Result<i64, ErrorEnvelope> =

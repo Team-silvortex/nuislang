@@ -398,7 +398,9 @@ fn lower_expr(
         | NirExpr::Free(_)
         | NirExpr::Binary { .. }
         | NirExpr::StructLiteral { .. }
-        | NirExpr::FieldAccess { .. } => lower_core_expr(expr, state, bindings)
+        | NirExpr::FieldAccess { .. }
+        | NirExpr::VariantIs { .. }
+        | NirExpr::VariantFieldAccess { .. } => lower_core_expr(expr, state, bindings)
             .expect("core expr family must be handled by lower_core_expr"),
     }
 }

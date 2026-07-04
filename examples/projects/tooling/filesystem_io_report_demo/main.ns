@@ -15,7 +15,7 @@ mod cpu Main {
   extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
   extern "c" fn host_file_close(file_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
-  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_line_count(text_handle: i64) -> i64;
   extern "c" fn host_text_word_count(text_handle: i64) -> i64;
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
@@ -79,7 +79,7 @@ mod cpu Main {
     let first_block: i64 = append_line(title_line_handle, joined_line_handle, 10);
     let second_block: i64 = append_line(first_block, status_line_handle, 10);
     let report_handle: i64 = host_text_concat(second_block, 1801);
-    let report_len: i64 = host_text_measure(report_handle);
+    let report_len: i64 = host_text_len(report_handle);
     let stdout_written: i64 = host_stdout_write(report_handle);
     let stderr_written: i64 = host_stderr_write(report_handle);
     let stdout_flushed: i64 = host_stdout_flush();

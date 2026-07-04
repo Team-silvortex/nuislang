@@ -441,7 +441,9 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
                 collect_instantiated_units_expr(value, units);
             }
         }
-        NirExpr::FieldAccess { base, .. } => collect_instantiated_units_expr(base, units),
+        NirExpr::FieldAccess { base, .. }
+        | NirExpr::VariantIs { base, .. }
+        | NirExpr::VariantFieldAccess { base, .. } => collect_instantiated_units_expr(base, units),
         NirExpr::Binary { lhs, rhs, .. } => {
             collect_instantiated_units_expr(lhs, units);
             collect_instantiated_units_expr(rhs, units);

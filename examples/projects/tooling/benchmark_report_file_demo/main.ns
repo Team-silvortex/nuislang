@@ -10,7 +10,7 @@ mod cpu Main {
   extern "c" fn host_file_close(file_handle: i64) -> i64;
   extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
-  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_line_count(text_handle: i64) -> i64;
   extern "c" fn host_text_word_count(text_handle: i64) -> i64;
   extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
@@ -110,10 +110,10 @@ mod cpu Main {
     let second_block: i64 = append_line(first_block, status_line_handle, 10);
     let report_handle: i64 = host_text_concat(second_block, 1801);
     let output_path_handle: i64 = host_temp_file_handle(221);
-    let output_file_handle: i64 = host_file_open(output_path_handle, 1);
+    let output_file_handle: i64 = host_file_open(output_path_handle, 1537);
     let write_code: i64 = host_file_write(output_file_handle, report_handle);
     let output_close_code: i64 = host_file_close(output_file_handle);
-    let report_len: i64 = host_text_measure(report_handle);
+    let report_len: i64 = host_text_len(report_handle);
     let file_validation_total: i64 = StdFsContracts.file_report_output_validation_total(
       output_path_handle,
       output_file_handle,
@@ -135,9 +135,9 @@ mod cpu Main {
       total_span_ns: total_span_ns,
       total_sleep_ns: first_sleep_ns + second_sleep_ns + third_sleep_ns,
       kv_line_handle: kv_line_handle,
-      kv_line_len: host_text_measure(kv_line_handle),
+      kv_line_len: host_text_len(kv_line_handle),
       status_line_handle: status_line_handle,
-      status_line_len: host_text_measure(status_line_handle),
+      status_line_len: host_text_len(status_line_handle),
       report_handle: report_handle,
       report_len: report_len,
       report_lines: host_text_line_count(report_handle),
@@ -186,7 +186,10 @@ mod cpu Main {
       )
       + StdFsContracts.host_fs_value_or_zero(summary.output_path_handle)
       + summary.file_validation_total;
-    if summary.file_validation_total < 4 {
+    if summary.file_validation_total < 3 {
+      return StdTimeContracts.time_error();
+    }
+    if summary.write_code <= 0 {
       return StdTimeContracts.time_error();
     }
     if !StdTextContracts.text_stats_ready(

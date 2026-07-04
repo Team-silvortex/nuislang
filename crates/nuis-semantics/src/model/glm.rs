@@ -24,6 +24,8 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::MethodCall { .. }
         | NirExpr::StructLiteral { .. }
         | NirExpr::FieldAccess { .. }
+        | NirExpr::VariantIs { .. }
+        | NirExpr::VariantFieldAccess { .. }
         | NirExpr::Binary { .. }
         | NirExpr::IsNull(_) => None,
         NirExpr::CpuJoin(_) | NirExpr::CpuJoinResult(_) | NirExpr::CpuThreadJoin(_) => {

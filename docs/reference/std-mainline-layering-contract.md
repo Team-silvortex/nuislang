@@ -200,16 +200,18 @@ Concrete sources:
 
 Current project proof route:
 
-* [file_read_demo](../../examples/projects/filesystem/file_read_demo)
-* [file_write_demo](../../examples/projects/filesystem/file_write_demo)
-* [file_copy_demo](../../examples/projects/filesystem/file_copy_demo)
-* [file_roundtrip_demo](../../examples/projects/filesystem/file_roundtrip_demo)
-* [file_output_demo](../../examples/projects/filesystem/file_output_demo)
-* [directory_create_demo](../../examples/projects/filesystem/directory_create_demo)
-* [directory_remove_demo](../../examples/projects/filesystem/directory_remove_demo)
-* [filesystem_report_demo](../../examples/projects/filesystem/filesystem_report_demo)
-* [filesystem_report_file_demo](../../examples/projects/filesystem/filesystem_report_file_demo)
+* [file_read_demo](../../examples/projects/tooling/file_read_demo)
+* [file_write_demo](../../examples/projects/tooling/file_write_demo)
+* [file_copy_demo](../../examples/projects/tooling/file_copy_demo)
+* [file_roundtrip_demo](../../examples/projects/tooling/file_roundtrip_demo)
+* [file_output_demo](../../examples/projects/tooling/file_output_demo)
+* [directory_create_demo](../../examples/projects/tooling/directory_create_demo)
+* [directory_remove_demo](../../examples/projects/tooling/directory_remove_demo)
+* [filesystem_report_demo](../../examples/projects/tooling/filesystem_report_demo)
+* [filesystem_report_file_demo](../../examples/projects/tooling/filesystem_report_file_demo)
 * [filesystem_io_report_demo](../../examples/projects/tooling/filesystem_io_report_demo)
+* [path_analysis_demo](../../examples/projects/tooling/path_analysis_demo)
+* [path_copy_remove_demo](../../examples/projects/tooling/path_copy_remove_demo)
 
 Current contract rule:
 

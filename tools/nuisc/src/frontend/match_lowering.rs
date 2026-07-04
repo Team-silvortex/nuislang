@@ -85,7 +85,38 @@ pub(super) fn lower_match_stmt_with_async(
         )?;
         (&arms[..wildcard_index], else_body)
     } else if is_exhaustive_option_or_result_match(arms, &value_ty, type_aliases)? {
-        (arms, Vec::new())
+        let (last_arm, arms_to_lower) = arms
+            .split_last()
+            .ok_or_else(|| "internal error: exhaustive match has no arms".to_owned())?;
+        let (_, pattern_bindings) = lower_match_pattern_condition_and_bindings(
+            &last_arm.pattern,
+            &match_value,
+            &value_ty,
+            type_aliases,
+            struct_table,
+        )?;
+        let mut last_bindings = bindings.clone();
+        let mut else_body = Vec::new();
+        for (name, ty, value) in pattern_bindings {
+            last_bindings.insert(name.clone(), ty.clone());
+            else_body.push(NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value,
+            });
+        }
+        else_body.extend(lower_stmt_block_with_async(
+            &last_arm.body,
+            current_domain,
+            current_function_is_async,
+            &mut last_bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        )?);
+        (arms_to_lower, else_body)
     } else {
         return Err(
             "minimal `match` currently requires a final unguarded `_` arm unless an `Option` or `Result` match is explicitly exhaustive"
@@ -411,20 +442,36 @@ fn lower_match_pattern_condition_and_bindings(
             let field = &definition.fields[0];
             let field_ty =
                 instantiate_struct_field_type(&lowered_pattern_ty, definition, &field.ty);
-            let field_expr = NirExpr::FieldAccess {
+            let variant_condition = NirExpr::VariantIs {
                 base: Box::new(lowered_value.clone()),
+                variant: lowered_pattern_ty.name.clone(),
+            };
+            let field_expr = NirExpr::VariantFieldAccess {
+                base: Box::new(lowered_value.clone()),
+                variant: lowered_pattern_ty.name.clone(),
                 field: field.name.clone(),
             };
-            match payload.as_ref() {
-                AstMatchPattern::Wildcard => Ok((NirExpr::Bool(true), Vec::new())),
+            let (payload_condition, bindings) = match payload.as_ref() {
+                AstMatchPattern::Wildcard => (NirExpr::Bool(true), Vec::new()),
                 other => lower_match_pattern_condition_and_bindings(
                     other,
                     &field_expr,
                     &field_ty,
                     type_aliases,
                     struct_table,
-                ),
-            }
+                )?,
+            };
+            Ok((
+                match payload_condition {
+                    NirExpr::Bool(true) => variant_condition,
+                    other => NirExpr::Binary {
+                        op: NirBinaryOp::And,
+                        lhs: Box::new(variant_condition),
+                        rhs: Box::new(other),
+                    },
+                },
+                bindings,
+            ))
         }
         (AstMatchPattern::StructFields { type_ref, fields }, _) => {
             let lowered_pattern_ty = if let Some(type_ref) = type_ref {

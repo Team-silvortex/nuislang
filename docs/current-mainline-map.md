@@ -190,12 +190,18 @@ If you want one shortest checked-in route per question, use:
   [reference/galaxy-frontdoor-prep-sketch.md](reference/galaxy-frontdoor-prep-sketch.md) ->
   [reference/galaxy-texture-handoff-contract.md](reference/galaxy-texture-handoff-contract.md)
 * std filesystem contract smoke:
-  [file_read_demo](../examples/projects/filesystem/file_read_demo) ->
-  [file_write_demo](../examples/projects/filesystem/file_write_demo) ->
-  [file_copy_demo](../examples/projects/filesystem/file_copy_demo) ->
-  [file_roundtrip_demo](../examples/projects/filesystem/file_roundtrip_demo) ->
-  [filesystem_report_demo](../examples/projects/filesystem/filesystem_report_demo) ->
-  [filesystem_report_file_demo](../examples/projects/filesystem/filesystem_report_file_demo)
+  [file_read_demo](../examples/projects/tooling/file_read_demo) ->
+  [file_write_demo](../examples/projects/tooling/file_write_demo) ->
+  [file_copy_demo](../examples/projects/tooling/file_copy_demo) ->
+  [file_output_demo](../examples/projects/tooling/file_output_demo) ->
+  [file_roundtrip_demo](../examples/projects/tooling/file_roundtrip_demo) ->
+  [directory_create_demo](../examples/projects/tooling/directory_create_demo) ->
+  [directory_remove_demo](../examples/projects/tooling/directory_remove_demo) ->
+  [filesystem_report_demo](../examples/projects/tooling/filesystem_report_demo) ->
+  [filesystem_report_file_demo](../examples/projects/tooling/filesystem_report_file_demo) ->
+  [filesystem_io_report_demo](../examples/projects/tooling/filesystem_io_report_demo) ->
+  [path_analysis_demo](../examples/projects/tooling/path_analysis_demo) ->
+  [path_copy_remove_demo](../examples/projects/tooling/path_copy_remove_demo)
   current rule:
   these are `std=workspace` contract consumers and should return process-style
   `fs_ok` / `fs_error` instead of raw probe totals
@@ -204,10 +210,19 @@ If you want one shortest checked-in route per question, use:
   [terminal_io_demo](../examples/projects/tooling/terminal_io_demo) ->
   [io_report_demo](../examples/projects/tooling/io_report_demo) ->
   [filesystem_io_report_demo](../examples/projects/tooling/filesystem_io_report_demo) ->
-  [benchmark_report_file_demo](../examples/projects/tooling/benchmark_report_file_demo)
+  [benchmark_report_file_demo](../examples/projects/tooling/benchmark_report_file_demo) ->
+  [result_runtime_demo](../examples/projects/tooling/result_runtime_demo) ->
+  [result_diagnostic_demo](../examples/projects/tooling/result_diagnostic_demo) ->
+  [text_report_builder_demo](../examples/projects/tooling/text_report_builder_demo) ->
+  [text_report_json_demo](../examples/projects/tooling/text_report_json_demo) ->
+  [result_enum_runtime_demo](../examples/projects/tooling/result_enum_runtime_demo)
   current rule:
   these prove cross-contract composition across filesystem, console I/O, text,
-  and benchmark helpers
+  benchmark, result/error, diagnostic, and JSON/report helpers
+  current gap:
+  Result enum `Ok`/`map`/value extraction, `Err`/`map_err`, and
+  branch-selected struct summaries are run-backed; static known-variant pruning
+  is still future control-flow hardening work
 * shader/kernel showcase:
   [window_controls_demo](../examples/projects/window_controls_demo) /
   [kernel_tensor_demo](../examples/projects/kernel_tensor_demo)

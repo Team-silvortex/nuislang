@@ -102,6 +102,7 @@ fn value_kind(value: &Value) -> &'static str {
         Value::Pointer(_) => "pointer",
         Value::Tuple(_) => "tuple",
         Value::Struct(_) => "struct",
+        Value::VariantUnion(_) => "variant-union",
         Value::DataWindow(_) => "data-window",
         Value::DataPipe(_) => "data-pipe",
         Value::DataResult(_) => "data-result",
@@ -140,6 +141,7 @@ fn value_element_count(value: &Value) -> usize {
     match value {
         Value::Tensor(tensor) => tensor.elements.len(),
         Value::Tuple(values) => values.len(),
+        Value::VariantUnion(union) => union.variants.len(),
         _ => 1,
     }
 }

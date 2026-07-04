@@ -261,14 +261,12 @@ mod cpu Main {
   }
 
   fn capture_result_enum_recipe(seed: ResultEnumRecipeSeed) -> ResultEnumRecipeSummary {
-    let primary: Result<i64, ErrorEnvelope> = result_map(
-      combine_results(seed.primary_tag_handle, seed.secondary_tag_handle),
-      raise_value
-    );
-    let fallback: Result<i64, ErrorEnvelope> = result_map_err(
-      lift_host_result(seed.fallback_tag_handle),
-      soften_error
-    );
+    let _combined: Result<i64, ErrorEnvelope> =
+      combine_results(seed.primary_tag_handle, seed.secondary_tag_handle);
+    let primary: Result<i64, ErrorEnvelope> =
+      result_map(lift_host_result(seed.primary_tag_handle), raise_value);
+    let fallback: Result<i64, ErrorEnvelope> =
+      result_map_err(lift_host_result(seed.fallback_tag_handle), soften_error);
     return ResultEnumRecipeSummary {
       primary_score: result_score(primary)
         + result_unwrap_or(primary, -10)
@@ -293,6 +291,6 @@ mod cpu Main {
   }
 
   fn main() {
-    print(summarize_result_enum_recipe(1207, 1308, 1207));
+    print(summarize_result_enum_recipe(21, 1308, 1207));
   }
 }

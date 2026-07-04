@@ -4,7 +4,6 @@ mod cpu Main {
   extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
-  extern "c" fn host_text_measure(text_handle: i64) -> i64;
   extern "c" fn host_text_line_count(text_handle: i64) -> i64;
   extern "c" fn host_text_word_count(text_handle: i64) -> i64;
   extern "c" fn host_text_format_i64(pattern_handle: i64, value: i64) -> i64;
@@ -48,9 +47,9 @@ mod cpu Main {
       chained_handle: chained_handle,
       primary_single_handle: primary_single_handle,
       primary_pair_handle: primary_pair_handle,
-      primary_pair_len: host_text_measure(primary_pair_handle),
+      primary_pair_len: host_text_len(primary_pair_handle),
       pipeline_handle: pipeline_handle,
-      pipeline_len: host_text_measure(pipeline_handle),
+      pipeline_len: host_text_len(pipeline_handle),
       pipeline_lines: host_text_line_count(pipeline_handle),
       pipeline_words: host_text_word_count(pipeline_handle),
       pair_len: host_json_pair_len(601, primary_single_handle),
@@ -61,7 +60,7 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: TextPipelineProjectSummary = capture_text_pipeline_project();
-    return StdTextContracts.pipeline_status_total(
+    let total: i64 = StdTextContracts.pipeline_status_total(
       summary.lhs_len,
       summary.rhs_len,
       summary.merged_handle,
@@ -78,5 +77,19 @@ mod cpu Main {
       summary.array_len,
       summary.object_len
     );
+    if !StdTextContracts.text_stats_ready(
+      summary.pipeline_len,
+      summary.pipeline_lines,
+      summary.pipeline_words
+    ) {
+      return StdTextContracts.text_error();
+    }
+    if !StdTextContracts.json_pair_ready(summary.pair_len) {
+      return StdTextContracts.text_error();
+    }
+    if total > 0 {
+      return StdTextContracts.text_ok();
+    }
+    return StdTextContracts.text_error();
   }
 }

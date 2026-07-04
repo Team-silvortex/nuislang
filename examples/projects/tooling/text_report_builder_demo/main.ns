@@ -2,7 +2,7 @@ use cpu StdTextContracts;
 
 mod cpu Main {
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
-  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_line_count(text_handle: i64) -> i64;
   extern "c" fn host_text_word_count(text_handle: i64) -> i64;
 
@@ -47,14 +47,14 @@ mod cpu Main {
     let first_block: i64 = append_line(title_line_handle, kv_line_handle, 10);
     let second_block: i64 = append_line(first_block, status_line_handle, 10);
     let report_handle: i64 = host_text_concat(second_block, 1801);
-    let report_len: i64 = host_text_measure(report_handle);
+    let report_len: i64 = host_text_len(report_handle);
     return TextReportBuilderProjectSummary {
       title_line_handle: title_line_handle,
-      title_line_len: host_text_measure(title_line_handle),
+      title_line_len: host_text_len(title_line_handle),
       kv_line_handle: kv_line_handle,
-      kv_line_len: host_text_measure(kv_line_handle),
+      kv_line_len: host_text_len(kv_line_handle),
       status_line_handle: status_line_handle,
-      status_line_len: host_text_measure(status_line_handle),
+      status_line_len: host_text_len(status_line_handle),
       report_handle: report_handle,
       report_len: report_len,
       report_lines: host_text_line_count(report_handle),
@@ -88,6 +88,9 @@ mod cpu Main {
     if summary.validation_total < 2 {
       return StdTextContracts.text_error();
     }
-    return total;
+    if total > 0 {
+      return StdTextContracts.text_ok();
+    }
+    return StdTextContracts.text_error();
   }
 }

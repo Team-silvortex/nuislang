@@ -15,6 +15,8 @@ Canonical companions:
 * shortest repo-wide route:
   [current-mainline-map.md](../../../docs/current-mainline-map.md)
 * project companions:
+  [examples/projects/tooling/README.md](../../../examples/projects/tooling/README.md)
+* legacy micro-probe companions:
   [examples/projects/filesystem/README.md](../../../examples/projects/filesystem/README.md)
 * state/location companions:
   [examples/projects/state/README.md](../../../examples/projects/state/README.md)
@@ -41,6 +43,11 @@ Current rule:
 * keep `kv/cache/config` in the broader persistence lane, not in this router
 * read `StdFsContracts` consumers as the current run-backed smoke layer for
   filesystem examples that return process-style success/failure exits
+* treat [examples/projects/tooling](../../../examples/projects/tooling) as the
+  current runnable std filesystem proof route
+* treat [examples/projects/filesystem](../../../examples/projects/filesystem) as
+  legacy/reference micro-probe coverage unless you are specifically auditing
+  old path/file/directory examples
 
 ## Source Router
 
@@ -69,13 +76,15 @@ Current rule:
 * [file_copy_recipe.ns](../../../stdlib/std/file_copy_recipe.ns)
 * [file_roundtrip_recipe.ns](../../../stdlib/std/file_roundtrip_recipe.ns)
 * current project smoke consumers:
-  [file_read_demo](../../../examples/projects/filesystem/file_read_demo),
-  [file_write_demo](../../../examples/projects/filesystem/file_write_demo),
-  [file_copy_demo](../../../examples/projects/filesystem/file_copy_demo),
-  [file_roundtrip_demo](../../../examples/projects/filesystem/file_roundtrip_demo),
-  [file_output_demo](../../../examples/projects/filesystem/file_output_demo),
-  [directory_create_demo](../../../examples/projects/filesystem/directory_create_demo),
-  [directory_remove_demo](../../../examples/projects/filesystem/directory_remove_demo)
+  [file_read_demo](../../../examples/projects/tooling/file_read_demo),
+  [file_write_demo](../../../examples/projects/tooling/file_write_demo),
+  [file_copy_demo](../../../examples/projects/tooling/file_copy_demo),
+  [file_roundtrip_demo](../../../examples/projects/tooling/file_roundtrip_demo),
+  [file_output_demo](../../../examples/projects/tooling/file_output_demo),
+  [directory_create_demo](../../../examples/projects/tooling/directory_create_demo),
+  [directory_remove_demo](../../../examples/projects/tooling/directory_remove_demo),
+  [path_analysis_demo](../../../examples/projects/tooling/path_analysis_demo),
+  [path_copy_remove_demo](../../../examples/projects/tooling/path_copy_remove_demo)
 * report bridge:
   [path_runtime_recipe.ns](../../../stdlib/std/path_runtime_recipe.ns)
   ->
@@ -128,16 +137,16 @@ Shortest grouped route:
   [hello_cwd_runtime_facades.ns](../../../examples/ns/ffi/hello_cwd_runtime_facades.ns),
   [hello_location_runtime_facades.ns](../../../examples/ns/ffi/hello_location_runtime_facades.ns)
 * project-form anchors:
-  [path_runtime_demo](../../../examples/projects/filesystem/path_runtime_demo),
-  [file_read_demo](../../../examples/projects/filesystem/file_read_demo),
-  [file_runtime_demo](../../../examples/projects/filesystem/file_runtime_demo),
-  [file_write_demo](../../../examples/projects/filesystem/file_write_demo),
-  [file_copy_demo](../../../examples/projects/filesystem/file_copy_demo),
-  [directory_runtime_demo](../../../examples/projects/filesystem/directory_runtime_demo),
-  [filesystem_report_demo](../../../examples/projects/filesystem/filesystem_report_demo),
-  [filesystem_report_file_demo](../../../examples/projects/filesystem/filesystem_report_file_demo),
+  [file_read_demo](../../../examples/projects/tooling/file_read_demo),
+  [file_write_demo](../../../examples/projects/tooling/file_write_demo),
+  [file_copy_demo](../../../examples/projects/tooling/file_copy_demo),
+  [file_roundtrip_demo](../../../examples/projects/tooling/file_roundtrip_demo),
+  [filesystem_report_demo](../../../examples/projects/tooling/filesystem_report_demo),
+  [filesystem_report_file_demo](../../../examples/projects/tooling/filesystem_report_file_demo),
   [benchmark_report_file_demo](../../../examples/projects/tooling/benchmark_report_file_demo),
   [filesystem_io_report_demo](../../../examples/projects/tooling/filesystem_io_report_demo),
+  [path_analysis_demo](../../../examples/projects/tooling/path_analysis_demo),
+  [path_copy_remove_demo](../../../examples/projects/tooling/path_copy_remove_demo),
   [cwd_runtime_demo](../../../examples/projects/state/cwd_runtime_demo),
   [location_runtime_demo](../../../examples/projects/state/location_runtime_demo)
 

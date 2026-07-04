@@ -1,0 +1,62 @@
+use cpu StdFsContracts;
+
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_dir_create(path_handle: i64) -> i64;
+  extern "c" fn host_dir_remove(path_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+  extern "c" fn host_path_remove(path_handle: i64) -> i64;
+
+  struct DirectoryRemoveProjectSummary {
+    path_handle: i64,
+    cleanup_code: i64,
+    create_code: i64,
+    exists_before_remove: i64,
+    remove_code: i64,
+    exists_after_remove: i64
+  }
+
+  fn capture_directory_remove_project(prefix_handle: i64) -> DirectoryRemoveProjectSummary {
+    let path_handle: i64 = host_temp_file_handle(prefix_handle);
+    let cleanup_code: i64 = host_path_remove(path_handle);
+    let create_code: i64 = host_dir_create(path_handle);
+    let exists_before_remove: i64 = host_fs_exists(path_handle);
+    let remove_code: i64 = host_dir_remove(path_handle);
+    return DirectoryRemoveProjectSummary {
+      path_handle: path_handle,
+      cleanup_code: cleanup_code,
+      create_code: create_code,
+      exists_before_remove: exists_before_remove,
+      remove_code: remove_code,
+      exists_after_remove: host_fs_exists(path_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: DirectoryRemoveProjectSummary = capture_directory_remove_project(2813);
+    let total: i64 = StdFsContracts.host_fs_value_or_zero(summary.path_handle)
+      + StdFsContracts.host_fs_value_exit_code(summary.cleanup_code)
+      + StdFsContracts.directory_mutation_status_total(
+        summary.create_code,
+        summary.exists_before_remove,
+        summary.remove_code,
+        summary.exists_after_remove
+      );
+    if !StdFsContracts.close_ok(summary.create_code) {
+      return StdFsContracts.fs_error();
+    }
+    if !StdFsContracts.close_ok(summary.remove_code) {
+      return StdFsContracts.fs_error();
+    }
+    if !StdFsContracts.metadata_exists(summary.exists_before_remove) {
+      return StdFsContracts.fs_error();
+    }
+    if StdFsContracts.metadata_exists(summary.exists_after_remove) {
+      return StdFsContracts.fs_error();
+    }
+    if total >= 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
+  }
+}

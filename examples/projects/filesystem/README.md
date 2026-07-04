@@ -1,9 +1,13 @@
 # Filesystem Project Companions
 
-This folder contains narrow project-form path and filesystem companions.
+This folder contains legacy narrow project-form path and filesystem companions.
 
-Many of these are tiny surface checks. They are useful, but they are not all
-first-stop examples.
+Many of these are tiny surface checks. They are useful as compile/reference
+coverage, but they are no longer the first-stop runnable std filesystem route.
+
+For the current `build -> artifact-doctor -> run-artifact` smoke chain, prefer
+[../tooling/README.md](../tooling/README.md) and the filesystem/path-shaped
+entries under `examples/projects/tooling`.
 
 Current role rule:
 
@@ -11,6 +15,9 @@ Current role rule:
 * most `path_*` entries are companion-only micro-probes
 * the rest of the subtree is narrow runtime/filesystem coverage, not showcase
   onboarding
+* new run-backed std filesystem examples should go under
+  [../tooling](../tooling), unless they specifically exercise this legacy
+  micro-probe cluster
 
 ## Start Here
 
@@ -19,6 +26,13 @@ If you only want the shortest route through this subtree, start with:
 * [path_runtime_demo](path_runtime_demo)
 * [file_runtime_demo](file_runtime_demo)
 * [directory_runtime_demo](directory_runtime_demo)
+
+If you want the current runnable std filesystem route instead, start with:
+
+* [../tooling/file_read_demo](../tooling/file_read_demo)
+* [../tooling/file_roundtrip_demo](../tooling/file_roundtrip_demo)
+* [../tooling/path_analysis_demo](../tooling/path_analysis_demo)
+* [../tooling/path_copy_remove_demo](../tooling/path_copy_remove_demo)
 
 ## Pick By Goal
 

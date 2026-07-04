@@ -257,8 +257,9 @@ mod cpu Main {
   }
 
   fn capture_result_enum_project() -> ResultEnumProjectSummary {
-    let success: Result<i64, ErrorEnvelope> = result_map(combine_results(1207, 1308), raise_value);
-    let fallback: Result<i64, ErrorEnvelope> = result_map_err(lift_host_result(1207), soften_error);
+    let success: Result<i64, ErrorEnvelope> = result_map(lift_host_result(21), raise_value);
+    let fallback: Result<i64, ErrorEnvelope> =
+      result_map_err(lift_host_result(1207), soften_error);
     return ResultEnumProjectSummary {
       success_score: result_score(success)
         + result_unwrap_or(success, -10)

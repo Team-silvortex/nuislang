@@ -174,7 +174,9 @@ fn expr_is_dead_binding_safe(expr: &NirExpr) -> bool {
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .all(|(_, value)| expr_is_dead_binding_safe(value)),
-        NirExpr::FieldAccess { base, .. } => expr_is_dead_binding_safe(base),
+        NirExpr::FieldAccess { base, .. }
+        | NirExpr::VariantIs { base, .. }
+        | NirExpr::VariantFieldAccess { base, .. } => expr_is_dead_binding_safe(base),
         _ => true,
     }
 }
@@ -211,6 +213,8 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::DataWindowed(inner)
         | NirExpr::DataValue(inner)
         | NirExpr::DataFreezeWindow(inner)
+        | NirExpr::VariantIs { base: inner, .. }
+        | NirExpr::VariantFieldAccess { base: inner, .. }
         | NirExpr::CpuJoin(inner)
         | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)

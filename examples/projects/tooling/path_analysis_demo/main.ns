@@ -1,0 +1,108 @@
+use cpu StdFsContracts;
+
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_path_is_absolute(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_relative(path_handle: i64) -> i64;
+  extern "c" fn host_path_parent(path_handle: i64) -> i64;
+  extern "c" fn host_path_has_parent(path_handle: i64) -> i64;
+  extern "c" fn host_path_basename(path_handle: i64) -> i64;
+  extern "c" fn host_path_filename(path_handle: i64) -> i64;
+  extern "c" fn host_path_stem(path_handle: i64) -> i64;
+  extern "c" fn host_path_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_has_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_depth(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_basename_only(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_hidden(path_handle: i64) -> i64;
+  extern "c" fn host_path_ends_with_slash(path_handle: i64) -> i64;
+  extern "c" fn host_path_remove(path_handle: i64) -> i64;
+
+  struct PathAnalysisProjectSummary {
+    path_handle: i64,
+    is_absolute: i64,
+    is_relative: i64,
+    parent_handle: i64,
+    has_parent: i64,
+    basename_handle: i64,
+    filename_handle: i64,
+    stem_handle: i64,
+    extension_handle: i64,
+    has_extension: i64,
+    depth: i64,
+    is_basename_only: i64,
+    is_hidden: i64,
+    ends_with_slash: i64,
+    remove_status: i64
+  }
+
+  fn capture_path_analysis_project(prefix_handle: i64) -> PathAnalysisProjectSummary {
+    let path_handle: i64 = host_temp_file_handle(prefix_handle);
+    return PathAnalysisProjectSummary {
+      path_handle: path_handle,
+      is_absolute: host_path_is_absolute(path_handle),
+      is_relative: host_path_is_relative(path_handle),
+      parent_handle: host_path_parent(path_handle),
+      has_parent: host_path_has_parent(path_handle),
+      basename_handle: host_path_basename(path_handle),
+      filename_handle: host_path_filename(path_handle),
+      stem_handle: host_path_stem(path_handle),
+      extension_handle: host_path_extension(path_handle),
+      has_extension: host_path_has_extension(path_handle),
+      depth: host_path_depth(path_handle),
+      is_basename_only: host_path_is_basename_only(path_handle),
+      is_hidden: host_path_is_hidden(path_handle),
+      ends_with_slash: host_path_ends_with_slash(path_handle),
+      remove_status: host_path_remove(path_handle)
+    };
+  }
+
+  fn path_analysis_total(summary: PathAnalysisProjectSummary) -> i64 {
+    return StdFsContracts.path_probe_status_total(
+      0,
+      summary.has_parent,
+      summary.has_extension
+    ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle)
+      + StdFsContracts.host_fs_value_or_zero(summary.parent_handle)
+      + StdFsContracts.host_fs_value_or_zero(summary.basename_handle)
+      + StdFsContracts.host_fs_value_or_zero(summary.filename_handle)
+      + StdFsContracts.host_fs_value_or_zero(summary.stem_handle)
+      + StdFsContracts.host_fs_value_or_zero(summary.extension_handle)
+      + StdFsContracts.host_fs_value_or_zero(summary.depth)
+      + StdFsContracts.host_fs_value_exit_code(summary.remove_status);
+  }
+
+  fn main() -> i64 {
+    let summary: PathAnalysisProjectSummary = capture_path_analysis_project(2311);
+    if summary.path_handle <= 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.is_absolute != 1 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.is_relative != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.has_parent != 1 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.depth <= 1 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.is_basename_only != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.is_hidden != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.ends_with_slash != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.remove_status <= 0 {
+      return StdFsContracts.fs_error();
+    }
+    if path_analysis_total(summary) > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
+  }
+}

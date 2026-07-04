@@ -110,11 +110,13 @@ reading an entire subtree.
   [workflow_runtime_demo](tooling/workflow_runtime_demo),
   [native_artifact_closure_demo](tooling/native_artifact_closure_demo)
 * path / file / directory surfaces:
-  [filesystem](filesystem)
+  [tooling](tooling) for the current runnable std filesystem smoke chain, and
+  [filesystem](filesystem) for legacy path/file/directory micro-probes.
   Start with:
-  [path_runtime_demo](filesystem/path_runtime_demo),
-  [file_runtime_demo](filesystem/file_runtime_demo),
-  [directory_runtime_demo](filesystem/directory_runtime_demo)
+  [file_read_demo](tooling/file_read_demo),
+  [file_roundtrip_demo](tooling/file_roundtrip_demo),
+  [path_analysis_demo](tooling/path_analysis_demo),
+  [path_copy_remove_demo](tooling/path_copy_remove_demo)
 * profile and recipe ladders across domains:
   [domains](domains)
   Start with:

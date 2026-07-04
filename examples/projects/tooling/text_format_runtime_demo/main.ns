@@ -3,7 +3,7 @@ use cpu StdTextContracts;
 mod cpu Main {
   extern "c" fn host_text_format_i64(pattern_handle: i64, value: i64) -> i64;
   extern "c" fn host_text_format_pair(pattern_handle: i64, lhs: i64, rhs: i64) -> i64;
-  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_line_count(text_handle: i64) -> i64;
   extern "c" fn host_text_word_count(text_handle: i64) -> i64;
 
@@ -26,12 +26,12 @@ mod cpu Main {
     return TextFormatRuntimeProjectSummary {
       primary_single_handle: host_text_format_i64(811, 13),
       primary_pair_handle: primary_pair_handle,
-      primary_pair_len: host_text_measure(primary_pair_handle),
+      primary_pair_len: host_text_len(primary_pair_handle),
       primary_pair_lines: host_text_line_count(primary_pair_handle),
       primary_pair_words: host_text_word_count(primary_pair_handle),
       secondary_single_handle: host_text_format_i64(907, 34),
       secondary_pair_handle: secondary_pair_handle,
-      secondary_pair_len: host_text_measure(secondary_pair_handle),
+      secondary_pair_len: host_text_len(secondary_pair_handle),
       secondary_pair_lines: host_text_line_count(secondary_pair_handle),
       secondary_pair_words: host_text_word_count(secondary_pair_handle)
     };

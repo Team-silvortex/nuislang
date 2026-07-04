@@ -750,7 +750,7 @@ impl Operation {
         match self.instruction.as_str() {
             "text" | "const_bool" | "const_i32" | "const" | "const_i64" | "const_f32"
             | "const_f64" | "null" => CpuLlvmLoweringClass::Literal,
-            "struct" | "field" => CpuLlvmLoweringClass::Aggregate,
+            "struct" | "field" | "variant_is" | "variant_field" => CpuLlvmLoweringClass::Aggregate,
             "borrow" | "borrow_end" | "move_ptr" => CpuLlvmLoweringClass::Pointer,
             "neg" | "add" | "add_i32" | "add_f32" | "add_f64" | "sub" | "sub_i32" | "sub_f32"
             | "sub_f64" | "mul" | "mul_i32" | "mul_f32" | "mul_f64" | "div" | "div_i32"
@@ -955,6 +955,7 @@ pub enum Value {
     Pointer(Option<usize>),
     Tuple(Vec<Value>),
     Struct(StructValue),
+    VariantUnion(VariantUnionValue),
     DataWindow(DataWindow),
     DataPipe(DataPipe),
     DataResult(DataResultHandle),
@@ -1763,9 +1764,18 @@ pub struct StructValue {
     pub fields: Vec<(String, Value)>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct VariantUnionValue {
+    pub parent_type_name: String,
+    pub active_variant: String,
+    pub variants: BTreeMap<String, StructValue>,
+}
+
 impl Eq for Value {}
 
 impl Eq for StructValue {}
+
+impl Eq for VariantUnionValue {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataWindow {
@@ -2036,6 +2046,7 @@ impl fmt::Display for Value {
                 write!(f, ")")
             }
             Self::Struct(value) => write!(f, "{value}"),
+            Self::VariantUnion(value) => write!(f, "{value}"),
             Self::DataWindow(window) => write!(f, "{window}"),
             Self::DataPipe(pipe) => write!(f, "{pipe}"),
             Self::DataResult(result) => write!(f, "{result}"),
@@ -2234,6 +2245,23 @@ impl fmt::Display for StructValue {
             write!(f, "{name}: {value}")?;
         }
         write!(f, "}}")
+    }
+}
+
+impl fmt::Display for VariantUnionValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}<active={}>[",
+            self.parent_type_name, self.active_variant
+        )?;
+        for (index, variant) in self.variants.keys().enumerate() {
+            if index > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{variant}")?;
+        }
+        write!(f, "]")
     }
 }
 
@@ -2507,6 +2535,7 @@ impl ExecutionState {
             Some(Value::Pointer(_)) => Err(format!("`{name}` is pointer, expected int")),
             Some(Value::Tuple(_)) => Err(format!("`{name}` is tuple, expected int")),
             Some(Value::Struct(_)) => Err(format!("`{name}` is struct, expected int")),
+            Some(Value::VariantUnion(_)) => Err(format!("`{name}` is variant-union, expected int")),
             Some(Value::DataWindow(_)) => Err(format!("`{name}` is window, expected int")),
             Some(Value::DataPipe(_)) => Err(format!("`{name}` is pipe, expected int")),
             Some(Value::DataResult(_)) => Err(format!("`{name}` is data-result, expected int")),
@@ -3217,6 +3246,12 @@ fn is_move_value_legal(value: &Value) -> bool {
             .fields
             .iter()
             .all(|(_, value)| is_move_value_legal(value)),
+        Value::VariantUnion(value) => value.variants.values().all(|variant| {
+            variant
+                .fields
+                .iter()
+                .all(|(_, value)| is_move_value_legal(value))
+        }),
         _ => true,
     }
 }
@@ -3233,6 +3268,12 @@ fn is_window_base_legal(value: &Value) -> bool {
             .fields
             .iter()
             .all(|(_, value)| is_move_value_legal(value)),
+        Value::VariantUnion(value) => value.variants.values().all(|variant| {
+            variant
+                .fields
+                .iter()
+                .all(|(_, value)| is_move_value_legal(value))
+        }),
         _ => true,
     }
 }

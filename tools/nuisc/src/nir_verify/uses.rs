@@ -11,6 +11,14 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
                 }
             }
         }
+        NirExpr::VariantFieldAccess { base, .. } => {
+            if let Some(name) = expr_resource_key(expr) {
+                if moved.contains(&name) {
+                    return Err(format!("nir verify: use of moved value `{}`", name));
+                }
+            }
+            verify_expr_uses(base, moved)?;
+        }
         NirExpr::Instantiate { .. } => {}
         NirExpr::CastI64ToI32(inner)
         | NirExpr::CastI32ToI64(inner)
@@ -352,6 +360,9 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
                 verify_expr_uses(value, moved)?;
             }
         }
+        NirExpr::VariantIs { base, .. } => {
+            verify_expr_uses(base, moved)?;
+        }
         NirExpr::Binary { lhs, rhs, .. } => {
             verify_expr_uses(lhs, moved)?;
             verify_expr_uses(rhs, moved)?;
@@ -372,6 +383,14 @@ pub(super) fn expr_resource_key(expr: &NirExpr) -> Option<String> {
         NirExpr::FieldAccess { base, field } => {
             let base = expr_resource_key(base)?;
             Some(format!("{base}.{field}"))
+        }
+        NirExpr::VariantFieldAccess {
+            base,
+            variant,
+            field,
+        } => {
+            let base = expr_resource_key(base)?;
+            Some(format!("{base}.{variant}.{field}"))
         }
         _ => None,
     }

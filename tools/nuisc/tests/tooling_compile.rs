@@ -48,6 +48,66 @@ const TOOLING_PROJECTS: &[(&str, &str)] = &[
         "../../examples/projects/tooling/cli_project_build_report_demo",
     ),
     (
+        "argv runtime",
+        "../../examples/projects/tooling/argv_runtime_demo",
+    ),
+    (
+        "env runtime",
+        "../../examples/projects/tooling/env_runtime_demo",
+    ),
+    (
+        "diagnostic runtime",
+        "../../examples/projects/tooling/diagnostic_runtime_demo",
+    ),
+    (
+        "error runtime",
+        "../../examples/projects/tooling/error_runtime_demo",
+    ),
+    (
+        "json runtime",
+        "../../examples/projects/tooling/json_runtime_demo",
+    ),
+    (
+        "result runtime",
+        "../../examples/projects/tooling/result_runtime_demo",
+    ),
+    (
+        "result enum runtime",
+        "../../examples/projects/tooling/result_enum_runtime_demo",
+    ),
+    (
+        "result diagnostic",
+        "../../examples/projects/tooling/result_diagnostic_demo",
+    ),
+    (
+        "text format runtime",
+        "../../examples/projects/tooling/text_format_runtime_demo",
+    ),
+    (
+        "time runtime",
+        "../../examples/projects/tooling/time_runtime_demo",
+    ),
+    (
+        "io runtime",
+        "../../examples/projects/tooling/io_runtime_demo",
+    ),
+    (
+        "terminal io",
+        "../../examples/projects/tooling/terminal_io_demo",
+    ),
+    (
+        "stdin runtime",
+        "../../examples/projects/tooling/stdin_runtime_demo",
+    ),
+    (
+        "tty runtime",
+        "../../examples/projects/tooling/tty_runtime_demo",
+    ),
+    (
+        "input runtime",
+        "../../examples/projects/tooling/input_runtime_demo",
+    ),
+    (
         "benchmark report",
         "../../examples/projects/tooling/benchmark_report_demo",
     ),
@@ -58,6 +118,54 @@ const TOOLING_PROJECTS: &[(&str, &str)] = &[
     (
         "benchmark report file",
         "../../examples/projects/tooling/benchmark_report_file_demo",
+    ),
+    (
+        "file read",
+        "../../examples/projects/tooling/file_read_demo",
+    ),
+    (
+        "file write",
+        "../../examples/projects/tooling/file_write_demo",
+    ),
+    (
+        "file copy",
+        "../../examples/projects/tooling/file_copy_demo",
+    ),
+    (
+        "file output",
+        "../../examples/projects/tooling/file_output_demo",
+    ),
+    (
+        "file roundtrip",
+        "../../examples/projects/tooling/file_roundtrip_demo",
+    ),
+    (
+        "directory create",
+        "../../examples/projects/tooling/directory_create_demo",
+    ),
+    (
+        "directory remove",
+        "../../examples/projects/tooling/directory_remove_demo",
+    ),
+    (
+        "filesystem report",
+        "../../examples/projects/tooling/filesystem_report_demo",
+    ),
+    (
+        "filesystem report file",
+        "../../examples/projects/tooling/filesystem_report_file_demo",
+    ),
+    (
+        "filesystem io report",
+        "../../examples/projects/tooling/filesystem_io_report_demo",
+    ),
+    (
+        "path analysis",
+        "../../examples/projects/tooling/path_analysis_demo",
+    ),
+    (
+        "path copy remove",
+        "../../examples/projects/tooling/path_copy_remove_demo",
     ),
     (
         "hetero proxy benchmark",

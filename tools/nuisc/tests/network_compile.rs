@@ -128,6 +128,12 @@ fn compiles_http_service_lane_recipe_project() {
 }
 
 #[test]
+fn compiles_net_result_enum_recipe_project() {
+    let project = Path::new("../../examples/projects/domains/net_result_enum_recipe_demo");
+    nuisc::pipeline::compile_project(project).expect("net result enum project should compile");
+}
+
+#[test]
 fn compiles_httpish_client_session_packet_recipe_project() {
     let project =
         Path::new("../../examples/projects/domains/net_httpish_client_session_packet_recipe_demo");

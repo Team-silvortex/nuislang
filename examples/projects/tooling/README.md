@@ -135,10 +135,39 @@ Short rule:
   [diagnostic_runtime_demo](diagnostic_runtime_demo)
   as the lower-level text/json/format probes that now include generated text
   length, line-count, and word-count observation
+* filesystem and path-shaped host I/O:
+  [file_read_demo](file_read_demo),
+  [file_write_demo](file_write_demo),
+  [file_copy_demo](file_copy_demo),
+  [file_output_demo](file_output_demo),
+  [file_roundtrip_demo](file_roundtrip_demo),
+  [directory_create_demo](directory_create_demo),
+  [directory_remove_demo](directory_remove_demo),
+  [filesystem_report_demo](filesystem_report_demo),
+  [filesystem_report_file_demo](filesystem_report_file_demo),
+  [filesystem_io_report_demo](filesystem_io_report_demo),
+  [path_analysis_demo](path_analysis_demo),
+  [path_copy_remove_demo](path_copy_remove_demo)
+  as the current project-form filesystem std contract smoke chain
+
+Validation commands:
+
+* daily/light:
+  `cargo test -q -p nuis --test std_filesystem_smoke`
+* full run-backed chain:
+  `cargo test -q -p nuis --test std_filesystem_smoke -- --ignored`
+  This widens the same run-backed path across filesystem/path, text, console
+  IO, benchmark, heterogeneous proxy, argv/env, error/result probes, diagnostic
+  bridges, JSON, text-format, host-text, terminal/stdin/TTY, and time companions.
 * result and error surfaces:
   [error_runtime_demo](error_runtime_demo),
   [result_runtime_demo](result_runtime_demo),
-  [result_diagnostic_demo](result_diagnostic_demo)
+  [result_diagnostic_demo](result_diagnostic_demo),
+  [result_enum_runtime_demo](result_enum_runtime_demo)
+  as run-backed probes. `result_enum_runtime_demo` currently covers the
+  Ok/map/value-extraction and Err/map_err paths plus branch-selected struct
+  summaries. Static known-variant pruning is still future control-flow
+  hardening work.
 * input and terminal I/O:
   [input_runtime_demo](input_runtime_demo),
   [cli_cat_demo](cli_cat_demo),

@@ -1814,6 +1814,15 @@ pub enum NirExpr {
         base: Box<NirExpr>,
         field: String,
     },
+    VariantIs {
+        base: Box<NirExpr>,
+        variant: String,
+    },
+    VariantFieldAccess {
+        base: Box<NirExpr>,
+        variant: String,
+        field: String,
+    },
     Binary {
         op: NirBinaryOp,
         lhs: Box<NirExpr>,
@@ -2172,6 +2181,8 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::HostBufferHandle(_)
         | NirExpr::StructLiteral { .. }
         | NirExpr::FieldAccess { .. }
+        | NirExpr::VariantIs { .. }
+        | NirExpr::VariantFieldAccess { .. }
         | NirExpr::Binary { .. }
         | NirExpr::IsNull(_) => NirExprEffectClass::Pure,
         NirExpr::Borrow(_)

@@ -217,21 +217,6 @@ pub(super) fn synthesize_try_statements(
                 AstMatchArm {
                     pattern: nuis_semantics::model::AstMatchPattern::PayloadStruct {
                         type_ref: AstTypeRef {
-                            name: "Result.Ok".to_owned(),
-                            generic_args: Vec::new(),
-                            is_optional: false,
-                            is_ref: false,
-                        },
-                        payload: Box::new(nuis_semantics::model::AstMatchPattern::Bind(
-                            payload_name,
-                        )),
-                    },
-                    guard: None,
-                    body: vec![ok_stmt],
-                },
-                AstMatchArm {
-                    pattern: nuis_semantics::model::AstMatchPattern::PayloadStruct {
-                        type_ref: AstTypeRef {
                             name: "Result.Err".to_owned(),
                             generic_args: Vec::new(),
                             is_optional: false,
@@ -247,6 +232,21 @@ pub(super) fn synthesize_try_statements(
                         generic_args: Vec::new(),
                         args: vec![super::AstExpr::Var(error_name)],
                     }))],
+                },
+                AstMatchArm {
+                    pattern: nuis_semantics::model::AstMatchPattern::PayloadStruct {
+                        type_ref: AstTypeRef {
+                            name: "Result.Ok".to_owned(),
+                            generic_args: Vec::new(),
+                            is_optional: false,
+                            is_ref: false,
+                        },
+                        payload: Box::new(nuis_semantics::model::AstMatchPattern::Bind(
+                            payload_name,
+                        )),
+                    },
+                    guard: None,
+                    body: vec![ok_stmt],
                 },
             ],
         },

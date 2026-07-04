@@ -542,7 +542,9 @@ pub(super) fn verify_expr_tree(
             data_bindings,
             task_result_facts,
         )?,
-        NirExpr::FieldAccess { base, .. } => verify_expr(
+        NirExpr::FieldAccess { base, .. }
+        | NirExpr::VariantIs { base, .. }
+        | NirExpr::VariantFieldAccess { base, .. } => verify_expr(
             base,
             moved,
             borrows,

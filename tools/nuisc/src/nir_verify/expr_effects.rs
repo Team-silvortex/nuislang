@@ -193,7 +193,9 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
                 );
             }
         }
-        NirExpr::FieldAccess { base, .. } => apply_guaranteed_expr_effects(
+        NirExpr::FieldAccess { base, .. }
+        | NirExpr::VariantIs { base, .. }
+        | NirExpr::VariantFieldAccess { base, .. } => apply_guaranteed_expr_effects(
             base,
             moved,
             borrows,

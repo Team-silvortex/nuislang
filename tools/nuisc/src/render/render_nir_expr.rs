@@ -394,6 +394,19 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
                 .join(", ")
         ),
         NirExpr::FieldAccess { base, field } => format!("{}.{}", render_nir_expr(base), field),
+        NirExpr::VariantIs { base, variant } => {
+            format!("variant_is({}, {})", render_nir_expr(base), variant)
+        }
+        NirExpr::VariantFieldAccess {
+            base,
+            variant,
+            field,
+        } => format!(
+            "variant_field({}, {}, {})",
+            render_nir_expr(base),
+            variant,
+            field
+        ),
         NirExpr::Binary { op, lhs, rhs } => format!(
             "({} {} {})",
             render_nir_expr(lhs),

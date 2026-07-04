@@ -68,6 +68,16 @@ pub(super) fn lower_core_expr(
         NirExpr::FieldAccess { base, field } => {
             Some(lower_field_access(base, field, state, bindings))
         }
+        NirExpr::VariantIs { base, variant } => {
+            Some(lower_variant_is(base, variant, state, bindings))
+        }
+        NirExpr::VariantFieldAccess {
+            base,
+            variant,
+            field,
+        } => Some(lower_variant_field_access(
+            base, variant, field, state, bindings,
+        )),
         _ => None,
     }
 }
@@ -586,6 +596,49 @@ fn lower_field_access(
             module: "cpu".to_owned(),
             instruction: "field".to_owned(),
             args: vec![base_name.clone(), field.to_owned()],
+        },
+    });
+    push_dep_edges(state, &base_name, &name);
+    Ok(name)
+}
+
+fn lower_variant_is(
+    base: &NirExpr,
+    variant: &str,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let base_name = lower_expr(base, state, bindings)?;
+    let name = next_name(state, "variant_is");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "variant_is".to_owned(),
+            args: vec![base_name.clone(), variant.to_owned()],
+        },
+    });
+    push_dep_edges(state, &base_name, &name);
+    Ok(name)
+}
+
+fn lower_variant_field_access(
+    base: &NirExpr,
+    variant: &str,
+    field: &str,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let base_name = lower_expr(base, state, bindings)?;
+    let name = next_name(state, "variant_field");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "variant_field".to_owned(),
+            args: vec![base_name.clone(), variant.to_owned(), field.to_owned()],
         },
     });
     push_dep_edges(state, &base_name, &name);

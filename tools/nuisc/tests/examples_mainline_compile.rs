@@ -40,6 +40,7 @@ fn compiles_shader_kernel_profile_mainline_examples() {
     for path in [
         "../../examples/projects/domains/shader_profile_demo",
         "../../examples/projects/domains/shader_render_profile_demo",
+        "../../examples/projects/domains/shader_result_enum_demo",
         "../../examples/projects/domains/kernel_profile_demo",
         "../../examples/projects/domains/kernel_tensor_profile_demo",
         "../../examples/projects/domains/kernel_tensor_axis_pipeline_demo",

@@ -403,6 +403,29 @@ fn scalar_binding_created_in_only_one_branch_is_unbound_after_if() {
 }
 
 #[test]
+fn scalar_binding_created_in_surviving_branch_is_available_after_other_branch_returns() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "cond".to_owned(),
+            ty: None,
+            value: NirExpr::Bool(true),
+        },
+        NirStmt::If {
+            condition: NirExpr::Var("cond".to_owned()),
+            then_body: vec![NirStmt::Let {
+                name: "x".to_owned(),
+                ty: None,
+                value: NirExpr::Int(1),
+            }],
+            else_body: vec![NirStmt::Return(Some(NirExpr::Int(-1)))],
+        },
+        NirStmt::Expr(NirExpr::Var("x".to_owned())),
+    ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
 fn branch_local_borrow_alias_created_in_both_branches_can_be_ended_after_if() {
     let module = module_with_body(vec![
         NirStmt::Let {

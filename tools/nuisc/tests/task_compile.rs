@@ -1752,6 +1752,12 @@ fn compiles_task_result_policy_branch_project() {
 }
 
 #[test]
+fn compiles_task_result_enum_project() {
+    let project = Path::new("../../examples/projects/task/task_result_enum_demo");
+    nuisc::pipeline::compile_project(project).expect("task result enum project should compile");
+}
+
+#[test]
 fn lowers_task_result_policy_branch_project_with_branch_selection_shape() {
     let artifacts = compiled_project("../../examples/projects/task/task_result_policy_branch_demo");
 

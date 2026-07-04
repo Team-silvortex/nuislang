@@ -23,7 +23,8 @@ use self::uses::expr_resource_key;
 pub fn verify_nir_module(module: &NirModule) -> Result<(), String> {
     verify_declared_types(module)?;
     for function in &module.functions {
-        verify_function(function)?;
+        verify_function(function)
+            .map_err(|error| format!("{error} in function `{}`", function.name))?;
     }
     Ok(())
 }
@@ -304,29 +305,50 @@ fn verify_stmt(
                     &mut else_task_result_facts,
                 )?;
             }
-            merge_branch_state(
-                moved,
-                borrows,
-                &then_moved,
-                &then_borrows,
-                &else_moved,
-                &else_borrows,
-            );
-            merge_control_flow_borrow_bindings(
-                borrow_bindings,
-                &then_borrow_bindings,
-                &else_borrow_bindings,
-            );
-            merge_control_flow_data_bindings(
-                data_bindings,
-                &then_data_bindings,
-                &else_data_bindings,
-            );
-            merge_control_flow_task_result_facts(
-                task_result_facts,
-                &then_task_result_facts,
-                &else_task_result_facts,
-            );
+            match (
+                block_always_terminates(then_body),
+                block_always_terminates(else_body),
+            ) {
+                (true, false) => {
+                    *moved = else_moved;
+                    *borrows = else_borrows;
+                    *borrow_bindings = else_borrow_bindings;
+                    *data_bindings = else_data_bindings;
+                    *task_result_facts = else_task_result_facts;
+                }
+                (false, true) => {
+                    *moved = then_moved;
+                    *borrows = then_borrows;
+                    *borrow_bindings = then_borrow_bindings;
+                    *data_bindings = then_data_bindings;
+                    *task_result_facts = then_task_result_facts;
+                }
+                _ => {
+                    merge_branch_state(
+                        moved,
+                        borrows,
+                        &then_moved,
+                        &then_borrows,
+                        &else_moved,
+                        &else_borrows,
+                    );
+                    merge_control_flow_borrow_bindings(
+                        borrow_bindings,
+                        &then_borrow_bindings,
+                        &else_borrow_bindings,
+                    );
+                    merge_control_flow_data_bindings(
+                        data_bindings,
+                        &then_data_bindings,
+                        &else_data_bindings,
+                    );
+                    merge_control_flow_task_result_facts(
+                        task_result_facts,
+                        &then_task_result_facts,
+                        &else_task_result_facts,
+                    );
+                }
+            }
         }
         NirStmt::While { condition, body } => {
             verify_condition_expr(
@@ -397,6 +419,22 @@ fn verify_stmt(
         }
     }
     Ok(())
+}
+
+fn block_always_terminates(body: &[NirStmt]) -> bool {
+    body.iter().any(stmt_always_terminates)
+}
+
+fn stmt_always_terminates(stmt: &NirStmt) -> bool {
+    match stmt {
+        NirStmt::Return(_) | NirStmt::Break | NirStmt::Continue => true,
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => block_always_terminates(then_body) && block_always_terminates(else_body),
+        _ => false,
+    }
 }
 
 #[cfg(test)]

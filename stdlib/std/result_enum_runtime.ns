@@ -250,12 +250,12 @@ mod cpu Main {
   }
 
   fn summarize_result_enum(primary_tag_handle: i64, secondary_tag_handle: i64) -> i64 {
-    let combined: Result<i64, ErrorEnvelope> = combine_results(primary_tag_handle, secondary_tag_handle);
-    let raised: Result<i64, ErrorEnvelope> = result_map(combined, raise_value);
-    let fallback: Result<i64, ErrorEnvelope> = result_map_err(
-      lift_host_result(primary_tag_handle),
-      soften_error
-    );
+    let _combined: Result<i64, ErrorEnvelope> =
+      combine_results(primary_tag_handle, secondary_tag_handle);
+    let raised: Result<i64, ErrorEnvelope> =
+      result_map(lift_host_result(primary_tag_handle), raise_value);
+    let fallback: Result<i64, ErrorEnvelope> =
+      result_map_err(lift_host_result(secondary_tag_handle), soften_error);
     return result_score(raised)
       + result_score(fallback)
       + result_unwrap_or(raised, -10)
@@ -265,6 +265,6 @@ mod cpu Main {
   }
 
   fn main() {
-    print(summarize_result_enum(1207, 1308));
+    print(summarize_result_enum(21, 1207));
   }
 }

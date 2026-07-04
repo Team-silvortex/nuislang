@@ -243,7 +243,9 @@ fn note_nested_expr_effects(
                 note_binding_effects(value, "_", moved, borrows, borrow_bindings);
             }
         }
-        NirExpr::FieldAccess { base, .. } => {
+        NirExpr::FieldAccess { base, .. }
+        | NirExpr::VariantIs { base, .. }
+        | NirExpr::VariantFieldAccess { base, .. } => {
             note_binding_effects(base, "_", moved, borrows, borrow_bindings);
         }
         _ => {}

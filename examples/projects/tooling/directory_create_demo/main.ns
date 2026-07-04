@@ -1,0 +1,44 @@
+use cpu StdFsContracts;
+
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_dir_create(path_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+  extern "c" fn host_path_remove(path_handle: i64) -> i64;
+
+  struct DirectoryCreateProjectSummary {
+    path_handle: i64,
+    cleanup_code: i64,
+    create_code: i64,
+    exists_code: i64
+  }
+
+  fn capture_directory_create_project(prefix_handle: i64) -> DirectoryCreateProjectSummary {
+    let path_handle: i64 = host_temp_file_handle(prefix_handle);
+    let cleanup_code: i64 = host_path_remove(path_handle);
+    return DirectoryCreateProjectSummary {
+      path_handle: path_handle,
+      cleanup_code: cleanup_code,
+      create_code: host_dir_create(path_handle),
+      exists_code: host_fs_exists(path_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: DirectoryCreateProjectSummary = capture_directory_create_project(2801);
+    let total: i64 = StdFsContracts.host_fs_value_or_zero(summary.path_handle)
+      + StdFsContracts.host_fs_value_exit_code(summary.cleanup_code)
+      + StdFsContracts.host_fs_value_exit_code(summary.create_code)
+      + StdFsContracts.host_fs_value_or_zero(summary.exists_code);
+    if !StdFsContracts.close_ok(summary.create_code) {
+      return StdFsContracts.fs_error();
+    }
+    if !StdFsContracts.metadata_exists(summary.exists_code) {
+      return StdFsContracts.fs_error();
+    }
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
+  }
+}
