@@ -1,4 +1,5 @@
 name = "generic_payload_struct_state_demo"
 entry = "main.ns"
+modules = ["main.ns"]
 version = "0.1.0"
 edition = "1.0"

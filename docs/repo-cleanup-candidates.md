@@ -187,7 +187,7 @@ Reason:
   `nuis.project.abi.txt`, the manifest-level `abi_graph` summary, and related
   build artifacts
 * current top-level docs and project docs still intentionally use them as
-  concrete build targets rather than purely ephemeral `/private/tmp` outputs
+  concrete build targets rather than purely ephemeral host-temp outputs
 
 Practical rule:
 
@@ -267,8 +267,8 @@ Why this needs a decision:
 Current status:
 
 * policy 1 is now the active repository policy
-* revisit only if we later want to make `/private/tmp` rebuilds the only
-  supported artifact inspection route
+* revisit only if we later want to make host-temp rebuilds the only supported
+  artifact inspection route
 
 ### Raw runtime helper modules
 

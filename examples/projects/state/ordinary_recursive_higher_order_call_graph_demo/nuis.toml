@@ -1,2 +1,4 @@
 name = "ordinary_recursive_higher_order_call_graph_demo"
+version = "0.1.0"
 entry = "main.ns"
+modules = ["main.ns"]

@@ -4,7 +4,7 @@ use super::{
     container_pipeline_actual::{actual_container_fields, ActualContainerFields},
     container_pipeline_mismatch::container_metadata_issues,
     container_pipeline_tables::container_table_issue_sets,
-    fnv1a64_hex,
+    container_verify, fnv1a64_hex,
 };
 use std::path::Path;
 use std::{fs, path::PathBuf};
@@ -88,6 +88,31 @@ pub(crate) fn nsld_verify_container_report(
                 .unwrap_or_else(|| "missing".to_owned())
         ));
     }
+
+    let (expected_native_object_section_present, expected_native_object_section_id) =
+        native_object_section_summary(&expected_report.sections);
+    let (expected_native_object_loader_symbol_present, expected_native_object_loader_symbol_id) =
+        native_object_loader_symbol_summary(&expected_report.loader_symbols);
+    let (expected_native_object_relocation_present, expected_native_object_relocation_id) =
+        native_object_relocation_summary(&expected_report.relocations);
+    let actual_sections = actual
+        .as_ref()
+        .map(|source| container_verify::container_section_entries(source))
+        .unwrap_or_default();
+    let actual_loader_symbols = actual
+        .as_ref()
+        .map(|source| container_verify::loader_symbol_entries(source))
+        .unwrap_or_default();
+    let actual_relocations = actual
+        .as_ref()
+        .map(|source| container_verify::relocation_entries(source))
+        .unwrap_or_default();
+    let (actual_native_object_section_present, actual_native_object_section_id) =
+        native_object_section_optional_summary(&actual_sections);
+    let (actual_native_object_loader_symbol_present, actual_native_object_loader_symbol_id) =
+        native_object_loader_symbol_optional_summary(&actual_loader_symbols);
+    let (actual_native_object_relocation_present, actual_native_object_relocation_id) =
+        native_object_relocation_optional_summary(&actual_relocations);
 
     let ActualContainerFields {
         actual_container_layout_hash,
@@ -220,6 +245,12 @@ pub(crate) fn nsld_verify_container_report(
             .first()
             .map(|external_import| external_import.required)
             .unwrap_or(false),
+        expected_native_object_section_present,
+        expected_native_object_section_id,
+        expected_native_object_loader_symbol_present,
+        expected_native_object_loader_symbol_id,
+        expected_native_object_relocation_present,
+        expected_native_object_relocation_id,
         actual_container_layout_hash,
         actual_container_hash,
         actual_metadata_table_hash,
@@ -252,6 +283,12 @@ pub(crate) fn nsld_verify_container_report(
         actual_external_import_name,
         actual_external_import_provider,
         actual_external_import_required,
+        actual_native_object_section_present,
+        actual_native_object_section_id,
+        actual_native_object_loader_symbol_present,
+        actual_native_object_loader_symbol_id,
+        actual_native_object_relocation_present,
+        actual_native_object_relocation_id,
         container_section_issues,
         section_range_issues,
         loader_symbol_issues,
@@ -259,4 +296,64 @@ pub(crate) fn nsld_verify_container_report(
         external_import_issues,
         issues,
     }
+}
+
+fn native_object_section_summary(
+    sections: &[container::NsldContainerSectionEntry],
+) -> (bool, String) {
+    sections
+        .iter()
+        .find(|section| section.section_kind == "native-object-output")
+        .map(|section| (true, section.section_id.clone()))
+        .unwrap_or_else(|| (false, String::new()))
+}
+
+fn native_object_section_optional_summary(
+    sections: &[container::NsldContainerSectionEntry],
+) -> (bool, Option<String>) {
+    sections
+        .iter()
+        .find(|section| section.section_kind == "native-object-output")
+        .map(|section| (true, Some(section.section_id.clone())))
+        .unwrap_or((false, None))
+}
+
+fn native_object_loader_symbol_summary(
+    symbols: &[container::NsldContainerLoaderSymbol],
+) -> (bool, String) {
+    symbols
+        .iter()
+        .find(|symbol| symbol.symbol_kind == "native-object-output")
+        .map(|symbol| (true, symbol.symbol_id.clone()))
+        .unwrap_or_else(|| (false, String::new()))
+}
+
+fn native_object_loader_symbol_optional_summary(
+    symbols: &[container::NsldContainerLoaderSymbol],
+) -> (bool, Option<String>) {
+    symbols
+        .iter()
+        .find(|symbol| symbol.symbol_kind == "native-object-output")
+        .map(|symbol| (true, Some(symbol.symbol_id.clone())))
+        .unwrap_or((false, None))
+}
+
+fn native_object_relocation_summary(
+    relocations: &[container::NsldContainerRelocationEntry],
+) -> (bool, String) {
+    relocations
+        .iter()
+        .find(|relocation| relocation.relocation_kind == "native-object-binding")
+        .map(|relocation| (true, relocation.relocation_id.clone()))
+        .unwrap_or_else(|| (false, String::new()))
+}
+
+fn native_object_relocation_optional_summary(
+    relocations: &[container::NsldContainerRelocationEntry],
+) -> (bool, Option<String>) {
+    relocations
+        .iter()
+        .find(|relocation| relocation.relocation_kind == "native-object-binding")
+        .map(|relocation| (true, Some(relocation.relocation_id.clone())))
+        .unwrap_or((false, None))
 }

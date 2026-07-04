@@ -39,7 +39,14 @@ pub(crate) fn nsld_object_byte_layout_report(
         .map(|section| section.file_offset.saturating_add(section.size_bytes))
         .max()
         .unwrap_or(0);
-    let byte_layout_hash = nsld_object_byte_layout_hash(&sections, total_size_bytes);
+    let byte_layout_hash = nsld_object_byte_layout_hash(
+        &object_plan.writer_target_id,
+        &object_plan.writer_backend_kind,
+        &object_plan.object_family,
+        &object_plan.object_format,
+        &sections,
+        total_size_bytes,
+    );
     let blockers = dry_run.blockers;
     let layout_ready = dry_run.dry_run_ready && blockers.is_empty();
 
@@ -49,6 +56,10 @@ pub(crate) fn nsld_object_byte_layout_report(
             .join("nuis.nsld.object-byte-layout.toml")
             .display()
             .to_string(),
+        writer_target_id: object_plan.writer_target_id,
+        writer_backend_kind: object_plan.writer_backend_kind,
+        object_family: object_plan.object_family,
+        object_format: object_plan.object_format,
         object_plan_hash: object_plan.object_plan_hash,
         object_layout_hash: object_plan.object_layout_hash,
         byte_layout_hash,
@@ -297,10 +308,16 @@ fn push_string_field_mismatch(
 }
 
 fn nsld_object_byte_layout_hash(
+    writer_target_id: &str,
+    writer_backend_kind: &str,
+    object_family: &str,
+    object_format: &str,
     sections: &[NsldObjectByteSectionDiagnostic],
     total_size_bytes: usize,
 ) -> String {
-    let mut material = format!("total_size_bytes={total_size_bytes}\n");
+    let mut material = format!(
+        "writer_target_id={writer_target_id}\nwriter_backend_kind={writer_backend_kind}\nobject_family={object_family}\nobject_format={object_format}\ntotal_size_bytes={total_size_bytes}\n"
+    );
     for section in sections {
         material.push_str(&format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
@@ -318,7 +335,10 @@ fn nsld_object_byte_layout_hash(
 
 #[cfg(test)]
 mod tests {
-    use super::{nsld_emit_object_byte_layout_report, nsld_verify_object_byte_layout_report};
+    use super::{
+        nsld_emit_object_byte_layout_report, nsld_object_byte_layout_report,
+        nsld_verify_object_byte_layout_report,
+    };
     use crate::{
         main_test_support::empty_link_plan, object_emit::nsld_emit_object_report,
         object_writer_input::nsld_emit_object_writer_dry_run_report,
@@ -346,6 +366,22 @@ mod tests {
         assert_eq!(emit.section_count, 4);
         assert!(verify.valid);
         assert!(verify.issues.is_empty());
+    }
+
+    #[test]
+    fn object_byte_layout_serializes_writer_identity() {
+        let plan = empty_link_plan();
+        let report = nsld_object_byte_layout_report(Path::new("manifest.toml"), &plan);
+        let rendered = crate::toml::render_object_byte_layout(&report);
+        let json = crate::json_object::nsld_object_byte_layout_report_json(&report);
+
+        assert_eq!(report.writer_target_id, "arm64-macos-mach-o");
+        assert_eq!(report.writer_backend_kind, "mach-o-arm64");
+        assert_eq!(report.object_family, "mach-o");
+        assert!(rendered.contains("writer_backend_kind = \"mach-o-arm64\""));
+        assert!(rendered.contains("object_family = \"mach-o\""));
+        assert!(json.contains("\"writer_backend_kind\":\"mach-o-arm64\""));
+        assert!(json.contains("\"object_family\":\"mach-o\""));
     }
 
     #[test]

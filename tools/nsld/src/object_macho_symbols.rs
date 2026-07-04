@@ -21,7 +21,7 @@ pub(crate) struct NsldMachOSymbolPlan {
 pub(crate) fn mach_o_arm64_symbol_table_plan(
     file_layout: &NsldObjectFileLayoutReport,
 ) -> Option<NsldMachOSymbolTablePlan> {
-    if file_layout.backend_kind != "mach-o-arm64" {
+    if file_layout.writer_backend_kind != "mach-o-arm64" {
         return None;
     }
     let section_records = file_layout

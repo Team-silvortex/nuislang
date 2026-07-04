@@ -1,6 +1,12 @@
 pub(crate) use super::container_pipeline_verify::nsld_verify_container_report;
 
-use super::{assembly::nsld_section_manifest_report, container, fnv1a64_hex, toml};
+use super::{
+    artifact_chain::{nsld_artifact_stage_kind_path, NsldArtifactStageKind},
+    assembly::nsld_section_manifest_report,
+    container, fnv1a64_hex,
+    object_output::nsld_object_output_issues,
+    toml,
+};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -14,29 +20,33 @@ pub(crate) fn nsld_container_plan_report(
     plan: &nuisc::linker::LinkPlan,
 ) -> container::NsldContainerPlanReport {
     let section_manifest = nsld_section_manifest_report(manifest, plan);
+    let mut sections = section_manifest.sections;
+    let mut blockers = section_manifest.blockers;
+    append_object_output_section(plan, &mut sections, &mut blockers);
     let output_path = PathBuf::from(&plan.output_dir)
         .join("nuis.nsld.container")
         .display()
         .to_string();
+    let section_table_hash = super::assembly::nsld_section_table_hash(&sections);
     let container_layout_hash = container::layout_hash(
         NSLD_CONTAINER_MAGIC,
         NSLD_CONTAINER_VERSION,
-        section_manifest.section_count,
-        &section_manifest.section_table_hash,
+        sections.len(),
+        &section_table_hash,
         &output_path,
         fnv1a64_hex,
     );
     container::NsldContainerPlanReport {
         manifest: manifest.display().to_string(),
-        ready: section_manifest.ready,
+        ready: section_manifest.ready && blockers.is_empty(),
         container_magic: NSLD_CONTAINER_MAGIC.to_owned(),
         container_version: NSLD_CONTAINER_VERSION,
-        section_count: section_manifest.section_count,
-        section_table_hash: section_manifest.section_table_hash,
+        section_count: sections.len(),
+        section_table_hash,
         container_layout_hash,
         output_path,
-        sections: section_manifest.sections,
-        blockers: section_manifest.blockers,
+        sections,
+        blockers,
     }
 }
 
@@ -60,6 +70,40 @@ pub(crate) fn nsld_emit_container_plan_report(
         container_layout_hash: report.container_layout_hash,
         section_count: report.section_count,
     })
+}
+
+fn append_object_output_section(
+    plan: &nuisc::linker::LinkPlan,
+    sections: &mut Vec<super::reports::NsldAssembleSectionDiagnostic>,
+    blockers: &mut Vec<String>,
+) {
+    let object_output_path =
+        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectOutput);
+    if !object_output_path.exists() {
+        return;
+    }
+    let output_issues = nsld_object_output_issues(plan);
+    if !output_issues.is_empty() {
+        blockers.extend(
+            output_issues
+                .into_iter()
+                .map(|issue| format!("object-output:{issue}")),
+        );
+        return;
+    }
+    let source_path = object_output_path.display().to_string();
+    let source_hash = fs::read(&object_output_path)
+        .map(|bytes| fnv1a64_hex(&bytes))
+        .unwrap_or_else(|_| "missing".to_owned());
+    let order_index = sections.len();
+    sections.push(super::reports::NsldAssembleSectionDiagnostic {
+        order_index,
+        section_id: format!("sec{order_index:04}.native-object-output"),
+        section_kind: "native-object-output".to_owned(),
+        source_path,
+        source_hash,
+        required: true,
+    });
 }
 
 pub(crate) fn nsld_verify_container_plan_report(
@@ -147,6 +191,10 @@ pub(crate) fn nsld_container_report(
     );
     loader_symbols.extend(container::hetero_loader_symbols(
         &plan.hetero_calculate.nodes,
+        &sections,
+        loader_symbols.len(),
+    ));
+    loader_symbols.extend(container::native_object_loader_symbols(
         &sections,
         loader_symbols.len(),
     ));

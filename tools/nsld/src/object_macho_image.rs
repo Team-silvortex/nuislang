@@ -14,7 +14,7 @@ pub(crate) fn encode_mach_o_arm64_image(
     plan: &nuisc::linker::LinkPlan,
     file_layout: &NsldObjectFileLayoutReport,
 ) -> Option<Vec<u8>> {
-    if file_layout.backend_kind != "mach-o-arm64" {
+    if file_layout.writer_backend_kind != "mach-o-arm64" {
         return None;
     }
     let mut bytes = vec![0u8; file_layout.total_file_size_bytes];

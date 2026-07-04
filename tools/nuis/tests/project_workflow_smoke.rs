@@ -73,10 +73,10 @@ fn assert_project_workflow_smoke(project_path: &str, label: &str, expected_locke
         "abi_mode: auto-recommended",
         "project-status output",
     );
-    assert_contains(
-        &status_stdout,
-        "recommended_next_step: project_lock_abi",
-        "project-status output",
+    assert!(
+        status_stdout.contains("recommended_next_step: project_lock_abi")
+            || status_stdout.contains("recommended_next_step: galaxy_lock_deps"),
+        "project-status output should recommend ABI locking directly or galaxy locking before ABI locking\nfull output:\n{status_stdout}"
     );
 
     let lock = run_nuis(&["project-lock-abi", &project_root_text]);

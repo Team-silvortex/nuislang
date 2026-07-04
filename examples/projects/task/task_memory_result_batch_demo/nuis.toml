@@ -1,5 +1,5 @@
 name = "task_memory_result_batch_demo"
 version = "0.1.0"
 
-[project]
 entry = "main.ns"
+modules = ["main.ns"]

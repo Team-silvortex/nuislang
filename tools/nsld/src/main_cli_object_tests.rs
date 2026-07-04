@@ -116,6 +116,25 @@ fn parses_verify_object_emit_input_and_json_flag() {
 }
 
 #[test]
+fn parses_verify_object_output_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "verify-object-output".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::VerifyObjectOutput {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
 fn parses_verify_object_writer_input_input_and_json_flag() {
     let command = parse_args(
         vec![

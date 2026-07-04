@@ -1,8 +1,8 @@
-version = 1
-
-[project]
 name = "pipe_runtime_demo"
+version = "0.1.0"
 entry = "main.ns"
+modules = ["main.ns"]
 
-[abi]
-cpu = "cpu.arm64.apple_aapcs64"
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+]

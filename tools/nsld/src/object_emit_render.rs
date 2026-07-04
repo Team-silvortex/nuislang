@@ -33,6 +33,8 @@ pub(crate) fn render_object_emit_blocked(report: &NsldObjectEmitReport) -> Strin
         report.image_dry_run_hash.as_deref().unwrap_or(""),
     );
     push_string(&mut out, "writer_target_id", &report.writer_target_id);
+    push_string(&mut out, "writer_backend_kind", &report.writer_backend_kind);
+    push_string(&mut out, "object_family", &report.object_family);
     push_string(&mut out, "object_plan_hash", &report.object_plan_hash);
     out.push_str(&format!("emitted = {}\n", report.emitted));
     out.push_str(&format!("can_emit_object = {}\n", report.can_emit_object));

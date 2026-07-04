@@ -26,6 +26,8 @@ Future `nsld-core` or equivalent galaxy-style capability should own:
 * deterministic link graphs and link-unit registration
 * lifecycle hook ordering and global clock metadata
 * deterministic section and data-segment layout
+* object-plan target identity metadata before platform object bytes are emitted
+* native object output verification against deterministic image bytes
 * unified heterogeneous container metadata
 * static C-world compatibility wrapper policy
 

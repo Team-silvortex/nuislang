@@ -1,6 +1,4 @@
-version = 1
-
-[project]
 name = "task_async_while_post_flow_cond_demo"
+version = "0.1.0"
 entry = "main.ns"
-
+modules = ["main.ns"]

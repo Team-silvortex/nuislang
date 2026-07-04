@@ -3,6 +3,6 @@ version = "0.1.0"
 entry = "main.ns"
 modules = ["main.ns"]
 
-abis = [
-  { name = "cpu-main", kind = "staticlib", target = "host-native" }
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
 ]

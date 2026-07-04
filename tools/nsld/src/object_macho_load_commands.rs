@@ -21,7 +21,7 @@ pub(crate) struct NsldMachOSectionCommandPlan {
 pub(crate) fn mach_o_arm64_load_commands_plan(
     file_layout: &NsldObjectFileLayoutReport,
 ) -> Option<NsldMachOLoadCommandsPlan> {
-    if file_layout.backend_kind != "mach-o-arm64" {
+    if file_layout.writer_backend_kind != "mach-o-arm64" {
         return None;
     }
     let load_commands = record_by_kind(file_layout, "macho-load-commands")?;

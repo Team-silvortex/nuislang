@@ -86,8 +86,16 @@ pub(crate) fn render_object_plan(report: &NsldObjectPlanReport) -> String {
         escape_toml_string(&report.writer_target_id)
     ));
     out.push_str(&format!(
+        "writer_backend_kind = \"{}\"\n",
+        escape_toml_string(&report.writer_backend_kind)
+    ));
+    out.push_str(&format!(
         "writer_status = \"{}\"\n",
         escape_toml_string(&report.writer_status)
+    ));
+    out.push_str(&format!(
+        "object_family = \"{}\"\n",
+        escape_toml_string(&report.object_family)
     ));
     out.push_str(&format!(
         "unsupported_features = [{}]\n",
@@ -192,6 +200,14 @@ pub(crate) fn render_object_writer_input(report: &NsldObjectPlanReport) -> Strin
     out.push_str(&format!(
         "writer_target_id = \"{}\"\n",
         escape_toml_string(&report.writer_target_id)
+    ));
+    out.push_str(&format!(
+        "writer_backend_kind = \"{}\"\n",
+        escape_toml_string(&report.writer_backend_kind)
+    ));
+    out.push_str(&format!(
+        "object_family = \"{}\"\n",
+        escape_toml_string(&report.object_family)
     ));
     out.push_str(&format!(
         "writer_status = \"{}\"\n",
@@ -331,6 +347,14 @@ pub(crate) fn render_object_writer_dry_run(report: &NsldObjectWriterDryRunReport
         escape_toml_string(&report.writer_target_id)
     ));
     out.push_str(&format!(
+        "writer_backend_kind = \"{}\"\n",
+        escape_toml_string(&report.writer_backend_kind)
+    ));
+    out.push_str(&format!(
+        "object_family = \"{}\"\n",
+        escape_toml_string(&report.object_family)
+    ));
+    out.push_str(&format!(
         "object_plan_hash = \"{}\"\n",
         escape_toml_string(&report.object_plan_hash)
     ));
@@ -380,6 +404,22 @@ pub(crate) fn render_object_byte_layout(report: &NsldObjectByteLayoutReport) -> 
     out.push_str(&format!(
         "output_path = \"{}\"\n",
         escape_toml_string(&report.output_path)
+    ));
+    out.push_str(&format!(
+        "writer_target_id = \"{}\"\n",
+        escape_toml_string(&report.writer_target_id)
+    ));
+    out.push_str(&format!(
+        "writer_backend_kind = \"{}\"\n",
+        escape_toml_string(&report.writer_backend_kind)
+    ));
+    out.push_str(&format!(
+        "object_family = \"{}\"\n",
+        escape_toml_string(&report.object_family)
+    ));
+    out.push_str(&format!(
+        "object_format = \"{}\"\n",
+        escape_toml_string(&report.object_format)
     ));
     out.push_str(&format!(
         "object_plan_hash = \"{}\"\n",
@@ -448,8 +488,12 @@ pub(crate) fn render_object_file_layout(report: &NsldObjectFileLayoutReport) -> 
         escape_toml_string(&report.writer_target_id)
     ));
     out.push_str(&format!(
-        "backend_kind = \"{}\"\n",
-        escape_toml_string(&report.backend_kind)
+        "writer_backend_kind = \"{}\"\n",
+        escape_toml_string(&report.writer_backend_kind)
+    ));
+    out.push_str(&format!(
+        "object_family = \"{}\"\n",
+        escape_toml_string(&report.object_family)
     ));
     out.push_str(&format!(
         "object_format = \"{}\"\n",

@@ -1,7 +1,12 @@
 use super::{
-    fnv1a64_hex, main_test_support::empty_link_plan, nsld_artifact_chain_issues, nsld_check_report,
-    nsld_closure_report, nsld_link_input_diagnostics, nsld_link_input_table_hash,
-    nsld_prepare_report, nsld_sidecar_capability_diagnostics, toml,
+    artifact_chain::{
+        nsld_artifact_chain_issues, nsld_artifact_stage_file_name, nsld_artifact_stage_kind_path,
+        NsldArtifactStage, NsldArtifactStageKind,
+    },
+    fnv1a64_hex,
+    main_test_support::empty_link_plan,
+    nsld_check_report, nsld_closure_report, nsld_link_input_diagnostics,
+    nsld_link_input_table_hash, nsld_prepare_report, nsld_sidecar_capability_diagnostics, toml,
 };
 use crate::container_verify::{self, TomlFieldKind};
 use std::{env, fs, path::Path};
@@ -27,6 +32,43 @@ fn closure_reports_container_metadata_fingerprint() {
     ));
     assert!(report_json.contains("\"container_metadata_table_hash\":\"0x"));
     assert!(report_json.contains("\"container_loader_readiness\":"));
+}
+
+#[test]
+fn closure_reports_verified_prepared_artifact_chain_after_prepare() {
+    let dir = env::temp_dir().join(format!("nsld-closure-prepared-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_closure_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_closure_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.prepared_artifact_chain_valid);
+    assert!(report.prepared_artifact_chain_issues.is_empty());
+    assert!(report
+        .internal_contracts
+        .iter()
+        .any(|contract| contract == "verified-prepared-artifact-chain"));
+    assert!(report
+        .internal_contracts
+        .iter()
+        .any(|contract| contract == "verified-object-writer-input"));
+    assert!(report
+        .internal_contracts
+        .iter()
+        .any(|contract| contract == "verified-object-output"));
+    assert!(report
+        .internal_contracts
+        .iter()
+        .any(|contract| contract == "verified-object-writer-dry-run"));
+    assert!(report_json.contains("\"prepared_artifact_chain_valid\":true"));
+    assert!(report_json.contains("\"prepared_artifact_chain_issues\":[]"));
 }
 
 #[test]
@@ -103,12 +145,12 @@ source_offset = 12
 #[test]
 fn artifact_chain_accepts_contiguous_prepared_prefix() {
     let issues = nsld_artifact_chain_issues(&[
-        ("inputs", true),
-        ("units", true),
-        ("bundle", true),
-        ("assemble", false),
-        ("section", false),
-        ("object", false),
+        test_artifact_stage("inputs", true),
+        test_artifact_stage("units", true),
+        test_artifact_stage("bundle", true),
+        test_artifact_stage("assemble", false),
+        test_artifact_stage("section", false),
+        test_artifact_stage("object", false),
     ]);
     assert!(issues.is_empty());
 }
@@ -116,12 +158,12 @@ fn artifact_chain_accepts_contiguous_prepared_prefix() {
 #[test]
 fn artifact_chain_rejects_later_artifact_without_prerequisite() {
     let issues = nsld_artifact_chain_issues(&[
-        ("inputs", true),
-        ("units", false),
-        ("bundle", true),
-        ("assemble", true),
-        ("section", true),
-        ("object", true),
+        test_artifact_stage("inputs", true),
+        test_artifact_stage("units", false),
+        test_artifact_stage("bundle", true),
+        test_artifact_stage("assemble", true),
+        test_artifact_stage("section", true),
+        test_artifact_stage("object", true),
     ]);
     assert_eq!(
         issues,
@@ -132,6 +174,49 @@ fn artifact_chain_rejects_later_artifact_without_prerequisite() {
             "artifact `object` is present but prerequisite `units` is missing".to_owned(),
         ]
     );
+}
+
+#[test]
+fn artifact_chain_allows_missing_optional_object_output_before_later_artifacts() {
+    let issues = nsld_artifact_chain_issues(&[
+        test_artifact_stage("object-emit", true),
+        test_optional_artifact_stage("nuis.nsld.mach-o", false),
+        test_artifact_stage("object-writer-dry-run", true),
+        test_artifact_stage("container-plan", true),
+    ]);
+    assert!(issues.is_empty());
+}
+
+#[test]
+fn artifact_stage_kind_paths_are_canonical() {
+    assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::ObjectWriterInput),
+        "nuis.nsld.object-writer-input.toml"
+    );
+    assert_eq!(
+        nsld_artifact_stage_kind_path("out", NsldArtifactStageKind::ContainerPayload)
+            .display()
+            .to_string(),
+        "out/nuis.nsld.container.payload"
+    );
+}
+
+fn test_artifact_stage(file_name: &'static str, present: bool) -> NsldArtifactStage {
+    NsldArtifactStage {
+        kind: NsldArtifactStageKind::LinkInputs,
+        file_name,
+        present,
+        required: true,
+    }
+}
+
+fn test_optional_artifact_stage(file_name: &'static str, present: bool) -> NsldArtifactStage {
+    NsldArtifactStage {
+        kind: NsldArtifactStageKind::ObjectOutput,
+        file_name,
+        present,
+        required: false,
+    }
 }
 
 #[test]
@@ -270,6 +355,41 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     assert!(report.object_plan_present);
     assert_eq!(report.object_plan_valid, Some(true));
     assert!(report.object_plan_issues.is_empty());
+    assert!(report.object_writer_input_present);
+    assert_eq!(report.object_writer_input_valid, Some(true));
+    assert!(report.object_writer_input_issues.is_empty());
+    assert!(report.object_byte_layout_present);
+    assert_eq!(report.object_byte_layout_valid, Some(true));
+    assert!(report.object_byte_layout_issues.is_empty());
+    assert!(report.object_file_layout_present);
+    assert_eq!(report.object_file_layout_valid, Some(true));
+    assert!(report.object_file_layout_issues.is_empty());
+    assert!(report.object_image_dry_run_present);
+    assert_eq!(report.object_image_dry_run_valid, Some(true));
+    assert!(report.object_image_dry_run_issues.is_empty());
+    assert!(report.object_image_dry_run_bytes_present);
+    assert!(report.object_emit_blocked_present);
+    assert_eq!(report.object_emit_blocked_valid, Some(true));
+    assert!(report.object_emit_blocked_issues.is_empty());
+    assert!(report.object_output_present);
+    assert_eq!(report.object_output_valid, Some(true));
+    assert!(report.object_output_expected_size_bytes.is_some());
+    assert_eq!(
+        report.object_output_expected_size_bytes,
+        report.object_output_actual_size_bytes
+    );
+    assert!(report
+        .object_output_expected_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert_eq!(
+        report.object_output_expected_hash,
+        report.object_output_actual_hash
+    );
+    assert!(report.object_output_issues.is_empty());
+    assert!(report.object_writer_dry_run_present);
+    assert_eq!(report.object_writer_dry_run_valid, Some(true));
+    assert!(report.object_writer_dry_run_issues.is_empty());
     assert!(report.container_section_issues.is_empty());
     assert!(report.container_loader_symbol_issues.is_empty());
     assert!(report.container_relocation_issues.is_empty());
@@ -281,6 +401,25 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     assert!(report_json.contains("\"object_plan_present\":true"));
     assert!(report_json.contains("\"object_plan_valid\":true"));
     assert!(report_json.contains("\"object_plan_issues\":[]"));
+    assert!(report_json.contains("\"object_writer_input_present\":true"));
+    assert!(report_json.contains("\"object_writer_input_valid\":true"));
+    assert!(report_json.contains("\"object_byte_layout_present\":true"));
+    assert!(report_json.contains("\"object_byte_layout_valid\":true"));
+    assert!(report_json.contains("\"object_file_layout_present\":true"));
+    assert!(report_json.contains("\"object_file_layout_valid\":true"));
+    assert!(report_json.contains("\"object_image_dry_run_present\":true"));
+    assert!(report_json.contains("\"object_image_dry_run_valid\":true"));
+    assert!(report_json.contains("\"object_image_dry_run_bytes_present\":true"));
+    assert!(report_json.contains("\"object_emit_blocked_present\":true"));
+    assert!(report_json.contains("\"object_emit_blocked_valid\":true"));
+    assert!(report_json.contains("\"object_output_present\":true"));
+    assert!(report_json.contains("\"object_output_valid\":true"));
+    assert!(report_json.contains("\"object_output_expected_size_bytes\":"));
+    assert!(report_json.contains("\"object_output_actual_size_bytes\":"));
+    assert!(report_json.contains("\"object_output_expected_hash\":\"0x"));
+    assert!(report_json.contains("\"object_output_actual_hash\":\"0x"));
+    assert!(report_json.contains("\"object_writer_dry_run_present\":true"));
+    assert!(report_json.contains("\"object_writer_dry_run_valid\":true"));
     assert_eq!(
         report.container_loader_readiness.as_deref(),
         Some("host-assisted")
@@ -290,6 +429,29 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
         .as_deref()
         .is_some_and(|hash| hash.starts_with("0x")));
     assert_eq!(report.container_external_import_count, Some(3));
+    assert!(report.container_native_object_section_present);
+    assert_eq!(
+        report.container_native_object_section_id.as_deref(),
+        Some("sec0004.native-object-output")
+    );
+    assert!(report.container_native_object_loader_symbol_present);
+    assert_eq!(
+        report.container_native_object_loader_symbol_id.as_deref(),
+        Some("sym0001.native-object-output")
+    );
+    assert!(report.container_native_object_relocation_present);
+    assert_eq!(
+        report.container_native_object_relocation_id.as_deref(),
+        Some("rel0001.native-object")
+    );
+    assert!(report_json.contains("\"container_native_object_section_present\":true"));
+    assert!(report_json
+        .contains("\"container_native_object_section_id\":\"sec0004.native-object-output\""));
+    assert!(report_json
+        .contains("\"container_native_object_loader_symbol_id\":\"sym0001.native-object-output\""));
+    assert!(
+        report_json.contains("\"container_native_object_relocation_id\":\"rel0001.native-object\"")
+    );
     assert!(report
         .container_loader_blockers
         .iter()
@@ -298,4 +460,43 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
         .issues
         .iter()
         .all(|issue| !issue.contains("container loader readiness is blocked")));
+}
+
+#[test]
+fn check_reports_tampered_object_output() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-object-output-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    fs::write(dir.join("nuis.nsld.mach-o"), b"damaged-object").unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.valid);
+    assert!(report.object_output_present);
+    assert_eq!(report.object_output_valid, Some(false));
+    assert_ne!(
+        report.object_output_expected_size_bytes,
+        report.object_output_actual_size_bytes
+    );
+    assert_ne!(
+        report.object_output_expected_hash,
+        report.object_output_actual_hash
+    );
+    assert!(report
+        .object_output_issues
+        .iter()
+        .any(|issue| issue.contains("object_output_hash mismatch")));
+    assert!(report
+        .issues
+        .iter()
+        .any(|issue| issue == "object output verification failed"));
 }

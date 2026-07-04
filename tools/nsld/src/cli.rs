@@ -19,6 +19,7 @@ pub(crate) enum Command {
     ObjectWriterReadiness { input: PathBuf, json: bool },
     EmitObject { input: PathBuf, json: bool },
     VerifyObjectEmit { input: PathBuf, json: bool },
+    VerifyObjectOutput { input: PathBuf, json: bool },
     VerifyObjectWriterInput { input: PathBuf, json: bool },
     ObjectWriterDryRun { input: PathBuf, json: bool },
     EmitObjectWriterDryRun { input: PathBuf, json: bool },
@@ -74,6 +75,7 @@ where
         | "object-writer-readiness"
         | "emit-object"
         | "verify-object-emit"
+        | "verify-object-output"
         | "verify-object-writer-input"
         | "object-writer-dry-run"
         | "emit-object-writer-dry-run"
@@ -117,6 +119,7 @@ where
             let is_object_writer_readiness = command == "object-writer-readiness";
             let is_emit_object = command == "emit-object";
             let is_verify_object_emit = command == "verify-object-emit";
+            let is_verify_object_output = command == "verify-object-output";
             let is_verify_object_writer_input = command == "verify-object-writer-input";
             let is_object_writer_dry_run = command == "object-writer-dry-run";
             let is_emit_object_writer_dry_run = command == "emit-object-writer-dry-run";
@@ -187,6 +190,8 @@ where
                 Ok(Command::EmitObject { input, json })
             } else if is_verify_object_emit {
                 Ok(Command::VerifyObjectEmit { input, json })
+            } else if is_verify_object_output {
+                Ok(Command::VerifyObjectOutput { input, json })
             } else if is_verify_object_writer_input {
                 Ok(Command::VerifyObjectWriterInput { input, json })
             } else if is_object_writer_dry_run {
@@ -286,6 +291,7 @@ fn usage() -> &'static str {
         "  nsld object-writer-readiness <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-object <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-object-emit <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld verify-object-output <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-object-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld object-writer-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-object-writer-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",

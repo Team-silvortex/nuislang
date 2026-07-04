@@ -51,6 +51,7 @@ validation_contracts = ["glm.resource-lifetime"]
     });
 
     let report = nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let payload_bytes = fs::read(&report.container_payload_path).unwrap();
 
     assert!(report.valid);
     assert!(report.issues.is_empty());
@@ -60,15 +61,38 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(Path::new(&report.assemble_plan_path).exists());
     assert!(Path::new(&report.section_manifest_path).exists());
     assert!(Path::new(&report.object_plan_path).exists());
+    assert!(Path::new(&report.object_writer_input_path).exists());
+    assert!(Path::new(&report.object_byte_layout_path).exists());
+    assert!(Path::new(&report.object_file_layout_path).exists());
+    assert!(Path::new(&report.object_image_dry_run_path).exists());
+    assert!(Path::new(&report.object_image_dry_run_bytes_path).exists());
+    assert!(Path::new(&report.object_emit_blocked_path).exists());
+    assert!(Path::new(&report.object_output_path).exists());
+    assert!(Path::new(&report.object_writer_dry_run_path).exists());
     assert!(Path::new(&report.container_plan_path).exists());
     assert!(Path::new(&report.container_path).exists());
     assert!(dir.join("nuis.nsld.object-plan.toml").exists());
+    assert!(dir.join("nuis.nsld.object-writer-input.toml").exists());
+    assert!(dir.join("nuis.nsld.object.blocked.toml").exists());
+    assert!(dir.join("nuis.nsld.mach-o").exists());
+    assert!(dir.join("nuis.nsld.object-writer-dry-run.toml").exists());
+    assert!(payload_bytes
+        .windows(4)
+        .any(|window| window == [0xcf, 0xfa, 0xed, 0xfe]));
     assert_eq!(report.link_input_count, 1);
     assert_eq!(report.unit_count, 1);
     assert!(report.bundle_ready);
     assert_ne!(report.assemble_plan_hash, "missing");
     assert_ne!(report.section_table_hash, "missing");
     assert_ne!(report.object_plan_hash, "missing");
+    assert!(report.object_emitted);
+    assert_ne!(report.byte_layout_hash, "missing");
+    assert_ne!(report.file_layout_hash, "missing");
+    assert!(report
+        .object_image_hash
+        .as_deref()
+        .unwrap()
+        .starts_with("0x"));
     assert_ne!(report.metadata_table_hash, "missing");
     assert_ne!(report.container_layout_hash, "missing");
     assert_ne!(report.container_hash, "missing");

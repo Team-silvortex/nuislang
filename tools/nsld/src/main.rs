@@ -1,3 +1,4 @@
+mod artifact_chain;
 mod assembly;
 mod check;
 mod cli;
@@ -63,6 +64,7 @@ mod object_macho_image;
 mod object_macho_load_commands;
 mod object_macho_relocations;
 mod object_macho_symbols;
+mod object_output;
 mod object_plan;
 mod object_plan_verify;
 mod object_render;

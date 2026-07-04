@@ -9,7 +9,7 @@ use super::{
         object_section_table_mismatch_issues, relocation_seed_entries,
         relocation_seed_table_field_issues, relocation_seed_table_mismatch_issues,
     },
-    object_writer_backend::{object_writer_backend, object_writer_blockers},
+    object_writer_backend::{object_format_family, object_writer_backend, object_writer_blockers},
     reports::{NsldObjectPlanEmitReport, NsldObjectPlanReport, NsldObjectPlanVerifyReport},
     toml,
 };
@@ -37,6 +37,7 @@ pub(crate) fn nsld_object_plan_report(
         &plan.cpu_target.machine_os,
         &plan.cpu_target.object_format,
     );
+    let object_family = object_format_family(&plan.cpu_target.object_format).to_owned();
     let blockers = object_writer_blockers(&backend, &section_manifest.blockers);
     let object_sections = object_section_layout(&section_manifest.sections);
     let relocation_seeds = object_relocation_seeds(&object_sections);
@@ -46,6 +47,9 @@ pub(crate) fn nsld_object_plan_report(
         &plan.cpu_target.machine_arch,
         &plan.cpu_target.machine_os,
         &plan.cpu_target.object_format,
+        &object_family,
+        &backend.target_id,
+        &backend.backend_kind,
         &section_manifest.section_table_hash,
         &object_layout_hash,
         &relocation_seed_table_hash,
@@ -74,7 +78,9 @@ pub(crate) fn nsld_object_plan_report(
         relocation_seed_count: relocation_seeds.len(),
         relocation_seed_table_hash,
         writer_target_id: backend.target_id,
+        writer_backend_kind: backend.backend_kind,
         writer_status: backend.status,
+        object_family,
         unsupported_features: backend.unsupported_features,
         emission_status: "plan-only".to_owned(),
         object_sections,
@@ -181,21 +187,17 @@ mod tests {
     use std::{fs, path::Path};
 
     #[test]
-    fn object_plan_is_plan_only_until_object_writer_exists() {
+    fn object_plan_reports_ready_mach_o_writer_identity() {
         let plan = empty_link_plan();
         let report = nsld_object_plan_report(Path::new("nuis.build.manifest.toml"), &plan);
 
         assert_eq!(report.object_format, "mach-o");
         assert_eq!(report.emission_status, "plan-only");
         assert_eq!(report.writer_target_id, "arm64-macos-mach-o");
-        assert_eq!(report.writer_status, "recognized-blocked");
-        assert_eq!(
-            report.unsupported_features,
-            vec![
-                "object-byte-emitter".to_owned(),
-                "native-relocation-applier".to_owned()
-            ]
-        );
+        assert_eq!(report.writer_backend_kind, "mach-o-arm64");
+        assert_eq!(report.writer_status, "ready");
+        assert_eq!(report.object_family, "mach-o");
+        assert!(report.unsupported_features.is_empty());
         assert_eq!(
             report.object_sections[0].object_section_name,
             ".nuis.text.compiled"
@@ -216,10 +218,8 @@ mod tests {
         assert!(!report.relocation_seeds[0].native_relocation_ready);
         assert!(report
             .blockers
-            .contains(&"object-byte-emitter:not-implemented".to_owned()));
-        assert!(report
-            .blockers
-            .contains(&"native-relocation-applier:not-implemented".to_owned()));
+            .iter()
+            .any(|blocker| blocker.contains("section:nsld-link-input-table:")));
     }
 
     #[test]
@@ -247,6 +247,19 @@ mod tests {
             .issues
             .iter()
             .any(|issue| issue == "object_section[0].object_section_role missing"));
+    }
+
+    #[test]
+    fn object_plan_serializes_writer_backend_identity() {
+        let plan = empty_link_plan();
+        let report = nsld_object_plan_report(Path::new("nuis.build.manifest.toml"), &plan);
+        let rendered = crate::toml::render_object_plan(&report);
+        let json = crate::json_object::nsld_object_plan_report_json(&report);
+
+        assert!(rendered.contains("writer_backend_kind = \"mach-o-arm64\""));
+        assert!(rendered.contains("object_family = \"mach-o\""));
+        assert!(json.contains("\"writer_backend_kind\":\"mach-o-arm64\""));
+        assert!(json.contains("\"object_family\":\"mach-o\""));
     }
 
     #[test]

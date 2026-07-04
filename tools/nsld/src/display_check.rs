@@ -54,6 +54,51 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         optional_bool_text(report.section_manifest_valid)
     );
     println!(
+        "  object_plan: present={} valid={}",
+        report.object_plan_present,
+        optional_bool_text(report.object_plan_valid)
+    );
+    println!(
+        "  object_writer_input: present={} valid={}",
+        report.object_writer_input_present,
+        optional_bool_text(report.object_writer_input_valid)
+    );
+    println!(
+        "  object_byte_layout: present={} valid={}",
+        report.object_byte_layout_present,
+        optional_bool_text(report.object_byte_layout_valid)
+    );
+    println!(
+        "  object_file_layout: present={} valid={}",
+        report.object_file_layout_present,
+        optional_bool_text(report.object_file_layout_valid)
+    );
+    println!(
+        "  object_image_dry_run: present={} valid={} bytes_present={}",
+        report.object_image_dry_run_present,
+        optional_bool_text(report.object_image_dry_run_valid),
+        report.object_image_dry_run_bytes_present
+    );
+    println!(
+        "  object_emit_blocked: present={} valid={}",
+        report.object_emit_blocked_present,
+        optional_bool_text(report.object_emit_blocked_valid)
+    );
+    println!(
+        "  object_output: present={} valid={} expected_size={} actual_size={} expected_hash={} actual_hash={}",
+        report.object_output_present,
+        optional_bool_text(report.object_output_valid),
+        optional_usize_text(report.object_output_expected_size_bytes),
+        optional_usize_text(report.object_output_actual_size_bytes),
+        optional_string_text(report.object_output_expected_hash.as_deref()),
+        optional_string_text(report.object_output_actual_hash.as_deref())
+    );
+    println!(
+        "  object_writer_dry_run: present={} valid={}",
+        report.object_writer_dry_run_present,
+        optional_bool_text(report.object_writer_dry_run_valid)
+    );
+    println!(
         "  container_plan: present={} valid={}",
         report.container_plan_present,
         optional_bool_text(report.container_plan_valid)
@@ -81,6 +126,15 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.container_loader_blockers.len(),
         optional_string_text(report.container_metadata_table_hash.as_deref()),
         optional_usize_text(report.container_external_import_count)
+    );
+    println!(
+        "  container_native_object: section_present={} section_id={} loader_symbol_present={} loader_symbol_id={} relocation_present={} relocation_id={}",
+        report.container_native_object_section_present,
+        optional_string_text(report.container_native_object_section_id.as_deref()),
+        report.container_native_object_loader_symbol_present,
+        optional_string_text(report.container_native_object_loader_symbol_id.as_deref()),
+        report.container_native_object_relocation_present,
+        optional_string_text(report.container_native_object_relocation_id.as_deref())
     );
     println!(
         "  artifact_chain: valid={} issues={}",
@@ -160,6 +214,30 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     }
     for issue in &report.section_manifest_issues {
         println!("  section_manifest_issue: {issue}");
+    }
+    for issue in &report.object_plan_issues {
+        println!("  object_plan_issue: {issue}");
+    }
+    for issue in &report.object_writer_input_issues {
+        println!("  object_writer_input_issue: {issue}");
+    }
+    for issue in &report.object_byte_layout_issues {
+        println!("  object_byte_layout_issue: {issue}");
+    }
+    for issue in &report.object_file_layout_issues {
+        println!("  object_file_layout_issue: {issue}");
+    }
+    for issue in &report.object_image_dry_run_issues {
+        println!("  object_image_dry_run_issue: {issue}");
+    }
+    for issue in &report.object_emit_blocked_issues {
+        println!("  object_emit_blocked_issue: {issue}");
+    }
+    for issue in &report.object_output_issues {
+        println!("  object_output_issue: {issue}");
+    }
+    for issue in &report.object_writer_dry_run_issues {
+        println!("  object_writer_dry_run_issue: {issue}");
     }
     for issue in &report.container_plan_issues {
         println!("  container_plan_issue: {issue}");

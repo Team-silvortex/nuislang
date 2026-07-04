@@ -1,2 +1,4 @@
 name = "generic_method_bound_guarded_nested_match_demo"
+version = "0.1.0"
 entry = "main.ns"
+modules = ["main.ns"]

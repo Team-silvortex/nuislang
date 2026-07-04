@@ -39,7 +39,7 @@ pub(crate) fn tampered_container_source(
             "loader_entry_section_id = \"sec0000.compiled-artifact\"",
             "loader_entry_section_id = \"sec9999.missing\"",
         )
-        .replace("loader_symbol_count = 2", "loader_symbol_count = 0")
+        .replace("loader_symbol_count = 3", "loader_symbol_count = 0")
         .replace(
             &format!(
                 "loader_symbol_table_hash = \"{}\"",
@@ -64,7 +64,7 @@ pub(crate) fn tampered_container_source(
             "section_id = \"sec0000.compiled-artifact\"",
             "section_id = \"sec9999.missing\"",
         )
-        .replace("relocation_count = 2", "relocation_count = 3")
+        .replace("relocation_count = 3", "relocation_count = 4")
         .replace(
             "relocation_id = \"rel0000.lifecycle-entry\"",
             "relocation_id = \"rel9999.manual\"",

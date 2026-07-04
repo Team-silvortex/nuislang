@@ -20,6 +20,8 @@ pub(crate) fn render_object_image_dry_run(report: &NsldObjectImageDryRunReport) 
     push_string(&mut out, "output_path", &report.output_path);
     push_string(&mut out, "image_path", &report.image_path);
     push_string(&mut out, "writer_target_id", &report.writer_target_id);
+    push_string(&mut out, "writer_backend_kind", &report.writer_backend_kind);
+    push_string(&mut out, "object_family", &report.object_family);
     push_string(&mut out, "backend_kind", &report.backend_kind);
     push_string(&mut out, "backend_family", &report.backend_family);
     push_string(&mut out, "backend_status", &report.backend_status);

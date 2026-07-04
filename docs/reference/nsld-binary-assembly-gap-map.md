@@ -141,6 +141,9 @@ nsld prepare
   -> nsld object-plan
   -> nsld emit-object-plan
   -> nsld verify-object-plan
+  -> nsld object-byte-layout
+  -> nsld object-file-layout
+  -> nsld object-image-dry-run
 ```
 
 That gives the object writer a deterministic planning layer before bytes are
@@ -158,18 +161,30 @@ It also emits `[[object_relocation_seed]]` records, which are Nsld-owned
 relocation intent seeds and not yet native Mach-O, ELF, PE, shader, or kernel
 relocation records.
 The plan also exposes a writer summary with `writer_target_id`,
-`writer_status`, and `unsupported_features`, so future byte-emission commands
-can distinguish "target known, writer blocked" from "target unknown".
+`writer_backend_kind`, `object_family`, `writer_status`, and
+`unsupported_features`, so future byte-emission commands can distinguish
+"target known, writer blocked" from "target unknown" without hardcoding one
+platform family into the linker frontdoor.
 `verify-object-plan` now validates required object-section and relocation-seed
 fields plus semantic drift in both tables.
 `object-writer-readiness` exposes the same information as a command-level
-readiness gate before any future `emit-object` command attempts byte emission.
-`emit-object` is currently wired as a structured blocked command: it reports the
-planned output path and blockers, but it does not write platform object bytes.
-It succeeds when it materializes diagnostic artifacts: the future byte writer's
-deterministic input snapshot, the blocked emit report, and the object image
-dry-run report/bin pair. `verify-object-emit` checks that those artifacts still
-agree on the object plan hash and dry-run image hash.
+readiness gate before `emit-object` attempts byte emission.
+`emit-object` is now wired to the first minimal native object writer: prepared
+Mach-O arm64 input can be emitted as optional `nuis.nsld.mach-o` from the
+deterministic image bytes. Unprepared input, ELF, and COFF still report
+blockers. The command also materializes diagnostic artifacts: the future byte
+writer's deterministic input snapshot, the alpha emit report at
+`nuis.nsld.object.blocked.toml`, and the object image dry-run report/bin pair.
+`verify-object-emit` checks that
+those artifacts still agree on the object plan hash and dry-run image hash.
+`verify-object-output` checks the emitted native object bytes themselves by
+comparing the object output path, currently `nuis.nsld.mach-o`, against
+`nuis.nsld.object-image-dry-run.bin` by size and content hash. `nsld check`
+additionally runs that verification when the object output is present, and
+`nsld closure` can surface it as `verified-object-output`.
+Container planning also uses this validation as the native-object admission
+gate: an invalid object output becomes an `object-output:*` blocker instead of
+being repackaged as a `native-object-output` section.
 `verify-object-writer-input` closes that snapshot loop by validating the writer
 input hashes, section and relocation-seed counts, and required writer table
 field types before a future byte writer consumes it.
@@ -182,6 +197,17 @@ keeps it locked to the current object plan and writer input snapshot.
 `object-byte-layout` adds the next deterministic layer: byte offsets, byte
 sizes, alignment, total byte span, and `byte_layout_hash`, materialized as
 `nuis.nsld.object-byte-layout.toml` before native object bytes exist.
+It carries the same `writer_target_id`, `writer_backend_kind`, `object_family`,
+and `object_format` identity from `object-plan`, and includes those fields in
+the byte-layout hash so backend-family changes cannot accidentally reuse stale
+layout cache entries.
+`object-file-layout` continues that identity into writer-family-specific file
+records, including the file-layout hash, while still keeping Mach-O/ELF/COFF
+families behind registered writer metadata rather than ad hoc linker branches.
+`object-image-dry-run` then preserves `writer_backend_kind` and `object_family`
+alongside its image-backend status fields, and verification rejects identity
+drift before any future real object writer treats the dry-run image as an
+emission input.
 
 ## Success Boundary
 

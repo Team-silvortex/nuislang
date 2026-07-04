@@ -4,6 +4,7 @@ entry = "main.ns"
 modules = ["main.ns", "network_unit.ns"]
 galaxy = ["std=workspace"]
 
-abis = [
-  { name = "cpu-main", kind = "staticlib", target = "host-native" }
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "network=network.socket.macos.arm64.v1",
 ]

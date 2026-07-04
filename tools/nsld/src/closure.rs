@@ -1,31 +1,25 @@
 use super::{
+    artifact_chain::{
+        nsld_artifact_chain_issues, nsld_artifact_stage_kind_path, nsld_artifact_stage_present,
+        nsld_artifact_stages, NsldArtifactStageKind,
+    },
     container_pipeline::nsld_container_report,
     link_units::{
         nsld_link_input_summary, nsld_sidecar_capability_diagnostics,
         nsld_verify_link_inputs_report,
     },
+    object_byte_layout::nsld_verify_object_byte_layout_report,
+    object_emit::nsld_verify_object_emit_report,
+    object_file_layout::nsld_verify_object_file_layout_report,
+    object_image_dry_run::nsld_verify_object_image_dry_run_report,
+    object_output::nsld_object_output_issues,
+    object_plan::nsld_verify_object_plan_report,
+    object_writer_input::{
+        nsld_verify_object_writer_dry_run_report, nsld_verify_object_writer_input_report,
+    },
     reports::NsldClosureReport,
 };
-use std::path::{Path, PathBuf};
-
-pub(crate) fn nsld_artifact_chain_issues(stages: &[(&str, bool)]) -> Vec<String> {
-    let mut first_missing_before_present = None;
-    let mut issues = Vec::new();
-
-    for (name, present) in stages {
-        if *present {
-            if let Some(missing) = first_missing_before_present {
-                issues.push(format!(
-                    "artifact `{name}` is present but prerequisite `{missing}` is missing"
-                ));
-            }
-        } else if first_missing_before_present.is_none() {
-            first_missing_before_present = Some(*name);
-        }
-    }
-
-    issues
-}
+use std::path::Path;
 
 pub(crate) fn nsld_closure_report(
     manifest: &Path,
@@ -58,7 +52,8 @@ pub(crate) fn nsld_closure_report(
         internal_contracts.push("link-input-sidecar-table".to_owned());
     }
     let link_input_summary = nsld_link_input_summary(&sidecar_capabilities);
-    let link_input_table_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.link-inputs.toml");
+    let link_input_table_path =
+        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::LinkInputs);
     let link_input_verify_report = link_input_table_path
         .exists()
         .then(|| nsld_verify_link_inputs_report(manifest, plan));
@@ -113,6 +108,96 @@ pub(crate) fn nsld_closure_report(
             unresolved.push(format!("link-input-table:{issue}"));
         }
     }
+    let prepared_artifact_stages = nsld_artifact_stages(&plan.output_dir);
+    let prepared_artifact_chain_issues = nsld_artifact_chain_issues(&prepared_artifact_stages);
+    let prepared_artifact_chain_valid = prepared_artifact_chain_issues.is_empty();
+    if prepared_artifact_chain_valid
+        && prepared_artifact_stages
+            .iter()
+            .all(|stage| stage.present || !stage.required)
+    {
+        internal_contracts.push("verified-prepared-artifact-chain".to_owned());
+    }
+    for issue in &prepared_artifact_chain_issues {
+        unresolved.push(format!("prepared-artifact-chain:{issue}"));
+    }
+    verify_prepared_artifact(
+        "object-plan",
+        nsld_artifact_stage_present(&prepared_artifact_stages, NsldArtifactStageKind::ObjectPlan),
+        || nsld_verify_object_plan_report(manifest, plan).valid,
+        &mut internal_contracts,
+        &mut unresolved,
+    );
+    verify_prepared_artifact(
+        "object-writer-input",
+        nsld_artifact_stage_present(
+            &prepared_artifact_stages,
+            NsldArtifactStageKind::ObjectWriterInput,
+        ),
+        || nsld_verify_object_writer_input_report(manifest, plan).valid,
+        &mut internal_contracts,
+        &mut unresolved,
+    );
+    verify_prepared_artifact(
+        "object-byte-layout",
+        nsld_artifact_stage_present(
+            &prepared_artifact_stages,
+            NsldArtifactStageKind::ObjectByteLayout,
+        ),
+        || nsld_verify_object_byte_layout_report(manifest, plan).valid,
+        &mut internal_contracts,
+        &mut unresolved,
+    );
+    verify_prepared_artifact(
+        "object-file-layout",
+        nsld_artifact_stage_present(
+            &prepared_artifact_stages,
+            NsldArtifactStageKind::ObjectFileLayout,
+        ),
+        || nsld_verify_object_file_layout_report(manifest, plan).valid,
+        &mut internal_contracts,
+        &mut unresolved,
+    );
+    verify_prepared_artifact(
+        "object-image-dry-run",
+        nsld_artifact_stage_present(
+            &prepared_artifact_stages,
+            NsldArtifactStageKind::ObjectImageDryRun,
+        ),
+        || nsld_verify_object_image_dry_run_report(manifest, plan).valid,
+        &mut internal_contracts,
+        &mut unresolved,
+    );
+    verify_prepared_artifact(
+        "object-emit-blocked",
+        nsld_artifact_stage_present(
+            &prepared_artifact_stages,
+            NsldArtifactStageKind::ObjectEmitBlocked,
+        ),
+        || nsld_verify_object_emit_report(manifest, plan).valid,
+        &mut internal_contracts,
+        &mut unresolved,
+    );
+    verify_prepared_artifact(
+        "object-output",
+        nsld_artifact_stage_present(
+            &prepared_artifact_stages,
+            NsldArtifactStageKind::ObjectOutput,
+        ),
+        || nsld_object_output_issues(plan).is_empty(),
+        &mut internal_contracts,
+        &mut unresolved,
+    );
+    verify_prepared_artifact(
+        "object-writer-dry-run",
+        nsld_artifact_stage_present(
+            &prepared_artifact_stages,
+            NsldArtifactStageKind::ObjectWriterDryRun,
+        ),
+        || nsld_verify_object_writer_dry_run_report(manifest, plan).valid,
+        &mut internal_contracts,
+        &mut unresolved,
+    );
 
     NsldClosureReport {
         manifest: manifest.display().to_string(),
@@ -124,6 +209,8 @@ pub(crate) fn nsld_closure_report(
         link_input_table_hash: link_input_summary.table_hash,
         link_input_table_present,
         link_input_table_valid,
+        prepared_artifact_chain_valid,
+        prepared_artifact_chain_issues,
         container_metadata_table_hash: container_report.metadata_table_hash,
         container_loader_readiness: container_report.loader_readiness,
         external_dependencies,
@@ -139,5 +226,22 @@ pub(crate) fn nsld_closure_report(
         clock_edge_count: plan.clock_protocol.edges.len(),
         data_segment_count: plan.hetero_calculate.data_segments.len(),
         final_stage_link_mode: plan.final_stage.link_mode.clone(),
+    }
+}
+
+fn verify_prepared_artifact(
+    contract: &str,
+    present: bool,
+    verify: impl FnOnce() -> bool,
+    internal_contracts: &mut Vec<String>,
+    unresolved: &mut Vec<String>,
+) {
+    if !present {
+        return;
+    }
+    if verify() {
+        internal_contracts.push(format!("verified-{contract}"));
+    } else {
+        unresolved.push(format!("{contract}:verification"));
     }
 }

@@ -1,3 +1,4 @@
 name = "match_or_state_demo"
 version = "0.1.0"
 entry = "main.ns"
+modules = ["main.ns"]

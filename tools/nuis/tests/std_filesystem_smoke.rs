@@ -125,6 +125,10 @@ const STD_TOOLING_FULL_SMOKE_PROJECTS: &[(&str, &str)] = &[
         "../../examples/projects/tooling/result_enum_runtime_demo",
     ),
     (
+        "net_result_enum",
+        "../../examples/projects/domains/net_result_enum_recipe_demo",
+    ),
+    (
         "text_format_runtime",
         "../../examples/projects/tooling/text_format_runtime_demo",
     ),

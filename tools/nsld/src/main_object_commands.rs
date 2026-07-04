@@ -6,6 +6,7 @@ use crate::object_byte_layout::*;
 use crate::object_emit::*;
 use crate::object_file_layout::*;
 use crate::object_image_dry_run::*;
+use crate::object_output::*;
 use crate::object_plan::*;
 use crate::object_writer_input::*;
 
@@ -22,6 +23,9 @@ pub(crate) fn run_object_command(command: &Command) -> Option<Result<(), String>
         Command::EmitObject { input, json } => Some(run_emit_object_command(input, *json)),
         Command::VerifyObjectEmit { input, json } => {
             Some(run_verify_object_emit_command(input, *json))
+        }
+        Command::VerifyObjectOutput { input, json } => {
+            Some(run_verify_object_output_command(input, *json))
         }
         Command::VerifyObjectWriterInput { input, json } => {
             Some(run_verify_object_writer_input_command(input, *json))
@@ -134,6 +138,20 @@ fn run_verify_object_emit_command(input: &std::path::Path, json: bool) -> Result
     }
     if !report.valid {
         return Err("nsld object emit verification failed".to_owned());
+    }
+    Ok(())
+}
+
+fn run_verify_object_output_command(input: &std::path::Path, json: bool) -> Result<(), String> {
+    let ctx = load_link_input_context(input)?;
+    let report = nsld_verify_object_output_report(&ctx.manifest, &ctx.plan);
+    if json {
+        println!("{}", nsld_object_output_verify_report_json(&report));
+    } else {
+        print_nsld_object_output_verify_report(&report);
+    }
+    if !report.valid {
+        return Err("nsld object output verification failed".to_owned());
     }
     Ok(())
 }
@@ -352,6 +370,10 @@ mod tests {
                 json: false,
             },
             Command::VerifyObjectEmit {
+                input: input.clone(),
+                json: false,
+            },
+            Command::VerifyObjectOutput {
                 input: input.clone(),
                 json: false,
             },

@@ -34,6 +34,8 @@ pub(crate) fn nsld_verify_object_writer_input_report(
     });
     let (
         actual_object_plan_hash,
+        actual_writer_backend_kind,
+        actual_object_family,
         actual_object_layout_hash,
         actual_relocation_seed_table_hash,
         actual_section_count,
@@ -41,6 +43,8 @@ pub(crate) fn nsld_verify_object_writer_input_report(
     ) = match actual.as_ref() {
         Ok(source) => (
             toml::string_value(source, "object_plan_hash"),
+            toml::string_value(source, "writer_backend_kind"),
+            toml::string_value(source, "object_family"),
             toml::string_value(source, "object_layout_hash"),
             toml::string_value(source, "relocation_seed_table_hash"),
             toml::usize_value(source, "section_count"),
@@ -48,7 +52,7 @@ pub(crate) fn nsld_verify_object_writer_input_report(
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None)
+            (None, None, None, None, None, None, None)
         }
     };
     if let Ok(actual) = actual {
@@ -67,6 +71,26 @@ pub(crate) fn nsld_verify_object_writer_input_report(
                 "object_plan_hash mismatch: expected {}, found {}",
                 expected_report.object_plan_hash,
                 actual_object_plan_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_writer_backend_kind.as_deref()
+            != Some(expected_report.writer_backend_kind.as_str())
+        {
+            issues.push(format!(
+                "writer_backend_kind mismatch: expected {}, found {}",
+                expected_report.writer_backend_kind,
+                actual_writer_backend_kind
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_object_family.as_deref() != Some(expected_report.object_family.as_str()) {
+            issues.push(format!(
+                "object_family mismatch: expected {}, found {}",
+                expected_report.object_family,
+                actual_object_family
                     .clone()
                     .unwrap_or_else(|| "missing".to_owned())
             ));
@@ -117,11 +141,15 @@ pub(crate) fn nsld_verify_object_writer_input_report(
         input_path: input_path.display().to_string(),
         valid: issues.is_empty(),
         expected_object_plan_hash: expected_report.object_plan_hash,
+        expected_writer_backend_kind: expected_report.writer_backend_kind,
+        expected_object_family: expected_report.object_family,
         expected_object_layout_hash: expected_report.object_layout_hash,
         expected_relocation_seed_table_hash: expected_report.relocation_seed_table_hash,
         expected_section_count: expected_report.section_count,
         expected_relocation_seed_count: expected_report.relocation_seed_count,
         actual_object_plan_hash,
+        actual_writer_backend_kind,
+        actual_object_family,
         actual_object_layout_hash,
         actual_relocation_seed_table_hash,
         actual_section_count,
@@ -162,6 +190,8 @@ pub(crate) fn nsld_object_writer_dry_run_report(
             .display()
             .to_string(),
         writer_target_id: readiness.target_id,
+        writer_backend_kind: object_plan.writer_backend_kind,
+        object_family: object_plan.object_family,
         object_plan_hash: object_plan.object_plan_hash,
         object_layout_hash: object_plan.object_layout_hash,
         relocation_seed_table_hash: object_plan.relocation_seed_table_hash,
@@ -213,6 +243,8 @@ pub(crate) fn nsld_verify_object_writer_dry_run_report(
     });
     let (
         actual_object_plan_hash,
+        actual_writer_backend_kind,
+        actual_object_family,
         actual_object_layout_hash,
         actual_relocation_seed_table_hash,
         actual_section_count,
@@ -221,6 +253,8 @@ pub(crate) fn nsld_verify_object_writer_dry_run_report(
     ) = match actual.as_ref() {
         Ok(source) => (
             toml::string_value(source, "object_plan_hash"),
+            toml::string_value(source, "writer_backend_kind"),
+            toml::string_value(source, "object_family"),
             toml::string_value(source, "object_layout_hash"),
             toml::string_value(source, "relocation_seed_table_hash"),
             toml::usize_value(source, "section_count"),
@@ -229,7 +263,7 @@ pub(crate) fn nsld_verify_object_writer_dry_run_report(
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None, None)
+            (None, None, None, None, None, None, None, None)
         }
     };
     if let Ok(actual) = actual {
@@ -241,6 +275,18 @@ pub(crate) fn nsld_verify_object_writer_dry_run_report(
             "object_plan_hash",
             &expected_report.object_plan_hash,
             actual_object_plan_hash.as_deref(),
+        );
+        push_string_mismatch(
+            &mut issues,
+            "writer_backend_kind",
+            &expected_report.writer_backend_kind,
+            actual_writer_backend_kind.as_deref(),
+        );
+        push_string_mismatch(
+            &mut issues,
+            "object_family",
+            &expected_report.object_family,
+            actual_object_family.as_deref(),
         );
         push_string_mismatch(
             &mut issues,
@@ -282,12 +328,16 @@ pub(crate) fn nsld_verify_object_writer_dry_run_report(
         input_path: input_path.display().to_string(),
         valid: issues.is_empty(),
         expected_object_plan_hash: expected_report.object_plan_hash,
+        expected_writer_backend_kind: expected_report.writer_backend_kind,
+        expected_object_family: expected_report.object_family,
         expected_object_layout_hash: expected_report.object_layout_hash,
         expected_relocation_seed_table_hash: expected_report.relocation_seed_table_hash,
         expected_section_count: expected_report.section_count,
         expected_relocation_seed_count: expected_report.relocation_seed_count,
         expected_dry_run_ready: expected_report.dry_run_ready,
         actual_object_plan_hash,
+        actual_writer_backend_kind,
+        actual_object_family,
         actual_object_layout_hash,
         actual_relocation_seed_table_hash,
         actual_section_count,
@@ -444,9 +494,19 @@ fn writer_relocation_seed_table_mismatch_issues(
 
 #[cfg(test)]
 mod tests {
-    use super::nsld_object_writer_dry_run_report;
-    use super::{nsld_emit_object_writer_dry_run_report, nsld_verify_object_writer_dry_run_report};
-    use crate::{main_test_support::empty_link_plan, object_emit::nsld_emit_object_report};
+    use super::{
+        nsld_emit_object_writer_dry_run_report, nsld_object_writer_dry_run_report,
+        nsld_verify_object_writer_dry_run_report, nsld_verify_object_writer_input_report,
+    };
+    use crate::{
+        assembly::{
+            nsld_emit_assemble_plan_report, nsld_emit_link_bundle_report,
+            nsld_emit_section_manifest_report,
+        },
+        link_units::{nsld_emit_link_inputs_report, nsld_emit_link_units_report},
+        main_test_support::empty_link_plan,
+        object_emit::nsld_emit_object_report,
+    };
     use std::{fs, path::Path};
 
     #[test]
@@ -472,7 +532,7 @@ mod tests {
     }
 
     #[test]
-    fn dry_run_consumes_emitted_writer_input_but_stays_blocked_without_writer() {
+    fn dry_run_consumes_emitted_writer_input_and_is_ready_for_mach_o() {
         let dir = std::env::temp_dir().join(format!(
             "nsld-object-writer-dry-run-blocked-{}",
             std::process::id()
@@ -480,20 +540,90 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let mut plan = empty_link_plan();
         plan.output_dir = dir.display().to_string();
+        plan.compiled_artifact.path = dir.join("nuis.compiled.artifact").display().to_string();
+        fs::write(&plan.compiled_artifact.path, b"compiled-artifact").unwrap();
+        emit_object_prerequisites(Path::new("manifest.toml"), &plan);
         nsld_emit_object_report(Path::new("manifest.toml"), &plan).unwrap();
 
         let report = nsld_object_writer_dry_run_report(Path::new("manifest.toml"), &plan);
         fs::remove_dir_all(dir).unwrap();
 
         assert!(report.writer_input_valid);
-        assert!(!report.can_emit_object);
-        assert!(!report.dry_run_ready);
+        assert!(report.can_emit_object);
+        assert!(report.dry_run_ready);
         assert_eq!(report.section_count, 4);
         assert_eq!(report.relocation_seed_count, 4);
+        assert_eq!(report.writer_backend_kind, "mach-o-arm64");
+        assert_eq!(report.object_family, "mach-o");
+        let rendered = crate::toml::render_object_writer_dry_run(&report);
+        let json = crate::json_object::nsld_object_writer_dry_run_report_json(&report);
+        assert!(rendered.contains("writer_backend_kind = \"mach-o-arm64\""));
+        assert!(rendered.contains("object_family = \"mach-o\""));
+        assert!(json.contains("\"writer_backend_kind\":\"mach-o-arm64\""));
+        assert!(json.contains("\"object_family\":\"mach-o\""));
         assert!(report.planned_output_path.ends_with("nuis.nsld.mach-o"));
-        assert!(report
-            .blockers
-            .contains(&"object-byte-emitter:not-implemented".to_owned()));
+        assert!(report.blockers.is_empty());
+    }
+
+    fn emit_object_prerequisites(manifest: &Path, plan: &nuisc::linker::LinkPlan) {
+        nsld_emit_link_inputs_report(manifest, plan).unwrap();
+        nsld_emit_link_units_report(manifest, plan).unwrap();
+        nsld_emit_link_bundle_report(manifest, plan).unwrap();
+        nsld_emit_assemble_plan_report(manifest, plan).unwrap();
+        nsld_emit_section_manifest_report(manifest, plan).unwrap();
+    }
+
+    #[test]
+    fn verify_object_writer_input_reports_writer_identity_drift() {
+        let dir = std::env::temp_dir().join(format!(
+            "nsld-object-writer-input-identity-drift-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let mut plan = empty_link_plan();
+        plan.output_dir = dir.display().to_string();
+        nsld_emit_object_report(Path::new("manifest.toml"), &plan).unwrap();
+        let input_path = dir.join("nuis.nsld.object-writer-input.toml");
+        let damaged = fs::read_to_string(&input_path).unwrap().replace(
+            "writer_backend_kind = \"mach-o-arm64\"",
+            "writer_backend_kind = \"elf-amd64\"",
+        );
+        fs::write(&input_path, damaged).unwrap();
+
+        let verify = nsld_verify_object_writer_input_report(Path::new("manifest.toml"), &plan);
+        fs::remove_dir_all(dir).unwrap();
+
+        assert!(!verify.valid);
+        assert!(verify.issues.iter().any(|issue| {
+            issue == "writer_backend_kind mismatch: expected mach-o-arm64, found elf-amd64"
+        }));
+    }
+
+    #[test]
+    fn verify_object_writer_dry_run_reports_writer_identity_drift() {
+        let dir = std::env::temp_dir().join(format!(
+            "nsld-object-writer-dry-run-identity-drift-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let mut plan = empty_link_plan();
+        plan.output_dir = dir.display().to_string();
+        nsld_emit_object_report(Path::new("manifest.toml"), &plan).unwrap();
+        nsld_emit_object_writer_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+        let input_path = dir.join("nuis.nsld.object-writer-dry-run.toml");
+        let damaged = fs::read_to_string(&input_path).unwrap().replace(
+            "writer_backend_kind = \"mach-o-arm64\"",
+            "writer_backend_kind = \"elf-amd64\"",
+        );
+        fs::write(&input_path, damaged).unwrap();
+
+        let verify = nsld_verify_object_writer_dry_run_report(Path::new("manifest.toml"), &plan);
+        fs::remove_dir_all(dir).unwrap();
+
+        assert!(!verify.valid);
+        assert!(verify.issues.iter().any(|issue| {
+            issue == "writer_backend_kind mismatch: expected mach-o-arm64, found elf-amd64"
+        }));
     }
 
     #[test]

@@ -82,6 +82,15 @@ pub(crate) fn object_writer_backend_readiness(
     }
 }
 
+pub(crate) fn object_format_family(object_format: &str) -> &'static str {
+    match object_format {
+        "mach-o" => "mach-o",
+        "elf" => "elf",
+        "coff" => "coff",
+        _ => "unknown-object-family",
+    }
+}
+
 fn object_writer_target_id(machine_arch: &str, machine_os: &str, object_format: &str) -> String {
     format!("{machine_arch}-{machine_os}-{object_format}")
 }
@@ -102,6 +111,7 @@ fn object_writer_backend_kind(
 
 fn object_writer_backend_status(backend_kind: &str) -> &'static str {
     match backend_kind {
+        "mach-o-arm64" => "ready",
         "unknown-object-writer" => "unsupported-target",
         _ => "recognized-blocked",
     }
@@ -147,6 +157,7 @@ fn object_writer_stage_ids(backend_kind: &str) -> Vec<String> {
 
 fn object_writer_unsupported_features(backend_kind: &str) -> Vec<String> {
     match backend_kind {
+        "mach-o-arm64" => Vec::new(),
         "unknown-object-writer" => vec!["object-writer-target".to_owned()],
         _ => vec![
             "object-byte-emitter".to_owned(),
@@ -157,7 +168,14 @@ fn object_writer_unsupported_features(backend_kind: &str) -> Vec<String> {
 
 fn object_writer_stage_status(backend_kind: &str, stage_id: &str) -> &'static str {
     match (backend_kind, stage_id) {
-        ("mach-o-arm64", "macho-header") => "planned",
+        (
+            "mach-o-arm64",
+            "macho-header"
+            | "macho-section-table"
+            | "macho-symbol-table"
+            | "macho-relocation-table"
+            | "macho-byte-emission",
+        ) => "ready",
         _ => "not-implemented",
     }
 }
@@ -182,7 +200,7 @@ mod tests {
 
         assert_eq!(backend.target_id, "arm64-macos-mach-o");
         assert_eq!(backend.backend_kind, "mach-o-arm64");
-        assert_eq!(backend.status, "recognized-blocked");
+        assert_eq!(backend.status, "ready");
         assert_eq!(
             backend
                 .writer_stages
@@ -197,61 +215,47 @@ mod tests {
                 "macho-byte-emission".to_owned()
             ]
         );
-        assert_eq!(backend.writer_stages[0].status, "planned");
+        assert_eq!(backend.writer_stages[0].status, "ready");
         assert!(backend
             .writer_stages
             .iter()
-            .skip(1)
-            .all(|stage| stage.required && stage.status == "not-implemented"));
-        assert!(backend
-            .unsupported_features
-            .contains(&"object-byte-emitter".to_owned()));
+            .all(|stage| stage.required && stage.status == "ready"));
+        assert!(backend.unsupported_features.is_empty());
     }
 
     #[test]
-    fn backend_blockers_include_stage_level_missing_work() {
+    fn mach_o_backend_blockers_forward_upstream_blockers_only() {
         let backend = object_writer_backend("arm64", "macos", "mach-o");
         let blockers =
             super::object_writer_blockers(&backend, &["section-manifest:blocked".to_owned()]);
 
-        assert!(blockers.contains(&"section-manifest:blocked".to_owned()));
-        assert!(blockers.contains(&"object-byte-emitter:not-implemented".to_owned()));
-        assert!(blockers.contains(&"native-relocation-applier:not-implemented".to_owned()));
-        assert!(blockers.contains(&"object-writer-stage:macho-header:planned".to_owned()));
-        assert!(blockers
-            .contains(&"object-writer-stage:macho-relocation-table:not-implemented".to_owned()));
+        assert_eq!(blockers, vec!["section-manifest:blocked".to_owned()]);
     }
 
     #[test]
     fn stage_blockers_only_include_required_non_ready_stages() {
         let mut backend = object_writer_backend("arm64", "macos", "mach-o");
-        backend.writer_stages[0].status = "ready".to_owned();
+        backend.writer_stages[0].status = "planned".to_owned();
         backend.writer_stages[1].required = false;
         let blockers = object_writer_stage_blockers(&backend);
 
         assert!(!blockers.contains(&"object-writer-stage:macho-header:ready".to_owned()));
         assert!(!blockers
             .contains(&"object-writer-stage:macho-section-table:not-implemented".to_owned()));
-        assert!(
-            blockers.contains(&"object-writer-stage:macho-symbol-table:not-implemented".to_owned())
-        );
+        assert!(blockers.contains(&"object-writer-stage:macho-header:planned".to_owned()));
     }
 
     #[test]
     fn readiness_requires_all_required_stages_to_be_ready() {
         let mut backend = object_writer_backend("arm64", "macos", "mach-o");
-        backend.unsupported_features.clear();
-        let readiness = object_writer_backend_readiness(&backend, true, &[]);
-
-        assert!(!readiness.can_emit_object);
-        assert_eq!(backend.writer_stages[0].status, "planned");
-
-        for stage in &mut backend.writer_stages {
-            stage.status = "ready".to_owned();
-        }
         let readiness = object_writer_backend_readiness(&backend, true, &[]);
 
         assert!(readiness.can_emit_object);
+
+        backend.writer_stages[0].status = "planned".to_owned();
+        let readiness = object_writer_backend_readiness(&backend, true, &[]);
+
+        assert!(!readiness.can_emit_object);
     }
 
     #[test]

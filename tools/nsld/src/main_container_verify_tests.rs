@@ -71,9 +71,14 @@ validation_contracts = ["glm.resource-lifetime"]
     let preview = nsld_container_report(Path::new("manifest.toml"), &plan);
 
     let report = nsld_verify_container_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_container_verify_report_json(&report);
 
-    assert_eq!(preview.loader_symbols.len(), 2);
-    assert_eq!(preview.relocations.len(), 2);
+    assert_eq!(preview.loader_symbols.len(), 3);
+    assert_eq!(preview.relocations.len(), 3);
+    assert!(preview
+        .loader_symbols
+        .iter()
+        .any(|symbol| symbol.symbol_kind == "native-object-output"));
     assert_eq!(payload_bytes.len(), prepare.payload_size_bytes);
     assert_eq!(fnv1a64_hex(&payload_bytes), prepare.payload_hash);
     assert!(container_source.contains("offset = 0"));
@@ -85,7 +90,7 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(container_source.contains("loader_entry_kind = \"lifecycle-bootstrap\""));
     assert!(container_source.contains("loader_entry_symbol = \"main\""));
     assert!(container_source.contains("loader_entry_section_id = \"sec0000.compiled-artifact\""));
-    assert!(container_source.contains("loader_symbol_count = 2"));
+    assert!(container_source.contains("loader_symbol_count = 3"));
     assert!(container_source.contains("loader_symbol_table_hash = \"0x"));
     assert!(container_source.contains("[[loader_symbol]]"));
     assert!(container_source.contains("symbol_id = \"sym0000.loader-entry\""));
@@ -94,7 +99,10 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(container_source.contains("symbol_id = \"sym0001.hetero-node.shader.official.shader\""));
     assert!(container_source.contains("symbol_kind = \"hetero-node-dispatch\""));
     assert!(container_source.contains("symbol_name = \"t0001.shader\""));
-    assert!(container_source.contains("relocation_count = 2"));
+    assert!(container_source.contains("symbol_id = \"sym0002.native-object-output\""));
+    assert!(container_source.contains("symbol_kind = \"native-object-output\""));
+    assert!(container_source.contains("symbol_name = \"__nuis_native_object\""));
+    assert!(container_source.contains("relocation_count = 3"));
     assert!(container_source.contains("relocation_table_hash = \"0x"));
     assert!(container_source.contains("[[relocation]]"));
     assert!(container_source.contains("relocation_id = \"rel0000.lifecycle-entry\""));
@@ -105,6 +113,9 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(container_source.contains("relocation_kind = \"hetero-node-binding\""));
     assert!(container_source
         .contains("target_symbol_id = \"sym0001.hetero-node.shader.official.shader\""));
+    assert!(container_source.contains("relocation_id = \"rel0002.native-object\""));
+    assert!(container_source.contains("relocation_kind = \"native-object-binding\""));
+    assert!(container_source.contains("target_symbol_id = \"sym0002.native-object-output\""));
     assert!(container_source.contains("external_import_count = 3"));
     assert!(container_source.contains("external_import_table_hash = \"0x"));
     assert!(container_source.contains("[[external_import]]"));
@@ -115,9 +126,10 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(container_source.contains("payload_hash = \"0x"));
     assert!(container_source.contains("container_section_table_hash = \"0x"));
     assert!(container_source.contains("metadata_table_hash = \"0x"));
+    assert!(container_source.contains("section_kind = \"native-object-output\""));
     assert!(report.valid);
     assert!(report.issues.is_empty());
-    assert_eq!(report.actual_section_count, Some(5));
+    assert_eq!(report.actual_section_count, Some(6));
     assert_eq!(
         report.actual_container_section_table_hash.as_deref(),
         Some(report.expected_container_section_table_hash.as_str())
@@ -153,8 +165,8 @@ validation_contracts = ["glm.resource-lifetime"]
     );
     assert_eq!(report.expected_external_import_count, 3);
     assert_eq!(report.actual_external_import_count, Some(3));
-    assert_eq!(report.expected_loader_symbol_count, 2);
-    assert_eq!(report.actual_loader_symbol_count, Some(2));
+    assert_eq!(report.expected_loader_symbol_count, 3);
+    assert_eq!(report.actual_loader_symbol_count, Some(3));
     assert_eq!(
         report.actual_loader_symbol_table_hash.as_deref(),
         Some(report.expected_loader_symbol_table_hash.as_str())
@@ -179,8 +191,8 @@ validation_contracts = ["glm.resource-lifetime"]
         report.actual_loader_symbol_section_id.as_deref(),
         Some("sec0000.compiled-artifact")
     );
-    assert_eq!(report.expected_relocation_count, 2);
-    assert_eq!(report.actual_relocation_count, Some(2));
+    assert_eq!(report.expected_relocation_count, 3);
+    assert_eq!(report.actual_relocation_count, Some(3));
     assert_eq!(
         report.actual_relocation_table_hash.as_deref(),
         Some(report.expected_relocation_table_hash.as_str())
@@ -241,6 +253,43 @@ validation_contracts = ["glm.resource-lifetime"]
     );
     assert!(report.expected_external_import_required);
     assert_eq!(report.actual_external_import_required, Some(true));
+    assert!(report.expected_native_object_section_present);
+    assert_eq!(
+        report.expected_native_object_section_id,
+        "sec0005.native-object-output"
+    );
+    assert!(report.actual_native_object_section_present);
+    assert_eq!(
+        report.actual_native_object_section_id.as_deref(),
+        Some("sec0005.native-object-output")
+    );
+    assert!(report.expected_native_object_loader_symbol_present);
+    assert_eq!(
+        report.expected_native_object_loader_symbol_id,
+        "sym0002.native-object-output"
+    );
+    assert!(report.actual_native_object_loader_symbol_present);
+    assert_eq!(
+        report.actual_native_object_loader_symbol_id.as_deref(),
+        Some("sym0002.native-object-output")
+    );
+    assert!(report.expected_native_object_relocation_present);
+    assert_eq!(
+        report.expected_native_object_relocation_id,
+        "rel0002.native-object"
+    );
+    assert!(report.actual_native_object_relocation_present);
+    assert_eq!(
+        report.actual_native_object_relocation_id.as_deref(),
+        Some("rel0002.native-object")
+    );
+    assert!(report_json.contains("\"expected_native_object_section_present\":true"));
+    assert!(report_json.contains("\"actual_native_object_section_present\":true"));
+    assert!(report_json
+        .contains("\"expected_native_object_loader_symbol_id\":\"sym0002.native-object-output\""));
+    assert!(
+        report_json.contains("\"actual_native_object_relocation_id\":\"rel0002.native-object\"")
+    );
 
     fs::write(
         &prepare.container_path,
@@ -310,7 +359,7 @@ validation_contracts = ["glm.resource-lifetime"]
         .loader_symbol_issues
         .iter()
         .any(|issue| issue.starts_with("loader_symbol[1].symbol_name mismatch")));
-    assert_eq!(tampered_report.actual_relocation_count, Some(3));
+    assert_eq!(tampered_report.actual_relocation_count, Some(4));
     assert_eq!(
         tampered_report.actual_relocation_table_hash.as_deref(),
         Some("0x0000000000000000")

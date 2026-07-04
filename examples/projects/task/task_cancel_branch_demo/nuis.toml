@@ -1,5 +1,7 @@
 name = "task_cancel_branch_demo"
+version = "0.1.0"
 entry = "main.ns"
+modules = ["main.ns"]
 
 abi = [
   "cpu=cpu.arm64.apple_aapcs64",

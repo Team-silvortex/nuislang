@@ -15,7 +15,7 @@ pub(crate) struct NsldMachOHeaderPlan {
 pub(crate) fn mach_o_arm64_header_plan(
     file_layout: &NsldObjectFileLayoutReport,
 ) -> Option<NsldMachOHeaderPlan> {
-    (file_layout.backend_kind == "mach-o-arm64").then(|| NsldMachOHeaderPlan {
+    (file_layout.writer_backend_kind == "mach-o-arm64").then(|| NsldMachOHeaderPlan {
         magic: 0xfeedfacf,
         cpu_type: 0x0100000c,
         cpu_subtype: 0,

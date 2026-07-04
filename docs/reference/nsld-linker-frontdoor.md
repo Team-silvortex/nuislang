@@ -24,6 +24,7 @@ Nuis-owned heterogeneous executable, see
 * clock protocol visibility
 * lowering sidecar capability validation for domains that declare IR sidecars
 * deterministic link-unit reporting across registered domain units
+* object-plan target identity metadata for Mach-O/ELF/COFF-family writers
 * final-stage reporting
 * the first independent CLI boundary for future linker work
 
@@ -71,6 +72,8 @@ cargo run -p nsld -- emit-object <artifact-output-dir>
 cargo run -p nsld -- emit-object <artifact-output-dir> --json
 cargo run -p nsld -- verify-object-emit <artifact-output-dir>
 cargo run -p nsld -- verify-object-emit <artifact-output-dir> --json
+cargo run -p nsld -- verify-object-output <artifact-output-dir>
+cargo run -p nsld -- verify-object-output <artifact-output-dir> --json
 cargo run -p nsld -- verify-object-writer-input <artifact-output-dir>
 cargo run -p nsld -- verify-object-writer-input <artifact-output-dir> --json
 cargo run -p nsld -- object-writer-dry-run <artifact-output-dir>
@@ -139,7 +142,7 @@ cargo run -p nsld -- prepare <artifact-output-dir>
 cargo run -p nsld -- check <artifact-output-dir>
 ```
 
-`nsld prepare` emits and immediately verifies the nine current Nsld-owned
+`nsld prepare` emits and immediately verifies up to sixteen current Nsld-owned
 artifacts in dependency order:
 
 * `nuis.nsld.link-inputs.toml`
@@ -148,6 +151,13 @@ artifacts in dependency order:
 * `nuis.nsld.assemble-plan.toml`
 * `nuis.nsld.section-manifest.toml`
 * `nuis.nsld.object-plan.toml`
+* `nuis.nsld.object-writer-input.toml`
+* `nuis.nsld.object-byte-layout.toml`
+* `nuis.nsld.object-file-layout.toml`
+* `nuis.nsld.object-image-dry-run.toml`
+* `nuis.nsld.object.blocked.toml`
+* optional `nuis.nsld.mach-o` when the Mach-O arm64 writer can emit
+* `nuis.nsld.object-writer-dry-run.toml`
 * `nuis.nsld.container-plan.toml`
 * `nuis.nsld.container`
 * `nuis.nsld.container.payload`
@@ -157,7 +167,13 @@ table. `nsld inputs` remains accepted as the alpha-era compatibility alias.
 
 This gives later linker, cache, and debugger stages one reproducible
 preparation step without hiding the lower-level `inputs`, `emit-units`, or
-`emit-bundle` commands.
+`emit-bundle` commands. It also emits `nuis.nsld.object-image-dry-run.bin`
+when the registered object-image backend can construct a deterministic dry-run
+image. `nsld check` treats the writer input snapshot, blocked emit report, and
+writer dry-run report as first-class chain artifacts, so stale object-writer
+state is caught before container or future native object emission. When native
+object emission succeeds, `prepare` also verifies the emitted object output
+against the deterministic image bytes before treating the preparation as valid.
 The prepare report also returns the final container `metadata_table_hash`,
 `container_layout_hash`, `container_hash`, `payload_size_bytes`, and
 `payload_hash`, so later stages can key off the prepared binary-contract
@@ -255,12 +271,11 @@ the file is missing, if the full content differs, or if `section_count` or
 `nsld object-plan` derives the first object-writer-facing plan from the section
 manifest. It maps each Nsld section to a stable object section name and role
 and now records deterministic writer layout seeds such as source size,
-alignment, planned file offset seed, and planned file size seed while keeping
-native byte emission and relocation application explicitly blocked behind
-`plan-only` status.
-The report also includes `writer_target_id`, `writer_status`, and
-`unsupported_features` so future byte writers can consume the plan without
-guessing target support.
+alignment, planned file offset seed, and planned file size seed. The object
+plan remains a non-mutating contract even when a registered writer is ready.
+The report also includes `writer_target_id`, `writer_backend_kind`,
+`object_family`, `writer_status`, and `unsupported_features` so future byte
+writers can consume the plan without guessing target support.
 `[[object_relocation_seed]]` entries describe Nsld-owned relocation intent
 before it is lowered into Mach-O, ELF, PE, shader, or kernel relocation forms.
 `nsld verify-object-plan` checks the plan hash, section count,
@@ -269,24 +284,34 @@ presence/types, and mapping/seed drift.
 `nsld object-writer-readiness` is a non-mutating readiness view over the same
 plan. It reports whether object emission is currently allowed for the selected
 writer target.
-`nsld emit-object` already exists as a structured frontdoor, but in the current
-alpha it intentionally reports `emitted = false` while the object byte emitter
-and native relocation applier are still blocked. The command succeeds when it
-materializes the current diagnostic artifacts: `nuis.nsld.object-writer-input.toml`,
-`nuis.nsld.object.blocked.toml`, `nuis.nsld.object-image-dry-run.toml`, and
-`nuis.nsld.object-image-dry-run.bin`.
-`nsld verify-object-emit` checks that the blocked emit report and image dry-run
+`nsld emit-object` is now the first native object emission frontdoor. For the
+registered Mach-O arm64 writer, once the prerequisite Nsld artifacts are
+prepared, it writes `nuis.nsld.mach-o` from the deterministic image bytes and
+reports `emitted = true`. For unprepared input or backends that remain
+blocked, it still reports `emitted = false` with blockers.
+The command also materializes the current diagnostic artifacts:
+`nuis.nsld.object-writer-input.toml`, `nuis.nsld.object.blocked.toml`,
+`nuis.nsld.object-image-dry-run.toml`, and
+`nuis.nsld.object-image-dry-run.bin`. The `object.blocked.toml` path is kept as
+the alpha compatibility emit-report path while the report schema evolves.
+`nsld verify-object-emit` checks that the emit report and image dry-run
 artifacts still agree on the object plan hash and dry-run image hash.
+`nsld verify-object-output` separately checks the emitted native object bytes:
+today that means `nuis.nsld.mach-o` must have the same size and content hash as
+`nuis.nsld.object-image-dry-run.bin`. Keeping this as its own frontdoor lets
+later ELF/PE writers, Nsld's future linker core, and nsdb consume the native
+object contract without re-running or parsing `check`.
 `nsld verify-object-writer-input` checks that this snapshot still matches the
-current object plan hashes, section count, relocation seed count, and required
-writer table field types.
+current object plan hashes, writer identity, section count, relocation seed
+count, and required writer table field types.
 `nsld object-writer-dry-run` is a non-mutating writer preflight report. It
 summarizes the writer input path, planned native object path, section and
 relocation seed counts, whether the writer input is valid, and the blockers
 that still prevent real byte emission.
 `nsld emit-object-writer-dry-run` writes this preflight state to
 `nuis.nsld.object-writer-dry-run.toml`; `nsld verify-object-writer-dry-run`
-checks that artifact against the current writer input and object plan state.
+checks that artifact against the current writer input, writer identity, and
+object plan state.
 `nsld object-byte-layout` then derives the deterministic byte-level section
 layout: file offsets, byte sizes, alignment, total byte span, and a
 `byte_layout_hash`. `emit-object-byte-layout` writes
@@ -305,9 +330,11 @@ registered but intentionally report `not-implemented`. `emit-object-image-dry-ru
 writes both `nuis.nsld.object-image-dry-run.toml` and
 `nuis.nsld.object-image-dry-run.bin`, while `verify-object-image-dry-run`
 checks the report, image size, and image hash.
-The `emit-object` frontdoor also writes `nuis.nsld.object.blocked.toml` while
-real object emission is blocked, so CI and later linker stages can consume the
-failed emission state without scraping stderr.
+The `emit-object` frontdoor also writes `nuis.nsld.object.blocked.toml` as its
+current emit report, so CI and later linker stages can consume emitted or
+blocked emission state without scraping stderr. That report preserves
+`writer_backend_kind` and `object_family` from the object-plan chain, and
+`verify-object-emit` rejects writer identity drift.
 
 `nsld container-plan` derives the first Nuis-owned binary container layout
 plan. It consumes the section manifest, records the container magic/version,
@@ -357,6 +384,13 @@ container magic/version, `container_layout_hash`, `container_hash`, blockers,
 aggregate `payload_size_bytes` / `payload_hash`, and section table with
 deterministic `offset` / `size_bytes` entries without claiming to replace
 relocation, final native object linking, or host executable wrapping.
+When `nuis.nsld.mach-o` has been emitted and passes the same validation exposed
+by `verify-object-output`, the container plan appends it as a
+`native-object-output` section so the native object participates in the
+container section table, payload hash, and loader-facing metadata instead of
+remaining a side artifact. If the object output exists but no longer matches
+the deterministic dry-run bytes, the container plan reports
+`object-output:*` blockers and does not package the invalid native object.
 The preview report exposes `metadata_table_hash`,
 `container_section_table_hash`, `loader_symbol_table_hash`,
 `relocation_table_hash`, and `external_import_table_hash` so loader, release,
@@ -479,6 +513,11 @@ missing or invalid fields such as
 separately in `section_range_issues` against each section's `payload_hash`, so a
 corrupted payload segment can be reported without waiting for later relocation
 or final native linking.
+When a native object is packaged, the verification report also exposes a
+native-object summary: whether the `native-object-output` section exists,
+whether the `native-object-output` loader symbol exists, and whether the
+`native-object-binding` relocation exists, with their ids for debugger/linker
+consumers.
 
 The loader entry fields and `[[loader_symbol]]` table are the first
 loader-facing bootstrap records in the Nsld container. They currently bind the
@@ -539,6 +578,17 @@ the top-level linker health report.
   present
 * an emitted `nuis.nsld.object-plan.toml` is still valid when that file is
   present
+* an emitted `nuis.nsld.object-writer-input.toml` is still valid when that file
+  is present
+* emitted object byte/file/image dry-run reports are still valid when present
+* an emitted `nuis.nsld.object.blocked.toml` still agrees with the object plan
+  and image dry-run hash when present
+* an emitted `nuis.nsld.mach-o` still matches the deterministic image dry-run
+  bytes when present, using the same check exposed by `verify-object-output`;
+  the check report includes expected/actual object-output size and hash fields
+  when the object output exists
+* an emitted `nuis.nsld.object-writer-dry-run.toml` is still valid when that
+  file is present
 * an emitted `nuis.nsld.container-plan.toml` is still valid when that file is
   present
 * an emitted `nuis.nsld.container` is still valid when that file is present
@@ -546,6 +596,8 @@ the top-level linker health report.
   when either side exists
 * the container loader readiness can be surfaced from the top-level check when
   a container is present
+* the container native-object summary can be surfaced from the top-level check,
+  including native object section, loader symbol, and relocation ids
 * the emitted Nsld artifact chain is a contiguous prepared prefix, so a later
   artifact such as `nuis.nsld.container` cannot appear without its prerequisite
   metadata artifacts
@@ -610,6 +662,19 @@ If `nuis.nsld.link-inputs.toml` exists, closure also verifies it. A valid table
 adds `verified-link-input-table` to `internal_contracts`; an invalid table adds
 `link-input-table:*` entries to `unresolved`. If the table is absent, closure
 reports the table state as absent without treating that absence as unresolved.
+
+Closure also checks the prepared Nsld artifact prefix, including the object
+plan, writer input snapshot, object byte/file/image dry-run reports, blocked
+object emit report, optional emitted object output, writer dry-run report, and
+container artifacts. Missing required artifacts are tolerated when the prefix is
+contiguous, because `closure` is a route-feasibility view rather than
+`prepare`; optional object output may be absent for targets that cannot yet
+emit native bytes. If a later required artifact appears without its
+prerequisite, `prepared_artifact_chain:*` is added to `unresolved`. If an
+existing object-writer artifact no longer verifies against the current plan, or
+the object output exists but no longer matches the image dry-run bytes, the
+matching `object-*:*` unresolved entry is reported; verified artifacts are
+surfaced as `verified-*` internal contracts.
 
 When every declared lowering IR sidecar has a valid capability block, closure
 adds `lowering-sidecar-capabilities` to `internal_contracts`. Domains without

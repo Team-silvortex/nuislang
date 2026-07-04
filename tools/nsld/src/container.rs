@@ -201,6 +201,29 @@ pub(crate) fn hetero_loader_symbols(
     symbols
 }
 
+pub(crate) fn native_object_loader_symbols(
+    sections: &[NsldContainerSectionEntry],
+    start_index: usize,
+) -> Vec<NsldContainerLoaderSymbol> {
+    sections
+        .iter()
+        .filter(|section| section.section_kind == "native-object-output")
+        .enumerate()
+        .map(|(native_index, section)| {
+            let index = start_index + native_index;
+            NsldContainerLoaderSymbol {
+                symbol_id: format!("sym{index:04}.native-object-output"),
+                symbol_kind: "native-object-output".to_owned(),
+                symbol_name: "__nuis_native_object".to_owned(),
+                section_id: section.section_id.clone(),
+                offset: section.offset,
+                size_bytes: section.size_bytes,
+                payload_hash: section.payload_hash.clone(),
+            }
+        })
+        .collect()
+}
+
 pub(crate) fn relocations(
     loader_symbols: &[NsldContainerLoaderSymbol],
 ) -> Vec<NsldContainerRelocationEntry> {
@@ -221,6 +244,7 @@ pub(crate) fn relocations(
 fn relocation_id_suffix(symbol: &NsldContainerLoaderSymbol) -> &'static str {
     match symbol.symbol_kind.as_str() {
         "hetero-node-dispatch" => "hetero-node",
+        "native-object-output" => "native-object",
         _ => "lifecycle-entry",
     }
 }
@@ -228,6 +252,7 @@ fn relocation_id_suffix(symbol: &NsldContainerLoaderSymbol) -> &'static str {
 fn relocation_kind_for_symbol(symbol: &NsldContainerLoaderSymbol) -> &'static str {
     match symbol.symbol_kind.as_str() {
         "hetero-node-dispatch" => "hetero-node-binding",
+        "native-object-output" => "native-object-binding",
         _ => "lifecycle-entry-binding",
     }
 }

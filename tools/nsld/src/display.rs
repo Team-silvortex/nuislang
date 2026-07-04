@@ -38,6 +38,14 @@ pub(crate) fn print_nsld_closure_report(report: &NsldClosureReport) {
         optional_bool_text(report.link_input_table_valid)
     );
     println!(
+        "  prepared_artifact_chain: valid={} issues={}",
+        report.prepared_artifact_chain_valid,
+        report.prepared_artifact_chain_issues.len()
+    );
+    for issue in &report.prepared_artifact_chain_issues {
+        println!("  prepared_artifact_chain_issue: {issue}");
+    }
+    println!(
         "  container_metadata_table_hash: {}",
         report.container_metadata_table_hash
     );
@@ -172,6 +180,23 @@ pub(crate) fn print_nsld_prepare_report(report: &NsldPrepareReport) {
     println!("  assemble_plan: {}", report.assemble_plan_path);
     println!("  section_manifest: {}", report.section_manifest_path);
     println!("  object_plan: {}", report.object_plan_path);
+    println!("  object_writer_input: {}", report.object_writer_input_path);
+    println!("  object_byte_layout: {}", report.object_byte_layout_path);
+    println!("  object_file_layout: {}", report.object_file_layout_path);
+    println!(
+        "  object_image_dry_run: {}",
+        report.object_image_dry_run_path
+    );
+    println!(
+        "  object_image_dry_run_bytes: {}",
+        report.object_image_dry_run_bytes_path
+    );
+    println!("  object_emit_blocked: {}", report.object_emit_blocked_path);
+    println!("  object_output: {}", report.object_output_path);
+    println!(
+        "  object_writer_dry_run: {}",
+        report.object_writer_dry_run_path
+    );
     println!("  container_plan: {}", report.container_plan_path);
     println!("  container: {}", report.container_path);
     println!("  container_payload: {}", report.container_payload_path);
@@ -185,6 +210,13 @@ pub(crate) fn print_nsld_prepare_report(report: &NsldPrepareReport) {
     println!("  assemble_plan_hash: {}", report.assemble_plan_hash);
     println!("  section_table_hash: {}", report.section_table_hash);
     println!("  object_plan_hash: {}", report.object_plan_hash);
+    println!("  object_emitted: {}", report.object_emitted);
+    println!("  byte_layout_hash: {}", report.byte_layout_hash);
+    println!("  file_layout_hash: {}", report.file_layout_hash);
+    println!(
+        "  object_image_hash: {}",
+        report.object_image_hash.as_deref().unwrap_or("missing")
+    );
     println!("  metadata_table_hash: {}", report.metadata_table_hash);
     println!("  container_layout_hash: {}", report.container_layout_hash);
     println!("  container_hash: {}", report.container_hash);

@@ -23,7 +23,9 @@ pub(crate) fn print_nsld_object_plan_report(report: &NsldObjectPlanReport) {
         report.relocation_seed_table_hash
     );
     println!("  writer_target_id: {}", report.writer_target_id);
+    println!("  writer_backend_kind: {}", report.writer_backend_kind);
     println!("  writer_status: {}", report.writer_status);
+    println!("  object_family: {}", report.object_family);
     if !report.unsupported_features.is_empty() {
         println!(
             "  unsupported_features: {}",
@@ -175,6 +177,8 @@ pub(crate) fn print_nsld_object_writer_dry_run_report(report: &NsldObjectWriterD
     println!("  writer_input_path: {}", report.writer_input_path);
     println!("  planned_output_path: {}", report.planned_output_path);
     println!("  writer_target_id: {}", report.writer_target_id);
+    println!("  writer_backend_kind: {}", report.writer_backend_kind);
+    println!("  object_family: {}", report.object_family);
     println!("  object_plan_hash: {}", report.object_plan_hash);
     println!("  object_layout_hash: {}", report.object_layout_hash);
     println!(
@@ -215,6 +219,14 @@ pub(crate) fn print_nsld_object_writer_dry_run_verify_report(
         report.expected_object_plan_hash
     );
     println!(
+        "  expected_writer_backend_kind: {}",
+        report.expected_writer_backend_kind
+    );
+    println!(
+        "  expected_object_family: {}",
+        report.expected_object_family
+    );
+    println!(
         "  expected_object_layout_hash: {}",
         report.expected_object_layout_hash
     );
@@ -228,6 +240,17 @@ pub(crate) fn print_nsld_object_writer_dry_run_verify_report(
             .actual_object_plan_hash
             .as_deref()
             .unwrap_or("missing")
+    );
+    println!(
+        "  actual_writer_backend_kind: {}",
+        report
+            .actual_writer_backend_kind
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_object_family: {}",
+        report.actual_object_family.as_deref().unwrap_or("missing")
     );
     println!(
         "  actual_object_layout_hash: {}",
@@ -267,6 +290,10 @@ pub(crate) fn print_nsld_object_byte_layout_report(report: &NsldObjectByteLayout
     println!("Nsld object byte layout");
     println!("  manifest: {}", report.manifest);
     println!("  output_path: {}", report.output_path);
+    println!("  writer_target_id: {}", report.writer_target_id);
+    println!("  writer_backend_kind: {}", report.writer_backend_kind);
+    println!("  object_family: {}", report.object_family);
+    println!("  object_format: {}", report.object_format);
     println!("  object_plan_hash: {}", report.object_plan_hash);
     println!("  object_layout_hash: {}", report.object_layout_hash);
     println!("  byte_layout_hash: {}", report.byte_layout_hash);
@@ -336,7 +363,8 @@ pub(crate) fn print_nsld_object_file_layout_report(report: &NsldObjectFileLayout
     println!("  manifest: {}", report.manifest);
     println!("  output_path: {}", report.output_path);
     println!("  writer_target_id: {}", report.writer_target_id);
-    println!("  backend_kind: {}", report.backend_kind);
+    println!("  writer_backend_kind: {}", report.writer_backend_kind);
+    println!("  object_family: {}", report.object_family);
     println!("  object_format: {}", report.object_format);
     println!("  object_plan_hash: {}", report.object_plan_hash);
     println!("  byte_layout_hash: {}", report.byte_layout_hash);

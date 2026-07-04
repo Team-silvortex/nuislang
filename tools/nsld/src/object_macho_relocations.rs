@@ -26,7 +26,7 @@ pub(crate) fn mach_o_arm64_relocation_table_plan(
     plan: &nuisc::linker::LinkPlan,
     file_layout: &NsldObjectFileLayoutReport,
 ) -> Option<NsldMachORelocationTablePlan> {
-    if file_layout.backend_kind != "mach-o-arm64" {
+    if file_layout.writer_backend_kind != "mach-o-arm64" {
         return None;
     }
     let object_plan = nsld_object_plan_report(manifest, plan);

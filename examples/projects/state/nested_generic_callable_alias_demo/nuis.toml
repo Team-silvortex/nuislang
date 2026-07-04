@@ -1,2 +1,4 @@
 name = "nested_generic_callable_alias_demo"
+version = "0.1.0"
 entry = "main.ns"
+modules = ["main.ns"]

@@ -261,6 +261,7 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: NetResultEnumProjectSummary = capture_net_result_enum_project();
-    return summary.primary_score + summary.secondary_score;
+    print(summary.primary_score + summary.secondary_score);
+    return 0;
   }
 }

@@ -7925,6 +7925,38 @@ mod cpu Main {
     }
 
     #[test]
+    fn build_report_json_exposes_kernel_result_profile_bundle_summary() {
+        let project_root =
+            checked_in_path("../../examples/projects/domains/kernel_result_profile_demo");
+        let output_dir = temp_dir("build_report_kernel_result_profile_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_build_report_json(&output_dir);
+
+        assert!(json.contains("\"ready_to_run\":true"));
+        assert!(json.contains("\"binary_name\":\"kernel_result_profile_demo\""));
+        assert!(json.contains("\"packaging_mode\":\"native-cpu-llvm\""));
+        assert!(json.contains("\"domain_units_count\":2"));
+        assert!(json.contains("\"heterogeneous_domain_count\":1"));
+        assert!(json.contains("\"domain_family\":\"cpu\""));
+        assert!(json.contains("\"domain_family\":\"kernel\""));
+        assert!(json.contains("\"selected_lowering_target\":\"llvm\""));
+        assert!(json.contains("\"backend_family\":\"coreml\""));
+        assert!(json.contains("\"selected_lowering_target\":\"coreml.apple-ane\""));
+        assert!(json.contains("\"bridge_registry_units\":1"));
+        assert!(json.contains("\"host_bridge_plan_units\":1"));
+        assert!(json.contains("\"runtime_payload_backed_heterogeneous_units\":1"));
+        assert!(json.contains("\"runtime_execution_kernel_host_reference_events\":4"));
+        assert!(json.contains("\"runtime_host_yir_attempted\":true"));
+        assert!(json.contains("\"runtime_host_yir_ok\":true"));
+        assert!(json.contains("\"runtime_host_yir_kernel_nodes\":4"));
+        assert!(json.contains("\"runtime_host_yir_kernel_integer_checksum\":18"));
+        assert!(json.contains("\"link_plan_final_stage\":\"host-native-link\""));
+        assert!(json.contains("\"link_plan_final_driver\":\"clang\""));
+        assert!(json.contains("\"link_plan_domain_units\":2"));
+    }
+
+    #[test]
     fn run_artifact_json_exposes_real_heterogeneous_runtime_summary() {
         let project_root = checked_in_path("../../examples/projects/domains/shader_profile_demo");
         let output_dir = temp_dir("run_artifact_shader_profile_outputs");
@@ -7962,6 +7994,35 @@ mod cpu Main {
         assert!(json.contains("\"domain_payload_blobs_checked\":2"));
         assert!(json.contains("\"domain_payload_bridge_plans_checked\":2"));
         assert!(json.contains("\"domain_bridge_stubs_checked\":2"));
+        assert!(json.contains("\"link_plan_final_stage\":\"heterogeneous-bundle-pack\""));
+        assert!(json.contains("\"link_plan_final_driver\":\"yir-pack-aot\""));
+        assert!(json.contains("\"link_plan_domain_units\":3"));
+    }
+
+    #[test]
+    fn build_report_json_exposes_shader_result_enum_bundle_summary() {
+        let project_root =
+            checked_in_path("../../examples/projects/domains/shader_result_enum_demo");
+        let output_dir = temp_dir("build_report_shader_result_enum_outputs");
+
+        handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+        let json = render_build_report_json(&output_dir);
+
+        assert!(json.contains("\"ready_to_run\":true"));
+        assert!(json.contains("\"binary_name\":\"shader_result_enum_demo\""));
+        assert!(json.contains("\"packaging_mode\":\"window-aot-bundle\""));
+        assert!(json.contains("\"domain_units_count\":3"));
+        assert!(json.contains("\"heterogeneous_domain_count\":2"));
+        assert!(json.contains("\"domain_family\":\"cpu\""));
+        assert!(json.contains("\"domain_family\":\"data\""));
+        assert!(json.contains("\"domain_family\":\"shader\""));
+        assert!(json.contains("\"selected_lowering_target\":\"llvm\""));
+        assert!(json.contains("\"selected_lowering_target\":\"metal.apple-silicon-gpu\""));
+        assert!(json.contains("\"bridge_registry_units\":2"));
+        assert!(json.contains("\"host_bridge_plan_units\":2"));
+        assert!(json.contains("\"runtime_payload_backed_heterogeneous_units\":2"));
+        assert!(json.contains("\"runtime_host_yir_attempted\":true"));
+        assert!(json.contains("\"runtime_host_yir_ok\":true"));
         assert!(json.contains("\"link_plan_final_stage\":\"heterogeneous-bundle-pack\""));
         assert!(json.contains("\"link_plan_final_driver\":\"yir-pack-aot\""));
         assert!(json.contains("\"link_plan_domain_units\":3"));

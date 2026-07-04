@@ -40,9 +40,11 @@ pub(crate) fn nsld_object_image_dry_run_report(
             .to_string(),
         image_path: object_image_dry_run_image_path(plan).display().to_string(),
         writer_target_id: file_layout.writer_target_id,
-        backend_family: object_image_backend_family(&file_layout.backend_kind).to_owned(),
-        backend_status: object_image_backend_status(&file_layout.backend_kind).to_owned(),
-        backend_kind: file_layout.backend_kind,
+        writer_backend_kind: file_layout.writer_backend_kind.clone(),
+        object_family: file_layout.object_family,
+        backend_family: object_image_backend_family(&file_layout.writer_backend_kind).to_owned(),
+        backend_status: object_image_backend_status(&file_layout.writer_backend_kind).to_owned(),
+        backend_kind: file_layout.writer_backend_kind,
         object_format: file_layout.object_format,
         file_layout_hash: file_layout.file_layout_hash,
         record_count: file_layout.record_count,
@@ -113,6 +115,8 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
     });
     let (
         actual_file_layout_hash,
+        actual_writer_backend_kind,
+        actual_object_family,
         actual_backend_family,
         actual_backend_status,
         actual_image_constructed,
@@ -122,6 +126,8 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
     ) = match actual.as_ref() {
         Ok(source) => (
             toml::string_value(source, "file_layout_hash"),
+            toml::string_value(source, "writer_backend_kind"),
+            toml::string_value(source, "object_family"),
             toml::string_value(source, "backend_family"),
             toml::string_value(source, "backend_status"),
             toml::bool_value(source, "image_constructed"),
@@ -131,7 +137,7 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None, None, None)
+            (None, None, None, None, None, None, None, None, None)
         }
     };
     if let Ok(actual) = actual {
@@ -143,6 +149,18 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
             "file_layout_hash",
             &expected_report.file_layout_hash,
             actual_file_layout_hash.as_deref(),
+        );
+        push_string_mismatch(
+            &mut issues,
+            "writer_backend_kind",
+            &expected_report.writer_backend_kind,
+            actual_writer_backend_kind.as_deref(),
+        );
+        push_string_mismatch(
+            &mut issues,
+            "object_family",
+            &expected_report.object_family,
+            actual_object_family.as_deref(),
         );
         push_string_mismatch(
             &mut issues,
@@ -206,6 +224,8 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
         input_path: input_path.display().to_string(),
         image_path: image_path.display().to_string(),
         valid: issues.is_empty(),
+        expected_writer_backend_kind: expected_report.writer_backend_kind,
+        expected_object_family: expected_report.object_family,
         expected_backend_family: expected_report.backend_family,
         expected_backend_status: expected_report.backend_status,
         expected_file_layout_hash: expected_report.file_layout_hash,
@@ -214,6 +234,8 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
         expected_image_size_bytes: expected_report.image_size_bytes,
         expected_image_hash: expected_report.image_hash,
         actual_file_layout_hash,
+        actual_writer_backend_kind,
+        actual_object_family,
         actual_backend_family,
         actual_backend_status,
         actual_image_constructed,
@@ -332,6 +354,8 @@ mod tests {
         let plan = empty_link_plan();
         let report = nsld_object_image_dry_run_report(Path::new("manifest.toml"), &plan);
 
+        assert_eq!(report.writer_backend_kind, "mach-o-arm64");
+        assert_eq!(report.object_family, "mach-o");
         assert_eq!(report.backend_kind, "mach-o-arm64");
         assert_eq!(report.backend_family, "mach-o");
         assert_eq!(report.backend_status, "ready");
@@ -342,6 +366,43 @@ mod tests {
             .blockers
             .iter()
             .any(|blocker| blocker.starts_with("object-file-layout:")));
+    }
+
+    #[test]
+    fn object_image_dry_run_serializes_writer_identity() {
+        let plan = empty_link_plan();
+        let report = nsld_object_image_dry_run_report(Path::new("manifest.toml"), &plan);
+        let rendered = crate::toml::render_object_image_dry_run(&report);
+        let json = crate::json_object_image::nsld_object_image_dry_run_report_json(&report);
+
+        assert!(rendered.contains("writer_backend_kind = \"mach-o-arm64\""));
+        assert!(rendered.contains("object_family = \"mach-o\""));
+        assert!(json.contains("\"writer_backend_kind\":\"mach-o-arm64\""));
+        assert!(json.contains("\"object_family\":\"mach-o\""));
+    }
+
+    #[test]
+    fn verify_object_image_dry_run_reports_writer_identity_drift() {
+        let mut plan = empty_link_plan();
+        plan.output_dir = temp_output_dir("nsld-object-image-dry-run-identity-drift");
+        fs::create_dir_all(&plan.output_dir).unwrap();
+        let manifest = Path::new("manifest.toml");
+        nsld_emit_object_image_dry_run_report(manifest, &plan).unwrap();
+
+        let path = Path::new(&plan.output_dir).join("nuis.nsld.object-image-dry-run.toml");
+        let damaged = fs::read_to_string(&path).unwrap().replace(
+            "writer_backend_kind = \"mach-o-arm64\"",
+            "writer_backend_kind = \"elf-amd64\"",
+        );
+        fs::write(&path, damaged).unwrap();
+
+        let verify = nsld_verify_object_image_dry_run_report(manifest, &plan);
+        fs::remove_dir_all(&plan.output_dir).unwrap();
+
+        assert!(!verify.valid);
+        assert!(verify.issues.iter().any(|issue| {
+            issue == "writer_backend_kind mismatch: expected mach-o-arm64, found elf-amd64"
+        }));
     }
 
     #[test]

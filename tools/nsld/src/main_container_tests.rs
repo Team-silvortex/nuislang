@@ -1,6 +1,6 @@
 use super::{
-    main_test_support::empty_link_plan, nsld_container_report, nsld_emit_container_report,
-    nsld_prepare_report, nsld_verify_container_plan_report,
+    main_test_support::empty_link_plan, nsld_container_plan_report, nsld_container_report,
+    nsld_emit_container_report, nsld_prepare_report, nsld_verify_container_plan_report,
 };
 use nuisc::linker::LinkPlanHeteroNode;
 use std::{env, fs, path::Path};
@@ -71,7 +71,7 @@ validation_contracts = ["glm.resource-lifetime"]
 
     assert!(report.valid);
     assert!(report.issues.is_empty());
-    assert_eq!(report.actual_section_count, Some(5));
+    assert_eq!(report.actual_section_count, Some(6));
     assert_eq!(
         report.actual_container_layout_hash,
         Some(prepare.container_layout_hash)
@@ -106,4 +106,39 @@ fn emit_container_reports_metadata_table_hash() {
     assert!(preview_json.contains("\"relocation_table_hash\":\"0x"));
     assert!(preview_json.contains("\"external_import_table_hash\":\"0x"));
     assert!(emit_json.contains("\"metadata_table_hash\":\"0x"));
+}
+
+#[test]
+fn container_plan_blocks_invalid_native_object_output() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-container-invalid-object-output-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    fs::write(dir.join("nuis.nsld.mach-o"), b"drifted-object").unwrap();
+    let plan_report = nsld_container_plan_report(Path::new("manifest.toml"), &plan);
+    let container_report = nsld_container_report(Path::new("manifest.toml"), &plan);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!plan_report.ready);
+    assert!(plan_report
+        .blockers
+        .iter()
+        .any(|blocker| blocker.contains("object-output:object_output_hash mismatch")));
+    assert!(plan_report
+        .sections
+        .iter()
+        .all(|section| section.section_kind != "native-object-output"));
+    assert_eq!(container_report.loader_readiness, "blocked");
+    assert!(container_report
+        .loader_blockers
+        .iter()
+        .any(|blocker| blocker.contains("object-output:object_output_hash mismatch")));
 }

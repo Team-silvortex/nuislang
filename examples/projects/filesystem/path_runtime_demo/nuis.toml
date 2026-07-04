@@ -1,4 +1,5 @@
 name = "path_runtime_demo"
+version = "0.1.0"
 entry = "main.ns"
 modules = ["main.ns"]
 abi = [

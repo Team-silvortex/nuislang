@@ -39,6 +39,29 @@ Compared with a single `.ns` file, project mode currently gives you:
 * ABI locking or auto-resolution
 * project-level compiler and build metadata outputs
 
+Current checked-in manifest shape:
+
+```toml
+name = "example_project"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns"]
+
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+]
+```
+
+Practical manifest rule:
+
+* checked-in examples declare top-level `name`, `version`, `entry`, and
+  `modules`
+* use `abi = ["domain=abi"]` when the example is meant to be ABI-locked
+* omit `abi` only when the example intentionally exercises
+  `auto-recommended -> project-lock-abi`
+* do not use the retired `[project]`, `[abi]`, or `abis = [{ ... }]` manifest
+  shapes in new examples
+
 Current practical rule:
 
 * use projects to understand the real compile workflow
@@ -122,6 +145,7 @@ reading an entire subtree.
   Start with:
   [shader_profile_demo](domains/shader_profile_demo),
   [kernel_profile_demo](domains/kernel_profile_demo),
+  [kernel_result_profile_demo](domains/kernel_result_profile_demo),
   [network_profile_demo](domains/network_profile_demo),
   [net_http_client_get_recipe_demo](domains/net_http_client_get_recipe_demo),
   [net_result_enum_recipe_demo](domains/net_result_enum_recipe_demo),

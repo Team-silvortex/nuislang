@@ -24,7 +24,9 @@ pub(crate) fn nsld_object_plan_report_json(report: &NsldObjectPlanReport) -> Str
             &report.relocation_seed_table_hash,
         ),
         json_string_field("writer_target_id", &report.writer_target_id),
+        json_string_field("writer_backend_kind", &report.writer_backend_kind),
         json_string_field("writer_status", &report.writer_status),
+        json_string_field("object_family", &report.object_family),
         json_string_array_field("unsupported_features", &report.unsupported_features),
         json_string_field("emission_status", &report.emission_status),
         format!(
@@ -151,6 +153,8 @@ pub(crate) fn nsld_object_writer_dry_run_report_json(
         json_string_field("writer_input_path", &report.writer_input_path),
         json_string_field("planned_output_path", &report.planned_output_path),
         json_string_field("writer_target_id", &report.writer_target_id),
+        json_string_field("writer_backend_kind", &report.writer_backend_kind),
+        json_string_field("object_family", &report.object_family),
         json_string_field("object_plan_hash", &report.object_plan_hash),
         json_string_field("object_layout_hash", &report.object_layout_hash),
         json_string_field(
@@ -197,6 +201,11 @@ pub(crate) fn nsld_object_writer_dry_run_verify_report_json(
             &report.expected_object_plan_hash,
         ),
         json_string_field(
+            "expected_writer_backend_kind",
+            &report.expected_writer_backend_kind,
+        ),
+        json_string_field("expected_object_family", &report.expected_object_family),
+        json_string_field(
             "expected_object_layout_hash",
             &report.expected_object_layout_hash,
         ),
@@ -213,6 +222,14 @@ pub(crate) fn nsld_object_writer_dry_run_verify_report_json(
         json_optional_string_field(
             "actual_object_plan_hash",
             report.actual_object_plan_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_writer_backend_kind",
+            report.actual_writer_backend_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_object_family",
+            report.actual_object_family.as_deref(),
         ),
         json_optional_string_field(
             "actual_object_layout_hash",
@@ -239,6 +256,10 @@ pub(crate) fn nsld_object_byte_layout_report_json(report: &NsldObjectByteLayoutR
         json_string_field("kind", "nsld_object_byte_layout"),
         json_string_field("manifest", &report.manifest),
         json_string_field("output_path", &report.output_path),
+        json_string_field("writer_target_id", &report.writer_target_id),
+        json_string_field("writer_backend_kind", &report.writer_backend_kind),
+        json_string_field("object_family", &report.object_family),
+        json_string_field("object_format", &report.object_format),
         json_string_field("object_plan_hash", &report.object_plan_hash),
         json_string_field("object_layout_hash", &report.object_layout_hash),
         json_string_field("byte_layout_hash", &report.byte_layout_hash),
@@ -302,7 +323,8 @@ pub(crate) fn nsld_object_file_layout_report_json(report: &NsldObjectFileLayoutR
         json_string_field("manifest", &report.manifest),
         json_string_field("output_path", &report.output_path),
         json_string_field("writer_target_id", &report.writer_target_id),
-        json_string_field("backend_kind", &report.backend_kind),
+        json_string_field("writer_backend_kind", &report.writer_backend_kind),
+        json_string_field("object_family", &report.object_family),
         json_string_field("object_format", &report.object_format),
         json_string_field("object_plan_hash", &report.object_plan_hash),
         json_string_field("byte_layout_hash", &report.byte_layout_hash),

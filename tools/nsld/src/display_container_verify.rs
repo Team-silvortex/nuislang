@@ -1,6 +1,6 @@
 use super::{
     container::NsldContainerVerifyReport,
-    display::{optional_bool_text, optional_usize_text},
+    display::{optional_bool_text, optional_string_text, optional_usize_text},
 };
 
 pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyReport) {
@@ -133,6 +133,15 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
     println!(
         "  expected_external_import_required: {}",
         report.expected_external_import_required
+    );
+    println!(
+        "  expected_native_object: section_present={} section_id={} loader_symbol_present={} loader_symbol_id={} relocation_present={} relocation_id={}",
+        report.expected_native_object_section_present,
+        report.expected_native_object_section_id,
+        report.expected_native_object_loader_symbol_present,
+        report.expected_native_object_loader_symbol_id,
+        report.expected_native_object_relocation_present,
+        report.expected_native_object_relocation_id
     );
     println!(
         "  actual_container_layout_hash: {}",
@@ -327,6 +336,15 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
     println!(
         "  actual_external_import_required: {}",
         optional_bool_text(report.actual_external_import_required)
+    );
+    println!(
+        "  actual_native_object: section_present={} section_id={} loader_symbol_present={} loader_symbol_id={} relocation_present={} relocation_id={}",
+        report.actual_native_object_section_present,
+        optional_string_text(report.actual_native_object_section_id.as_deref()),
+        report.actual_native_object_loader_symbol_present,
+        optional_string_text(report.actual_native_object_loader_symbol_id.as_deref()),
+        report.actual_native_object_relocation_present,
+        optional_string_text(report.actual_native_object_relocation_id.as_deref())
     );
     for issue in &report.container_section_issues {
         println!("  container_section_issue: {issue}");

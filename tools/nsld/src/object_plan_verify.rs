@@ -30,7 +30,9 @@ pub(crate) fn object_section_table_field_issues(source: &str) -> Vec<String> {
         "object_plan_header",
         &[
             ("writer_target_id", TomlFieldKind::String),
+            ("writer_backend_kind", TomlFieldKind::String),
             ("writer_status", TomlFieldKind::String),
+            ("object_family", TomlFieldKind::String),
             ("unsupported_features", TomlFieldKind::Array),
         ],
     ));

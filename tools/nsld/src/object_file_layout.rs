@@ -4,7 +4,6 @@ use super::{
     object_byte_layout::nsld_object_byte_layout_report,
     object_plan::nsld_object_plan_report,
     object_plan_verify::{toml_block_string_value, toml_block_usize_value, toml_table_blocks},
-    object_writer_backend::object_writer_backend,
     reports::{
         NsldObjectFileLayoutEmitReport, NsldObjectFileLayoutRecordDiagnostic,
         NsldObjectFileLayoutReport, NsldObjectFileLayoutVerifyReport,
@@ -22,12 +21,7 @@ pub(crate) fn nsld_object_file_layout_report(
 ) -> NsldObjectFileLayoutReport {
     let object_plan = nsld_object_plan_report(manifest, plan);
     let byte_layout = nsld_object_byte_layout_report(manifest, plan);
-    let backend = object_writer_backend(
-        &object_plan.target_arch,
-        &object_plan.target_os,
-        &object_plan.object_format,
-    );
-    let records = match backend.backend_kind.as_str() {
+    let records = match object_plan.writer_backend_kind.as_str() {
         "mach-o-arm64" => mach_o_arm64_file_layout_records(
             &byte_layout.sections,
             object_plan.relocation_seed_count,
@@ -39,7 +33,14 @@ pub(crate) fn nsld_object_file_layout_report(
         .map(|record| record.file_offset.saturating_add(record.size_bytes))
         .max()
         .unwrap_or(0);
-    let file_layout_hash = nsld_object_file_layout_hash(&records, total_file_size_bytes);
+    let file_layout_hash = nsld_object_file_layout_hash(
+        &object_plan.writer_target_id,
+        &object_plan.writer_backend_kind,
+        &object_plan.object_family,
+        &object_plan.object_format,
+        &records,
+        total_file_size_bytes,
+    );
     let layout_ready = byte_layout.layout_ready && byte_layout.blockers.is_empty();
 
     NsldObjectFileLayoutReport {
@@ -48,8 +49,9 @@ pub(crate) fn nsld_object_file_layout_report(
             .join("nuis.nsld.object-file-layout.toml")
             .display()
             .to_string(),
-        writer_target_id: backend.target_id,
-        backend_kind: backend.backend_kind,
+        writer_target_id: object_plan.writer_target_id,
+        writer_backend_kind: object_plan.writer_backend_kind,
+        object_family: object_plan.object_family,
         object_format: object_plan.object_format,
         object_plan_hash: object_plan.object_plan_hash,
         byte_layout_hash: byte_layout.byte_layout_hash,
@@ -419,10 +421,16 @@ fn mach_o_section_symbol_name(source_section_id: &str) -> String {
 }
 
 fn nsld_object_file_layout_hash(
+    writer_target_id: &str,
+    writer_backend_kind: &str,
+    object_family: &str,
+    object_format: &str,
     records: &[NsldObjectFileLayoutRecordDiagnostic],
     total_file_size_bytes: usize,
 ) -> String {
-    let mut material = format!("total_file_size_bytes={total_file_size_bytes}\n");
+    let mut material = format!(
+        "writer_target_id={writer_target_id}\nwriter_backend_kind={writer_backend_kind}\nobject_family={object_family}\nobject_format={object_format}\ntotal_file_size_bytes={total_file_size_bytes}\n"
+    );
     for record in records {
         material.push_str(&format!(
             "{}|{}|{}|{}|{}|{}\n",
@@ -451,7 +459,8 @@ mod tests {
         let plan = empty_link_plan();
         let report = nsld_object_file_layout_report(Path::new("manifest.toml"), &plan);
 
-        assert_eq!(report.backend_kind, "mach-o-arm64");
+        assert_eq!(report.writer_backend_kind, "mach-o-arm64");
+        assert_eq!(report.object_family, "mach-o");
         assert_eq!(report.object_format, "mach-o");
         assert!(!report.layout_ready);
         assert!(report.file_layout_hash.starts_with("0x"));
@@ -469,6 +478,22 @@ mod tests {
             .iter()
             .any(|record| record.record_kind == "macho-string-table"));
         assert!(report.total_file_size_bytes > 0);
+    }
+
+    #[test]
+    fn object_file_layout_serializes_writer_identity() {
+        let plan = empty_link_plan();
+        let report = nsld_object_file_layout_report(Path::new("manifest.toml"), &plan);
+        let rendered = crate::toml::render_object_file_layout(&report);
+        let json = crate::json_object::nsld_object_file_layout_report_json(&report);
+
+        assert_eq!(report.writer_target_id, "arm64-macos-mach-o");
+        assert_eq!(report.writer_backend_kind, "mach-o-arm64");
+        assert_eq!(report.object_family, "mach-o");
+        assert!(rendered.contains("writer_backend_kind = \"mach-o-arm64\""));
+        assert!(rendered.contains("object_family = \"mach-o\""));
+        assert!(json.contains("\"writer_backend_kind\":\"mach-o-arm64\""));
+        assert!(json.contains("\"object_family\":\"mach-o\""));
     }
 
     #[test]

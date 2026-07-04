@@ -221,11 +221,19 @@ If you want one shortest checked-in route per question, use:
   benchmark, result/error, diagnostic, and JSON/report helpers
   current gap:
   Result enum `Ok`/`map`/value extraction, `Err`/`map_err`, and
-  branch-selected struct summaries are run-backed; static known-variant pruning
-  is still future control-flow hardening work
+  branch-selected struct summaries are run-backed on CPU/tooling, task, and
+  network; shader Result enum is artifact-doctor/build-report backed as a
+  ready-to-run `window-aot-bundle` with CPU/data/shader domain units. Static
+  known-variant pruning and branch-local shader effects are still future
+  hardening work.
 * shader/kernel showcase:
   [window_controls_demo](../examples/projects/window_controls_demo) /
-  [kernel_tensor_demo](../examples/projects/kernel_tensor_demo)
+  [kernel_tensor_demo](../examples/projects/kernel_tensor_demo) /
+  [kernel_result_profile_demo](../examples/projects/domains/kernel_result_profile_demo)
+  current rule:
+  kernel Result/profile code is build-report backed with CPU + kernel domain
+  units, CoreML/Apple ANE lowering metadata, host bridge metadata, and host-yir
+  kernel reference execution
 * WitSage kernel-facing ML route:
   [stdlib/witsage/README.md](../stdlib/witsage/README.md) ->
   [examples/projects/domains/witsage_kernel_demo](../examples/projects/domains/witsage_kernel_demo) ->

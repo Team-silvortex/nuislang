@@ -50,6 +50,95 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
         json_bool_field("object_plan_present", report.object_plan_present),
         json_optional_bool_field("object_plan_valid", report.object_plan_valid),
         json_string_array_field("object_plan_issues", &report.object_plan_issues),
+        json_bool_field(
+            "object_writer_input_present",
+            report.object_writer_input_present,
+        ),
+        json_optional_bool_field(
+            "object_writer_input_valid",
+            report.object_writer_input_valid,
+        ),
+        json_string_array_field(
+            "object_writer_input_issues",
+            &report.object_writer_input_issues,
+        ),
+        json_bool_field(
+            "object_byte_layout_present",
+            report.object_byte_layout_present,
+        ),
+        json_optional_bool_field("object_byte_layout_valid", report.object_byte_layout_valid),
+        json_string_array_field(
+            "object_byte_layout_issues",
+            &report.object_byte_layout_issues,
+        ),
+        json_bool_field(
+            "object_file_layout_present",
+            report.object_file_layout_present,
+        ),
+        json_optional_bool_field("object_file_layout_valid", report.object_file_layout_valid),
+        json_string_array_field(
+            "object_file_layout_issues",
+            &report.object_file_layout_issues,
+        ),
+        json_bool_field(
+            "object_image_dry_run_present",
+            report.object_image_dry_run_present,
+        ),
+        json_optional_bool_field(
+            "object_image_dry_run_valid",
+            report.object_image_dry_run_valid,
+        ),
+        json_string_array_field(
+            "object_image_dry_run_issues",
+            &report.object_image_dry_run_issues,
+        ),
+        json_bool_field(
+            "object_image_dry_run_bytes_present",
+            report.object_image_dry_run_bytes_present,
+        ),
+        json_bool_field(
+            "object_emit_blocked_present",
+            report.object_emit_blocked_present,
+        ),
+        json_optional_bool_field(
+            "object_emit_blocked_valid",
+            report.object_emit_blocked_valid,
+        ),
+        json_string_array_field(
+            "object_emit_blocked_issues",
+            &report.object_emit_blocked_issues,
+        ),
+        json_bool_field("object_output_present", report.object_output_present),
+        json_optional_bool_field("object_output_valid", report.object_output_valid),
+        json_optional_usize_field(
+            "object_output_expected_size_bytes",
+            report.object_output_expected_size_bytes,
+        ),
+        json_optional_usize_field(
+            "object_output_actual_size_bytes",
+            report.object_output_actual_size_bytes,
+        ),
+        json_optional_string_field(
+            "object_output_expected_hash",
+            report.object_output_expected_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "object_output_actual_hash",
+            report.object_output_actual_hash.as_deref(),
+        ),
+        json_string_array_field("object_output_issues", &report.object_output_issues),
+        json_bool_field(
+            "object_writer_dry_run_present",
+            report.object_writer_dry_run_present,
+        ),
+        json_optional_bool_field(
+            "object_writer_dry_run_valid",
+            report.object_writer_dry_run_valid,
+        ),
+        json_string_array_field(
+            "object_writer_dry_run_issues",
+            &report.object_writer_dry_run_issues,
+        ),
         json_bool_field("container_plan_present", report.container_plan_present),
         json_optional_bool_field("container_plan_valid", report.container_plan_valid),
         json_string_array_field("container_plan_issues", &report.container_plan_issues),
@@ -89,6 +178,30 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
         json_optional_usize_field(
             "container_external_import_count",
             report.container_external_import_count,
+        ),
+        json_bool_field(
+            "container_native_object_section_present",
+            report.container_native_object_section_present,
+        ),
+        json_optional_string_field(
+            "container_native_object_section_id",
+            report.container_native_object_section_id.as_deref(),
+        ),
+        json_bool_field(
+            "container_native_object_loader_symbol_present",
+            report.container_native_object_loader_symbol_present,
+        ),
+        json_optional_string_field(
+            "container_native_object_loader_symbol_id",
+            report.container_native_object_loader_symbol_id.as_deref(),
+        ),
+        json_bool_field(
+            "container_native_object_relocation_present",
+            report.container_native_object_relocation_present,
+        ),
+        json_optional_string_field(
+            "container_native_object_relocation_id",
+            report.container_native_object_relocation_id.as_deref(),
         ),
         json_bool_field("artifact_chain_valid", report.artifact_chain_valid),
         json_string_array_field("artifact_chain_issues", &report.artifact_chain_issues),
@@ -221,6 +334,23 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
         json_string_field("assemble_plan_path", &report.assemble_plan_path),
         json_string_field("section_manifest_path", &report.section_manifest_path),
         json_string_field("object_plan_path", &report.object_plan_path),
+        json_string_field("object_writer_input_path", &report.object_writer_input_path),
+        json_string_field("object_byte_layout_path", &report.object_byte_layout_path),
+        json_string_field("object_file_layout_path", &report.object_file_layout_path),
+        json_string_field(
+            "object_image_dry_run_path",
+            &report.object_image_dry_run_path,
+        ),
+        json_string_field(
+            "object_image_dry_run_bytes_path",
+            &report.object_image_dry_run_bytes_path,
+        ),
+        json_string_field("object_emit_blocked_path", &report.object_emit_blocked_path),
+        json_string_field("object_output_path", &report.object_output_path),
+        json_string_field(
+            "object_writer_dry_run_path",
+            &report.object_writer_dry_run_path,
+        ),
         json_string_field("container_plan_path", &report.container_plan_path),
         json_string_field("container_path", &report.container_path),
         json_string_field("container_payload_path", &report.container_payload_path),
@@ -234,6 +364,10 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
         json_string_field("assemble_plan_hash", &report.assemble_plan_hash),
         json_string_field("section_table_hash", &report.section_table_hash),
         json_string_field("object_plan_hash", &report.object_plan_hash),
+        json_bool_field("object_emitted", report.object_emitted),
+        json_string_field("byte_layout_hash", &report.byte_layout_hash),
+        json_string_field("file_layout_hash", &report.file_layout_hash),
+        json_optional_string_field("object_image_hash", report.object_image_hash.as_deref()),
         json_string_field("metadata_table_hash", &report.metadata_table_hash),
         json_string_field("container_layout_hash", &report.container_layout_hash),
         json_string_field("container_hash", &report.container_hash),
@@ -419,6 +553,14 @@ pub(crate) fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
         json_string_field("link_input_table_hash", &report.link_input_table_hash),
         json_bool_field("link_input_table_present", report.link_input_table_present),
         json_optional_bool_field("link_input_table_valid", report.link_input_table_valid),
+        json_bool_field(
+            "prepared_artifact_chain_valid",
+            report.prepared_artifact_chain_valid,
+        ),
+        json_string_array_field(
+            "prepared_artifact_chain_issues",
+            &report.prepared_artifact_chain_issues,
+        ),
         json_string_field(
             "container_metadata_table_hash",
             &report.container_metadata_table_hash,

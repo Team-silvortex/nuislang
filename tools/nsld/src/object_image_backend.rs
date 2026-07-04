@@ -22,12 +22,12 @@ pub(crate) fn encode_object_image_for_backend(
     plan: &nuisc::linker::LinkPlan,
     file_layout: &NsldObjectFileLayoutReport,
 ) -> NsldObjectImageEncodeResult {
-    let Some(entry) = object_image_backend_entry(&file_layout.backend_kind) else {
+    let Some(entry) = object_image_backend_entry(&file_layout.writer_backend_kind) else {
         return NsldObjectImageEncodeResult {
             image: None,
             blockers: vec![format!(
                 "object-image-backend:{}:unsupported",
-                file_layout.backend_kind
+                file_layout.writer_backend_kind
             )],
         };
     };

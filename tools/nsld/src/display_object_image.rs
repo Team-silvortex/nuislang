@@ -6,6 +6,8 @@ pub(crate) fn print_nsld_object_image_dry_run_report(report: &NsldObjectImageDry
     println!("  output_path: {}", report.output_path);
     println!("  image_path: {}", report.image_path);
     println!("  writer_target_id: {}", report.writer_target_id);
+    println!("  writer_backend_kind: {}", report.writer_backend_kind);
+    println!("  object_family: {}", report.object_family);
     println!("  backend_kind: {}", report.backend_kind);
     println!("  backend_family: {}", report.backend_family);
     println!("  backend_status: {}", report.backend_status);
@@ -57,6 +59,14 @@ pub(crate) fn print_nsld_object_image_dry_run_verify_report(
     println!("  image_path: {}", report.image_path);
     println!("  valid: {}", report.valid);
     println!(
+        "  expected_writer_backend_kind: {}",
+        report.expected_writer_backend_kind
+    );
+    println!(
+        "  expected_object_family: {}",
+        report.expected_object_family
+    );
+    println!(
         "  expected_file_layout_hash: {}",
         report.expected_file_layout_hash
     );
@@ -74,6 +84,17 @@ pub(crate) fn print_nsld_object_image_dry_run_verify_report(
             .actual_file_layout_hash
             .as_deref()
             .unwrap_or("missing")
+    );
+    println!(
+        "  actual_writer_backend_kind: {}",
+        report
+            .actual_writer_backend_kind
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_object_family: {}",
+        report.actual_object_family.as_deref().unwrap_or("missing")
     );
     println!(
         "  actual_backend_family: {}",

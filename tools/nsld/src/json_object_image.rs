@@ -10,6 +10,8 @@ pub(crate) fn nsld_object_image_dry_run_report_json(
         json_string_field("output_path", &report.output_path),
         json_string_field("image_path", &report.image_path),
         json_string_field("writer_target_id", &report.writer_target_id),
+        json_string_field("writer_backend_kind", &report.writer_backend_kind),
+        json_string_field("object_family", &report.object_family),
         json_string_field("backend_kind", &report.backend_kind),
         json_string_field("backend_family", &report.backend_family),
         json_string_field("backend_status", &report.backend_status),
@@ -54,6 +56,11 @@ pub(crate) fn nsld_object_image_dry_run_verify_report_json(
         json_string_field("input_path", &report.input_path),
         json_string_field("image_path", &report.image_path),
         json_bool_field("valid", report.valid),
+        json_string_field(
+            "expected_writer_backend_kind",
+            &report.expected_writer_backend_kind,
+        ),
+        json_string_field("expected_object_family", &report.expected_object_family),
         json_string_field("expected_backend_family", &report.expected_backend_family),
         json_string_field("expected_backend_status", &report.expected_backend_status),
         json_string_field(
@@ -73,6 +80,14 @@ pub(crate) fn nsld_object_image_dry_run_verify_report_json(
         json_optional_string_field(
             "actual_file_layout_hash",
             report.actual_file_layout_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_writer_backend_kind",
+            report.actual_writer_backend_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_object_family",
+            report.actual_object_family.as_deref(),
         ),
         json_optional_string_field(
             "actual_backend_family",

@@ -110,6 +110,16 @@ surface_shader.ns / kernel_unit.ns style profile source
 -> window_controls_demo / kernel_tensor_demo
 ```
 
+Current kernel profile rule:
+
+* checked-in `kernel_unit.ns` profiles declare the shared slots
+  `bind_core`, `queue_depth`, and `batch_lanes`
+* explicit `kernel_target_config("apple_ane", "coreml", batch_lanes)` is no
+  longer written in examples
+* the project pipeline materializes the target config from the selected
+  `kernel=...` ABI, keeping profile source portable across future kernel
+  backends
+
 ## Why This Is Project-First
 
 These lanes already have real current meaning through:

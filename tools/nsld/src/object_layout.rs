@@ -11,6 +11,9 @@ pub(crate) fn nsld_object_plan_hash(
     target_arch: &str,
     target_os: &str,
     object_format: &str,
+    object_family: &str,
+    writer_target_id: &str,
+    writer_backend_kind: &str,
     section_table_hash: &str,
     object_layout_hash: &str,
     relocation_seed_table_hash: &str,
@@ -57,7 +60,7 @@ pub(crate) fn nsld_object_plan_hash(
         .collect::<Vec<_>>()
         .join("|");
     let material = format!(
-        "target_arch={target_arch}\ntarget_os={target_os}\nobject_format={object_format}\nsection_table_hash={section_table_hash}\nobject_layout_hash={object_layout_hash}\nrelocation_seed_table_hash={relocation_seed_table_hash}\nsource_container_path={source_container_path}\nsource_payload_path={source_payload_path}\nobject_sections={section_material}\nrelocation_seeds={relocation_material}\nblockers={}\n",
+        "target_arch={target_arch}\ntarget_os={target_os}\nobject_format={object_format}\nobject_family={object_family}\nwriter_target_id={writer_target_id}\nwriter_backend_kind={writer_backend_kind}\nsection_table_hash={section_table_hash}\nobject_layout_hash={object_layout_hash}\nrelocation_seed_table_hash={relocation_seed_table_hash}\nsource_container_path={source_container_path}\nsource_payload_path={source_payload_path}\nobject_sections={section_material}\nrelocation_seeds={relocation_material}\nblockers={}\n",
         blockers.join("|")
     );
     fnv1a64_hex(material.as_bytes())
