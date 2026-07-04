@@ -80,6 +80,23 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.object_image_dry_run_bytes_present
     );
     println!(
+        "  object_image_relocation_lowering: valid={} rule_count={}",
+        optional_bool_text(report.object_image_relocation_lowering_valid),
+        optional_usize_text(report.object_image_relocation_lowering_rule_count)
+    );
+    for rule in &report.object_image_relocation_lowering_rules {
+        println!(
+            "  object_image_relocation_lowering_rule: id={} source_seed_kind={} target={} pc_relative={} length_power={} external={} relocation_type={}",
+            rule.rule_id,
+            rule.source_seed_kind,
+            rule.target_relocation_kind,
+            rule.pc_relative,
+            rule.length_power,
+            rule.external,
+            rule.relocation_type
+        );
+    }
+    println!(
         "  object_emit_blocked: present={} valid={}",
         report.object_emit_blocked_present,
         optional_bool_text(report.object_emit_blocked_valid)
@@ -109,10 +126,11 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         optional_bool_text(report.container_valid)
     );
     println!(
-        "  container_tables: sections={} loader_symbols={} relocations={} external_imports={}",
+        "  container_tables: sections={} loader_symbols={} relocations={} compatibility_domains={} external_imports={}",
         report.container_section_issues.len(),
         report.container_loader_symbol_issues.len(),
         report.container_relocation_issues.len(),
+        report.container_compatibility_domain_issues.len(),
         report.container_external_import_issues.len()
     );
     println!(
@@ -126,6 +144,18 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.container_loader_blockers.len(),
         optional_string_text(report.container_metadata_table_hash.as_deref()),
         optional_usize_text(report.container_external_import_count)
+    );
+    println!(
+        "  container_compatibility_domain: count={} table_hash={} id={} kind={} paradigm={} hook={} abi={} wrapper={} required={}",
+        optional_usize_text(report.container_compatibility_domain_count),
+        optional_string_text(report.container_compatibility_domain_table_hash.as_deref()),
+        optional_string_text(report.container_compatibility_domain_id.as_deref()),
+        optional_string_text(report.container_compatibility_domain_kind.as_deref()),
+        optional_string_text(report.container_compatibility_domain_paradigm.as_deref()),
+        optional_string_text(report.container_compatibility_domain_lifecycle_hook.as_deref()),
+        optional_string_text(report.container_compatibility_domain_abi_family.as_deref()),
+        optional_string_text(report.container_compatibility_domain_wrapper_policy.as_deref()),
+        optional_bool_text(report.container_compatibility_domain_required)
     );
     println!(
         "  container_native_object: section_present={} section_id={} loader_symbol_present={} loader_symbol_id={} relocation_present={} relocation_id={}",
@@ -230,6 +260,9 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     for issue in &report.object_image_dry_run_issues {
         println!("  object_image_dry_run_issue: {issue}");
     }
+    for issue in &report.object_image_relocation_lowering_issues {
+        println!("  object_image_relocation_lowering_issue: {issue}");
+    }
     for issue in &report.object_emit_blocked_issues {
         println!("  object_emit_blocked_issue: {issue}");
     }
@@ -253,6 +286,9 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     }
     for issue in &report.container_relocation_issues {
         println!("  container_relocation_issue: {issue}");
+    }
+    for issue in &report.container_compatibility_domain_issues {
+        println!("  container_compatibility_domain_issue: {issue}");
     }
     for issue in &report.container_external_import_issues {
         println!("  container_external_import_issue: {issue}");

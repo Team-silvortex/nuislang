@@ -1,6 +1,7 @@
 use super::{
     main_test_support::empty_link_plan, nsld_assemble_plan_report, nsld_prepare_report,
-    nsld_verify_assemble_plan_report, nsld_verify_section_manifest_report, toml,
+    nsld_verify_assemble_plan_report, nsld_verify_section_manifest_report,
+    object_file_layout::nsld_object_file_layout_report, toml,
 };
 use nuisc::linker::LinkPlanHeteroNode;
 use std::{env, fs, path::Path};
@@ -51,7 +52,15 @@ validation_contracts = ["glm.resource-lifetime"]
     });
 
     let report = nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report_json = super::json::nsld_prepare_report_json(&report);
     let payload_bytes = fs::read(&report.container_payload_path).unwrap();
+    let object_bytes = fs::read(&report.object_output_path).unwrap();
+    let object_file_layout = nsld_object_file_layout_report(Path::new("manifest.toml"), &plan);
+    let compiled_artifact_record = object_file_layout
+        .records
+        .iter()
+        .find(|record| record.record_id == "section.sec0000.compiled-artifact")
+        .unwrap();
 
     assert!(report.valid);
     assert!(report.issues.is_empty());
@@ -79,6 +88,11 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(payload_bytes
         .windows(4)
         .any(|window| window == [0xcf, 0xfa, 0xed, 0xfe]));
+    assert_eq!(
+        &object_bytes[compiled_artifact_record.file_offset
+            ..compiled_artifact_record.file_offset + "compiled-artifact".len()],
+        b"compiled-artifact"
+    );
     assert_eq!(report.link_input_count, 1);
     assert_eq!(report.unit_count, 1);
     assert!(report.bundle_ready);
@@ -93,7 +107,64 @@ validation_contracts = ["glm.resource-lifetime"]
         .as_deref()
         .unwrap()
         .starts_with("0x"));
+    assert!(report.object_image_relocation_lowering_valid);
+    assert_eq!(report.object_image_relocation_lowering_rule_count, 4);
+    assert_eq!(report.object_image_relocation_lowering_rules.len(), 4);
+    assert_eq!(
+        report.object_image_relocation_lowering_rules[0].source_seed_kind,
+        "bootstrap-entry-seed"
+    );
+    assert!(report.object_image_relocation_lowering_issues.is_empty());
     assert_ne!(report.metadata_table_hash, "missing");
+    assert_eq!(report.compatibility_domain_count, Some(1));
+    assert!(report
+        .compatibility_domain_table_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert_eq!(
+        report.compatibility_domain_id.as_deref(),
+        Some("compat0000.cffi-von-neumann")
+    );
+    assert_eq!(
+        report.compatibility_domain_kind.as_deref(),
+        Some("cffi-host-compat")
+    );
+    assert_eq!(
+        report.compatibility_domain_paradigm.as_deref(),
+        Some("classic-von-neumann-host")
+    );
+    assert_eq!(
+        report.compatibility_domain_lifecycle_hook.as_deref(),
+        Some("on_cffi_native_object")
+    );
+    assert_eq!(
+        report.compatibility_domain_abi_family.as_deref(),
+        Some("mach-o")
+    );
+    assert_eq!(
+        report.compatibility_domain_wrapper_policy.as_deref(),
+        Some("wrapped")
+    );
+    assert_eq!(report.compatibility_domain_required, Some(true));
+    assert!(report_json.contains("\"compatibility_domain_count\":1"));
+    assert!(report_json.contains("\"compatibility_domain_table_hash\":\"0x"));
+    assert!(report_json.contains("\"compatibility_domain_id\":\"compat0000.cffi-von-neumann\""));
+    assert!(report_json.contains("\"compatibility_domain_kind\":\"cffi-host-compat\""));
+    assert!(report_json.contains("\"compatibility_domain_paradigm\":\"classic-von-neumann-host\""));
+    assert!(
+        report_json.contains("\"compatibility_domain_lifecycle_hook\":\"on_cffi_native_object\"")
+    );
+    assert!(report_json.contains("\"compatibility_domain_abi_family\":\"mach-o\""));
+    assert!(report_json.contains("\"compatibility_domain_wrapper_policy\":\"wrapped\""));
+    assert!(report_json.contains("\"compatibility_domain_required\":true"));
+    assert!(
+        report_json.contains("\"compatibility_domain_summary\":{\"count\":1,\"table_hash\":\"0x")
+    );
+    assert!(report_json.contains("\"object_image_relocation_lowering_valid\":true"));
+    assert!(report_json.contains("\"object_image_relocation_lowering_rule_count\":4"));
+    assert!(report_json.contains("\"object_image_relocation_lowering_rules\":[{"));
+    assert!(report_json.contains("\"source_seed_kind\":\"bootstrap-entry-seed\""));
+    assert!(report_json.contains("\"object_image_relocation_lowering_issues\":[]"));
     assert_ne!(report.container_layout_hash, "missing");
     assert_ne!(report.container_hash, "missing");
     assert!(report.payload_size_bytes > 0);

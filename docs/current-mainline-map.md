@@ -14,21 +14,22 @@ If you only need the shortest current `alpha-0.7.*` reading route, use this orde
 3. [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md)
 4. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
 5. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-6. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
-7. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
-8. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-9. [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-10. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-11. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-12. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-13. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-14. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
-15. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
-16. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
-17. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
-18. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-19. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-20. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
+6. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
+7. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
+8. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
+9. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+10. [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
+11. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+12. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+13. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+14. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+15. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
+16. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
+17. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
+18. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
+19. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+20. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
+21. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
 
 Short rule:
 
@@ -58,6 +59,8 @@ Short rule:
   [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
 * current binary format protocol:
   [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+* CFFI / classic von-Neumann domain contract:
+  [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
 * predecessor ABI vocabulary bridge into `0.20.*`:
   [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 * immediate predecessor alpha closeout set:
@@ -114,7 +117,8 @@ Use this section as a router, not as a full inventory.
   [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md),
   [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md),
   [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md),
-  [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+  [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md),
+  [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
   current native control-flow smoke gate:
   [artifact_cli.rs](../tools/nuisc/tests/artifact_cli.rs)
   current host-YIR runtime probe:

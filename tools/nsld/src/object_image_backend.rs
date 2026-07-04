@@ -1,4 +1,11 @@
-use super::{object_macho_image::encode_mach_o_arm64_image, reports::NsldObjectFileLayoutReport};
+use super::{
+    object_macho_image::encode_mach_o_arm64_image,
+    object_macho_relocations::{
+        mach_o_arm64_relocation_lowering_rule_count, mach_o_arm64_relocation_lowering_rules,
+        mach_o_arm64_relocation_resolution_issues,
+    },
+    reports::{NsldObjectFileLayoutReport, NsldRelocationLoweringRuleDiagnostic},
+};
 use std::path::Path;
 
 type ObjectImageEncoder =
@@ -41,11 +48,17 @@ pub(crate) fn encode_object_image_for_backend(
         };
     };
     let image = encoder(manifest, plan, file_layout);
-    let blockers = image
+    let mut blockers = image
         .is_none()
         .then(|| format!("object-image-backend:{}:encode-failed", entry.backend_kind))
         .into_iter()
-        .collect();
+        .collect::<Vec<_>>();
+    blockers.extend(object_image_backend_resolution_issues(
+        entry.backend_kind,
+        manifest,
+        plan,
+        file_layout,
+    ));
 
     NsldObjectImageEncodeResult { image, blockers }
 }
@@ -60,6 +73,22 @@ pub(crate) fn object_image_backend_family(backend_kind: &str) -> &'static str {
     object_image_backend_entry(backend_kind)
         .map(|entry| entry.object_family)
         .unwrap_or("unknown")
+}
+
+pub(crate) fn object_image_backend_relocation_lowering_rule_count(backend_kind: &str) -> usize {
+    match backend_kind {
+        "mach-o-arm64" => mach_o_arm64_relocation_lowering_rule_count(),
+        _ => 0,
+    }
+}
+
+pub(crate) fn object_image_backend_relocation_lowering_rules(
+    backend_kind: &str,
+) -> Vec<NsldRelocationLoweringRuleDiagnostic> {
+    match backend_kind {
+        "mach-o-arm64" => mach_o_arm64_relocation_lowering_rules(),
+        _ => Vec::new(),
+    }
 }
 
 fn object_image_backend_entry(backend_kind: &str) -> Option<ObjectImageBackendEntry> {
@@ -97,14 +126,42 @@ fn object_image_backend_entries() -> Vec<ObjectImageBackendEntry> {
     ]
 }
 
+fn object_image_backend_resolution_issues(
+    backend_kind: &str,
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+    file_layout: &NsldObjectFileLayoutReport,
+) -> Vec<String> {
+    match backend_kind {
+        "mach-o-arm64" => mach_o_arm64_relocation_resolution_issues(manifest, plan, file_layout),
+        _ => Vec::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{object_image_backend_family, object_image_backend_status};
+    use super::{
+        encode_object_image_for_backend, object_image_backend_family,
+        object_image_backend_relocation_lowering_rule_count,
+        object_image_backend_relocation_lowering_rules, object_image_backend_status,
+    };
+    use crate::{
+        main_test_support::empty_link_plan, object_file_layout::nsld_object_file_layout_report,
+    };
+    use std::path::Path;
 
     #[test]
     fn image_backend_registry_keeps_macho_as_one_registered_backend() {
         assert_eq!(object_image_backend_status("mach-o-arm64"), "ready");
         assert_eq!(object_image_backend_family("mach-o-arm64"), "mach-o");
+        assert_eq!(
+            object_image_backend_relocation_lowering_rule_count("mach-o-arm64"),
+            4
+        );
+        assert_eq!(
+            object_image_backend_relocation_lowering_rules("mach-o-arm64")[0].source_seed_kind,
+            "bootstrap-entry-seed"
+        );
     }
 
     #[test]
@@ -117,5 +174,22 @@ mod tests {
         assert_eq!(object_image_backend_status("coff-amd64"), "not-implemented");
         assert_eq!(object_image_backend_family("elf-amd64"), "elf");
         assert_eq!(object_image_backend_family("coff-amd64"), "coff");
+    }
+
+    #[test]
+    fn mach_o_backend_reports_unresolved_relocation_symbols() {
+        let plan = empty_link_plan();
+        let manifest = Path::new("manifest.toml");
+        let mut file_layout = nsld_object_file_layout_report(manifest, &plan);
+        file_layout
+            .records
+            .retain(|record| record.record_id != "section.sec0000.compiled-artifact");
+
+        let result = encode_object_image_for_backend(manifest, &plan, &file_layout);
+
+        assert!(result
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("unresolved-section-symbol")));
     }
 }

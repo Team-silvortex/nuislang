@@ -107,6 +107,42 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
         report.expected_relocation_addend
     );
     println!(
+        "  expected_compatibility_domain_count: {}",
+        report.expected_compatibility_domain_count
+    );
+    println!(
+        "  expected_compatibility_domain_table_hash: {}",
+        report.expected_compatibility_domain_table_hash
+    );
+    println!(
+        "  expected_compatibility_domain_id: {}",
+        report.expected_compatibility_domain_id
+    );
+    println!(
+        "  expected_compatibility_domain_kind: {}",
+        report.expected_compatibility_domain_kind
+    );
+    println!(
+        "  expected_compatibility_domain_paradigm: {}",
+        report.expected_compatibility_domain_paradigm
+    );
+    println!(
+        "  expected_compatibility_domain_lifecycle_hook: {}",
+        report.expected_compatibility_domain_lifecycle_hook
+    );
+    println!(
+        "  expected_compatibility_domain_abi_family: {}",
+        report.expected_compatibility_domain_abi_family
+    );
+    println!(
+        "  expected_compatibility_domain_wrapper_policy: {}",
+        report.expected_compatibility_domain_wrapper_policy
+    );
+    println!(
+        "  expected_compatibility_domain_required: {}",
+        report.expected_compatibility_domain_required
+    );
+    println!(
         "  expected_external_import_count: {}",
         report.expected_external_import_count
     );
@@ -295,6 +331,63 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
             .unwrap_or_else(|| "missing".to_owned())
     );
     println!(
+        "  actual_compatibility_domain_count: {}",
+        optional_usize_text(report.actual_compatibility_domain_count)
+    );
+    println!(
+        "  actual_compatibility_domain_table_hash: {}",
+        report
+            .actual_compatibility_domain_table_hash
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_compatibility_domain_id: {}",
+        report
+            .actual_compatibility_domain_id
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_compatibility_domain_kind: {}",
+        report
+            .actual_compatibility_domain_kind
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_compatibility_domain_paradigm: {}",
+        report
+            .actual_compatibility_domain_paradigm
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_compatibility_domain_lifecycle_hook: {}",
+        report
+            .actual_compatibility_domain_lifecycle_hook
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_compatibility_domain_abi_family: {}",
+        report
+            .actual_compatibility_domain_abi_family
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_compatibility_domain_wrapper_policy: {}",
+        report
+            .actual_compatibility_domain_wrapper_policy
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_compatibility_domain_required: {}",
+        optional_bool_text(report.actual_compatibility_domain_required)
+    );
+    println!(
         "  actual_external_import_count: {}",
         optional_usize_text(report.actual_external_import_count)
     );
@@ -354,6 +447,9 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
     }
     for issue in &report.relocation_issues {
         println!("  relocation_issue: {issue}");
+    }
+    for issue in &report.compatibility_domain_issues {
+        println!("  compatibility_domain_issue: {issue}");
     }
     for issue in &report.external_import_issues {
         println!("  external_import_issue: {issue}");

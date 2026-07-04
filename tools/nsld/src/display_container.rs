@@ -88,10 +88,11 @@ pub(crate) fn print_nsld_container_report(report: &NsldContainerReport) {
     );
     for symbol in &report.loader_symbols {
         println!(
-            "  loader_symbol: id={} kind={} name={} section={} offset={} size={} payload_hash={}",
+            "  loader_symbol: id={} kind={} name={} hook={} section={} offset={} size={} payload_hash={}",
             symbol.symbol_id,
             symbol.symbol_kind,
             symbol.symbol_name,
+            symbol.lifecycle_hook,
             symbol.section_id,
             symbol.offset,
             symbol.size_bytes,
@@ -109,6 +110,26 @@ pub(crate) fn print_nsld_container_report(report: &NsldContainerReport) {
             relocation.source_offset,
             relocation.target_symbol_id,
             relocation.addend
+        );
+    }
+    println!(
+        "  compatibility_domains: {}",
+        report.compatibility_domains.len()
+    );
+    println!(
+        "  compatibility_domain_table_hash: {}",
+        report.compatibility_domain_table_hash
+    );
+    for domain in &report.compatibility_domains {
+        println!(
+            "  compatibility_domain: id={} kind={} paradigm={} hook={} abi={} wrapper={} required={}",
+            domain.domain_id,
+            domain.domain_kind,
+            domain.paradigm,
+            domain.lifecycle_hook,
+            domain.abi_family,
+            domain.wrapper_policy,
+            domain.required
         );
     }
     println!("  external_imports: {}", report.external_imports.len());

@@ -70,6 +70,21 @@ pub(crate) fn encode_mach_o_string_table(plan: &NsldMachOSymbolTablePlan) -> Vec
     plan.strings.clone()
 }
 
+pub(crate) fn mach_o_arm64_section_symbol_index(
+    file_layout: &NsldObjectFileLayoutReport,
+    source_section_id: &str,
+) -> Option<usize> {
+    if file_layout.writer_backend_kind != "mach-o-arm64" {
+        return None;
+    }
+    file_layout
+        .records
+        .iter()
+        .filter(|record| record.record_kind == "section-payload")
+        .position(|record| section_id(record) == source_section_id)
+        .map(|section_index| section_index + 1)
+}
+
 fn symbol_plan(
     name: &str,
     strings: &mut Vec<u8>,
@@ -91,11 +106,14 @@ fn symbol_plan(
 }
 
 fn mach_o_symbol_name(record: &NsldObjectFileLayoutRecordDiagnostic) -> String {
-    let raw = record
+    format!("__nuis_{}", section_id(record).replace('.', "_"))
+}
+
+fn section_id(record: &NsldObjectFileLayoutRecordDiagnostic) -> &str {
+    record
         .record_id
         .strip_prefix("section.")
-        .unwrap_or(&record.record_id);
-    format!("__nuis_{}", raw.replace('.', "_"))
+        .unwrap_or(&record.record_id)
 }
 
 fn record_by_kind<'a>(
@@ -123,7 +141,8 @@ fn write_u64_le(bytes: &mut [u8], offset: usize, value: u64) {
 #[cfg(test)]
 mod tests {
     use super::{
-        encode_mach_o_string_table, encode_mach_o_symbols, mach_o_arm64_symbol_table_plan,
+        encode_mach_o_string_table, encode_mach_o_symbols, mach_o_arm64_section_symbol_index,
+        mach_o_arm64_symbol_table_plan,
     };
     use crate::{
         main_test_support::empty_link_plan, object_file_layout::nsld_object_file_layout_report,
@@ -148,5 +167,13 @@ mod tests {
             .windows("__nuis_entry".len())
             .any(|window| window == b"__nuis_entry"));
         assert_eq!(&symbol_bytes[0..4], &[1, 0, 0, 0]);
+        assert_eq!(
+            mach_o_arm64_section_symbol_index(&file_layout, "sec0000.compiled-artifact"),
+            Some(1)
+        );
+        assert_eq!(
+            mach_o_arm64_section_symbol_index(&file_layout, "sec0003.nsld-link-bundle"),
+            Some(4)
+        );
     }
 }

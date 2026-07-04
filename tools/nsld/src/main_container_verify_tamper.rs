@@ -57,6 +57,10 @@ pub(crate) fn tampered_container_source(
         )
         .replace("symbol_name = \"main\"", "symbol_name = \"alt\"")
         .replace(
+            "lifecycle_hook = \"on_lifecycle_bootstrap\"",
+            "lifecycle_hook = \"on_manual_lifecycle\"",
+        )
+        .replace(
             "symbol_name = \"t0001.shader\"",
             "symbol_name = \"t9999.shader.manual\"",
         )
@@ -93,6 +97,38 @@ pub(crate) fn tampered_container_source(
                 report.expected_relocation_table_hash
             ),
             "relocation_table_hash = \"0x0000000000000000\"",
+        )
+        .replace(
+            "compatibility_domain_count = 1",
+            "compatibility_domain_count = 2",
+        )
+        .replace(
+            &format!(
+                "compatibility_domain_table_hash = \"{}\"",
+                report.expected_compatibility_domain_table_hash
+            ),
+            "compatibility_domain_table_hash = \"0x0000000000000000\"",
+        )
+        .replace(
+            "domain_id = \"compat0000.cffi-von-neumann\"",
+            "domain_id = \"compat9999.manual\"",
+        )
+        .replace(
+            "domain_kind = \"cffi-host-compat\"",
+            "domain_kind = \"manual-compat\"",
+        )
+        .replace(
+            "paradigm = \"classic-von-neumann-host\"",
+            "paradigm = \"manual-host\"",
+        )
+        .replace(
+            "lifecycle_hook = \"on_cffi_native_object\"",
+            "lifecycle_hook = \"on_manual_compat\"",
+        )
+        .replace("abi_family = \"mach-o\"", "abi_family = \"manual-object\"")
+        .replace(
+            "wrapper_policy = \"wrapped\"",
+            "wrapper_policy = \"manual-wrapper\"",
         )
         .replace("external_import_count = 3", "external_import_count = 0")
         .replace(

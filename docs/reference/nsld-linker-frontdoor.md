@@ -24,17 +24,30 @@ Nuis-owned heterogeneous executable, see
 * clock protocol visibility
 * lowering sidecar capability validation for domains that declare IR sidecars
 * deterministic link-unit reporting across registered domain units
-* object-plan target identity metadata for Mach-O/ELF/COFF-family writers
+* object-plan target identity metadata for optional Mach-O/ELF/COFF-family
+  compatibility writers
 * final-stage reporting
 * the first independent CLI boundary for future linker work
 
 `Nsld` does not yet own:
 
-* final native object linking
+* final host-native executable wrapping for Mach-O, ELF, or PE
 * replacement of the host toolchain wrapper
 * binary section assembly independent from `nuisc`
 * stable linker script or relocation formats
 * finished `nsld-core` galaxy-style API for direct compiler/runtime consumers
+
+The long-term Nsld design is not `.o`-first. Nuis-native linking should be able
+to consume structured Nsld/YIR/Nustar link units, lifecycle/clock metadata,
+GLM-compatible ownership metadata, deterministic sections, and heterogeneous
+payloads directly. Mach-O, ELF, PE/COFF, and traditional object files are
+compatibility/finalization backends: useful for host operating systems and C ABI
+bridges, but not the required internal representation of the linker core.
+
+This also means the C ABI, libc, and classic von-Neumann host stack should be
+treated as a CFFI / host-compat execution domain inside Nuis. They are not the
+semantic root of the linker. See
+[cffi-von-neumann-domain-contract.md](cffi-von-neumann-domain-contract.md).
 
 ## Commands
 
@@ -178,6 +191,13 @@ The prepare report also returns the final container `metadata_table_hash`,
 `container_layout_hash`, `container_hash`, `payload_size_bytes`, and
 `payload_hash`, so later stages can key off the prepared binary-contract
 summary without re-opening every artifact.
+It also surfaces object-image relocation lowering status through
+`object_image_relocation_lowering_valid`,
+`object_image_relocation_lowering_rule_count`, and
+`object_image_relocation_lowering_issues`, matching the top-level check view.
+The prepare JSON report also exposes
+`object_image_relocation_lowering_rules`, so orchestration tools can inspect
+the active relocation registry without opening the dry-run TOML separately.
 
 `nsld assemble-plan` is the first dry-run view of binary assembly. It consumes
 the prepared bundle state and lists the sections that a future Nsld-owned
@@ -284,11 +304,13 @@ presence/types, and mapping/seed drift.
 `nsld object-writer-readiness` is a non-mutating readiness view over the same
 plan. It reports whether object emission is currently allowed for the selected
 writer target.
-`nsld emit-object` is now the first native object emission frontdoor. For the
-registered Mach-O arm64 writer, once the prerequisite Nsld artifacts are
-prepared, it writes `nuis.nsld.mach-o` from the deterministic image bytes and
-reports `emitted = true`. For unprepared input or backends that remain
-blocked, it still reports `emitted = false` with blockers.
+`nsld emit-object` is the first compatibility object emission frontdoor. For
+the registered Mach-O arm64 writer, once the prerequisite Nsld artifacts are
+prepared, it writes optional `nuis.nsld.mach-o` from the deterministic image
+bytes and reports `emitted = true`. For unprepared input or backends that
+remain blocked, it still reports `emitted = false` with blockers. This is not a
+claim that Nsld's core must consume `.o` files; it is a host-system
+compatibility lane alongside the Nuis-native container/link graph lane.
 The command also materializes the current diagnostic artifacts:
 `nuis.nsld.object-writer-input.toml`, `nuis.nsld.object.blocked.toml`,
 `nuis.nsld.object-image-dry-run.toml`, and
@@ -300,7 +322,7 @@ artifacts still agree on the object plan hash and dry-run image hash.
 today that means `nuis.nsld.mach-o` must have the same size and content hash as
 `nuis.nsld.object-image-dry-run.bin`. Keeping this as its own frontdoor lets
 later ELF/PE writers, Nsld's future linker core, and nsdb consume the native
-object contract without re-running or parsing `check`.
+object compatibility contract without re-running or parsing `check`.
 `nsld verify-object-writer-input` checks that this snapshot still matches the
 current object plan hashes, writer identity, section count, relocation seed
 count, and required writer table field types.
@@ -383,7 +405,8 @@ view. It is intentionally still a metadata container shell: it records the
 container magic/version, `container_layout_hash`, `container_hash`, blockers,
 aggregate `payload_size_bytes` / `payload_hash`, and section table with
 deterministic `offset` / `size_bytes` entries without claiming to replace
-relocation, final native object linking, or host executable wrapping.
+relocation finalization, compatibility object finalization, or host executable
+wrapping.
 When `nuis.nsld.mach-o` has been emitted and passes the same validation exposed
 by `verify-object-output`, the container plan appends it as a
 `native-object-output` section so the native object participates in the
@@ -391,6 +414,13 @@ container section table, payload hash, and loader-facing metadata instead of
 remaining a side artifact. If the object output exists but no longer matches
 the deterministic dry-run bytes, the container plan reports
 `object-output:*` blockers and does not package the invalid native object.
+This section is best understood as a CFFI Nustar / host-compatibility lane, not
+as the Nuis-native linker core. A future Nuis binary format can reserve a
+dedicated lifecycle phase for these native-object payloads: enter through an
+explicit compatibility hook, run under the CFFI whitelist and wrapper policy,
+then return results through Nuis-owned metadata and memory-safety contracts.
+That keeps C ABI execution visible to the scheduler instead of turning it into
+an unstructured side call.
 The preview report exposes `metadata_table_hash`,
 `container_section_table_hash`, `loader_symbol_table_hash`,
 `relocation_table_hash`, and `external_import_table_hash` so loader, release,
@@ -430,6 +460,8 @@ loader_symbol_count = 2
 loader_symbol_table_hash = "0x..."
 relocation_count = 2
 relocation_table_hash = "0x..."
+compatibility_domain_count = 1
+compatibility_domain_table_hash = "0x..."
 external_import_count = 3
 external_import_table_hash = "0x..."
 payload_size_bytes = 1234
@@ -441,6 +473,7 @@ blockers = []
 symbol_id = "sym0000.loader-entry"
 symbol_kind = "lifecycle-bootstrap"
 symbol_name = "nustar.bootstrap.v1"
+lifecycle_hook = "on_lifecycle_bootstrap"
 section_id = "sec0000.compiled-artifact"
 offset = 0
 size_bytes = 1234
@@ -461,6 +494,15 @@ source_section_id = "sec0004.lowering-sidecar-input"
 source_offset = 1234
 target_symbol_id = "sym0001.hetero-node.shader.official.shader"
 addend = 0
+
+[[compatibility_domain]]
+domain_id = "compat0000.cffi-von-neumann"
+domain_kind = "cffi-host-compat"
+paradigm = "classic-von-neumann-host"
+lifecycle_hook = "on_cffi_native_object"
+abi_family = "mach-o"
+wrapper_policy = "wrapped"
+required = true
 
 [[external_import]]
 import_id = "imp0000.final-stage-driver"
@@ -501,15 +543,19 @@ fails if either file is missing, if the metadata content differs, or if
 `container_layout_hash`, `loader_entry_kind`, `loader_entry_symbol`,
 `loader_entry_section_id`, `loader_readiness`, `loader_symbol_count`,
 `loader_symbol_table_hash`, `relocation_count`, `relocation_table_hash`,
+`compatibility_domain_count`, `compatibility_domain_table_hash`,
 `external_import_count`, `external_import_table_hash`, `payload_size_bytes`,
 `payload_hash`, or `container_hash` no longer match. It also parses and checks
-every `[[section]]`, `[[loader_symbol]]`, `[[relocation]]`, and
-`[[external_import]]` table entry by index. Field-level table diagnostics are
-grouped into `container_section_issues`, `loader_symbol_issues`,
-`relocation_issues`, and `external_import_issues`; malformed entries report
+every `[[section]]`, `[[loader_symbol]]`, `[[relocation]]`,
+`[[compatibility_domain]]`, and `[[external_import]]` table entry by index.
+Field-level table diagnostics are grouped into `container_section_issues`,
+`loader_symbol_issues`, `relocation_issues`,
+`compatibility_domain_issues`, and `external_import_issues`; malformed entries report
 missing or invalid fields such as
 `relocation[0].relocation_kind missing` or
-`relocation[0].source_offset invalid`. Section payload ranges are checked
+`relocation[0].source_offset invalid`. Loader symbols also carry
+`lifecycle_hook`, so bootstrap, heterogeneous dispatch, and CFFI native-object
+lanes are visible to the scheduler-facing metadata. Section payload ranges are checked
 separately in `section_range_issues` against each section's `payload_hash`, so a
 corrupted payload segment can be reported without waiting for later relocation
 or final native linking.
@@ -518,11 +564,28 @@ native-object summary: whether the `native-object-output` section exists,
 whether the `native-object-output` loader symbol exists, and whether the
 `native-object-binding` relocation exists, with their ids for debugger/linker
 consumers.
+JSON reports keep the legacy flat fields for compatibility, but also expose
+object-shaped compatibility-domain summaries for tooling:
+`compatibility_domain_summary` on container, prepare, and closure reports,
+`container_compatibility_domain_summary` on check reports, and
+`expected_compatibility_domain_summary` /
+`actual_compatibility_domain_summary` on verify-container reports.
+
+The `[[compatibility_domain]]` table is the current Nsld metadata hook for
+explicit CFFI / host-compat execution domains. The default entry is
+`compat0000.cffi-von-neumann`, with `domain_kind = "cffi-host-compat"`,
+`paradigm = "classic-von-neumann-host"`, and
+`lifecycle_hook = "on_cffi_native_object"`. This table is intentionally
+separate from `[[external_import]]`: external imports describe dependencies
+outside the self-owned container, while compatibility domains describe the
+execution paradigm admitted into the Nuis container and schedule.
 
 The loader entry fields and `[[loader_symbol]]` table are the first
 loader-facing bootstrap records in the Nsld container. They currently bind the
 lifecycle bootstrap symbol from the link plan to the compiled artifact section
-and its payload range; future loader/runtime work can extend that into richer
+and its payload range with `on_lifecycle_bootstrap`; heterogeneous nodes use
+their declared lifecycle hook; native-object compatibility payloads use
+`on_cffi_native_object`. Future loader/runtime work can extend that into richer
 symbol and relocation tables without changing the container's basic entry
 contract.
 
@@ -587,6 +650,11 @@ the top-level linker health report.
   bytes when present, using the same check exposed by `verify-object-output`;
   the check report includes expected/actual object-output size and hash fields
   when the object output exists
+* object-image relocation lowering status is surfaced through
+  `object_image_relocation_lowering_valid`,
+  `object_image_relocation_lowering_rule_count`, and
+  `object_image_relocation_lowering_issues`; check JSON also exposes
+  `object_image_relocation_lowering_rules` for rule-level auditability
 * an emitted `nuis.nsld.object-writer-dry-run.toml` is still valid when that
   file is present
 * an emitted `nuis.nsld.container-plan.toml` is still valid when that file is
@@ -598,6 +666,9 @@ the top-level linker health report.
   a container is present
 * the container native-object summary can be surfaced from the top-level check,
   including native object section, loader symbol, and relocation ids
+* the container compatibility-domain summary can be surfaced from the top-level
+  check, including the CFFI/host-compat domain id, paradigm, lifecycle hook,
+  ABI family, wrapper policy, table hash, and required flag
 * the emitted Nsld artifact chain is a contiguous prepared prefix, so a later
   artifact such as `nuis.nsld.container` cannot appear without its prerequisite
   metadata artifacts
@@ -629,7 +700,11 @@ for this prepare-order state.
 
 When `nuis.nsld.container` exists, the check report also exposes
 `container_loader_readiness`, `container_loader_blockers`,
-`container_metadata_table_hash`, and `container_external_import_count`.
+`container_metadata_table_hash`, `container_external_import_count`, and the
+`container_compatibility_domain_*` summary fields. Those fields let CI and
+future tooling distinguish "this route still has external host dependencies"
+from "this Nuis container explicitly admits the CFFI / classic-von-Neumann
+compatibility execution domain."
 `host-assisted` is reported as an explicit remaining dependency state, not as a
 check failure; `blocked` fails the check because it means the container still
 has unresolved assembly blockers.
@@ -694,10 +769,18 @@ input identities and their content hashes, so a future linker/cache/debugger
 can cheaply detect whether the complete heterogeneous input set is unchanged.
 
 Closure also reports the expected container `container_metadata_table_hash`
-and `container_loader_readiness`. These are derived from the current link plan
-and do not require `nuis.nsld.container` to have been emitted yet; they give
-route-planning tools the same container fingerprint used by `container`,
-`emit-container`, `prepare`, and `check`.
+and `container_loader_readiness`. It also reports the expected compatibility
+domain summary: count, table hash, domain id, domain kind, paradigm, lifecycle
+hook, ABI family, wrapper policy, and required flag. These are derived from the
+current link plan and do not require `nuis.nsld.container` to have been emitted
+yet; they give route-planning tools the same container fingerprint and
+CFFI/host-compat domain identity used by `container`, `emit-container`,
+`prepare`, and `check`.
+
+`nsld prepare` also returns the same compatibility-domain summary after it has
+emitted and verified the full artifact chain. This makes the prepare result a
+single frontdoor for both "which files were written?" and "which host-compat
+execution paradigm did the prepared container admit?"
 
 This is not final object linking yet; it is the linker-owned input table that
 future binary assembly, cache reuse, debug-symbol correlation, and closure

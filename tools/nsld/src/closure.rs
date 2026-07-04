@@ -63,6 +63,7 @@ pub(crate) fn nsld_closure_report(
         internal_contracts.push("verified-link-input-table".to_owned());
     }
     let container_report = nsld_container_report(manifest, plan);
+    let compatibility_domain = container_report.compatibility_domains.first();
 
     let host_wrapper_required = matches!(
         plan.final_stage.link_mode.as_str(),
@@ -213,6 +214,18 @@ pub(crate) fn nsld_closure_report(
         prepared_artifact_chain_issues,
         container_metadata_table_hash: container_report.metadata_table_hash,
         container_loader_readiness: container_report.loader_readiness,
+        compatibility_domain_count: container_report.compatibility_domains.len(),
+        compatibility_domain_table_hash: container_report.compatibility_domain_table_hash,
+        compatibility_domain_id: compatibility_domain.map(|domain| domain.domain_id.clone()),
+        compatibility_domain_kind: compatibility_domain.map(|domain| domain.domain_kind.clone()),
+        compatibility_domain_paradigm: compatibility_domain.map(|domain| domain.paradigm.clone()),
+        compatibility_domain_lifecycle_hook: compatibility_domain
+            .map(|domain| domain.lifecycle_hook.clone()),
+        compatibility_domain_abi_family: compatibility_domain
+            .map(|domain| domain.abi_family.clone()),
+        compatibility_domain_wrapper_policy: compatibility_domain
+            .map(|domain| domain.wrapper_policy.clone()),
+        compatibility_domain_required: compatibility_domain.map(|domain| domain.required),
         external_dependencies,
         unresolved,
         host_wrapper_required,

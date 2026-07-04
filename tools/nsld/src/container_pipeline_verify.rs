@@ -37,6 +37,7 @@ pub(crate) fn nsld_verify_container_report(
     let mut section_range_issues = Vec::new();
     let mut loader_symbol_issues = Vec::new();
     let mut relocation_issues = Vec::new();
+    let mut compatibility_domain_issues = Vec::new();
     let mut external_import_issues = Vec::new();
     if let Ok(source) = actual.as_ref() {
         let table_issue_sets = container_table_issue_sets(source, &expected_report);
@@ -48,6 +49,9 @@ pub(crate) fn nsld_verify_container_report(
 
         relocation_issues = table_issue_sets.relocation_issues;
         issues.extend(relocation_issues.iter().cloned());
+
+        compatibility_domain_issues = table_issue_sets.compatibility_domain_issues;
+        issues.extend(compatibility_domain_issues.iter().cloned());
 
         external_import_issues = table_issue_sets.external_import_issues;
         issues.extend(external_import_issues.iter().cloned());
@@ -140,6 +144,15 @@ pub(crate) fn nsld_verify_container_report(
         actual_relocation_source_offset,
         actual_relocation_target_symbol_id,
         actual_relocation_addend,
+        actual_compatibility_domain_count,
+        actual_compatibility_domain_table_hash,
+        actual_compatibility_domain_id,
+        actual_compatibility_domain_kind,
+        actual_compatibility_domain_paradigm,
+        actual_compatibility_domain_lifecycle_hook,
+        actual_compatibility_domain_abi_family,
+        actual_compatibility_domain_wrapper_policy,
+        actual_compatibility_domain_required,
         actual_external_import_count,
         actual_external_import_table_hash,
         actual_external_import_id,
@@ -218,6 +231,43 @@ pub(crate) fn nsld_verify_container_report(
             .first()
             .map(|relocation| relocation.addend)
             .unwrap_or_default(),
+        expected_compatibility_domain_count: expected_report.compatibility_domains.len(),
+        expected_compatibility_domain_table_hash: expected_report.compatibility_domain_table_hash,
+        expected_compatibility_domain_id: expected_report
+            .compatibility_domains
+            .first()
+            .map(|domain| domain.domain_id.clone())
+            .unwrap_or_default(),
+        expected_compatibility_domain_kind: expected_report
+            .compatibility_domains
+            .first()
+            .map(|domain| domain.domain_kind.clone())
+            .unwrap_or_default(),
+        expected_compatibility_domain_paradigm: expected_report
+            .compatibility_domains
+            .first()
+            .map(|domain| domain.paradigm.clone())
+            .unwrap_or_default(),
+        expected_compatibility_domain_lifecycle_hook: expected_report
+            .compatibility_domains
+            .first()
+            .map(|domain| domain.lifecycle_hook.clone())
+            .unwrap_or_default(),
+        expected_compatibility_domain_abi_family: expected_report
+            .compatibility_domains
+            .first()
+            .map(|domain| domain.abi_family.clone())
+            .unwrap_or_default(),
+        expected_compatibility_domain_wrapper_policy: expected_report
+            .compatibility_domains
+            .first()
+            .map(|domain| domain.wrapper_policy.clone())
+            .unwrap_or_default(),
+        expected_compatibility_domain_required: expected_report
+            .compatibility_domains
+            .first()
+            .map(|domain| domain.required)
+            .unwrap_or(false),
         expected_external_import_count: expected_report.external_imports.len(),
         expected_external_import_table_hash: expected_report.external_import_table_hash,
         expected_external_import_id: expected_report
@@ -276,6 +326,15 @@ pub(crate) fn nsld_verify_container_report(
         actual_relocation_source_offset,
         actual_relocation_target_symbol_id,
         actual_relocation_addend,
+        actual_compatibility_domain_count,
+        actual_compatibility_domain_table_hash,
+        actual_compatibility_domain_id,
+        actual_compatibility_domain_kind,
+        actual_compatibility_domain_paradigm,
+        actual_compatibility_domain_lifecycle_hook,
+        actual_compatibility_domain_abi_family,
+        actual_compatibility_domain_wrapper_policy,
+        actual_compatibility_domain_required,
         actual_external_import_count,
         actual_external_import_table_hash,
         actual_external_import_id,
@@ -293,6 +352,7 @@ pub(crate) fn nsld_verify_container_report(
         section_range_issues,
         loader_symbol_issues,
         relocation_issues,
+        compatibility_domain_issues,
         external_import_issues,
         issues,
     }

@@ -5,9 +5,10 @@ use super::{
     object_macho_symbols::{
         encode_mach_o_string_table, encode_mach_o_symbols, mach_o_arm64_symbol_table_plan,
     },
+    object_plan::nsld_object_plan_report,
     reports::{NsldObjectFileLayoutRecordDiagnostic, NsldObjectFileLayoutReport},
 };
-use std::path::Path;
+use std::{fs, path::Path};
 
 pub(crate) fn encode_mach_o_arm64_image(
     manifest: &Path,
@@ -45,6 +46,7 @@ pub(crate) fn encode_mach_o_arm64_image(
         record_by_kind(file_layout, "macho-string-table")?,
         &encode_mach_o_string_table(&symbols),
     )?;
+    write_section_payloads(&mut bytes, manifest, plan, file_layout)?;
     Some(bytes)
 }
 
@@ -72,6 +74,36 @@ fn record_by_kind<'a>(
         .records
         .iter()
         .find(|record| record.record_kind == kind)
+}
+
+fn write_section_payloads(
+    image: &mut [u8],
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+    file_layout: &NsldObjectFileLayoutReport,
+) -> Option<()> {
+    let object_plan = nsld_object_plan_report(manifest, plan);
+    for record in file_layout
+        .records
+        .iter()
+        .filter(|record| record.record_kind == "section-payload")
+    {
+        let Some(source_section_id) = record.record_id.strip_prefix("section.") else {
+            return None;
+        };
+        let Some(section) = object_plan
+            .object_sections
+            .iter()
+            .find(|section| section.source_section_id == source_section_id)
+        else {
+            return None;
+        };
+        let Ok(payload) = fs::read(&section.source_path) else {
+            continue;
+        };
+        write_record(image, record, &payload)?;
+    }
+    Some(())
 }
 
 #[cfg(test)]

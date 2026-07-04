@@ -69,9 +69,19 @@ Long-range role:
 * not the default semantic model for memory, scheduling, or device ownership
 * not the thing that defines what a `nuis` program fundamentally is
 
+The stronger design reading is that the whole C / libc / classic
+von-Neumann-host world is a hardware and execution paradigm wrapped by Nuis.
+It is not merely a bag of foreign functions. Today that paradigm maps to
+ordinary CPUs, process loaders, host kernels, and native linkers. In a later
+Nuis-native machine it can become one explicit compatibility fabric alongside
+shader, kernel, network, and data-fabric domains.
+
 Short rule:
 
 `C ABI is an interop domain; it should not become the ontology of nuis`
+
+Implementation-facing anchor:
+[../reference/cffi-von-neumann-domain-contract.md](../../docs/reference/cffi-von-neumann-domain-contract.md)
 
 ## Nuis OS Direction
 
@@ -120,6 +130,36 @@ This is why the language/toolchain should keep investing in:
 * native binary protocol evolution instead of only host-object emission
 * official galaxies such as `std`, PixelMagic, and WitSage as real pressure
   tests for CPU/shader/kernel/network cooperation
+
+## Performance Posture
+
+The bootstrap path can accept a CFFI / host-compat performance tax, as long as
+the tax is visible and structurally removable.
+
+Early Nuis programs may depend heavily on CFFI Nustar compatibility lanes for
+I/O, filesystem, networking, platform services, and native wrappers. Compared
+with direct C/C++ on the same host, those lanes can reasonably be slower while
+the project is still prioritizing explicit contracts, whitelist validation,
+GLM/YIR visibility, and deterministic lifecycle metadata.
+
+The long-range goal is staged:
+
+* alpha/toolchain phase: make overhead measurable with std, benchmark, and
+  hetero-proxy examples instead of hiding it behind claims
+* Nuis OS phase: move common compatibility costs into kernel/runtime-owned
+  services so fewer calls pay full process-level wrapper overhead
+* hardware-paradigm phase: use heterogeneous scheduling and data placement to
+  win on workloads where classic CPU-centered execution is not the natural fit
+
+Working target language:
+
+* short-term compatibility overhead may be in a rough 20% class for some
+  CFFI-heavy paths, especially against tight hand-written C/C++ baselines
+* Nuis OS compatibility services should aim for a lower 5-10% class overhead
+  on common host-compat paths when measured workload shape permits
+* true heterogeneous workloads may eventually outperform classic pipelines by
+  avoiding unnecessary CPU-centered data motion and scheduling assumptions
+* these are roadmap targets, not current benchmark claims
 
 ## Roadmap Posture
 
@@ -172,4 +212,3 @@ This roadmap does not claim that the repository already has:
 Short rule:
 
 `write the future into the architecture, but keep the status reports honest`
-

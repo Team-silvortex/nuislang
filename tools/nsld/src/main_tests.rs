@@ -30,8 +30,49 @@ fn closure_reports_container_metadata_fingerprint() {
         report.container_loader_readiness.as_str(),
         "blocked" | "host-assisted" | "self-contained"
     ));
+    assert_eq!(report.compatibility_domain_count, 1);
+    assert!(report.compatibility_domain_table_hash.starts_with("0x"));
+    assert_eq!(
+        report.compatibility_domain_id.as_deref(),
+        Some("compat0000.cffi-von-neumann")
+    );
+    assert_eq!(
+        report.compatibility_domain_kind.as_deref(),
+        Some("cffi-host-compat")
+    );
+    assert_eq!(
+        report.compatibility_domain_paradigm.as_deref(),
+        Some("classic-von-neumann-host")
+    );
+    assert_eq!(
+        report.compatibility_domain_lifecycle_hook.as_deref(),
+        Some("on_cffi_native_object")
+    );
+    assert_eq!(
+        report.compatibility_domain_abi_family.as_deref(),
+        Some("mach-o")
+    );
+    assert_eq!(
+        report.compatibility_domain_wrapper_policy.as_deref(),
+        Some("wrapped")
+    );
+    assert_eq!(report.compatibility_domain_required, Some(true));
     assert!(report_json.contains("\"container_metadata_table_hash\":\"0x"));
     assert!(report_json.contains("\"container_loader_readiness\":"));
+    assert!(report_json.contains("\"compatibility_domain_count\":1"));
+    assert!(report_json.contains("\"compatibility_domain_table_hash\":\"0x"));
+    assert!(report_json.contains("\"compatibility_domain_id\":\"compat0000.cffi-von-neumann\""));
+    assert!(report_json.contains("\"compatibility_domain_kind\":\"cffi-host-compat\""));
+    assert!(report_json.contains("\"compatibility_domain_paradigm\":\"classic-von-neumann-host\""));
+    assert!(
+        report_json.contains("\"compatibility_domain_lifecycle_hook\":\"on_cffi_native_object\"")
+    );
+    assert!(report_json.contains("\"compatibility_domain_abi_family\":\"mach-o\""));
+    assert!(report_json.contains("\"compatibility_domain_wrapper_policy\":\"wrapped\""));
+    assert!(report_json.contains("\"compatibility_domain_required\":true"));
+    assert!(
+        report_json.contains("\"compatibility_domain_summary\":{\"count\":1,\"table_hash\":\"0x")
+    );
 }
 
 #[test]
@@ -367,6 +408,14 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     assert!(report.object_image_dry_run_present);
     assert_eq!(report.object_image_dry_run_valid, Some(true));
     assert!(report.object_image_dry_run_issues.is_empty());
+    assert_eq!(report.object_image_relocation_lowering_valid, Some(true));
+    assert_eq!(report.object_image_relocation_lowering_rule_count, Some(4));
+    assert_eq!(report.object_image_relocation_lowering_rules.len(), 4);
+    assert_eq!(
+        report.object_image_relocation_lowering_rules[0].source_seed_kind,
+        "bootstrap-entry-seed"
+    );
+    assert!(report.object_image_relocation_lowering_issues.is_empty());
     assert!(report.object_image_dry_run_bytes_present);
     assert!(report.object_emit_blocked_present);
     assert_eq!(report.object_emit_blocked_valid, Some(true));
@@ -393,10 +442,12 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     assert!(report.container_section_issues.is_empty());
     assert!(report.container_loader_symbol_issues.is_empty());
     assert!(report.container_relocation_issues.is_empty());
+    assert!(report.container_compatibility_domain_issues.is_empty());
     assert!(report.container_external_import_issues.is_empty());
     assert!(report_json.contains("\"container_section_issues\":[]"));
     assert!(report_json.contains("\"container_loader_symbol_issues\":[]"));
     assert!(report_json.contains("\"container_relocation_issues\":[]"));
+    assert!(report_json.contains("\"container_compatibility_domain_issues\":[]"));
     assert!(report_json.contains("\"container_external_import_issues\":[]"));
     assert!(report_json.contains("\"object_plan_present\":true"));
     assert!(report_json.contains("\"object_plan_valid\":true"));
@@ -409,6 +460,11 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     assert!(report_json.contains("\"object_file_layout_valid\":true"));
     assert!(report_json.contains("\"object_image_dry_run_present\":true"));
     assert!(report_json.contains("\"object_image_dry_run_valid\":true"));
+    assert!(report_json.contains("\"object_image_relocation_lowering_valid\":true"));
+    assert!(report_json.contains("\"object_image_relocation_lowering_rule_count\":4"));
+    assert!(report_json.contains("\"object_image_relocation_lowering_rules\":[{"));
+    assert!(report_json.contains("\"source_seed_kind\":\"bootstrap-entry-seed\""));
+    assert!(report_json.contains("\"object_image_relocation_lowering_issues\":[]"));
     assert!(report_json.contains("\"object_image_dry_run_bytes_present\":true"));
     assert!(report_json.contains("\"object_emit_blocked_present\":true"));
     assert!(report_json.contains("\"object_emit_blocked_valid\":true"));
@@ -428,6 +484,40 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
         .container_metadata_table_hash
         .as_deref()
         .is_some_and(|hash| hash.starts_with("0x")));
+    assert_eq!(report.container_compatibility_domain_count, Some(1));
+    assert!(report
+        .container_compatibility_domain_table_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert_eq!(
+        report.container_compatibility_domain_id.as_deref(),
+        Some("compat0000.cffi-von-neumann")
+    );
+    assert_eq!(
+        report.container_compatibility_domain_kind.as_deref(),
+        Some("cffi-host-compat")
+    );
+    assert_eq!(
+        report.container_compatibility_domain_paradigm.as_deref(),
+        Some("classic-von-neumann-host")
+    );
+    assert_eq!(
+        report
+            .container_compatibility_domain_lifecycle_hook
+            .as_deref(),
+        Some("on_cffi_native_object")
+    );
+    assert_eq!(
+        report.container_compatibility_domain_abi_family.as_deref(),
+        Some("mach-o")
+    );
+    assert_eq!(
+        report
+            .container_compatibility_domain_wrapper_policy
+            .as_deref(),
+        Some("wrapped")
+    );
+    assert_eq!(report.container_compatibility_domain_required, Some(true));
     assert_eq!(report.container_external_import_count, Some(3));
     assert!(report.container_native_object_section_present);
     assert_eq!(
@@ -445,6 +535,20 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
         Some("rel0001.native-object")
     );
     assert!(report_json.contains("\"container_native_object_section_present\":true"));
+    assert!(report_json.contains("\"container_compatibility_domain_count\":1"));
+    assert!(report_json.contains("\"container_compatibility_domain_table_hash\":\"0x"));
+    assert!(report_json
+        .contains("\"container_compatibility_domain_id\":\"compat0000.cffi-von-neumann\""));
+    assert!(report_json.contains("\"container_compatibility_domain_kind\":\"cffi-host-compat\""));
+    assert!(report_json
+        .contains("\"container_compatibility_domain_paradigm\":\"classic-von-neumann-host\""));
+    assert!(report_json
+        .contains("\"container_compatibility_domain_lifecycle_hook\":\"on_cffi_native_object\""));
+    assert!(report_json.contains("\"container_compatibility_domain_abi_family\":\"mach-o\""));
+    assert!(report_json.contains("\"container_compatibility_domain_wrapper_policy\":\"wrapped\""));
+    assert!(report_json.contains("\"container_compatibility_domain_required\":true"));
+    assert!(report_json
+        .contains("\"container_compatibility_domain_summary\":{\"count\":1,\"table_hash\":\"0x"));
     assert!(report_json
         .contains("\"container_native_object_section_id\":\"sec0004.native-object-output\""));
     assert!(report_json

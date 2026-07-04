@@ -166,6 +166,14 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
         report.external_imports.len()
     ));
     out.push_str(&format!(
+        "compatibility_domain_count = {}\n",
+        report.compatibility_domains.len()
+    ));
+    out.push_str(&format!(
+        "compatibility_domain_table_hash = \"{}\"\n",
+        escape_toml_string(&report.compatibility_domain_table_hash)
+    ));
+    out.push_str(&format!(
         "external_import_table_hash = \"{}\"\n",
         escape_toml_string(&report.external_import_table_hash)
     ));
@@ -200,6 +208,10 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
             escape_toml_string(&symbol.symbol_name)
         ));
         out.push_str(&format!(
+            "lifecycle_hook = \"{}\"\n",
+            escape_toml_string(&symbol.lifecycle_hook)
+        ));
+        out.push_str(&format!(
             "section_id = \"{}\"\n",
             escape_toml_string(&symbol.section_id)
         ));
@@ -230,6 +242,34 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
             escape_toml_string(&relocation.target_symbol_id)
         ));
         out.push_str(&format!("addend = {}\n", relocation.addend));
+    }
+    for domain in &report.compatibility_domains {
+        out.push_str("\n[[compatibility_domain]]\n");
+        out.push_str(&format!(
+            "domain_id = \"{}\"\n",
+            escape_toml_string(&domain.domain_id)
+        ));
+        out.push_str(&format!(
+            "domain_kind = \"{}\"\n",
+            escape_toml_string(&domain.domain_kind)
+        ));
+        out.push_str(&format!(
+            "paradigm = \"{}\"\n",
+            escape_toml_string(&domain.paradigm)
+        ));
+        out.push_str(&format!(
+            "lifecycle_hook = \"{}\"\n",
+            escape_toml_string(&domain.lifecycle_hook)
+        ));
+        out.push_str(&format!(
+            "abi_family = \"{}\"\n",
+            escape_toml_string(&domain.abi_family)
+        ));
+        out.push_str(&format!(
+            "wrapper_policy = \"{}\"\n",
+            escape_toml_string(&domain.wrapper_policy)
+        ));
+        out.push_str(&format!("required = {}\n", domain.required));
     }
     for external_import in &report.external_imports {
         out.push_str("\n[[external_import]]\n");

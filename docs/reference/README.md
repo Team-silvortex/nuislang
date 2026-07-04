@@ -32,6 +32,7 @@ Start in this order:
   - [toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md)
   - [nsld-linker-frontdoor.md](nsld-linker-frontdoor.md)
   - [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md)
+  - [cffi-von-neumann-domain-contract.md](cffi-von-neumann-domain-contract.md)
   - [nsdb-yir-debugger-frontdoor.md](nsdb-yir-debugger-frontdoor.md)
 * `NIR` safety boundary
   - [nir-memory-model.md](nir-memory-model.md)
@@ -83,6 +84,10 @@ frontdoor?”, start with
 If your question is specifically “what remains between the current Nsld
 container and a runnable Nuis-owned heterogeneous executable?”, start with
 [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md).
+
+If your question is specifically “how should Nuis treat the C world and the
+classic von-Neumann host stack?”, start with
+[cffi-von-neumann-domain-contract.md](cffi-von-neumann-domain-contract.md).
 
 If your question is specifically “how should Nuis debugging work above native
 LLDB-style shell debugging?”, start with

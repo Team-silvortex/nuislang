@@ -54,6 +54,8 @@ Current versioning entrypoints:
   [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
 * long-range heterogeneous OS roadmap:
   [docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md](docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md)
+* CFFI / classic von-Neumann domain contract:
+  [docs/reference/cffi-von-neumann-domain-contract.md](docs/reference/cffi-von-neumann-domain-contract.md)
 * predecessor `alpha-0.1.*` status anchor:
   [docs/versioning/nuis-alpha-0.1-mainline-status.md](docs/versioning/nuis-alpha-0.1-mainline-status.md)
 * predecessor alpha closeout board:
@@ -137,6 +139,8 @@ Current responsibility split:
 * `nuisc` is the compiler/scheduler core that consumes `.ns` or project inputs and emits `NIR`, `YIR`, LLVM IR, and AOT outputs.
 * `nustar` packages are where per-domain ABI support, default lanes, frontend/lowering entrypoints, and package contracts are registered.
 * `nustar` packages are also starting to declare per-domain clock contracts such as `clock_domain_id`, `clock_kind`, `clock_epoch_kind`, `clock_resolution`, and `clock_bridge_default`.
+* the C ABI / libc / classic host stack should enter through a CFFI or
+  host-compat domain contract rather than acting as the implicit machine model.
 * `subprojects/yalivia` and `subprojects/vulpoya` are now hosted inside this repository tree as sibling ecosystem projects while their boundaries are still evolving.
 
 ## Quick Start

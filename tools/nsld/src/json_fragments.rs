@@ -96,6 +96,31 @@ pub(crate) fn nsld_container_sections_json(sections: &[NsldContainerSectionEntry
         .join(",")
 }
 
+pub(crate) fn compatibility_domain_summary_json(
+    count: Option<usize>,
+    table_hash: Option<&str>,
+    domain_id: Option<&str>,
+    domain_kind: Option<&str>,
+    paradigm: Option<&str>,
+    lifecycle_hook: Option<&str>,
+    abi_family: Option<&str>,
+    wrapper_policy: Option<&str>,
+    required: Option<bool>,
+) -> String {
+    let fields = vec![
+        json_optional_usize_field("count", count),
+        json_optional_string_field("table_hash", table_hash),
+        json_optional_string_field("domain_id", domain_id),
+        json_optional_string_field("domain_kind", domain_kind),
+        json_optional_string_field("paradigm", paradigm),
+        json_optional_string_field("lifecycle_hook", lifecycle_hook),
+        json_optional_string_field("abi_family", abi_family),
+        json_optional_string_field("wrapper_policy", wrapper_policy),
+        json_optional_bool_field("required", required),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
 pub(crate) fn nsld_object_sections_json(sections: &[NsldObjectSectionDiagnostic]) -> String {
     sections
         .iter()

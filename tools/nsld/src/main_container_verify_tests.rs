@@ -95,13 +95,16 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(container_source.contains("[[loader_symbol]]"));
     assert!(container_source.contains("symbol_id = \"sym0000.loader-entry\""));
     assert!(container_source.contains("symbol_name = \"main\""));
+    assert!(container_source.contains("lifecycle_hook = \"on_lifecycle_bootstrap\""));
     assert!(container_source.contains("section_id = \"sec0000.compiled-artifact\""));
     assert!(container_source.contains("symbol_id = \"sym0001.hetero-node.shader.official.shader\""));
     assert!(container_source.contains("symbol_kind = \"hetero-node-dispatch\""));
     assert!(container_source.contains("symbol_name = \"t0001.shader\""));
+    assert!(container_source.contains("lifecycle_hook = \"on_hetero_submission_progress\""));
     assert!(container_source.contains("symbol_id = \"sym0002.native-object-output\""));
     assert!(container_source.contains("symbol_kind = \"native-object-output\""));
     assert!(container_source.contains("symbol_name = \"__nuis_native_object\""));
+    assert!(container_source.contains("lifecycle_hook = \"on_cffi_native_object\""));
     assert!(container_source.contains("relocation_count = 3"));
     assert!(container_source.contains("relocation_table_hash = \"0x"));
     assert!(container_source.contains("[[relocation]]"));
@@ -116,6 +119,15 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(container_source.contains("relocation_id = \"rel0002.native-object\""));
     assert!(container_source.contains("relocation_kind = \"native-object-binding\""));
     assert!(container_source.contains("target_symbol_id = \"sym0002.native-object-output\""));
+    assert!(container_source.contains("compatibility_domain_count = 1"));
+    assert!(container_source.contains("compatibility_domain_table_hash = \"0x"));
+    assert!(container_source.contains("[[compatibility_domain]]"));
+    assert!(container_source.contains("domain_id = \"compat0000.cffi-von-neumann\""));
+    assert!(container_source.contains("domain_kind = \"cffi-host-compat\""));
+    assert!(container_source.contains("paradigm = \"classic-von-neumann-host\""));
+    assert!(container_source.contains("lifecycle_hook = \"on_cffi_native_object\""));
+    assert!(container_source.contains("abi_family = \"mach-o\""));
+    assert!(container_source.contains("wrapper_policy = \"wrapped\""));
     assert!(container_source.contains("external_import_count = 3"));
     assert!(container_source.contains("external_import_table_hash = \"0x"));
     assert!(container_source.contains("[[external_import]]"));
@@ -227,6 +239,59 @@ validation_contracts = ["glm.resource-lifetime"]
     );
     assert_eq!(report.expected_relocation_addend, 0);
     assert_eq!(report.actual_relocation_addend, Some(0));
+    assert_eq!(report.expected_compatibility_domain_count, 1);
+    assert_eq!(report.actual_compatibility_domain_count, Some(1));
+    assert_eq!(
+        report.actual_compatibility_domain_table_hash.as_deref(),
+        Some(report.expected_compatibility_domain_table_hash.as_str())
+    );
+    assert_eq!(
+        report.expected_compatibility_domain_id,
+        "compat0000.cffi-von-neumann"
+    );
+    assert_eq!(
+        report.actual_compatibility_domain_id.as_deref(),
+        Some("compat0000.cffi-von-neumann")
+    );
+    assert_eq!(
+        report.expected_compatibility_domain_kind,
+        "cffi-host-compat"
+    );
+    assert_eq!(
+        report.actual_compatibility_domain_kind.as_deref(),
+        Some("cffi-host-compat")
+    );
+    assert_eq!(
+        report.expected_compatibility_domain_paradigm,
+        "classic-von-neumann-host"
+    );
+    assert_eq!(
+        report.actual_compatibility_domain_paradigm.as_deref(),
+        Some("classic-von-neumann-host")
+    );
+    assert_eq!(
+        report.expected_compatibility_domain_lifecycle_hook,
+        "on_cffi_native_object"
+    );
+    assert_eq!(
+        report.actual_compatibility_domain_lifecycle_hook.as_deref(),
+        Some("on_cffi_native_object")
+    );
+    assert_eq!(report.expected_compatibility_domain_abi_family, "mach-o");
+    assert_eq!(
+        report.actual_compatibility_domain_abi_family.as_deref(),
+        Some("mach-o")
+    );
+    assert_eq!(
+        report.expected_compatibility_domain_wrapper_policy,
+        "wrapped"
+    );
+    assert_eq!(
+        report.actual_compatibility_domain_wrapper_policy.as_deref(),
+        Some("wrapped")
+    );
+    assert!(report.expected_compatibility_domain_required);
+    assert_eq!(report.actual_compatibility_domain_required, Some(true));
     assert_eq!(
         report.actual_external_import_table_hash.as_deref(),
         Some(report.expected_external_import_table_hash.as_str())
@@ -285,6 +350,16 @@ validation_contracts = ["glm.resource-lifetime"]
     );
     assert!(report_json.contains("\"expected_native_object_section_present\":true"));
     assert!(report_json.contains("\"actual_native_object_section_present\":true"));
+    assert!(report_json.contains("\"expected_compatibility_domain_count\":1"));
+    assert!(report_json.contains("\"actual_compatibility_domain_count\":1"));
+    assert!(report_json
+        .contains("\"expected_compatibility_domain_paradigm\":\"classic-von-neumann-host\""));
+    assert!(report_json
+        .contains("\"actual_compatibility_domain_lifecycle_hook\":\"on_cffi_native_object\""));
+    assert!(report_json
+        .contains("\"expected_compatibility_domain_summary\":{\"count\":1,\"table_hash\":\"0x"));
+    assert!(report_json
+        .contains("\"actual_compatibility_domain_summary\":{\"count\":1,\"table_hash\":\"0x"));
     assert!(report_json
         .contains("\"expected_native_object_loader_symbol_id\":\"sym0002.native-object-output\""));
     assert!(
@@ -302,6 +377,7 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(tampered_json.contains("\"container_section_issues\":["));
     assert!(tampered_json.contains("\"loader_symbol_issues\":["));
     assert!(tampered_json.contains("\"relocation_issues\":["));
+    assert!(tampered_json.contains("\"compatibility_domain_issues\":["));
     assert!(tampered_json.contains("\"external_import_issues\":["));
     assert_eq!(
         tampered_report.actual_loader_readiness.as_deref(),
@@ -390,6 +466,57 @@ validation_contracts = ["glm.resource-lifetime"]
         .relocation_issues
         .iter()
         .any(|issue| issue.starts_with("relocation[1].target_symbol_id mismatch")));
+    assert_eq!(tampered_report.actual_compatibility_domain_count, Some(2));
+    assert_eq!(
+        tampered_report
+            .actual_compatibility_domain_table_hash
+            .as_deref(),
+        Some("0x0000000000000000")
+    );
+    assert_eq!(
+        tampered_report.actual_compatibility_domain_id.as_deref(),
+        Some("compat9999.manual")
+    );
+    assert_eq!(
+        tampered_report.actual_compatibility_domain_kind.as_deref(),
+        Some("manual-compat")
+    );
+    assert_eq!(
+        tampered_report
+            .actual_compatibility_domain_paradigm
+            .as_deref(),
+        Some("manual-host")
+    );
+    assert_eq!(
+        tampered_report
+            .actual_compatibility_domain_lifecycle_hook
+            .as_deref(),
+        Some("on_manual_compat")
+    );
+    assert_eq!(
+        tampered_report
+            .actual_compatibility_domain_abi_family
+            .as_deref(),
+        Some("manual-object")
+    );
+    assert_eq!(
+        tampered_report
+            .actual_compatibility_domain_wrapper_policy
+            .as_deref(),
+        Some("manual-wrapper")
+    );
+    assert_eq!(
+        tampered_report.actual_compatibility_domain_required,
+        Some(false)
+    );
+    assert!(tampered_report
+        .compatibility_domain_issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain[0].domain_id mismatch")));
+    assert!(tampered_report
+        .compatibility_domain_issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain[0].paradigm mismatch")));
     assert_eq!(
         tampered_report.actual_external_import_table_hash.as_deref(),
         Some("0x0000000000000000")
@@ -495,6 +622,42 @@ validation_contracts = ["glm.resource-lifetime"]
         .issues
         .iter()
         .any(|issue| issue.starts_with("relocation_addend mismatch")));
+    assert!(tampered_report
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain_count mismatch")));
+    assert!(tampered_report
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain_table_hash mismatch")));
+    assert!(tampered_report
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain_id mismatch")));
+    assert!(tampered_report
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain_kind mismatch")));
+    assert!(tampered_report
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain_paradigm mismatch")));
+    assert!(tampered_report
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain_lifecycle_hook mismatch")));
+    assert!(tampered_report
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain_abi_family mismatch")));
+    assert!(tampered_report
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain_wrapper_policy mismatch")));
+    assert!(tampered_report
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("compatibility_domain_required mismatch")));
     assert!(tampered_report
         .issues
         .iter()

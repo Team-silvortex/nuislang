@@ -5,6 +5,7 @@ pub(crate) struct ContainerTableIssueSets {
     pub(crate) container_section_issues: Vec<String>,
     pub(crate) loader_symbol_issues: Vec<String>,
     pub(crate) relocation_issues: Vec<String>,
+    pub(crate) compatibility_domain_issues: Vec<String>,
     pub(crate) external_import_issues: Vec<String>,
 }
 
@@ -45,6 +46,7 @@ pub(crate) fn container_table_issue_sets(
             ("symbol_id", container_verify::TomlFieldKind::String),
             ("symbol_kind", container_verify::TomlFieldKind::String),
             ("symbol_name", container_verify::TomlFieldKind::String),
+            ("lifecycle_hook", container_verify::TomlFieldKind::String),
             ("section_id", container_verify::TomlFieldKind::String),
             ("offset", container_verify::TomlFieldKind::Usize),
             ("size_bytes", container_verify::TomlFieldKind::Usize),
@@ -70,6 +72,25 @@ pub(crate) fn container_table_issue_sets(
         ],
     ));
 
+    let mut compatibility_domain_issues = container_verify::compatibility_domain_issues(
+        &expected_report.compatibility_domains,
+        &container_verify::compatibility_domain_entries(source),
+    );
+    compatibility_domain_issues.extend(container_verify::table_field_issues(
+        source,
+        "compatibility_domain",
+        "compatibility_domain",
+        &[
+            ("domain_id", container_verify::TomlFieldKind::String),
+            ("domain_kind", container_verify::TomlFieldKind::String),
+            ("paradigm", container_verify::TomlFieldKind::String),
+            ("lifecycle_hook", container_verify::TomlFieldKind::String),
+            ("abi_family", container_verify::TomlFieldKind::String),
+            ("wrapper_policy", container_verify::TomlFieldKind::String),
+            ("required", container_verify::TomlFieldKind::Bool),
+        ],
+    ));
+
     let mut external_import_issues = container_verify::external_import_issues(
         &expected_report.external_imports,
         &container_verify::external_import_entries(source),
@@ -91,6 +112,7 @@ pub(crate) fn container_table_issue_sets(
         container_section_issues,
         loader_symbol_issues,
         relocation_issues,
+        compatibility_domain_issues,
         external_import_issues,
     }
 }

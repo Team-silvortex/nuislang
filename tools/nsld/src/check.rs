@@ -173,6 +173,20 @@ pub(crate) fn nsld_check_report(
         .as_ref()
         .map(|report| report.issues.clone())
         .unwrap_or_default();
+    let object_image_relocation_lowering_valid = object_image_dry_run_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_relocation_lowering_valid);
+    let object_image_relocation_lowering_rule_count = object_image_dry_run_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_relocation_lowering_rule_count);
+    let object_image_relocation_lowering_rules = object_image_dry_run_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_relocation_lowering_rules.clone())
+        .unwrap_or_default();
+    let object_image_relocation_lowering_issues = object_image_dry_run_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_relocation_lowering_issues.clone())
+        .unwrap_or_default();
     let object_image_dry_run_bytes_present = nsld_artifact_stage_kind_path(
         &plan.output_dir,
         NsldArtifactStageKind::ObjectImageDryRunBytes,
@@ -261,10 +275,41 @@ pub(crate) fn nsld_check_report(
         .as_ref()
         .map(|report| report.relocation_issues.clone())
         .unwrap_or_default();
+    let container_compatibility_domain_issues = container_verify_report
+        .as_ref()
+        .map(|report| report.compatibility_domain_issues.clone())
+        .unwrap_or_default();
     let container_external_import_issues = container_verify_report
         .as_ref()
         .map(|report| report.external_import_issues.clone())
         .unwrap_or_default();
+    let container_compatibility_domain_count = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_compatibility_domain_count);
+    let container_compatibility_domain_table_hash = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_compatibility_domain_table_hash.clone());
+    let container_compatibility_domain_id = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_compatibility_domain_id.clone());
+    let container_compatibility_domain_kind = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_compatibility_domain_kind.clone());
+    let container_compatibility_domain_paradigm = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_compatibility_domain_paradigm.clone());
+    let container_compatibility_domain_lifecycle_hook = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_compatibility_domain_lifecycle_hook.clone());
+    let container_compatibility_domain_abi_family = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_compatibility_domain_abi_family.clone());
+    let container_compatibility_domain_wrapper_policy = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_compatibility_domain_wrapper_policy.clone());
+    let container_compatibility_domain_required = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_compatibility_domain_required);
     let container_native_object_section_present = container_verify_report
         .as_ref()
         .is_some_and(|report| report.actual_native_object_section_present);
@@ -509,6 +554,10 @@ pub(crate) fn nsld_check_report(
         object_image_dry_run_present,
         object_image_dry_run_valid,
         object_image_dry_run_issues,
+        object_image_relocation_lowering_valid,
+        object_image_relocation_lowering_rule_count,
+        object_image_relocation_lowering_rules,
+        object_image_relocation_lowering_issues,
         object_image_dry_run_bytes_present,
         object_emit_blocked_present,
         object_emit_blocked_valid,
@@ -532,12 +581,22 @@ pub(crate) fn nsld_check_report(
         container_section_issues,
         container_loader_symbol_issues,
         container_relocation_issues,
+        container_compatibility_domain_issues,
         container_external_import_issues,
         container_payload_present,
         container_payload_issues,
         container_loader_readiness,
         container_loader_blockers,
         container_metadata_table_hash,
+        container_compatibility_domain_count,
+        container_compatibility_domain_table_hash,
+        container_compatibility_domain_id,
+        container_compatibility_domain_kind,
+        container_compatibility_domain_paradigm,
+        container_compatibility_domain_lifecycle_hook,
+        container_compatibility_domain_abi_family,
+        container_compatibility_domain_wrapper_policy,
+        container_compatibility_domain_required,
         container_external_import_count,
         container_native_object_section_present,
         container_native_object_section_id,

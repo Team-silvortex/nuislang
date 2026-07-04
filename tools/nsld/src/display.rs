@@ -53,6 +53,18 @@ pub(crate) fn print_nsld_closure_report(report: &NsldClosureReport) {
         "  container_loader_readiness: {}",
         report.container_loader_readiness
     );
+    println!(
+        "  compatibility_domain: count={} table_hash={} id={} kind={} paradigm={} hook={} abi={} wrapper={} required={}",
+        report.compatibility_domain_count,
+        report.compatibility_domain_table_hash,
+        optional_string_text(report.compatibility_domain_id.as_deref()),
+        optional_string_text(report.compatibility_domain_kind.as_deref()),
+        optional_string_text(report.compatibility_domain_paradigm.as_deref()),
+        optional_string_text(report.compatibility_domain_lifecycle_hook.as_deref()),
+        optional_string_text(report.compatibility_domain_abi_family.as_deref()),
+        optional_string_text(report.compatibility_domain_wrapper_policy.as_deref()),
+        optional_bool_text(report.compatibility_domain_required)
+    );
     for input in &report.link_inputs {
         println!(
             "  link_input: order={} id={} kind={} domain={} package={} native={} dispatch={} contracts={} bytes={} hash={} path={}",
@@ -217,7 +229,39 @@ pub(crate) fn print_nsld_prepare_report(report: &NsldPrepareReport) {
         "  object_image_hash: {}",
         report.object_image_hash.as_deref().unwrap_or("missing")
     );
+    println!(
+        "  object_image_relocation_lowering: valid={} rule_count={}",
+        report.object_image_relocation_lowering_valid,
+        report.object_image_relocation_lowering_rule_count
+    );
+    for rule in &report.object_image_relocation_lowering_rules {
+        println!(
+            "  object_image_relocation_lowering_rule: id={} source_seed_kind={} target={} pc_relative={} length_power={} external={} relocation_type={}",
+            rule.rule_id,
+            rule.source_seed_kind,
+            rule.target_relocation_kind,
+            rule.pc_relative,
+            rule.length_power,
+            rule.external,
+            rule.relocation_type
+        );
+    }
+    for issue in &report.object_image_relocation_lowering_issues {
+        println!("  object_image_relocation_lowering_issue: {issue}");
+    }
     println!("  metadata_table_hash: {}", report.metadata_table_hash);
+    println!(
+        "  compatibility_domain: count={} table_hash={} id={} kind={} paradigm={} hook={} abi={} wrapper={} required={}",
+        optional_usize_text(report.compatibility_domain_count),
+        optional_string_text(report.compatibility_domain_table_hash.as_deref()),
+        optional_string_text(report.compatibility_domain_id.as_deref()),
+        optional_string_text(report.compatibility_domain_kind.as_deref()),
+        optional_string_text(report.compatibility_domain_paradigm.as_deref()),
+        optional_string_text(report.compatibility_domain_lifecycle_hook.as_deref()),
+        optional_string_text(report.compatibility_domain_abi_family.as_deref()),
+        optional_string_text(report.compatibility_domain_wrapper_policy.as_deref()),
+        optional_bool_text(report.compatibility_domain_required)
+    );
     println!("  container_layout_hash: {}", report.container_layout_hash);
     println!("  container_hash: {}", report.container_hash);
     println!("  payload_size_bytes: {}", report.payload_size_bytes);

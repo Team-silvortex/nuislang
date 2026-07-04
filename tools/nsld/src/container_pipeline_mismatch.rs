@@ -167,6 +167,62 @@ pub(crate) fn container_metadata_issues(
     }
     push_usize_mismatch(
         &mut issues,
+        "compatibility_domain_count",
+        expected_report.compatibility_domains.len(),
+        actual.actual_compatibility_domain_count,
+    );
+    push_string_mismatch(
+        &mut issues,
+        "compatibility_domain_table_hash",
+        &expected_report.compatibility_domain_table_hash,
+        &actual.actual_compatibility_domain_table_hash,
+    );
+    if let Some(expected_domain) = expected_report.compatibility_domains.first() {
+        push_string_mismatch(
+            &mut issues,
+            "compatibility_domain_id",
+            &expected_domain.domain_id,
+            &actual.actual_compatibility_domain_id,
+        );
+        push_string_mismatch(
+            &mut issues,
+            "compatibility_domain_kind",
+            &expected_domain.domain_kind,
+            &actual.actual_compatibility_domain_kind,
+        );
+        push_string_mismatch(
+            &mut issues,
+            "compatibility_domain_paradigm",
+            &expected_domain.paradigm,
+            &actual.actual_compatibility_domain_paradigm,
+        );
+        push_string_mismatch(
+            &mut issues,
+            "compatibility_domain_lifecycle_hook",
+            &expected_domain.lifecycle_hook,
+            &actual.actual_compatibility_domain_lifecycle_hook,
+        );
+        push_string_mismatch(
+            &mut issues,
+            "compatibility_domain_abi_family",
+            &expected_domain.abi_family,
+            &actual.actual_compatibility_domain_abi_family,
+        );
+        push_string_mismatch(
+            &mut issues,
+            "compatibility_domain_wrapper_policy",
+            &expected_domain.wrapper_policy,
+            &actual.actual_compatibility_domain_wrapper_policy,
+        );
+        push_bool_mismatch(
+            &mut issues,
+            "compatibility_domain_required",
+            expected_domain.required,
+            actual.actual_compatibility_domain_required,
+        );
+    }
+    push_usize_mismatch(
+        &mut issues,
         "external_import_count",
         expected_report.external_imports.len(),
         actual.actual_external_import_count,

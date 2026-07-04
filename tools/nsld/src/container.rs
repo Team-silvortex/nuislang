@@ -124,6 +124,44 @@ pub(crate) fn external_imports(plan: &nuisc::linker::LinkPlan) -> Vec<NsldContai
     imports
 }
 
+pub(crate) fn compatibility_domains(
+    plan: &nuisc::linker::LinkPlan,
+    sections: &[NsldContainerSectionEntry],
+) -> Vec<NsldContainerCompatibilityDomain> {
+    let has_native_object = sections
+        .iter()
+        .any(|section| section.section_kind == "native-object-output");
+    let has_c_world_policy = !plan.hetero_calculate.c_world_policy.is_empty()
+        && plan.hetero_calculate.c_world_policy != "none";
+    let needs_host_finalize = matches!(
+        plan.final_stage.link_mode.as_str(),
+        "host-toolchain-finalize" | "bundle-packaging"
+    );
+    if !(has_native_object || has_c_world_policy || needs_host_finalize) {
+        return Vec::new();
+    }
+
+    vec![NsldContainerCompatibilityDomain {
+        domain_id: "compat0000.cffi-von-neumann".to_owned(),
+        domain_kind: "cffi-host-compat".to_owned(),
+        paradigm: "classic-von-neumann-host".to_owned(),
+        lifecycle_hook: "on_cffi_native_object".to_owned(),
+        abi_family: plan
+            .cpu_target
+            .object_format
+            .is_empty()
+            .then_some("host-native")
+            .unwrap_or(&plan.cpu_target.object_format)
+            .to_owned(),
+        wrapper_policy: if has_c_world_policy {
+            plan.hetero_calculate.c_world_policy.clone()
+        } else {
+            "host-toolchain-wrapper".to_owned()
+        },
+        required: has_native_object || needs_host_finalize,
+    }]
+}
+
 pub(crate) fn loader_blockers(
     external_imports: &[NsldContainerExternalImport],
     container_blockers: &[String],
@@ -157,6 +195,7 @@ pub(crate) fn loader_symbols(
                 symbol_id: "sym0000.loader-entry".to_owned(),
                 symbol_kind: loader_entry_kind.to_owned(),
                 symbol_name: loader_entry_symbol.to_owned(),
+                lifecycle_hook: "on_lifecycle_bootstrap".to_owned(),
                 section_id: section.section_id.clone(),
                 offset: section.offset,
                 size_bytes: section.size_bytes,
@@ -191,6 +230,7 @@ pub(crate) fn hetero_loader_symbols(
                 ),
                 symbol_kind: "hetero-node-dispatch".to_owned(),
                 symbol_name: node.timestamp.clone(),
+                lifecycle_hook: node.lifecycle_hook.clone(),
                 section_id: section.section_id.clone(),
                 offset: section.offset,
                 size_bytes: section.size_bytes,
@@ -215,6 +255,7 @@ pub(crate) fn native_object_loader_symbols(
                 symbol_id: format!("sym{index:04}.native-object-output"),
                 symbol_kind: "native-object-output".to_owned(),
                 symbol_name: "__nuis_native_object".to_owned(),
+                lifecycle_hook: "on_cffi_native_object".to_owned(),
                 section_id: section.section_id.clone(),
                 offset: section.offset,
                 size_bytes: section.size_bytes,
@@ -269,6 +310,8 @@ pub(crate) fn loader_symbol_table_hash(
         material.push('\t');
         material.push_str(&symbol.symbol_name);
         material.push('\t');
+        material.push_str(&symbol.lifecycle_hook);
+        material.push('\t');
         material.push_str(&symbol.section_id);
         material.push('\t');
         material.push_str(&symbol.offset.to_string());
@@ -296,6 +339,30 @@ pub(crate) fn external_import_table_hash(
         material.push_str(&import.provider);
         material.push('\t');
         material.push_str(if import.required { "true" } else { "false" });
+        material.push('\n');
+    }
+    hash_bytes(material.as_bytes())
+}
+
+pub(crate) fn compatibility_domain_table_hash(
+    domains: &[NsldContainerCompatibilityDomain],
+    hash_bytes: fn(&[u8]) -> String,
+) -> String {
+    let mut material = String::new();
+    for domain in domains {
+        material.push_str(&domain.domain_id);
+        material.push('\t');
+        material.push_str(&domain.domain_kind);
+        material.push('\t');
+        material.push_str(&domain.paradigm);
+        material.push('\t');
+        material.push_str(&domain.lifecycle_hook);
+        material.push('\t');
+        material.push_str(&domain.abi_family);
+        material.push('\t');
+        material.push_str(&domain.wrapper_policy);
+        material.push('\t');
+        material.push_str(if domain.required { "true" } else { "false" });
         material.push('\n');
     }
     hash_bytes(material.as_bytes())
@@ -355,11 +422,12 @@ pub(crate) fn metadata_table_hash(
     container_section_table_hash: &str,
     loader_symbol_table_hash: &str,
     relocation_table_hash: &str,
+    compatibility_domain_table_hash: &str,
     external_import_table_hash: &str,
     hash_bytes: fn(&[u8]) -> String,
 ) -> String {
     let material = format!(
-        "{container_section_table_hash}\t{loader_symbol_table_hash}\t{relocation_table_hash}\t{external_import_table_hash}\n"
+        "{container_section_table_hash}\t{loader_symbol_table_hash}\t{relocation_table_hash}\t{compatibility_domain_table_hash}\t{external_import_table_hash}\n"
     );
     hash_bytes(material.as_bytes())
 }
@@ -372,6 +440,7 @@ pub(crate) fn file_hash(
     loader_entry_section_id: &str,
     loader_symbols: &[NsldContainerLoaderSymbol],
     relocations: &[NsldContainerRelocationEntry],
+    compatibility_domains: &[NsldContainerCompatibilityDomain],
     external_imports: &[NsldContainerExternalImport],
     loader_readiness: &str,
     loader_blockers: &[String],
@@ -424,6 +493,8 @@ pub(crate) fn file_hash(
         material.push('\t');
         material.push_str(&symbol.symbol_name);
         material.push('\t');
+        material.push_str(&symbol.lifecycle_hook);
+        material.push('\t');
         material.push_str(&symbol.section_id);
         material.push('\t');
         material.push_str(&symbol.offset.to_string());
@@ -446,6 +517,27 @@ pub(crate) fn file_hash(
         material.push_str(&relocation.target_symbol_id);
         material.push('\t');
         material.push_str(&relocation.addend.to_string());
+        material.push('\n');
+    }
+    for domain in compatibility_domains {
+        material.push_str("compatibility_domain\t");
+        material.push_str(&domain.domain_id);
+        material.push('\t');
+        material.push_str(&domain.domain_kind);
+        material.push('\t');
+        material.push_str(&domain.paradigm);
+        material.push('\t');
+        material.push_str(&domain.lifecycle_hook);
+        material.push('\t');
+        material.push_str(&domain.abi_family);
+        material.push('\t');
+        material.push_str(&domain.wrapper_policy);
+        material.push('\t');
+        material.push_str(if domain.required {
+            "required"
+        } else {
+            "optional"
+        });
         material.push('\n');
     }
     for external_import in external_imports {

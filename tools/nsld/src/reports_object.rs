@@ -336,7 +336,22 @@ pub(crate) struct NsldObjectImageDryRunReport {
     pub(crate) image_ready: bool,
     pub(crate) image_size_bytes: Option<usize>,
     pub(crate) image_hash: Option<String>,
+    pub(crate) relocation_lowering_valid: bool,
+    pub(crate) relocation_lowering_rule_count: usize,
+    pub(crate) relocation_lowering_rules: Vec<NsldRelocationLoweringRuleDiagnostic>,
+    pub(crate) relocation_lowering_issues: Vec<String>,
     pub(crate) blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldRelocationLoweringRuleDiagnostic {
+    pub(crate) rule_id: String,
+    pub(crate) source_seed_kind: String,
+    pub(crate) target_relocation_kind: String,
+    pub(crate) pc_relative: bool,
+    pub(crate) length_power: u8,
+    pub(crate) external: bool,
+    pub(crate) relocation_type: u8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -366,6 +381,10 @@ pub(crate) struct NsldObjectImageDryRunVerifyReport {
     pub(crate) expected_image_ready: bool,
     pub(crate) expected_image_size_bytes: Option<usize>,
     pub(crate) expected_image_hash: Option<String>,
+    pub(crate) expected_relocation_lowering_valid: bool,
+    pub(crate) expected_relocation_lowering_rule_count: usize,
+    pub(crate) expected_relocation_lowering_rules: Vec<NsldRelocationLoweringRuleDiagnostic>,
+    pub(crate) expected_relocation_lowering_issues: Vec<String>,
     pub(crate) actual_file_layout_hash: Option<String>,
     pub(crate) actual_writer_backend_kind: Option<String>,
     pub(crate) actual_object_family: Option<String>,
@@ -375,6 +394,10 @@ pub(crate) struct NsldObjectImageDryRunVerifyReport {
     pub(crate) actual_image_ready: Option<bool>,
     pub(crate) actual_image_size_bytes: Option<usize>,
     pub(crate) actual_image_hash: Option<String>,
+    pub(crate) actual_relocation_lowering_valid: Option<bool>,
+    pub(crate) actual_relocation_lowering_rule_count: Option<usize>,
+    pub(crate) actual_relocation_lowering_rules: Option<Vec<NsldRelocationLoweringRuleDiagnostic>>,
+    pub(crate) actual_relocation_lowering_issues: Option<Vec<String>>,
     pub(crate) actual_image_file_size_bytes: Option<usize>,
     pub(crate) actual_image_file_hash: Option<String>,
     pub(crate) issues: Vec<String>,

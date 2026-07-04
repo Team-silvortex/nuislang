@@ -1,11 +1,15 @@
 use super::{
     container::{
-        NsldContainerEmitReport, NsldContainerExternalImport, NsldContainerLoaderSymbol,
-        NsldContainerPlanEmitReport, NsldContainerPlanReport, NsldContainerPlanVerifyReport,
-        NsldContainerRelocationEntry, NsldContainerReport, NsldContainerVerifyReport,
+        NsldContainerCompatibilityDomain, NsldContainerEmitReport, NsldContainerExternalImport,
+        NsldContainerLoaderSymbol, NsldContainerPlanEmitReport, NsldContainerPlanReport,
+        NsldContainerPlanVerifyReport, NsldContainerRelocationEntry, NsldContainerReport,
+        NsldContainerVerifyReport,
     },
     json_fields::*,
-    json_fragments::{nsld_assemble_sections_json, nsld_container_sections_json},
+    json_fragments::{
+        compatibility_domain_summary_json, nsld_assemble_sections_json,
+        nsld_container_sections_json,
+    },
 };
 
 pub(crate) fn nsld_container_plan_report_json(report: &NsldContainerPlanReport) -> String {
@@ -67,6 +71,7 @@ pub(crate) fn nsld_container_plan_verify_report_json(
 }
 
 pub(crate) fn nsld_container_report_json(report: &NsldContainerReport) -> String {
+    let compatibility_domain = report.compatibility_domains.first();
     let fields = vec![
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_container"),
@@ -84,6 +89,24 @@ pub(crate) fn nsld_container_report_json(report: &NsldContainerReport) -> String
         json_string_field("loader_entry_section_id", &report.loader_entry_section_id),
         json_string_field("loader_symbol_table_hash", &report.loader_symbol_table_hash),
         json_string_field("relocation_table_hash", &report.relocation_table_hash),
+        json_string_field(
+            "compatibility_domain_table_hash",
+            &report.compatibility_domain_table_hash,
+        ),
+        format!(
+            "\"compatibility_domain_summary\":{}",
+            compatibility_domain_summary_json(
+                Some(report.compatibility_domains.len()),
+                Some(&report.compatibility_domain_table_hash),
+                compatibility_domain.map(|domain| domain.domain_id.as_str()),
+                compatibility_domain.map(|domain| domain.domain_kind.as_str()),
+                compatibility_domain.map(|domain| domain.paradigm.as_str()),
+                compatibility_domain.map(|domain| domain.lifecycle_hook.as_str()),
+                compatibility_domain.map(|domain| domain.abi_family.as_str()),
+                compatibility_domain.map(|domain| domain.wrapper_policy.as_str()),
+                compatibility_domain.map(|domain| domain.required),
+            )
+        ),
         format!(
             "\"loader_symbols\":[{}]",
             nsld_container_loader_symbols_json(&report.loader_symbols)
@@ -95,6 +118,10 @@ pub(crate) fn nsld_container_report_json(report: &NsldContainerReport) -> String
         format!(
             "\"external_imports\":[{}]",
             nsld_container_external_imports_json(&report.external_imports)
+        ),
+        format!(
+            "\"compatibility_domains\":[{}]",
+            nsld_container_compatibility_domains_json(&report.compatibility_domains)
         ),
         json_string_field(
             "external_import_table_hash",
@@ -126,6 +153,7 @@ fn nsld_container_loader_symbols_json(symbols: &[NsldContainerLoaderSymbol]) -> 
                 json_string_field("symbol_id", &symbol.symbol_id),
                 json_string_field("symbol_kind", &symbol.symbol_kind),
                 json_string_field("symbol_name", &symbol.symbol_name),
+                json_string_field("lifecycle_hook", &symbol.lifecycle_hook),
                 json_string_field("section_id", &symbol.section_id),
                 json_usize_field("offset", symbol.offset),
                 json_usize_field("size_bytes", symbol.size_bytes),
@@ -165,6 +193,27 @@ fn nsld_container_external_imports_json(imports: &[NsldContainerExternalImport])
                 json_string_field("import_name", &external_import.import_name),
                 json_string_field("provider", &external_import.provider),
                 json_bool_field("required", external_import.required),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn nsld_container_compatibility_domains_json(
+    domains: &[NsldContainerCompatibilityDomain],
+) -> String {
+    domains
+        .iter()
+        .map(|domain| {
+            let fields = vec![
+                json_string_field("domain_id", &domain.domain_id),
+                json_string_field("domain_kind", &domain.domain_kind),
+                json_string_field("paradigm", &domain.paradigm),
+                json_string_field("lifecycle_hook", &domain.lifecycle_hook),
+                json_string_field("abi_family", &domain.abi_family),
+                json_string_field("wrapper_policy", &domain.wrapper_policy),
+                json_bool_field("required", domain.required),
             ];
             format!("{{{}}}", fields.join(","))
         })
@@ -282,6 +331,56 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
         json_isize_field(
             "expected_relocation_addend",
             report.expected_relocation_addend,
+        ),
+        json_usize_field(
+            "expected_compatibility_domain_count",
+            report.expected_compatibility_domain_count,
+        ),
+        json_string_field(
+            "expected_compatibility_domain_table_hash",
+            &report.expected_compatibility_domain_table_hash,
+        ),
+        json_string_field(
+            "expected_compatibility_domain_id",
+            &report.expected_compatibility_domain_id,
+        ),
+        json_string_field(
+            "expected_compatibility_domain_kind",
+            &report.expected_compatibility_domain_kind,
+        ),
+        json_string_field(
+            "expected_compatibility_domain_paradigm",
+            &report.expected_compatibility_domain_paradigm,
+        ),
+        json_string_field(
+            "expected_compatibility_domain_lifecycle_hook",
+            &report.expected_compatibility_domain_lifecycle_hook,
+        ),
+        json_string_field(
+            "expected_compatibility_domain_abi_family",
+            &report.expected_compatibility_domain_abi_family,
+        ),
+        json_string_field(
+            "expected_compatibility_domain_wrapper_policy",
+            &report.expected_compatibility_domain_wrapper_policy,
+        ),
+        json_bool_field(
+            "expected_compatibility_domain_required",
+            report.expected_compatibility_domain_required,
+        ),
+        format!(
+            "\"expected_compatibility_domain_summary\":{}",
+            compatibility_domain_summary_json(
+                Some(report.expected_compatibility_domain_count),
+                Some(&report.expected_compatibility_domain_table_hash),
+                Some(&report.expected_compatibility_domain_id),
+                Some(&report.expected_compatibility_domain_kind),
+                Some(&report.expected_compatibility_domain_paradigm),
+                Some(&report.expected_compatibility_domain_lifecycle_hook),
+                Some(&report.expected_compatibility_domain_abi_family),
+                Some(&report.expected_compatibility_domain_wrapper_policy),
+                Some(report.expected_compatibility_domain_required),
+            )
         ),
         json_usize_field(
             "expected_external_import_count",
@@ -424,6 +523,56 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
         ),
         json_optional_isize_field("actual_relocation_addend", report.actual_relocation_addend),
         json_optional_usize_field(
+            "actual_compatibility_domain_count",
+            report.actual_compatibility_domain_count,
+        ),
+        json_optional_string_field(
+            "actual_compatibility_domain_table_hash",
+            report.actual_compatibility_domain_table_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_compatibility_domain_id",
+            report.actual_compatibility_domain_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_compatibility_domain_kind",
+            report.actual_compatibility_domain_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_compatibility_domain_paradigm",
+            report.actual_compatibility_domain_paradigm.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_compatibility_domain_lifecycle_hook",
+            report.actual_compatibility_domain_lifecycle_hook.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_compatibility_domain_abi_family",
+            report.actual_compatibility_domain_abi_family.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_compatibility_domain_wrapper_policy",
+            report.actual_compatibility_domain_wrapper_policy.as_deref(),
+        ),
+        json_optional_bool_field(
+            "actual_compatibility_domain_required",
+            report.actual_compatibility_domain_required,
+        ),
+        format!(
+            "\"actual_compatibility_domain_summary\":{}",
+            compatibility_domain_summary_json(
+                report.actual_compatibility_domain_count,
+                report.actual_compatibility_domain_table_hash.as_deref(),
+                report.actual_compatibility_domain_id.as_deref(),
+                report.actual_compatibility_domain_kind.as_deref(),
+                report.actual_compatibility_domain_paradigm.as_deref(),
+                report.actual_compatibility_domain_lifecycle_hook.as_deref(),
+                report.actual_compatibility_domain_abi_family.as_deref(),
+                report.actual_compatibility_domain_wrapper_policy.as_deref(),
+                report.actual_compatibility_domain_required,
+            )
+        ),
+        json_optional_usize_field(
             "actual_external_import_count",
             report.actual_external_import_count,
         ),
@@ -479,6 +628,10 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
         json_string_array_field("section_range_issues", &report.section_range_issues),
         json_string_array_field("loader_symbol_issues", &report.loader_symbol_issues),
         json_string_array_field("relocation_issues", &report.relocation_issues),
+        json_string_array_field(
+            "compatibility_domain_issues",
+            &report.compatibility_domain_issues,
+        ),
         json_string_array_field("external_import_issues", &report.external_import_issues),
         json_string_array_field("issues", &report.issues),
     ];

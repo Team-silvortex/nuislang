@@ -13,9 +13,12 @@ pub(crate) struct NsldMachOLoadCommandsPlan {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldMachOSectionCommandPlan {
     pub(crate) section_name: String,
+    pub(crate) source_section_id: String,
     pub(crate) file_offset: usize,
     pub(crate) size_bytes: usize,
     pub(crate) alignment_power: u32,
+    pub(crate) relocation_offset: usize,
+    pub(crate) relocation_count: usize,
 }
 
 pub(crate) fn mach_o_arm64_load_commands_plan(
@@ -25,17 +28,29 @@ pub(crate) fn mach_o_arm64_load_commands_plan(
         return None;
     }
     let load_commands = record_by_kind(file_layout, "macho-load-commands")?;
+    let relocations = record_by_kind(file_layout, "macho-relocation-table")?;
     let symbols = record_by_kind(file_layout, "macho-symbol-table")?;
     let strings = record_by_kind(file_layout, "macho-string-table")?;
     let records = file_layout
         .records
         .iter()
         .filter(|record| record.record_kind == "section-payload")
-        .map(|record| NsldMachOSectionCommandPlan {
-            section_name: mach_o_section_name(record),
-            file_offset: record.file_offset,
-            size_bytes: record.size_bytes,
-            alignment_power: alignment_power(record.alignment),
+        .enumerate()
+        .map(|(index, record)| {
+            let relocation_count = usize::from(index < relocations.size_bytes / 8);
+            NsldMachOSectionCommandPlan {
+                section_name: mach_o_section_name(record),
+                source_section_id: source_section_id(record).to_owned(),
+                file_offset: record.file_offset,
+                size_bytes: record.size_bytes,
+                alignment_power: alignment_power(record.alignment),
+                relocation_offset: if relocation_count == 0 {
+                    0
+                } else {
+                    relocations.file_offset + index * 8
+                },
+                relocation_count,
+            }
         })
         .collect::<Vec<_>>();
 
@@ -70,8 +85,8 @@ pub(crate) fn encode_mach_o_load_commands(plan: &NsldMachOLoadCommandsPlan) -> V
         write_u64_le(&mut bytes, offset + 40, section.size_bytes as u64);
         write_u32_le(&mut bytes, offset + 48, section.file_offset as u32);
         write_u32_le(&mut bytes, offset + 52, section.alignment_power);
-        write_u32_le(&mut bytes, offset + 56, 0);
-        write_u32_le(&mut bytes, offset + 60, 0);
+        write_u32_le(&mut bytes, offset + 56, section.relocation_offset as u32);
+        write_u32_le(&mut bytes, offset + 60, section.relocation_count as u32);
         write_u32_le(&mut bytes, offset + 64, 0);
         write_u32_le(&mut bytes, offset + 68, 0);
         write_u32_le(&mut bytes, offset + 72, 0);
@@ -99,15 +114,19 @@ fn record_by_kind<'a>(
 }
 
 fn mach_o_section_name(record: &NsldObjectFileLayoutRecordDiagnostic) -> String {
-    let raw = record
-        .record_id
-        .strip_prefix("section.")
-        .unwrap_or(&record.record_id);
+    let raw = source_section_id(record);
     let mut name = raw.replace('.', "_");
     if !name.starts_with("__") {
         name = format!("__{name}");
     }
     name.chars().take(16).collect()
+}
+
+fn source_section_id(record: &NsldObjectFileLayoutRecordDiagnostic) -> &str {
+    record
+        .record_id
+        .strip_prefix("section.")
+        .unwrap_or(&record.record_id)
 }
 
 fn alignment_power(alignment: usize) -> u32 {
@@ -168,10 +187,21 @@ mod tests {
         assert_eq!(commands.section_count, 4);
         assert_eq!(commands.command_size, 416);
         assert_eq!(commands.symbol_count, 5);
+        assert_eq!(
+            commands.records[0].source_section_id,
+            "sec0000.compiled-artifact"
+        );
+        assert_eq!(commands.records[0].relocation_count, 1);
+        assert!(commands.records[0].relocation_offset > 0);
         assert_eq!(bytes.len(), commands.command_size);
         assert_eq!(&bytes[0..4], &[0x19, 0x00, 0x00, 0x00]);
         assert_eq!(&bytes[4..8], &[0x88, 0x01, 0x00, 0x00]);
         assert_eq!(&bytes[72..74], b"__");
+        assert_eq!(
+            &bytes[128..132],
+            &(commands.records[0].relocation_offset as u32).to_le_bytes()
+        );
+        assert_eq!(&bytes[132..136], &[1, 0, 0, 0]);
         assert_eq!(&bytes[392..396], &[0x02, 0x00, 0x00, 0x00]);
         assert_eq!(&bytes[396..400], &[0x18, 0x00, 0x00, 0x00]);
     }

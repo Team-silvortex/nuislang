@@ -2,11 +2,16 @@ use super::{
     fnv1a64_hex,
     object_file_layout::nsld_object_file_layout_report,
     object_image_backend::{
-        encode_object_image_for_backend, object_image_backend_family, object_image_backend_status,
+        encode_object_image_for_backend, object_image_backend_family,
+        object_image_backend_relocation_lowering_rule_count,
+        object_image_backend_relocation_lowering_rules, object_image_backend_status,
+    },
+    object_plan_verify::{
+        toml_block_bool_value, toml_block_string_value, toml_block_usize_value, toml_table_blocks,
     },
     reports::{
         NsldObjectImageDryRunEmitReport, NsldObjectImageDryRunReport,
-        NsldObjectImageDryRunVerifyReport,
+        NsldObjectImageDryRunVerifyReport, NsldRelocationLoweringRuleDiagnostic,
     },
     toml,
 };
@@ -26,6 +31,16 @@ pub(crate) fn nsld_object_image_dry_run_report(
         blockers.push("object-file-layout:not-ready".to_owned());
     }
     blockers.extend(image_result.blockers);
+    let relocation_lowering_issues = blockers
+        .iter()
+        .filter(|blocker| blocker.starts_with("mach-o-relocation:"))
+        .cloned()
+        .collect::<Vec<_>>();
+    let relocation_lowering_valid = relocation_lowering_issues.is_empty();
+    let relocation_lowering_rule_count =
+        object_image_backend_relocation_lowering_rule_count(&file_layout.writer_backend_kind);
+    let relocation_lowering_rules =
+        object_image_backend_relocation_lowering_rules(&file_layout.writer_backend_kind);
     let image = image_result.image;
     let image_size_bytes = image.as_ref().map(Vec::len);
     let image_hash = image.as_ref().map(|bytes| fnv1a64_hex(bytes));
@@ -53,6 +68,10 @@ pub(crate) fn nsld_object_image_dry_run_report(
         image_ready,
         image_size_bytes,
         image_hash,
+        relocation_lowering_valid,
+        relocation_lowering_rule_count,
+        relocation_lowering_rules,
+        relocation_lowering_issues,
         blockers,
     }
 }
@@ -123,6 +142,10 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
         actual_image_ready,
         actual_image_size_bytes,
         actual_image_hash,
+        actual_relocation_lowering_valid,
+        actual_relocation_lowering_rule_count,
+        actual_relocation_lowering_rules,
+        actual_relocation_lowering_issues,
     ) = match actual.as_ref() {
         Ok(source) => (
             toml::string_value(source, "file_layout_hash"),
@@ -134,10 +157,19 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
             toml::bool_value(source, "image_ready"),
             optional_usize_value(source, "image_size_bytes"),
             optional_string_value(source, "image_hash"),
+            toml::bool_value(source, "relocation_lowering_valid"),
+            toml::usize_value(source, "relocation_lowering_rule_count"),
+            Some(relocation_lowering_rule_entries(source)),
+            Some(toml::string_array_value(
+                source,
+                "relocation_lowering_issues",
+            )),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None, None, None, None, None)
+            (
+                None, None, None, None, None, None, None, None, None, None, None, None, None,
+            )
         }
     };
     if let Ok(actual) = actual {
@@ -198,6 +230,29 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
             expected_report.image_hash.as_deref(),
             actual_image_hash.as_deref(),
         );
+        push_bool_mismatch(
+            &mut issues,
+            "relocation_lowering_valid",
+            expected_report.relocation_lowering_valid,
+            actual_relocation_lowering_valid,
+        );
+        push_usize_mismatch(
+            &mut issues,
+            "relocation_lowering_rule_count",
+            expected_report.relocation_lowering_rule_count,
+            actual_relocation_lowering_rule_count,
+        );
+        push_string_array_mismatch(
+            &mut issues,
+            "relocation_lowering_issues",
+            &expected_report.relocation_lowering_issues,
+            actual_relocation_lowering_issues.as_deref(),
+        );
+        push_relocation_lowering_rule_mismatches(
+            &mut issues,
+            &expected_report.relocation_lowering_rules,
+            actual_relocation_lowering_rules.as_deref(),
+        );
     }
     let (actual_image_file_size_bytes, actual_image_file_hash) =
         image_file_size_and_hash(&image_path).unwrap_or_else(|error| {
@@ -233,6 +288,10 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
         expected_image_ready: expected_report.image_ready,
         expected_image_size_bytes: expected_report.image_size_bytes,
         expected_image_hash: expected_report.image_hash,
+        expected_relocation_lowering_valid: expected_report.relocation_lowering_valid,
+        expected_relocation_lowering_rule_count: expected_report.relocation_lowering_rule_count,
+        expected_relocation_lowering_rules: expected_report.relocation_lowering_rules,
+        expected_relocation_lowering_issues: expected_report.relocation_lowering_issues,
         actual_file_layout_hash,
         actual_writer_backend_kind,
         actual_object_family,
@@ -242,6 +301,10 @@ pub(crate) fn nsld_verify_object_image_dry_run_report(
         actual_image_ready,
         actual_image_size_bytes,
         actual_image_hash,
+        actual_relocation_lowering_valid,
+        actual_relocation_lowering_rule_count,
+        actual_relocation_lowering_rules,
+        actual_relocation_lowering_issues,
         actual_image_file_size_bytes,
         actual_image_file_hash,
         issues,
@@ -275,6 +338,23 @@ fn optional_usize_value(source: &str, key: &str) -> Option<usize> {
     toml::usize_value(source, key).filter(|value| *value != 0)
 }
 
+fn relocation_lowering_rule_entries(source: &str) -> Vec<NsldRelocationLoweringRuleDiagnostic> {
+    toml_table_blocks(source, "relocation_lowering_rule")
+        .into_iter()
+        .filter_map(|block| {
+            Some(NsldRelocationLoweringRuleDiagnostic {
+                rule_id: toml_block_string_value(&block, "rule_id")?,
+                source_seed_kind: toml_block_string_value(&block, "source_seed_kind")?,
+                target_relocation_kind: toml_block_string_value(&block, "target_relocation_kind")?,
+                pc_relative: toml_block_bool_value(&block, "pc_relative")?,
+                length_power: toml_block_usize_value(&block, "length_power")? as u8,
+                external: toml_block_bool_value(&block, "external")?,
+                relocation_type: toml_block_usize_value(&block, "relocation_type")? as u8,
+            })
+        })
+        .collect()
+}
+
 fn push_string_mismatch(
     issues: &mut Vec<String>,
     field: &str,
@@ -300,6 +380,22 @@ fn push_bool_mismatch(issues: &mut Vec<String>, field: &str, expected: bool, act
     }
 }
 
+fn push_usize_mismatch(
+    issues: &mut Vec<String>,
+    field: &str,
+    expected: usize,
+    actual: Option<usize>,
+) {
+    if actual != Some(expected) {
+        issues.push(format!(
+            "{field} mismatch: expected {expected}, found {}",
+            actual
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "missing".to_owned())
+        ));
+    }
+}
+
 fn push_optional_usize_mismatch(
     issues: &mut Vec<String>,
     field: &str,
@@ -311,6 +407,141 @@ fn push_optional_usize_mismatch(
             "{field} mismatch: expected {}, found {}",
             optional_usize_text(expected),
             optional_usize_text(actual)
+        ));
+    }
+}
+
+fn push_string_array_mismatch(
+    issues: &mut Vec<String>,
+    field: &str,
+    expected: &[String],
+    actual: Option<&[String]>,
+) {
+    if actual != Some(expected) {
+        issues.push(format!(
+            "{field} mismatch: expected [{}], found [{}]",
+            expected.join(", "),
+            actual
+                .map(|values| values.join(", "))
+                .unwrap_or_else(|| "missing".to_owned())
+        ));
+    }
+}
+
+fn push_relocation_lowering_rule_mismatches(
+    issues: &mut Vec<String>,
+    expected: &[NsldRelocationLoweringRuleDiagnostic],
+    actual: Option<&[NsldRelocationLoweringRuleDiagnostic]>,
+) {
+    let Some(actual) = actual else {
+        issues.push(format!(
+            "relocation_lowering_rule_entry_count mismatch: expected {}, found missing",
+            expected.len()
+        ));
+        return;
+    };
+    if actual.len() != expected.len() {
+        issues.push(format!(
+            "relocation_lowering_rule_entry_count mismatch: expected {}, found {}",
+            expected.len(),
+            actual.len()
+        ));
+    }
+    for (index, expected_rule) in expected.iter().enumerate() {
+        let Some(actual_rule) = actual.get(index) else {
+            issues.push(format!("relocation_lowering_rule[{index}] missing"));
+            continue;
+        };
+        push_rule_string_mismatch(
+            issues,
+            index,
+            "rule_id",
+            &expected_rule.rule_id,
+            &actual_rule.rule_id,
+        );
+        push_rule_string_mismatch(
+            issues,
+            index,
+            "source_seed_kind",
+            &expected_rule.source_seed_kind,
+            &actual_rule.source_seed_kind,
+        );
+        push_rule_string_mismatch(
+            issues,
+            index,
+            "target_relocation_kind",
+            &expected_rule.target_relocation_kind,
+            &actual_rule.target_relocation_kind,
+        );
+        push_rule_bool_mismatch(
+            issues,
+            index,
+            "pc_relative",
+            expected_rule.pc_relative,
+            actual_rule.pc_relative,
+        );
+        push_rule_usize_mismatch(
+            issues,
+            index,
+            "length_power",
+            expected_rule.length_power as usize,
+            actual_rule.length_power as usize,
+        );
+        push_rule_bool_mismatch(
+            issues,
+            index,
+            "external",
+            expected_rule.external,
+            actual_rule.external,
+        );
+        push_rule_usize_mismatch(
+            issues,
+            index,
+            "relocation_type",
+            expected_rule.relocation_type as usize,
+            actual_rule.relocation_type as usize,
+        );
+    }
+}
+
+fn push_rule_string_mismatch(
+    issues: &mut Vec<String>,
+    index: usize,
+    field: &str,
+    expected: &str,
+    actual: &str,
+) {
+    if actual != expected {
+        issues.push(format!(
+            "relocation_lowering_rule[{index}].{field} mismatch: expected {expected}, found {actual}"
+        ));
+    }
+}
+
+fn push_rule_bool_mismatch(
+    issues: &mut Vec<String>,
+    index: usize,
+    field: &str,
+    expected: bool,
+    actual: bool,
+) {
+    if actual != expected {
+        issues.push(format!(
+            "relocation_lowering_rule[{index}].{field} mismatch: expected {expected}, found {actual}"
+        ));
+    }
+}
+
+fn push_rule_usize_mismatch(
+    issues: &mut Vec<String>,
+    index: usize,
+    field: &str,
+    expected: usize,
+    actual: usize,
+) {
+    if actual != expected {
+        issues.push(format!(
+            "relocation_lowering_rule[{index}].{field} mismatch: expected {expected}, found {actual}"
         ));
     }
 }
@@ -362,6 +593,14 @@ mod tests {
         assert!(report.image_constructed);
         assert_eq!(report.image_size_bytes, Some(report.total_file_size_bytes));
         assert!(report.image_hash.as_deref().unwrap().starts_with("0x"));
+        assert!(report.relocation_lowering_valid);
+        assert_eq!(report.relocation_lowering_rule_count, 4);
+        assert_eq!(report.relocation_lowering_rules.len(), 4);
+        assert_eq!(
+            report.relocation_lowering_rules[0].source_seed_kind,
+            "bootstrap-entry-seed"
+        );
+        assert!(report.relocation_lowering_issues.is_empty());
         assert!(report
             .blockers
             .iter()
@@ -377,8 +616,18 @@ mod tests {
 
         assert!(rendered.contains("writer_backend_kind = \"mach-o-arm64\""));
         assert!(rendered.contains("object_family = \"mach-o\""));
+        assert!(rendered.contains("relocation_lowering_valid = true"));
+        assert!(rendered.contains("relocation_lowering_rule_count = 4"));
+        assert!(rendered.contains("[[relocation_lowering_rule]]"));
+        assert!(rendered.contains("source_seed_kind = \"bootstrap-entry-seed\""));
         assert!(json.contains("\"writer_backend_kind\":\"mach-o-arm64\""));
         assert!(json.contains("\"object_family\":\"mach-o\""));
+        assert!(json.contains("\"relocation_lowering_valid\":true"));
+        assert!(json.contains("\"relocation_lowering_rule_count\":4"));
+        assert!(json.contains("\"relocation_lowering_issues\":[]"));
+        assert!(json.contains("\"relocation_lowering_rules\":[{"));
+        assert!(json.contains("\"source_seed_kind\":\"bootstrap-entry-seed\""));
+        assert!(json.contains("\"target_relocation_kind\":\"arm64-unsigned-pointer\""));
     }
 
     #[test]
@@ -425,6 +674,23 @@ mod tests {
 
         let verify = nsld_verify_object_image_dry_run_report(manifest, &plan);
         assert!(verify.valid, "{:?}", verify.issues);
+        assert!(verify.expected_relocation_lowering_valid);
+        assert_eq!(verify.actual_relocation_lowering_valid, Some(true));
+        assert_eq!(verify.expected_relocation_lowering_rule_count, 4);
+        assert_eq!(verify.actual_relocation_lowering_rule_count, Some(4));
+        assert_eq!(verify.expected_relocation_lowering_rules.len(), 4);
+        assert_eq!(
+            verify
+                .actual_relocation_lowering_rules
+                .as_deref()
+                .map(|rules| rules.len()),
+            Some(4)
+        );
+        assert!(verify.expected_relocation_lowering_issues.is_empty());
+        assert_eq!(
+            verify.actual_relocation_lowering_issues.as_deref(),
+            Some([].as_slice())
+        );
         assert_eq!(
             verify.actual_image_hash.as_deref(),
             verify.expected_image_hash.as_deref()
@@ -439,6 +705,55 @@ mod tests {
             verify.actual_image_file_size_bytes,
             verify.expected_image_size_bytes
         );
+    }
+
+    #[test]
+    fn verify_object_image_dry_run_reports_relocation_lowering_drift() {
+        let mut plan = empty_link_plan();
+        plan.output_dir = temp_output_dir("nsld-object-image-dry-run-relocation-drift");
+        fs::create_dir_all(&plan.output_dir).unwrap();
+        let manifest = Path::new("manifest.toml");
+        nsld_emit_object_image_dry_run_report(manifest, &plan).unwrap();
+
+        let path = Path::new(&plan.output_dir).join("nuis.nsld.object-image-dry-run.toml");
+        let damaged = fs::read_to_string(&path).unwrap().replace(
+            "relocation_lowering_rule_count = 4",
+            "relocation_lowering_rule_count = 0",
+        );
+        fs::write(&path, damaged).unwrap();
+
+        let verify = nsld_verify_object_image_dry_run_report(manifest, &plan);
+        fs::remove_dir_all(&plan.output_dir).unwrap();
+
+        assert!(!verify.valid);
+        assert_eq!(verify.actual_relocation_lowering_rule_count, Some(0));
+        assert!(verify.issues.iter().any(|issue| {
+            issue == "relocation_lowering_rule_count mismatch: expected 4, found 0"
+        }));
+    }
+
+    #[test]
+    fn verify_object_image_dry_run_reports_relocation_rule_drift() {
+        let mut plan = empty_link_plan();
+        plan.output_dir = temp_output_dir("nsld-object-image-dry-run-rule-drift");
+        fs::create_dir_all(&plan.output_dir).unwrap();
+        let manifest = Path::new("manifest.toml");
+        nsld_emit_object_image_dry_run_report(manifest, &plan).unwrap();
+
+        let path = Path::new(&plan.output_dir).join("nuis.nsld.object-image-dry-run.toml");
+        let damaged = fs::read_to_string(&path).unwrap().replace(
+            "target_relocation_kind = \"arm64-unsigned-pointer\"",
+            "target_relocation_kind = \"wrong-relocation\"",
+        );
+        fs::write(&path, damaged).unwrap();
+
+        let verify = nsld_verify_object_image_dry_run_report(manifest, &plan);
+        fs::remove_dir_all(&plan.output_dir).unwrap();
+
+        assert!(!verify.valid);
+        assert!(verify.issues.iter().any(|issue| {
+            issue == "relocation_lowering_rule[0].target_relocation_kind mismatch: expected arm64-unsigned-pointer, found wrong-relocation"
+        }));
     }
 
     fn temp_output_dir(prefix: &str) -> String {

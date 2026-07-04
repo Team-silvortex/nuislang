@@ -36,6 +36,7 @@ pub(crate) fn loader_symbol_entries(source: &str) -> Vec<container::NsldContaine
                 symbol_id: toml_block_string_value(&block, "symbol_id")?,
                 symbol_kind: toml_block_string_value(&block, "symbol_kind")?,
                 symbol_name: toml_block_string_value(&block, "symbol_name")?,
+                lifecycle_hook: toml_block_string_value(&block, "lifecycle_hook")?,
                 section_id: toml_block_string_value(&block, "section_id")?,
                 offset: toml_block_usize_value(&block, "offset")?,
                 size_bytes: toml_block_usize_value(&block, "size_bytes")?,
@@ -70,6 +71,25 @@ pub(crate) fn external_import_entries(source: &str) -> Vec<container::NsldContai
                 import_kind: toml_block_string_value(&block, "import_kind")?,
                 import_name: toml_block_string_value(&block, "import_name")?,
                 provider: toml_block_string_value(&block, "provider")?,
+                required: toml_block_bool_value(&block, "required")?,
+            })
+        })
+        .collect()
+}
+
+pub(crate) fn compatibility_domain_entries(
+    source: &str,
+) -> Vec<container::NsldContainerCompatibilityDomain> {
+    toml_table_blocks(source, "compatibility_domain")
+        .into_iter()
+        .filter_map(|block| {
+            Some(container::NsldContainerCompatibilityDomain {
+                domain_id: toml_block_string_value(&block, "domain_id")?,
+                domain_kind: toml_block_string_value(&block, "domain_kind")?,
+                paradigm: toml_block_string_value(&block, "paradigm")?,
+                lifecycle_hook: toml_block_string_value(&block, "lifecycle_hook")?,
+                abi_family: toml_block_string_value(&block, "abi_family")?,
+                wrapper_policy: toml_block_string_value(&block, "wrapper_policy")?,
                 required: toml_block_bool_value(&block, "required")?,
             })
         })
@@ -184,6 +204,12 @@ pub(crate) fn loader_symbol_issues(
             issues.push(format!(
                 "loader_symbol[{index}].symbol_name mismatch: expected {}, found {}",
                 expected_entry.symbol_name, actual_entry.symbol_name
+            ));
+        }
+        if actual_entry.lifecycle_hook != expected_entry.lifecycle_hook {
+            issues.push(format!(
+                "loader_symbol[{index}].lifecycle_hook mismatch: expected {}, found {}",
+                expected_entry.lifecycle_hook, actual_entry.lifecycle_hook
             ));
         }
         if actual_entry.section_id != expected_entry.section_id {
@@ -315,6 +341,69 @@ pub(crate) fn external_import_issues(
         if actual_entry.required != expected_entry.required {
             issues.push(format!(
                 "external_import[{index}].required mismatch: expected {}, found {}",
+                expected_entry.required, actual_entry.required
+            ));
+        }
+    }
+    issues
+}
+
+pub(crate) fn compatibility_domain_issues(
+    expected: &[container::NsldContainerCompatibilityDomain],
+    actual: &[container::NsldContainerCompatibilityDomain],
+) -> Vec<String> {
+    let mut issues = Vec::new();
+    if actual.len() != expected.len() {
+        issues.push(format!(
+            "compatibility_domain_table_entry_count mismatch: expected {}, found {}",
+            expected.len(),
+            actual.len()
+        ));
+    }
+    for (index, expected_entry) in expected.iter().enumerate() {
+        let Some(actual_entry) = actual.get(index) else {
+            issues.push(format!("compatibility_domain[{index}] missing"));
+            continue;
+        };
+        if actual_entry.domain_id != expected_entry.domain_id {
+            issues.push(format!(
+                "compatibility_domain[{index}].domain_id mismatch: expected {}, found {}",
+                expected_entry.domain_id, actual_entry.domain_id
+            ));
+        }
+        if actual_entry.domain_kind != expected_entry.domain_kind {
+            issues.push(format!(
+                "compatibility_domain[{index}].domain_kind mismatch: expected {}, found {}",
+                expected_entry.domain_kind, actual_entry.domain_kind
+            ));
+        }
+        if actual_entry.paradigm != expected_entry.paradigm {
+            issues.push(format!(
+                "compatibility_domain[{index}].paradigm mismatch: expected {}, found {}",
+                expected_entry.paradigm, actual_entry.paradigm
+            ));
+        }
+        if actual_entry.lifecycle_hook != expected_entry.lifecycle_hook {
+            issues.push(format!(
+                "compatibility_domain[{index}].lifecycle_hook mismatch: expected {}, found {}",
+                expected_entry.lifecycle_hook, actual_entry.lifecycle_hook
+            ));
+        }
+        if actual_entry.abi_family != expected_entry.abi_family {
+            issues.push(format!(
+                "compatibility_domain[{index}].abi_family mismatch: expected {}, found {}",
+                expected_entry.abi_family, actual_entry.abi_family
+            ));
+        }
+        if actual_entry.wrapper_policy != expected_entry.wrapper_policy {
+            issues.push(format!(
+                "compatibility_domain[{index}].wrapper_policy mismatch: expected {}, found {}",
+                expected_entry.wrapper_policy, actual_entry.wrapper_policy
+            ));
+        }
+        if actual_entry.required != expected_entry.required {
+            issues.push(format!(
+                "compatibility_domain[{index}].required mismatch: expected {}, found {}",
                 expected_entry.required, actual_entry.required
             ));
         }

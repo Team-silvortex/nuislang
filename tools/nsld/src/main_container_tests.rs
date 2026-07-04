@@ -104,6 +104,12 @@ fn emit_container_reports_metadata_table_hash() {
     assert!(preview_json.contains("\"container_section_table_hash\":\"0x"));
     assert!(preview_json.contains("\"loader_symbol_table_hash\":\"0x"));
     assert!(preview_json.contains("\"relocation_table_hash\":\"0x"));
+    assert!(preview_json.contains("\"compatibility_domain_table_hash\":\"0x"));
+    assert!(
+        preview_json.contains("\"compatibility_domain_summary\":{\"count\":1,\"table_hash\":\"0x")
+    );
+    assert!(preview_json.contains("\"domain_kind\":\"cffi-host-compat\""));
+    assert!(preview_json.contains("\"paradigm\":\"classic-von-neumann-host\""));
     assert!(preview_json.contains("\"external_import_table_hash\":\"0x"));
     assert!(emit_json.contains("\"metadata_table_hash\":\"0x"));
 }

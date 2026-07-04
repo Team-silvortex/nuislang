@@ -202,6 +202,9 @@ pub(crate) fn nsld_container_report(
         container::loader_symbol_table_hash(&loader_symbols, fnv1a64_hex);
     let relocations = container::relocations(&loader_symbols);
     let relocation_table_hash = container::relocation_table_hash(&relocations, fnv1a64_hex);
+    let compatibility_domains = container::compatibility_domains(plan, &sections);
+    let compatibility_domain_table_hash =
+        container::compatibility_domain_table_hash(&compatibility_domains, fnv1a64_hex);
     let external_imports = container::external_imports(plan);
     let external_import_table_hash =
         container::external_import_table_hash(&external_imports, fnv1a64_hex);
@@ -209,6 +212,7 @@ pub(crate) fn nsld_container_report(
         &container_section_table_hash,
         &loader_symbol_table_hash,
         &relocation_table_hash,
+        &compatibility_domain_table_hash,
         &external_import_table_hash,
         fnv1a64_hex,
     );
@@ -234,6 +238,7 @@ pub(crate) fn nsld_container_report(
         &loader_entry_section_id,
         &loader_symbols,
         &relocations,
+        &compatibility_domains,
         &external_imports,
         &loader_readiness,
         &loader_blockers,
@@ -258,6 +263,8 @@ pub(crate) fn nsld_container_report(
         loader_symbols,
         relocation_table_hash,
         relocations,
+        compatibility_domain_table_hash,
+        compatibility_domains,
         external_import_table_hash,
         external_imports,
         payload_size_bytes,

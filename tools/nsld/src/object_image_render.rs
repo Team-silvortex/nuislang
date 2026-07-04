@@ -40,9 +40,35 @@ pub(crate) fn render_object_image_dry_run(report: &NsldObjectImageDryRunReport) 
     push_optional_usize(&mut out, "image_size_bytes", report.image_size_bytes);
     push_optional_string(&mut out, "image_hash", report.image_hash.as_deref());
     out.push_str(&format!(
+        "relocation_lowering_valid = {}\n",
+        report.relocation_lowering_valid
+    ));
+    out.push_str(&format!(
+        "relocation_lowering_rule_count = {}\n",
+        report.relocation_lowering_rule_count
+    ));
+    out.push_str(&format!(
+        "relocation_lowering_issues = [{}]\n",
+        super::toml::toml_string_array_literal(&report.relocation_lowering_issues)
+    ));
+    out.push_str(&format!(
         "blockers = [{}]\n",
         super::toml::toml_string_array_literal(&report.blockers)
     ));
+    for rule in &report.relocation_lowering_rules {
+        out.push_str("\n[[relocation_lowering_rule]]\n");
+        push_string(&mut out, "rule_id", &rule.rule_id);
+        push_string(&mut out, "source_seed_kind", &rule.source_seed_kind);
+        push_string(
+            &mut out,
+            "target_relocation_kind",
+            &rule.target_relocation_kind,
+        );
+        out.push_str(&format!("pc_relative = {}\n", rule.pc_relative));
+        out.push_str(&format!("length_power = {}\n", rule.length_power));
+        out.push_str(&format!("external = {}\n", rule.external));
+        out.push_str(&format!("relocation_type = {}\n", rule.relocation_type));
+    }
     out
 }
 

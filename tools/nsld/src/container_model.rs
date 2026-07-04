@@ -53,6 +53,8 @@ pub(crate) struct NsldContainerReport {
     pub(crate) loader_symbols: Vec<NsldContainerLoaderSymbol>,
     pub(crate) relocation_table_hash: String,
     pub(crate) relocations: Vec<NsldContainerRelocationEntry>,
+    pub(crate) compatibility_domain_table_hash: String,
+    pub(crate) compatibility_domains: Vec<NsldContainerCompatibilityDomain>,
     pub(crate) external_import_table_hash: String,
     pub(crate) external_imports: Vec<NsldContainerExternalImport>,
     pub(crate) payload_size_bytes: usize,
@@ -75,10 +77,22 @@ pub(crate) struct NsldContainerExternalImport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerCompatibilityDomain {
+    pub(crate) domain_id: String,
+    pub(crate) domain_kind: String,
+    pub(crate) paradigm: String,
+    pub(crate) lifecycle_hook: String,
+    pub(crate) abi_family: String,
+    pub(crate) wrapper_policy: String,
+    pub(crate) required: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldContainerLoaderSymbol {
     pub(crate) symbol_id: String,
     pub(crate) symbol_kind: String,
     pub(crate) symbol_name: String,
+    pub(crate) lifecycle_hook: String,
     pub(crate) section_id: String,
     pub(crate) offset: usize,
     pub(crate) size_bytes: usize,
@@ -153,6 +167,15 @@ pub(crate) struct NsldContainerVerifyReport {
     pub(crate) expected_relocation_source_offset: usize,
     pub(crate) expected_relocation_target_symbol_id: String,
     pub(crate) expected_relocation_addend: isize,
+    pub(crate) expected_compatibility_domain_count: usize,
+    pub(crate) expected_compatibility_domain_table_hash: String,
+    pub(crate) expected_compatibility_domain_id: String,
+    pub(crate) expected_compatibility_domain_kind: String,
+    pub(crate) expected_compatibility_domain_paradigm: String,
+    pub(crate) expected_compatibility_domain_lifecycle_hook: String,
+    pub(crate) expected_compatibility_domain_abi_family: String,
+    pub(crate) expected_compatibility_domain_wrapper_policy: String,
+    pub(crate) expected_compatibility_domain_required: bool,
     pub(crate) expected_external_import_count: usize,
     pub(crate) expected_external_import_table_hash: String,
     pub(crate) expected_external_import_id: String,
@@ -191,6 +214,15 @@ pub(crate) struct NsldContainerVerifyReport {
     pub(crate) actual_relocation_source_offset: Option<usize>,
     pub(crate) actual_relocation_target_symbol_id: Option<String>,
     pub(crate) actual_relocation_addend: Option<isize>,
+    pub(crate) actual_compatibility_domain_count: Option<usize>,
+    pub(crate) actual_compatibility_domain_table_hash: Option<String>,
+    pub(crate) actual_compatibility_domain_id: Option<String>,
+    pub(crate) actual_compatibility_domain_kind: Option<String>,
+    pub(crate) actual_compatibility_domain_paradigm: Option<String>,
+    pub(crate) actual_compatibility_domain_lifecycle_hook: Option<String>,
+    pub(crate) actual_compatibility_domain_abi_family: Option<String>,
+    pub(crate) actual_compatibility_domain_wrapper_policy: Option<String>,
+    pub(crate) actual_compatibility_domain_required: Option<bool>,
     pub(crate) actual_external_import_count: Option<usize>,
     pub(crate) actual_external_import_table_hash: Option<String>,
     pub(crate) actual_external_import_id: Option<String>,
@@ -208,6 +240,7 @@ pub(crate) struct NsldContainerVerifyReport {
     pub(crate) section_range_issues: Vec<String>,
     pub(crate) loader_symbol_issues: Vec<String>,
     pub(crate) relocation_issues: Vec<String>,
+    pub(crate) compatibility_domain_issues: Vec<String>,
     pub(crate) external_import_issues: Vec<String>,
     pub(crate) issues: Vec<String>,
 }

@@ -226,7 +226,32 @@ pub(crate) fn nsld_prepare_report(
         byte_layout_hash: object_byte_layout_emit.byte_layout_hash,
         file_layout_hash: object_file_layout_emit.file_layout_hash,
         object_image_hash: object_image_dry_run_emit.image_hash,
+        object_image_relocation_lowering_valid: object_image_dry_run_verify
+            .actual_relocation_lowering_valid
+            .unwrap_or(false),
+        object_image_relocation_lowering_rule_count: object_image_dry_run_verify
+            .actual_relocation_lowering_rule_count
+            .unwrap_or(0),
+        object_image_relocation_lowering_rules: object_image_dry_run_verify
+            .actual_relocation_lowering_rules
+            .unwrap_or_default(),
+        object_image_relocation_lowering_issues: object_image_dry_run_verify
+            .actual_relocation_lowering_issues
+            .unwrap_or_default(),
         metadata_table_hash: container_file_emit.metadata_table_hash,
+        compatibility_domain_count: container_file_verify.actual_compatibility_domain_count,
+        compatibility_domain_table_hash: container_file_verify
+            .actual_compatibility_domain_table_hash,
+        compatibility_domain_id: container_file_verify.actual_compatibility_domain_id,
+        compatibility_domain_kind: container_file_verify.actual_compatibility_domain_kind,
+        compatibility_domain_paradigm: container_file_verify.actual_compatibility_domain_paradigm,
+        compatibility_domain_lifecycle_hook: container_file_verify
+            .actual_compatibility_domain_lifecycle_hook,
+        compatibility_domain_abi_family: container_file_verify
+            .actual_compatibility_domain_abi_family,
+        compatibility_domain_wrapper_policy: container_file_verify
+            .actual_compatibility_domain_wrapper_policy,
+        compatibility_domain_required: container_file_verify.actual_compatibility_domain_required,
         container_layout_hash: container_emit.container_layout_hash,
         container_hash: container_file_emit.container_hash,
         payload_size_bytes: container_file_emit.payload_size_bytes,

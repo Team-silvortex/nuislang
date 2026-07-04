@@ -92,6 +92,22 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
             "object_image_dry_run_issues",
             &report.object_image_dry_run_issues,
         ),
+        json_optional_bool_field(
+            "object_image_relocation_lowering_valid",
+            report.object_image_relocation_lowering_valid,
+        ),
+        json_optional_usize_field(
+            "object_image_relocation_lowering_rule_count",
+            report.object_image_relocation_lowering_rule_count,
+        ),
+        format!(
+            "\"object_image_relocation_lowering_rules\":[{}]",
+            relocation_lowering_rules_json(&report.object_image_relocation_lowering_rules)
+        ),
+        json_string_array_field(
+            "object_image_relocation_lowering_issues",
+            &report.object_image_relocation_lowering_issues,
+        ),
         json_bool_field(
             "object_image_dry_run_bytes_present",
             report.object_image_dry_run_bytes_present,
@@ -155,6 +171,10 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
             &report.container_relocation_issues,
         ),
         json_string_array_field(
+            "container_compatibility_domain_issues",
+            &report.container_compatibility_domain_issues,
+        ),
+        json_string_array_field(
             "container_external_import_issues",
             &report.container_external_import_issues,
         ),
@@ -174,6 +194,64 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
         json_optional_string_field(
             "container_metadata_table_hash",
             report.container_metadata_table_hash.as_deref(),
+        ),
+        json_optional_usize_field(
+            "container_compatibility_domain_count",
+            report.container_compatibility_domain_count,
+        ),
+        json_optional_string_field(
+            "container_compatibility_domain_table_hash",
+            report.container_compatibility_domain_table_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "container_compatibility_domain_id",
+            report.container_compatibility_domain_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "container_compatibility_domain_kind",
+            report.container_compatibility_domain_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "container_compatibility_domain_paradigm",
+            report.container_compatibility_domain_paradigm.as_deref(),
+        ),
+        json_optional_string_field(
+            "container_compatibility_domain_lifecycle_hook",
+            report
+                .container_compatibility_domain_lifecycle_hook
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "container_compatibility_domain_abi_family",
+            report.container_compatibility_domain_abi_family.as_deref(),
+        ),
+        json_optional_string_field(
+            "container_compatibility_domain_wrapper_policy",
+            report
+                .container_compatibility_domain_wrapper_policy
+                .as_deref(),
+        ),
+        json_optional_bool_field(
+            "container_compatibility_domain_required",
+            report.container_compatibility_domain_required,
+        ),
+        format!(
+            "\"container_compatibility_domain_summary\":{}",
+            compatibility_domain_summary_json(
+                report.container_compatibility_domain_count,
+                report.container_compatibility_domain_table_hash.as_deref(),
+                report.container_compatibility_domain_id.as_deref(),
+                report.container_compatibility_domain_kind.as_deref(),
+                report.container_compatibility_domain_paradigm.as_deref(),
+                report
+                    .container_compatibility_domain_lifecycle_hook
+                    .as_deref(),
+                report.container_compatibility_domain_abi_family.as_deref(),
+                report
+                    .container_compatibility_domain_wrapper_policy
+                    .as_deref(),
+                report.container_compatibility_domain_required,
+            )
         ),
         json_optional_usize_field(
             "container_external_import_count",
@@ -368,7 +446,73 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
         json_string_field("byte_layout_hash", &report.byte_layout_hash),
         json_string_field("file_layout_hash", &report.file_layout_hash),
         json_optional_string_field("object_image_hash", report.object_image_hash.as_deref()),
+        json_bool_field(
+            "object_image_relocation_lowering_valid",
+            report.object_image_relocation_lowering_valid,
+        ),
+        json_usize_field(
+            "object_image_relocation_lowering_rule_count",
+            report.object_image_relocation_lowering_rule_count,
+        ),
+        format!(
+            "\"object_image_relocation_lowering_rules\":[{}]",
+            relocation_lowering_rules_json(&report.object_image_relocation_lowering_rules)
+        ),
+        json_string_array_field(
+            "object_image_relocation_lowering_issues",
+            &report.object_image_relocation_lowering_issues,
+        ),
         json_string_field("metadata_table_hash", &report.metadata_table_hash),
+        json_optional_usize_field(
+            "compatibility_domain_count",
+            report.compatibility_domain_count,
+        ),
+        json_optional_string_field(
+            "compatibility_domain_table_hash",
+            report.compatibility_domain_table_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_id",
+            report.compatibility_domain_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_kind",
+            report.compatibility_domain_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_paradigm",
+            report.compatibility_domain_paradigm.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_lifecycle_hook",
+            report.compatibility_domain_lifecycle_hook.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_abi_family",
+            report.compatibility_domain_abi_family.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_wrapper_policy",
+            report.compatibility_domain_wrapper_policy.as_deref(),
+        ),
+        json_optional_bool_field(
+            "compatibility_domain_required",
+            report.compatibility_domain_required,
+        ),
+        format!(
+            "\"compatibility_domain_summary\":{}",
+            compatibility_domain_summary_json(
+                report.compatibility_domain_count,
+                report.compatibility_domain_table_hash.as_deref(),
+                report.compatibility_domain_id.as_deref(),
+                report.compatibility_domain_kind.as_deref(),
+                report.compatibility_domain_paradigm.as_deref(),
+                report.compatibility_domain_lifecycle_hook.as_deref(),
+                report.compatibility_domain_abi_family.as_deref(),
+                report.compatibility_domain_wrapper_policy.as_deref(),
+                report.compatibility_domain_required,
+            )
+        ),
         json_string_field("container_layout_hash", &report.container_layout_hash),
         json_string_field("container_hash", &report.container_hash),
         json_usize_field("payload_size_bytes", report.payload_size_bytes),
@@ -568,6 +712,56 @@ pub(crate) fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
         json_string_field(
             "container_loader_readiness",
             &report.container_loader_readiness,
+        ),
+        json_usize_field(
+            "compatibility_domain_count",
+            report.compatibility_domain_count,
+        ),
+        json_string_field(
+            "compatibility_domain_table_hash",
+            &report.compatibility_domain_table_hash,
+        ),
+        json_optional_string_field(
+            "compatibility_domain_id",
+            report.compatibility_domain_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_kind",
+            report.compatibility_domain_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_paradigm",
+            report.compatibility_domain_paradigm.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_lifecycle_hook",
+            report.compatibility_domain_lifecycle_hook.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_abi_family",
+            report.compatibility_domain_abi_family.as_deref(),
+        ),
+        json_optional_string_field(
+            "compatibility_domain_wrapper_policy",
+            report.compatibility_domain_wrapper_policy.as_deref(),
+        ),
+        json_optional_bool_field(
+            "compatibility_domain_required",
+            report.compatibility_domain_required,
+        ),
+        format!(
+            "\"compatibility_domain_summary\":{}",
+            compatibility_domain_summary_json(
+                Some(report.compatibility_domain_count),
+                Some(&report.compatibility_domain_table_hash),
+                report.compatibility_domain_id.as_deref(),
+                report.compatibility_domain_kind.as_deref(),
+                report.compatibility_domain_paradigm.as_deref(),
+                report.compatibility_domain_lifecycle_hook.as_deref(),
+                report.compatibility_domain_abi_family.as_deref(),
+                report.compatibility_domain_wrapper_policy.as_deref(),
+                report.compatibility_domain_required,
+            )
         ),
         json_string_array_field("external_dependencies", &report.external_dependencies),
         json_string_array_field("unresolved", &report.unresolved),

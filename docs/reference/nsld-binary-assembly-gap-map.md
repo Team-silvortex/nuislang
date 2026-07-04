@@ -42,20 +42,24 @@ It currently owns:
 
 It does not yet own:
 
-* Mach-O, ELF, or PE object emission
+* optional Mach-O, ELF, or PE compatibility object emission
 * native relocation application
 * final executable entrypoint generation
 * Nuis lifecycle runtime bootstrapping
 * heterogeneous dispatch at runtime
 
-## Gap 1: Object Writer
+## Gap 1: Compatibility Object Writer
 
-Nsld needs a self-owned object writer layer.
+Nsld needs a self-owned binary assembly layer. A traditional object writer can
+be one backend of that layer, but it is not required to be the core
+representation. Nuis-native linking can consume structured link units, section
+manifests, clock/lifecycle metadata, GLM-compatible ownership metadata, and
+heterogeneous payloads directly.
 
 Minimum first target:
 
 * consume the section manifest and payload
-* write a host object container for one platform
+* optionally write a host object container for one platform
 * preserve Nsld section identity in object metadata where possible
 * keep Nsld hashes as source-of-truth verification metadata
 * avoid special C-world shortcuts outside the external import contract
@@ -146,11 +150,12 @@ nsld prepare
   -> nsld object-image-dry-run
 ```
 
-That gives the object writer a deterministic planning layer before bytes are
-emitted. It mirrors the existing assemble/container path and keeps the project
-moving without pretending the native executable story is finished. The current
-`object-plan` is intentionally `plan-only`; native object bytes and relocation
-application are still separate future layers.
+That gives the compatibility object writer a deterministic planning layer
+before bytes are emitted. It mirrors the existing assemble/container path and
+keeps the project moving without pretending the native executable story is
+finished. The current `object-plan` is intentionally non-mutating; native object
+bytes and relocation application remain optional compatibility/finalization
+layers rather than the mandatory internal form of Nsld.
 
 The plan already assigns each Nsld section a writer-facing object section
 record with a stable object section name, object section role, source section
@@ -168,10 +173,10 @@ platform family into the linker frontdoor.
 `verify-object-plan` now validates required object-section and relocation-seed
 fields plus semantic drift in both tables.
 `object-writer-readiness` exposes the same information as a command-level
-readiness gate before `emit-object` attempts byte emission.
-`emit-object` is now wired to the first minimal native object writer: prepared
-Mach-O arm64 input can be emitted as optional `nuis.nsld.mach-o` from the
-deterministic image bytes. Unprepared input, ELF, and COFF still report
+readiness gate before `emit-object` attempts compatibility byte emission.
+`emit-object` is now wired to the first minimal compatibility object writer:
+prepared Mach-O arm64 input can be emitted as optional `nuis.nsld.mach-o` from
+the deterministic image bytes. Unprepared input, ELF, and COFF still report
 blockers. The command also materializes diagnostic artifacts: the future byte
 writer's deterministic input snapshot, the alpha emit report at
 `nuis.nsld.object.blocked.toml`, and the object image dry-run report/bin pair.
@@ -185,6 +190,20 @@ additionally runs that verification when the object output is present, and
 Container planning also uses this validation as the native-object admission
 gate: an invalid object output becomes an `object-output:*` blocker instead of
 being repackaged as a `native-object-output` section.
+When the object is admitted, the Nsld container now also emits a
+`[[compatibility_domain]]` metadata entry for the CFFI / host-compat execution
+domain. That entry records the compatibility domain id, domain kind, classic
+von-Neumann host paradigm, lifecycle hook, ABI family, wrapper policy, and
+required flag, and its table hash participates in the container metadata hash.
+This object lane is intentionally optional. A future self-owned Nsld linker may
+emit a Nuis heterogeneous container or a host-native executable wrapper without
+round-tripping every internal unit through `.o`.
+For CFFI specifically, this native-object output can become a dedicated Nustar
+artifact lane inside the Nuis binary format: a compatibility payload admitted
+by hash, scheduled through explicit lifecycle hooks such as
+`on_cffi_native_object`, constrained by the CFFI signature whitelist, and
+wrapped by Nuis-owned memory/ownership metadata rather than being treated as an
+arbitrary native side call.
 `verify-object-writer-input` closes that snapshot loop by validating the writer
 input hashes, section and relocation-seed counts, and required writer table
 field types before a future byte writer consumes it.
@@ -208,6 +227,39 @@ families behind registered writer metadata rather than ad hoc linker branches.
 alongside its image-backend status fields, and verification rejects identity
 drift before any future real object writer treats the dry-run image as an
 emission input.
+For the Mach-O arm64 backend, the image encoder now writes readable Nsld
+section source bytes into the corresponding `section-payload` file-layout
+records. Missing source files still remain upstream readiness blockers rather
+than causing the dry-run image encoder to invent payload content.
+Mach-O section headers also now point at their deterministic relocation table
+slots with `reloff` / `nreloc`, so relocation seeds are visible through normal
+object-file section metadata instead of existing only as a detached Nsld table.
+The Mach-O relocation encoder resolves each relocation seed's source section id
+to the matching section symbol table index, instead of deriving the symbol index
+only from seed order. This is still not a complete native relocation applier,
+but it moves the object image closer to ordinary linker-visible semantics.
+If a relocation seed cannot resolve its source section to a Mach-O section
+symbol, the object-image backend now reports a structured
+`mach-o-relocation:*:unresolved-section-symbol:*` blocker instead of silently
+treating symbol index `0` as acceptable ready output.
+Mach-O arm64 also has the first seed-kind lowering registry: current
+bootstrap, metadata, data, and extension address seeds lower to conservative
+external pointer-sized unsigned relocations, while unknown seed kinds are
+reported as `mach-o-relocation:*:unsupported-seed-kind:*` blockers.
+`object-image-dry-run` reports this as structured metadata via
+`relocation_lowering_valid`, `relocation_lowering_rule_count`, and
+`relocation_lowering_issues`, so future linker gates do not need to infer
+relocation health from raw bytes.
+It also emits a machine-readable `[[relocation_lowering_rule]]` table and JSON
+`relocation_lowering_rules` array with source seed kind, target relocation kind,
+PC-relative mode, length power, external flag, and native relocation type.
+`verify-object-image-dry-run` also checks those fields directly, so relocation
+lowering drift is reported as a focused mismatch instead of only as a whole-file
+content change.
+The verify step now parses and compares each relocation lowering rule entry as
+well, so a rule can drift while keeping the same count and still produce a
+field-level diagnostic such as
+`relocation_lowering_rule[0].target_relocation_kind mismatch`.
 
 ## Success Boundary
 

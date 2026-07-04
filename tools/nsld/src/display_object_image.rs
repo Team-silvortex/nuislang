@@ -25,6 +25,29 @@ pub(crate) fn print_nsld_object_image_dry_run_report(report: &NsldObjectImageDry
         "  image_hash: {}",
         report.image_hash.as_deref().unwrap_or("missing")
     );
+    println!(
+        "  relocation_lowering_valid: {}",
+        report.relocation_lowering_valid
+    );
+    println!(
+        "  relocation_lowering_rule_count: {}",
+        report.relocation_lowering_rule_count
+    );
+    for issue in &report.relocation_lowering_issues {
+        println!("  relocation_lowering_issue: {issue}");
+    }
+    for rule in &report.relocation_lowering_rules {
+        println!(
+            "  relocation_lowering_rule: id={} source_seed_kind={} target={} pc_relative={} length_power={} external={} relocation_type={}",
+            rule.rule_id,
+            rule.source_seed_kind,
+            rule.target_relocation_kind,
+            rule.pc_relative,
+            rule.length_power,
+            rule.external,
+            rule.relocation_type
+        );
+    }
     for blocker in &report.blockers {
         println!("  blocker: {blocker}");
     }
@@ -112,6 +135,66 @@ pub(crate) fn print_nsld_object_image_dry_run_verify_report(
             .map(|value| value.to_string())
             .unwrap_or_else(|| "missing".to_owned())
     );
+    println!(
+        "  expected_relocation_lowering_valid: {}",
+        report.expected_relocation_lowering_valid
+    );
+    println!(
+        "  actual_relocation_lowering_valid: {}",
+        report
+            .actual_relocation_lowering_valid
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "missing".to_owned())
+    );
+    println!(
+        "  expected_relocation_lowering_rule_count: {}",
+        report.expected_relocation_lowering_rule_count
+    );
+    println!(
+        "  actual_relocation_lowering_rule_count: {}",
+        report
+            .actual_relocation_lowering_rule_count
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "missing".to_owned())
+    );
+    for issue in &report.expected_relocation_lowering_issues {
+        println!("  expected_relocation_lowering_issue: {issue}");
+    }
+    for issue in report
+        .actual_relocation_lowering_issues
+        .as_deref()
+        .unwrap_or(&[])
+    {
+        println!("  actual_relocation_lowering_issue: {issue}");
+    }
+    for rule in &report.expected_relocation_lowering_rules {
+        println!(
+            "  expected_relocation_lowering_rule: id={} source_seed_kind={} target={} pc_relative={} length_power={} external={} relocation_type={}",
+            rule.rule_id,
+            rule.source_seed_kind,
+            rule.target_relocation_kind,
+            rule.pc_relative,
+            rule.length_power,
+            rule.external,
+            rule.relocation_type
+        );
+    }
+    for rule in report
+        .actual_relocation_lowering_rules
+        .as_deref()
+        .unwrap_or(&[])
+    {
+        println!(
+            "  actual_relocation_lowering_rule: id={} source_seed_kind={} target={} pc_relative={} length_power={} external={} relocation_type={}",
+            rule.rule_id,
+            rule.source_seed_kind,
+            rule.target_relocation_kind,
+            rule.pc_relative,
+            rule.length_power,
+            rule.external,
+            rule.relocation_type
+        );
+    }
     println!(
         "  actual_image_file_size_bytes: {}",
         optional_usize_text(report.actual_image_file_size_bytes)
