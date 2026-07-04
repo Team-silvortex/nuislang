@@ -320,7 +320,7 @@ fn nsld_object_byte_layout_hash(
 mod tests {
     use super::{nsld_emit_object_byte_layout_report, nsld_verify_object_byte_layout_report};
     use crate::{
-        main_test_support::empty_link_plan, object_plan::nsld_emit_object_report,
+        main_test_support::empty_link_plan, object_emit::nsld_emit_object_report,
         object_writer_input::nsld_emit_object_writer_dry_run_report,
     };
     use std::{fs, path::Path};

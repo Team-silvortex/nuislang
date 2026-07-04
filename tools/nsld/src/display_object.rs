@@ -116,21 +116,6 @@ pub(crate) fn print_nsld_object_writer_readiness_report(report: &NsldObjectWrite
     }
 }
 
-pub(crate) fn print_nsld_object_emit_report(report: &NsldObjectEmitReport) {
-    println!("Nsld object emit");
-    println!("  manifest: {}", report.manifest);
-    println!("  output_path: {}", report.output_path);
-    println!("  writer_input_path: {}", report.writer_input_path);
-    println!("  blocked_report_path: {}", report.blocked_report_path);
-    println!("  writer_target_id: {}", report.writer_target_id);
-    println!("  object_plan_hash: {}", report.object_plan_hash);
-    println!("  emitted: {}", report.emitted);
-    println!("  can_emit_object: {}", report.can_emit_object);
-    for blocker in &report.blockers {
-        println!("  blocker: {blocker}");
-    }
-}
-
 pub(crate) fn print_nsld_object_writer_input_verify_report(
     report: &NsldObjectWriterInputVerifyReport,
 ) {

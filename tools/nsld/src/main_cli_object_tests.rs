@@ -97,6 +97,25 @@ fn parses_emit_object_input_and_json_flag() {
 }
 
 #[test]
+fn parses_verify_object_emit_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "verify-object-emit".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::VerifyObjectEmit {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
 fn parses_verify_object_writer_input_input_and_json_flag() {
     let command = parse_args(
         vec![
@@ -280,6 +299,63 @@ fn parses_verify_object_file_layout_input_and_json_flag() {
     assert_eq!(
         command,
         Ok(Command::VerifyObjectFileLayout {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_object_image_dry_run_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "object-image-dry-run".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::ObjectImageDryRun {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_emit_object_image_dry_run_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "emit-object-image-dry-run".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::EmitObjectImageDryRun {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_verify_object_image_dry_run_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "verify-object-image-dry-run".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::VerifyObjectImageDryRun {
             input: PathBuf::from("out"),
             json: true
         })

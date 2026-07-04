@@ -2,6 +2,8 @@ pub(crate) use super::display_check::print_check_report;
 pub(crate) use super::display_container::*;
 pub(crate) use super::display_link_tables::*;
 pub(crate) use super::display_object::*;
+pub(crate) use super::display_object_emit::*;
+pub(crate) use super::display_object_image::*;
 
 use super::reports::*;
 

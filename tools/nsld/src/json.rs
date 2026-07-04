@@ -1,5 +1,7 @@
 pub(crate) use super::json_container::*;
 pub(crate) use super::json_object::*;
+pub(crate) use super::json_object_emit::*;
+pub(crate) use super::json_object_image::*;
 
 use super::{json_fields::*, json_fragments::*, reports::*};
 

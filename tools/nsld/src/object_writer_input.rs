@@ -446,7 +446,7 @@ fn writer_relocation_seed_table_mismatch_issues(
 mod tests {
     use super::nsld_object_writer_dry_run_report;
     use super::{nsld_emit_object_writer_dry_run_report, nsld_verify_object_writer_dry_run_report};
-    use crate::{main_test_support::empty_link_plan, object_plan::nsld_emit_object_report};
+    use crate::{main_test_support::empty_link_plan, object_emit::nsld_emit_object_report};
     use std::{fs, path::Path};
 
     #[test]

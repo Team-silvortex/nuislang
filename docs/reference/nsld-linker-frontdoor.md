@@ -69,6 +69,8 @@ cargo run -p nsld -- object-writer-readiness <artifact-output-dir>
 cargo run -p nsld -- object-writer-readiness <artifact-output-dir> --json
 cargo run -p nsld -- emit-object <artifact-output-dir>
 cargo run -p nsld -- emit-object <artifact-output-dir> --json
+cargo run -p nsld -- verify-object-emit <artifact-output-dir>
+cargo run -p nsld -- verify-object-emit <artifact-output-dir> --json
 cargo run -p nsld -- verify-object-writer-input <artifact-output-dir>
 cargo run -p nsld -- verify-object-writer-input <artifact-output-dir> --json
 cargo run -p nsld -- object-writer-dry-run <artifact-output-dir>
@@ -256,10 +258,13 @@ presence/types, and mapping/seed drift.
 plan. It reports whether object emission is currently allowed for the selected
 writer target.
 `nsld emit-object` already exists as a structured frontdoor, but in the current
-alpha it intentionally reports `emitted = false` and exits with failure while
-the object byte emitter and native relocation applier are still blocked.
-It still writes `nuis.nsld.object-writer-input.toml`, a byte-writer input
-snapshot that contains section layout seeds and relocation seeds.
+alpha it intentionally reports `emitted = false` while the object byte emitter
+and native relocation applier are still blocked. The command succeeds when it
+materializes the current diagnostic artifacts: `nuis.nsld.object-writer-input.toml`,
+`nuis.nsld.object.blocked.toml`, `nuis.nsld.object-image-dry-run.toml`, and
+`nuis.nsld.object-image-dry-run.bin`.
+`nsld verify-object-emit` checks that the blocked emit report and image dry-run
+artifacts still agree on the object plan hash and dry-run image hash.
 `nsld verify-object-writer-input` checks that this snapshot still matches the
 current object plan hashes, section count, relocation seed count, and required
 writer table field types.

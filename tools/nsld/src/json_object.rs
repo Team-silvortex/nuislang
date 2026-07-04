@@ -93,23 +93,6 @@ pub(crate) fn nsld_object_writer_readiness_report_json(
     format!("{{{}}}", fields.join(","))
 }
 
-pub(crate) fn nsld_object_emit_report_json(report: &NsldObjectEmitReport) -> String {
-    let fields = vec![
-        json_string_field("tool", "nsld"),
-        json_string_field("kind", "nsld_object_emit"),
-        json_string_field("manifest", &report.manifest),
-        json_string_field("output_path", &report.output_path),
-        json_string_field("writer_input_path", &report.writer_input_path),
-        json_string_field("blocked_report_path", &report.blocked_report_path),
-        json_string_field("writer_target_id", &report.writer_target_id),
-        json_string_field("object_plan_hash", &report.object_plan_hash),
-        json_bool_field("emitted", report.emitted),
-        json_bool_field("can_emit_object", report.can_emit_object),
-        json_string_array_field("blockers", &report.blockers),
-    ];
-    format!("{{{}}}", fields.join(","))
-}
-
 pub(crate) fn nsld_object_writer_input_verify_report_json(
     report: &NsldObjectWriterInputVerifyReport,
 ) -> String {

@@ -93,11 +93,27 @@ pub(crate) struct NsldObjectEmitReport {
     pub(crate) output_path: String,
     pub(crate) writer_input_path: String,
     pub(crate) blocked_report_path: String,
+    pub(crate) image_dry_run_report_path: String,
+    pub(crate) image_dry_run_path: String,
+    pub(crate) image_dry_run_hash: Option<String>,
     pub(crate) writer_target_id: String,
     pub(crate) object_plan_hash: String,
     pub(crate) emitted: bool,
     pub(crate) can_emit_object: bool,
     pub(crate) blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectEmitVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_object_plan_hash: String,
+    pub(crate) expected_image_dry_run_hash: Option<String>,
+    pub(crate) actual_object_plan_hash: Option<String>,
+    pub(crate) actual_image_dry_run_hash: Option<String>,
+    pub(crate) image_dry_run_report_valid: bool,
+    pub(crate) issues: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -262,5 +278,62 @@ pub(crate) struct NsldObjectFileLayoutVerifyReport {
     pub(crate) actual_file_layout_hash: Option<String>,
     pub(crate) actual_record_count: Option<usize>,
     pub(crate) actual_total_file_size_bytes: Option<usize>,
+    pub(crate) issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectImageDryRunReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) image_path: String,
+    pub(crate) writer_target_id: String,
+    pub(crate) backend_kind: String,
+    pub(crate) backend_family: String,
+    pub(crate) backend_status: String,
+    pub(crate) object_format: String,
+    pub(crate) file_layout_hash: String,
+    pub(crate) record_count: usize,
+    pub(crate) total_file_size_bytes: usize,
+    pub(crate) image_constructed: bool,
+    pub(crate) image_ready: bool,
+    pub(crate) image_size_bytes: Option<usize>,
+    pub(crate) image_hash: Option<String>,
+    pub(crate) blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectImageDryRunEmitReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) image_path: String,
+    pub(crate) image_emitted: bool,
+    pub(crate) image_constructed: bool,
+    pub(crate) image_ready: bool,
+    pub(crate) image_size_bytes: Option<usize>,
+    pub(crate) image_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectImageDryRunVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) image_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_backend_family: String,
+    pub(crate) expected_backend_status: String,
+    pub(crate) expected_file_layout_hash: String,
+    pub(crate) expected_image_constructed: bool,
+    pub(crate) expected_image_ready: bool,
+    pub(crate) expected_image_size_bytes: Option<usize>,
+    pub(crate) expected_image_hash: Option<String>,
+    pub(crate) actual_file_layout_hash: Option<String>,
+    pub(crate) actual_backend_family: Option<String>,
+    pub(crate) actual_backend_status: Option<String>,
+    pub(crate) actual_image_constructed: Option<bool>,
+    pub(crate) actual_image_ready: Option<bool>,
+    pub(crate) actual_image_size_bytes: Option<usize>,
+    pub(crate) actual_image_hash: Option<String>,
+    pub(crate) actual_image_file_size_bytes: Option<usize>,
+    pub(crate) actual_image_file_hash: Option<String>,
     pub(crate) issues: Vec<String>,
 }

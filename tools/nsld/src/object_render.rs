@@ -1,6 +1,6 @@
 use super::{
     reports::{NsldObjectByteLayoutReport, NsldObjectFileLayoutReport},
-    reports::{NsldObjectEmitReport, NsldObjectPlanReport, NsldObjectWriterDryRunReport},
+    reports::{NsldObjectPlanReport, NsldObjectWriterDryRunReport},
     toml::{escape_toml_string, toml_string_array_literal},
     NSLD_LINK_INPUT_TABLE_PRODUCER, NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE, NSLD_OBJECT_PLAN_KIND,
     NSLD_OBJECT_PLAN_SCHEMA, NSLD_OBJECT_PLAN_SCHEMA_VERSION,
@@ -298,52 +298,6 @@ pub(crate) fn render_object_writer_input(report: &NsldObjectPlanReport) -> Strin
             seed.native_relocation_ready
         ));
     }
-    out
-}
-
-pub(crate) fn render_object_emit_blocked(report: &NsldObjectEmitReport) -> String {
-    let mut out = String::new();
-    out.push_str("schema = \"nuis-nsld-object-emit-blocked-v1\"\n");
-    out.push_str("schema_version = 1\n");
-    out.push_str("kind = \"object-emit-blocked\"\n");
-    out.push_str(&format!(
-        "producer = \"{}\"\n",
-        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
-    ));
-    out.push_str(&format!(
-        "producer_phase = \"{}\"\n",
-        escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
-    ));
-    out.push_str(&format!(
-        "manifest = \"{}\"\n",
-        escape_toml_string(&report.manifest)
-    ));
-    out.push_str(&format!(
-        "output_path = \"{}\"\n",
-        escape_toml_string(&report.output_path)
-    ));
-    out.push_str(&format!(
-        "writer_input_path = \"{}\"\n",
-        escape_toml_string(&report.writer_input_path)
-    ));
-    out.push_str(&format!(
-        "blocked_report_path = \"{}\"\n",
-        escape_toml_string(&report.blocked_report_path)
-    ));
-    out.push_str(&format!(
-        "writer_target_id = \"{}\"\n",
-        escape_toml_string(&report.writer_target_id)
-    ));
-    out.push_str(&format!(
-        "object_plan_hash = \"{}\"\n",
-        escape_toml_string(&report.object_plan_hash)
-    ));
-    out.push_str(&format!("emitted = {}\n", report.emitted));
-    out.push_str(&format!("can_emit_object = {}\n", report.can_emit_object));
-    out.push_str(&format!(
-        "blockers = [{}]\n",
-        toml_string_array_literal(&report.blockers)
-    ));
     out
 }
 
