@@ -50,6 +50,9 @@ pub(crate) struct NsldCheckReport {
     pub(crate) object_image_relocation_lowering_rule_count: Option<usize>,
     pub(crate) object_image_relocation_lowering_rules: Vec<NsldRelocationLoweringRuleDiagnostic>,
     pub(crate) object_image_relocation_lowering_issues: Vec<String>,
+    pub(crate) object_image_relocation_record_count: Option<usize>,
+    pub(crate) object_image_relocation_record_table_hash: Option<String>,
+    pub(crate) object_image_relocation_records: Vec<NsldObjectImageRelocationRecordDiagnostic>,
     pub(crate) object_image_dry_run_bytes_present: bool,
     pub(crate) object_emit_blocked_present: bool,
     pub(crate) object_emit_blocked_valid: Option<bool>,
@@ -77,6 +80,25 @@ pub(crate) struct NsldCheckReport {
     pub(crate) container_external_import_issues: Vec<String>,
     pub(crate) container_payload_present: bool,
     pub(crate) container_payload_issues: Vec<String>,
+    pub(crate) closure_snapshot_present: bool,
+    pub(crate) closure_snapshot_valid: Option<bool>,
+    pub(crate) closure_snapshot_issues: Vec<String>,
+    pub(crate) closure_snapshot_linker_contract_hash: Option<String>,
+    pub(crate) closure_snapshot_container_hash: Option<String>,
+    pub(crate) closure_snapshot_payload_size_bytes: Option<usize>,
+    pub(crate) closure_snapshot_payload_hash: Option<String>,
+    pub(crate) final_stage_plan_present: bool,
+    pub(crate) final_stage_plan_valid: Option<bool>,
+    pub(crate) final_stage_plan_ready: Option<bool>,
+    pub(crate) final_stage_plan_hash: Option<String>,
+    pub(crate) final_stage_plan_blocker_count: Option<usize>,
+    pub(crate) final_stage_plan_issues: Vec<String>,
+    pub(crate) final_executable_blocked_present: bool,
+    pub(crate) final_executable_blocked_valid: Option<bool>,
+    pub(crate) final_executable_blocked_emitted: Option<bool>,
+    pub(crate) final_executable_blocked_plan_hash: Option<String>,
+    pub(crate) final_executable_blocked_blocker_count: Option<usize>,
+    pub(crate) final_executable_blocked_issues: Vec<String>,
     pub(crate) container_loader_readiness: Option<String>,
     pub(crate) container_loader_blockers: Vec<String>,
     pub(crate) container_metadata_table_hash: Option<String>,
@@ -104,6 +126,36 @@ pub(crate) struct NsldCheckReport {
     pub(crate) clock_edges: Vec<NsldClockEdgeDiagnostic>,
     pub(crate) data_segments: Vec<NsldDataSegmentDiagnostic>,
     pub(crate) issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldArtifactChainReport {
+    pub(crate) manifest: String,
+    pub(crate) output_dir: String,
+    pub(crate) valid: bool,
+    pub(crate) stage_count: usize,
+    pub(crate) present_count: usize,
+    pub(crate) required_count: usize,
+    pub(crate) missing_required_count: usize,
+    pub(crate) optional_present_count: usize,
+    pub(crate) first_missing_required_stage: Option<String>,
+    pub(crate) next_required_stage: Option<String>,
+    pub(crate) suggested_command_id: Option<String>,
+    pub(crate) suggested_command: Option<String>,
+    pub(crate) suggested_command_resolved: Option<String>,
+    pub(crate) suggested_command_reason: Option<String>,
+    pub(crate) stages: Vec<NsldArtifactStageDiagnostic>,
+    pub(crate) issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldArtifactStageDiagnostic {
+    pub(crate) order_index: usize,
+    pub(crate) stage_id: String,
+    pub(crate) file_name: String,
+    pub(crate) path: String,
+    pub(crate) required: bool,
+    pub(crate) present: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -159,6 +211,7 @@ pub(crate) struct NsldClosureReport {
     pub(crate) manifest: String,
     pub(crate) closed: bool,
     pub(crate) internal_contracts: Vec<String>,
+    pub(crate) linker_contract_hash: String,
     pub(crate) link_inputs: Vec<NsldLinkInputDiagnostic>,
     pub(crate) link_input_count: usize,
     pub(crate) link_input_total_bytes: usize,
@@ -168,6 +221,10 @@ pub(crate) struct NsldClosureReport {
     pub(crate) prepared_artifact_chain_valid: bool,
     pub(crate) prepared_artifact_chain_issues: Vec<String>,
     pub(crate) container_metadata_table_hash: String,
+    pub(crate) container_layout_hash: String,
+    pub(crate) container_hash: String,
+    pub(crate) payload_size_bytes: usize,
+    pub(crate) payload_hash: String,
     pub(crate) container_loader_readiness: String,
     pub(crate) compatibility_domain_count: usize,
     pub(crate) compatibility_domain_table_hash: String,
@@ -178,6 +235,13 @@ pub(crate) struct NsldClosureReport {
     pub(crate) compatibility_domain_abi_family: Option<String>,
     pub(crate) compatibility_domain_wrapper_policy: Option<String>,
     pub(crate) compatibility_domain_required: Option<bool>,
+    pub(crate) object_image_relocation_lowering_valid: Option<bool>,
+    pub(crate) object_image_relocation_lowering_rule_count: Option<usize>,
+    pub(crate) object_image_relocation_lowering_rules: Vec<NsldRelocationLoweringRuleDiagnostic>,
+    pub(crate) object_image_relocation_lowering_issues: Vec<String>,
+    pub(crate) object_image_relocation_record_count: Option<usize>,
+    pub(crate) object_image_relocation_record_table_hash: Option<String>,
+    pub(crate) object_image_relocation_records: Vec<NsldObjectImageRelocationRecordDiagnostic>,
     pub(crate) external_dependencies: Vec<String>,
     pub(crate) unresolved: Vec<String>,
     pub(crate) host_wrapper_required: bool,
@@ -187,6 +251,38 @@ pub(crate) struct NsldClosureReport {
     pub(crate) clock_edge_count: usize,
     pub(crate) data_segment_count: usize,
     pub(crate) final_stage_link_mode: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldClosureEmitReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) linker_contract_hash: String,
+    pub(crate) closed: bool,
+    pub(crate) internal_contract_count: usize,
+    pub(crate) unresolved_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldClosureVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_linker_contract_hash: String,
+    pub(crate) expected_container_hash: String,
+    pub(crate) expected_payload_size_bytes: usize,
+    pub(crate) expected_payload_hash: String,
+    pub(crate) expected_closed: bool,
+    pub(crate) expected_internal_contract_count: usize,
+    pub(crate) expected_unresolved_count: usize,
+    pub(crate) actual_linker_contract_hash: Option<String>,
+    pub(crate) actual_container_hash: Option<String>,
+    pub(crate) actual_payload_size_bytes: Option<usize>,
+    pub(crate) actual_payload_hash: Option<String>,
+    pub(crate) actual_closed: Option<bool>,
+    pub(crate) actual_internal_contract_count: Option<usize>,
+    pub(crate) actual_unresolved_count: Option<usize>,
+    pub(crate) issues: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -287,6 +383,92 @@ pub(crate) struct NsldLinkBundleVerifyReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldFinalStagePlanReport {
+    pub(crate) manifest: String,
+    pub(crate) ready: bool,
+    pub(crate) plan_hash: String,
+    pub(crate) final_stage_kind: String,
+    pub(crate) final_stage_driver: String,
+    pub(crate) final_stage_link_mode: String,
+    pub(crate) final_output_path: String,
+    pub(crate) host_wrapper_required: bool,
+    pub(crate) compatibility_mode: String,
+    pub(crate) input_count: usize,
+    pub(crate) inputs: Vec<NsldFinalStageInputDiagnostic>,
+    pub(crate) container_hash: String,
+    pub(crate) payload_hash: String,
+    pub(crate) linker_contract_hash: String,
+    pub(crate) native_object_required: bool,
+    pub(crate) native_object_present: bool,
+    pub(crate) blockers: Vec<String>,
+    pub(crate) notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldFinalStageInputDiagnostic {
+    pub(crate) order_index: usize,
+    pub(crate) input_id: String,
+    pub(crate) input_kind: String,
+    pub(crate) path: String,
+    pub(crate) content_hash: String,
+    pub(crate) required: bool,
+    pub(crate) present: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldFinalStagePlanEmitReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) ready: bool,
+    pub(crate) plan_hash: String,
+    pub(crate) input_count: usize,
+    pub(crate) blocker_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldFinalStagePlanVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_plan_hash: String,
+    pub(crate) expected_input_count: usize,
+    pub(crate) actual_plan_hash: Option<String>,
+    pub(crate) actual_input_count: Option<usize>,
+    pub(crate) issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldFinalExecutableEmitReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) blocked_report_path: String,
+    pub(crate) emitted: bool,
+    pub(crate) can_emit_final_executable: bool,
+    pub(crate) final_stage_ready: bool,
+    pub(crate) final_stage_plan_hash: String,
+    pub(crate) final_stage_driver: String,
+    pub(crate) final_stage_link_mode: String,
+    pub(crate) host_wrapper_required: bool,
+    pub(crate) input_count: usize,
+    pub(crate) blockers: Vec<String>,
+    pub(crate) notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldFinalExecutableEmitVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_final_stage_plan_hash: String,
+    pub(crate) actual_final_stage_plan_hash: Option<String>,
+    pub(crate) expected_emitted: bool,
+    pub(crate) actual_emitted: Option<bool>,
+    pub(crate) expected_blocker_count: usize,
+    pub(crate) actual_blocker_count: Option<usize>,
+    pub(crate) issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldPrepareReport {
     pub(crate) manifest: String,
     pub(crate) valid: bool,
@@ -308,6 +490,8 @@ pub(crate) struct NsldPrepareReport {
     pub(crate) container_plan_path: String,
     pub(crate) container_path: String,
     pub(crate) container_payload_path: String,
+    pub(crate) closure_snapshot_path: String,
+    pub(crate) final_stage_plan_path: String,
     pub(crate) link_input_count: usize,
     pub(crate) link_input_table_hash: String,
     pub(crate) unit_count: usize,
@@ -326,6 +510,9 @@ pub(crate) struct NsldPrepareReport {
     pub(crate) object_image_relocation_lowering_rule_count: usize,
     pub(crate) object_image_relocation_lowering_rules: Vec<NsldRelocationLoweringRuleDiagnostic>,
     pub(crate) object_image_relocation_lowering_issues: Vec<String>,
+    pub(crate) object_image_relocation_record_count: usize,
+    pub(crate) object_image_relocation_record_table_hash: String,
+    pub(crate) object_image_relocation_records: Vec<NsldObjectImageRelocationRecordDiagnostic>,
     pub(crate) metadata_table_hash: String,
     pub(crate) compatibility_domain_count: Option<usize>,
     pub(crate) compatibility_domain_table_hash: Option<String>,
@@ -340,6 +527,9 @@ pub(crate) struct NsldPrepareReport {
     pub(crate) container_hash: String,
     pub(crate) payload_size_bytes: usize,
     pub(crate) payload_hash: String,
+    pub(crate) final_stage_plan_ready: bool,
+    pub(crate) final_stage_plan_hash: String,
+    pub(crate) final_stage_plan_blocker_count: usize,
     pub(crate) issues: Vec<String>,
 }
 

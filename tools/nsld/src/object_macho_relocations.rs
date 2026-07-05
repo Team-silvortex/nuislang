@@ -2,8 +2,8 @@ use super::{
     object_macho_symbols::mach_o_arm64_section_symbol_index,
     object_plan::nsld_object_plan_report,
     reports::{
-        NsldObjectFileLayoutReport, NsldObjectRelocationSeedDiagnostic,
-        NsldRelocationLoweringRuleDiagnostic,
+        NsldObjectFileLayoutReport, NsldObjectImageRelocationRecordDiagnostic,
+        NsldObjectRelocationSeedDiagnostic, NsldRelocationLoweringRuleDiagnostic,
     },
 };
 use std::path::Path;
@@ -17,6 +17,8 @@ pub(crate) struct NsldMachORelocationTablePlan {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldMachORelocationPlan {
+    pub(crate) relocation_seed_id: String,
+    pub(crate) source_section_id: String,
     pub(crate) address: u32,
     pub(crate) symbol_index: u32,
     pub(crate) seed_kind: String,
@@ -24,6 +26,37 @@ pub(crate) struct NsldMachORelocationPlan {
     pub(crate) length_power: u8,
     pub(crate) external: bool,
     pub(crate) relocation_type: u8,
+}
+
+pub(crate) fn mach_o_arm64_relocation_records(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+    file_layout: &NsldObjectFileLayoutReport,
+) -> Vec<NsldObjectImageRelocationRecordDiagnostic> {
+    mach_o_arm64_relocation_table_plan(manifest, plan, file_layout)
+        .map(|table| {
+            table
+                .relocations
+                .iter()
+                .enumerate()
+                .map(
+                    |(index, relocation)| NsldObjectImageRelocationRecordDiagnostic {
+                        record_id: format!("macho-arm64-reloc-record-{index:04}"),
+                        relocation_seed_id: relocation.relocation_seed_id.clone(),
+                        source_section_id: relocation.source_section_id.clone(),
+                        source_offset: relocation.address as usize,
+                        source_seed_kind: relocation.seed_kind.clone(),
+                        target_relocation_kind: "arm64-unsigned-pointer".to_owned(),
+                        symbol_index: relocation.symbol_index,
+                        pc_relative: relocation.pc_relative,
+                        length_power: relocation.length_power,
+                        external: relocation.external,
+                        relocation_type: relocation.relocation_type,
+                    },
+                )
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub(crate) fn mach_o_arm64_relocation_table_plan(
@@ -136,6 +169,8 @@ fn relocation_plan(
     let kind = mach_o_arm64_relocation_kind(&seed.relocation_seed_kind)
         .unwrap_or_else(mach_o_arm64_unknown_relocation_kind);
     NsldMachORelocationPlan {
+        relocation_seed_id: seed.relocation_seed_id.clone(),
+        source_section_id: seed.source_section_id.clone(),
         address: seed.source_offset_seed as u32,
         symbol_index: mach_o_arm64_section_symbol_index(file_layout, &seed.source_section_id)
             .unwrap_or(0) as u32,
@@ -197,7 +232,8 @@ fn write_u32_le(bytes: &mut [u8], offset: usize, value: u32) {
 mod tests {
     use super::{
         encode_mach_o_relocations, mach_o_arm64_relocation_lowering_rules,
-        mach_o_arm64_relocation_resolution_issues, mach_o_arm64_relocation_table_plan,
+        mach_o_arm64_relocation_records, mach_o_arm64_relocation_resolution_issues,
+        mach_o_arm64_relocation_table_plan,
     };
     use crate::{
         main_test_support::empty_link_plan, object_file_layout::nsld_object_file_layout_report,
@@ -223,6 +259,22 @@ mod tests {
         assert_eq!(bytes.len(), 32);
         assert_eq!(&bytes[0..4], &[0, 0, 0, 0]);
         assert_eq!(&bytes[4..8], &[1, 0, 0, 0x0e]);
+    }
+
+    #[test]
+    fn exposes_mach_o_relocation_records_for_diagnostics() {
+        let plan = empty_link_plan();
+        let manifest = Path::new("manifest.toml");
+        let file_layout = nsld_object_file_layout_report(manifest, &plan);
+        let records = mach_o_arm64_relocation_records(manifest, &plan, &file_layout);
+
+        assert_eq!(records.len(), 4);
+        assert_eq!(records[0].record_id, "macho-arm64-reloc-record-0000");
+        assert_eq!(records[0].relocation_seed_id, "orel0000.compiled_artifact");
+        assert_eq!(records[0].source_section_id, "sec0000.compiled-artifact");
+        assert_eq!(records[0].source_seed_kind, "bootstrap-entry-seed");
+        assert_eq!(records[0].target_relocation_kind, "arm64-unsigned-pointer");
+        assert_eq!(records[0].symbol_index, 1);
     }
 
     #[test]

@@ -15,14 +15,24 @@ link plan
   -> assemble plan
   -> section manifest
   -> object plan
+  -> object writer input
+  -> object byte layout
+  -> object file layout
+  -> object image dry run
   -> container plan
   -> container metadata
   -> container payload
+  -> closure snapshot
+  -> final-stage plan
 ```
 
 `nsld prepare` can emit and verify this chain today. This is already useful
 because it gives linker, cache, release, and debugger work one reproducible
-artifact boundary.
+artifact boundary. The final closure snapshot records the current
+`linker_contract_hash`, plus container and payload hash anchors, making later
+Nsld, cache, and debugger work able to detect linker-contract or assembly-input
+drift without treating the snapshot as part of its own self-verification
+material.
 
 ## Current Artifact Meaning
 
@@ -39,12 +49,15 @@ It currently owns:
 * external import records
 * payload hash and container hash
 * verification of metadata and payload consistency
+* deterministic final-stage plan before executable finalization
+* deterministic blocked final-executable emission report
 
 It does not yet own:
 
 * optional Mach-O, ELF, or PE compatibility object emission
 * native relocation application
 * final executable entrypoint generation
+* host-shell or Nuis-native executable materialization
 * Nuis lifecycle runtime bootstrapping
 * heterogeneous dispatch at runtime
 
@@ -253,6 +266,13 @@ relocation health from raw bytes.
 It also emits a machine-readable `[[relocation_lowering_rule]]` table and JSON
 `relocation_lowering_rules` array with source seed kind, target relocation kind,
 PC-relative mode, length power, external flag, and native relocation type.
+The dry-run report now also emits `relocation_record_count`,
+`relocation_record_table_hash`, `[[relocation_record]]`, and JSON
+`relocation_records`, capturing the actual backend relocation records derived
+from the seeds: source section, source offset, seed id, seed kind, target
+relocation kind, native symbol index, and encoded relocation flags. This gives
+Nsld, nsdb, and later link metadata passes a structured, hashable audit surface
+instead of forcing them to decode raw Mach-O bytes.
 `verify-object-image-dry-run` also checks those fields directly, so relocation
 lowering drift is reported as a focused mismatch instead of only as a whole-file
 content change.
@@ -260,6 +280,8 @@ The verify step now parses and compares each relocation lowering rule entry as
 well, so a rule can drift while keeping the same count and still produce a
 field-level diagnostic such as
 `relocation_lowering_rule[0].target_relocation_kind mismatch`.
+It also compares relocation records field-by-field; for example, a changed
+symbol index is reported as `relocation_record[0].symbol_index mismatch`.
 
 ## Success Boundary
 

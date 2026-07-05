@@ -340,6 +340,9 @@ pub(crate) struct NsldObjectImageDryRunReport {
     pub(crate) relocation_lowering_rule_count: usize,
     pub(crate) relocation_lowering_rules: Vec<NsldRelocationLoweringRuleDiagnostic>,
     pub(crate) relocation_lowering_issues: Vec<String>,
+    pub(crate) relocation_record_count: usize,
+    pub(crate) relocation_record_table_hash: String,
+    pub(crate) relocation_records: Vec<NsldObjectImageRelocationRecordDiagnostic>,
     pub(crate) blockers: Vec<String>,
 }
 
@@ -348,6 +351,21 @@ pub(crate) struct NsldRelocationLoweringRuleDiagnostic {
     pub(crate) rule_id: String,
     pub(crate) source_seed_kind: String,
     pub(crate) target_relocation_kind: String,
+    pub(crate) pc_relative: bool,
+    pub(crate) length_power: u8,
+    pub(crate) external: bool,
+    pub(crate) relocation_type: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectImageRelocationRecordDiagnostic {
+    pub(crate) record_id: String,
+    pub(crate) relocation_seed_id: String,
+    pub(crate) source_section_id: String,
+    pub(crate) source_offset: usize,
+    pub(crate) source_seed_kind: String,
+    pub(crate) target_relocation_kind: String,
+    pub(crate) symbol_index: u32,
     pub(crate) pc_relative: bool,
     pub(crate) length_power: u8,
     pub(crate) external: bool,
@@ -385,6 +403,9 @@ pub(crate) struct NsldObjectImageDryRunVerifyReport {
     pub(crate) expected_relocation_lowering_rule_count: usize,
     pub(crate) expected_relocation_lowering_rules: Vec<NsldRelocationLoweringRuleDiagnostic>,
     pub(crate) expected_relocation_lowering_issues: Vec<String>,
+    pub(crate) expected_relocation_record_count: usize,
+    pub(crate) expected_relocation_record_table_hash: String,
+    pub(crate) expected_relocation_records: Vec<NsldObjectImageRelocationRecordDiagnostic>,
     pub(crate) actual_file_layout_hash: Option<String>,
     pub(crate) actual_writer_backend_kind: Option<String>,
     pub(crate) actual_object_family: Option<String>,
@@ -398,6 +419,9 @@ pub(crate) struct NsldObjectImageDryRunVerifyReport {
     pub(crate) actual_relocation_lowering_rule_count: Option<usize>,
     pub(crate) actual_relocation_lowering_rules: Option<Vec<NsldRelocationLoweringRuleDiagnostic>>,
     pub(crate) actual_relocation_lowering_issues: Option<Vec<String>>,
+    pub(crate) actual_relocation_record_count: Option<usize>,
+    pub(crate) actual_relocation_record_table_hash: Option<String>,
+    pub(crate) actual_relocation_records: Option<Vec<NsldObjectImageRelocationRecordDiagnostic>>,
     pub(crate) actual_image_file_size_bytes: Option<usize>,
     pub(crate) actual_image_file_hash: Option<String>,
     pub(crate) issues: Vec<String>,

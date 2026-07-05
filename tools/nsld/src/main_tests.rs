@@ -1,12 +1,16 @@
 use super::{
     artifact_chain::{
-        nsld_artifact_chain_issues, nsld_artifact_stage_file_name, nsld_artifact_stage_kind_path,
-        NsldArtifactStage, NsldArtifactStageKind,
+        nsld_artifact_chain_issues, nsld_artifact_chain_report, nsld_artifact_stage_file_name,
+        nsld_artifact_stage_kind_path, NsldArtifactStage, NsldArtifactStageKind,
     },
     fnv1a64_hex,
     main_test_support::empty_link_plan,
-    nsld_check_report, nsld_closure_report, nsld_link_input_diagnostics,
-    nsld_link_input_table_hash, nsld_prepare_report, nsld_sidecar_capability_diagnostics, toml,
+    nsld_check_report, nsld_closure_report, nsld_emit_closure_report,
+    nsld_emit_final_executable_report, nsld_emit_final_stage_plan_report,
+    nsld_final_executable_readiness_report, nsld_final_stage_plan_report,
+    nsld_link_input_diagnostics, nsld_link_input_table_hash, nsld_prepare_report,
+    nsld_sidecar_capability_diagnostics, nsld_verify_closure_report,
+    nsld_verify_final_executable_emit_report, nsld_verify_final_stage_plan_report, toml,
 };
 use crate::container_verify::{self, TomlFieldKind};
 use std::{env, fs, path::Path};
@@ -26,6 +30,11 @@ fn closure_reports_container_metadata_fingerprint() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(report.container_metadata_table_hash.starts_with("0x"));
+    assert!(report.container_layout_hash.starts_with("0x"));
+    assert!(report.container_hash.starts_with("0x"));
+    assert!(report.payload_size_bytes > 0);
+    assert!(report.payload_hash.starts_with("0x"));
+    assert!(report.linker_contract_hash.starts_with("0x"));
     assert!(matches!(
         report.container_loader_readiness.as_str(),
         "blocked" | "host-assisted" | "self-contained"
@@ -58,6 +67,11 @@ fn closure_reports_container_metadata_fingerprint() {
     );
     assert_eq!(report.compatibility_domain_required, Some(true));
     assert!(report_json.contains("\"container_metadata_table_hash\":\"0x"));
+    assert!(report_json.contains("\"container_layout_hash\":\"0x"));
+    assert!(report_json.contains("\"container_hash\":\"0x"));
+    assert!(report_json.contains("\"payload_size_bytes\":"));
+    assert!(report_json.contains("\"payload_hash\":\"0x"));
+    assert!(report_json.contains("\"linker_contract_hash\":\"0x"));
     assert!(report_json.contains("\"container_loader_readiness\":"));
     assert!(report_json.contains("\"compatibility_domain_count\":1"));
     assert!(report_json.contains("\"compatibility_domain_table_hash\":\"0x"));
@@ -73,6 +87,361 @@ fn closure_reports_container_metadata_fingerprint() {
     assert!(
         report_json.contains("\"compatibility_domain_summary\":{\"count\":1,\"table_hash\":\"0x")
     );
+}
+
+#[test]
+fn closure_linker_contract_hash_is_stable_and_contract_sensitive() {
+    let dir = env::temp_dir().join(format!("nsld-closure-contract-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    let first = nsld_closure_report(Path::new("manifest.toml"), &plan);
+    let second = nsld_closure_report(Path::new("manifest.toml"), &plan);
+    plan.final_stage.link_mode = "bundle-packaging".to_owned();
+    let changed = nsld_closure_report(Path::new("manifest.toml"), &plan);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert_eq!(first.linker_contract_hash, second.linker_contract_hash);
+    assert_ne!(first.linker_contract_hash, changed.linker_contract_hash);
+    assert!(changed
+        .external_dependencies
+        .iter()
+        .any(|dependency| dependency == "host-launcher-wrapper"));
+}
+
+#[test]
+fn verify_closure_reports_linker_contract_hash_drift() {
+    let dir = env::temp_dir().join(format!("nsld-closure-verify-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    let emit = nsld_emit_closure_report(Path::new("manifest.toml"), &plan).unwrap();
+    let verify = nsld_verify_closure_report(Path::new("manifest.toml"), &plan);
+    let snapshot_path = Path::new(&emit.output_path);
+    let damaged = fs::read_to_string(snapshot_path).unwrap().replace(
+        &format!("linker_contract_hash = \"{}\"", emit.linker_contract_hash),
+        "linker_contract_hash = \"0x0000000000000000\"",
+    );
+    fs::write(snapshot_path, damaged).unwrap();
+    let damaged_verify = nsld_verify_closure_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_closure_verify_report_json(&damaged_verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(verify.valid, "{:?}", verify.issues);
+    assert_eq!(
+        verify.actual_linker_contract_hash.as_deref(),
+        Some(emit.linker_contract_hash.as_str())
+    );
+    assert!(verify
+        .actual_container_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(verify
+        .actual_payload_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(verify
+        .actual_payload_size_bytes
+        .is_some_and(|size| size > 0));
+    assert!(!damaged_verify.valid);
+    assert!(damaged_verify.issues.iter().any(|issue| {
+        issue.starts_with("linker_contract_hash mismatch: expected 0x")
+            && issue.ends_with("found 0x0000000000000000")
+    }));
+    assert!(verify_json.contains("\"actual_linker_contract_hash\":\"0x0000000000000000\""));
+    assert!(verify_json.contains("\"actual_container_hash\":\"0x"));
+    assert!(verify_json.contains("\"actual_payload_hash\":\"0x"));
+}
+
+#[test]
+fn verify_closure_reports_container_hash_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-closure-container-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    let emit = nsld_emit_closure_report(Path::new("manifest.toml"), &plan).unwrap();
+    let snapshot_path = Path::new(&emit.output_path);
+    let snapshot = fs::read_to_string(snapshot_path).unwrap();
+    fs::write(
+        snapshot_path,
+        snapshot.replace(
+            "container_hash = \"",
+            "container_hash = \"0x1111111111111111",
+        ),
+    )
+    .unwrap();
+    let verify = nsld_verify_closure_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_closure_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert!(verify.issues.iter().any(|issue| {
+        issue.starts_with("container_hash mismatch: expected 0x")
+            && issue.contains("found 0x1111111111111111")
+    }));
+    assert!(verify_json.contains("\"actual_container_hash\":\"0x1111111111111111"));
+}
+
+#[test]
+fn final_stage_plan_reports_deterministic_boundary_after_prepare() {
+    let dir = env::temp_dir().join(format!("nsld-final-stage-plan-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_final_stage_plan_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_final_stage_plan_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.ready);
+    assert!(report.plan_hash.starts_with("0x"));
+    assert_eq!(report.final_stage_driver, "clang");
+    assert_eq!(report.final_stage_link_mode, "host-toolchain-finalize");
+    assert!(report.host_wrapper_required);
+    assert_eq!(report.compatibility_mode, "host-assisted-wrapper");
+    assert_eq!(report.input_count, 4);
+    assert!(report.inputs.iter().all(|input| input.present));
+    assert!(report.container_hash.starts_with("0x"));
+    assert!(report.payload_hash.starts_with("0x"));
+    assert!(report.linker_contract_hash.starts_with("0x"));
+    assert!(report.native_object_required);
+    assert!(report.native_object_present);
+    assert!(report
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "self-owned-final-native-linker"));
+    assert!(report_json.contains("\"kind\":\"nsld_final_stage_plan\""));
+    assert!(report_json.contains("\"plan_hash\":\"0x"));
+    assert!(report_json.contains("\"final_stage_driver\":\"clang\""));
+    assert!(report_json.contains("\"input_count\":4"));
+    assert!(report_json.contains("\"inputs\":[{"));
+    assert!(report_json.contains("\"input_id\":\"fsi0002.closure-snapshot\""));
+    assert!(report_json.contains("\"container_hash\":\"0x"));
+    assert!(report_json.contains("\"payload_hash\":\"0x"));
+}
+
+#[test]
+fn final_executable_readiness_reports_without_writing_blocked_artifact() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-readiness-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_final_executable_readiness_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_final_executable_readiness_report_json(&report);
+    let blocked_path = nsld_artifact_stage_kind_path(
+        &plan.output_dir,
+        NsldArtifactStageKind::FinalExecutableBlocked,
+    );
+    let blocked_present = blocked_path.exists();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.emitted);
+    assert!(!report.can_emit_final_executable);
+    assert!(!report.final_stage_ready);
+    assert_eq!(
+        report.blocked_report_path,
+        blocked_path.display().to_string()
+    );
+    assert!(!blocked_present);
+    assert!(report
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "self-owned-final-native-linker"));
+    assert!(report_json.contains("\"kind\":\"nsld_final_executable_readiness\""));
+    assert!(report_json.contains("\"emitted\":false"));
+    assert!(report_json.contains("\"blocked_report_path\":\""));
+}
+
+#[test]
+fn verify_final_stage_plan_reports_plan_hash_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-stage-plan-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit = nsld_emit_final_stage_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    let verify = nsld_verify_final_stage_plan_report(Path::new("manifest.toml"), &plan);
+    let plan_path = Path::new(&emit.output_path);
+    let damaged = fs::read_to_string(plan_path).unwrap().replace(
+        &format!("plan_hash = \"{}\"", emit.plan_hash),
+        "plan_hash = \"0x2222222222222222\"",
+    );
+    fs::write(plan_path, damaged).unwrap();
+    let damaged_verify = nsld_verify_final_stage_plan_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_stage_plan_verify_report_json(&damaged_verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(verify.valid, "{:?}", verify.issues);
+    assert_eq!(
+        verify.actual_plan_hash.as_deref(),
+        Some(emit.plan_hash.as_str())
+    );
+    assert!(!damaged_verify.valid);
+    assert!(damaged_verify.issues.iter().any(|issue| {
+        issue.starts_with("plan_hash mismatch: expected 0x")
+            && issue.ends_with("found 0x2222222222222222")
+    }));
+    assert!(verify_json.contains("\"actual_plan_hash\":\"0x2222222222222222\""));
+}
+
+#[test]
+fn emit_final_executable_writes_blocked_boundary_report() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-blocked-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit = nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let verify = nsld_verify_final_executable_emit_report(Path::new("manifest.toml"), &plan);
+    let emit_json = super::json::nsld_final_executable_emit_report_json(&emit);
+    let report_source = fs::read_to_string(&emit.blocked_report_path).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!emit.emitted);
+    assert!(!emit.can_emit_final_executable);
+    assert!(!emit.final_stage_ready);
+    assert!(emit.final_stage_plan_hash.starts_with("0x"));
+    assert_eq!(emit.final_stage_driver, "clang");
+    assert_eq!(emit.final_stage_link_mode, "host-toolchain-finalize");
+    assert!(emit.host_wrapper_required);
+    assert_eq!(emit.input_count, 4);
+    assert!(emit
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "self-owned-final-native-linker"));
+    assert!(emit
+        .notes
+        .iter()
+        .any(|note| note == "final-executable-emit-is-contract-only"));
+    assert_eq!(
+        emit.blocked_report_path,
+        nsld_artifact_stage_kind_path(
+            &plan.output_dir,
+            NsldArtifactStageKind::FinalExecutableBlocked
+        )
+        .display()
+        .to_string()
+    );
+    assert!(verify.valid, "{:?}", verify.issues);
+    assert!(report_source.contains("schema = \"nuis-nsld-final-executable-blocked-v1\""));
+    assert!(report_source.contains("emitted = false"));
+    assert!(report_source.contains("blocker_count = "));
+    assert!(emit_json.contains("\"kind\":\"nsld_final_executable_emit\""));
+    assert!(!emit_json.contains("\"kind\":\"nsld_final_executable_readiness\""));
+    assert!(emit_json.contains("\"emitted\":false"));
+    assert!(emit_json.contains("\"final_stage_plan_hash\":\"0x"));
+}
+
+#[test]
+fn final_executable_blocked_artifact_does_not_change_closure_contract_hash() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-closure-stable-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let before = nsld_closure_report(Path::new("manifest.toml"), &plan);
+    nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let after = nsld_closure_report(Path::new("manifest.toml"), &plan);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert_eq!(after.linker_contract_hash, before.linker_contract_hash);
+    assert_eq!(
+        after.prepared_artifact_chain_valid,
+        before.prepared_artifact_chain_valid
+    );
+    assert_eq!(
+        after.prepared_artifact_chain_issues,
+        before.prepared_artifact_chain_issues
+    );
+    assert!(!after
+        .internal_contracts
+        .iter()
+        .any(|contract| contract.contains("final-executable")));
+    assert!(!after
+        .unresolved
+        .iter()
+        .any(|issue| issue.contains("final-executable")));
+}
+
+#[test]
+fn verify_final_executable_emit_reports_plan_hash_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit = nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report_path = Path::new(&emit.blocked_report_path);
+    let damaged = fs::read_to_string(report_path).unwrap().replace(
+        &format!("final_stage_plan_hash = \"{}\"", emit.final_stage_plan_hash),
+        "final_stage_plan_hash = \"0x3333333333333333\"",
+    );
+    fs::write(report_path, damaged).unwrap();
+    let verify = nsld_verify_final_executable_emit_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_executable_emit_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert!(verify.issues.iter().any(|issue| {
+        issue.starts_with("final_stage_plan_hash mismatch: expected 0x")
+            && issue.ends_with("found 0x3333333333333333")
+    }));
+    assert!(verify_json.contains("\"actual_final_stage_plan_hash\":\"0x3333333333333333\""));
 }
 
 #[test]
@@ -108,8 +477,41 @@ fn closure_reports_verified_prepared_artifact_chain_after_prepare() {
         .internal_contracts
         .iter()
         .any(|contract| contract == "verified-object-writer-dry-run"));
+    assert!(report
+        .internal_contracts
+        .iter()
+        .any(|contract| contract == "verified-object-image-relocation-record-table"));
+    assert!(report.linker_contract_hash.starts_with("0x"));
+    assert_eq!(report.object_image_relocation_lowering_valid, Some(true));
+    assert_eq!(report.object_image_relocation_lowering_rule_count, Some(4));
+    assert_eq!(report.object_image_relocation_lowering_rules.len(), 4);
+    assert_eq!(
+        report.object_image_relocation_lowering_rules[0].source_seed_kind,
+        "bootstrap-entry-seed"
+    );
+    assert!(report.object_image_relocation_lowering_issues.is_empty());
+    assert_eq!(report.object_image_relocation_record_count, Some(4));
+    assert!(report
+        .object_image_relocation_record_table_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert_eq!(report.object_image_relocation_records.len(), 4);
+    assert_eq!(
+        report.object_image_relocation_records[0].relocation_seed_id,
+        "orel0000.compiled_artifact"
+    );
     assert!(report_json.contains("\"prepared_artifact_chain_valid\":true"));
+    assert!(report_json.contains("\"linker_contract_hash\":\"0x"));
     assert!(report_json.contains("\"prepared_artifact_chain_issues\":[]"));
+    assert!(report_json.contains("\"object_image_relocation_lowering_valid\":true"));
+    assert!(report_json.contains("\"object_image_relocation_lowering_rule_count\":4"));
+    assert!(report_json.contains("\"object_image_relocation_lowering_rules\":[{"));
+    assert!(report_json.contains("\"source_seed_kind\":\"bootstrap-entry-seed\""));
+    assert!(report_json.contains("\"object_image_relocation_lowering_issues\":[]"));
+    assert!(report_json.contains("\"object_image_relocation_record_count\":4"));
+    assert!(report_json.contains("\"object_image_relocation_record_table_hash\":\"0x"));
+    assert!(report_json.contains("\"object_image_relocation_records\":[{"));
+    assert!(report_json.contains("\"relocation_seed_id\":\"orel0000.compiled_artifact\""));
 }
 
 #[test]
@@ -229,6 +631,16 @@ fn artifact_chain_allows_missing_optional_object_output_before_later_artifacts()
 }
 
 #[test]
+fn artifact_chain_treats_closure_snapshot_as_optional_chain_tail() {
+    let issues = nsld_artifact_chain_issues(&[
+        test_artifact_stage("container", true),
+        test_artifact_stage("nuis.nsld.container.payload", true),
+        test_optional_artifact_stage("nuis.nsld.closure.toml", false),
+    ]);
+    assert!(issues.is_empty());
+}
+
+#[test]
 fn artifact_stage_kind_paths_are_canonical() {
     assert_eq!(
         nsld_artifact_stage_file_name(NsldArtifactStageKind::ObjectWriterInput),
@@ -240,6 +652,105 @@ fn artifact_stage_kind_paths_are_canonical() {
             .to_string(),
         "out/nuis.nsld.container.payload"
     );
+    assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalStagePlan),
+        "nuis.nsld.final-stage-plan.toml"
+    );
+    assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableBlocked),
+        "nuis.nsld.final-executable.blocked.toml"
+    );
+}
+
+#[test]
+fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
+    let dir = env::temp_dir().join(format!("nsld-artifact-chain-report-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_artifact_chain_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.valid, "{:?}", report.issues);
+    assert_eq!(report.stage_count, 20);
+    assert!(report.present_count >= report.required_count);
+    assert_eq!(report.missing_required_count, 0);
+    assert!(report.optional_present_count >= 3);
+    assert_eq!(report.first_missing_required_stage, None);
+    assert_eq!(report.next_required_stage, None);
+    assert_eq!(report.suggested_command_id, None);
+    assert_eq!(report.suggested_command, None);
+    assert_eq!(report.suggested_command_resolved, None);
+    assert_eq!(report.suggested_command_reason, None);
+    assert!(report
+        .stages
+        .iter()
+        .any(|stage| stage.stage_id == "final-stage-plan" && stage.present && !stage.required));
+    assert!(report.stages.iter().any(|stage| {
+        stage.stage_id == "final-executable-blocked" && stage.present && !stage.required
+    }));
+    assert!(report_json.contains("\"kind\":\"nsld_artifact_chain\""));
+    assert!(report_json.contains("\"stage_id\":\"final-executable-blocked\""));
+    assert!(report_json.contains("\"missing_required_count\":0"));
+    assert!(report_json.contains("\"first_missing_required_stage\":null"));
+    assert!(report_json.contains("\"next_required_stage\":null"));
+    assert!(report_json.contains("\"suggested_command_id\":null"));
+    assert!(report_json.contains("\"suggested_command\":null"));
+    assert!(report_json.contains("\"suggested_command_resolved\":null"));
+    assert!(report_json.contains("\"suggested_command_reason\":null"));
+}
+
+#[test]
+fn artifact_chain_report_points_to_first_missing_required_stage() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-artifact-chain-report-missing-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+
+    let report = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_artifact_chain_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.valid);
+    assert!(report.missing_required_count > 0);
+    assert_eq!(
+        report.first_missing_required_stage.as_deref(),
+        Some("link-inputs")
+    );
+    assert_eq!(report.next_required_stage.as_deref(), Some("link-inputs"));
+    assert_eq!(report.suggested_command_id.as_deref(), Some("emit-inputs"));
+    assert_eq!(
+        report.suggested_command.as_deref(),
+        Some("nsld emit-inputs <input>")
+    );
+    assert_eq!(
+        report.suggested_command_resolved.as_deref(),
+        Some("nsld emit-inputs manifest.toml")
+    );
+    assert_eq!(
+        report.suggested_command_reason.as_deref(),
+        Some("first missing required artifact stage `link-inputs`")
+    );
+    assert!(report_json.contains("\"first_missing_required_stage\":\"link-inputs\""));
+    assert!(report_json.contains("\"next_required_stage\":\"link-inputs\""));
+    assert!(report_json.contains("\"suggested_command_id\":\"emit-inputs\""));
+    assert!(report_json.contains("\"suggested_command\":\"nsld emit-inputs <input>\""));
+    assert!(
+        report_json.contains("\"suggested_command_resolved\":\"nsld emit-inputs manifest.toml\"")
+    );
+    assert!(report_json.contains(
+        "\"suggested_command_reason\":\"first missing required artifact stage `link-inputs`\""
+    ));
 }
 
 fn test_artifact_stage(file_name: &'static str, present: bool) -> NsldArtifactStage {
@@ -416,6 +927,16 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
         "bootstrap-entry-seed"
     );
     assert!(report.object_image_relocation_lowering_issues.is_empty());
+    assert_eq!(report.object_image_relocation_record_count, Some(4));
+    assert!(report
+        .object_image_relocation_record_table_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert_eq!(report.object_image_relocation_records.len(), 4);
+    assert_eq!(
+        report.object_image_relocation_records[0].relocation_seed_id,
+        "orel0000.compiled_artifact"
+    );
     assert!(report.object_image_dry_run_bytes_present);
     assert!(report.object_emit_blocked_present);
     assert_eq!(report.object_emit_blocked_valid, Some(true));
@@ -444,11 +965,59 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     assert!(report.container_relocation_issues.is_empty());
     assert!(report.container_compatibility_domain_issues.is_empty());
     assert!(report.container_external_import_issues.is_empty());
+    assert!(report.closure_snapshot_present);
+    assert_eq!(report.closure_snapshot_valid, Some(true));
+    assert!(report.closure_snapshot_issues.is_empty());
+    assert!(report
+        .closure_snapshot_linker_contract_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(report
+        .closure_snapshot_container_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(report
+        .closure_snapshot_payload_size_bytes
+        .is_some_and(|size| size > 0));
+    assert!(report
+        .closure_snapshot_payload_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(report.final_stage_plan_present);
+    assert_eq!(report.final_stage_plan_valid, Some(true));
+    assert_eq!(report.final_stage_plan_ready, Some(false));
+    assert!(report
+        .final_stage_plan_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(report
+        .final_stage_plan_blocker_count
+        .is_some_and(|count| count >= 1));
+    assert!(report.final_stage_plan_issues.is_empty());
+    assert!(!report.final_executable_blocked_present);
+    assert_eq!(report.final_executable_blocked_valid, None);
+    assert_eq!(report.final_executable_blocked_emitted, None);
+    assert_eq!(report.final_executable_blocked_plan_hash, None);
+    assert_eq!(report.final_executable_blocked_blocker_count, None);
+    assert!(report.final_executable_blocked_issues.is_empty());
     assert!(report_json.contains("\"container_section_issues\":[]"));
     assert!(report_json.contains("\"container_loader_symbol_issues\":[]"));
     assert!(report_json.contains("\"container_relocation_issues\":[]"));
     assert!(report_json.contains("\"container_compatibility_domain_issues\":[]"));
     assert!(report_json.contains("\"container_external_import_issues\":[]"));
+    assert!(report_json.contains("\"closure_snapshot_present\":true"));
+    assert!(report_json.contains("\"closure_snapshot_valid\":true"));
+    assert!(report_json.contains("\"closure_snapshot_issues\":[]"));
+    assert!(report_json.contains("\"closure_snapshot_linker_contract_hash\":\"0x"));
+    assert!(report_json.contains("\"closure_snapshot_container_hash\":\"0x"));
+    assert!(report_json.contains("\"closure_snapshot_payload_size_bytes\":"));
+    assert!(report_json.contains("\"closure_snapshot_payload_hash\":\"0x"));
+    assert!(report_json.contains("\"final_stage_plan_present\":true"));
+    assert!(report_json.contains("\"final_stage_plan_valid\":true"));
+    assert!(report_json.contains("\"final_stage_plan_ready\":false"));
+    assert!(report_json.contains("\"final_stage_plan_hash\":\"0x"));
+    assert!(report_json.contains("\"final_executable_blocked_present\":false"));
+    assert!(report_json.contains("\"final_executable_blocked_valid\":null"));
     assert!(report_json.contains("\"object_plan_present\":true"));
     assert!(report_json.contains("\"object_plan_valid\":true"));
     assert!(report_json.contains("\"object_plan_issues\":[]"));
@@ -465,6 +1034,10 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     assert!(report_json.contains("\"object_image_relocation_lowering_rules\":[{"));
     assert!(report_json.contains("\"source_seed_kind\":\"bootstrap-entry-seed\""));
     assert!(report_json.contains("\"object_image_relocation_lowering_issues\":[]"));
+    assert!(report_json.contains("\"object_image_relocation_record_count\":4"));
+    assert!(report_json.contains("\"object_image_relocation_record_table_hash\":\"0x"));
+    assert!(report_json.contains("\"object_image_relocation_records\":[{"));
+    assert!(report_json.contains("\"relocation_seed_id\":\"orel0000.compiled_artifact\""));
     assert!(report_json.contains("\"object_image_dry_run_bytes_present\":true"));
     assert!(report_json.contains("\"object_emit_blocked_present\":true"));
     assert!(report_json.contains("\"object_emit_blocked_valid\":true"));
@@ -603,4 +1176,178 @@ fn check_reports_tampered_object_output() {
         .issues
         .iter()
         .any(|issue| issue == "object output verification failed"));
+}
+
+#[test]
+fn check_reports_tampered_closure_snapshot() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-closure-snapshot-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    let prepare = nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let snapshot_path = Path::new(&prepare.closure_snapshot_path);
+    let snapshot = fs::read_to_string(snapshot_path).unwrap();
+    fs::write(
+        snapshot_path,
+        snapshot.replace(
+            "linker_contract_hash = \"",
+            "linker_contract_hash = \"0x0000000000000000",
+        ),
+    )
+    .unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.valid);
+    assert!(report.closure_snapshot_present);
+    assert_eq!(report.closure_snapshot_valid, Some(false));
+    assert!(report.closure_snapshot_issues.iter().any(|issue| {
+        issue.starts_with("linker_contract_hash mismatch: expected 0x")
+            && issue.contains("found 0x0000000000000000")
+    }));
+    assert!(report
+        .issues
+        .iter()
+        .any(|issue| issue == "closure snapshot verification failed"));
+    assert!(report_json.contains("\"closure_snapshot_present\":true"));
+    assert!(report_json.contains("\"closure_snapshot_valid\":false"));
+    assert!(report_json.contains("\"closure_snapshot_container_hash\":\"0x"));
+    assert!(report_json.contains("\"closure_snapshot_payload_hash\":\"0x"));
+    assert!(report_json.contains("linker_contract_hash mismatch: expected 0x"));
+}
+
+#[test]
+fn check_reports_tampered_final_stage_plan() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-stage-plan-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    let prepare = nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let final_stage_plan_path = Path::new(&prepare.final_stage_plan_path);
+    let final_stage_plan = fs::read_to_string(final_stage_plan_path).unwrap();
+    fs::write(
+        final_stage_plan_path,
+        final_stage_plan.replace("plan_hash = \"", "plan_hash = \"0x3333333333333333"),
+    )
+    .unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.valid);
+    assert!(report.final_stage_plan_present);
+    assert_eq!(report.final_stage_plan_valid, Some(false));
+    assert!(report.final_stage_plan_issues.iter().any(|issue| {
+        issue.starts_with("plan_hash mismatch: expected 0x")
+            && issue.contains("found 0x3333333333333333")
+    }));
+    assert!(report
+        .issues
+        .iter()
+        .any(|issue| issue == "final-stage plan verification failed"));
+    assert!(report_json.contains("\"final_stage_plan_present\":true"));
+    assert!(report_json.contains("\"final_stage_plan_valid\":false"));
+    assert!(report_json.contains("plan_hash mismatch: expected 0x"));
+}
+
+#[test]
+fn check_reports_valid_final_executable_blocked_artifact_when_present() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-executable-blocked-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit = nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.valid, "{:?}", report.issues);
+    assert!(report.final_executable_blocked_present);
+    assert_eq!(report.final_executable_blocked_valid, Some(true));
+    assert_eq!(report.final_executable_blocked_emitted, Some(false));
+    assert_eq!(
+        report.final_executable_blocked_plan_hash.as_deref(),
+        Some(emit.final_stage_plan_hash.as_str())
+    );
+    assert_eq!(
+        report.final_executable_blocked_blocker_count,
+        Some(emit.blockers.len())
+    );
+    assert!(report.final_executable_blocked_issues.is_empty());
+    assert!(report_json.contains("\"final_executable_blocked_present\":true"));
+    assert!(report_json.contains("\"final_executable_blocked_valid\":true"));
+    assert!(report_json.contains("\"final_executable_blocked_emitted\":false"));
+    assert!(report_json.contains("\"final_executable_blocked_plan_hash\":\"0x"));
+}
+
+#[test]
+fn check_reports_tampered_final_executable_blocked_artifact() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-executable-blocked-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit = nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let blocked_path = Path::new(&emit.blocked_report_path);
+    let blocked_source = fs::read_to_string(blocked_path).unwrap();
+    fs::write(
+        blocked_path,
+        blocked_source.replace(
+            &format!("final_stage_plan_hash = \"{}\"", emit.final_stage_plan_hash),
+            "final_stage_plan_hash = \"0x4444444444444444\"",
+        ),
+    )
+    .unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.valid);
+    assert!(report.final_executable_blocked_present);
+    assert_eq!(report.final_executable_blocked_valid, Some(false));
+    assert_eq!(
+        report.final_executable_blocked_plan_hash.as_deref(),
+        Some("0x4444444444444444")
+    );
+    assert!(report
+        .final_executable_blocked_issues
+        .iter()
+        .any(|issue| issue.starts_with("final_stage_plan_hash mismatch: expected 0x")));
+    assert!(report
+        .issues
+        .iter()
+        .any(|issue| issue == "final executable blocked report verification failed"));
+    assert!(report_json.contains("\"final_executable_blocked_present\":true"));
+    assert!(report_json.contains("\"final_executable_blocked_valid\":false"));
+    assert!(report_json.contains("\"final_executable_blocked_plan_hash\":\"0x4444444444444444\""));
 }

@@ -7,8 +7,13 @@ use super::{
         nsld_verify_assemble_plan_report, nsld_verify_link_bundle_report,
         nsld_verify_section_manifest_report,
     },
+    closure::nsld_verify_closure_report,
     container_pipeline::{
         nsld_container_report, nsld_verify_container_plan_report, nsld_verify_container_report,
+    },
+    final_stage::{
+        nsld_final_stage_plan_report, nsld_verify_final_executable_emit_report,
+        nsld_verify_final_stage_plan_report,
     },
     link_units::{
         nsld_domain_diagnostics, nsld_sidecar_capability_diagnostics,
@@ -187,6 +192,16 @@ pub(crate) fn nsld_check_report(
         .as_ref()
         .and_then(|report| report.actual_relocation_lowering_issues.clone())
         .unwrap_or_default();
+    let object_image_relocation_record_count = object_image_dry_run_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_relocation_record_count);
+    let object_image_relocation_record_table_hash = object_image_dry_run_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_relocation_record_table_hash.clone());
+    let object_image_relocation_records = object_image_dry_run_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_relocation_records.clone())
+        .unwrap_or_default();
     let object_image_dry_run_bytes_present = nsld_artifact_stage_kind_path(
         &plan.output_dir,
         NsldArtifactStageKind::ObjectImageDryRunBytes,
@@ -354,6 +369,76 @@ pub(crate) fn nsld_check_report(
         container_payload_issues
             .push("container payload is missing for present container".to_owned());
     }
+    let closure_snapshot_path =
+        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ClosureSnapshot);
+    let closure_snapshot_present = closure_snapshot_path.exists();
+    let closure_snapshot_verify_report =
+        closure_snapshot_present.then(|| nsld_verify_closure_report(manifest, plan));
+    let closure_snapshot_valid = closure_snapshot_verify_report
+        .as_ref()
+        .map(|report| report.valid);
+    let closure_snapshot_issues = closure_snapshot_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
+    let closure_snapshot_linker_contract_hash = closure_snapshot_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_linker_contract_hash.clone());
+    let closure_snapshot_container_hash = closure_snapshot_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_container_hash.clone());
+    let closure_snapshot_payload_size_bytes = closure_snapshot_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_payload_size_bytes);
+    let closure_snapshot_payload_hash = closure_snapshot_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_payload_hash.clone());
+    let final_stage_plan_path =
+        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::FinalStagePlan);
+    let final_stage_plan_present = final_stage_plan_path.exists();
+    let final_stage_plan_verify_report =
+        final_stage_plan_present.then(|| nsld_verify_final_stage_plan_report(manifest, plan));
+    let final_stage_plan_valid = final_stage_plan_verify_report
+        .as_ref()
+        .map(|report| report.valid);
+    let final_stage_plan_issues = final_stage_plan_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
+    let expected_final_stage_plan_report =
+        final_stage_plan_present.then(|| nsld_final_stage_plan_report(manifest, plan));
+    let final_stage_plan_ready = expected_final_stage_plan_report
+        .as_ref()
+        .map(|report| report.ready);
+    let final_stage_plan_hash = expected_final_stage_plan_report
+        .as_ref()
+        .map(|report| report.plan_hash.clone());
+    let final_stage_plan_blocker_count = expected_final_stage_plan_report
+        .as_ref()
+        .map(|report| report.blockers.len());
+    let final_executable_blocked_path = nsld_artifact_stage_kind_path(
+        &plan.output_dir,
+        NsldArtifactStageKind::FinalExecutableBlocked,
+    );
+    let final_executable_blocked_present = final_executable_blocked_path.exists();
+    let final_executable_blocked_verify_report = final_executable_blocked_present
+        .then(|| nsld_verify_final_executable_emit_report(manifest, plan));
+    let final_executable_blocked_valid = final_executable_blocked_verify_report
+        .as_ref()
+        .map(|report| report.valid);
+    let final_executable_blocked_emitted = final_executable_blocked_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_emitted);
+    let final_executable_blocked_plan_hash = final_executable_blocked_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_final_stage_plan_hash.clone());
+    let final_executable_blocked_blocker_count = final_executable_blocked_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_blocker_count);
+    let final_executable_blocked_issues = final_executable_blocked_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
     let artifact_chain_issues = nsld_artifact_chain_issues(&nsld_artifact_stages(&plan.output_dir));
     let artifact_chain_valid = artifact_chain_issues.is_empty();
     let clock_edges = plan
@@ -487,6 +572,18 @@ pub(crate) fn nsld_check_report(
         issues.push("container payload state is inconsistent".to_owned());
         issues.extend(container_payload_issues.iter().cloned());
     }
+    if closure_snapshot_valid == Some(false) {
+        issues.push("closure snapshot verification failed".to_owned());
+        issues.extend(closure_snapshot_issues.iter().cloned());
+    }
+    if final_stage_plan_valid == Some(false) {
+        issues.push("final-stage plan verification failed".to_owned());
+        issues.extend(final_stage_plan_issues.iter().cloned());
+    }
+    if final_executable_blocked_valid == Some(false) {
+        issues.push("final executable blocked report verification failed".to_owned());
+        issues.extend(final_executable_blocked_issues.iter().cloned());
+    }
     if !artifact_chain_valid {
         issues.push("nsld artifact chain is incomplete".to_owned());
         issues.extend(artifact_chain_issues.iter().cloned());
@@ -508,6 +605,9 @@ pub(crate) fn nsld_check_report(
     let checks = checks + usize::from(container_plan_present);
     let checks = checks + usize::from(container_present);
     let checks = checks + usize::from(container_present || container_payload_present);
+    let checks = checks + usize::from(closure_snapshot_present);
+    let checks = checks + usize::from(final_stage_plan_present);
+    let checks = checks + usize::from(final_executable_blocked_present);
     let failures = issues.len();
     NsldCheckReport {
         manifest: manifest.display().to_string(),
@@ -558,6 +658,9 @@ pub(crate) fn nsld_check_report(
         object_image_relocation_lowering_rule_count,
         object_image_relocation_lowering_rules,
         object_image_relocation_lowering_issues,
+        object_image_relocation_record_count,
+        object_image_relocation_record_table_hash,
+        object_image_relocation_records,
         object_image_dry_run_bytes_present,
         object_emit_blocked_present,
         object_emit_blocked_valid,
@@ -585,6 +688,25 @@ pub(crate) fn nsld_check_report(
         container_external_import_issues,
         container_payload_present,
         container_payload_issues,
+        closure_snapshot_present,
+        closure_snapshot_valid,
+        closure_snapshot_issues,
+        closure_snapshot_linker_contract_hash,
+        closure_snapshot_container_hash,
+        closure_snapshot_payload_size_bytes,
+        closure_snapshot_payload_hash,
+        final_stage_plan_present,
+        final_stage_plan_valid,
+        final_stage_plan_ready,
+        final_stage_plan_hash,
+        final_stage_plan_blocker_count,
+        final_stage_plan_issues,
+        final_executable_blocked_present,
+        final_executable_blocked_valid,
+        final_executable_blocked_emitted,
+        final_executable_blocked_plan_hash,
+        final_executable_blocked_blocker_count,
+        final_executable_blocked_issues,
         container_loader_readiness,
         container_loader_blockers,
         container_metadata_table_hash,

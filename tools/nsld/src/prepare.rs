@@ -4,10 +4,12 @@ use super::{
         nsld_emit_section_manifest_report, nsld_verify_assemble_plan_report,
         nsld_verify_link_bundle_report, nsld_verify_section_manifest_report,
     },
+    closure::{nsld_emit_closure_report, nsld_verify_closure_report},
     container_pipeline::{
         nsld_emit_container_plan_report, nsld_emit_container_report,
         nsld_verify_container_plan_report, nsld_verify_container_report,
     },
+    final_stage::{nsld_emit_final_stage_plan_report, nsld_verify_final_stage_plan_report},
     link_units::{
         nsld_emit_link_inputs_report, nsld_emit_link_units_report, nsld_verify_link_inputs_report,
         nsld_verify_link_units_report,
@@ -66,6 +68,10 @@ pub(crate) fn nsld_prepare_report(
     let container_verify = nsld_verify_container_plan_report(manifest, plan);
     let container_file_emit = nsld_emit_container_report(manifest, plan)?;
     let container_file_verify = nsld_verify_container_report(manifest, plan);
+    let closure_emit = nsld_emit_closure_report(manifest, plan)?;
+    let closure_verify = nsld_verify_closure_report(manifest, plan);
+    let final_stage_plan_emit = nsld_emit_final_stage_plan_report(manifest, plan)?;
+    let final_stage_plan_verify = nsld_verify_final_stage_plan_report(manifest, plan);
 
     let mut issues = Vec::new();
     if !input_verify.valid {
@@ -190,6 +196,22 @@ pub(crate) fn nsld_prepare_report(
                 .map(|issue| format!("container:{issue}")),
         );
     }
+    if !closure_verify.valid {
+        issues.extend(
+            closure_verify
+                .issues
+                .iter()
+                .map(|issue| format!("closure:{issue}")),
+        );
+    }
+    if !final_stage_plan_verify.valid {
+        issues.extend(
+            final_stage_plan_verify
+                .issues
+                .iter()
+                .map(|issue| format!("final-stage-plan:{issue}")),
+        );
+    }
 
     Ok(NsldPrepareReport {
         manifest: manifest.display().to_string(),
@@ -212,6 +234,8 @@ pub(crate) fn nsld_prepare_report(
         container_plan_path: container_emit.output_path,
         container_path: container_file_emit.output_path,
         container_payload_path: container_file_emit.payload_path,
+        closure_snapshot_path: closure_emit.output_path,
+        final_stage_plan_path: final_stage_plan_emit.output_path,
         link_input_count: input_emit.link_input_count,
         link_input_table_hash: input_emit.link_input_table_hash,
         unit_count: unit_emit.unit_count,
@@ -238,6 +262,15 @@ pub(crate) fn nsld_prepare_report(
         object_image_relocation_lowering_issues: object_image_dry_run_verify
             .actual_relocation_lowering_issues
             .unwrap_or_default(),
+        object_image_relocation_record_count: object_image_dry_run_verify
+            .actual_relocation_record_count
+            .unwrap_or(0),
+        object_image_relocation_record_table_hash: object_image_dry_run_verify
+            .actual_relocation_record_table_hash
+            .unwrap_or_else(|| "missing".to_owned()),
+        object_image_relocation_records: object_image_dry_run_verify
+            .actual_relocation_records
+            .unwrap_or_default(),
         metadata_table_hash: container_file_emit.metadata_table_hash,
         compatibility_domain_count: container_file_verify.actual_compatibility_domain_count,
         compatibility_domain_table_hash: container_file_verify
@@ -256,6 +289,9 @@ pub(crate) fn nsld_prepare_report(
         container_hash: container_file_emit.container_hash,
         payload_size_bytes: container_file_emit.payload_size_bytes,
         payload_hash: container_file_emit.payload_hash,
+        final_stage_plan_ready: final_stage_plan_emit.ready,
+        final_stage_plan_hash: final_stage_plan_emit.plan_hash,
+        final_stage_plan_blocker_count: final_stage_plan_emit.blocker_count,
         issues,
     })
 }

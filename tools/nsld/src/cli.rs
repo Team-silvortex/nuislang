@@ -5,7 +5,16 @@ pub(crate) enum Command {
     Status,
     Plan { input: PathBuf, json: bool },
     Check { input: PathBuf, json: bool },
+    ArtifactChain { input: PathBuf, json: bool },
     Closure { input: PathBuf, json: bool },
+    EmitClosure { input: PathBuf, json: bool },
+    VerifyClosure { input: PathBuf, json: bool },
+    FinalStagePlan { input: PathBuf, json: bool },
+    EmitFinalStagePlan { input: PathBuf, json: bool },
+    VerifyFinalStagePlan { input: PathBuf, json: bool },
+    FinalExecutableReadiness { input: PathBuf, json: bool },
+    EmitFinalExecutable { input: PathBuf, json: bool },
+    VerifyFinalExecutableEmit { input: PathBuf, json: bool },
     Prepare { input: PathBuf, json: bool },
     AssemblePlan { input: PathBuf, json: bool },
     EmitAssemblePlan { input: PathBuf, json: bool },
@@ -61,7 +70,16 @@ where
         "status" => Ok(Command::Status),
         "plan"
         | "check"
+        | "artifact-chain"
         | "closure"
+        | "emit-closure"
+        | "verify-closure"
+        | "final-stage-plan"
+        | "emit-final-stage-plan"
+        | "verify-final-stage-plan"
+        | "final-executable-readiness"
+        | "emit-final-executable"
+        | "verify-final-executable-emit"
         | "prepare"
         | "assemble-plan"
         | "emit-assemble-plan"
@@ -105,7 +123,16 @@ where
         | "emit-inputs"
         | "verify-inputs" => {
             let is_check = command == "check";
+            let is_artifact_chain = command == "artifact-chain";
             let is_closure = command == "closure";
+            let is_emit_closure = command == "emit-closure";
+            let is_verify_closure = command == "verify-closure";
+            let is_final_stage_plan = command == "final-stage-plan";
+            let is_emit_final_stage_plan = command == "emit-final-stage-plan";
+            let is_verify_final_stage_plan = command == "verify-final-stage-plan";
+            let is_final_executable_readiness = command == "final-executable-readiness";
+            let is_emit_final_executable = command == "emit-final-executable";
+            let is_verify_final_executable_emit = command == "verify-final-executable-emit";
             let is_prepare = command == "prepare";
             let is_assemble_plan = command == "assemble-plan";
             let is_emit_assemble_plan = command == "emit-assemble-plan";
@@ -162,8 +189,26 @@ where
             let input = input.ok_or_else(|| usage().to_owned())?;
             if is_check {
                 Ok(Command::Check { input, json })
+            } else if is_artifact_chain {
+                Ok(Command::ArtifactChain { input, json })
             } else if is_closure {
                 Ok(Command::Closure { input, json })
+            } else if is_emit_closure {
+                Ok(Command::EmitClosure { input, json })
+            } else if is_verify_closure {
+                Ok(Command::VerifyClosure { input, json })
+            } else if is_final_stage_plan {
+                Ok(Command::FinalStagePlan { input, json })
+            } else if is_emit_final_stage_plan {
+                Ok(Command::EmitFinalStagePlan { input, json })
+            } else if is_verify_final_stage_plan {
+                Ok(Command::VerifyFinalStagePlan { input, json })
+            } else if is_final_executable_readiness {
+                Ok(Command::FinalExecutableReadiness { input, json })
+            } else if is_emit_final_executable {
+                Ok(Command::EmitFinalExecutable { input, json })
+            } else if is_verify_final_executable_emit {
+                Ok(Command::VerifyFinalExecutableEmit { input, json })
             } else if is_prepare {
                 Ok(Command::Prepare { input, json })
             } else if is_assemble_plan {
@@ -277,7 +322,16 @@ fn usage() -> &'static str {
         "  nsld status\n",
         "  nsld plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld check <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld artifact-chain <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld emit-closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld verify-closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-stage-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld emit-final-stage-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld verify-final-stage-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-readiness <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld emit-final-executable <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld verify-final-executable-emit <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld prepare <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",

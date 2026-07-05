@@ -48,6 +48,30 @@ pub(crate) fn print_nsld_object_image_dry_run_report(report: &NsldObjectImageDry
             rule.relocation_type
         );
     }
+    println!(
+        "  relocation_record_count: {}",
+        report.relocation_record_count
+    );
+    println!(
+        "  relocation_record_table_hash: {}",
+        report.relocation_record_table_hash
+    );
+    for record in &report.relocation_records {
+        println!(
+            "  relocation_record: id={} relocation_seed_id={} source_section_id={} source_offset={} source_seed_kind={} target={} symbol_index={} pc_relative={} length_power={} external={} relocation_type={}",
+            record.record_id,
+            record.relocation_seed_id,
+            record.source_section_id,
+            record.source_offset,
+            record.source_seed_kind,
+            record.target_relocation_kind,
+            record.symbol_index,
+            record.pc_relative,
+            record.length_power,
+            record.external,
+            record.relocation_type
+        );
+    }
     for blocker in &report.blockers {
         println!("  blocker: {blocker}");
     }
@@ -193,6 +217,57 @@ pub(crate) fn print_nsld_object_image_dry_run_verify_report(
             rule.length_power,
             rule.external,
             rule.relocation_type
+        );
+    }
+    println!(
+        "  expected_relocation_record_count: {}",
+        report.expected_relocation_record_count
+    );
+    println!(
+        "  expected_relocation_record_table_hash: {}",
+        report.expected_relocation_record_table_hash
+    );
+    println!(
+        "  actual_relocation_record_count: {}",
+        optional_usize_text(report.actual_relocation_record_count)
+    );
+    println!(
+        "  actual_relocation_record_table_hash: {}",
+        report
+            .actual_relocation_record_table_hash
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    for record in &report.expected_relocation_records {
+        println!(
+            "  expected_relocation_record: id={} relocation_seed_id={} source_section_id={} source_offset={} source_seed_kind={} target={} symbol_index={} pc_relative={} length_power={} external={} relocation_type={}",
+            record.record_id,
+            record.relocation_seed_id,
+            record.source_section_id,
+            record.source_offset,
+            record.source_seed_kind,
+            record.target_relocation_kind,
+            record.symbol_index,
+            record.pc_relative,
+            record.length_power,
+            record.external,
+            record.relocation_type
+        );
+    }
+    for record in report.actual_relocation_records.as_deref().unwrap_or(&[]) {
+        println!(
+            "  actual_relocation_record: id={} relocation_seed_id={} source_section_id={} source_offset={} source_seed_kind={} target={} symbol_index={} pc_relative={} length_power={} external={} relocation_type={}",
+            record.record_id,
+            record.relocation_seed_id,
+            record.source_section_id,
+            record.source_offset,
+            record.source_seed_kind,
+            record.target_relocation_kind,
+            record.symbol_index,
+            record.pc_relative,
+            record.length_power,
+            record.external,
+            record.relocation_type
         );
     }
     println!(

@@ -57,8 +57,18 @@ cargo run -p nsld -- plan <nuis.build.manifest.toml>
 cargo run -p nsld -- plan <artifact-output-dir> --json
 cargo run -p nsld -- check <artifact-output-dir>
 cargo run -p nsld -- check <artifact-output-dir> --json
+cargo run -p nsld -- artifact-chain <artifact-output-dir>
+cargo run -p nsld -- artifact-chain <artifact-output-dir> --json
 cargo run -p nsld -- closure <artifact-output-dir>
 cargo run -p nsld -- closure <artifact-output-dir> --json
+cargo run -p nsld -- emit-closure <artifact-output-dir>
+cargo run -p nsld -- verify-closure <artifact-output-dir> --json
+cargo run -p nsld -- final-stage-plan <artifact-output-dir>
+cargo run -p nsld -- emit-final-stage-plan <artifact-output-dir>
+cargo run -p nsld -- verify-final-stage-plan <artifact-output-dir> --json
+cargo run -p nsld -- final-executable-readiness <artifact-output-dir>
+cargo run -p nsld -- emit-final-executable <artifact-output-dir>
+cargo run -p nsld -- verify-final-executable-emit <artifact-output-dir> --json
 cargo run -p nsld -- prepare <artifact-output-dir>
 cargo run -p nsld -- prepare <artifact-output-dir> --json
 cargo run -p nsld -- assemble-plan <artifact-output-dir>
@@ -155,7 +165,7 @@ cargo run -p nsld -- prepare <artifact-output-dir>
 cargo run -p nsld -- check <artifact-output-dir>
 ```
 
-`nsld prepare` emits and immediately verifies up to sixteen current Nsld-owned
+`nsld prepare` emits and immediately verifies up to eighteen current Nsld-owned
 artifacts in dependency order:
 
 * `nuis.nsld.link-inputs.toml`
@@ -168,12 +178,15 @@ artifacts in dependency order:
 * `nuis.nsld.object-byte-layout.toml`
 * `nuis.nsld.object-file-layout.toml`
 * `nuis.nsld.object-image-dry-run.toml`
+* `nuis.nsld.object-image-dry-run.bin`
 * `nuis.nsld.object.blocked.toml`
 * optional `nuis.nsld.mach-o` when the Mach-O arm64 writer can emit
 * `nuis.nsld.object-writer-dry-run.toml`
 * `nuis.nsld.container-plan.toml`
 * `nuis.nsld.container`
 * `nuis.nsld.container.payload`
+* `nuis.nsld.closure.toml`
+* `nuis.nsld.final-stage-plan.toml`
 
 `nsld emit-inputs` is the explicit materialization command for the link-input
 table. `nsld inputs` remains accepted as the alpha-era compatibility alias.
@@ -191,13 +204,27 @@ The prepare report also returns the final container `metadata_table_hash`,
 `container_layout_hash`, `container_hash`, `payload_size_bytes`, and
 `payload_hash`, so later stages can key off the prepared binary-contract
 summary without re-opening every artifact.
+It also emits and verifies `nuis.nsld.closure.toml`, a closure-level linker
+contract snapshot keyed by `linker_contract_hash`. The closure snapshot is a
+prepared output and check-time validation target; it is intentionally excluded
+from closure's own prepared-prefix contract so the snapshot does not hash or
+verify itself recursively.
+`prepare` also emits and verifies `nuis.nsld.final-stage-plan.toml`, the
+deterministic executable-boundary plan. A final-stage plan can be valid while
+`ready = false`; for example, the current host-assisted route intentionally
+records `self-owned-final-native-linker` as a blocker until Nsld owns the final
+native executable step.
 It also surfaces object-image relocation lowering status through
 `object_image_relocation_lowering_valid`,
 `object_image_relocation_lowering_rule_count`, and
 `object_image_relocation_lowering_issues`, matching the top-level check view.
 The prepare JSON report also exposes
-`object_image_relocation_lowering_rules`, so orchestration tools can inspect
-the active relocation registry without opening the dry-run TOML separately.
+`object_image_relocation_lowering_rules`,
+`object_image_relocation_record_count`, and
+`object_image_relocation_record_table_hash`, and
+`object_image_relocation_records`, so orchestration tools can inspect the
+active relocation registry and actual backend relocation records without
+opening the dry-run TOML separately.
 
 `nsld assemble-plan` is the first dry-run view of binary assembly. It consumes
 the prepared bundle state and lists the sections that a future Nsld-owned
@@ -352,6 +379,12 @@ registered but intentionally report `not-implemented`. `emit-object-image-dry-ru
 writes both `nuis.nsld.object-image-dry-run.toml` and
 `nuis.nsld.object-image-dry-run.bin`, while `verify-object-image-dry-run`
 checks the report, image size, and image hash.
+The dry-run report also includes the relocation lowering registry and the
+actual backend relocation records through `relocation_lowering_rules`,
+`relocation_record_count`, `relocation_record_table_hash`, and
+`relocation_records`. For Mach-O arm64 this records the native symbol index and
+relocation flags derived from each seed, giving later linker/debugger stages a
+structured and hashable view before Nsld owns final object linking.
 The `emit-object` frontdoor also writes `nuis.nsld.object.blocked.toml` as its
 current emit report, so CI and later linker stages can consume emitted or
 blocked emission state without scraping stderr. That report preserves
@@ -616,6 +649,25 @@ derive that readiness.
 `container_payload_issues`, so missing or orphaned payload state is visible in
 the top-level linker health report.
 
+## Artifact Chain
+
+`nsld artifact-chain` is a non-mutating diagnostic view of the registered Nsld
+artifact sequence. It lists each stage in deterministic order with its
+`stage_id`, file name, full path, `required` flag, and `present` state. The
+summary exposes `stage_count`, `present_count`, `required_count`,
+`missing_required_count`, `optional_present_count`,
+`first_missing_required_stage`, `next_required_stage`, and
+`suggested_command_id`, `suggested_command`, plus `suggested_command_resolved`,
+`suggested_command_reason`, and the same ordering issues used by `nsld check`.
+The command id is stable for scripts and UI actions. The suggested command
+template uses `<input>` as the same manifest-or-output-dir argument accepted by
+the rest of the Nsld frontdoor; the resolved form replaces that placeholder
+with the manifest path known to the current report.
+
+This command is intentionally not a gate: it can describe half-built output
+directories without exiting as a failure. Use `nsld check` when the artifact
+chain should participate in the broader linker health result.
+
 ## Linker Check
 
 `nsld check` is the first dedicated linker gate. It currently verifies:
@@ -654,7 +706,10 @@ the top-level linker health report.
   `object_image_relocation_lowering_valid`,
   `object_image_relocation_lowering_rule_count`, and
   `object_image_relocation_lowering_issues`; check JSON also exposes
-  `object_image_relocation_lowering_rules` for rule-level auditability
+  `object_image_relocation_lowering_rules`,
+  `object_image_relocation_record_count`, and
+  `object_image_relocation_record_table_hash`, and
+  `object_image_relocation_records` for rule- and record-level auditability
 * an emitted `nuis.nsld.object-writer-dry-run.toml` is still valid when that
   file is present
 * an emitted `nuis.nsld.container-plan.toml` is still valid when that file is
@@ -724,6 +779,7 @@ The check report also exposes linker diagnostics for:
 `nsld closure` is a route-feasibility report. It separates:
 
 * `internal_contracts`: contracts Nsld can already consume as linker truth
+* `linker_contract_hash`: deterministic hash of the closure-level linker truth
 * `link_inputs`: validated lowering sidecars that can be consumed as linker
   inputs
 * `external_dependencies`: host or wrapper dependencies still outside Nsld
@@ -732,6 +788,21 @@ The check report also exposes linker diagnostics for:
 This command is intentionally conservative. A report with `closed = false`
 does not mean the build is unusable; it means the current route still depends
 on non-Nsld stages such as the host launcher wrapper or final native link.
+`linker_contract_hash` is not a native object hash and not the container hash;
+it fingerprints the current linker contract surface: internal contracts, link
+input table hash, container metadata/layout/hash state, payload hash, loader
+readiness, relocation record table hash, external dependencies, unresolved
+entries, and final-stage mode.
+`nsld emit-closure` materializes that surface to `nuis.nsld.closure.toml`;
+`nsld verify-closure` compares the snapshot against the current closure report
+and reports focused drift such as `linker_contract_hash mismatch`,
+`container_hash mismatch`, `payload_size_bytes mismatch`, or
+`payload_hash mismatch`.
+`nsld check` performs the same closure snapshot verification when the snapshot
+is present and exposes `closure_snapshot_present`, `closure_snapshot_valid`,
+`closure_snapshot_issues`, `closure_snapshot_linker_contract_hash`,
+`closure_snapshot_container_hash`, `closure_snapshot_payload_size_bytes`, and
+`closure_snapshot_payload_hash`.
 
 If `nuis.nsld.link-inputs.toml` exists, closure also verifies it. A valid table
 adds `verified-link-input-table` to `internal_contracts`; an invalid table adds
@@ -750,6 +821,28 @@ existing object-writer artifact no longer verifies against the current plan, or
 the object output exists but no longer matches the image dry-run bytes, the
 matching `object-*:*` unresolved entry is reported; verified artifacts are
 surfaced as `verified-*` internal contracts.
+The closure snapshot, final-stage plan, and final-executable blocked report are
+not part of this self-checking prepared-prefix view; they are chain-tail
+snapshots or diagnostics validated by their own `verify-*` commands and by
+`check` when present. This keeps `linker_contract_hash` from recursively
+depending on reports derived from the closure itself.
+The closure report and snapshot also expose `container_layout_hash`,
+`container_hash`, `payload_size_bytes`, and `payload_hash` as linker assembly
+anchors. These are not backend-specific object records; they are stable Nsld
+container/payload summaries that later nsld, nsdb, cache, and linker steps can
+compare before deciding whether to reuse or inspect heavier artifacts.
+When an object-image dry-run exists, closure also surfaces the relocation
+lowering registry through `object_image_relocation_lowering_valid`,
+`object_image_relocation_lowering_rule_count`,
+`object_image_relocation_lowering_rules`, and
+`object_image_relocation_lowering_issues`, plus
+`object_image_relocation_record_count` and
+`object_image_relocation_record_table_hash` and
+`object_image_relocation_records`, so the linker feasibility view can audit
+seed-kind-to-target relocation policy and actual backend relocation records
+without re-opening the dry-run TOML.
+When that dry-run verifies and the record table hash is present, closure also
+adds `verified-object-image-relocation-record-table` to `internal_contracts`.
 
 When every declared lowering IR sidecar has a valid capability block, closure
 adds `lowering-sidecar-capabilities` to `internal_contracts`. Domains without
@@ -776,6 +869,52 @@ current link plan and do not require `nuis.nsld.container` to have been emitted
 yet; they give route-planning tools the same container fingerprint and
 CFFI/host-compat domain identity used by `container`, `emit-container`,
 `prepare`, and `check`.
+
+## Final-Stage Plan
+
+`nsld final-stage-plan` is the deterministic boundary immediately before a
+runnable host or Nuis-native executable exists. It does not invoke clang, lld,
+or a future self-owned Nsld linker. Instead, it records the final-stage
+contract that such a linker must consume:
+
+* final-stage kind, driver, link mode, and output path
+* required inputs: Nsld container, container payload, closure snapshot, and
+  optional/required native object output
+* container hash, payload hash, and linker contract hash
+* compatibility mode, currently `host-assisted-wrapper` when the host toolchain
+  remains part of finalization
+* blockers such as `self-owned-final-native-linker` or missing final-stage
+  inputs
+
+`nsld emit-final-stage-plan` materializes this to
+`nuis.nsld.final-stage-plan.toml`; `nsld verify-final-stage-plan` re-computes
+the current plan and reports focused drift such as `plan_hash mismatch` or
+`input_count mismatch`. This gives Nsld, cache tooling, and future nsdb a stable
+surface for the executable boundary before real linker execution is owned.
+`nsld final-executable-readiness` is a non-mutating query for the next boundary:
+it reports the would-be output path, blocked-report path, final-stage plan hash,
+driver, link mode, blocker list, and notes without writing any artifact.
+`nsld emit-final-executable` materializes the same readiness shape. In
+alpha-0.6.x it does not fabricate a runnable executable and does not call the
+host toolchain; instead it writes `nuis.nsld.final-executable.blocked.toml`
+with `emitted = false`. `nsld verify-final-executable-emit` re-computes that
+blocked report and catches drift in fields such as `final_stage_plan_hash`,
+`emitted`, and `blocker_count`. This keeps final executable readiness
+scriptable without binding Nsld to one platform object format.
+The final-stage plan file is also checked by `nsld check`, which exposes
+`final_stage_plan_present`, `final_stage_plan_valid`,
+`final_stage_plan_ready`, `final_stage_plan_hash`,
+`final_stage_plan_blocker_count`, and `final_stage_plan_issues`. As with the
+standalone plan report, `ready = false` is informational; only verification
+drift fails the top-level check.
+If `nuis.nsld.final-executable.blocked.toml` is present, `nsld check` also
+verifies it and exposes `final_executable_blocked_present`,
+`final_executable_blocked_valid`, `final_executable_blocked_emitted`,
+`final_executable_blocked_plan_hash`,
+`final_executable_blocked_blocker_count`, and
+`final_executable_blocked_issues`. The file remains optional so `prepare` can
+stay a deterministic artifact preparation step while final executable emission
+remains an explicit boundary command.
 
 `nsld prepare` also returns the same compatibility-domain summary after it has
 emitted and verified the full artifact chain. This makes the prepare result a

@@ -80,6 +80,9 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(Path::new(&report.object_writer_dry_run_path).exists());
     assert!(Path::new(&report.container_plan_path).exists());
     assert!(Path::new(&report.container_path).exists());
+    assert!(Path::new(&report.container_payload_path).exists());
+    assert!(Path::new(&report.closure_snapshot_path).exists());
+    assert!(Path::new(&report.final_stage_plan_path).exists());
     assert!(dir.join("nuis.nsld.object-plan.toml").exists());
     assert!(dir.join("nuis.nsld.object-writer-input.toml").exists());
     assert!(dir.join("nuis.nsld.object.blocked.toml").exists());
@@ -115,6 +118,18 @@ validation_contracts = ["glm.resource-lifetime"]
         "bootstrap-entry-seed"
     );
     assert!(report.object_image_relocation_lowering_issues.is_empty());
+    assert_eq!(
+        report.object_image_relocation_record_count,
+        report.object_image_relocation_records.len()
+    );
+    assert!(report.object_image_relocation_record_count >= 4);
+    assert!(report
+        .object_image_relocation_record_table_hash
+        .starts_with("0x"));
+    assert_eq!(
+        report.object_image_relocation_records[0].relocation_seed_id,
+        "orel0000.compiled_artifact"
+    );
     assert_ne!(report.metadata_table_hash, "missing");
     assert_eq!(report.compatibility_domain_count, Some(1));
     assert!(report
@@ -165,10 +180,21 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(report_json.contains("\"object_image_relocation_lowering_rules\":[{"));
     assert!(report_json.contains("\"source_seed_kind\":\"bootstrap-entry-seed\""));
     assert!(report_json.contains("\"object_image_relocation_lowering_issues\":[]"));
+    assert!(report_json.contains("\"object_image_relocation_record_count\":"));
+    assert!(report_json.contains("\"object_image_relocation_record_table_hash\":\"0x"));
+    assert!(report_json.contains("\"object_image_relocation_records\":[{"));
+    assert!(report_json.contains("\"relocation_seed_id\":\"orel0000.compiled_artifact\""));
+    assert!(report_json.contains("\"closure_snapshot_path\":"));
     assert_ne!(report.container_layout_hash, "missing");
     assert_ne!(report.container_hash, "missing");
     assert!(report.payload_size_bytes > 0);
     assert_ne!(report.payload_hash, "missing");
+    assert!(!report.final_stage_plan_ready);
+    assert!(report.final_stage_plan_hash.starts_with("0x"));
+    assert!(report.final_stage_plan_blocker_count >= 1);
+    assert!(report_json.contains("\"final_stage_plan_path\":"));
+    assert!(report_json.contains("\"final_stage_plan_ready\":false"));
+    assert!(report_json.contains("\"final_stage_plan_hash\":\"0x"));
 
     fs::remove_dir_all(dir).unwrap();
 }

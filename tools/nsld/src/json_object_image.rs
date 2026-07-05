@@ -39,6 +39,15 @@ pub(crate) fn nsld_object_image_dry_run_report_json(
             "\"relocation_lowering_rules\":[{}]",
             relocation_lowering_rules_json(&report.relocation_lowering_rules)
         ),
+        json_usize_field("relocation_record_count", report.relocation_record_count),
+        json_string_field(
+            "relocation_record_table_hash",
+            &report.relocation_record_table_hash,
+        ),
+        format!(
+            "\"relocation_records\":[{}]",
+            relocation_records_json(&report.relocation_records)
+        ),
         json_string_array_field("blockers", &report.blockers),
     ];
     format!("{{{}}}", fields.join(","))
@@ -58,6 +67,31 @@ pub(crate) fn relocation_lowering_rules_json(
                 json_usize_field("length_power", rule.length_power as usize),
                 json_bool_field("external", rule.external),
                 json_usize_field("relocation_type", rule.relocation_type as usize),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+pub(crate) fn relocation_records_json(
+    records: &[NsldObjectImageRelocationRecordDiagnostic],
+) -> String {
+    records
+        .iter()
+        .map(|record| {
+            let fields = vec![
+                json_string_field("record_id", &record.record_id),
+                json_string_field("relocation_seed_id", &record.relocation_seed_id),
+                json_string_field("source_section_id", &record.source_section_id),
+                json_usize_field("source_offset", record.source_offset),
+                json_string_field("source_seed_kind", &record.source_seed_kind),
+                json_string_field("target_relocation_kind", &record.target_relocation_kind),
+                json_usize_field("symbol_index", record.symbol_index as usize),
+                json_bool_field("pc_relative", record.pc_relative),
+                json_usize_field("length_power", record.length_power as usize),
+                json_bool_field("external", record.external),
+                json_usize_field("relocation_type", record.relocation_type as usize),
             ];
             format!("{{{}}}", fields.join(","))
         })
@@ -130,6 +164,18 @@ pub(crate) fn nsld_object_image_dry_run_verify_report_json(
             "\"expected_relocation_lowering_rules\":[{}]",
             relocation_lowering_rules_json(&report.expected_relocation_lowering_rules)
         ),
+        json_usize_field(
+            "expected_relocation_record_count",
+            report.expected_relocation_record_count,
+        ),
+        json_string_field(
+            "expected_relocation_record_table_hash",
+            &report.expected_relocation_record_table_hash,
+        ),
+        format!(
+            "\"expected_relocation_records\":[{}]",
+            relocation_records_json(&report.expected_relocation_records)
+        ),
         json_optional_string_field(
             "actual_file_layout_hash",
             report.actual_file_layout_hash.as_deref(),
@@ -177,6 +223,18 @@ pub(crate) fn nsld_object_image_dry_run_verify_report_json(
                     .as_deref()
                     .unwrap_or(&[])
             )
+        ),
+        json_optional_usize_field(
+            "actual_relocation_record_count",
+            report.actual_relocation_record_count,
+        ),
+        json_optional_string_field(
+            "actual_relocation_record_table_hash",
+            report.actual_relocation_record_table_hash.as_deref(),
+        ),
+        format!(
+            "\"actual_relocation_records\":[{}]",
+            relocation_records_json(report.actual_relocation_records.as_deref().unwrap_or(&[]))
         ),
         json_optional_usize_field(
             "actual_image_file_size_bytes",

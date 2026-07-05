@@ -42,12 +42,183 @@ fn parses_check_input_and_json_flag() {
 }
 
 #[test]
+fn parses_artifact_chain_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "artifact-chain".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::ArtifactChain {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
 fn parses_closure_input_and_json_flag() {
     let command =
         parse_args(vec!["closure".to_owned(), "out".to_owned(), "--json".to_owned()].into_iter());
     assert_eq!(
         command,
         Ok(Command::Closure {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_emit_closure_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "emit-closure".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::EmitClosure {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_verify_closure_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "verify-closure".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::VerifyClosure {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_final_stage_plan_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "final-stage-plan".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::FinalStagePlan {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_emit_final_stage_plan_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "emit-final-stage-plan".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::EmitFinalStagePlan {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_verify_final_stage_plan_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "verify-final-stage-plan".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::VerifyFinalStagePlan {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_final_executable_readiness_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "final-executable-readiness".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::FinalExecutableReadiness {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_emit_final_executable_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "emit-final-executable".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::EmitFinalExecutable {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_verify_final_executable_emit_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "verify-final-executable-emit".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::VerifyFinalExecutableEmit {
             input: PathBuf::from("out"),
             json: true
         })

@@ -2,9 +2,12 @@ use super::{
     object_macho_image::encode_mach_o_arm64_image,
     object_macho_relocations::{
         mach_o_arm64_relocation_lowering_rule_count, mach_o_arm64_relocation_lowering_rules,
-        mach_o_arm64_relocation_resolution_issues,
+        mach_o_arm64_relocation_records, mach_o_arm64_relocation_resolution_issues,
     },
-    reports::{NsldObjectFileLayoutReport, NsldRelocationLoweringRuleDiagnostic},
+    reports::{
+        NsldObjectFileLayoutReport, NsldObjectImageRelocationRecordDiagnostic,
+        NsldRelocationLoweringRuleDiagnostic,
+    },
 };
 use std::path::Path;
 
@@ -87,6 +90,18 @@ pub(crate) fn object_image_backend_relocation_lowering_rules(
 ) -> Vec<NsldRelocationLoweringRuleDiagnostic> {
     match backend_kind {
         "mach-o-arm64" => mach_o_arm64_relocation_lowering_rules(),
+        _ => Vec::new(),
+    }
+}
+
+pub(crate) fn object_image_backend_relocation_records(
+    backend_kind: &str,
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+    file_layout: &NsldObjectFileLayoutReport,
+) -> Vec<NsldObjectImageRelocationRecordDiagnostic> {
+    match backend_kind {
+        "mach-o-arm64" => mach_o_arm64_relocation_records(manifest, plan, file_layout),
         _ => Vec::new(),
     }
 }

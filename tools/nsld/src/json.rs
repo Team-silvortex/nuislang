@@ -5,6 +5,45 @@ pub(crate) use super::json_object_image::*;
 
 use super::{json_fields::*, json_fragments::*, reports::*};
 
+pub(crate) fn nsld_artifact_chain_report_json(report: &NsldArtifactChainReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_artifact_chain"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_dir", &report.output_dir),
+        json_bool_field("valid", report.valid),
+        json_usize_field("stage_count", report.stage_count),
+        json_usize_field("present_count", report.present_count),
+        json_usize_field("required_count", report.required_count),
+        json_usize_field("missing_required_count", report.missing_required_count),
+        json_usize_field("optional_present_count", report.optional_present_count),
+        json_optional_string_field(
+            "first_missing_required_stage",
+            report.first_missing_required_stage.as_deref(),
+        ),
+        json_optional_string_field("next_required_stage", report.next_required_stage.as_deref()),
+        json_optional_string_field(
+            "suggested_command_id",
+            report.suggested_command_id.as_deref(),
+        ),
+        json_optional_string_field("suggested_command", report.suggested_command.as_deref()),
+        json_optional_string_field(
+            "suggested_command_resolved",
+            report.suggested_command_resolved.as_deref(),
+        ),
+        json_optional_string_field(
+            "suggested_command_reason",
+            report.suggested_command_reason.as_deref(),
+        ),
+        format!(
+            "\"stages\":[{}]",
+            artifact_chain_stage_diagnostics_json(&report.stages)
+        ),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
 pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
     let fields = vec![
         json_string_field("tool", "nsld"),
@@ -108,6 +147,18 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
             "object_image_relocation_lowering_issues",
             &report.object_image_relocation_lowering_issues,
         ),
+        json_optional_usize_field(
+            "object_image_relocation_record_count",
+            report.object_image_relocation_record_count,
+        ),
+        json_optional_string_field(
+            "object_image_relocation_record_table_hash",
+            report.object_image_relocation_record_table_hash.as_deref(),
+        ),
+        format!(
+            "\"object_image_relocation_records\":[{}]",
+            relocation_records_json(&report.object_image_relocation_records)
+        ),
         json_bool_field(
             "object_image_dry_run_bytes_present",
             report.object_image_dry_run_bytes_present,
@@ -183,6 +234,61 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
             report.container_payload_present,
         ),
         json_string_array_field("container_payload_issues", &report.container_payload_issues),
+        json_bool_field("closure_snapshot_present", report.closure_snapshot_present),
+        json_optional_bool_field("closure_snapshot_valid", report.closure_snapshot_valid),
+        json_string_array_field("closure_snapshot_issues", &report.closure_snapshot_issues),
+        json_optional_string_field(
+            "closure_snapshot_linker_contract_hash",
+            report.closure_snapshot_linker_contract_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "closure_snapshot_container_hash",
+            report.closure_snapshot_container_hash.as_deref(),
+        ),
+        json_optional_usize_field(
+            "closure_snapshot_payload_size_bytes",
+            report.closure_snapshot_payload_size_bytes,
+        ),
+        json_optional_string_field(
+            "closure_snapshot_payload_hash",
+            report.closure_snapshot_payload_hash.as_deref(),
+        ),
+        json_bool_field("final_stage_plan_present", report.final_stage_plan_present),
+        json_optional_bool_field("final_stage_plan_valid", report.final_stage_plan_valid),
+        json_optional_bool_field("final_stage_plan_ready", report.final_stage_plan_ready),
+        json_optional_string_field(
+            "final_stage_plan_hash",
+            report.final_stage_plan_hash.as_deref(),
+        ),
+        json_optional_usize_field(
+            "final_stage_plan_blocker_count",
+            report.final_stage_plan_blocker_count,
+        ),
+        json_string_array_field("final_stage_plan_issues", &report.final_stage_plan_issues),
+        json_bool_field(
+            "final_executable_blocked_present",
+            report.final_executable_blocked_present,
+        ),
+        json_optional_bool_field(
+            "final_executable_blocked_valid",
+            report.final_executable_blocked_valid,
+        ),
+        json_optional_bool_field(
+            "final_executable_blocked_emitted",
+            report.final_executable_blocked_emitted,
+        ),
+        json_optional_string_field(
+            "final_executable_blocked_plan_hash",
+            report.final_executable_blocked_plan_hash.as_deref(),
+        ),
+        json_optional_usize_field(
+            "final_executable_blocked_blocker_count",
+            report.final_executable_blocked_blocker_count,
+        ),
+        json_string_array_field(
+            "final_executable_blocked_issues",
+            &report.final_executable_blocked_issues,
+        ),
         json_optional_string_field(
             "container_loader_readiness",
             report.container_loader_readiness.as_deref(),
@@ -300,6 +406,24 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
         json_string_array_field("issues", &report.issues),
     ];
     format!("{{{}}}", fields.join(","))
+}
+
+fn artifact_chain_stage_diagnostics_json(stages: &[NsldArtifactStageDiagnostic]) -> String {
+    stages
+        .iter()
+        .map(|stage| {
+            let fields = vec![
+                json_usize_field("order_index", stage.order_index),
+                json_string_field("stage_id", &stage.stage_id),
+                json_string_field("file_name", &stage.file_name),
+                json_string_field("path", &stage.path),
+                json_bool_field("required", stage.required),
+                json_bool_field("present", stage.present),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 pub(crate) fn nsld_link_units_emit_report_json(report: &NsldLinkUnitsEmitReport) -> String {
@@ -432,6 +556,8 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
         json_string_field("container_plan_path", &report.container_plan_path),
         json_string_field("container_path", &report.container_path),
         json_string_field("container_payload_path", &report.container_payload_path),
+        json_string_field("closure_snapshot_path", &report.closure_snapshot_path),
+        json_string_field("final_stage_plan_path", &report.final_stage_plan_path),
         json_usize_field("link_input_count", report.link_input_count),
         json_string_field("link_input_table_hash", &report.link_input_table_hash),
         json_usize_field("unit_count", report.unit_count),
@@ -461,6 +587,18 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
         json_string_array_field(
             "object_image_relocation_lowering_issues",
             &report.object_image_relocation_lowering_issues,
+        ),
+        json_usize_field(
+            "object_image_relocation_record_count",
+            report.object_image_relocation_record_count,
+        ),
+        json_string_field(
+            "object_image_relocation_record_table_hash",
+            &report.object_image_relocation_record_table_hash,
+        ),
+        format!(
+            "\"object_image_relocation_records\":[{}]",
+            relocation_records_json(&report.object_image_relocation_records)
         ),
         json_string_field("metadata_table_hash", &report.metadata_table_hash),
         json_optional_usize_field(
@@ -517,6 +655,12 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
         json_string_field("container_hash", &report.container_hash),
         json_usize_field("payload_size_bytes", report.payload_size_bytes),
         json_string_field("payload_hash", &report.payload_hash),
+        json_bool_field("final_stage_plan_ready", report.final_stage_plan_ready),
+        json_string_field("final_stage_plan_hash", &report.final_stage_plan_hash),
+        json_usize_field(
+            "final_stage_plan_blocker_count",
+            report.final_stage_plan_blocker_count,
+        ),
         json_string_array_field("issues", &report.issues),
     ];
     format!("{{{}}}", fields.join(","))
@@ -681,6 +825,151 @@ pub(crate) fn nsld_link_inputs_verify_report_json(report: &NsldLinkInputsVerifyR
     format!("{{{}}}", fields.join(","))
 }
 
+pub(crate) fn nsld_final_stage_plan_report_json(report: &NsldFinalStagePlanReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_stage_plan"),
+        json_string_field("manifest", &report.manifest),
+        json_bool_field("ready", report.ready),
+        json_string_field("plan_hash", &report.plan_hash),
+        json_string_field("final_stage_kind", &report.final_stage_kind),
+        json_string_field("final_stage_driver", &report.final_stage_driver),
+        json_string_field("final_stage_link_mode", &report.final_stage_link_mode),
+        json_string_field("final_output_path", &report.final_output_path),
+        json_bool_field("host_wrapper_required", report.host_wrapper_required),
+        json_string_field("compatibility_mode", &report.compatibility_mode),
+        json_usize_field("input_count", report.input_count),
+        format!("\"inputs\":[{}]", final_stage_inputs_json(&report.inputs)),
+        json_string_field("container_hash", &report.container_hash),
+        json_string_field("payload_hash", &report.payload_hash),
+        json_string_field("linker_contract_hash", &report.linker_contract_hash),
+        json_bool_field("native_object_required", report.native_object_required),
+        json_bool_field("native_object_present", report.native_object_present),
+        json_string_array_field("blockers", &report.blockers),
+        json_string_array_field("notes", &report.notes),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_stage_plan_emit_report_json(
+    report: &NsldFinalStagePlanEmitReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_stage_plan_emit"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_bool_field("ready", report.ready),
+        json_string_field("plan_hash", &report.plan_hash),
+        json_usize_field("input_count", report.input_count),
+        json_usize_field("blocker_count", report.blocker_count),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_stage_plan_verify_report_json(
+    report: &NsldFinalStagePlanVerifyReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_stage_plan_verify"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("input_path", &report.input_path),
+        json_bool_field("valid", report.valid),
+        json_string_field("expected_plan_hash", &report.expected_plan_hash),
+        json_optional_string_field("actual_plan_hash", report.actual_plan_hash.as_deref()),
+        json_usize_field("expected_input_count", report.expected_input_count),
+        json_optional_usize_field("actual_input_count", report.actual_input_count),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_executable_emit_report_json(
+    report: &NsldFinalExecutableEmitReport,
+) -> String {
+    nsld_final_executable_report_json_with_kind(report, "nsld_final_executable_emit")
+}
+
+pub(crate) fn nsld_final_executable_readiness_report_json(
+    report: &NsldFinalExecutableEmitReport,
+) -> String {
+    nsld_final_executable_report_json_with_kind(report, "nsld_final_executable_readiness")
+}
+
+fn nsld_final_executable_report_json_with_kind(
+    report: &NsldFinalExecutableEmitReport,
+    kind: &str,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", kind),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("blocked_report_path", &report.blocked_report_path),
+        json_bool_field("emitted", report.emitted),
+        json_bool_field(
+            "can_emit_final_executable",
+            report.can_emit_final_executable,
+        ),
+        json_bool_field("final_stage_ready", report.final_stage_ready),
+        json_string_field("final_stage_plan_hash", &report.final_stage_plan_hash),
+        json_string_field("final_stage_driver", &report.final_stage_driver),
+        json_string_field("final_stage_link_mode", &report.final_stage_link_mode),
+        json_bool_field("host_wrapper_required", report.host_wrapper_required),
+        json_usize_field("input_count", report.input_count),
+        json_usize_field("blocker_count", report.blockers.len()),
+        json_string_array_field("blockers", &report.blockers),
+        json_string_array_field("notes", &report.notes),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_executable_emit_verify_report_json(
+    report: &NsldFinalExecutableEmitVerifyReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_executable_emit_verify"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("input_path", &report.input_path),
+        json_bool_field("valid", report.valid),
+        json_string_field(
+            "expected_final_stage_plan_hash",
+            &report.expected_final_stage_plan_hash,
+        ),
+        json_optional_string_field(
+            "actual_final_stage_plan_hash",
+            report.actual_final_stage_plan_hash.as_deref(),
+        ),
+        json_bool_field("expected_emitted", report.expected_emitted),
+        json_optional_bool_field("actual_emitted", report.actual_emitted),
+        json_usize_field("expected_blocker_count", report.expected_blocker_count),
+        json_optional_usize_field("actual_blocker_count", report.actual_blocker_count),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn final_stage_inputs_json(inputs: &[NsldFinalStageInputDiagnostic]) -> String {
+    inputs
+        .iter()
+        .map(|input| {
+            let fields = vec![
+                json_usize_field("order_index", input.order_index),
+                json_string_field("input_id", &input.input_id),
+                json_string_field("input_kind", &input.input_kind),
+                json_string_field("path", &input.path),
+                json_string_field("content_hash", &input.content_hash),
+                json_bool_field("required", input.required),
+                json_bool_field("present", input.present),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 pub(crate) fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
     let fields = vec![
         json_string_field("tool", "nsld"),
@@ -688,6 +977,7 @@ pub(crate) fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
         json_string_field("manifest", &report.manifest),
         json_bool_field("closed", report.closed),
         json_string_array_field("internal_contracts", &report.internal_contracts),
+        json_string_field("linker_contract_hash", &report.linker_contract_hash),
         format!(
             "\"link_inputs\":[{}]",
             nsld_link_inputs_json(&report.link_inputs)
@@ -709,6 +999,10 @@ pub(crate) fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
             "container_metadata_table_hash",
             &report.container_metadata_table_hash,
         ),
+        json_string_field("container_layout_hash", &report.container_layout_hash),
+        json_string_field("container_hash", &report.container_hash),
+        json_usize_field("payload_size_bytes", report.payload_size_bytes),
+        json_string_field("payload_hash", &report.payload_hash),
         json_string_field(
             "container_loader_readiness",
             &report.container_loader_readiness,
@@ -763,6 +1057,34 @@ pub(crate) fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
                 report.compatibility_domain_required,
             )
         ),
+        json_optional_bool_field(
+            "object_image_relocation_lowering_valid",
+            report.object_image_relocation_lowering_valid,
+        ),
+        json_optional_usize_field(
+            "object_image_relocation_lowering_rule_count",
+            report.object_image_relocation_lowering_rule_count,
+        ),
+        format!(
+            "\"object_image_relocation_lowering_rules\":[{}]",
+            relocation_lowering_rules_json(&report.object_image_relocation_lowering_rules)
+        ),
+        json_string_array_field(
+            "object_image_relocation_lowering_issues",
+            &report.object_image_relocation_lowering_issues,
+        ),
+        json_optional_usize_field(
+            "object_image_relocation_record_count",
+            report.object_image_relocation_record_count,
+        ),
+        json_optional_string_field(
+            "object_image_relocation_record_table_hash",
+            report.object_image_relocation_record_table_hash.as_deref(),
+        ),
+        format!(
+            "\"object_image_relocation_records\":[{}]",
+            relocation_records_json(&report.object_image_relocation_records)
+        ),
         json_string_array_field("external_dependencies", &report.external_dependencies),
         json_string_array_field("unresolved", &report.unresolved),
         json_bool_field("host_wrapper_required", report.host_wrapper_required),
@@ -772,6 +1094,70 @@ pub(crate) fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
         json_usize_field("clock_edge_count", report.clock_edge_count),
         json_usize_field("data_segment_count", report.data_segment_count),
         json_string_field("final_stage_link_mode", &report.final_stage_link_mode),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_closure_emit_report_json(report: &NsldClosureEmitReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_linker_closure_emit"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("linker_contract_hash", &report.linker_contract_hash),
+        json_bool_field("closed", report.closed),
+        json_usize_field("internal_contract_count", report.internal_contract_count),
+        json_usize_field("unresolved_count", report.unresolved_count),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_closure_verify_report_json(report: &NsldClosureVerifyReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_linker_closure_verify"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("input_path", &report.input_path),
+        json_bool_field("valid", report.valid),
+        json_string_field(
+            "expected_linker_contract_hash",
+            &report.expected_linker_contract_hash,
+        ),
+        json_optional_string_field(
+            "actual_linker_contract_hash",
+            report.actual_linker_contract_hash.as_deref(),
+        ),
+        json_string_field("expected_container_hash", &report.expected_container_hash),
+        json_optional_string_field(
+            "actual_container_hash",
+            report.actual_container_hash.as_deref(),
+        ),
+        json_usize_field(
+            "expected_payload_size_bytes",
+            report.expected_payload_size_bytes,
+        ),
+        json_optional_usize_field(
+            "actual_payload_size_bytes",
+            report.actual_payload_size_bytes,
+        ),
+        json_string_field("expected_payload_hash", &report.expected_payload_hash),
+        json_optional_string_field("actual_payload_hash", report.actual_payload_hash.as_deref()),
+        json_bool_field("expected_closed", report.expected_closed),
+        json_optional_bool_field("actual_closed", report.actual_closed),
+        json_usize_field(
+            "expected_internal_contract_count",
+            report.expected_internal_contract_count,
+        ),
+        json_optional_usize_field(
+            "actual_internal_contract_count",
+            report.actual_internal_contract_count,
+        ),
+        json_usize_field(
+            "expected_unresolved_count",
+            report.expected_unresolved_count,
+        ),
+        json_optional_usize_field("actual_unresolved_count", report.actual_unresolved_count),
+        json_string_array_field("issues", &report.issues),
     ];
     format!("{{{}}}", fields.join(","))
 }

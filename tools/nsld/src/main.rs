@@ -22,6 +22,7 @@ mod display_link_tables;
 mod display_object;
 mod display_object_emit;
 mod display_object_image;
+mod final_stage;
 mod json;
 mod json_container;
 mod json_fields;
@@ -79,6 +80,7 @@ mod toml_read;
 
 pub(crate) use protocol::*;
 
+use artifact_chain::*;
 use assembly::*;
 use check::*;
 use cli::{parse_args, Command};
@@ -87,6 +89,7 @@ use commands::{run_plan_command, run_status_command};
 use container_pipeline::*;
 use context::load_link_input_context;
 use display::*;
+use final_stage::*;
 use json::*;
 use link_units::*;
 use main_object_commands::run_object_command;
@@ -124,6 +127,15 @@ fn run() -> Result<(), String> {
                 return Err("nsld check failed".to_owned());
             }
         }
+        Command::ArtifactChain { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_artifact_chain_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_artifact_chain_report_json(&report));
+            } else {
+                print_nsld_artifact_chain_report(&report);
+            }
+        }
         Command::Closure { input, json } => {
             let ctx = load_link_input_context(&input)?;
             let report = nsld_closure_report(&ctx.manifest, &ctx.plan);
@@ -131,6 +143,87 @@ fn run() -> Result<(), String> {
                 println!("{}", nsld_closure_report_json(&report));
             } else {
                 print_nsld_closure_report(&report);
+            }
+        }
+        Command::EmitClosure { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_closure_report(&ctx.manifest, &ctx.plan)?;
+            if json {
+                println!("{}", nsld_closure_emit_report_json(&report));
+            } else {
+                print_nsld_closure_emit_report(&report);
+            }
+        }
+        Command::VerifyClosure { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_closure_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_closure_verify_report_json(&report));
+            } else {
+                print_nsld_closure_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld closure verification failed".to_owned());
+            }
+        }
+        Command::FinalStagePlan { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_final_stage_plan_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_final_stage_plan_report_json(&report));
+            } else {
+                print_nsld_final_stage_plan_report(&report);
+            }
+        }
+        Command::EmitFinalStagePlan { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_final_stage_plan_report(&ctx.manifest, &ctx.plan)?;
+            if json {
+                println!("{}", nsld_final_stage_plan_emit_report_json(&report));
+            } else {
+                print_nsld_final_stage_plan_emit_report(&report);
+            }
+        }
+        Command::VerifyFinalStagePlan { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_final_stage_plan_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_final_stage_plan_verify_report_json(&report));
+            } else {
+                print_nsld_final_stage_plan_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld final-stage plan verification failed".to_owned());
+            }
+        }
+        Command::FinalExecutableReadiness { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_final_executable_readiness_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_final_executable_readiness_report_json(&report));
+            } else {
+                print_nsld_final_executable_readiness_report(&report);
+            }
+        }
+        Command::EmitFinalExecutable { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_final_executable_report(&ctx.manifest, &ctx.plan)?;
+            if json {
+                println!("{}", nsld_final_executable_emit_report_json(&report));
+            } else {
+                print_nsld_final_executable_emit_report(&report);
+            }
+        }
+        Command::VerifyFinalExecutableEmit { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_final_executable_emit_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_final_executable_emit_verify_report_json(&report));
+            } else {
+                print_nsld_final_executable_emit_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld final executable emit verification failed".to_owned());
             }
         }
         Command::Prepare { input, json } => {

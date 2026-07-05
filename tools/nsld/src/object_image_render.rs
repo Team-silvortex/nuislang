@@ -52,6 +52,15 @@ pub(crate) fn render_object_image_dry_run(report: &NsldObjectImageDryRunReport) 
         super::toml::toml_string_array_literal(&report.relocation_lowering_issues)
     ));
     out.push_str(&format!(
+        "relocation_record_count = {}\n",
+        report.relocation_record_count
+    ));
+    push_string(
+        &mut out,
+        "relocation_record_table_hash",
+        &report.relocation_record_table_hash,
+    );
+    out.push_str(&format!(
         "blockers = [{}]\n",
         super::toml::toml_string_array_literal(&report.blockers)
     ));
@@ -68,6 +77,24 @@ pub(crate) fn render_object_image_dry_run(report: &NsldObjectImageDryRunReport) 
         out.push_str(&format!("length_power = {}\n", rule.length_power));
         out.push_str(&format!("external = {}\n", rule.external));
         out.push_str(&format!("relocation_type = {}\n", rule.relocation_type));
+    }
+    for record in &report.relocation_records {
+        out.push_str("\n[[relocation_record]]\n");
+        push_string(&mut out, "record_id", &record.record_id);
+        push_string(&mut out, "relocation_seed_id", &record.relocation_seed_id);
+        push_string(&mut out, "source_section_id", &record.source_section_id);
+        out.push_str(&format!("source_offset = {}\n", record.source_offset));
+        push_string(&mut out, "source_seed_kind", &record.source_seed_kind);
+        push_string(
+            &mut out,
+            "target_relocation_kind",
+            &record.target_relocation_kind,
+        );
+        out.push_str(&format!("symbol_index = {}\n", record.symbol_index));
+        out.push_str(&format!("pc_relative = {}\n", record.pc_relative));
+        out.push_str(&format!("length_power = {}\n", record.length_power));
+        out.push_str(&format!("external = {}\n", record.external));
+        out.push_str(&format!("relocation_type = {}\n", record.relocation_type));
     }
     out
 }

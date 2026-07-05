@@ -97,6 +97,30 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         );
     }
     println!(
+        "  object_image_relocation_records: count={} table_hash={}",
+        optional_usize_text(report.object_image_relocation_record_count),
+        report
+            .object_image_relocation_record_table_hash
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    for record in &report.object_image_relocation_records {
+        println!(
+            "  object_image_relocation_record: id={} relocation_seed_id={} source_section_id={} source_offset={} source_seed_kind={} target={} symbol_index={} pc_relative={} length_power={} external={} relocation_type={}",
+            record.record_id,
+            record.relocation_seed_id,
+            record.source_section_id,
+            record.source_offset,
+            record.source_seed_kind,
+            record.target_relocation_kind,
+            record.symbol_index,
+            record.pc_relative,
+            record.length_power,
+            record.external,
+            record.relocation_type
+        );
+    }
+    println!(
         "  object_emit_blocked: present={} valid={}",
         report.object_emit_blocked_present,
         optional_bool_text(report.object_emit_blocked_valid)
@@ -137,6 +161,34 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         "  container_payload: present={} issues={}",
         report.container_payload_present,
         report.container_payload_issues.len()
+    );
+    println!(
+        "  closure_snapshot: present={} valid={} linker_contract_hash={} container_hash={} payload_size={} payload_hash={} issues={}",
+        report.closure_snapshot_present,
+        optional_bool_text(report.closure_snapshot_valid),
+        optional_string_text(report.closure_snapshot_linker_contract_hash.as_deref()),
+        optional_string_text(report.closure_snapshot_container_hash.as_deref()),
+        optional_usize_text(report.closure_snapshot_payload_size_bytes),
+        optional_string_text(report.closure_snapshot_payload_hash.as_deref()),
+        report.closure_snapshot_issues.len()
+    );
+    println!(
+        "  final_stage_plan: present={} valid={} ready={} hash={} blockers={} issues={}",
+        report.final_stage_plan_present,
+        optional_bool_text(report.final_stage_plan_valid),
+        optional_bool_text(report.final_stage_plan_ready),
+        optional_string_text(report.final_stage_plan_hash.as_deref()),
+        optional_usize_text(report.final_stage_plan_blocker_count),
+        report.final_stage_plan_issues.len()
+    );
+    println!(
+        "  final_executable_blocked: present={} valid={} emitted={} hash={} blockers={} issues={}",
+        report.final_executable_blocked_present,
+        optional_bool_text(report.final_executable_blocked_valid),
+        optional_bool_text(report.final_executable_blocked_emitted),
+        optional_string_text(report.final_executable_blocked_plan_hash.as_deref()),
+        optional_usize_text(report.final_executable_blocked_blocker_count),
+        report.final_executable_blocked_issues.len()
     );
     println!(
         "  container_loader: readiness={} blockers={} metadata_table_hash={} external_imports={}",
@@ -295,6 +347,15 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     }
     for issue in &report.container_payload_issues {
         println!("  container_payload_issue: {issue}");
+    }
+    for issue in &report.closure_snapshot_issues {
+        println!("  closure_snapshot_issue: {issue}");
+    }
+    for issue in &report.final_stage_plan_issues {
+        println!("  final_stage_plan_issue: {issue}");
+    }
+    for issue in &report.final_executable_blocked_issues {
+        println!("  final_executable_blocked_issue: {issue}");
     }
     for blocker in &report.container_loader_blockers {
         println!("  container_loader_blocker: {blocker}");
