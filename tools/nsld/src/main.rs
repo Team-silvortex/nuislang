@@ -205,6 +205,54 @@ fn run() -> Result<(), String> {
                 print_nsld_final_executable_readiness_report(&report);
             }
         }
+        Command::FinalExecutableWriterPlan { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_final_executable_writer_plan_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_final_executable_writer_plan_report_json(&report));
+            } else {
+                print_nsld_final_executable_writer_plan_report(&report);
+            }
+        }
+        Command::EmitFinalExecutableWriterInput { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_emit_final_executable_writer_input_report(&ctx.manifest, &ctx.plan)?;
+            if json {
+                println!(
+                    "{}",
+                    nsld_final_executable_writer_input_emit_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_writer_input_emit_report(&report);
+            }
+        }
+        Command::VerifyFinalExecutableWriterInput { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_verify_final_executable_writer_input_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!(
+                    "{}",
+                    nsld_final_executable_writer_input_verify_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_writer_input_verify_report(&report);
+            }
+            if !report.valid {
+                return Err("nsld final executable writer input verification failed".to_owned());
+            }
+        }
+        Command::FinalExecutableHostDryRun { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_final_executable_host_dry_run_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!(
+                    "{}",
+                    nsld_final_executable_host_dry_run_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_host_dry_run_report(&report);
+            }
+        }
         Command::EmitFinalExecutable { input, json } => {
             let ctx = load_link_input_context(&input)?;
             let report = nsld_emit_final_executable_report(&ctx.manifest, &ctx.plan)?;

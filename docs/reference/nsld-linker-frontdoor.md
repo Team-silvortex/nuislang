@@ -8,6 +8,10 @@ contract logic in `nuisc::linker`. It does not yet claim to be the final
 self-owned object linker. Its job is to give linker work a stable tool
 boundary before the implementation is split out further.
 
+For the current `alpha-0.8.*` line, the emphasis is binary-linking
+convergence: keep the existing frontdoor/reporting discipline, but drive it
+toward the smallest runnable binary route before `alpha-0.10.0`.
+
 Longer-term, `Nsld` should be read as a CLI adapter over a future reusable
 linker core / galaxy capability boundary, not as a CLI-only tool. See
 [toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md).
@@ -67,6 +71,10 @@ cargo run -p nsld -- final-stage-plan <artifact-output-dir>
 cargo run -p nsld -- emit-final-stage-plan <artifact-output-dir>
 cargo run -p nsld -- verify-final-stage-plan <artifact-output-dir> --json
 cargo run -p nsld -- final-executable-readiness <artifact-output-dir>
+cargo run -p nsld -- final-executable-writer-plan <artifact-output-dir>
+cargo run -p nsld -- emit-final-executable-writer-input <artifact-output-dir>
+cargo run -p nsld -- verify-final-executable-writer-input <artifact-output-dir> --json
+cargo run -p nsld -- final-executable-host-dry-run <artifact-output-dir>
 cargo run -p nsld -- emit-final-executable <artifact-output-dir>
 cargo run -p nsld -- verify-final-executable-emit <artifact-output-dir> --json
 cargo run -p nsld -- prepare <artifact-output-dir>
@@ -893,14 +901,51 @@ the current plan and reports focused drift such as `plan_hash mismatch` or
 surface for the executable boundary before real linker execution is owned.
 `nsld final-executable-readiness` is a non-mutating query for the next boundary:
 it reports the would-be output path, blocked-report path, final-stage plan hash,
-driver, link mode, blocker list, and notes without writing any artifact.
+driver, link mode, writer kind/status, writer blockers, blocker list, and notes
+without writing any artifact.
+`nsld final-executable-writer-plan` expands that readiness boundary into the
+non-mutating writer contract: final-stage inputs, writer steps, writer
+kind/status, writer blockers, and notes. It is intentionally a plan rather than
+an emitter so alpha-0.8.x can make the final executable writer explicit before
+committing Mach-O, ELF, or PE-specific object assembly behavior.
+`nsld emit-final-executable-writer-input` materializes that writer contract as
+`nuis.nsld.final-executable-writer-input.toml`; `nsld
+verify-final-executable-writer-input` re-renders it and checks the writer input
+hash, final-stage plan hash, writer identity, writer status, and planned command
+argument count and values. The current host-assisted command input records the
+selected driver, target triple, native object, and output path, but still does
+not invoke the host linker.
+`nsld final-executable-host-dry-run` consumes the verified writer input,
+resolves the selected host driver through an explicit path or `PATH`, and
+reports `environment_ready`, `driver_available`, `driver_resolved_path`, and
+the exact command arguments. It is non-mutating and never invokes the host
+driver; it exists to make the final host-assisted call boundary auditable before
+Nsld is allowed to execute it.
 `nsld emit-final-executable` materializes the same readiness shape. In
-alpha-0.6.x it does not fabricate a runnable executable and does not call the
+alpha-0.8.x it does not fabricate a runnable executable and does not call the
 host toolchain; instead it writes `nuis.nsld.final-executable.blocked.toml`
-with `emitted = false`. `nsld verify-final-executable-emit` re-computes that
-blocked report and catches drift in fields such as `final_stage_plan_hash`,
-`emitted`, and `blocker_count`. This keeps final executable readiness
-scriptable without binding Nsld to one platform object format.
+with `emitted = false`. The emit path now also consumes
+`verify-final-executable-writer-input`: if the writer input is missing or has
+drifted, the blocked report records `writer_input_valid = false`,
+`writer_input_issues`, and a `final-executable-writer-input:invalid` blocker.
+It also consumes `final-executable-host-dry-run`, recording
+`host_dry_run_environment_ready`, `host_dry_run_driver_available`,
+`host_dry_run_driver_resolved_path`, `host_dry_run_can_invoke`, and
+`host_dry_run_blockers` in the same blocked report.
+`nsld verify-final-executable-emit` re-computes that blocked report and catches
+drift in fields such as `final_stage_plan_hash`, `emitted`, and
+`blocker_count`; it also reports focused drift for host dry-run readiness fields
+such as `host_dry_run_environment_ready` and
+`host_dry_run_driver_available`, plus invocation fields such as
+`host_dry_run_can_invoke`, `host_dry_run_driver_resolved_path`, and
+`host_dry_run_blockers`. The blocked report also includes
+`host_dry_run_blocker_count` so scripts can check the host-finalizer blocker
+summary without parsing the blocker array. The readiness report currently exposes
+`writer_kind = "host-assisted-final-executable"`,
+`writer_status = "blocked"`, and
+`final-executable-writer:host-assisted:not-implemented` as the writer-level
+blocker for the default host-toolchain route. This keeps final executable
+readiness scriptable without binding Nsld to one platform object format.
 The final-stage plan file is also checked by `nsld check`, which exposes
 `final_stage_plan_present`, `final_stage_plan_valid`,
 `final_stage_plan_ready`, `final_stage_plan_hash`,
@@ -1109,3 +1154,18 @@ For `alpha-0.6.0`, success means:
   units and validated lowering sidecars
 
 This is the beginning of linker independence, not the end of linker work.
+
+## Alpha-0.8.* Meaning
+
+For `alpha-0.8.*`, success means:
+
+* Nsld artifact-chain diagnostics can explain missing stages and suggested
+  commands
+* object/container/closure/final-stage artifacts remain deterministic and
+  checkable
+* final executable readiness describes the exact blocker before real execution
+* the next implementation work is pointed at a minimal runnable binary route
+  before `alpha-0.10.0`
+
+This is the convergence line for binary linking. It should still avoid claiming
+that the self-owned production linker is finished.

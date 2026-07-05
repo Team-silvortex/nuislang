@@ -24,6 +24,7 @@ link plan
   -> container payload
   -> closure snapshot
   -> final-stage plan
+  -> final executable readiness / blocked report
 ```
 
 `nsld prepare` can emit and verify this chain today. This is already useful
@@ -54,7 +55,7 @@ It currently owns:
 
 It does not yet own:
 
-* optional Mach-O, ELF, or PE compatibility object emission
+* ELF or PE compatibility object emission
 * native relocation application
 * final executable entrypoint generation
 * host-shell or Nuis-native executable materialization

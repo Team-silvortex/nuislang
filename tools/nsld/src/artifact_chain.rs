@@ -22,6 +22,7 @@ pub(crate) enum NsldArtifactStageKind {
     ContainerPayload,
     ClosureSnapshot,
     FinalStagePlan,
+    FinalExecutableWriterInput,
     FinalExecutableBlocked,
 }
 
@@ -105,6 +106,10 @@ const ARTIFACT_STAGE_DEFINITIONS: &[(NsldArtifactStageKind, &str)] = &[
         "nuis.nsld.final-stage-plan.toml",
     ),
     (
+        NsldArtifactStageKind::FinalExecutableWriterInput,
+        "nuis.nsld.final-executable-writer-input.toml",
+    ),
+    (
         NsldArtifactStageKind::FinalExecutableBlocked,
         "nuis.nsld.final-executable.blocked.toml",
     ),
@@ -143,6 +148,7 @@ pub(crate) fn nsld_artifact_stage_id(kind: NsldArtifactStageKind) -> &'static st
         NsldArtifactStageKind::ContainerPayload => "container-payload",
         NsldArtifactStageKind::ClosureSnapshot => "closure-snapshot",
         NsldArtifactStageKind::FinalStagePlan => "final-stage-plan",
+        NsldArtifactStageKind::FinalExecutableWriterInput => "final-executable-writer-input",
         NsldArtifactStageKind::FinalExecutableBlocked => "final-executable-blocked",
     }
 }
@@ -168,6 +174,7 @@ pub(crate) fn nsld_artifact_stage_suggested_command(kind: NsldArtifactStageKind)
         NsldArtifactStageKind::Container => "emit-container",
         NsldArtifactStageKind::ClosureSnapshot => "emit-closure",
         NsldArtifactStageKind::FinalStagePlan => "emit-final-stage-plan",
+        NsldArtifactStageKind::FinalExecutableWriterInput => "emit-final-executable-writer-input",
         NsldArtifactStageKind::FinalExecutableBlocked => "emit-final-executable",
     }
 }
@@ -206,6 +213,7 @@ pub(crate) fn nsld_artifact_stage_required(kind: NsldArtifactStageKind) -> bool 
         NsldArtifactStageKind::ObjectOutput
             | NsldArtifactStageKind::ClosureSnapshot
             | NsldArtifactStageKind::FinalStagePlan
+            | NsldArtifactStageKind::FinalExecutableWriterInput
             | NsldArtifactStageKind::FinalExecutableBlocked
     )
 }

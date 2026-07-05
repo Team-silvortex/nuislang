@@ -13,6 +13,10 @@ pub(crate) enum Command {
     EmitFinalStagePlan { input: PathBuf, json: bool },
     VerifyFinalStagePlan { input: PathBuf, json: bool },
     FinalExecutableReadiness { input: PathBuf, json: bool },
+    FinalExecutableWriterPlan { input: PathBuf, json: bool },
+    EmitFinalExecutableWriterInput { input: PathBuf, json: bool },
+    VerifyFinalExecutableWriterInput { input: PathBuf, json: bool },
+    FinalExecutableHostDryRun { input: PathBuf, json: bool },
     EmitFinalExecutable { input: PathBuf, json: bool },
     VerifyFinalExecutableEmit { input: PathBuf, json: bool },
     Prepare { input: PathBuf, json: bool },
@@ -78,6 +82,10 @@ where
         | "emit-final-stage-plan"
         | "verify-final-stage-plan"
         | "final-executable-readiness"
+        | "final-executable-writer-plan"
+        | "emit-final-executable-writer-input"
+        | "verify-final-executable-writer-input"
+        | "final-executable-host-dry-run"
         | "emit-final-executable"
         | "verify-final-executable-emit"
         | "prepare"
@@ -131,6 +139,12 @@ where
             let is_emit_final_stage_plan = command == "emit-final-stage-plan";
             let is_verify_final_stage_plan = command == "verify-final-stage-plan";
             let is_final_executable_readiness = command == "final-executable-readiness";
+            let is_final_executable_writer_plan = command == "final-executable-writer-plan";
+            let is_emit_final_executable_writer_input =
+                command == "emit-final-executable-writer-input";
+            let is_verify_final_executable_writer_input =
+                command == "verify-final-executable-writer-input";
+            let is_final_executable_host_dry_run = command == "final-executable-host-dry-run";
             let is_emit_final_executable = command == "emit-final-executable";
             let is_verify_final_executable_emit = command == "verify-final-executable-emit";
             let is_prepare = command == "prepare";
@@ -205,6 +219,14 @@ where
                 Ok(Command::VerifyFinalStagePlan { input, json })
             } else if is_final_executable_readiness {
                 Ok(Command::FinalExecutableReadiness { input, json })
+            } else if is_final_executable_writer_plan {
+                Ok(Command::FinalExecutableWriterPlan { input, json })
+            } else if is_emit_final_executable_writer_input {
+                Ok(Command::EmitFinalExecutableWriterInput { input, json })
+            } else if is_verify_final_executable_writer_input {
+                Ok(Command::VerifyFinalExecutableWriterInput { input, json })
+            } else if is_final_executable_host_dry_run {
+                Ok(Command::FinalExecutableHostDryRun { input, json })
             } else if is_emit_final_executable {
                 Ok(Command::EmitFinalExecutable { input, json })
             } else if is_verify_final_executable_emit {
@@ -330,6 +352,10 @@ fn usage() -> &'static str {
         "  nsld emit-final-stage-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-final-stage-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld final-executable-readiness <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-writer-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld emit-final-executable-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld verify-final-executable-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-host-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-final-executable <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-final-executable-emit <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld prepare <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",

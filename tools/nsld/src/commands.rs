@@ -4,10 +4,14 @@ use std::path::Path;
 pub(crate) fn run_status_command() {
     println!("Nsld linker front-door");
     println!("  tool: nsld");
-    println!("  phase: alpha-0.6.0 linker boundary");
-    println!("  current_role: link-plan inspection and hetero clock/link contract surfacing");
+    println!("  phase: alpha-0.8.0 binary-linking convergence");
+    println!(
+        "  current_role: link-plan inspection, artifact-chain diagnosis, and final executable readiness"
+    );
     println!("  implementation: reuses nuisc::linker while linker ownership is split out");
-    println!("  final_link_status: host-toolchain wrapper is still used for native launcher finalization");
+    println!(
+        "  final_link_status: final executable emission is still blocked before real binary linking"
+    );
 }
 
 pub(crate) fn run_plan_command(input: &Path, json: bool) -> Result<(), String> {
@@ -18,7 +22,7 @@ pub(crate) fn run_plan_command(input: &Path, json: bool) -> Result<(), String> {
         println!("Nsld link plan");
         println!("  input: {}", ctx.input.display());
         println!("  manifest: {}", ctx.manifest.display());
-        println!("  role: alpha-0.6.0 linker front-door");
+        println!("  role: alpha-0.8.0 binary-linking convergence front-door");
         for line in nuisc::linker::render_link_plan_summary(&ctx.plan) {
             println!("  {line}");
         }

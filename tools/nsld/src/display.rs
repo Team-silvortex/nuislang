@@ -437,6 +437,153 @@ pub(crate) fn print_nsld_final_executable_readiness_report(report: &NsldFinalExe
     print_nsld_final_executable_report_with_title(report, "Nsld final executable readiness");
 }
 
+pub(crate) fn print_nsld_final_executable_writer_plan_report(
+    report: &NsldFinalExecutableWriterPlanReport,
+) {
+    println!("Nsld final executable writer plan");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  writer_kind: {}", report.writer_kind);
+    println!("  writer_status: {}", report.writer_status);
+    println!("  final_stage_plan_hash: {}", report.final_stage_plan_hash);
+    println!("  final_stage_driver: {}", report.final_stage_driver);
+    println!("  final_stage_link_mode: {}", report.final_stage_link_mode);
+    println!("  host_wrapper_required: {}", report.host_wrapper_required);
+    println!("  input_count: {}", report.input_count);
+    for input in &report.inputs {
+        println!(
+            "  writer_input: order={} id={} kind={} required={} present={} hash={} path={}",
+            input.order_index,
+            input.input_id,
+            input.input_kind,
+            input.required,
+            input.present,
+            input.content_hash,
+            input.path
+        );
+    }
+    for step in &report.writer_steps {
+        println!("  writer_step: {step}");
+    }
+    for blocker in &report.writer_blockers {
+        println!("  writer_blocker: {blocker}");
+    }
+    for note in &report.notes {
+        println!("  note: {note}");
+    }
+}
+
+pub(crate) fn print_nsld_final_executable_writer_input_emit_report(
+    report: &NsldFinalExecutableWriterInputEmitReport,
+) {
+    println!("Nsld final executable writer input emit");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  writer_input_hash: {}", report.writer_input_hash);
+    println!("  writer_kind: {}", report.writer_kind);
+    println!("  writer_status: {}", report.writer_status);
+    println!("  final_stage_plan_hash: {}", report.final_stage_plan_hash);
+    println!("  final_stage_driver: {}", report.final_stage_driver);
+    println!("  final_stage_link_mode: {}", report.final_stage_link_mode);
+    println!("  host_wrapper_required: {}", report.host_wrapper_required);
+    println!("  command_arg_count: {}", report.command_arg_count);
+    for blocker in &report.writer_blockers {
+        println!("  writer_blocker: {blocker}");
+    }
+}
+
+pub(crate) fn print_nsld_final_executable_writer_input_verify_report(
+    report: &NsldFinalExecutableWriterInputVerifyReport,
+) {
+    println!("Nsld final executable writer input verify");
+    println!("  manifest: {}", report.manifest);
+    println!("  input_path: {}", report.input_path);
+    println!("  valid: {}", report.valid);
+    println!(
+        "  expected_writer_input_hash: {}",
+        report.expected_writer_input_hash
+    );
+    println!(
+        "  actual_writer_input_hash: {}",
+        optional_string_text(report.actual_writer_input_hash.as_deref())
+    );
+    println!(
+        "  expected_final_stage_plan_hash: {}",
+        report.expected_final_stage_plan_hash
+    );
+    println!(
+        "  actual_final_stage_plan_hash: {}",
+        optional_string_text(report.actual_final_stage_plan_hash.as_deref())
+    );
+    println!("  expected_writer_kind: {}", report.expected_writer_kind);
+    println!(
+        "  actual_writer_kind: {}",
+        optional_string_text(report.actual_writer_kind.as_deref())
+    );
+    println!(
+        "  expected_writer_status: {}",
+        report.expected_writer_status
+    );
+    println!(
+        "  actual_writer_status: {}",
+        optional_string_text(report.actual_writer_status.as_deref())
+    );
+    println!(
+        "  expected_command_arg_count: {}",
+        report.expected_command_arg_count
+    );
+    println!(
+        "  actual_command_arg_count: {}",
+        report
+            .actual_command_arg_count
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "missing".to_owned())
+    );
+    for arg in &report.expected_command_args {
+        println!("  expected_command_arg: {arg}");
+    }
+    for arg in &report.actual_command_args {
+        println!("  actual_command_arg: {arg}");
+    }
+    for issue in &report.issues {
+        println!("  issue: {issue}");
+    }
+}
+
+pub(crate) fn print_nsld_final_executable_host_dry_run_report(
+    report: &NsldFinalExecutableHostDryRunReport,
+) {
+    println!("Nsld final executable host dry run");
+    println!("  manifest: {}", report.manifest);
+    println!("  writer_input_path: {}", report.writer_input_path);
+    println!("  writer_input_valid: {}", report.writer_input_valid);
+    println!(
+        "  writer_input_hash: {}",
+        optional_string_text(report.writer_input_hash.as_deref())
+    );
+    println!("  driver: {}", report.driver);
+    println!("  driver_available: {}", report.driver_available);
+    println!(
+        "  driver_resolved_path: {}",
+        optional_string_text(report.driver_resolved_path.as_deref())
+    );
+    println!("  command_arg_count: {}", report.command_arg_count);
+    println!("  environment_ready: {}", report.environment_ready);
+    println!(
+        "  can_invoke_host_finalizer: {}",
+        report.can_invoke_host_finalizer
+    );
+    for arg in &report.command_args {
+        println!("  command_arg: {arg}");
+    }
+    for blocker in &report.blockers {
+        println!("  blocker: {blocker}");
+    }
+    for note in &report.notes {
+        println!("  note: {note}");
+    }
+}
+
 fn print_nsld_final_executable_report_with_title(
     report: &NsldFinalExecutableEmitReport,
     title: &str,
@@ -455,8 +602,60 @@ fn print_nsld_final_executable_report_with_title(
     println!("  final_stage_driver: {}", report.final_stage_driver);
     println!("  final_stage_link_mode: {}", report.final_stage_link_mode);
     println!("  host_wrapper_required: {}", report.host_wrapper_required);
+    println!("  writer_kind: {}", report.writer_kind);
+    println!("  writer_status: {}", report.writer_status);
+    println!("  writer_input_path: {}", report.writer_input_path);
+    println!(
+        "  writer_input_valid: {}",
+        report
+            .writer_input_valid
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "not-checked".to_owned())
+    );
+    println!(
+        "  writer_input_hash: {}",
+        optional_string_text(report.writer_input_hash.as_deref())
+    );
     println!("  input_count: {}", report.input_count);
     println!("  blocker_count: {}", report.blockers.len());
+    for blocker in &report.writer_blockers {
+        println!("  writer_blocker: {blocker}");
+    }
+    for issue in &report.writer_input_issues {
+        println!("  writer_input_issue: {issue}");
+    }
+    println!(
+        "  host_dry_run_environment_ready: {}",
+        report
+            .host_dry_run_environment_ready
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "not-checked".to_owned())
+    );
+    println!(
+        "  host_dry_run_driver_available: {}",
+        report
+            .host_dry_run_driver_available
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "not-checked".to_owned())
+    );
+    println!(
+        "  host_dry_run_driver_resolved_path: {}",
+        optional_string_text(report.host_dry_run_driver_resolved_path.as_deref())
+    );
+    println!(
+        "  host_dry_run_can_invoke: {}",
+        report
+            .host_dry_run_can_invoke
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "not-checked".to_owned())
+    );
+    for blocker in &report.host_dry_run_blockers {
+        println!("  host_dry_run_blocker: {blocker}");
+    }
+    println!(
+        "  host_dry_run_blocker_count: {}",
+        report.host_dry_run_blocker_count
+    );
     for blocker in &report.blockers {
         println!("  blocker: {blocker}");
     }
@@ -488,6 +687,52 @@ pub(crate) fn print_nsld_final_executable_emit_verify_report(
             .map(|value| value.to_string())
             .unwrap_or_else(|| "missing".to_owned())
     );
+    println!(
+        "  expected_host_dry_run_environment_ready: {}",
+        optional_bool_text(report.expected_host_dry_run_environment_ready)
+    );
+    println!(
+        "  actual_host_dry_run_environment_ready: {}",
+        optional_bool_text(report.actual_host_dry_run_environment_ready)
+    );
+    println!(
+        "  expected_host_dry_run_driver_available: {}",
+        optional_bool_text(report.expected_host_dry_run_driver_available)
+    );
+    println!(
+        "  actual_host_dry_run_driver_available: {}",
+        optional_bool_text(report.actual_host_dry_run_driver_available)
+    );
+    println!(
+        "  expected_host_dry_run_can_invoke: {}",
+        optional_bool_text(report.expected_host_dry_run_can_invoke)
+    );
+    println!(
+        "  actual_host_dry_run_can_invoke: {}",
+        optional_bool_text(report.actual_host_dry_run_can_invoke)
+    );
+    println!(
+        "  expected_host_dry_run_driver_resolved_path: {}",
+        optional_string_text(report.expected_host_dry_run_driver_resolved_path.as_deref())
+    );
+    println!(
+        "  actual_host_dry_run_driver_resolved_path: {}",
+        optional_string_text(report.actual_host_dry_run_driver_resolved_path.as_deref())
+    );
+    println!(
+        "  expected_host_dry_run_blocker_count: {}",
+        report.expected_host_dry_run_blocker_count
+    );
+    println!(
+        "  actual_host_dry_run_blocker_count: {}",
+        optional_usize_text(report.actual_host_dry_run_blocker_count)
+    );
+    for blocker in &report.expected_host_dry_run_blockers {
+        println!("  expected_host_dry_run_blocker: {blocker}");
+    }
+    for blocker in &report.actual_host_dry_run_blockers {
+        println!("  actual_host_dry_run_blocker: {blocker}");
+    }
     println!(
         "  expected_blocker_count: {}",
         report.expected_blocker_count
