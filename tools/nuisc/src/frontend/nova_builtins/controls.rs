@@ -55,7 +55,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             let max_expr = max_value
                 .map(|expr| {
                     lower_expr(
@@ -68,7 +68,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(127));
+                .unwrap_or(NirExpr::Int(127));
             let step_expr = step_value
                 .map(|expr| {
                     lower_expr(
@@ -81,7 +81,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(1));
+                .unwrap_or(NirExpr::Int(1));
             let disabled_expr = disabled
                 .map(|expr| {
                     lower_expr(
@@ -94,7 +94,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaSliderPacket".to_owned(),
                 type_args: Vec::new(),
@@ -133,7 +133,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(127));
+                .unwrap_or(NirExpr::Int(127));
             let type_name = match callee {
                 "nova_progress_packet" => "NovaProgressPacket",
                 _ => "NovaMeterPacket",
@@ -170,7 +170,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaTogglePacket".to_owned(),
                 type_args: Vec::new(),
@@ -277,7 +277,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             let dirty = dirty
                 .map(|expr| {
                     lower_expr(
@@ -290,7 +290,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaTextInputPacket".to_owned(),
                 type_args: Vec::new(),
@@ -347,7 +347,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(3));
+                .unwrap_or(NirExpr::Int(3));
             let multiple = multiple
                 .map(|expr| {
                     lower_expr(
@@ -360,7 +360,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             let committed = committed
                 .map(|expr| {
                     lower_expr(
@@ -373,7 +373,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(1));
+                .unwrap_or(NirExpr::Int(1));
             NirExpr::StructLiteral {
                 type_name: "NovaSelectPacket".to_owned(),
                 type_args: Vec::new(),
@@ -420,7 +420,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaCheckboxPacket".to_owned(),
                 type_args: Vec::new(),
@@ -475,7 +475,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaRadioPacket".to_owned(),
                 type_args: Vec::new(),
@@ -544,7 +544,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             let dirty = dirty
                 .map(|expr| {
                     lower_expr(
@@ -557,7 +557,7 @@ pub(super) fn lower_nova_control_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaTextAreaPacket".to_owned(),
                 type_args: Vec::new(),

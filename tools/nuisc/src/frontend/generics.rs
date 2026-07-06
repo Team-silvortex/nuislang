@@ -58,18 +58,34 @@ fn type_ref_looks_unresolved_placeholder(ty: &AstTypeRef) -> bool {
         && ty.name.chars().all(|ch| ch.is_ascii_uppercase())
 }
 
+pub(crate) struct GenericSubstitutionInferenceInput<'a> {
+    pub(crate) template: &'a AstFunction,
+    pub(crate) explicit_generic_args: &'a [AstTypeRef],
+    pub(crate) args: &'a [AstExpr],
+    pub(crate) expected: Option<&'a AstTypeRef>,
+    pub(crate) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(crate) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(crate) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(crate) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(crate) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(crate) context: Option<&'a str>,
+}
+
 pub(crate) fn infer_generic_substitutions(
-    template: &AstFunction,
-    explicit_generic_args: &[AstTypeRef],
-    args: &[AstExpr],
-    expected: Option<&AstTypeRef>,
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    context: Option<&str>,
+    input: GenericSubstitutionInferenceInput<'_>,
 ) -> Result<BTreeMap<String, NirTypeRef>, String> {
+    let GenericSubstitutionInferenceInput {
+        template,
+        explicit_generic_args,
+        args,
+        expected,
+        env,
+        visible_type_aliases,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        context,
+    } = input;
     if template.params.len() != args.len() {
         return Err(format!(
             "generic function `{}` expects {} args, found {}",

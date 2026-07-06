@@ -7,17 +7,32 @@ use super::{
     lower_nested_expr_with_async_and_consts, FunctionSignature, ModuleConstValue,
 };
 
+pub(super) struct UnaryLoweringInput<'a> {
+    pub(super) op: &'a AstUnaryOp,
+    pub(super) operand: &'a AstExpr,
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) expected: Option<&'a NirTypeRef>,
+}
+
 pub(super) fn lower_unary_expr_with_async(
-    op: &AstUnaryOp,
-    operand: &AstExpr,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
+    input: UnaryLoweringInput<'_>,
 ) -> Result<NirExpr, String> {
+    let UnaryLoweringInput {
+        op,
+        operand,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected,
+    } = input;
     let lowered_operand = lower_nested_expr_with_async_and_consts(
         operand,
         current_domain,
@@ -82,10 +97,10 @@ pub(super) fn lower_unary_expr_with_async(
             if operand_ty.name == "Node" && operand_ty.is_ref && !operand_ty.is_optional {
                 Ok(NirExpr::LoadValue(Box::new(lowered_operand)))
             } else {
-                return Err(format!(
+                Err(format!(
                     "unary `*` currently expects `ref Node` operand, found `{}`",
                     operand_ty.render()
-                ));
+                ))
             }
         }
     }

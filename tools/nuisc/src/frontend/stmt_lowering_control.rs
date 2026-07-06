@@ -489,7 +489,7 @@ fn rewrite_control_expr_terminal_branch(
                     ControlExprKind::If,
                 )?,
             });
-            return Ok(rewritten);
+            Ok(rewritten)
         }
         AstStmt::Match { value, arms } => {
             rewritten.push(AstStmt::Match {
@@ -509,7 +509,7 @@ fn rewrite_control_expr_terminal_branch(
                     })
                     .collect::<Result<Vec<_>, String>>()?,
             });
-            return Ok(rewritten);
+            Ok(rewritten)
         }
         AstStmt::Return(Some(value)) | AstStmt::Expr(value) => {
             for root_kind in [ControlExprKind::If, ControlExprKind::Match] {

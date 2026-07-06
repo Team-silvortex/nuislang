@@ -18,18 +18,17 @@ pub(super) struct FunctionSignature {
     pub(super) is_async: bool,
 }
 
+pub(super) struct InitialFunctionSignatures {
+    pub(super) signatures: BTreeMap<String, FunctionSignature>,
+    pub(super) generic_templates: BTreeMap<String, AstFunction>,
+    pub(super) concrete_module_functions: Vec<AstFunction>,
+}
+
 pub(super) fn build_initial_function_signatures(
     module: &AstModule,
     local_cpu_helpers: &[&AstModule],
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-) -> Result<
-    (
-        BTreeMap<String, FunctionSignature>,
-        BTreeMap<String, AstFunction>,
-        Vec<AstFunction>,
-    ),
-    String,
-> {
+) -> Result<InitialFunctionSignatures, String> {
     let mut signatures = BTreeMap::<String, FunctionSignature>::new();
 
     for function in &module.externs {
@@ -216,5 +215,9 @@ pub(super) fn build_initial_function_signatures(
         }
     }
 
-    Ok((signatures, generic_templates, concrete_module_functions))
+    Ok(InitialFunctionSignatures {
+        signatures,
+        generic_templates,
+        concrete_module_functions,
+    })
 }

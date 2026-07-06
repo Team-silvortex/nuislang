@@ -3076,7 +3076,7 @@ fn observe_source_node<'a>(
     })
 }
 
-fn observe_state_arg<'a>(node: &'a Node) -> Result<&'a str, String> {
+fn observe_state_arg(node: &Node) -> Result<&str, String> {
     node.op
         .args
         .get(1)
@@ -5771,32 +5771,32 @@ mod tests {
             nodes: vec![
                 node(
                     "project_profile_network_NetworkUnit_local_port",
-                    "cpu0",
-                    "cpu.const_i64",
+                    "network0",
+                    "network.const_i64",
                     &["7001"],
                 ),
                 node(
                     "project_profile_network_NetworkUnit_remote_port",
-                    "cpu0",
-                    "cpu.const_i64",
+                    "network0",
+                    "network.const_i64",
                     &["7443"],
                 ),
                 node(
                     "project_profile_network_NetworkUnit_connect_timeout_ms",
-                    "cpu0",
-                    "cpu.const_i64",
+                    "network0",
+                    "network.const_i64",
                     &["1500"],
                 ),
                 node(
                     "project_profile_network_NetworkUnit_read_timeout_ms",
-                    "cpu0",
-                    "cpu.const_i64",
+                    "network0",
+                    "network.const_i64",
                     &["800"],
                 ),
                 node(
                     "project_profile_network_NetworkUnit_write_timeout_ms",
-                    "cpu0",
-                    "cpu.const_i64",
+                    "network0",
+                    "network.const_i64",
                     &["900"],
                 ),
                 node(
@@ -5925,23 +5925,23 @@ mod tests {
                 node("closed", "network0", "network.is_closed", &["close_result"]),
             ],
             edges: vec![
-                xfer(
+                dep(
                     "project_profile_network_NetworkUnit_local_port",
                     "local_port_seed",
                 ),
-                xfer(
+                dep(
                     "project_profile_network_NetworkUnit_remote_port",
                     "remote_port_seed",
                 ),
-                xfer(
+                dep(
                     "project_profile_network_NetworkUnit_connect_timeout_ms",
                     "connect_timeout_seed",
                 ),
-                xfer(
+                dep(
                     "project_profile_network_NetworkUnit_read_timeout_ms",
                     "read_timeout_seed",
                 ),
-                xfer(
+                dep(
                     "project_profile_network_NetworkUnit_write_timeout_ms",
                     "write_timeout_seed",
                 ),
@@ -5986,20 +5986,20 @@ mod tests {
             nodes: vec![
                 node(
                     "project_profile_network_NetworkUnit_local_port",
-                    "cpu0",
-                    "cpu.const_i64",
+                    "network0",
+                    "network.const_i64",
                     &["7001"],
                 ),
                 node(
                     "project_profile_network_NetworkUnit_remote_port",
-                    "cpu0",
-                    "cpu.const_i64",
+                    "network0",
+                    "network.const_i64",
                     &["7443"],
                 ),
                 node(
                     "project_profile_network_NetworkUnit_connect_timeout_ms",
-                    "cpu0",
-                    "cpu.const_i64",
+                    "network0",
+                    "network.const_i64",
                     &["1500"],
                 ),
                 node(
@@ -6061,15 +6061,15 @@ mod tests {
                 ),
             ],
             edges: vec![
-                xfer(
+                dep(
                     "project_profile_network_NetworkUnit_local_port",
                     "local_port_seed",
                 ),
-                xfer(
+                dep(
                     "project_profile_network_NetworkUnit_remote_port",
                     "remote_port_seed",
                 ),
-                xfer(
+                dep(
                     "project_profile_network_NetworkUnit_connect_timeout_ms",
                     "connect_timeout_seed",
                 ),

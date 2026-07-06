@@ -9,4 +9,6 @@ mod templates;
 
 pub(crate) use callables::is_callable_type_with_aliases;
 pub(crate) use expansion::expand_higher_order_functions;
-pub(crate) use expansion_rewrite::rewrite_higher_order_calls_in_function;
+pub(crate) use expansion_rewrite::{
+    rewrite_higher_order_calls_in_function, HigherOrderFunctionRewriteInput,
+};

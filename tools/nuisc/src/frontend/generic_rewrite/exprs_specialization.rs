@@ -4,33 +4,61 @@ use nuis_semantics::model::{
     AstExpr, AstFunction, AstImplDef, AstStructDef, AstTypeAlias, AstTypeRef,
 };
 
-use super::super::generics::{infer_generic_substitutions, specialize_function_template};
+use super::super::generics::{
+    infer_generic_substitutions, specialize_function_template, GenericSubstitutionInferenceInput,
+};
 use super::super::{lower_type_ref_with_aliases, FunctionSignature};
 use super::GenericImplMethodTemplate;
 use crate::frontend::generic_rewrite::rewrite_generic_calls_in_function;
-use crate::frontend::higher_order::rewrite_higher_order_calls_in_function;
+use crate::frontend::higher_order::{
+    rewrite_higher_order_calls_in_function, HigherOrderFunctionRewriteInput,
+};
+
+pub(super) struct GenericSpecializationInput<'a> {
+    pub(super) template: &'a AstFunction,
+    pub(super) explicit_generic_args: &'a [AstTypeRef],
+    pub(super) args: &'a [AstExpr],
+    pub(super) expected: Option<&'a AstTypeRef>,
+    pub(super) context: &'a str,
+    pub(super) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) generic_impl_method_templates: &'a [GenericImplMethodTemplate],
+    pub(super) higher_order_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) specialization_cache: &'a mut BTreeSet<String>,
+    pub(super) specialized_functions: &'a mut Vec<AstFunction>,
+    pub(super) specialized_signatures: &'a mut Vec<(String, FunctionSignature)>,
+}
 
 pub(super) fn ensure_generic_specialization(
-    template: &AstFunction,
-    explicit_generic_args: &[AstTypeRef],
-    args: &[AstExpr],
-    expected: Option<&AstTypeRef>,
-    context: &str,
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    generic_impl_method_templates: &[GenericImplMethodTemplate],
-    higher_order_templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    specialization_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
-    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+    input: GenericSpecializationInput<'_>,
 ) -> Result<String, String> {
-    let substitutions = infer_generic_substitutions(
+    let GenericSpecializationInput {
+        template,
+        explicit_generic_args,
+        args,
+        expected,
+        context,
+        env,
+        visible_type_aliases,
+        generic_templates,
+        generic_impl_method_templates,
+        higher_order_templates,
+        function_table,
+        signatures,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    } = input;
+    let substitutions = infer_generic_substitutions(GenericSubstitutionInferenceInput {
         template,
         explicit_generic_args,
         args,
@@ -40,8 +68,8 @@ pub(super) fn ensure_generic_specialization(
         impl_lookup,
         struct_table,
         function_return_types,
-        Some(context),
-    )?;
+        context: Some(context),
+    })?;
     let specialized_name = format!(
         "{}__{}",
         template.name,
@@ -59,17 +87,18 @@ pub(super) fn ensure_generic_specialization(
             specialize_function_template(template, &specialized_name, &substitutions)?;
         let mut higher_order_specialization_cache = BTreeSet::new();
         let mut higher_order_specialized_templates = Vec::new();
-        let higher_order_rewritten = rewrite_higher_order_calls_in_function(
-            &specialized,
-            higher_order_templates,
-            function_table,
-            &[],
-            &BTreeMap::new(),
-            &BTreeMap::new(),
-            visible_type_aliases,
-            &mut higher_order_specialization_cache,
-            &mut higher_order_specialized_templates,
-        )?;
+        let higher_order_rewritten =
+            rewrite_higher_order_calls_in_function(HigherOrderFunctionRewriteInput {
+                function: &specialized,
+                templates: higher_order_templates,
+                function_table,
+                module_impls: &[],
+                visible_structs: &BTreeMap::new(),
+                method_template_lookup: &BTreeMap::new(),
+                visible_type_aliases,
+                specialized_cache: &mut higher_order_specialization_cache,
+                specialized_functions: &mut higher_order_specialized_templates,
+            })?;
         let mut extended_generic_templates = generic_templates.clone();
         for template in higher_order_specialized_templates {
             if !template.generic_params.is_empty() {
@@ -164,9 +193,9 @@ pub(super) fn ensure_generic_impl_method_specialization(
             })
             && template.function.params.len() == args.len()
     }) {
-        if infer_generic_substitutions(
-            &template.function,
-            &[],
+        if infer_generic_substitutions(GenericSubstitutionInferenceInput {
+            template: &template.function,
+            explicit_generic_args: &[],
             args,
             expected,
             env,
@@ -174,8 +203,8 @@ pub(super) fn ensure_generic_impl_method_specialization(
             impl_lookup,
             struct_table,
             function_return_types,
-            None,
-        )
+            context: None,
+        })
         .is_ok()
         {
             candidates.push(template);
@@ -198,24 +227,26 @@ pub(super) fn ensure_generic_impl_method_specialization(
         return Ok(None);
     };
     Ok(Some(ensure_generic_specialization(
-        &template.function,
-        &[],
-        args,
-        expected,
-        method_name,
-        env,
-        visible_type_aliases,
-        generic_templates,
-        generic_impl_method_templates,
-        higher_order_templates,
-        function_table,
-        signatures,
-        impl_lookup,
-        struct_table,
-        function_return_types,
-        specialization_cache,
-        specialized_functions,
-        specialized_signatures,
+        GenericSpecializationInput {
+            template: &template.function,
+            explicit_generic_args: &[],
+            args,
+            expected,
+            context: method_name,
+            env,
+            visible_type_aliases,
+            generic_templates,
+            generic_impl_method_templates,
+            higher_order_templates,
+            function_table,
+            signatures,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            specialization_cache,
+            specialized_functions,
+            specialized_signatures,
+        },
     )?))
 }
 
@@ -251,18 +282,18 @@ pub(super) fn ensure_generic_impl_method_specialization_from_receiver_expected(
     for template in generic_impl_method_templates.iter().filter(|template| {
         template.method_name == method_name && template.function.params.len() == actual_args.len()
     }) {
-        if infer_generic_substitutions(
-            &template.function,
-            &[],
-            &inference_args,
+        if infer_generic_substitutions(GenericSubstitutionInferenceInput {
+            template: &template.function,
+            explicit_generic_args: &[],
+            args: &inference_args,
             expected,
             env,
             visible_type_aliases,
             impl_lookup,
             struct_table,
             function_return_types,
-            None,
-        )
+            context: None,
+        })
         .is_ok()
         {
             candidates.push(template);
@@ -282,23 +313,25 @@ pub(super) fn ensure_generic_impl_method_specialization_from_receiver_expected(
         return Ok(None);
     };
     Ok(Some(ensure_generic_specialization(
-        &template.function,
-        &[],
-        &inference_args,
-        expected,
-        method_name,
-        env,
-        visible_type_aliases,
-        generic_templates,
-        generic_impl_method_templates,
-        higher_order_templates,
-        function_table,
-        signatures,
-        impl_lookup,
-        struct_table,
-        function_return_types,
-        specialization_cache,
-        specialized_functions,
-        specialized_signatures,
+        GenericSpecializationInput {
+            template: &template.function,
+            explicit_generic_args: &[],
+            args: &inference_args,
+            expected,
+            context: method_name,
+            env,
+            visible_type_aliases,
+            generic_templates,
+            generic_impl_method_templates,
+            higher_order_templates,
+            function_table,
+            signatures,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            specialization_cache,
+            specialized_functions,
+            specialized_signatures,
+        },
     )?))
 }

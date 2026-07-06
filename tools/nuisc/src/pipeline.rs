@@ -159,7 +159,13 @@ pub fn compile_source_path_with_options(
     }
     let source = fs::read_to_string(path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
-    compile_source_with_options(&source, options)
+    let ast = crate::frontend::parse_nuis_ast(&source)?;
+    let helper_modules = stdlib_library_helpers_for_source_path(path)?;
+    if helper_modules.is_empty() {
+        compile_ast_with_options(ast, options)
+    } else {
+        compile_ast_with_helper_modules(ast, &helper_modules, options)
+    }
 }
 
 pub fn compile_project(path: &Path) -> Result<PipelineArtifacts, String> {
@@ -226,6 +232,105 @@ pub fn compile_ast_with_options(
     let nir = crate::frontend::lower_ast_to_nir(&ast)?;
     let prepared = prepare_pipeline(ast, nir, &BTreeSet::new(), |_, _, _| Ok(()))?;
     lower_prepared_pipeline(prepared, options.lowering_target.clone())
+}
+
+fn compile_ast_with_helper_modules(
+    ast: AstModule,
+    helper_modules: &[AstModule],
+    options: &PipelineCompileOptions,
+) -> Result<PipelineArtifacts, String> {
+    let local_units = helper_modules
+        .iter()
+        .map(|module| (module.domain.clone(), module.unit.clone()))
+        .collect::<BTreeSet<_>>();
+    let nir = crate::frontend::lower_project_ast_to_nir(&ast, helper_modules)?;
+    let prepared = prepare_pipeline(ast, nir, &local_units, |_, _, _| Ok(()))?;
+    lower_prepared_pipeline(prepared, options.lowering_target.clone())
+}
+
+fn stdlib_library_helpers_for_source_path(path: &Path) -> Result<Vec<AstModule>, String> {
+    let stdlib_root = match crate::stdlib_registry::resolve_stdlib_root() {
+        Ok(root) => root,
+        Err(_) => return Ok(Vec::new()),
+    };
+    let canonical_root = stdlib_root.canonicalize().map_err(|error| {
+        format!(
+            "failed to canonicalize `{}`: {error}",
+            stdlib_root.display()
+        )
+    })?;
+    let canonical_path = path
+        .canonicalize()
+        .map_err(|error| format!("failed to canonicalize `{}`: {error}", path.display()))?;
+    let Ok(relative) = canonical_path.strip_prefix(&canonical_root) else {
+        return Ok(Vec::new());
+    };
+    let Some(module_path) = relative.components().next().and_then(|component| {
+        let value = component.as_os_str().to_string_lossy();
+        (!value.is_empty()).then(|| value.into_owned())
+    }) else {
+        return Ok(Vec::new());
+    };
+    if !canonical_root
+        .join(&module_path)
+        .join("module.toml")
+        .is_file()
+    {
+        return Ok(Vec::new());
+    }
+
+    let mut visited = BTreeSet::new();
+    let mut helper_paths = Vec::new();
+    collect_stdlib_library_module_paths(
+        &canonical_root,
+        &module_path,
+        &canonical_path,
+        &mut visited,
+        &mut helper_paths,
+    )?;
+    helper_paths
+        .into_iter()
+        .map(|helper_path| {
+            let source = fs::read_to_string(&helper_path)
+                .map_err(|error| format!("failed to read `{}`: {error}", helper_path.display()))?;
+            crate::frontend::parse_nuis_ast(&source)
+        })
+        .collect()
+}
+
+fn collect_stdlib_library_module_paths(
+    stdlib_root: &Path,
+    module_path: &str,
+    input_path: &Path,
+    visited: &mut BTreeSet<String>,
+    helper_paths: &mut Vec<PathBuf>,
+) -> Result<(), String> {
+    if !visited.insert(module_path.to_owned()) {
+        return Ok(());
+    }
+    let manifest = crate::stdlib_registry::load_stdlib_module_manifest(stdlib_root, module_path)?;
+    for dependency in &manifest.depends_on {
+        collect_stdlib_library_module_paths(
+            stdlib_root,
+            dependency,
+            input_path,
+            visited,
+            helper_paths,
+        )?;
+    }
+    for library_module in &manifest.library_modules {
+        let helper_path = stdlib_root.join(module_path).join(library_module);
+        let canonical_helper = helper_path.canonicalize().map_err(|error| {
+            format!(
+                "failed to canonicalize stdlib library module `{}`: {error}",
+                helper_path.display()
+            )
+        })?;
+        if canonical_helper != input_path && !helper_paths.contains(&canonical_helper) {
+            helper_paths.push(canonical_helper);
+        }
+    }
+    Ok(())
 }
 
 fn prepare_project_nir(

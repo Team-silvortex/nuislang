@@ -175,8 +175,11 @@ mod cpu Main {
   }
 
   fn capture_workflow_runtime_project() -> WorkflowReport {
-    let first_step: WorkflowStep = build_workflow_step(3001, 401, 17, true);
-    let second_step: WorkflowStep = build_workflow_step(3002, 503, 29, false);
+    let empty_args: i64 = text_handle("");
+    let first_step: WorkflowStep =
+      build_workflow_step(text_handle("first"), text_handle("/usr/bin/true"), empty_args, true);
+    let second_step: WorkflowStep =
+      build_workflow_step(text_handle("second"), text_handle("/usr/bin/true"), empty_args, false);
     let first_report: WorkflowStepReport = run_workflow_step(first_step);
 
     if first_step.fail_fast && first_report.result.succeeded == false {

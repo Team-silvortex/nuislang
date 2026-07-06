@@ -1509,17 +1509,9 @@ fn analyze_draw_instanced(
         .find(|candidate| {
             candidate.op.module == "shader" && candidate.op.instruction == "render_state"
         });
-    let (
-        blend_mode,
-        blend_enabled,
-        depth_compare,
-        depth_test_enabled,
-        depth_write_enabled,
-        cull_mode,
-        front_face,
-    ) = render_state
+    let render_state = render_state
         .and_then(|state| extract_render_state(state, nodes))
-        .unwrap_or((None, None, None, None, None, None, None));
+        .unwrap_or_default();
     let fabric_handle_table = fabric_handle_tables
         .iter()
         .find(|table| {
@@ -1547,13 +1539,13 @@ fn analyze_draw_instanced(
         wgsl_source,
         fabric_handle_table,
         bindings,
-        blend_mode,
-        blend_enabled,
-        depth_compare,
-        depth_test_enabled,
-        depth_write_enabled,
-        cull_mode,
-        front_face,
+        blend_mode: render_state.blend_mode,
+        blend_enabled: render_state.blend_enabled,
+        depth_compare: render_state.depth_compare,
+        depth_test_enabled: render_state.depth_test_enabled,
+        depth_write_enabled: render_state.depth_write_enabled,
+        cull_mode: render_state.cull_mode,
+        front_face: render_state.front_face,
         shader_ir_stages,
     }
 }
@@ -1726,22 +1718,16 @@ fn extract_bindings(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Vec<ShaderRes
             }
             let slot = binding.op.args[0].parse::<usize>().ok()?;
             let source = binding.op.args[1].clone();
-            let (
-                texture_format,
-                texture_width,
-                texture_height,
-                sampler_filter,
-                sampler_address_mode,
-            ) = extract_binding_metadata(kind, source.as_str(), nodes);
+            let binding_metadata = extract_binding_metadata(kind, source.as_str(), nodes);
             Some(ShaderResourceBinding {
                 slot,
                 kind: kind.to_owned(),
                 source,
-                texture_format,
-                texture_width,
-                texture_height,
-                sampler_filter,
-                sampler_address_mode,
+                texture_format: binding_metadata.texture_format,
+                texture_width: binding_metadata.texture_width,
+                texture_height: binding_metadata.texture_height,
+                sampler_filter: binding_metadata.sampler_filter,
+                sampler_address_mode: binding_metadata.sampler_address_mode,
             })
         })
         .collect()
@@ -2174,19 +2160,33 @@ fn build_kernel_graphs(stages: &[KernelStageContract]) -> Vec<KernelComputeGraph
         .collect()
 }
 
+#[derive(Default)]
+struct BindingMetadata {
+    texture_format: Option<String>,
+    texture_width: Option<usize>,
+    texture_height: Option<usize>,
+    sampler_filter: Option<String>,
+    sampler_address_mode: Option<String>,
+}
+
+#[derive(Default)]
+struct RenderStateMetadata {
+    blend_mode: Option<String>,
+    blend_enabled: Option<bool>,
+    depth_compare: Option<String>,
+    depth_test_enabled: Option<bool>,
+    depth_write_enabled: Option<bool>,
+    cull_mode: Option<String>,
+    front_face: Option<String>,
+}
+
 fn extract_binding_metadata(
     kind: &str,
     source: &str,
     nodes: &BTreeMap<&str, &Node>,
-) -> (
-    Option<String>,
-    Option<usize>,
-    Option<usize>,
-    Option<String>,
-    Option<String>,
-) {
+) -> BindingMetadata {
     let Some(source_node) = nodes.get(source).copied() else {
-        return (None, None, None, None, None);
+        return BindingMetadata::default();
     };
 
     match kind {
@@ -2197,43 +2197,29 @@ fn extract_binding_metadata(
         {
             let width = source_node.op.args[1].parse::<usize>().ok();
             let height = source_node.op.args[2].parse::<usize>().ok();
-            (
-                Some(source_node.op.args[0].clone()),
-                width,
-                height,
-                None,
-                None,
-            )
+            BindingMetadata {
+                texture_format: Some(source_node.op.args[0].clone()),
+                texture_width: width,
+                texture_height: height,
+                ..BindingMetadata::default()
+            }
         }
         "sampler_binding"
             if source_node.op.module == "shader"
                 && source_node.op.instruction == "sampler"
                 && source_node.op.args.len() == 2 =>
         {
-            (
-                None,
-                None,
-                None,
-                Some(source_node.op.args[0].clone()),
-                Some(source_node.op.args[1].clone()),
-            )
+            BindingMetadata {
+                sampler_filter: Some(source_node.op.args[0].clone()),
+                sampler_address_mode: Some(source_node.op.args[1].clone()),
+                ..BindingMetadata::default()
+            }
         }
-        _ => (None, None, None, None, None),
+        _ => BindingMetadata::default(),
     }
 }
 
-fn extract_render_state(
-    node: &Node,
-    nodes: &BTreeMap<&str, &Node>,
-) -> Option<(
-    Option<String>,
-    Option<bool>,
-    Option<String>,
-    Option<bool>,
-    Option<bool>,
-    Option<String>,
-    Option<String>,
-)> {
+fn extract_render_state(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Option<RenderStateMetadata> {
     if node.op.args.len() != 4 {
         return None;
     }
@@ -2276,15 +2262,15 @@ fn extract_render_state(
         None
     }?;
 
-    Some((
+    Some(RenderStateMetadata {
         blend_mode,
-        Some(blend_enabled),
+        blend_enabled: Some(blend_enabled),
         depth_compare,
-        Some(depth_test_enabled),
-        Some(depth_write_enabled),
+        depth_test_enabled: Some(depth_test_enabled),
+        depth_write_enabled: Some(depth_write_enabled),
         cull_mode,
         front_face,
-    ))
+    })
 }
 
 fn parse_bool_literal(raw: &str) -> Option<bool> {

@@ -4,11 +4,12 @@ use nuis_semantics::model::{
     AstExpr, AstFunction, AstGenericParam, AstImplDef, AstMatchArm, AstTypeRef,
 };
 
-use super::lambda_expansion_block::expand_lambda_block;
+use super::lambda_expansion_block::{expand_lambda_block, ExpandLambdaBlockInput};
 use super::lambda_expansion_synth::{
     expected_callable_type_for_call_arg, expected_callable_type_for_method_arg,
     inline_lambda_return_type_from_callable, synthesize_lambda_function,
-    synthesize_lambda_function_with_known_return_type,
+    synthesize_lambda_function_with_known_return_type, ExpectedCallArgInput,
+    ExpectedMethodArgInput, KnownReturnLambdaSynthesisInput, LambdaSynthesisInput,
 };
 use super::lambda_expansion_types::{build_lambda_binding_value, build_lambda_call, LambdaBinding};
 
@@ -56,36 +57,36 @@ pub(super) fn rewrite_lambda_expr(
                 counter,
                 synthesized,
             )?),
-            then_body: expand_lambda_block(
-                then_body,
-                expected_expr_type,
+            then_body: expand_lambda_block(ExpandLambdaBlockInput {
+                body: then_body,
+                current_return_type: expected_expr_type,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
                 module_impls,
-                &BTreeMap::new(),
+                visible_structs: &BTreeMap::new(),
                 module_const_names,
                 module_function_table,
                 owning_function_name,
                 counter,
                 synthesized,
-            )?,
-            else_body: expand_lambda_block(
-                else_body,
-                expected_expr_type,
+            })?,
+            else_body: expand_lambda_block(ExpandLambdaBlockInput {
+                body: else_body,
+                current_return_type: expected_expr_type,
                 inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 visible_local_types,
                 module_impls,
-                &BTreeMap::new(),
+                visible_structs: &BTreeMap::new(),
                 module_const_names,
                 module_function_table,
                 owning_function_name,
                 counter,
                 synthesized,
-            )?,
+            })?,
         },
         AstExpr::Match { value, arms } => AstExpr::Match {
             value: Box::new(rewrite_lambda_expr(
@@ -124,21 +125,21 @@ pub(super) fn rewrite_lambda_expr(
                             )?),
                             None => None,
                         },
-                        body: expand_lambda_block(
-                            &arm.body,
-                            expected_expr_type,
+                        body: expand_lambda_block(ExpandLambdaBlockInput {
+                            body: &arm.body,
+                            current_return_type: expected_expr_type,
                             inherited_generic_params,
                             lambda_aliases,
                             visible_locals,
                             visible_local_types,
                             module_impls,
-                            &BTreeMap::new(),
+                            visible_structs: &BTreeMap::new(),
                             module_const_names,
                             module_function_table,
                             owning_function_name,
                             counter,
                             synthesized,
-                        )?,
+                        })?,
                     })
                 })
                 .collect::<Result<Vec<_>, String>>()?,
@@ -148,22 +149,22 @@ pub(super) fn rewrite_lambda_expr(
             return_type,
             body,
         } => {
-            let binding = synthesize_lambda_function(
+            let binding = synthesize_lambda_function(LambdaSynthesisInput {
                 params,
                 return_type,
                 body,
                 inherited_generic_params,
                 lambda_aliases,
-                visible_locals,
-                visible_local_types,
+                outer_locals: visible_locals,
+                outer_local_types: visible_local_types,
                 module_impls,
-                &BTreeMap::new(),
+                visible_structs: &BTreeMap::new(),
                 module_const_names,
                 module_function_table,
                 owning_function_name,
                 counter,
                 synthesized,
-            )?;
+            })?;
             build_lambda_binding_value(&binding)
         }
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_lambda_expr(
@@ -220,22 +221,22 @@ pub(super) fn rewrite_lambda_expr(
                     return_type,
                     body,
                 } => {
-                    let binding = synthesize_lambda_function(
+                    let binding = synthesize_lambda_function(LambdaSynthesisInput {
                         params,
                         return_type,
                         body,
                         inherited_generic_params,
                         lambda_aliases,
-                        visible_locals,
-                        visible_local_types,
+                        outer_locals: visible_locals,
+                        outer_local_types: visible_local_types,
                         module_impls,
-                        &BTreeMap::new(),
+                        visible_structs: &BTreeMap::new(),
                         module_const_names,
                         module_function_table,
                         owning_function_name,
                         counter,
                         synthesized,
-                    )?;
+                    })?;
                     build_lambda_call(&binding, rewritten_args)
                 }
                 AstExpr::Var(name) => {
@@ -275,36 +276,38 @@ pub(super) fn rewrite_lambda_expr(
                         let inferred_return_type = inline_lambda_return_type_from_callable(
                             params,
                             return_type,
-                            expected_callable_type_for_call_arg(
+                            expected_callable_type_for_call_arg(ExpectedCallArgInput {
                                 callee,
                                 index,
                                 generic_args,
                                 args,
-                                expected_expr_type,
+                                expected_result_type: expected_expr_type,
                                 visible_local_types,
                                 module_function_table,
                                 module_impls,
-                            )
+                            })
                             .as_ref(),
                         )?;
                         let binding = synthesize_lambda_function_with_known_return_type(
-                            params,
-                            inferred_return_type.ok_or_else(|| {
-                                "inline lambda currently requires an explicit return type"
-                                    .to_owned()
-                            })?,
-                            body,
-                            inherited_generic_params,
-                            lambda_aliases,
-                            visible_locals,
-                            visible_local_types,
-                            module_impls,
-                            &BTreeMap::new(),
-                            module_const_names,
-                            module_function_table,
-                            owning_function_name,
-                            counter,
-                            synthesized,
+                            KnownReturnLambdaSynthesisInput {
+                                params,
+                                lambda_return_type: inferred_return_type.ok_or_else(|| {
+                                    "inline lambda currently requires an explicit return type"
+                                        .to_owned()
+                                })?,
+                                body,
+                                inherited_generic_params,
+                                lambda_aliases,
+                                outer_locals: visible_locals,
+                                outer_local_types: visible_local_types,
+                                module_impls,
+                                visible_structs: &BTreeMap::new(),
+                                module_const_names,
+                                module_function_table,
+                                owning_function_name,
+                                counter,
+                                synthesized,
+                            },
                         )?;
                         Ok(build_lambda_binding_value(&binding))
                     } else {
@@ -368,36 +371,38 @@ pub(super) fn rewrite_lambda_expr(
                         let inferred_return_type = inline_lambda_return_type_from_callable(
                             params,
                             return_type,
-                            expected_callable_type_for_method_arg(
+                            expected_callable_type_for_method_arg(ExpectedMethodArgInput {
                                 receiver,
                                 method,
                                 index,
                                 args,
-                                expected_expr_type,
+                                expected_result_type: expected_expr_type,
                                 visible_local_types,
                                 module_function_table,
                                 module_impls,
-                            )
+                            })
                             .as_ref(),
                         )?;
                         let binding = synthesize_lambda_function_with_known_return_type(
-                            params,
-                            inferred_return_type.ok_or_else(|| {
-                                "inline lambda currently requires an explicit return type"
-                                    .to_owned()
-                            })?,
-                            body,
-                            inherited_generic_params,
-                            lambda_aliases,
-                            visible_locals,
-                            visible_local_types,
-                            module_impls,
-                            &BTreeMap::new(),
-                            module_const_names,
-                            module_function_table,
-                            owning_function_name,
-                            counter,
-                            synthesized,
+                            KnownReturnLambdaSynthesisInput {
+                                params,
+                                lambda_return_type: inferred_return_type.ok_or_else(|| {
+                                    "inline lambda currently requires an explicit return type"
+                                        .to_owned()
+                                })?,
+                                body,
+                                inherited_generic_params,
+                                lambda_aliases,
+                                outer_locals: visible_locals,
+                                outer_local_types: visible_local_types,
+                                module_impls,
+                                visible_structs: &BTreeMap::new(),
+                                module_const_names,
+                                module_function_table,
+                                owning_function_name,
+                                counter,
+                                synthesized,
+                            },
                         )?;
                         Ok(build_lambda_binding_value(&binding))
                     } else {

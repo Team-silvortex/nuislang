@@ -4,6 +4,13 @@ use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 
 use super::super::{lower_expr, named_type, FunctionSignature, ModuleConstValue};
 
+struct NovaResourceStateEnv<'a> {
+    current_domain: &'a str,
+    bindings: &'a BTreeMap<String, NirTypeRef>,
+    signatures: &'a BTreeMap<String, FunctionSignature>,
+    struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_nova_resource_state_builtin_call(
     callee: &str,
@@ -15,6 +22,12 @@ pub(super) fn lower_nova_resource_state_builtin_call(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<Option<NirExpr>, String> {
+    let env = NovaResourceStateEnv {
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+    };
     let expr = match callee {
         "nova_visibility_state" => build_five_field_state(
             args,
@@ -28,10 +41,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "distance_band",
                 "mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_cull_state" => build_five_field_state(
             args,
@@ -45,10 +55,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "lod_band",
                 "mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_lod_state" => build_five_field_state(
             args,
@@ -62,10 +69,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "switch_distance",
                 "bias",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_streaming_state" => build_five_field_state(
             args,
@@ -79,10 +83,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "evict_budget",
                 "channel",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_residency_state" => build_five_field_state(
             args,
@@ -96,10 +97,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "spill_budget",
                 "residency_mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_eviction_state" => build_five_field_state(
             args,
@@ -113,10 +111,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "reclaim_budget",
                 "eviction_mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_prefetch_state" => build_five_field_state(
             args,
@@ -130,10 +125,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "warm_budget",
                 "prefetch_mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_budget_state" => build_five_field_state(
             args,
@@ -147,10 +139,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "headroom",
                 "budget_policy",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_pressure_state" => build_five_field_state(
             args,
@@ -164,10 +153,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "throttled",
                 "pressure_mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_thermal_state" => build_five_field_state(
             args,
@@ -181,10 +167,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "throttled",
                 "thermal_mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_power_state" => build_five_field_state(
             args,
@@ -198,10 +181,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "capped",
                 "power_mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_latency_state" => build_five_field_state(
             args,
@@ -215,10 +195,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "jitter",
                 "latency_mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_frame_pacing_state" => build_five_field_state(
             args,
@@ -232,10 +209,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "vsync_mode",
                 "pacing_mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_jank_state" => build_five_field_state(
             args,
@@ -249,10 +223,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "recovery",
                 "jank_mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_frame_variance_state" => build_five_field_state(
             args,
@@ -266,10 +237,7 @@ pub(super) fn lower_nova_resource_state_builtin_call(
                 "burst_mode",
                 "variance_mask",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         _ => return Ok(None),
     };
@@ -282,20 +250,17 @@ fn build_five_field_state(
     packet_type: &str,
     state_type: &str,
     fields: [&str; 5],
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    env: &NovaResourceStateEnv<'_>,
 ) -> Result<NirExpr, String> {
     let [packet] = args else {
         return Err(arg_error.to_owned());
     };
     let packet = lower_expr(
         packet,
-        current_domain,
-        bindings,
-        signatures,
-        struct_table,
+        env.current_domain,
+        env.bindings,
+        env.signatures,
+        env.struct_table,
         Some(&named_type(packet_type)),
     )?;
     Ok(NirExpr::StructLiteral {

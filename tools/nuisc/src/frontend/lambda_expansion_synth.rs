@@ -6,32 +6,70 @@ use nuis_semantics::model::{
 };
 
 use super::super::lambda_validation::collect_lambda_block_captures;
-use super::expand_lambda_block;
 use super::lambda_expansion_types::{
     callable_type_arity, infer_generic_call_substitutions, infer_impl_method_substitutions,
-    infer_local_binding_type, specialize_type_with_substitutions, LambdaBinding,
+    infer_local_binding_type, specialize_type_with_substitutions, ImplMethodSubstitutionInput,
+    LambdaBinding,
 };
+use super::{expand_lambda_block, ExpandLambdaBlockInput};
+
+pub(super) struct LambdaSynthesisInput<'a> {
+    pub(super) params: &'a [AstParam],
+    pub(super) return_type: &'a Option<AstTypeRef>,
+    pub(super) body: &'a [AstStmt],
+    pub(super) inherited_generic_params: &'a [AstGenericParam],
+    pub(super) lambda_aliases: &'a BTreeMap<String, LambdaBinding>,
+    pub(super) outer_locals: &'a BTreeSet<String>,
+    pub(super) outer_local_types: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) module_impls: &'a [AstImplDef],
+    pub(super) visible_structs: &'a BTreeMap<String, AstStructDef>,
+    pub(super) module_const_names: &'a BTreeSet<String>,
+    pub(super) module_function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) owning_function_name: &'a str,
+    pub(super) counter: &'a mut usize,
+    pub(super) synthesized: &'a mut Vec<AstFunction>,
+}
+
+pub(super) struct KnownReturnLambdaSynthesisInput<'a> {
+    pub(super) params: &'a [AstParam],
+    pub(super) lambda_return_type: AstTypeRef,
+    pub(super) body: &'a [AstStmt],
+    pub(super) inherited_generic_params: &'a [AstGenericParam],
+    pub(super) lambda_aliases: &'a BTreeMap<String, LambdaBinding>,
+    pub(super) outer_locals: &'a BTreeSet<String>,
+    pub(super) outer_local_types: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) module_impls: &'a [AstImplDef],
+    pub(super) visible_structs: &'a BTreeMap<String, AstStructDef>,
+    pub(super) module_const_names: &'a BTreeSet<String>,
+    pub(super) module_function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) owning_function_name: &'a str,
+    pub(super) counter: &'a mut usize,
+    pub(super) synthesized: &'a mut Vec<AstFunction>,
+}
 
 pub(super) fn synthesize_lambda_function(
-    params: &[AstParam],
-    return_type: &Option<AstTypeRef>,
-    body: &[AstStmt],
-    inherited_generic_params: &[AstGenericParam],
-    lambda_aliases: &BTreeMap<String, LambdaBinding>,
-    outer_locals: &BTreeSet<String>,
-    outer_local_types: &BTreeMap<String, AstTypeRef>,
-    module_impls: &[AstImplDef],
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    module_const_names: &BTreeSet<String>,
-    module_function_table: &BTreeMap<String, AstFunction>,
-    owning_function_name: &str,
-    counter: &mut usize,
-    synthesized: &mut Vec<AstFunction>,
+    input: LambdaSynthesisInput<'_>,
 ) -> Result<LambdaBinding, String> {
+    let LambdaSynthesisInput {
+        params,
+        return_type,
+        body,
+        inherited_generic_params,
+        lambda_aliases,
+        outer_locals,
+        outer_local_types,
+        module_impls,
+        visible_structs,
+        module_const_names,
+        module_function_table,
+        owning_function_name,
+        counter,
+        synthesized,
+    } = input;
     let Some(lambda_return_type) = return_type.clone() else {
         return Err("inline lambda currently requires an explicit return type".to_owned());
     };
-    synthesize_lambda_function_with_known_return_type(
+    synthesize_lambda_function_with_known_return_type(KnownReturnLambdaSynthesisInput {
         params,
         lambda_return_type,
         body,
@@ -46,25 +84,28 @@ pub(super) fn synthesize_lambda_function(
         owning_function_name,
         counter,
         synthesized,
-    )
+    })
 }
 
 pub(super) fn synthesize_lambda_function_with_known_return_type(
-    params: &[AstParam],
-    lambda_return_type: AstTypeRef,
-    body: &[AstStmt],
-    inherited_generic_params: &[AstGenericParam],
-    lambda_aliases: &BTreeMap<String, LambdaBinding>,
-    outer_locals: &BTreeSet<String>,
-    outer_local_types: &BTreeMap<String, AstTypeRef>,
-    module_impls: &[AstImplDef],
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    module_const_names: &BTreeSet<String>,
-    module_function_table: &BTreeMap<String, AstFunction>,
-    owning_function_name: &str,
-    counter: &mut usize,
-    synthesized: &mut Vec<AstFunction>,
+    input: KnownReturnLambdaSynthesisInput<'_>,
 ) -> Result<LambdaBinding, String> {
+    let KnownReturnLambdaSynthesisInput {
+        params,
+        lambda_return_type,
+        body,
+        inherited_generic_params,
+        lambda_aliases,
+        outer_locals,
+        outer_local_types,
+        module_impls,
+        visible_structs,
+        module_const_names,
+        module_function_table,
+        owning_function_name,
+        counter,
+        synthesized,
+    } = input;
     let mut lambda_locals = params
         .iter()
         .map(|param| param.name.clone())
@@ -101,13 +142,13 @@ pub(super) fn synthesize_lambda_function_with_known_return_type(
         lambda_visible_local_types.insert(capture.name.clone(), capture.ty.clone());
     }
 
-    let lambda_body = expand_lambda_block(
+    let lambda_body = expand_lambda_block(ExpandLambdaBlockInput {
         body,
-        Some(&lambda_return_type),
+        current_return_type: Some(&lambda_return_type),
         inherited_generic_params,
         lambda_aliases,
-        &lambda_visible_locals,
-        &lambda_visible_local_types,
+        visible_locals: &lambda_visible_locals,
+        visible_local_types: &lambda_visible_local_types,
         module_impls,
         visible_structs,
         module_const_names,
@@ -115,7 +156,7 @@ pub(super) fn synthesize_lambda_function_with_known_return_type(
         owning_function_name,
         counter,
         synthesized,
-    )?;
+    })?;
     let mut synthesized_params = params.to_vec();
     synthesized_params.extend(capture_params.clone());
     synthesized.push(AstFunction {
@@ -182,16 +223,41 @@ pub(super) fn inline_lambda_return_type_from_callable(
     Ok(Some(inferred_return_type))
 }
 
+pub(super) struct ExpectedCallArgInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) index: usize,
+    pub(super) generic_args: &'a [AstTypeRef],
+    pub(super) args: &'a [AstExpr],
+    pub(super) expected_result_type: Option<&'a AstTypeRef>,
+    pub(super) visible_local_types: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) module_function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) module_impls: &'a [AstImplDef],
+}
+
+pub(super) struct ExpectedMethodArgInput<'a> {
+    pub(super) receiver: &'a AstExpr,
+    pub(super) method: &'a str,
+    pub(super) index: usize,
+    pub(super) args: &'a [AstExpr],
+    pub(super) expected_result_type: Option<&'a AstTypeRef>,
+    pub(super) visible_local_types: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) module_function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) module_impls: &'a [AstImplDef],
+}
+
 pub(super) fn expected_callable_type_for_call_arg(
-    callee: &str,
-    index: usize,
-    generic_args: &[AstTypeRef],
-    args: &[AstExpr],
-    expected_result_type: Option<&AstTypeRef>,
-    visible_local_types: &BTreeMap<String, AstTypeRef>,
-    module_function_table: &BTreeMap<String, AstFunction>,
-    module_impls: &[AstImplDef],
+    input: ExpectedCallArgInput<'_>,
 ) -> Option<AstTypeRef> {
+    let ExpectedCallArgInput {
+        callee,
+        index,
+        generic_args,
+        args,
+        expected_result_type,
+        visible_local_types,
+        module_function_table,
+        module_impls,
+    } = input;
     let function = module_function_table.get(callee)?;
     let param = function.params.get(index)?;
     let specialized = if function.generic_params.is_empty() && generic_args.is_empty() {
@@ -212,15 +278,18 @@ pub(super) fn expected_callable_type_for_call_arg(
 }
 
 pub(super) fn expected_callable_type_for_method_arg(
-    receiver: &AstExpr,
-    method: &str,
-    index: usize,
-    args: &[AstExpr],
-    expected_result_type: Option<&AstTypeRef>,
-    visible_local_types: &BTreeMap<String, AstTypeRef>,
-    module_function_table: &BTreeMap<String, AstFunction>,
-    module_impls: &[AstImplDef],
+    input: ExpectedMethodArgInput<'_>,
 ) -> Option<AstTypeRef> {
+    let ExpectedMethodArgInput {
+        receiver,
+        method,
+        index,
+        args,
+        expected_result_type,
+        visible_local_types,
+        module_function_table,
+        module_impls,
+    } = input;
     let receiver_ty = infer_local_binding_type(
         receiver,
         visible_local_types,
@@ -235,16 +304,16 @@ pub(super) fn expected_callable_type_for_method_arg(
         else {
             continue;
         };
-        let substitutions = infer_impl_method_substitutions(
+        let substitutions = infer_impl_method_substitutions(ImplMethodSubstitutionInput {
             definition,
             method_index,
-            &receiver_ty,
+            receiver_ty: &receiver_ty,
             args,
             expected_result_type,
             visible_local_types,
             module_function_table,
             module_impls,
-        );
+        });
         let specialized_for_type =
             specialize_type_with_substitutions(&definition.for_type, &substitutions);
         if specialized_for_type != receiver_ty {

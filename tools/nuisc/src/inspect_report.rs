@@ -251,16 +251,19 @@ pub(crate) fn inspect_galaxy_docs_json(summary: &GalaxyDocSummary) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join(",");
+            let items_field = format!("\"items\":[{}]", items);
             format!(
                 "{{{},{},{},{}}}",
                 json_string_field("library_module", &module.library_module),
                 json_string_field("module_path", &module.module_path),
                 json_usize_field("documented_item_count", module.documented_item_count),
-                format!("\"items\":[{}]", items)
+                items_field
             )
         })
         .collect::<Vec<_>>()
         .join(",");
+    let documented_items = json_usize_field("documented_item_count", summary.documented_item_count);
+    let modules_field = format!("{documented_items},\"modules\":[{modules}]");
     format!(
         "{{{},{},{},{},{},{}}}",
         json_string_field("kind", "nuis_galaxy_doc_index"),
@@ -271,11 +274,7 @@ pub(crate) fn inspect_galaxy_docs_json(summary: &GalaxyDocSummary) -> String {
             "documented_library_module_count",
             summary.documented_library_module_count
         ),
-        format!(
-            "{},\"modules\":[{}]",
-            json_usize_field("documented_item_count", summary.documented_item_count),
-            modules
-        )
+        modules_field
     )
 }
 

@@ -81,7 +81,7 @@ fn infer_view_call_type_inner(
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
     active_exprs: &mut BTreeSet<usize>,
 ) -> Option<AstTypeRef> {
-    let inferred = match callee {
+    match callee {
         "buffer_len" => Some(ast_named_type("i64")),
         "slice" => {
             let [buffer, _, _] = args else {
@@ -483,7 +483,6 @@ fn infer_view_call_type_inner(
                 Some(ast_named_type("i64"))
             }
         }
-        _ => return None,
-    };
-    inferred
+        _ => None,
+    }
 }

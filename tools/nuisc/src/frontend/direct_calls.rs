@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 
-use super::call_helpers::{ensure_call_arg_matches_param, lower_extern_call_arg_for_param};
+use super::call_helpers::{
+    ensure_call_arg_matches_param, lower_extern_call_arg_for_param, CallArgParamCheck,
+};
 use super::{
     ensure_ref_like, i32_type, lower_expr, lower_nested_expr_with_async, FunctionSignature,
     ModuleConstValue,
@@ -153,16 +155,16 @@ fn lower_named_call(
     for (index, (arg, expected_param)) in
         lowered_args.iter().zip(signature.params.iter()).enumerate()
     {
-        ensure_call_arg_matches_param(
+        ensure_call_arg_matches_param(CallArgParamCheck {
             callee,
-            index,
+            arg_index: index,
             arg,
             expected_param,
             bindings,
             signatures,
             struct_table,
-            signature.is_extern,
-        )?;
+            is_extern: signature.is_extern,
+        })?;
     }
     if signature.is_async {
         if !current_function_is_async {

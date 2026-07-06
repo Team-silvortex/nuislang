@@ -348,9 +348,7 @@ fn carry_source_payload_len(kind: &str) -> Option<usize> {
     } else if one_payload_indexed_prefixes.iter().any(|prefix| {
         kind.strip_prefix(prefix)
             .is_some_and(|index| index.parse::<usize>().is_ok())
-    }) {
-        Some(1)
-    } else if one_payload_zero_payload_indexed_prefixes
+    }) || one_payload_zero_payload_indexed_prefixes
         .iter()
         .any(|prefix| {
             kind.strip_prefix(prefix).is_some_and(|suffix| {
@@ -442,9 +440,7 @@ fn carry_source_payload_len(kind: &str) -> Option<usize> {
             | "mul_read_at_dynamic_prev_current"
             | "add_source_plus_invariant"
             | "mul_source_plus_invariant"
-    ) {
-        Some(1)
-    } else if [
+    ) || [
         "add_read_at_dynamic_prev_carry",
         "mul_read_at_dynamic_prev_carry",
         "add_read_at_dynamic_carry",
@@ -1589,7 +1585,7 @@ impl RegisteredMod for CpuMod {
                 Ok(InstructionSemantics::effect(inputs))
             }
             "loop_while_i64_flow_chain" | "loop_while_scalar_flow_chain" => {
-                if node.op.args.len() < 8 || (node.op.args.len() - 8) % 2 != 0 {
+                if node.op.args.len() < 8 || !(node.op.args.len() - 8).is_multiple_of(2) {
                     return Err(format!(
                         "node `{}` expects `cpu.loop_while_scalar_flow_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)*`",
                         node.name
@@ -1706,7 +1702,7 @@ impl RegisteredMod for CpuMod {
                 Ok(InstructionSemantics::effect(inputs))
             }
             "loop_while_i64_async_flow_chain" | "loop_while_scalar_async_flow_chain" => {
-                if node.op.args.len() < 7 || (node.op.args.len() - 7) % 2 != 0 {
+                if node.op.args.len() < 7 || !(node.op.args.len() - 7).is_multiple_of(2) {
                     return Err(format!(
                         "node `{}` expects `cpu.loop_while_scalar_async_flow_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)*`",
                         node.name
@@ -1825,7 +1821,7 @@ impl RegisteredMod for CpuMod {
                     &validate_flow_control_kind,
                 )?;
                 if carry_start_index < node.op.args.len()
-                    && (node.op.args.len() - carry_start_index) % 5 != 0
+                    && !(node.op.args.len() - carry_start_index).is_multiple_of(5)
                 {
                     return Err(format!(
                         "node `{}` expects `cpu.loop_while_scalar_async_flow_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_flow_expr> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)*`",
@@ -1845,7 +1841,7 @@ impl RegisteredMod for CpuMod {
                 Ok(InstructionSemantics::effect(inputs))
             }
             "loop_while_i64_post_flow_chain" | "loop_while_scalar_post_flow_chain" => {
-                if node.op.args.len() < 10 || (node.op.args.len() - 8) % 2 != 0 {
+                if node.op.args.len() < 10 || !(node.op.args.len() - 8).is_multiple_of(2) {
                     return Err(format!(
                         "node `{}` expects `cpu.loop_while_scalar_post_flow_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)+`",
                         node.name
@@ -1962,7 +1958,7 @@ impl RegisteredMod for CpuMod {
                 Ok(InstructionSemantics::effect(inputs))
             }
             "loop_while_i64_async_post_flow_chain" | "loop_while_scalar_async_post_flow_chain" => {
-                if node.op.args.len() < 9 || (node.op.args.len() - 7) % 2 != 0 {
+                if node.op.args.len() < 9 || !(node.op.args.len() - 7).is_multiple_of(2) {
                     return Err(format!(
                         "node `{}` expects `cpu.loop_while_scalar_async_post_flow_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)+`",
                         node.name

@@ -128,13 +128,13 @@ use self::annotations::{
     validate_export_annotations, validate_extern_host_symbols, validate_function_annotations,
     validate_host_symbol_bridge_annotations, validate_struct_annotations,
 };
-use self::binary_lowering::lower_binary_expr_with_async;
+use self::binary_lowering::{lower_binary_expr_with_async, BinaryLoweringInput};
 use self::call_helpers::{
     ensure_mutex_guard_like, ensure_mutex_like, ensure_ref_like, ensure_spawn_input_safe,
     ensure_task_like, ensure_thread_like, lower_result_observer_call_with_consts,
     lower_result_wrapper_call_with_consts,
 };
-use self::call_lowering::lower_call_expr_with_async;
+use self::call_lowering::{lower_call_expr_with_async, CallLoweringInput};
 use self::call_routing::lower_routed_call_or_core_builtin;
 use self::const_assembly::assemble_module_consts;
 use self::direct_calls::lower_direct_call_builtin_or_named_call;
@@ -159,7 +159,7 @@ use self::module_assembly::{
 };
 use self::return_inference::infer_missing_function_return_type;
 use self::signature_building::{build_initial_function_signatures, FunctionSignature};
-use self::specialization_pipeline::build_lowered_functions_and_impls;
+use self::specialization_pipeline::{build_lowered_functions_and_impls, LoweredFunctionsInput};
 use self::text_handle_rewrite::rewrite_text_handle_helpers;
 use self::validation::validate_declared_nir_types;
 use self::validation_assignments::validate_ast_assignments;
@@ -254,8 +254,11 @@ pub fn lower_project_ast_to_nir(
         .map(|definition| (definition.name.clone(), definition.clone()))
         .collect::<BTreeMap<_, _>>();
 
-    let (mut signatures, generic_templates, concrete_module_functions) =
+    let initial_signatures =
         build_initial_function_signatures(module, &local_cpu_helpers, &visible_type_aliases)?;
+    let mut signatures = initial_signatures.signatures;
+    let generic_templates = initial_signatures.generic_templates;
+    let concrete_module_functions = initial_signatures.concrete_module_functions;
     let module_struct_table = build_module_struct_table(module);
     let impl_lookup = build_impl_lookup(module, &visible_type_aliases)?;
     validate_ast_generic_constraints(
@@ -276,20 +279,23 @@ pub fn lower_project_ast_to_nir(
     let module_const_values = const_assembly.module_const_values;
     let module_const_env = const_assembly.module_const_env;
 
-    let (lowered_functions, lowered_traits, lowered_impls) = build_lowered_functions_and_impls(
+    let lowered = build_lowered_functions_and_impls(LoweredFunctionsInput {
         module,
-        &local_cpu_helpers,
-        &visible_type_aliases,
-        &module_const_values,
-        &module_const_env,
-        &helper_const_maps,
-        &mut signatures,
-        &struct_table,
-        &module_struct_table,
-        &impl_lookup,
-        &generic_templates,
-        &concrete_module_functions,
-    )?;
+        local_cpu_helpers: &local_cpu_helpers,
+        visible_type_aliases: &visible_type_aliases,
+        module_const_values: &module_const_values,
+        module_const_env: &module_const_env,
+        helper_const_maps: &helper_const_maps,
+        signatures: &mut signatures,
+        struct_table: &struct_table,
+        module_struct_table: &module_struct_table,
+        impl_lookup: &impl_lookup,
+        generic_templates: &generic_templates,
+        concrete_module_functions: &concrete_module_functions,
+    })?;
+    let lowered_functions = lowered.functions;
+    let lowered_traits = lowered.traits;
+    let lowered_impls = lowered.impls;
     let (lowered_externs, lowered_extern_interfaces) =
         lower_extern_items(module, &visible_type_aliases)?;
 
@@ -324,7 +330,7 @@ pub fn parse_nuis_module(input: &str) -> Result<NirModule, String> {
     lower_ast_to_nir(&ast)
 }
 
-pub fn collect_nir_tests<'a>(module: &'a NirModule) -> Vec<&'a NirFunction> {
+pub fn collect_nir_tests(module: &NirModule) -> Vec<&NirFunction> {
     module
         .functions
         .iter()
@@ -332,7 +338,7 @@ pub fn collect_nir_tests<'a>(module: &'a NirModule) -> Vec<&'a NirFunction> {
         .collect()
 }
 
-pub fn collect_nir_benchmarks<'a>(module: &'a NirModule) -> Vec<&'a NirFunction> {
+pub fn collect_nir_benchmarks(module: &NirModule) -> Vec<&NirFunction> {
     module
         .functions
         .iter()

@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{AstExpr, AstFunction, AstMatchArm, AstTypeAlias};
 
-use super::super::expansion::{specialize_higher_order_call, BoundCallable};
+use super::super::expansion::{
+    specialize_higher_order_call, BoundCallable, HigherOrderCallSpecializationInput,
+};
 use super::rewrite_higher_order_template_block;
 
 pub(crate) fn rewrite_higher_order_template_expr(
@@ -145,21 +147,23 @@ pub(crate) fn rewrite_higher_order_template_expr(
             callee,
             generic_args,
             args,
-        } if templates.contains_key(callee) => specialize_higher_order_call(
-            callee,
-            args,
-            generic_args,
-            Some(callable_bindings),
-            None,
-            &BTreeMap::new(),
-            templates,
-            function_table,
-            &[],
-            &BTreeMap::new(),
-            visible_type_aliases,
-            specialized_cache,
-            specialized_functions,
-        )?,
+        } if templates.contains_key(callee) => {
+            specialize_higher_order_call(HigherOrderCallSpecializationInput {
+                callee,
+                args,
+                explicit_generic_args: generic_args,
+                template_callable_bindings: Some(callable_bindings),
+                expected: None,
+                local_types: &BTreeMap::new(),
+                templates,
+                function_table,
+                module_impls: &[],
+                visible_structs: &BTreeMap::new(),
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            })?
+        }
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_higher_order_template_expr(
             value,
             callable_bindings,

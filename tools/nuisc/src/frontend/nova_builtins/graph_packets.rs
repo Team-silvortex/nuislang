@@ -17,34 +17,34 @@ pub(super) fn lower_nova_graph_packet_builtin_call(
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<Option<NirExpr>, String> {
     let expr = match callee {
-        "nova_transform_packet" => build_packet(
+        "nova_transform_packet" => build_packet(PacketBuildInput {
             args,
-            4,
-            "nova_transform_packet(...) expects 4 args",
-            "NovaTransformPacket",
-            &["translate", "rotate", "scale", "pivot"],
+            expected_len: 4,
+            arg_error: "nova_transform_packet(...) expects 4 args",
+            type_name: "NovaTransformPacket",
+            fields: &["translate", "rotate", "scale", "pivot"],
             current_domain,
             bindings,
             signatures,
             struct_table,
-        )?,
-        "nova_node_packet" => build_packet(
+        })?,
+        "nova_node_packet" => build_packet(PacketBuildInput {
             args,
-            4,
-            "nova_node_packet(...) expects 4 args",
-            "NovaNodePacket",
-            &["node_id", "parent_id", "flags", "depth"],
+            expected_len: 4,
+            arg_error: "nova_node_packet(...) expects 4 args",
+            type_name: "NovaNodePacket",
+            fields: &["node_id", "parent_id", "flags", "depth"],
             current_domain,
             bindings,
             signatures,
             struct_table,
-        )?,
-        "nova_scene_link_packet" => build_packet(
+        })?,
+        "nova_scene_link_packet" => build_packet(PacketBuildInput {
             args,
-            6,
-            "nova_scene_link_packet(...) expects 6 args",
-            "NovaSceneLinkPacket",
-            &[
+            expected_len: 6,
+            arg_error: "nova_scene_link_packet(...) expects 6 args",
+            type_name: "NovaSceneLinkPacket",
+            fields: &[
                 "node_slot",
                 "transform_slot",
                 "mesh_slot",
@@ -56,13 +56,13 @@ pub(super) fn lower_nova_graph_packet_builtin_call(
             bindings,
             signatures,
             struct_table,
-        )?,
-        "nova_instance_packet" => build_packet(
+        })?,
+        "nova_instance_packet" => build_packet(PacketBuildInput {
             args,
-            6,
-            "nova_instance_packet(...) expects 6 args",
-            "NovaInstancePacket",
-            &[
+            expected_len: 6,
+            arg_error: "nova_instance_packet(...) expects 6 args",
+            type_name: "NovaInstancePacket",
+            fields: &[
                 "node_slot",
                 "count",
                 "stride",
@@ -74,13 +74,13 @@ pub(super) fn lower_nova_graph_packet_builtin_call(
             bindings,
             signatures,
             struct_table,
-        )?,
-        "nova_scene_graph_packet" => build_packet(
+        })?,
+        "nova_scene_graph_packet" => build_packet(PacketBuildInput {
             args,
-            5,
-            "nova_scene_graph_packet(...) expects 5 args",
-            "NovaSceneGraphPacket",
-            &[
+            expected_len: 5,
+            arg_error: "nova_scene_graph_packet(...) expects 5 args",
+            type_name: "NovaSceneGraphPacket",
+            fields: &[
                 "root_slot",
                 "node_count",
                 "link_count",
@@ -91,13 +91,13 @@ pub(super) fn lower_nova_graph_packet_builtin_call(
             bindings,
             signatures,
             struct_table,
-        )?,
-        "nova_scene_node_packet" => build_packet(
+        })?,
+        "nova_scene_node_packet" => build_packet(PacketBuildInput {
             args,
-            5,
-            "nova_scene_node_packet(...) expects 5 args",
-            "NovaSceneNodePacket",
-            &[
+            expected_len: 5,
+            arg_error: "nova_scene_node_packet(...) expects 5 args",
+            type_name: "NovaSceneNodePacket",
+            fields: &[
                 "node_slot",
                 "first_child_slot",
                 "sibling_slot",
@@ -108,13 +108,13 @@ pub(super) fn lower_nova_graph_packet_builtin_call(
             bindings,
             signatures,
             struct_table,
-        )?,
-        "nova_instance_group_packet" => build_packet(
+        })?,
+        "nova_instance_group_packet" => build_packet(PacketBuildInput {
             args,
-            5,
-            "nova_instance_group_packet(...) expects 5 args",
-            "NovaInstanceGroupPacket",
-            &[
+            expected_len: 5,
+            arg_error: "nova_instance_group_packet(...) expects 5 args",
+            type_name: "NovaInstanceGroupPacket",
+            fields: &[
                 "root_instance_slot",
                 "group_count",
                 "visible_count",
@@ -125,13 +125,13 @@ pub(super) fn lower_nova_graph_packet_builtin_call(
             bindings,
             signatures,
             struct_table,
-        )?,
-        "nova_scene_cluster_packet" => build_packet(
+        })?,
+        "nova_scene_cluster_packet" => build_packet(PacketBuildInput {
             args,
-            5,
-            "nova_scene_cluster_packet(...) expects 5 args",
-            "NovaSceneClusterPacket",
-            &[
+            expected_len: 5,
+            arg_error: "nova_scene_cluster_packet(...) expects 5 args",
+            type_name: "NovaSceneClusterPacket",
+            fields: &[
                 "root_node_slot",
                 "node_budget",
                 "instance_group_slot",
@@ -142,23 +142,36 @@ pub(super) fn lower_nova_graph_packet_builtin_call(
             bindings,
             signatures,
             struct_table,
-        )?,
+        })?,
         _ => return Ok(None),
     };
     Ok(Some(expr))
 }
 
-fn build_packet(
-    args: &[AstExpr],
+struct PacketBuildInput<'a> {
+    args: &'a [AstExpr],
     expected_len: usize,
-    arg_error: &str,
-    type_name: &str,
-    fields: &[&str],
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-) -> Result<NirExpr, String> {
+    arg_error: &'a str,
+    type_name: &'a str,
+    fields: &'a [&'a str],
+    current_domain: &'a str,
+    bindings: &'a BTreeMap<String, NirTypeRef>,
+    signatures: &'a BTreeMap<String, FunctionSignature>,
+    struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
+fn build_packet(input: PacketBuildInput<'_>) -> Result<NirExpr, String> {
+    let PacketBuildInput {
+        args,
+        expected_len,
+        arg_error,
+        type_name,
+        fields,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+    } = input;
     let values = lower_i64_arg_list(
         args,
         expected_len,

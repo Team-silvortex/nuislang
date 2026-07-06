@@ -1318,7 +1318,7 @@ fn materialized_support_path(
 }
 
 fn decode_hex_bytes(value: &str) -> Result<Vec<u8>, ArtifactError> {
-    if value.len() % 2 != 0 {
+    if !value.len().is_multiple_of(2) {
         return Err(ArtifactError::new("hex payload length must be even"));
     }
     let mut out = Vec::with_capacity(value.len() / 2);

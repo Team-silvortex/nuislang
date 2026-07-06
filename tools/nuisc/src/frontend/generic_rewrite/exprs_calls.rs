@@ -5,11 +5,12 @@ use nuis_semantics::model::{
 };
 
 use super::super::{resolve_ast_type_ref_aliases, FunctionSignature};
-use super::exprs::rewrite_generic_calls_in_expr;
-use super::exprs_aliases::resolved_struct_constructor_alias;
-use super::exprs_expected::call_arg_expected_type;
+use super::exprs::{rewrite_generic_calls_in_expr, GenericExprRewriteInput};
+use super::exprs_aliases::{resolved_struct_constructor_alias, StructConstructorAliasInput};
+use super::exprs_expected::{call_arg_expected_type, CallArgExpectedTypeInput};
 use super::exprs_specialization::{
     ensure_generic_impl_method_specialization, ensure_generic_specialization,
+    GenericSpecializationInput,
 };
 use super::GenericImplMethodTemplate;
 
@@ -42,20 +43,20 @@ pub(super) fn rewrite_generic_call_expr(
         .iter()
         .enumerate()
         .map(|(index, arg)| {
-            let arg_expected = call_arg_expected_type(
+            let arg_expected = call_arg_expected_type(CallArgExpectedTypeInput {
                 callee,
-                &rewritten_generic_args,
+                generic_args: &rewritten_generic_args,
                 index,
                 expected,
                 generic_templates,
                 signatures,
                 visible_type_aliases,
                 struct_table,
-            );
-            rewrite_generic_calls_in_expr(
-                arg,
+            });
+            rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: arg,
                 context,
-                arg_expected.as_ref(),
+                expected: arg_expected.as_ref(),
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -69,7 +70,7 @@ pub(super) fn rewrite_generic_call_expr(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
     if let Some((trait_name, method_name)) = callee.rsplit_once('.') {
@@ -100,12 +101,13 @@ pub(super) fn rewrite_generic_call_expr(
         }
     }
     if let Some(template) = generic_templates.get(callee) {
-        let specialized_name = ensure_generic_specialization(
+        let specialization_context = format!("{context} call `{callee}`");
+        let specialized_name = ensure_generic_specialization(GenericSpecializationInput {
             template,
-            &rewritten_generic_args,
-            &rewritten_args,
+            explicit_generic_args: &rewritten_generic_args,
+            args: &rewritten_args,
             expected,
-            &format!("{context} call `{callee}`"),
+            context: &specialization_context,
             env,
             visible_type_aliases,
             generic_templates,
@@ -119,24 +121,24 @@ pub(super) fn rewrite_generic_call_expr(
             specialization_cache,
             specialized_functions,
             specialized_signatures,
-        )?;
+        })?;
         Ok(AstExpr::Call {
             callee: specialized_name,
             generic_args: Vec::new(),
             args: rewritten_args,
         })
     } else {
-        let rewritten_callee = resolved_struct_constructor_alias(
+        let rewritten_callee = resolved_struct_constructor_alias(StructConstructorAliasInput {
             callee,
-            &rewritten_generic_args,
+            generic_args: &rewritten_generic_args,
             expected,
-            &rewritten_args,
+            args: &rewritten_args,
             env,
             visible_type_aliases,
             impl_lookup,
             struct_table,
             function_return_types,
-        )?
+        })?
         .unwrap_or_else(|| (callee.to_owned(), rewritten_generic_args.clone()));
         Ok(AstExpr::Call {
             callee: rewritten_callee.0,

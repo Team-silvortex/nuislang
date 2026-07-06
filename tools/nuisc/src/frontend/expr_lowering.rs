@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::binary_lowering::lower_binary_expr_with_async;
+use super::binary_lowering::{lower_binary_expr_with_async, BinaryLoweringInput};
 use super::metadata::{hidden_private_field_count, ModuleConstValue};
-use super::unary_lowering::lower_unary_expr_with_async;
+use super::unary_lowering::{lower_unary_expr_with_async, UnaryLoweringInput};
 use super::validation_helpers::render_type_name;
 use super::{
     infer_nir_expr_type, instantiate_struct_field_type, lower_call_expr_with_async, named_type,
-    resolve_declared_or_inferred, struct_field_type, AstExpr, FunctionSignature, NirExpr,
-    NirStructDef, NirTypeRef,
+    resolve_declared_or_inferred, struct_field_type, AstExpr, CallLoweringInput, FunctionSignature,
+    NirExpr, NirStructDef, NirTypeRef,
 };
 
 #[path = "expr_lowering_methods.rs"]
@@ -147,16 +147,15 @@ pub(super) fn lower_expr_with_async(
         AstExpr::Var(name) => {
             if let Some(constant) = module_consts.get(name) {
                 constant.value.clone()
-            } else if bindings.contains_key(name) {
-                NirExpr::Var(name.clone())
-            } else if expected.is_some_and(|ty| {
+            } else if bindings.contains_key(name)
+                || (expected.is_some_and(|ty| {
                 !ty.is_optional
                     && !ty.is_ref
                     && matches!(
                         (ty.name.as_str(), ty.generic_args.len()),
                         ("Fn1", 2) | ("Fn2", 3) | ("Fn3", 4)
                     )
-            }) && signatures.contains_key(name)
+            }) && signatures.contains_key(name))
             {
                 NirExpr::Var(name.clone())
             } else if signatures.contains_key(name) {
@@ -205,7 +204,7 @@ pub(super) fn lower_expr_with_async(
             callee,
             generic_args,
             args,
-        } => lower_call_expr_with_async(
+        } => lower_call_expr_with_async(CallLoweringInput {
             callee,
             generic_args,
             args,
@@ -217,7 +216,7 @@ pub(super) fn lower_expr_with_async(
             struct_table,
             expected,
             allow_async_calls,
-        )?,
+        })?,
         AstExpr::MethodCall {
             receiver,
             method,
@@ -435,7 +434,7 @@ pub(super) fn lower_expr_with_async(
                 field: field.clone(),
             }
         }
-        AstExpr::Unary { op, operand } => lower_unary_expr_with_async(
+        AstExpr::Unary { op, operand } => lower_unary_expr_with_async(UnaryLoweringInput {
             op,
             operand,
             current_domain,
@@ -445,8 +444,8 @@ pub(super) fn lower_expr_with_async(
             signatures,
             struct_table,
             expected,
-        )?,
-        AstExpr::Binary { op, lhs, rhs } => lower_binary_expr_with_async(
+        })?,
+        AstExpr::Binary { op, lhs, rhs } => lower_binary_expr_with_async(BinaryLoweringInput {
             op,
             lhs,
             rhs,
@@ -457,6 +456,6 @@ pub(super) fn lower_expr_with_async(
             signatures,
             struct_table,
             expected,
-        )?,
+        })?,
     })
 }

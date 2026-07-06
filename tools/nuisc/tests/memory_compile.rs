@@ -1033,7 +1033,12 @@ fn compiles_text_serialization_intrinsics_into_buffer() {
     assert!(artifacts
         .llvm_ir
         .contains("call i64 @host_serialize_i64_into"));
-    assert!(artifacts.llvm_ir.contains("ptrtoint ptr"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("declare i64 @host_serialize_text_into(ptr, ptr, i64)"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("declare i64 @host_serialize_i64_into(i64, i64, i64)"));
 }
 
 #[test]

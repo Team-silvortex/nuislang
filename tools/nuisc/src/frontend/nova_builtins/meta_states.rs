@@ -4,6 +4,13 @@ use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 
 use super::super::{lower_expr, named_type, FunctionSignature, ModuleConstValue};
 
+struct NovaMetaLoweringEnv<'a> {
+    current_domain: &'a str,
+    bindings: &'a BTreeMap<String, NirTypeRef>,
+    signatures: &'a BTreeMap<String, FunctionSignature>,
+    struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_nova_meta_state_builtin_call(
     callee: &str,
@@ -15,6 +22,12 @@ pub(super) fn lower_nova_meta_state_builtin_call(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<Option<NirExpr>, String> {
+    let env = NovaMetaLoweringEnv {
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+    };
     let result = match callee {
         "nova_feedback_state" => build_state(
             args,
@@ -22,10 +35,7 @@ pub(super) fn lower_nova_meta_state_builtin_call(
             "NovaFeedbackPacket",
             "NovaFeedbackState",
             ["status", "latency", "retries", "channel"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_intent_state" => build_state(
             args,
@@ -33,10 +43,7 @@ pub(super) fn lower_nova_meta_state_builtin_call(
             "NovaIntentPacket",
             "NovaIntentState",
             ["kind", "target_slot", "urgency", "policy"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_reaction_state" => build_state(
             args,
@@ -44,10 +51,7 @@ pub(super) fn lower_nova_meta_state_builtin_call(
             "NovaReactionPacket",
             "NovaReactionState",
             ["kind", "result_slot", "stability", "echo_mode"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_outcome_state" => build_state(
             args,
@@ -55,10 +59,7 @@ pub(super) fn lower_nova_meta_state_builtin_call(
             "NovaOutcomePacket",
             "NovaOutcomeState",
             ["kind", "final_slot", "confidence", "settle_mode"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_resolution_state" => build_state(
             args,
@@ -66,10 +67,7 @@ pub(super) fn lower_nova_meta_state_builtin_call(
             "NovaResolutionPacket",
             "NovaResolutionState",
             ["kind", "commit_slot", "convergence", "policy_mode"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_commit_state" => build_state(
             args,
@@ -77,10 +75,7 @@ pub(super) fn lower_nova_meta_state_builtin_call(
             "NovaCommitPacket",
             "NovaCommitState",
             ["kind", "applied_slot", "durability", "commit_mode"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_snapshot_state" => build_state(
             args,
@@ -88,10 +83,7 @@ pub(super) fn lower_nova_meta_state_builtin_call(
             "NovaSnapshotPacket",
             "NovaSnapshotState",
             ["kind", "source_slot", "retention", "replay_mode"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_checkpoint_state" => build_state(
             args,
@@ -99,10 +91,7 @@ pub(super) fn lower_nova_meta_state_builtin_call(
             "NovaCheckpointPacket",
             "NovaCheckpointState",
             ["kind", "anchor_slot", "rollback_depth", "resume_mode"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_selection_state" => build_state(
             args,
@@ -110,10 +99,7 @@ pub(super) fn lower_nova_meta_state_builtin_call(
             "NovaSelectionPacket",
             "NovaSelectionState",
             ["selected", "span", "mode", "origin"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_list_selection"
         | "nova_table_selection"
@@ -138,20 +124,17 @@ fn build_state(
     packet_type: &str,
     state_type: &str,
     fields: [&str; 4],
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    env: &NovaMetaLoweringEnv<'_>,
 ) -> Result<NirExpr, String> {
     let [packet] = args else {
         return Err(arg_error.to_owned());
     };
     let packet = lower_expr(
         packet,
-        current_domain,
-        bindings,
-        signatures,
-        struct_table,
+        env.current_domain,
+        env.bindings,
+        env.signatures,
+        env.struct_table,
         Some(&named_type(packet_type)),
     )?;
     Ok(NirExpr::StructLiteral {

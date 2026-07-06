@@ -15,6 +15,10 @@ use yir_lower_contract::{analyze_kernel_lowering, analyze_shader_lowering};
 use yir_lower_llvm::emit_module;
 use yir_verify::verify_module;
 
+mod host_ffi_stub;
+
+use host_ffi_stub::render_host_ffi_stubs;
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("{error}");
@@ -230,36 +234,37 @@ fn run() -> Result<(), String> {
                 .first()
                 .map(|binding| binding.resource.as_str()),
         );
+        let rendered_fabric_boot_plan = render_fabric_boot_plan(&fabric_boot_plan);
         fs::write(
             &host_path,
-            objc_host_source(
-                window_spec
+            objc_host_source(ObjcHostSourceSpec {
+                window_title: window_spec
                     .as_ref()
                     .map(|spec| spec.title.as_str())
                     .unwrap_or(stem),
-                window_spec.as_ref().map(|spec| spec.width).unwrap_or(640),
-                window_spec.as_ref().map(|spec| spec.height).unwrap_or(480),
-                shader_contract
+                window_width: window_spec.as_ref().map(|spec| spec.width).unwrap_or(640),
+                window_height: window_spec.as_ref().map(|spec| spec.height).unwrap_or(480),
+                fabric_worker_core: shader_contract
                     .fabric_core_bindings
                     .first()
                     .map(|binding| binding.core_index),
-                primary_fabric_binding
+                fabric_table_id: primary_fabric_binding
                     .as_ref()
                     .map(|binding| binding.table_id.as_str()),
-                primary_fabric_binding
+                fabric_host_resource: primary_fabric_binding
                     .as_ref()
                     .map(|binding| binding.host_resource.as_str()),
-                primary_fabric_binding
+                fabric_render_resource: primary_fabric_binding
                     .as_ref()
                     .map(|binding| binding.render_resource.as_str()),
-                &render_fabric_boot_plan(&fabric_boot_plan),
-                fabric_boot_plan.len(),
-                frame_bundle
+                fabric_boot_plan: &rendered_fabric_boot_plan,
+                fabric_boot_plan_len: fabric_boot_plan.len(),
+                embedded_fallback_ppm_bytes: frame_bundle
                     .as_ref()
                     .map(|bundle| bundle.embedded_ppm_bytes.as_str()),
-                runtime_frame_support.as_ref(),
-                &host_ffi_stub_source,
-            ),
+                runtime_frame_support: runtime_frame_support.as_ref(),
+                host_ffi_stubs: &host_ffi_stub_source,
+            }),
         )
         .map_err(|error| format!("failed to write `{}`: {error}", host_path.display()))?;
         compile_native_appkit_binary(
@@ -761,73 +766,76 @@ fn render_shader_descriptor_lines(
     variant: &yir_lower_contract::ShaderBackendVariant,
     prefix: &str,
 ) -> String {
-    render_backend_descriptor_lines(
+    render_backend_descriptor_lines(BackendDescriptorLineSpec {
         prefix,
-        variant.backend,
-        variant.backend_family,
-        variant.target_os,
-        variant.target_device,
-        variant.ir_format,
-        variant.dispatch_abi,
-        variant.kind,
-        variant.priority,
-        variant.status,
-        variant.verification,
-        &variant.entry,
-        &variant.artifact,
-    )
+        backend: variant.backend,
+        backend_family: variant.backend_family,
+        target_os: variant.target_os,
+        target_device: variant.target_device,
+        ir_format: variant.ir_format,
+        dispatch_abi: variant.dispatch_abi,
+        kind: variant.kind,
+        priority: variant.priority,
+        status: variant.status,
+        verification: variant.verification,
+        entry: &variant.entry,
+        artifact: &variant.artifact,
+    })
 }
 
 fn render_kernel_descriptor_lines(
     variant: &yir_lower_contract::KernelBackendVariant,
     prefix: &str,
 ) -> String {
-    render_backend_descriptor_lines(
+    render_backend_descriptor_lines(BackendDescriptorLineSpec {
         prefix,
-        variant.backend,
-        variant.backend_family,
-        variant.target_os,
-        variant.target_device,
-        variant.ir_format,
-        variant.dispatch_abi,
-        variant.kind,
-        variant.priority,
-        variant.status,
-        variant.verification,
-        &variant.entry,
-        &variant.artifact,
-    )
+        backend: variant.backend,
+        backend_family: variant.backend_family,
+        target_os: variant.target_os,
+        target_device: variant.target_device,
+        ir_format: variant.ir_format,
+        dispatch_abi: variant.dispatch_abi,
+        kind: variant.kind,
+        priority: variant.priority,
+        status: variant.status,
+        verification: variant.verification,
+        entry: &variant.entry,
+        artifact: &variant.artifact,
+    })
 }
 
-fn render_backend_descriptor_lines(
-    prefix: &str,
-    backend: &str,
-    backend_family: &str,
-    target_os: &str,
-    target_device: &str,
-    ir_format: &str,
-    dispatch_abi: &str,
-    kind: &str,
+struct BackendDescriptorLineSpec<'a> {
+    prefix: &'a str,
+    backend: &'a str,
+    backend_family: &'a str,
+    target_os: &'a str,
+    target_device: &'a str,
+    ir_format: &'a str,
+    dispatch_abi: &'a str,
+    kind: &'a str,
     priority: usize,
-    status: &str,
-    verification: &str,
-    entry: &str,
-    artifact: &str,
-) -> String {
+    status: &'a str,
+    verification: &'a str,
+    entry: &'a str,
+    artifact: &'a str,
+}
+
+fn render_backend_descriptor_lines(spec: BackendDescriptorLineSpec<'_>) -> String {
+    let prefix = spec.prefix;
     [
-        format!("{prefix}backend={backend}"),
-        format!("{prefix}backend_family={backend_family}"),
-        format!("{prefix}target_os={target_os}"),
-        format!("{prefix}target_device={target_device}"),
-        format!("{prefix}ir_format={ir_format}"),
-        format!("{prefix}dispatch_abi={dispatch_abi}"),
-        format!("{prefix}kind={kind}"),
-        format!("{prefix}priority={priority}"),
-        format!("{prefix}status={status}"),
-        format!("{prefix}verification={verification}"),
-        format!("{prefix}entry={entry}"),
-        format!("{prefix}artifact={artifact}"),
-        format!("{prefix}"),
+        format!("{prefix}backend={}", spec.backend),
+        format!("{prefix}backend_family={}", spec.backend_family),
+        format!("{prefix}target_os={}", spec.target_os),
+        format!("{prefix}target_device={}", spec.target_device),
+        format!("{prefix}ir_format={}", spec.ir_format),
+        format!("{prefix}dispatch_abi={}", spec.dispatch_abi),
+        format!("{prefix}kind={}", spec.kind),
+        format!("{prefix}priority={}", spec.priority),
+        format!("{prefix}status={}", spec.status),
+        format!("{prefix}verification={}", spec.verification),
+        format!("{prefix}entry={}", spec.entry),
+        format!("{prefix}artifact={}", spec.artifact),
+        prefix.to_string(),
     ]
     .join("\n")
 }
@@ -2076,11 +2084,10 @@ fn remove_wrapped_call_swizzle(expr: &str, name: &str) -> String {
         } else {
             None
         };
-        let Some((suffix, remove_len)) = swizzle else {
+        let Some((_, remove_len)) = swizzle else {
             break;
         };
-        let inner = out[start + 1..end + 1].to_owned();
-        let replacement = if suffix == ".xyzw" { inner } else { inner };
+        let replacement = out[start + 1..end + 1].to_owned();
         out.replace_range(start..end + 1 + remove_len, &replacement);
     }
     out
@@ -2376,7 +2383,7 @@ fn maybe_emit_prerendered_frame(
             Value::Frame(frame) => Some(frame),
             _ => None,
         })
-        .last();
+        .next_back();
 
     let Some(frame) = frame else {
         return Ok(None);
@@ -3124,101 +3131,6 @@ fn parse_host_ffi_hash_manifest_entries(value: &str) -> Result<BTreeMap<String, 
     Ok(out)
 }
 
-fn render_host_ffi_stubs(host_ffi_symbols: &BTreeMap<String, HostFfiSignature>) -> String {
-    let mut out = String::new();
-    for (symbol, signature) in host_ffi_symbols {
-        if signature.abi == "libc" {
-            continue;
-        }
-        out.push('\n');
-        out.push_str(&render_host_ffi_stub(symbol, signature));
-    }
-    out
-}
-
-fn render_host_ffi_stub(symbol: &str, signature_info: &HostFfiSignature) -> String {
-    let arg_count = signature_info.arg_count();
-    let mut signature = String::new();
-    if arg_count == 0 {
-        signature.push_str("void");
-    } else {
-        for index in 0..arg_count {
-            if index > 0 {
-                signature.push_str(", ");
-            }
-            signature.push_str(&format!(
-                "{} arg{index}",
-                signature_info.arg_types[index].c_type()
-            ));
-        }
-    }
-
-    let body = if symbol.ends_with("color_bias") && arg_count >= 1 {
-        "    return host_color_bias(arg0);".to_owned()
-    } else if symbol.ends_with("speed_curve") && arg_count >= 1 {
-        "    return host_speed_curve(arg0);".to_owned()
-    } else if symbol.ends_with("radius_curve") && arg_count >= 1 {
-        "    return host_radius_curve(arg0);".to_owned()
-    } else if symbol.ends_with("mix_tick") && arg_count >= 2 {
-        "    return host_mix_tick(arg0, arg1);".to_owned()
-    } else if symbol == "host_network_connect_probe" && arg_count >= 3 {
-        "    if (arg0 <= 0 || arg1 <= 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2;"
-            .to_owned()
-    } else if symbol == "host_network_open_tcp_stream" && arg_count >= 2 {
-        "    if (arg0 <= 0 || arg1 < 0) return 0;\n    return arg0 + arg1 + 1;".to_owned()
-    } else if symbol == "host_network_open_tcp_listener" && arg_count >= 3 {
-        "    if (arg0 <= 0 || arg1 < 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2 + 1;"
-            .to_owned()
-    } else if symbol == "host_network_open_udp_datagram" && arg_count >= 2 {
-        "    if (arg0 <= 0 && arg1 <= 0) return 0;\n    return arg0 + arg1 + 1;".to_owned()
-    } else if symbol == "host_network_bind_udp_datagram" && arg_count >= 3 {
-        "    if (arg0 <= 0 || arg1 < 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2 + 1;"
-            .to_owned()
-    } else if symbol == "host_network_accept_owned" && arg_count >= 3 {
-        "    if (arg0 <= 0 || arg1 < 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2 + 1;"
-            .to_owned()
-    } else if symbol == "host_network_close_owned" && arg_count >= 1 {
-        "    return arg0 > 0 ? 1 : 0;".to_owned()
-    } else if symbol == "host_network_send_owned" && arg_count >= 3 {
-        "    if (arg0 <= 0 || arg1 <= 0 || arg2 <= 0) return 0;\n    return arg0 + arg1 + arg2;"
-            .to_owned()
-    } else if symbol == "host_network_recv_owned" && arg_count >= 3 {
-        "    if (arg0 <= 0 || arg1 <= 0 || arg2 <= 0) return 0;\n    return arg0 + arg1 + arg2;"
-            .to_owned()
-    } else if symbol == "host_network_recv_http_status_owned" && arg_count >= 3 {
-        "    if (arg0 <= 0 || arg1 <= 0 || arg2 <= 0) return 0;\n    return 200;".to_owned()
-    } else if symbol == "host_network_accept_probe" && arg_count >= 3 {
-        "    if (arg0 <= 0 || arg1 < 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2;"
-            .to_owned()
-    } else if symbol == "host_network_close" && arg_count >= 1 {
-        "    return arg0 > 0 ? 1 : 0;".to_owned()
-    } else if symbol == "host_network_send_probe" && arg_count >= 3 {
-        "    if (arg0 <= 0 || arg1 <= 0 || arg2 <= 0) return 0;\n    return arg0 + arg1 + arg2;"
-            .to_owned()
-    } else if symbol == "host_network_recv_probe" && arg_count >= 3 {
-        "    if (arg0 <= 0 || arg1 <= 0 || arg2 <= 0) return 0;\n    return arg0 + arg1 + arg2;"
-            .to_owned()
-    } else if arg_count == 0 {
-        "    return 0;".to_owned()
-    } else if arg_count == 1 {
-        "    return arg0;".to_owned()
-    } else {
-        let mut expr = String::new();
-        for index in 0..arg_count {
-            if index > 0 {
-                expr.push_str(" + ");
-            }
-            expr.push_str(&format!("arg{index}"));
-        }
-        format!("    return {expr};")
-    };
-
-    format!(
-        "{} {symbol}({signature}) {{\n{body}\n}}\n",
-        signature_info.return_type.c_type()
-    )
-}
-
 fn maybe_prepare_embedded_runtime_support(
     module: &YirModule,
     source: &str,
@@ -3262,20 +3174,36 @@ fn ensure_runtime_host_staticlib_built() -> Result<PathBuf, String> {
     ))
 }
 
-fn objc_host_source(
-    window_title: &str,
+struct ObjcHostSourceSpec<'a> {
+    window_title: &'a str,
     window_width: usize,
     window_height: usize,
     fabric_worker_core: Option<usize>,
-    fabric_table_id: Option<&str>,
-    fabric_host_resource: Option<&str>,
-    fabric_render_resource: Option<&str>,
-    fabric_boot_plan: &str,
+    fabric_table_id: Option<&'a str>,
+    fabric_host_resource: Option<&'a str>,
+    fabric_render_resource: Option<&'a str>,
+    fabric_boot_plan: &'a str,
     fabric_boot_plan_len: usize,
-    embedded_fallback_ppm_bytes: Option<&str>,
-    runtime_frame_support: Option<&RuntimeFrameSupport>,
-    host_ffi_stubs: &str,
-) -> String {
+    embedded_fallback_ppm_bytes: Option<&'a str>,
+    runtime_frame_support: Option<&'a RuntimeFrameSupport>,
+    host_ffi_stubs: &'a str,
+}
+
+fn objc_host_source(spec: ObjcHostSourceSpec<'_>) -> String {
+    let ObjcHostSourceSpec {
+        window_title,
+        window_width,
+        window_height,
+        fabric_worker_core,
+        fabric_table_id,
+        fabric_host_resource,
+        fabric_render_resource,
+        fabric_boot_plan,
+        fabric_boot_plan_len,
+        embedded_fallback_ppm_bytes,
+        runtime_frame_support,
+        host_ffi_stubs,
+    } = spec;
     let affinity_tag = fabric_worker_core
         .map(|core| core.saturating_add(1))
         .unwrap_or(0);
@@ -4120,8 +4048,7 @@ mod tests {
             &symbol_manifest,
             "host_i32_curve:fnv1a64:0000000000000000",
         )
-        .err()
-        .expect("mismatched host ffi hash should be rejected");
+        .expect_err("mismatched host ffi hash should be rejected");
 
         assert!(error.contains("host ffi manifest hash mismatch for `host_i32_curve`"));
         assert!(error.contains("fnv1a64:b0042e2b5ee2c2aa"));
@@ -4133,8 +4060,7 @@ mod tests {
             "host_i32_curve@nurs:i32(i32)",
             "host_i32_curve:fnv1a64:b0042e2b5ee2c2aa",
         )
-        .err()
-        .expect("manifest hash should bind the ABI as well as the signature");
+        .expect_err("manifest hash should bind the ABI as well as the signature");
 
         assert!(error.contains("host ffi manifest hash mismatch for `host_i32_curve`"));
     }
@@ -4373,8 +4299,7 @@ mod tests {
             "host_unregistered:fnv1a64:f8a191df2b6270f9",
             &registry_lines(&["c:ffi_symbol:host_i32_curve=i32(i32)"]),
         )
-        .err()
-        .expect("unregistered host ffi symbol should be rejected");
+        .expect_err("unregistered host ffi symbol should be rejected");
 
         assert!(error.contains("host ffi symbol `host_unregistered` ABI `c` is not registered"));
     }
@@ -4396,8 +4321,7 @@ mod tests {
         ));
 
         let error = collect_host_ffi_symbols(&module)
-            .err()
-            .expect("same host symbol with different return width should be rejected");
+            .expect_err("same host symbol with different return width should be rejected");
         assert!(error.contains("host ffi symbol `host_curve` is used with conflicting signatures"));
         assert!(error.contains("i64(i64)"));
         assert!(error.contains("i32(i64)"));

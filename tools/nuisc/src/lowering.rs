@@ -427,6 +427,9 @@ mod tests_direct_calls;
 #[path = "lowering/tests_doc_contracts.rs"]
 mod tests_doc_contracts;
 #[cfg(test)]
+#[path = "lowering/tests_guard_return_survivor.rs"]
+mod tests_guard_return_survivor;
+#[cfg(test)]
 #[path = "lowering/tests_higher_order_direct_calls.rs"]
 mod tests_higher_order_direct_calls;
 #[cfg(test)]

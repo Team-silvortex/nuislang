@@ -7,7 +7,7 @@ use nuis_semantics::model::{
 use super::super::{infer_ast_expr_type, FunctionSignature};
 use super::blocks_expected::contains_unresolved_struct_placeholder;
 use super::blocks_stmt::rewrite_generic_calls_in_stmt;
-use super::exprs::rewrite_generic_calls_in_expr;
+use super::exprs::{rewrite_generic_calls_in_expr, GenericExprRewriteInput};
 use super::hoists::hoist_direct_result_wrapper_args;
 use super::GenericImplMethodTemplate;
 
@@ -106,14 +106,16 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
                 specialized_functions,
                 specialized_signatures,
             )?;
-            let rewritten_value = rewrite_generic_calls_in_expr(
-                &AstExpr::Call {
-                    callee: callee.clone(),
-                    generic_args: generic_args.clone(),
-                    args: rewritten_args,
-                },
-                &format!("{context} local `{name}`"),
-                ty.as_ref().or(let_fallback_expected),
+            let rewritten_call_expr = AstExpr::Call {
+                callee: callee.clone(),
+                generic_args: generic_args.clone(),
+                args: rewritten_args,
+            };
+            let rewritten_context = format!("{context} local `{name}`");
+            let rewritten_value = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: &rewritten_call_expr,
+                context: &rewritten_context,
+                expected: ty.as_ref().or(let_fallback_expected),
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -127,7 +129,7 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            })?;
             let mut inferred = ty
                 .clone()
                 .or_else(|| {
@@ -184,14 +186,15 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
                 specialized_functions,
                 specialized_signatures,
             )?;
-            let rewritten_value = rewrite_generic_calls_in_expr(
-                &AstExpr::Call {
-                    callee: callee.clone(),
-                    generic_args: generic_args.clone(),
-                    args: rewritten_args,
-                },
+            let rewritten_call_expr = AstExpr::Call {
+                callee: callee.clone(),
+                generic_args: generic_args.clone(),
+                args: rewritten_args,
+            };
+            let rewritten_value = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: &rewritten_call_expr,
                 context,
-                current_return_type,
+                expected: current_return_type,
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -205,7 +208,7 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            })?;
             hoisted.push(AstStmt::Return(Some(rewritten_value)));
             Ok(hoisted)
         }

@@ -6,8 +6,10 @@ use nuis_semantics::model::{
 
 use super::super::generics::infer_alias_aware_ast_expr_type;
 use super::super::{lower_type_ref, resolve_ast_type_ref_aliases, FunctionSignature};
-use super::exprs_aliases::method_call_receiver_expected_type;
-pub(super) use super::exprs_expected::call_arg_expected_type;
+use super::exprs_aliases::{
+    method_call_receiver_expected_type, MethodCallReceiverExpectedTypeInput,
+};
+pub(super) use super::exprs_expected::{call_arg_expected_type, CallArgExpectedTypeInput};
 use super::exprs_operators::{
     builtin_binary_supported_ast, builtin_unary_supported_ast, overloaded_binary_trait,
     overloaded_unary_trait,
@@ -18,24 +20,46 @@ use super::exprs_specialization::{
 };
 use super::GenericImplMethodTemplate;
 
+pub(super) struct GenericExprRewriteInput<'a> {
+    pub(super) expr: &'a AstExpr,
+    pub(super) context: &'a str,
+    pub(super) expected: Option<&'a AstTypeRef>,
+    pub(super) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) generic_impl_method_templates: &'a [GenericImplMethodTemplate],
+    pub(super) higher_order_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) specialization_cache: &'a mut BTreeSet<String>,
+    pub(super) specialized_functions: &'a mut Vec<AstFunction>,
+    pub(super) specialized_signatures: &'a mut Vec<(String, FunctionSignature)>,
+}
+
 pub(super) fn rewrite_generic_calls_in_expr(
-    expr: &AstExpr,
-    context: &str,
-    expected: Option<&AstTypeRef>,
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    generic_impl_method_templates: &[GenericImplMethodTemplate],
-    higher_order_templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    specialization_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
-    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+    input: GenericExprRewriteInput<'_>,
 ) -> Result<AstExpr, String> {
+    let GenericExprRewriteInput {
+        expr,
+        context,
+        expected,
+        env,
+        visible_type_aliases,
+        generic_templates,
+        generic_impl_method_templates,
+        higher_order_templates,
+        function_table,
+        signatures,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    } = input;
     Ok(match expr {
         AstExpr::If {
             condition,
@@ -45,10 +69,10 @@ pub(super) fn rewrite_generic_calls_in_expr(
             let mut then_env = env.clone();
             let mut else_env = env.clone();
             AstExpr::If {
-                condition: Box::new(rewrite_generic_calls_in_expr(
-                    condition,
+                condition: Box::new(rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                    expr: condition,
                     context,
-                    Some(&super::super::ast_named_type("bool")),
+                    expected: Some(&super::super::ast_named_type("bool")),
                     env,
                     visible_type_aliases,
                     generic_templates,
@@ -62,7 +86,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                     specialization_cache,
                     specialized_functions,
                     specialized_signatures,
-                )?),
+                })?),
                 then_body: super::blocks::rewrite_generic_calls_in_block(
                     then_body,
                     &format!("{context} if-then"),
@@ -102,10 +126,10 @@ pub(super) fn rewrite_generic_calls_in_expr(
             }
         }
         AstExpr::Match { value, arms } => {
-            let rewritten_value = rewrite_generic_calls_in_expr(
-                value,
+            let rewritten_value = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: value,
                 context,
-                None,
+                expected: None,
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -119,7 +143,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            })?;
             let scrutinee_type = infer_alias_aware_ast_expr_type(
                 &rewritten_value,
                 env,
@@ -152,26 +176,8 @@ pub(super) fn rewrite_generic_calls_in_expr(
             }
         }
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_generic_calls_in_expr(
-            value,
-            context,
-            expected,
-            env,
-            visible_type_aliases,
-            generic_templates,
-            generic_impl_method_templates,
-            higher_order_templates,
-            function_table,
-            signatures,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-            specialization_cache,
-            specialized_functions,
-            specialized_signatures,
-        )?)),
-        AstExpr::Unary { op, operand } => {
-            let rewritten_operand = rewrite_generic_calls_in_expr(
-                operand,
+            GenericExprRewriteInput {
+                expr: value,
                 context,
                 expected,
                 env,
@@ -187,7 +193,27 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            },
+        )?)),
+        AstExpr::Unary { op, operand } => {
+            let rewritten_operand = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: operand,
+                context,
+                expected,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                generic_impl_method_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            })?;
             if let Some((trait_name, method_name)) = overloaded_unary_trait(*op) {
                 if let Some(operand_ty) = infer_alias_aware_ast_expr_type(
                     &rewritten_operand,
@@ -273,10 +299,10 @@ pub(super) fn rewrite_generic_calls_in_expr(
             let rewritten_args = args
                 .iter()
                 .map(|arg| {
-                    rewrite_generic_calls_in_expr(
-                        arg,
+                    rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                        expr: arg,
                         context,
-                        None,
+                        expected: None,
                         env,
                         visible_type_aliases,
                         generic_templates,
@@ -290,24 +316,25 @@ pub(super) fn rewrite_generic_calls_in_expr(
                         specialization_cache,
                         specialized_functions,
                         specialized_signatures,
-                    )
+                    })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            let receiver_expected = method_call_receiver_expected_type(
-                receiver,
-                method,
-                generic_args,
-                &rewritten_args,
-                env,
-                visible_type_aliases,
-                impl_lookup,
-                struct_table,
-                function_return_types,
-            );
-            let rewritten_receiver = rewrite_generic_calls_in_expr(
-                receiver,
+            let receiver_expected =
+                method_call_receiver_expected_type(MethodCallReceiverExpectedTypeInput {
+                    receiver,
+                    method,
+                    generic_args,
+                    args: &rewritten_args,
+                    env,
+                    visible_type_aliases,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                });
+            let rewritten_receiver = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: receiver,
                 context,
-                receiver_expected.as_ref(),
+                expected: receiver_expected.as_ref(),
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -321,7 +348,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            })?;
             let rewritten_receiver =
                 super::super::receiver_expected::specialize_receiver_constructor_from_expected(
                     &rewritten_receiver,
@@ -439,10 +466,10 @@ pub(super) fn rewrite_generic_calls_in_expr(
             )?
         }
         AstExpr::Binary { op, lhs, rhs } => {
-            let rewritten_lhs = rewrite_generic_calls_in_expr(
-                lhs,
+            let rewritten_lhs = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: lhs,
                 context,
-                None,
+                expected: None,
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -456,11 +483,11 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
-            let rewritten_rhs = rewrite_generic_calls_in_expr(
-                rhs,
+            })?;
+            let rewritten_rhs = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: rhs,
                 context,
-                None,
+                expected: None,
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -474,7 +501,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            })?;
             if let Some((trait_name, method_name)) = overloaded_binary_trait(*op) {
                 let lhs_ty = infer_alias_aware_ast_expr_type(
                     &rewritten_lhs,

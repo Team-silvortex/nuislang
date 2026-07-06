@@ -6,28 +6,47 @@ use nuis_semantics::model::{
 };
 
 use super::lambda_expansion_expr::rewrite_lambda_expr;
-use super::lambda_expansion_synth::synthesize_lambda_function;
+use super::lambda_expansion_synth::{synthesize_lambda_function, LambdaSynthesisInput};
 use super::lambda_expansion_types::{
     callable_binding_return_type, callable_type_from_function, callable_type_from_signature,
     callable_type_matches_signature, extend_local_field_bindings_from_expr,
     extend_local_field_bindings_from_type, infer_local_binding_type, LambdaBinding,
 };
 
+pub(super) struct ExpandLambdaBlockInput<'a> {
+    pub(super) body: &'a [AstStmt],
+    pub(super) current_return_type: Option<&'a AstTypeRef>,
+    pub(super) inherited_generic_params: &'a [AstGenericParam],
+    pub(super) lambda_aliases: &'a BTreeMap<String, LambdaBinding>,
+    pub(super) visible_locals: &'a BTreeSet<String>,
+    pub(super) visible_local_types: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) module_impls: &'a [AstImplDef],
+    pub(super) visible_structs: &'a BTreeMap<String, AstStructDef>,
+    pub(super) module_const_names: &'a BTreeSet<String>,
+    pub(super) module_function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) owning_function_name: &'a str,
+    pub(super) counter: &'a mut usize,
+    pub(super) synthesized: &'a mut Vec<AstFunction>,
+}
+
 pub(super) fn expand_lambda_block(
-    body: &[AstStmt],
-    current_return_type: Option<&AstTypeRef>,
-    inherited_generic_params: &[AstGenericParam],
-    lambda_aliases: &BTreeMap<String, LambdaBinding>,
-    visible_locals: &BTreeSet<String>,
-    visible_local_types: &BTreeMap<String, AstTypeRef>,
-    module_impls: &[AstImplDef],
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    module_const_names: &BTreeSet<String>,
-    module_function_table: &BTreeMap<String, AstFunction>,
-    owning_function_name: &str,
-    counter: &mut usize,
-    synthesized: &mut Vec<AstFunction>,
+    input: ExpandLambdaBlockInput<'_>,
 ) -> Result<Vec<AstStmt>, String> {
+    let ExpandLambdaBlockInput {
+        body,
+        current_return_type,
+        inherited_generic_params,
+        lambda_aliases,
+        visible_locals,
+        visible_local_types,
+        module_impls,
+        visible_structs,
+        module_const_names,
+        module_function_table,
+        owning_function_name,
+        counter,
+        synthesized,
+    } = input;
     let mut aliases = lambda_aliases.clone();
     let mut locals = visible_locals.clone();
     let mut local_types = visible_local_types.clone();
@@ -47,14 +66,14 @@ pub(super) fn expand_lambda_block(
             } => {
                 let effective_return_type =
                     callable_binding_return_type(name, params, ty.as_ref(), return_type)?;
-                let binding = synthesize_lambda_function(
+                let binding = synthesize_lambda_function(LambdaSynthesisInput {
                     params,
-                    &effective_return_type,
+                    return_type: &effective_return_type,
                     body,
                     inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
+                    lambda_aliases: &aliases,
+                    outer_locals: &locals,
+                    outer_local_types: &local_types,
                     module_impls,
                     visible_structs,
                     module_const_names,
@@ -62,7 +81,7 @@ pub(super) fn expand_lambda_block(
                     owning_function_name,
                     counter,
                     synthesized,
-                )
+                })
                 .map_err(|error| {
                     if error == "inline lambda currently requires an explicit return type" {
                         format!(
@@ -351,13 +370,13 @@ pub(super) fn expand_lambda_block(
                     counter,
                     synthesized,
                 )?,
-                then_body: expand_lambda_block(
-                    then_body,
+                then_body: expand_lambda_block(ExpandLambdaBlockInput {
+                    body: then_body,
                     current_return_type,
                     inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
+                    lambda_aliases: &aliases,
+                    visible_locals: &locals,
+                    visible_local_types: &local_types,
                     module_impls,
                     visible_structs,
                     module_const_names,
@@ -365,14 +384,14 @@ pub(super) fn expand_lambda_block(
                     owning_function_name,
                     counter,
                     synthesized,
-                )?,
-                else_body: expand_lambda_block(
-                    else_body,
+                })?,
+                else_body: expand_lambda_block(ExpandLambdaBlockInput {
+                    body: else_body,
                     current_return_type,
                     inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
+                    lambda_aliases: &aliases,
+                    visible_locals: &locals,
+                    visible_local_types: &local_types,
                     module_impls,
                     visible_structs,
                     module_const_names,
@@ -380,7 +399,7 @@ pub(super) fn expand_lambda_block(
                     owning_function_name,
                     counter,
                     synthesized,
-                )?,
+                })?,
             }),
             AstStmt::Match { value, arms } => rewritten.push(AstStmt::Match {
                 value: rewrite_lambda_expr(
@@ -422,13 +441,13 @@ pub(super) fn expand_lambda_block(
                                     )
                                 })
                                 .transpose()?,
-                            body: expand_lambda_block(
-                                &arm.body,
+                            body: expand_lambda_block(ExpandLambdaBlockInput {
+                                body: &arm.body,
                                 current_return_type,
                                 inherited_generic_params,
-                                &aliases,
-                                &locals,
-                                &local_types,
+                                lambda_aliases: &aliases,
+                                visible_locals: &locals,
+                                visible_local_types: &local_types,
                                 module_impls,
                                 visible_structs,
                                 module_const_names,
@@ -436,7 +455,7 @@ pub(super) fn expand_lambda_block(
                                 owning_function_name,
                                 counter,
                                 synthesized,
-                            )?,
+                            })?,
                         })
                     })
                     .collect::<Result<Vec<_>, String>>()?,
@@ -456,13 +475,13 @@ pub(super) fn expand_lambda_block(
                     counter,
                     synthesized,
                 )?,
-                body: expand_lambda_block(
+                body: expand_lambda_block(ExpandLambdaBlockInput {
                     body,
                     current_return_type,
                     inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
+                    lambda_aliases: &aliases,
+                    visible_locals: &locals,
+                    visible_local_types: &local_types,
                     module_impls,
                     visible_structs,
                     module_const_names,
@@ -470,7 +489,7 @@ pub(super) fn expand_lambda_block(
                     owning_function_name,
                     counter,
                     synthesized,
-                )?,
+                })?,
             }),
             AstStmt::Expr(expr) => rewritten.push(AstStmt::Expr(rewrite_lambda_expr(
                 expr,

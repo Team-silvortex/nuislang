@@ -13,24 +13,24 @@ pub fn compute_compile_cache_key_with_plan(
     plan: Option<&ProjectCompilationPlan>,
 ) -> Result<CompileCacheKey, String> {
     let root = cache_root(input, project);
-    let mut records = Vec::<CacheFingerprintRecord<'_>>::new();
-
-    records.push(CacheFingerprintRecord::inline_bytes(
-        "toolchain.nuisc.version",
-        env!("CARGO_PKG_VERSION").as_bytes().to_vec(),
-    ));
-    records.push(CacheFingerprintRecord::inline_bytes(
-        "toolchain.nuisc.cache_epoch",
-        COMPILE_CACHE_EPOCH.as_bytes().to_vec(),
-    ));
-    records.push(CacheFingerprintRecord::inline_bytes(
-        "toolchain.engine.version",
-        crate::engine::default_engine().version.as_bytes().to_vec(),
-    ));
-    records.push(CacheFingerprintRecord::inline_bytes(
-        "toolchain.engine.profile",
-        crate::engine::default_engine().profile.as_bytes().to_vec(),
-    ));
+    let mut records = vec![
+        CacheFingerprintRecord::inline_bytes(
+            "toolchain.nuisc.version",
+            env!("CARGO_PKG_VERSION").as_bytes().to_vec(),
+        ),
+        CacheFingerprintRecord::inline_bytes(
+            "toolchain.nuisc.cache_epoch",
+            COMPILE_CACHE_EPOCH.as_bytes().to_vec(),
+        ),
+        CacheFingerprintRecord::inline_bytes(
+            "toolchain.engine.version",
+            crate::engine::default_engine().version.as_bytes().to_vec(),
+        ),
+        CacheFingerprintRecord::inline_bytes(
+            "toolchain.engine.profile",
+            crate::engine::default_engine().profile.as_bytes().to_vec(),
+        ),
+    ];
 
     if let Some(project) = project {
         if let Some(plan) = plan {

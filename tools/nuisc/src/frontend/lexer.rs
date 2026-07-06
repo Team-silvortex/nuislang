@@ -185,7 +185,7 @@ fn next_non_whitespace_char(chars: &std::iter::Peekable<std::str::Chars<'_>>) ->
 }
 
 fn skip_line_comment(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) {
-    while let Some(ch) = chars.next() {
+    for ch in chars.by_ref() {
         if ch == '\n' {
             break;
         }
@@ -194,7 +194,7 @@ fn skip_line_comment(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) {
 
 fn consume_doc_comment(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {
     let mut text = String::new();
-    while let Some(ch) = chars.next() {
+    for ch in chars.by_ref() {
         if ch == '\n' {
             break;
         }

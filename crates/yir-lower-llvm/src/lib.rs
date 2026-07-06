@@ -1,3 +1,12 @@
+#![allow(
+    clippy::if_same_then_else,
+    clippy::needless_borrow,
+    clippy::ptr_arg,
+    clippy::too_many_arguments,
+    clippy::type_complexity,
+    clippy::useless_format
+)]
+
 use std::collections::BTreeMap;
 
 use yir_core::{CpuLlvmLoweringClass, EdgeKind, Node, Resource, YirModule};
@@ -10995,7 +11004,16 @@ declare void @nuis_debug_print_f64(double)\n\n\
 declare i64 @host_color_bias(i64)\n\
 declare i64 @host_speed_curve(i64)\n\
 declare i64 @host_radius_curve(i64)\n\
-declare i64 @host_mix_tick(i64, i64)\n\n\
+declare i64 @host_mix_tick(i64, i64)\n\
+declare i64 @host_text_handle(i64)\n\n\
+declare i64 @host_argv_count()\n\
+declare i64 @host_argv_at(i64)\n\
+declare i64 @host_file_open(i64, i64)\n\
+declare i64 @host_file_read(i64, i64, i64)\n\
+declare i64 @host_file_write(i64, i64)\n\
+declare i64 @host_file_close(i64)\n\
+declare i64 @host_serialize_i64_into(i64, i64, i64)\n\
+declare i64 @host_deserialize_text_from(i64, i64, i64)\n\n\
 declare i64 @HostRenderCurves__color_bias(i64)\n\
 declare i64 @HostRenderCurves__speed_curve(i64)\n\
 declare i64 @HostRenderCurves__radius_curve(i64)\n\
@@ -11589,6 +11607,15 @@ fn is_builtin_host_ffi_symbol(symbol: &str) -> bool {
             | "HostRenderCurves__radius_curve"
             | "HostRenderCurves__mix_tick"
             | "HostMath__speed_curve"
+            | "host_argv_count"
+            | "host_argv_at"
+            | "host_file_open"
+            | "host_file_read"
+            | "host_file_write"
+            | "host_file_close"
+            | "host_text_handle"
+            | "host_serialize_i64_into"
+            | "host_deserialize_text_from"
     )
 }
 

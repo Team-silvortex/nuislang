@@ -175,21 +175,26 @@ pub(crate) fn append_relocated_domain_lowering_plan_index_manifest_section(
     out.push('\n');
 }
 
+pub(crate) struct BuildManifestDomainIndexSections<'a> {
+    pub(crate) bridge_registry_path: Option<&'a Path>,
+    pub(crate) bridge_registry_inline: Option<&'a str>,
+    pub(crate) host_bridge_plan_index_path: Option<&'a Path>,
+    pub(crate) host_bridge_plan_index_inline: Option<&'a str>,
+    pub(crate) lowering_plan_index_path: Option<&'a Path>,
+    pub(crate) lowering_plan_index_inline: Option<&'a str>,
+    pub(crate) units: &'a [BuildManifestDomainBuildUnit],
+}
+
 pub(crate) fn append_build_manifest_domain_index_sections(
     out: &mut String,
-    bridge_registry_path: Option<&Path>,
-    bridge_registry_inline: Option<&str>,
-    host_bridge_plan_index_path: Option<&Path>,
-    host_bridge_plan_index_inline: Option<&str>,
-    lowering_plan_index_path: Option<&Path>,
-    lowering_plan_index_inline: Option<&str>,
-    units: &[BuildManifestDomainBuildUnit],
+    sections: BuildManifestDomainIndexSections<'_>,
 ) {
+    let units = sections.units;
     let hetero_unit_count = units
         .iter()
         .filter(|unit| unit.domain_family != "cpu")
         .count();
-    if let Some(bridge_registry_path) = bridge_registry_path {
+    if let Some(bridge_registry_path) = sections.bridge_registry_path {
         out.push('\n');
         out.push_str("[bridge_registry]\n");
         out.push_str(&format!(
@@ -198,14 +203,14 @@ pub(crate) fn append_build_manifest_domain_index_sections(
         ));
         out.push_str("bridge_registry_schema = \"nuis-bridge-registry-v1\"\n");
         out.push_str(&format!("bridge_registry_units = {hetero_unit_count}\n"));
-        if let Some(source) = bridge_registry_inline {
+        if let Some(source) = sections.bridge_registry_inline {
             out.push_str(&format!(
                 "bridge_registry_inline = \"{}\"\n",
                 escape_toml_string(source)
             ));
         }
     }
-    if let Some(host_bridge_plan_index_path) = host_bridge_plan_index_path {
+    if let Some(host_bridge_plan_index_path) = sections.host_bridge_plan_index_path {
         out.push('\n');
         out.push_str("[host_bridge_plan_index]\n");
         out.push_str(&format!(
@@ -214,14 +219,14 @@ pub(crate) fn append_build_manifest_domain_index_sections(
         ));
         out.push_str("host_bridge_plan_index_schema = \"nuis-host-bridge-plan-index-v1\"\n");
         out.push_str(&format!("host_bridge_plan_units = {hetero_unit_count}\n"));
-        if let Some(source) = host_bridge_plan_index_inline {
+        if let Some(source) = sections.host_bridge_plan_index_inline {
             out.push_str(&format!(
                 "host_bridge_plan_index_inline = \"{}\"\n",
                 escape_toml_string(source)
             ));
         }
     }
-    if let Some(lowering_plan_index_path) = lowering_plan_index_path {
+    if let Some(lowering_plan_index_path) = sections.lowering_plan_index_path {
         out.push('\n');
         out.push_str("[domain_lowering_plan_index]\n");
         out.push_str(&format!(
@@ -230,7 +235,7 @@ pub(crate) fn append_build_manifest_domain_index_sections(
         ));
         out.push_str("lowering_plan_index_schema = \"nuis-domain-lowering-plan-index-v1\"\n");
         out.push_str(&format!("lowering_plan_units = {hetero_unit_count}\n"));
-        if let Some(source) = lowering_plan_index_inline {
+        if let Some(source) = sections.lowering_plan_index_inline {
             out.push_str(&format!(
                 "lowering_plan_index_inline = \"{}\"\n",
                 escape_toml_string(source)

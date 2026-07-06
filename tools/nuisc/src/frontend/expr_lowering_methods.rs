@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::AstTypeRef;
 
 use crate::frontend::call_helpers::{
-    ensure_call_arg_matches_param, lower_extern_call_arg_for_param,
+    ensure_call_arg_matches_param, lower_extern_call_arg_for_param, CallArgParamCheck,
 };
 use crate::frontend::metadata::ModuleConstValue;
 use crate::frontend::{
@@ -64,16 +64,16 @@ pub(super) fn lower_method_call_with_async(
             for (index, (arg, expected_param)) in
                 lowered_args.iter().zip(signature.params.iter()).enumerate()
             {
-                ensure_call_arg_matches_param(
-                    &signature_key,
-                    index,
+                ensure_call_arg_matches_param(CallArgParamCheck {
+                    callee: &signature_key,
+                    arg_index: index,
                     arg,
                     expected_param,
                     bindings,
                     signatures,
                     struct_table,
-                    signature.is_extern,
-                )?;
+                    is_extern: signature.is_extern,
+                })?;
             }
             if signature.is_extern {
                 if current_domain != "cpu" {

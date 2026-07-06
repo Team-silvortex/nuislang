@@ -4,6 +4,13 @@ use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 
 use super::super::{lower_expr, named_type, FunctionSignature, ModuleConstValue};
 
+struct NovaRenderStateEnv<'a> {
+    current_domain: &'a str,
+    bindings: &'a BTreeMap<String, NirTypeRef>,
+    signatures: &'a BTreeMap<String, FunctionSignature>,
+    struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_nova_render_state_builtin_call(
     callee: &str,
@@ -15,6 +22,12 @@ pub(super) fn lower_nova_render_state_builtin_call(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<Option<NirExpr>, String> {
+    let env = NovaRenderStateEnv {
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+    };
     let expr = match callee {
         "nova_theme_state" => build_four_field_state(
             args,
@@ -22,10 +35,7 @@ pub(super) fn lower_nova_render_state_builtin_call(
             "NovaThemePacket",
             "NovaThemeState",
             ["accent", "surface", "panel_mode", "contrast"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_surface_state" => build_four_field_state(
             args,
@@ -33,10 +43,7 @@ pub(super) fn lower_nova_render_state_builtin_call(
             "NovaSurfacePacket",
             "NovaSurfaceState",
             ["density", "elevation", "grid", "sheen"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_viewport_state" => build_four_field_state(
             args,
@@ -44,10 +51,7 @@ pub(super) fn lower_nova_render_state_builtin_call(
             "NovaViewportPacket",
             "NovaViewportState",
             ["origin_x", "origin_y", "width", "height"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_layer_state" => build_four_field_state(
             args,
@@ -55,10 +59,7 @@ pub(super) fn lower_nova_render_state_builtin_call(
             "NovaLayerPacket",
             "NovaLayerState",
             ["order", "blend", "visibility", "clip"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_scene_state" => build_four_field_state(
             args,
@@ -71,10 +72,7 @@ pub(super) fn lower_nova_render_state_builtin_call(
                 "light_count",
                 "animation_phase",
             ],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_camera_state" => build_four_field_state(
             args,
@@ -82,10 +80,7 @@ pub(super) fn lower_nova_render_state_builtin_call(
             "NovaCameraPacket",
             "NovaCameraState",
             ["kind", "focus", "zoom", "orbit"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_material_state" => build_four_field_state(
             args,
@@ -93,10 +88,7 @@ pub(super) fn lower_nova_render_state_builtin_call(
             "NovaMaterialPacket",
             "NovaMaterialState",
             ["shader_kind", "albedo", "roughness", "emissive"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_light_state" => build_four_field_state(
             args,
@@ -104,10 +96,7 @@ pub(super) fn lower_nova_render_state_builtin_call(
             "NovaLightPacket",
             "NovaLightState",
             ["kind", "intensity", "range", "reactive"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         "nova_mesh_state" => build_four_field_state(
             args,
@@ -115,10 +104,7 @@ pub(super) fn lower_nova_render_state_builtin_call(
             "NovaMeshPacket",
             "NovaMeshState",
             ["primitive", "vertex_count", "index_count", "skinning"],
-            current_domain,
-            bindings,
-            signatures,
-            struct_table,
+            &env,
         )?,
         _ => return Ok(None),
     };
@@ -131,20 +117,17 @@ fn build_four_field_state(
     packet_type: &str,
     state_type: &str,
     fields: [&str; 4],
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    env: &NovaRenderStateEnv<'_>,
 ) -> Result<NirExpr, String> {
     let [packet] = args else {
         return Err(arg_error.to_owned());
     };
     let packet = lower_expr(
         packet,
-        current_domain,
-        bindings,
-        signatures,
-        struct_table,
+        env.current_domain,
+        env.bindings,
+        env.signatures,
+        env.struct_table,
         Some(&named_type(packet_type)),
     )?;
     Ok(NirExpr::StructLiteral {

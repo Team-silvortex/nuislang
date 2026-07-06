@@ -12,16 +12,28 @@ use super::exprs_alias_expected::{
     contains_ast_placeholder_generic_name, infer_alias_struct_target_from_expected,
 };
 
-pub(super) fn call_arg_expected_type(
-    callee: &str,
-    generic_args: &[AstTypeRef],
-    index: usize,
-    expected: Option<&AstTypeRef>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-) -> Option<AstTypeRef> {
+pub(super) struct CallArgExpectedTypeInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) generic_args: &'a [AstTypeRef],
+    pub(super) index: usize,
+    pub(super) expected: Option<&'a AstTypeRef>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+}
+
+pub(super) fn call_arg_expected_type(input: CallArgExpectedTypeInput<'_>) -> Option<AstTypeRef> {
+    let CallArgExpectedTypeInput {
+        callee,
+        generic_args,
+        index,
+        expected,
+        generic_templates,
+        signatures,
+        visible_type_aliases,
+        struct_table,
+    } = input;
     if let Some(from_explicit_generics) = generic_template_arg_expected_type_from_explicit_args(
         callee,
         generic_args,

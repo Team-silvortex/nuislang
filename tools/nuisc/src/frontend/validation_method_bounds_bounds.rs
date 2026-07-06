@@ -274,8 +274,8 @@ pub(super) fn validate_explicit_trait_call_bound(
                 .is_some_and(|methods| methods.contains(method))
         {
             return Err(format!(
-                "{context} calls trait method `{trait_name}.{method}`, but trait `{trait_name}` does not define method `{method}`; did you mean `{}`?",
-                format!("{}.{}", variants[0], method)
+                "{context} calls trait method `{trait_name}.{method}`, but trait `{trait_name}` does not define method `{method}`; did you mean `{}.{method}`?",
+                variants[0]
             ));
         }
         return Err(format!(
@@ -432,10 +432,12 @@ fn resolve_generic_receiver_context(
     }
 
     let resolved = resolve_ast_type_ref_aliases(ty, visible_type_aliases)?;
-    if resolved.generic_args.is_empty() && !resolved.is_optional && !resolved.is_ref {
-        if generic_param_names.contains(&resolved.name) {
-            return Ok(Some((resolved.name.clone(), String::new())));
-        }
+    if resolved.generic_args.is_empty()
+        && !resolved.is_optional
+        && !resolved.is_ref
+        && generic_param_names.contains(&resolved.name)
+    {
+        return Ok(Some((resolved.name.clone(), String::new())));
     }
     Ok(None)
 }

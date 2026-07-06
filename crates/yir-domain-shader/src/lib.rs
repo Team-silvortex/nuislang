@@ -813,7 +813,7 @@ impl RegisteredMod for ShaderMod {
                     "vertex_binding" => "vertex_buffer",
                     _ => "index_buffer",
                 };
-                match (&*expected, &value) {
+                match (expected, &value) {
                     ("texture", Value::Texture(_)) | ("sampler", Value::Sampler(_)) => {}
                     ("vertex_layout", Value::VertexLayout(_)) => {}
                     ("vertex_buffer", Value::VertexBuffer(_))
@@ -1491,12 +1491,7 @@ fn draw_control_panel_surface(
         panel_top,
         panel_right,
         panel_bottom,
-        '/',
-        '\\',
-        '\\',
-        '/',
-        '-',
-        '|',
+        BoxGlyphs::new('/', '\\', '\\', '/', '-', '|'),
     );
     fill_rect(
         &mut rows,
@@ -2293,12 +2288,7 @@ fn draw_control_panel_surface(
         button_top,
         button_right,
         button_bottom,
-        '[',
-        ']',
-        ']',
-        '[',
-        '=',
-        '|',
+        BoxGlyphs::new('[', ']', ']', '[', '=', '|'),
     );
     fill_rect(
         &mut rows,
@@ -2362,12 +2352,7 @@ fn draw_control_panel_surface(
         text_top,
         text_right,
         text_bottom,
-        '[',
-        ']',
-        ']',
-        '[',
-        '-',
-        '|',
+        BoxGlyphs::new('[', ']', ']', '[', '-', '|'),
     );
     let text_value = format!("nova-{:03}", packet.text_echo.abs() % 1000);
     put_text(&mut rows, text_left + 2, text_top + 1, &text_value);
@@ -2506,12 +2491,7 @@ fn draw_control_panel_surface(
         textarea_top,
         textarea_right,
         textarea_bottom,
-        '[',
-        ']',
-        ']',
-        '[',
-        '-',
-        '|',
+        BoxGlyphs::new('[', ']', ']', '[', '-', '|'),
     );
     put_text(&mut rows, textarea_left + 2, textarea_top, "notes");
     let visible_lines = packet.textarea_lines.clamp(2, 3) as usize;
@@ -2910,16 +2890,17 @@ fn draw_slider(
     }
     rows[y][left] = '[';
     rows[y][right] = ']';
-    for x in (left + 1)..right {
-        rows[y][x] = '-';
+    let row = &mut rows[y];
+    for cell in row.iter_mut().take(right).skip(left + 1) {
+        *cell = '-';
     }
     let inner = right.saturating_sub(left + 1).max(1);
     let fill = (value.min(127) * inner) / 127;
-    for x in 0..fill.min(inner) {
-        rows[y][left + 1 + x] = '=';
+    for cell in row.iter_mut().skip(left + 1).take(fill.min(inner)) {
+        *cell = '=';
     }
     let knob_x = left + 1 + fill.min(inner.saturating_sub(1));
-    rows[y][knob_x] = accent;
+    row[knob_x] = accent;
 }
 
 fn draw_knob(
@@ -2992,7 +2973,12 @@ fn draw_card(
         return;
     }
     draw_box(
-        rows, left, top, right, bottom, '.', '.', '\'', '\'', '-', '|',
+        rows,
+        left,
+        top,
+        right,
+        bottom,
+        BoxGlyphs::new('.', '.', '\'', '\'', '-', '|'),
     );
     fill_rect(
         rows,
@@ -3010,45 +2996,63 @@ fn draw_card(
     }
 }
 
-fn draw_box(
-    rows: &mut [Vec<char>],
-    left: usize,
-    top: usize,
-    right: usize,
-    bottom: usize,
+#[derive(Clone, Copy)]
+struct BoxGlyphs {
     tl: char,
     tr: char,
     br: char,
     bl: char,
     horizontal: char,
     vertical: char,
+}
+
+impl BoxGlyphs {
+    fn new(tl: char, tr: char, br: char, bl: char, horizontal: char, vertical: char) -> Self {
+        Self {
+            tl,
+            tr,
+            br,
+            bl,
+            horizontal,
+            vertical,
+        }
+    }
+}
+
+fn draw_box(
+    rows: &mut [Vec<char>],
+    left: usize,
+    top: usize,
+    right: usize,
+    bottom: usize,
+    glyphs: BoxGlyphs,
 ) {
     if rows.is_empty() || top >= rows.len() || bottom >= rows.len() || left >= right {
         return;
     }
     for x in left..=right.min(rows[top].len().saturating_sub(1)) {
-        rows[top][x] = horizontal;
-        rows[bottom][x] = horizontal;
+        rows[top][x] = glyphs.horizontal;
+        rows[bottom][x] = glyphs.horizontal;
     }
-    for y in top..=bottom {
-        if left < rows[y].len() {
-            rows[y][left] = vertical;
+    for row in rows.iter_mut().take(bottom + 1).skip(top) {
+        if left < row.len() {
+            row[left] = glyphs.vertical;
         }
-        if right < rows[y].len() {
-            rows[y][right] = vertical;
+        if right < row.len() {
+            row[right] = glyphs.vertical;
         }
     }
     if left < rows[top].len() {
-        rows[top][left] = tl;
+        rows[top][left] = glyphs.tl;
     }
     if right < rows[top].len() {
-        rows[top][right] = tr;
+        rows[top][right] = glyphs.tr;
     }
     if right < rows[bottom].len() {
-        rows[bottom][right] = br;
+        rows[bottom][right] = glyphs.br;
     }
     if left < rows[bottom].len() {
-        rows[bottom][left] = bl;
+        rows[bottom][left] = glyphs.bl;
     }
 }
 
@@ -3172,7 +3176,12 @@ fn draw_scene_preview(
             let top_y = object_y.saturating_sub(radius).max(preview_top);
             let bottom_y = (object_y + radius).min(ground_y.saturating_sub(1));
             draw_box(
-                rows, left_x, top_y, right_x, bottom_y, glyph, glyph, glyph, glyph, glyph, glyph,
+                rows,
+                left_x,
+                top_y,
+                right_x,
+                bottom_y,
+                BoxGlyphs::new(glyph, glyph, glyph, glyph, glyph, glyph),
             );
             if left_x + 1 < right_x && top_y + 1 < bottom_y {
                 fill_rect(
@@ -6955,7 +6964,15 @@ fn draw_topology_edges(rows: &mut [Vec<char>], samples: &[(usize, usize, char)],
         "triangle_strip" => {
             for window in samples.windows(3) {
                 let [(ax, ay, _), (bx, by, _), (cx, cy, _)] = [window[0], window[1], window[2]];
-                stamp_triangle_fill(rows, ax, ay, bx, by, cx, cy, ',');
+                stamp_triangle_fill(
+                    rows,
+                    TrianglePoints {
+                        a: (ax, ay),
+                        b: (bx, by),
+                        c: (cx, cy),
+                    },
+                    ',',
+                );
             }
             for window in samples.windows(2) {
                 let [(ax, ay, _), (bx, by, _)] = [window[0], window[1]];
@@ -6972,7 +6989,15 @@ fn draw_topology_edges(rows: &mut [Vec<char>], samples: &[(usize, usize, char)],
                     let (ax, ay, _) = chunk[0];
                     let (bx, by, _) = chunk[1];
                     let (cx, cy, _) = chunk[2];
-                    stamp_triangle_fill(rows, ax, ay, bx, by, cx, cy, ',');
+                    stamp_triangle_fill(
+                        rows,
+                        TrianglePoints {
+                            a: (ax, ay),
+                            b: (bx, by),
+                            c: (cx, cy),
+                        },
+                        ',',
+                    );
                     stamp_line(rows, ax, ay, bx, by, '+');
                     stamp_line(rows, bx, by, cx, cy, '+');
                     stamp_line(rows, cx, cy, ax, ay, '+');
@@ -7149,20 +7174,21 @@ fn stamp_line(rows: &mut [Vec<char>], ax: usize, ay: usize, bx: usize, by: usize
     }
 }
 
-fn stamp_triangle_fill(
-    rows: &mut [Vec<char>],
-    ax: usize,
-    ay: usize,
-    bx: usize,
-    by: usize,
-    cx: usize,
-    cy: usize,
-    glyph: char,
-) {
+#[derive(Clone, Copy)]
+struct TrianglePoints {
+    a: (usize, usize),
+    b: (usize, usize),
+    c: (usize, usize),
+}
+
+fn stamp_triangle_fill(rows: &mut [Vec<char>], points: TrianglePoints, glyph: char) {
     if rows.is_empty() || rows[0].is_empty() {
         return;
     }
 
+    let (ax, ay) = points.a;
+    let (bx, by) = points.b;
+    let (cx, cy) = points.c;
     let min_x = ax.min(bx).min(cx);
     let max_x = ax.max(bx).max(cx).min(rows[0].len().saturating_sub(1));
     let min_y = ay.min(by).min(cy);

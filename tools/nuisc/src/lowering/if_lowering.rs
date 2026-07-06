@@ -358,14 +358,32 @@ fn lower_guard_return_with_surviving_binding(
     else {
         return Ok(None);
     };
-    let pure_helpers = state.pure_helpers.clone();
-    let Some((surviving_name, surviving_value)) =
-        lower_binding_if_chain(else_body, state, bindings, &pure_helpers)?
+    if else_body.is_empty()
+        || !else_body
+            .iter()
+            .any(|stmt| matches!(stmt, NirStmt::Let { .. } | NirStmt::Const { .. }))
+        || !else_body.iter().all(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let { .. } | NirStmt::Const { .. } | NirStmt::Expr(_)
+            )
+        })
+    {
+        return Ok(None);
+    }
+    let returned_name = lower_expr(&returned, state, bindings)?;
+    lower_guard_return(condition_name.to_owned(), returned_name, state);
+    let mut local_bindings = bindings.clone();
+    let Some(surviving_name) =
+        super::body_lowering::lower_linear_stmts(else_body, state, &mut local_bindings)?
     else {
         return Ok(None);
     };
-    let returned_name = lower_expr(&returned, state, bindings)?;
-    lower_guard_return(condition_name.to_owned(), returned_name, state);
+    let Some(surviving_value) = local_bindings.get(&surviving_name).cloned() else {
+        return Err(format!(
+            "minimal nuisc lowering expected surviving branch binding `{surviving_name}` after guarded return"
+        ));
+    };
     Ok(Some(LoweredIfOutcome::Bind {
         name: surviving_name,
         value: surviving_value,

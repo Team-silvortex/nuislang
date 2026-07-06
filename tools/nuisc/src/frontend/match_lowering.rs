@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     nir_expr_effect_class, AstExpr, AstMatchArm, AstMatchPattern, AstTypeAlias, AstTypeRef,
@@ -141,7 +140,7 @@ pub(super) fn lower_match_stmt_with_async(
                 guard,
                 current_domain,
                 current_function_is_async,
-                &mut guard_bindings,
+                &guard_bindings,
                 module_consts,
                 signatures,
                 struct_table,
@@ -328,6 +327,7 @@ fn substitute_pattern_binding_vars(
         _ => expr.clone(),
     }
 }
+type MatchPatternConditionAndBindings = (NirExpr, Vec<(String, NirTypeRef, NirExpr)>);
 
 fn lower_match_pattern_condition_and_bindings(
     pattern: &AstMatchPattern,
@@ -335,7 +335,7 @@ fn lower_match_pattern_condition_and_bindings(
     value_ty: &NirTypeRef,
     type_aliases: &BTreeMap<String, AstTypeAlias>,
     struct_table: &BTreeMap<String, NirStructDef>,
-) -> Result<(NirExpr, Vec<(String, NirTypeRef, NirExpr)>), String> {
+) -> Result<MatchPatternConditionAndBindings, String> {
     match (pattern, value_ty.scalar_kind()) {
         (AstMatchPattern::Wildcard, _) => {
             unreachable!("wildcard pattern should be handled before lowering")

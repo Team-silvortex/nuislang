@@ -5,7 +5,10 @@ use nuis_semantics::model::{
 };
 
 use super::super::{infer_ast_expr_type, FunctionSignature};
-use super::exprs::{call_arg_expected_type, rewrite_generic_calls_in_expr};
+use super::exprs::{
+    call_arg_expected_type, rewrite_generic_calls_in_expr, CallArgExpectedTypeInput,
+    GenericExprRewriteInput,
+};
 use super::GenericImplMethodTemplate;
 
 #[allow(clippy::too_many_arguments)]
@@ -33,7 +36,7 @@ pub(super) fn hoist_direct_result_wrapper_args(
     let mut hoisted = Vec::new();
     let mut rewritten_args = Vec::new();
     for (index, arg) in args.iter().enumerate() {
-        let arg_expected = call_arg_expected_type(
+        let arg_expected = call_arg_expected_type(CallArgExpectedTypeInput {
             callee,
             generic_args,
             index,
@@ -42,11 +45,11 @@ pub(super) fn hoist_direct_result_wrapper_args(
             signatures,
             visible_type_aliases,
             struct_table,
-        );
-        let rewritten_arg = rewrite_generic_calls_in_expr(
-            arg,
+        });
+        let rewritten_arg = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+            expr: arg,
             context,
-            arg_expected.as_ref(),
+            expected: arg_expected.as_ref(),
             env,
             visible_type_aliases,
             generic_templates,
@@ -60,7 +63,7 @@ pub(super) fn hoist_direct_result_wrapper_args(
             specialization_cache,
             specialized_functions,
             specialized_signatures,
-        )?;
+        })?;
         if is_direct_result_wrapper_expr(&rewritten_arg) {
             let Some(inferred_ty) = infer_ast_expr_type(
                 &rewritten_arg,

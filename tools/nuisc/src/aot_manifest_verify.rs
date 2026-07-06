@@ -1,6 +1,8 @@
 use std::{fs, path::Path};
 
-use crate::aot_domain_index_verify::verify_domain_index_artifacts;
+use crate::aot_domain_index_verify::{
+    verify_domain_index_artifacts, DomainIndexArtifactRef, DomainIndexVerifyInput,
+};
 use crate::aot_domain_payload_verify::verify_domain_payload_blobs;
 use crate::aot_domain_unit_verify::verify_domain_build_units;
 use crate::aot_manifest_core_verify::{verify_manifest_artifacts, verify_manifest_core};
@@ -30,31 +32,41 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
 
     let domain_payload_report = verify_domain_payload_blobs(path, domain_build_units)?;
 
-    let domain_index_report = verify_domain_index_artifacts(
-        path,
-        fields.bridge_registry_path.as_deref(),
-        fields.bridge_registry_schema.as_deref(),
-        fields.bridge_registry_units,
-        fields.bridge_registry_inline.as_deref(),
-        fields.host_bridge_plan_index_path.as_deref(),
-        fields.host_bridge_plan_index_schema.as_deref(),
-        fields.host_bridge_plan_units,
-        fields.host_bridge_plan_index_inline.as_deref(),
-        fields.lowering_plan_index_path.as_deref(),
-        fields.lowering_plan_index_schema.as_deref(),
-        fields.lowering_plan_units,
-        fields.lowering_plan_index_inline.as_deref(),
-        fields.clock_protocol_path.as_deref(),
-        fields.clock_protocol_schema.as_deref(),
-        fields.clock_protocol_domains,
-        fields.clock_protocol_inline.as_deref(),
-        fields.hetero_calculate_plan_path.as_deref(),
-        fields.hetero_calculate_plan_schema.as_deref(),
-        fields.hetero_calculate_plan_units,
-        fields.hetero_calculate_plan_inline.as_deref(),
+    let domain_index_report = verify_domain_index_artifacts(DomainIndexVerifyInput {
+        manifest_path: path,
+        bridge_registry: DomainIndexArtifactRef {
+            path: fields.bridge_registry_path.as_deref(),
+            schema: fields.bridge_registry_schema.as_deref(),
+            count: fields.bridge_registry_units,
+            inline: fields.bridge_registry_inline.as_deref(),
+        },
+        host_bridge_plan_index: DomainIndexArtifactRef {
+            path: fields.host_bridge_plan_index_path.as_deref(),
+            schema: fields.host_bridge_plan_index_schema.as_deref(),
+            count: fields.host_bridge_plan_units,
+            inline: fields.host_bridge_plan_index_inline.as_deref(),
+        },
+        lowering_plan_index: DomainIndexArtifactRef {
+            path: fields.lowering_plan_index_path.as_deref(),
+            schema: fields.lowering_plan_index_schema.as_deref(),
+            count: fields.lowering_plan_units,
+            inline: fields.lowering_plan_index_inline.as_deref(),
+        },
+        clock_protocol: DomainIndexArtifactRef {
+            path: fields.clock_protocol_path.as_deref(),
+            schema: fields.clock_protocol_schema.as_deref(),
+            count: fields.clock_protocol_domains,
+            inline: fields.clock_protocol_inline.as_deref(),
+        },
+        hetero_calculate_plan: DomainIndexArtifactRef {
+            path: fields.hetero_calculate_plan_path.as_deref(),
+            schema: fields.hetero_calculate_plan_schema.as_deref(),
+            count: fields.hetero_calculate_plan_units,
+            inline: fields.hetero_calculate_plan_inline.as_deref(),
+        },
         heterogeneous_domain_count,
         domain_build_units,
-    )?;
+    })?;
 
     let project_metadata_report = verify_project_metadata_artifacts(
         path,

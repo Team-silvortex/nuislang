@@ -1,10 +1,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstFunction, AstImplDef, AstModule, AstTypeAlias, AstTypeRef, NirFunction, NirStructDef,
+    AstFunction, AstImplDef, AstModule, AstStructDef, AstTypeAlias, AstTypeRef, NirFunction,
+    NirStructDef,
 };
 
-use super::higher_order::{is_callable_type_with_aliases, rewrite_higher_order_calls_in_function};
+use super::higher_order::{
+    is_callable_type_with_aliases, rewrite_higher_order_calls_in_function,
+    HigherOrderFunctionRewriteInput,
+};
 use super::stmt_lowering::lower_stmt_sequence_with_async;
 use super::{
     build_default_impl_method, build_default_impl_method_function,
@@ -18,20 +22,44 @@ use nuis_semantics::model::{
     NirImplDef, NirImplMethod, NirTraitDef, NirTraitMethodSig, NirTypeRef,
 };
 
+pub(super) struct LoweredFunctionsInput<'a> {
+    pub(super) module: &'a AstModule,
+    pub(super) local_cpu_helpers: &'a [&'a AstModule],
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) module_const_values: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) module_const_env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) helper_const_maps: &'a BTreeMap<String, BTreeMap<String, ModuleConstValue>>,
+    pub(super) signatures: &'a mut BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) module_struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) concrete_module_functions: &'a [AstFunction],
+}
+
+pub(super) struct LoweredFunctionsOutput {
+    pub(super) functions: Vec<NirFunction>,
+    pub(super) traits: Vec<NirTraitDef>,
+    pub(super) impls: Vec<NirImplDef>,
+}
+
 pub(super) fn build_lowered_functions_and_impls(
-    module: &AstModule,
-    local_cpu_helpers: &[&AstModule],
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    module_const_values: &BTreeMap<String, ModuleConstValue>,
-    module_const_env: &BTreeMap<String, AstTypeRef>,
-    helper_const_maps: &BTreeMap<String, BTreeMap<String, ModuleConstValue>>,
-    signatures: &mut BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    module_struct_table: &BTreeMap<String, nuis_semantics::model::AstStructDef>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    concrete_module_functions: &[AstFunction],
-) -> Result<(Vec<NirFunction>, Vec<NirTraitDef>, Vec<NirImplDef>), String> {
+    input: LoweredFunctionsInput<'_>,
+) -> Result<LoweredFunctionsOutput, String> {
+    let LoweredFunctionsInput {
+        module,
+        local_cpu_helpers,
+        visible_type_aliases,
+        module_const_values,
+        module_const_env,
+        helper_const_maps,
+        signatures,
+        struct_table,
+        module_struct_table,
+        impl_lookup,
+        generic_templates,
+        concrete_module_functions,
+    } = input;
     let mut trait_defs = module
         .traits
         .iter()
@@ -179,17 +207,18 @@ pub(super) fn build_lowered_functions_and_impls(
     let mut higher_order_specialization_cache = BTreeSet::new();
     for function in original_specialized_functions {
         let mut higher_order_specialized_templates = Vec::new();
-        let higher_order_rewritten = rewrite_higher_order_calls_in_function(
-            &function,
-            &higher_order_templates,
-            &higher_order_function_table,
-            &[],
-            &BTreeMap::new(),
-            &BTreeMap::new(),
-            visible_type_aliases,
-            &mut higher_order_specialization_cache,
-            &mut higher_order_specialized_templates,
-        )?;
+        let higher_order_rewritten =
+            rewrite_higher_order_calls_in_function(HigherOrderFunctionRewriteInput {
+                function: &function,
+                templates: &higher_order_templates,
+                function_table: &higher_order_function_table,
+                module_impls: &[],
+                visible_structs: &BTreeMap::new(),
+                method_template_lookup: &BTreeMap::new(),
+                visible_type_aliases,
+                specialized_cache: &mut higher_order_specialization_cache,
+                specialized_functions: &mut higher_order_specialized_templates,
+            })?;
         let mut extended_generic_templates = generic_templates.clone();
         for template in higher_order_specialized_templates {
             if !template.generic_params.is_empty() {
@@ -228,7 +257,7 @@ pub(super) fn build_lowered_functions_and_impls(
         };
         let lowered_for_type =
             lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases)?;
-        let mut impl_methods = definition.methods.iter().cloned().collect::<Vec<_>>();
+        let mut impl_methods = definition.methods.to_vec();
         for trait_method in &trait_def.methods {
             if trait_method.default_body.is_none()
                 || impl_methods
@@ -474,5 +503,9 @@ pub(super) fn build_lowered_functions_and_impls(
         });
     }
 
-    Ok((lowered_functions, lowered_traits, lowered_impls))
+    Ok(LoweredFunctionsOutput {
+        functions: lowered_functions,
+        traits: lowered_traits,
+        impls: lowered_impls,
+    })
 }

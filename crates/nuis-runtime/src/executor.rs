@@ -499,8 +499,8 @@ impl Executor {
     }
 }
 
-fn normalized_summary<'a>(
-    section: Option<Result<&'a str, std::str::Utf8Error>>,
+fn normalized_summary(
+    section: Option<Result<&str, std::str::Utf8Error>>,
     section_name: &str,
     prepared: &PreparedDomainExecution<'_>,
 ) -> Result<String, RuntimeError> {
@@ -518,8 +518,8 @@ fn normalized_summary<'a>(
     })
 }
 
-fn optional_summary<'a>(
-    section: Option<Result<&'a str, std::str::Utf8Error>>,
+fn optional_summary(
+    section: Option<Result<&str, std::str::Utf8Error>>,
     prepared: &PreparedDomainExecution<'_>,
 ) -> Result<Option<String>, RuntimeError> {
     match section {
@@ -851,7 +851,7 @@ fn domain_resource_capability_label(
 
 fn capability_scope(domain_family: &str, selected_lowering_target: Option<&str>) -> String {
     if let Some(target) = selected_lowering_target {
-        let slug = target.replace('.', "_").replace('-', "_");
+        let slug = target.replace(['.', '-'], "_");
         format!("{domain_family}.{slug}")
     } else {
         domain_family.to_owned()

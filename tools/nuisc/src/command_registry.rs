@@ -46,13 +46,10 @@ pub(crate) fn run_registry(json: bool) -> Result<(), String> {
             })
             .collect::<Result<Vec<_>, String>>()?;
         println!(
-            "{{{},{},{}}}",
-            format!(
-                "\"contract_schema\":\"{}\"",
-                registry::NUSTAR_DOMAIN_CONTRACT_SCHEMA
-            ),
+            "{{\"contract_schema\":\"{}\",{},\"domains\":[{}]}}",
+            registry::NUSTAR_DOMAIN_CONTRACT_SCHEMA,
             json_bool_field("registry_indexed", true),
-            format!("\"domains\":[{}]", contracts.join(","))
+            contracts.join(",")
         );
         return Ok(());
     }

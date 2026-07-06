@@ -114,16 +114,16 @@ fn expected_type_for_var_from_following_stmts(
                     struct_table,
                 )
             });
-            super::exprs::call_arg_expected_type(
+            super::exprs::call_arg_expected_type(super::exprs::CallArgExpectedTypeInput {
                 callee,
                 generic_args,
                 index,
-                call_expected.as_ref().or(current_return_type),
+                expected: call_expected.as_ref().or(current_return_type),
                 generic_templates,
                 signatures,
                 visible_type_aliases,
                 struct_table,
-            )
+            })
         }
         AstStmt::Return(Some(AstExpr::Call {
             callee,
@@ -131,16 +131,16 @@ fn expected_type_for_var_from_following_stmts(
             args,
         })) => args.iter().enumerate().find_map(|(index, arg)| {
             matches!(arg, AstExpr::Var(var_name) if var_name == current_name).then(|| {
-                super::exprs::call_arg_expected_type(
+                super::exprs::call_arg_expected_type(super::exprs::CallArgExpectedTypeInput {
                     callee,
                     generic_args,
                     index,
-                    current_return_type,
+                    expected: current_return_type,
                     generic_templates,
                     signatures,
                     visible_type_aliases,
                     struct_table,
-                )
+                })
             })?
         }),
         _ => None,

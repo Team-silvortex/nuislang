@@ -234,7 +234,7 @@ pub(super) fn lower_function(
         test_should_fail: function.test_should_fail,
         test_reason: function.test_reason.clone(),
         test_timeout_ms: function.test_timeout_ms,
-        test_clock_domain: function.test_clock_domain.clone(),
+        test_clock_domain: function.test_clock_domain,
         test_clock_policy: function.test_clock_policy,
         benchmark_name: function.benchmark_name.clone(),
         benchmark_warmup_iters: function.benchmark_warmup_iters,

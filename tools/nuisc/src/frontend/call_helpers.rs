@@ -105,16 +105,28 @@ pub(super) fn ensure_mutex_guard_like(
     }
 }
 
-pub(super) fn ensure_call_arg_matches_param(
-    callee: &str,
-    arg_index: usize,
-    arg: &NirExpr,
-    expected_param: &NirTypeRef,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    is_extern: bool,
-) -> Result<(), String> {
+pub(super) struct CallArgParamCheck<'a> {
+    pub(super) callee: &'a str,
+    pub(super) arg_index: usize,
+    pub(super) arg: &'a NirExpr,
+    pub(super) expected_param: &'a NirTypeRef,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) is_extern: bool,
+}
+
+pub(super) fn ensure_call_arg_matches_param(input: CallArgParamCheck<'_>) -> Result<(), String> {
+    let CallArgParamCheck {
+        callee,
+        arg_index,
+        arg,
+        expected_param,
+        bindings,
+        signatures,
+        struct_table,
+        is_extern,
+    } = input;
     let Some(actual_ty) = infer_nir_expr_type(arg, bindings, signatures, struct_table) else {
         return Ok(());
     };
@@ -287,16 +299,16 @@ mod tests {
             len: Box::new(NirExpr::Int(8)),
             fill: Box::new(NirExpr::Int(0)),
         };
-        ensure_call_arg_matches_param(
-            "host_stdin_read",
-            0,
-            &expr,
-            &i64_host_value_type(),
-            &BTreeMap::new(),
-            &BTreeMap::new(),
-            &BTreeMap::new(),
-            true,
-        )
+        ensure_call_arg_matches_param(CallArgParamCheck {
+            callee: "host_stdin_read",
+            arg_index: 0,
+            arg: &expr,
+            expected_param: &i64_host_value_type(),
+            bindings: &BTreeMap::new(),
+            signatures: &BTreeMap::new(),
+            struct_table: &BTreeMap::new(),
+            is_extern: true,
+        })
         .unwrap();
     }
 
@@ -306,16 +318,16 @@ mod tests {
             value: Box::new(NirExpr::Int(1)),
             next: Box::new(NirExpr::Null),
         };
-        let error = ensure_call_arg_matches_param(
-            "host_stdin_read",
-            0,
-            &expr,
-            &i64_host_value_type(),
-            &BTreeMap::new(),
-            &BTreeMap::new(),
-            &BTreeMap::new(),
-            true,
-        )
+        let error = ensure_call_arg_matches_param(CallArgParamCheck {
+            callee: "host_stdin_read",
+            arg_index: 0,
+            arg: &expr,
+            expected_param: &i64_host_value_type(),
+            bindings: &BTreeMap::new(),
+            signatures: &BTreeMap::new(),
+            struct_table: &BTreeMap::new(),
+            is_extern: true,
+        })
         .unwrap_err();
         assert!(error.contains("expects `i64`, found `ref Node`"));
         assert!(error.contains("`ref Buffer -> i64`"));
@@ -338,38 +350,30 @@ mod tests {
     }
 }
 
-#[allow(dead_code)]
-pub(super) fn lower_single_nested_expr(
-    name: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+pub(super) struct SingleNestedExprLoweringInput<'a> {
+    pub(super) name: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
+pub(super) fn lower_single_nested_expr_with_consts(
+    input: SingleNestedExprLoweringInput<'_>,
 ) -> Result<NirExpr, String> {
-    lower_single_nested_expr_with_consts(
+    let SingleNestedExprLoweringInput {
         name,
         args,
         current_domain,
         current_function_is_async,
         bindings,
-        &BTreeMap::new(),
+        module_consts,
         signatures,
         struct_table,
-    )
-}
-
-pub(super) fn lower_single_nested_expr_with_consts(
-    name: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-) -> Result<NirExpr, String> {
+    } = input;
     let [value] = args else {
         return Err(format!("{name}(...) expects exactly one argument"));
     };
@@ -382,34 +386,6 @@ pub(super) fn lower_single_nested_expr_with_consts(
         signatures,
         struct_table,
         None,
-    )
-}
-
-#[allow(dead_code)]
-pub(super) fn lower_result_wrapper_call(
-    name: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    family: NirResultFamily,
-    build: fn(Box<NirExpr>, NirResultStage) -> Result<NirExpr, String>,
-    usage_hint: &str,
-) -> Result<NirExpr, String> {
-    lower_result_wrapper_call_with_consts(
-        name,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        &BTreeMap::new(),
-        signatures,
-        struct_table,
-        family,
-        build,
-        usage_hint,
     )
 }
 
@@ -430,16 +406,16 @@ pub(super) fn lower_result_wrapper_call_with_consts(
     let [value] = args else {
         return Err(format!("{name}(...) expects 1 arg"));
     };
-    let lowered = lower_single_nested_expr_with_consts(
+    let lowered = lower_single_nested_expr_with_consts(SingleNestedExprLoweringInput {
         name,
-        &[value.clone()],
+        args: std::slice::from_ref(value),
         current_domain,
         current_function_is_async,
         bindings,
         module_consts,
         signatures,
         struct_table,
-    )?;
+    })?;
     let Some(stage) = infer_result_stage(&lowered) else {
         return Err(format!("{name}(...) {expected_shape}"));
     };
@@ -464,32 +440,6 @@ fn validate_result_stage_payload(
     stage.validate_payload(payload)
 }
 
-#[allow(dead_code)]
-pub(super) fn lower_result_observer_call(
-    name: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    family: NirResultFamily,
-    build: fn(NirExpr) -> NirExpr,
-) -> Result<NirExpr, String> {
-    lower_result_observer_call_with_consts(
-        name,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        &BTreeMap::new(),
-        signatures,
-        struct_table,
-        family,
-        build,
-    )
-}
-
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_result_observer_call_with_consts<FBuild>(
     name: &str,
@@ -506,7 +456,7 @@ pub(super) fn lower_result_observer_call_with_consts<FBuild>(
 where
     FBuild: Fn(NirExpr) -> NirExpr,
 {
-    let lowered = lower_single_nested_expr_with_consts(
+    let lowered = lower_single_nested_expr_with_consts(SingleNestedExprLoweringInput {
         name,
         args,
         current_domain,
@@ -515,7 +465,7 @@ where
         module_consts,
         signatures,
         struct_table,
-    )?;
+    })?;
     ensure_result_like(name, &lowered, family, bindings, signatures, struct_table)?;
     Ok(build(lowered))
 }

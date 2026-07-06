@@ -7,18 +7,34 @@ use super::{
     lower_nested_expr_with_async_and_consts, FunctionSignature, ModuleConstValue,
 };
 
+pub(super) struct BinaryLoweringInput<'a> {
+    pub(super) op: &'a AstBinaryOp,
+    pub(super) lhs: &'a AstExpr,
+    pub(super) rhs: &'a AstExpr,
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) expected: Option<&'a NirTypeRef>,
+}
+
 pub(super) fn lower_binary_expr_with_async(
-    op: &AstBinaryOp,
-    lhs: &AstExpr,
-    rhs: &AstExpr,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
+    input: BinaryLoweringInput<'_>,
 ) -> Result<NirExpr, String> {
+    let BinaryLoweringInput {
+        op,
+        lhs,
+        rhs,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected,
+    } = input;
     let operand_expected = match op {
         AstBinaryOp::Add
         | AstBinaryOp::Sub

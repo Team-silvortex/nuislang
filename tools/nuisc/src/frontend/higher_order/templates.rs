@@ -12,16 +12,30 @@ mod templates_expr;
 
 pub(crate) use templates_expr::rewrite_higher_order_template_expr;
 
+pub(crate) struct HigherOrderTemplateSpecializationInput<'a> {
+    pub(crate) template: &'a AstFunction,
+    pub(crate) specialized_name: &'a str,
+    pub(crate) callable_bindings: &'a BTreeMap<String, BoundCallable>,
+    pub(crate) templates: &'a BTreeMap<String, AstFunction>,
+    pub(crate) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(crate) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(crate) specialized_cache: &'a mut BTreeSet<String>,
+    pub(crate) specialized_functions: &'a mut Vec<AstFunction>,
+}
+
 pub(crate) fn specialize_higher_order_template(
-    template: &AstFunction,
-    specialized_name: &str,
-    callable_bindings: &BTreeMap<String, BoundCallable>,
-    templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    specialized_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
+    input: HigherOrderTemplateSpecializationInput<'_>,
 ) -> Result<AstFunction, String> {
+    let HigherOrderTemplateSpecializationInput {
+        template,
+        specialized_name,
+        callable_bindings,
+        templates,
+        function_table,
+        visible_type_aliases,
+        specialized_cache,
+        specialized_functions,
+    } = input;
     let body = rewrite_higher_order_template_block(
         &template.body,
         callable_bindings,

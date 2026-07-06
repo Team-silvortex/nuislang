@@ -11,7 +11,7 @@ mod lambda_expansion_synth;
 #[path = "lambda_expansion_types.rs"]
 mod lambda_expansion_types;
 
-use self::lambda_expansion_block::expand_lambda_block;
+use self::lambda_expansion_block::{expand_lambda_block, ExpandLambdaBlockInput};
 use self::lambda_expansion_types::extend_local_field_bindings_from_type;
 
 pub(super) fn expand_module_lambdas(module: &AstModule) -> Result<AstModule, String> {
@@ -73,21 +73,21 @@ fn expand_function_lambdas(
             &mut visible_local_types,
         );
     }
-    let body = expand_lambda_block(
-        &function.body,
-        function.return_type.as_ref(),
-        &function.generic_params,
-        &BTreeMap::new(),
-        &visible_locals,
-        &visible_local_types,
+    let body = expand_lambda_block(ExpandLambdaBlockInput {
+        body: &function.body,
+        current_return_type: function.return_type.as_ref(),
+        inherited_generic_params: &function.generic_params,
+        lambda_aliases: &BTreeMap::new(),
+        visible_locals: &visible_locals,
+        visible_local_types: &visible_local_types,
         module_impls,
         visible_structs,
         module_const_names,
         module_function_table,
-        &function.name,
-        &mut counter,
-        &mut synthesized,
-    )?;
+        owning_function_name: &function.name,
+        counter: &mut counter,
+        synthesized: &mut synthesized,
+    })?;
     let mut rewritten = function.clone();
     rewritten.body = body;
     Ok((rewritten, synthesized))

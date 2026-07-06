@@ -7,7 +7,7 @@ use nuis_semantics::model::{
 use super::super::{infer_ast_expr_type, FunctionSignature};
 use super::blocks::{rewrite_generic_calls_in_block, rewrite_generic_calls_in_match_arms};
 use super::blocks_expected::contains_unresolved_struct_placeholder;
-use super::exprs::rewrite_generic_calls_in_expr;
+use super::exprs::{rewrite_generic_calls_in_expr, GenericExprRewriteInput};
 use super::GenericImplMethodTemplate;
 
 #[allow(clippy::too_many_arguments)]
@@ -37,10 +37,11 @@ pub(super) fn rewrite_generic_calls_in_stmt(
             value,
             mutable,
         } => {
-            let rewritten_value = rewrite_generic_calls_in_expr(
-                value,
-                &format!("{context} local `{name}`"),
-                ty.as_ref().or(let_fallback_expected),
+            let value_context = format!("{context} local `{name}`");
+            let rewritten_value = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: value,
+                context: &value_context,
+                expected: ty.as_ref().or(let_fallback_expected),
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -54,7 +55,7 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            })?;
             let mut inferred = ty
                 .clone()
                 .or_else(|| {
@@ -86,24 +87,27 @@ pub(super) fn rewrite_generic_calls_in_stmt(
         }
         AstStmt::AssignLocal { name, value } => AstStmt::AssignLocal {
             name: name.clone(),
-            value: rewrite_generic_calls_in_expr(
-                value,
-                &format!("{context} local `{name}`"),
-                env.get(name),
-                env,
-                visible_type_aliases,
-                generic_templates,
-                generic_impl_method_templates,
-                higher_order_templates,
-                function_table,
-                signatures,
-                impl_lookup,
-                struct_table,
-                function_return_types,
-                specialization_cache,
-                specialized_functions,
-                specialized_signatures,
-            )?,
+            value: {
+                let value_context = format!("{context} local `{name}`");
+                rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                    expr: value,
+                    context: &value_context,
+                    expected: env.get(name),
+                    env,
+                    visible_type_aliases,
+                    generic_templates,
+                    generic_impl_method_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                })?
+            },
         },
         AstStmt::DestructureLet {
             type_ref,
@@ -112,30 +116,34 @@ pub(super) fn rewrite_generic_calls_in_stmt(
         } => AstStmt::DestructureLet {
             type_ref: type_ref.clone(),
             fields: fields.clone(),
-            value: rewrite_generic_calls_in_expr(
-                value,
-                &format!("{context} destructure"),
-                type_ref.as_ref(),
-                env,
-                visible_type_aliases,
-                generic_templates,
-                generic_impl_method_templates,
-                higher_order_templates,
-                function_table,
-                signatures,
-                impl_lookup,
-                struct_table,
-                function_return_types,
-                specialization_cache,
-                specialized_functions,
-                specialized_signatures,
-            )?,
+            value: {
+                let value_context = format!("{context} destructure");
+                rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                    expr: value,
+                    context: &value_context,
+                    expected: type_ref.as_ref(),
+                    env,
+                    visible_type_aliases,
+                    generic_templates,
+                    generic_impl_method_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                })?
+            },
         },
         AstStmt::Const { name, ty, value } => {
-            let rewritten_value = rewrite_generic_calls_in_expr(
-                value,
-                &format!("{context} const `{name}`"),
-                ty.as_ref(),
+            let value_context = format!("{context} const `{name}`");
+            let rewritten_value = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: value,
+                context: &value_context,
+                expected: ty.as_ref(),
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -149,7 +157,7 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            })?;
             let mut inferred = ty.clone().or_else(|| {
                 infer_ast_expr_type(
                     &rewritten_value,
@@ -175,51 +183,11 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                 value: rewritten_value,
             }
         }
-        AstStmt::Print(value) => AstStmt::Print(rewrite_generic_calls_in_expr(
-            value,
-            context,
-            None,
-            env,
-            visible_type_aliases,
-            generic_templates,
-            generic_impl_method_templates,
-            higher_order_templates,
-            function_table,
-            signatures,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-            specialization_cache,
-            specialized_functions,
-            specialized_signatures,
-        )?),
-        AstStmt::Await(value) => AstStmt::Await(rewrite_generic_calls_in_expr(
-            value,
-            context,
-            None,
-            env,
-            visible_type_aliases,
-            generic_templates,
-            generic_impl_method_templates,
-            higher_order_templates,
-            function_table,
-            signatures,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-            specialization_cache,
-            specialized_functions,
-            specialized_signatures,
-        )?),
-        AstStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            let rewritten_condition = rewrite_generic_calls_in_expr(
-                condition,
+        AstStmt::Print(value) => {
+            AstStmt::Print(rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: value,
                 context,
-                None,
+                expected: None,
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -233,7 +201,51 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            })?)
+        }
+        AstStmt::Await(value) => {
+            AstStmt::Await(rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: value,
+                context,
+                expected: None,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                generic_impl_method_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            })?)
+        }
+        AstStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            let rewritten_condition = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: condition,
+                context,
+                expected: None,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                generic_impl_method_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            })?;
             let mut then_env = env.clone();
             let mut else_env = env.clone();
             AstStmt::If {
@@ -277,10 +289,10 @@ pub(super) fn rewrite_generic_calls_in_stmt(
             }
         }
         AstStmt::Match { value, arms } => {
-            let rewritten_value = rewrite_generic_calls_in_expr(
-                value,
+            let rewritten_value = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: value,
                 context,
-                None,
+                expected: None,
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -294,7 +306,7 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            })?;
             let scrutinee_type = infer_ast_expr_type(
                 &rewritten_value,
                 env,
@@ -326,10 +338,10 @@ pub(super) fn rewrite_generic_calls_in_stmt(
             }
         }
         AstStmt::While { condition, body } => {
-            let rewritten_condition = rewrite_generic_calls_in_expr(
-                condition,
+            let rewritten_condition = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: condition,
                 context,
-                None,
+                expected: None,
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -343,7 +355,7 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?;
+            })?;
             let mut loop_env = env.clone();
             AstStmt::While {
                 condition: rewritten_condition,
@@ -367,29 +379,11 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                 )?,
             }
         }
-        AstStmt::Expr(expr) => AstStmt::Expr(rewrite_generic_calls_in_expr(
-            expr,
-            context,
-            None,
-            env,
-            visible_type_aliases,
-            generic_templates,
-            generic_impl_method_templates,
-            higher_order_templates,
-            function_table,
-            signatures,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-            specialization_cache,
-            specialized_functions,
-            specialized_signatures,
-        )?),
-        AstStmt::Return(value) => AstStmt::Return(match value {
-            Some(value) => Some(rewrite_generic_calls_in_expr(
-                value,
+        AstStmt::Expr(expr) => {
+            AstStmt::Expr(rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr,
                 context,
-                current_return_type,
+                expected: None,
                 env,
                 visible_type_aliases,
                 generic_templates,
@@ -403,7 +397,27 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?),
+            })?)
+        }
+        AstStmt::Return(value) => AstStmt::Return(match value {
+            Some(value) => Some(rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                expr: value,
+                context,
+                expected: current_return_type,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                generic_impl_method_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            })?),
             None => None,
         }),
         AstStmt::Break => AstStmt::Break,

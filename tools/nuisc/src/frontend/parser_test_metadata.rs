@@ -1,16 +1,37 @@
 use super::*;
 
+#[derive(Clone)]
+pub(super) struct TestMetadata {
+    pub(super) label: Option<String>,
+    pub(super) ignored: bool,
+    pub(super) should_fail: bool,
+    pub(super) reason: Option<String>,
+    pub(super) timeout_ms: Option<i64>,
+    pub(super) clock_domain: Option<TestClockDomain>,
+    pub(super) clock_policy: Option<TestClockPolicy>,
+}
+
+#[derive(Clone)]
+pub(super) struct BenchmarkMetadata {
+    pub(super) label: Option<String>,
+    pub(super) warmup_iters: Option<i64>,
+    pub(super) measure_iters: Option<i64>,
+    pub(super) timeout_ms: Option<i64>,
+    pub(super) clock_domain: Option<TestClockDomain>,
+    pub(super) clock_policy: Option<TestClockPolicy>,
+}
+
 impl Parser {
-    pub(super) fn build_test_attribute(
-        &self,
-        label: Option<String>,
-        ignored: bool,
-        should_fail: bool,
-        reason: Option<String>,
-        timeout_ms: Option<i64>,
-        clock_domain: Option<TestClockDomain>,
-        clock_policy: Option<TestClockPolicy>,
-    ) -> AstAttribute {
+    pub(super) fn build_test_attribute(&self, metadata: TestMetadata) -> AstAttribute {
+        let TestMetadata {
+            label,
+            ignored,
+            should_fail,
+            reason,
+            timeout_ms,
+            clock_domain,
+            clock_policy,
+        } = metadata;
         let mut args = Vec::new();
         if let Some(label) = label {
             if !label.is_empty() {
@@ -65,18 +86,7 @@ impl Parser {
     pub(super) fn parse_test_attribute_metadata(
         &self,
         args: &[AstAttributeArg],
-    ) -> Result<
-        (
-            Option<String>,
-            bool,
-            bool,
-            Option<String>,
-            Option<i64>,
-            Option<TestClockDomain>,
-            Option<TestClockPolicy>,
-        ),
-        String,
-    > {
+    ) -> Result<TestMetadata, String> {
         let mut label = Some(String::new());
         let mut ignored = false;
         let mut should_fail = false;
@@ -153,7 +163,7 @@ impl Parser {
             }
         }
 
-        Ok((
+        Ok(TestMetadata {
             label,
             ignored,
             should_fail,
@@ -161,18 +171,18 @@ impl Parser {
             timeout_ms,
             clock_domain,
             clock_policy,
-        ))
+        })
     }
 
-    pub(super) fn build_benchmark_attribute(
-        &self,
-        label: Option<String>,
-        warmup_iters: Option<i64>,
-        measure_iters: Option<i64>,
-        timeout_ms: Option<i64>,
-        clock_domain: Option<TestClockDomain>,
-        clock_policy: Option<TestClockPolicy>,
-    ) -> AstAttribute {
+    pub(super) fn build_benchmark_attribute(&self, metadata: BenchmarkMetadata) -> AstAttribute {
+        let BenchmarkMetadata {
+            label,
+            warmup_iters,
+            measure_iters,
+            timeout_ms,
+            clock_domain,
+            clock_policy,
+        } = metadata;
         let mut args = Vec::new();
         if let Some(label) = label {
             if !label.is_empty() {
@@ -221,17 +231,7 @@ impl Parser {
     pub(super) fn parse_benchmark_attribute_metadata(
         &self,
         args: &[AstAttributeArg],
-    ) -> Result<
-        (
-            Option<String>,
-            Option<i64>,
-            Option<i64>,
-            Option<i64>,
-            Option<TestClockDomain>,
-            Option<TestClockPolicy>,
-        ),
-        String,
-    > {
+    ) -> Result<BenchmarkMetadata, String> {
         let mut label = Some(String::new());
         let mut warmup_iters = None;
         let mut measure_iters = None;
@@ -299,30 +299,17 @@ impl Parser {
             }
         }
 
-        Ok((
+        Ok(BenchmarkMetadata {
             label,
             warmup_iters,
             measure_iters,
             timeout_ms,
             clock_domain,
             clock_policy,
-        ))
+        })
     }
 
-    pub(super) fn parse_test_decl_call_syntax(
-        &mut self,
-    ) -> Result<
-        (
-            Option<String>,
-            bool,
-            bool,
-            Option<String>,
-            Option<i64>,
-            Option<TestClockDomain>,
-            Option<TestClockPolicy>,
-        ),
-        String,
-    > {
+    pub(super) fn parse_test_decl_call_syntax(&mut self) -> Result<TestMetadata, String> {
         self.expect_symbol('(')?;
         let mut label = Some(String::new());
         let mut ignored = false;
@@ -403,7 +390,7 @@ impl Parser {
             }
         }
         self.expect_symbol(')')?;
-        Ok((
+        Ok(TestMetadata {
             label,
             ignored,
             should_fail,
@@ -411,22 +398,10 @@ impl Parser {
             timeout_ms,
             clock_domain,
             clock_policy,
-        ))
+        })
     }
 
-    pub(super) fn parse_benchmark_decl_call_syntax(
-        &mut self,
-    ) -> Result<
-        (
-            Option<String>,
-            Option<i64>,
-            Option<i64>,
-            Option<i64>,
-            Option<TestClockDomain>,
-            Option<TestClockPolicy>,
-        ),
-        String,
-    > {
+    pub(super) fn parse_benchmark_decl_call_syntax(&mut self) -> Result<BenchmarkMetadata, String> {
         self.expect_symbol('(')?;
         let mut label = Some(String::new());
         let mut warmup_iters = None;
@@ -476,14 +451,14 @@ impl Parser {
             }
         }
         self.expect_symbol(')')?;
-        Ok((
+        Ok(BenchmarkMetadata {
             label,
             warmup_iters,
             measure_iters,
             timeout_ms,
             clock_domain,
             clock_policy,
-        ))
+        })
     }
 
     fn parse_test_meta_bool(&mut self) -> Result<bool, String> {

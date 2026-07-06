@@ -13,9 +13,15 @@ use super::super::{
 use super::callables::{
     function_type_matches_callable, is_callable_type_with_aliases, sanitize_symbol_fragment,
 };
-use super::expansion_rewrite::rewrite_higher_order_calls_in_function;
+use super::expansion_rewrite::{
+    rewrite_higher_order_calls_in_function, HigherOrderFunctionRewriteInput,
+    HigherOrderRewriteContext,
+};
 use super::expansion_rewrite_expr::rewrite_higher_order_calls_in_expr;
-use super::templates::{rewrite_higher_order_template_expr, specialize_higher_order_template};
+use super::templates::{
+    rewrite_higher_order_template_expr, specialize_higher_order_template,
+    HigherOrderTemplateSpecializationInput,
+};
 
 const LAMBDA_BIND_PREFIX: &str = "__lambda_bind.";
 
@@ -29,6 +35,7 @@ use super::expansion_expected::{
 };
 use super::expansion_inference::{
     infer_higher_order_substitutions, specialize_type_with_substitutions,
+    HigherOrderSubstitutionInferenceInput,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,36 +139,57 @@ pub(crate) fn expand_higher_order_functions(
         expanded
             .functions
             .push(rewrite_higher_order_calls_in_function(
-                function,
-                &templates,
-                &function_table,
-                &module.impls,
-                &visible_structs,
-                &method_template_lookup,
-                visible_type_aliases,
-                &mut specialized_cache,
-                &mut specialized_functions,
+                HigherOrderFunctionRewriteInput {
+                    function,
+                    templates: &templates,
+                    function_table: &function_table,
+                    module_impls: &module.impls,
+                    visible_structs: &visible_structs,
+                    method_template_lookup: &method_template_lookup,
+                    visible_type_aliases,
+                    specialized_cache: &mut specialized_cache,
+                    specialized_functions: &mut specialized_functions,
+                },
             )?);
     }
     expanded.functions.extend(specialized_functions);
     Ok(expanded)
 }
 
+pub(crate) struct HigherOrderCallSpecializationInput<'a> {
+    pub(crate) callee: &'a str,
+    pub(crate) args: &'a [AstExpr],
+    pub(crate) explicit_generic_args: &'a [AstTypeRef],
+    pub(crate) template_callable_bindings: Option<&'a BTreeMap<String, BoundCallable>>,
+    pub(crate) expected: Option<&'a AstTypeRef>,
+    pub(crate) local_types: &'a BTreeMap<String, AstTypeRef>,
+    pub(crate) templates: &'a BTreeMap<String, AstFunction>,
+    pub(crate) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(crate) module_impls: &'a [AstImplDef],
+    pub(crate) visible_structs: &'a BTreeMap<String, AstStructDef>,
+    pub(crate) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(crate) specialized_cache: &'a mut BTreeSet<String>,
+    pub(crate) specialized_functions: &'a mut Vec<AstFunction>,
+}
+
 pub(super) fn specialize_higher_order_call(
-    callee: &str,
-    args: &[AstExpr],
-    explicit_generic_args: &[AstTypeRef],
-    template_callable_bindings: Option<&BTreeMap<String, BoundCallable>>,
-    expected: Option<&AstTypeRef>,
-    local_types: &BTreeMap<String, AstTypeRef>,
-    templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    module_impls: &[AstImplDef],
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    specialized_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
+    input: HigherOrderCallSpecializationInput<'_>,
 ) -> Result<AstExpr, String> {
+    let HigherOrderCallSpecializationInput {
+        callee,
+        args,
+        explicit_generic_args,
+        template_callable_bindings,
+        expected,
+        local_types,
+        templates,
+        function_table,
+        module_impls,
+        visible_structs,
+        visible_type_aliases,
+        specialized_cache,
+        specialized_functions,
+    } = input;
     let template = templates
         .get(callee)
         .ok_or_else(|| format!("unknown higher-order template `{callee}`"))?;
@@ -198,16 +226,17 @@ pub(super) fn specialize_higher_order_call(
             visible_type_aliases,
         );
         if callable_param {
-            let rewritten_arg = rewrite_higher_order_argument_expr(
-                arg,
-                template_callable_bindings,
-                ordinary_expected.as_ref(),
-                templates,
-                function_table,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
-            )?;
+            let rewritten_arg =
+                rewrite_higher_order_argument_expr(HigherOrderArgumentRewriteInput {
+                    expr: arg,
+                    template_callable_bindings,
+                    expected: ordinary_expected.as_ref(),
+                    templates,
+                    function_table,
+                    visible_type_aliases,
+                    specialized_cache,
+                    specialized_functions,
+                })?;
             let Some(bound_callable) =
                 parse_bound_callable_expr(&rewritten_arg, template_callable_bindings)
             else {
@@ -288,16 +317,17 @@ pub(super) fn specialize_higher_order_call(
             );
             callable_fragments.push(sanitize_symbol_fragment(&callable_name));
         } else {
-            let rewritten_arg = rewrite_higher_order_argument_expr(
-                arg,
-                template_callable_bindings,
-                ordinary_expected.as_ref(),
-                templates,
-                function_table,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
-            )?;
+            let rewritten_arg =
+                rewrite_higher_order_argument_expr(HigherOrderArgumentRewriteInput {
+                    expr: arg,
+                    template_callable_bindings,
+                    expected: ordinary_expected.as_ref(),
+                    templates,
+                    function_table,
+                    visible_type_aliases,
+                    specialized_cache,
+                    specialized_functions,
+                })?;
             ordinary_args.push(annotate_expr_head_with_expected_type(
                 rewritten_arg,
                 ordinary_expected.as_ref(),
@@ -305,17 +335,18 @@ pub(super) fn specialize_higher_order_call(
         }
     }
 
-    let inferred_substitutions = infer_higher_order_substitutions(
-        template,
-        &explicit_substitutions,
-        args,
-        expected,
-        local_types,
-        function_table,
-        module_impls,
-        visible_structs,
-        visible_type_aliases,
-    )?;
+    let inferred_substitutions =
+        infer_higher_order_substitutions(HigherOrderSubstitutionInferenceInput {
+            template,
+            explicit_substitutions: &explicit_substitutions,
+            args,
+            expected,
+            local_types,
+            function_table,
+            module_impls,
+            visible_structs,
+            visible_type_aliases,
+        })?;
     let type_fragments = template
         .generic_params
         .iter()
@@ -410,16 +441,17 @@ pub(super) fn specialize_higher_order_call(
         )
     };
     if specialized_cache.insert(specialized_name.clone()) {
-        let specialized = specialize_higher_order_template(
-            template,
-            &specialized_name,
-            &callable_bindings,
-            templates,
-            function_table,
-            visible_type_aliases,
-            specialized_cache,
-            specialized_functions,
-        )?;
+        let specialized =
+            specialize_higher_order_template(HigherOrderTemplateSpecializationInput {
+                template,
+                specialized_name: &specialized_name,
+                callable_bindings: &callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            })?;
         let inferred_ast_substitutions = inferred_substitutions
             .iter()
             .map(|(name, ty)| (name.clone(), ast_type_from_nir(ty)))
@@ -442,16 +474,30 @@ pub(super) fn specialize_higher_order_call(
     })
 }
 
+struct HigherOrderArgumentRewriteInput<'a> {
+    expr: &'a AstExpr,
+    template_callable_bindings: Option<&'a BTreeMap<String, BoundCallable>>,
+    expected: Option<&'a AstTypeRef>,
+    templates: &'a BTreeMap<String, AstFunction>,
+    function_table: &'a BTreeMap<String, AstFunction>,
+    visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &'a mut BTreeSet<String>,
+    specialized_functions: &'a mut Vec<AstFunction>,
+}
+
 fn rewrite_higher_order_argument_expr(
-    expr: &AstExpr,
-    template_callable_bindings: Option<&BTreeMap<String, BoundCallable>>,
-    expected: Option<&AstTypeRef>,
-    templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    specialized_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
+    input: HigherOrderArgumentRewriteInput<'_>,
 ) -> Result<AstExpr, String> {
+    let HigherOrderArgumentRewriteInput {
+        expr,
+        template_callable_bindings,
+        expected,
+        templates,
+        function_table,
+        visible_type_aliases,
+        specialized_cache,
+        specialized_functions,
+    } = input;
     if let Some(bindings) = template_callable_bindings {
         return rewrite_higher_order_template_expr(
             expr,
@@ -463,18 +509,19 @@ fn rewrite_higher_order_argument_expr(
             specialized_functions,
         );
     }
-    rewrite_higher_order_calls_in_expr(
-        expr,
-        expected,
-        None,
-        &BTreeMap::new(),
+    let local_types = BTreeMap::new();
+    let module_impls = Vec::new();
+    let visible_structs = BTreeMap::new();
+    let method_template_lookup = BTreeMap::new();
+    let mut context = HigherOrderRewriteContext {
         templates,
         function_table,
-        &[],
-        &BTreeMap::new(),
-        &BTreeMap::new(),
+        module_impls: &module_impls,
+        visible_structs: &visible_structs,
+        method_template_lookup: &method_template_lookup,
         visible_type_aliases,
         specialized_cache,
         specialized_functions,
-    )
+    };
+    rewrite_higher_order_calls_in_expr(expr, expected, None, &local_types, &mut context)
 }

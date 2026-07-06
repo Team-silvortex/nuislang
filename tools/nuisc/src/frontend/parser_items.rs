@@ -1,3 +1,4 @@
+use super::parser_test_metadata::{BenchmarkMetadata, TestMetadata};
 use super::*;
 
 impl Parser {
@@ -312,23 +313,15 @@ impl Parser {
                         .to_owned(),
                 );
             }
-            let (
-                declared_test_name,
-                test_ignored,
-                test_should_fail,
-                test_reason,
-                test_timeout_ms,
-                test_clock_domain,
-                test_clock_policy,
-            ) = self.parse_test_decl_call_syntax()?;
+            let test_metadata = self.parse_test_decl_call_syntax()?;
             (
-                declared_test_name,
-                test_ignored,
-                test_should_fail,
-                test_reason,
-                test_timeout_ms,
-                test_clock_domain,
-                test_clock_policy,
+                test_metadata.label,
+                test_metadata.ignored,
+                test_metadata.should_fail,
+                test_metadata.reason,
+                test_metadata.timeout_ms,
+                test_metadata.clock_domain,
+                test_metadata.clock_policy,
                 None,
                 None,
                 None,
@@ -344,14 +337,7 @@ impl Parser {
                         .to_owned(),
                 );
             }
-            let (
-                declared_benchmark_name,
-                benchmark_warmup_iters,
-                benchmark_measure_iters,
-                benchmark_timeout_ms,
-                benchmark_clock_domain,
-                benchmark_clock_policy,
-            ) = self.parse_benchmark_decl_call_syntax()?;
+            let benchmark_metadata = self.parse_benchmark_decl_call_syntax()?;
             (
                 None,
                 false,
@@ -360,12 +346,12 @@ impl Parser {
                 None,
                 None,
                 None,
-                declared_benchmark_name,
-                benchmark_warmup_iters,
-                benchmark_measure_iters,
-                benchmark_timeout_ms,
-                benchmark_clock_domain,
-                benchmark_clock_policy,
+                benchmark_metadata.label,
+                benchmark_metadata.warmup_iters,
+                benchmark_metadata.measure_iters,
+                benchmark_metadata.timeout_ms,
+                benchmark_metadata.clock_domain,
+                benchmark_metadata.clock_policy,
             )
         } else {
             (
@@ -423,72 +409,57 @@ impl Parser {
             ));
         }
         if declared_test_name.is_some() {
-            attributes.push(self.build_test_attribute(
-                declared_test_name.clone(),
-                test_ignored,
-                test_should_fail,
-                test_reason.clone(),
-                test_timeout_ms,
-                test_clock_domain,
-                test_clock_policy,
-            ));
+            attributes.push(self.build_test_attribute(TestMetadata {
+                label: declared_test_name.clone(),
+                ignored: test_ignored,
+                should_fail: test_should_fail,
+                reason: test_reason.clone(),
+                timeout_ms: test_timeout_ms,
+                clock_domain: test_clock_domain,
+                clock_policy: test_clock_policy,
+            }));
         }
         if declared_benchmark_name.is_some() {
-            attributes.push(self.build_benchmark_attribute(
-                declared_benchmark_name.clone(),
-                benchmark_warmup_iters,
-                benchmark_measure_iters,
-                benchmark_timeout_ms,
-                benchmark_clock_domain,
-                benchmark_clock_policy,
-            ));
+            attributes.push(self.build_benchmark_attribute(BenchmarkMetadata {
+                label: declared_benchmark_name.clone(),
+                warmup_iters: benchmark_warmup_iters,
+                measure_iters: benchmark_measure_iters,
+                timeout_ms: benchmark_timeout_ms,
+                clock_domain: benchmark_clock_domain,
+                clock_policy: benchmark_clock_policy,
+            }));
         }
-        let (
-            raw_test_name,
-            test_ignored,
-            test_should_fail,
-            test_reason,
-            test_timeout_ms,
-            test_clock_domain,
-            test_clock_policy,
-        ) = match test_from_attribute {
+        let test_metadata = match test_from_attribute {
             Some(values) => values,
-            None => (
-                declared_test_name,
-                test_ignored,
-                test_should_fail,
-                test_reason,
-                test_timeout_ms,
-                test_clock_domain,
-                test_clock_policy,
-            ),
+            None => TestMetadata {
+                label: declared_test_name,
+                ignored: test_ignored,
+                should_fail: test_should_fail,
+                reason: test_reason,
+                timeout_ms: test_timeout_ms,
+                clock_domain: test_clock_domain,
+                clock_policy: test_clock_policy,
+            },
         };
-        let test_name = raw_test_name.map(|label| {
+        let test_name = test_metadata.label.clone().map(|label| {
             if label.is_empty() {
                 name.clone()
             } else {
                 label
             }
         });
-        let (
-            raw_benchmark_name,
-            benchmark_warmup_iters,
-            benchmark_measure_iters,
-            benchmark_timeout_ms,
-            benchmark_clock_domain,
-            benchmark_clock_policy,
-        ) = match benchmark_from_attribute {
+        let benchmark_metadata = match benchmark_from_attribute {
             Some(values) => values,
-            None => (
-                declared_benchmark_name,
-                benchmark_warmup_iters,
-                benchmark_measure_iters,
-                benchmark_timeout_ms,
-                benchmark_clock_domain,
-                benchmark_clock_policy,
-            ),
+            None => BenchmarkMetadata {
+                label: declared_benchmark_name,
+                warmup_iters: benchmark_warmup_iters,
+                measure_iters: benchmark_measure_iters,
+                timeout_ms: benchmark_timeout_ms,
+                clock_domain: benchmark_clock_domain,
+                clock_policy: benchmark_clock_policy,
+            },
         };
-        let benchmark_name = raw_benchmark_name.map(|label| {
+        let benchmark_name = benchmark_metadata.label.clone().map(|label| {
             if label.is_empty() {
                 name.clone()
             } else {
@@ -515,18 +486,18 @@ impl Parser {
             name,
             attributes,
             test_name,
-            test_ignored,
-            test_should_fail,
-            test_reason,
-            test_timeout_ms,
-            test_clock_domain,
-            test_clock_policy,
+            test_ignored: test_metadata.ignored,
+            test_should_fail: test_metadata.should_fail,
+            test_reason: test_metadata.reason,
+            test_timeout_ms: test_metadata.timeout_ms,
+            test_clock_domain: test_metadata.clock_domain,
+            test_clock_policy: test_metadata.clock_policy,
             benchmark_name,
-            benchmark_warmup_iters,
-            benchmark_measure_iters,
-            benchmark_timeout_ms,
-            benchmark_clock_domain,
-            benchmark_clock_policy,
+            benchmark_warmup_iters: benchmark_metadata.warmup_iters,
+            benchmark_measure_iters: benchmark_metadata.measure_iters,
+            benchmark_timeout_ms: benchmark_metadata.timeout_ms,
+            benchmark_clock_domain: benchmark_metadata.clock_domain,
+            benchmark_clock_policy: benchmark_metadata.clock_policy,
             is_async,
             generic_params,
             where_bounds,

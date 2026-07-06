@@ -49,35 +49,28 @@ pub(crate) fn build_manifest_domain_units(
         .iter()
         .map(|contract| {
             let abi = abi_by_domain.get(&contract.domain_family).cloned();
-            let (
-                machine_arch,
-                machine_os,
-                backend_family,
-                vendor,
-                device_class,
-                selected_lowering_target,
-            ) = resolve_domain_build_unit_target(&contract.domain_family, abi.as_deref())?;
+            let target = resolve_domain_build_unit_target(&contract.domain_family, abi.as_deref())?;
             let artifact_metadata = domain_artifact_metadata(
                 &contract.domain_family,
-                backend_family.as_deref(),
-                selected_lowering_target.as_deref(),
-                device_class.as_deref(),
+                target.backend_family.as_deref(),
+                target.selected_lowering_target.as_deref(),
+                target.device_class.as_deref(),
             );
             Ok(BuildManifestDomainBuildUnit {
                 package_id: contract.package_id.clone(),
                 domain_family: contract.domain_family.clone(),
                 abi,
-                machine_arch,
-                machine_os,
-                backend_family,
-                vendor,
-                device_class,
+                machine_arch: target.machine_arch,
+                machine_os: target.machine_os,
+                backend_family: target.backend_family,
+                vendor: target.vendor,
+                device_class: target.device_class,
                 target_device: artifact_metadata.target_device,
                 ir_format: artifact_metadata.ir_format,
                 dispatch_abi: artifact_metadata.dispatch_abi,
                 backend_priority: artifact_metadata.backend_priority,
                 verification: artifact_metadata.verification,
-                selected_lowering_target,
+                selected_lowering_target: target.selected_lowering_target,
                 artifact_stub_path: None,
                 artifact_stub_inline: None,
                 artifact_payload_path: None,
@@ -119,34 +112,40 @@ fn build_abi_map(
     abi_by_domain
 }
 
+struct DomainBuildUnitTarget {
+    machine_arch: Option<String>,
+    machine_os: Option<String>,
+    backend_family: Option<String>,
+    vendor: Option<String>,
+    device_class: Option<String>,
+    selected_lowering_target: Option<String>,
+}
+
 fn resolve_domain_build_unit_target(
     domain_family: &str,
     abi: Option<&str>,
-) -> Result<
-    (
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    ),
-    String,
-> {
+) -> Result<DomainBuildUnitTarget, String> {
     let Some(abi) = abi else {
-        return Ok((None, None, None, None, None, None));
+        return Ok(DomainBuildUnitTarget {
+            machine_arch: None,
+            machine_os: None,
+            backend_family: None,
+            vendor: None,
+            device_class: None,
+            selected_lowering_target: None,
+        });
     };
     match domain_family {
         "cpu" => {
             let target = resolve_cpu_build_target_from_abi(Path::new("nustar-packages"), abi)?;
-            Ok((
-                Some(target.machine_arch),
-                Some(target.machine_os),
-                Some("llvm".to_owned()),
-                None,
-                None,
-                Some("llvm".to_owned()),
-            ))
+            Ok(DomainBuildUnitTarget {
+                machine_arch: Some(target.machine_arch),
+                machine_os: Some(target.machine_os),
+                backend_family: Some("llvm".to_owned()),
+                vendor: None,
+                device_class: None,
+                selected_lowering_target: Some("llvm".to_owned()),
+            })
         }
         "shader" | "kernel" | "network" => {
             let manifest = crate::registry::load_manifest_for_domain(
@@ -162,16 +161,23 @@ fn resolve_domain_build_unit_target(
                 );
             let backend_family =
                 crate::project::backend_family_for_registered_abi_target(domain_family, &target);
-            Ok((
-                Some(target.machine_arch),
-                Some(target.machine_os),
+            Ok(DomainBuildUnitTarget {
+                machine_arch: Some(target.machine_arch),
+                machine_os: Some(target.machine_os),
                 backend_family,
-                target.vendor,
-                target.device_class,
+                vendor: target.vendor,
+                device_class: target.device_class,
                 selected_lowering_target,
-            ))
+            })
         }
-        _ => Ok((None, None, None, None, None, None)),
+        _ => Ok(DomainBuildUnitTarget {
+            machine_arch: None,
+            machine_os: None,
+            backend_family: None,
+            vendor: None,
+            device_class: None,
+            selected_lowering_target: None,
+        }),
     }
 }
 

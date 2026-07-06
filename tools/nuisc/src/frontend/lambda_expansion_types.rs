@@ -209,16 +209,30 @@ pub(super) fn infer_generic_call_substitutions(
     substitutions
 }
 
+pub(super) struct ImplMethodSubstitutionInput<'a> {
+    pub(super) definition: &'a AstImplDef,
+    pub(super) method_index: usize,
+    pub(super) receiver_ty: &'a AstTypeRef,
+    pub(super) args: &'a [AstExpr],
+    pub(super) expected_result_type: Option<&'a AstTypeRef>,
+    pub(super) visible_local_types: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) module_function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) module_impls: &'a [AstImplDef],
+}
+
 pub(super) fn infer_impl_method_substitutions(
-    definition: &AstImplDef,
-    method_index: usize,
-    receiver_ty: &AstTypeRef,
-    args: &[AstExpr],
-    expected_result_type: Option<&AstTypeRef>,
-    visible_local_types: &BTreeMap<String, AstTypeRef>,
-    module_function_table: &BTreeMap<String, AstFunction>,
-    module_impls: &[AstImplDef],
+    input: ImplMethodSubstitutionInput<'_>,
 ) -> BTreeMap<String, AstTypeRef> {
+    let ImplMethodSubstitutionInput {
+        definition,
+        method_index,
+        receiver_ty,
+        args,
+        expected_result_type,
+        visible_local_types,
+        module_function_table,
+        module_impls,
+    } = input;
     let generic_names = definition
         .generic_params
         .iter()
@@ -473,16 +487,16 @@ pub(super) fn infer_local_binding_type(
                 else {
                     continue;
                 };
-                let substitutions = infer_impl_method_substitutions(
+                let substitutions = infer_impl_method_substitutions(ImplMethodSubstitutionInput {
                     definition,
                     method_index,
-                    &receiver_ty,
+                    receiver_ty: &receiver_ty,
                     args,
-                    None,
+                    expected_result_type: None,
                     visible_local_types,
                     module_function_table,
                     module_impls,
-                );
+                });
                 let specialized_for_type =
                     specialize_type_with_substitutions(&definition.for_type, &substitutions);
                 if specialized_for_type != receiver_ty {

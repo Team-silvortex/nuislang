@@ -11,6 +11,9 @@ use super::exprs_alias_expected::{
     ast_type_args_are_placeholder_generics, infer_alias_struct_target_from_expected,
     seed_alias_generic_substitutions_from_expected_pattern,
 };
+pub(super) use super::exprs_alias_inputs::{
+    MethodCallReceiverExpectedTypeInput, StructConstructorAliasInput, StructLiteralAliasInput,
+};
 
 pub(super) fn concrete_struct_literal_type(
     rewritten_name: &str,
@@ -38,16 +41,19 @@ pub(super) fn concrete_struct_literal_type(
 }
 
 pub(super) fn resolved_struct_constructor_alias(
-    callee: &str,
-    generic_args: &[AstTypeRef],
-    expected: Option<&AstTypeRef>,
-    args: &[AstExpr],
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    input: StructConstructorAliasInput<'_>,
 ) -> Result<Option<(String, Vec<AstTypeRef>)>, String> {
+    let StructConstructorAliasInput {
+        callee,
+        generic_args,
+        expected,
+        args,
+        env,
+        visible_type_aliases,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+    } = input;
     let alias_placeholder_names = visible_type_aliases
         .get(callee)
         .map(|alias| {
@@ -115,16 +121,19 @@ pub(super) fn resolved_struct_constructor_alias(
 }
 
 pub(super) fn resolved_struct_literal_alias(
-    type_name: &str,
-    type_args: &[AstTypeRef],
-    expected: Option<&AstTypeRef>,
-    fields: &[(String, AstExpr)],
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    input: StructLiteralAliasInput<'_>,
 ) -> Result<Option<(String, Vec<AstTypeRef>)>, String> {
+    let StructLiteralAliasInput {
+        type_name,
+        type_args,
+        expected,
+        fields,
+        env,
+        visible_type_aliases,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+    } = input;
     let alias_placeholder_names = visible_type_aliases
         .get(type_name)
         .map(|alias| {
@@ -168,7 +177,6 @@ pub(super) fn resolved_struct_literal_alias(
     let resolved = match resolve_ast_type_ref_aliases(&type_ref, visible_type_aliases) {
         Ok(resolved) => resolved,
         Err(error) => {
-            if has_placeholder_type_args {}
             if visible_type_aliases.contains_key(type_name) {
                 return Err(error);
             }
@@ -181,16 +189,19 @@ pub(super) fn resolved_struct_literal_alias(
 }
 
 pub(super) fn method_call_receiver_expected_type(
-    receiver: &AstExpr,
-    method: &str,
-    generic_args: &[AstTypeRef],
-    args: &[AstExpr],
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    input: MethodCallReceiverExpectedTypeInput<'_>,
 ) -> Option<AstTypeRef> {
+    let MethodCallReceiverExpectedTypeInput {
+        receiver,
+        method,
+        generic_args,
+        args,
+        env,
+        visible_type_aliases,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+    } = input;
     if let Some(explicit) = super::super::receiver_expected::explicit_receiver_expected_type(
         receiver,
         generic_args,
@@ -394,7 +405,6 @@ fn infer_alias_struct_target_from_usage_seeded(
     let mut pending = patterns
         .iter()
         .zip(concrete_exprs.iter())
-        .map(|(pattern, expr)| (pattern, expr))
         .collect::<Vec<_>>();
     while !pending.is_empty() {
         let mut progress = false;
@@ -508,17 +518,19 @@ pub(super) fn infer_alias_aware_ast_expr_type_for_pattern(
             fields,
         } => {
             if visible_type_aliases.contains_key(type_name) {
-                if let Ok(Some((resolved_name, resolved_args))) = resolved_struct_literal_alias(
-                    type_name,
-                    type_args,
-                    Some(expected_pattern),
-                    fields,
-                    env,
-                    visible_type_aliases,
-                    impl_lookup,
-                    struct_table,
-                    function_return_types,
-                ) {
+                if let Ok(Some((resolved_name, resolved_args))) =
+                    resolved_struct_literal_alias(StructLiteralAliasInput {
+                        type_name,
+                        type_args,
+                        expected: Some(expected_pattern),
+                        fields,
+                        env,
+                        visible_type_aliases,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                    })
+                {
                     return Some(AstTypeRef {
                         name: resolved_name,
                         generic_args: resolved_args,
@@ -534,17 +546,19 @@ pub(super) fn infer_alias_aware_ast_expr_type_for_pattern(
             args,
         } => {
             if visible_type_aliases.contains_key(callee) {
-                if let Ok(Some((resolved_name, resolved_args))) = resolved_struct_constructor_alias(
-                    callee,
-                    generic_args,
-                    Some(expected_pattern),
-                    args,
-                    env,
-                    visible_type_aliases,
-                    impl_lookup,
-                    struct_table,
-                    function_return_types,
-                ) {
+                if let Ok(Some((resolved_name, resolved_args))) =
+                    resolved_struct_constructor_alias(StructConstructorAliasInput {
+                        callee,
+                        generic_args,
+                        expected: Some(expected_pattern),
+                        args,
+                        env,
+                        visible_type_aliases,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                    })
+                {
                     return Some(AstTypeRef {
                         name: resolved_name,
                         generic_args: resolved_args,

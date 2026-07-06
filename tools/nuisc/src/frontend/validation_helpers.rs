@@ -59,9 +59,7 @@ fn async_parameter_violation_detail_inner(
             ));
         }
     }
-    let Some(definition) = struct_table.get(&ty.name) else {
-        return None;
-    };
+    let definition = struct_table.get(&ty.name)?;
     let visit_key = ty.render();
     if !visiting.insert(visit_key.clone()) {
         return None;
@@ -95,9 +93,7 @@ fn async_boundary_violation_detail_inner(
             ty.render()
         ));
     }
-    let Some(definition) = struct_table.get(&ty.name) else {
-        return None;
-    };
+    let definition = struct_table.get(&ty.name)?;
     let visit_key = ty.render();
     if !visiting.insert(visit_key.clone()) {
         return None;

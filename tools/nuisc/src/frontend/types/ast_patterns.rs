@@ -15,7 +15,7 @@ pub(crate) fn infer_ast_expr_type_for_pattern(
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
 ) -> Option<AstTypeRef> {
-    infer_ast_expr_type_for_pattern_inner(
+    infer_ast_expr_type_for_pattern_inner(PatternExprInferenceInput {
         expr,
         expected_pattern,
         placeholder_names,
@@ -23,8 +23,8 @@ pub(crate) fn infer_ast_expr_type_for_pattern(
         impl_lookup,
         struct_table,
         function_return_types,
-        &mut BTreeSet::new(),
-    )
+        active_exprs: &mut BTreeSet::new(),
+    })
 }
 
 pub(super) fn type_args_are_pattern_placeholders(
@@ -37,16 +37,30 @@ pub(super) fn type_args_are_pattern_placeholders(
             .all(|arg| contains_ast_placeholder_generic_name(arg, placeholder_names))
 }
 
+struct PatternExprInferenceInput<'a> {
+    expr: &'a AstExpr,
+    expected_pattern: &'a AstTypeRef,
+    placeholder_names: &'a BTreeSet<String>,
+    env: &'a BTreeMap<String, AstTypeRef>,
+    impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    struct_table: &'a BTreeMap<String, AstStructDef>,
+    function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    active_exprs: &'a mut BTreeSet<usize>,
+}
+
 fn infer_ast_expr_type_for_pattern_inner(
-    expr: &AstExpr,
-    expected_pattern: &AstTypeRef,
-    placeholder_names: &BTreeSet<String>,
-    env: &BTreeMap<String, AstTypeRef>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    active_exprs: &mut BTreeSet<usize>,
+    input: PatternExprInferenceInput<'_>,
 ) -> Option<AstTypeRef> {
+    let PatternExprInferenceInput {
+        expr,
+        expected_pattern,
+        placeholder_names,
+        env,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        active_exprs,
+    } = input;
     match expr {
         AstExpr::StructLiteral {
             type_name,
@@ -164,16 +178,16 @@ pub(super) fn infer_struct_literal_ast_type_seeded(
             let field = definition.fields.iter().find(|field| field.name == name)?;
             let field_pattern =
                 specialize_ast_type_pattern_with_known_substitutions(&field.ty, &substitutions);
-            let value_ty = infer_ast_expr_type_for_pattern_inner(
-                value,
-                &field_pattern,
-                generic_names,
+            let value_ty = infer_ast_expr_type_for_pattern_inner(PatternExprInferenceInput {
+                expr: value,
+                expected_pattern: &field_pattern,
+                placeholder_names: generic_names,
                 env,
                 impl_lookup,
                 struct_table,
                 function_return_types,
                 active_exprs,
-            );
+            });
             let Some(value_ty) = value_ty else {
                 next_pending.push((name, value));
                 continue;
@@ -217,16 +231,16 @@ pub(super) fn infer_payload_constructor_ast_type_seeded(
         &definition.fields[0].ty,
         &substitutions,
     );
-    let arg_ty = infer_ast_expr_type_for_pattern_inner(
-        arg,
-        &field_pattern,
-        generic_names,
+    let arg_ty = infer_ast_expr_type_for_pattern_inner(PatternExprInferenceInput {
+        expr: arg,
+        expected_pattern: &field_pattern,
+        placeholder_names: generic_names,
         env,
         impl_lookup,
         struct_table,
         function_return_types,
         active_exprs,
-    )?;
+    })?;
     unify_ast_generic_type_pattern(
         &definition.fields[0].ty,
         &arg_ty,

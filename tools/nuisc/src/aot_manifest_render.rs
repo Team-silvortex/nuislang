@@ -5,7 +5,9 @@ use nuis_artifact::{BuildManifestDomainBuildUnit, NuisExecutableEnvelope, NuisLi
 use crate::aot_artifact_hash::{
     append_artifact_hash_manifest_sections, append_artifacts_manifest_section,
 };
-use crate::aot_domain_index_render::append_build_manifest_domain_index_sections;
+use crate::aot_domain_index_render::{
+    append_build_manifest_domain_index_sections, BuildManifestDomainIndexSections,
+};
 use crate::aot_domain_unit_render::append_domain_build_unit_manifest_sections;
 use crate::aot_manifest_artifacts::BuildManifestArtifactSet;
 use crate::aot_manifest_domain_model::BuildManifestExecutionContract;
@@ -63,13 +65,18 @@ pub(crate) fn render_build_manifest_source(
 
     append_build_manifest_domain_index_sections(
         &mut out,
-        input.artifact_set.bridge_registry_path.as_deref(),
-        input.artifact_set.bridge_registry_inline.as_deref(),
-        input.artifact_set.host_bridge_plan_index_path.as_deref(),
-        input.artifact_set.host_bridge_plan_index_inline.as_deref(),
-        input.artifact_set.lowering_plan_index_path.as_deref(),
-        input.artifact_set.lowering_plan_index_inline.as_deref(),
-        input.domain_build_units,
+        BuildManifestDomainIndexSections {
+            bridge_registry_path: input.artifact_set.bridge_registry_path.as_deref(),
+            bridge_registry_inline: input.artifact_set.bridge_registry_inline.as_deref(),
+            host_bridge_plan_index_path: input.artifact_set.host_bridge_plan_index_path.as_deref(),
+            host_bridge_plan_index_inline: input
+                .artifact_set
+                .host_bridge_plan_index_inline
+                .as_deref(),
+            lowering_plan_index_path: input.artifact_set.lowering_plan_index_path.as_deref(),
+            lowering_plan_index_inline: input.artifact_set.lowering_plan_index_inline.as_deref(),
+            units: input.domain_build_units,
+        },
     );
     if let Some(path) = input.artifact_set.clock_protocol_path.as_deref() {
         out.push('\n');

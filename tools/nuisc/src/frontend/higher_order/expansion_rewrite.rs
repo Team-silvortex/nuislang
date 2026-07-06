@@ -11,17 +11,43 @@ use super::expansion_inference::{
 };
 use super::expansion_rewrite_expr::rewrite_higher_order_calls_in_expr;
 
+pub(crate) struct HigherOrderRewriteContext<'a> {
+    pub(crate) templates: &'a BTreeMap<String, AstFunction>,
+    pub(crate) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(crate) module_impls: &'a [AstImplDef],
+    pub(crate) visible_structs: &'a BTreeMap<String, AstStructDef>,
+    pub(crate) method_template_lookup: &'a BTreeMap<(String, String), String>,
+    pub(crate) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(crate) specialized_cache: &'a mut BTreeSet<String>,
+    pub(crate) specialized_functions: &'a mut Vec<AstFunction>,
+}
+
+pub(crate) struct HigherOrderFunctionRewriteInput<'a> {
+    pub(crate) function: &'a AstFunction,
+    pub(crate) templates: &'a BTreeMap<String, AstFunction>,
+    pub(crate) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(crate) module_impls: &'a [AstImplDef],
+    pub(crate) visible_structs: &'a BTreeMap<String, AstStructDef>,
+    pub(crate) method_template_lookup: &'a BTreeMap<(String, String), String>,
+    pub(crate) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(crate) specialized_cache: &'a mut BTreeSet<String>,
+    pub(crate) specialized_functions: &'a mut Vec<AstFunction>,
+}
+
 pub(crate) fn rewrite_higher_order_calls_in_function(
-    function: &AstFunction,
-    templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    module_impls: &[AstImplDef],
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    method_template_lookup: &BTreeMap<(String, String), String>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    specialized_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
+    input: HigherOrderFunctionRewriteInput<'_>,
 ) -> Result<AstFunction, String> {
+    let HigherOrderFunctionRewriteInput {
+        function,
+        templates,
+        function_table,
+        module_impls,
+        visible_structs,
+        method_template_lookup,
+        visible_type_aliases,
+        specialized_cache,
+        specialized_functions,
+    } = input;
     let mut local_types = function
         .params
         .iter()
@@ -35,11 +61,7 @@ pub(crate) fn rewrite_higher_order_calls_in_function(
             &mut local_types,
         );
     }
-    let body = rewrite_higher_order_calls_in_block(
-        &function.body,
-        function.return_type.as_ref(),
-        function.return_type.as_ref(),
-        &local_types,
+    let mut context = HigherOrderRewriteContext {
         templates,
         function_table,
         module_impls,
@@ -48,6 +70,13 @@ pub(crate) fn rewrite_higher_order_calls_in_function(
         visible_type_aliases,
         specialized_cache,
         specialized_functions,
+    };
+    let body = rewrite_higher_order_calls_in_block(
+        &function.body,
+        function.return_type.as_ref(),
+        function.return_type.as_ref(),
+        &local_types,
+        &mut context,
     )?;
     let mut rewritten = function.clone();
     rewritten.body = body;
@@ -59,14 +88,7 @@ pub(crate) fn rewrite_higher_order_calls_in_block(
     current_return_type: Option<&AstTypeRef>,
     tail_expected: Option<&AstTypeRef>,
     local_types: &BTreeMap<String, AstTypeRef>,
-    templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    module_impls: &[AstImplDef],
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    method_template_lookup: &BTreeMap<(String, String), String>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    specialized_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
+    context: &mut HigherOrderRewriteContext<'_>,
 ) -> Result<Vec<AstStmt>, String> {
     let mut env = local_types.clone();
     let mut rewritten = Vec::with_capacity(body.len());
@@ -76,14 +98,7 @@ pub(crate) fn rewrite_higher_order_calls_in_block(
             current_return_type,
             tail_expected,
             &env,
-            templates,
-            function_table,
-            module_impls,
-            visible_structs,
-            method_template_lookup,
-            visible_type_aliases,
-            specialized_cache,
-            specialized_functions,
+            context,
         )?;
         match &rewritten_stmt {
             AstStmt::Let {
@@ -96,35 +111,41 @@ pub(crate) fn rewrite_higher_order_calls_in_block(
                         extend_local_field_bindings_from_type(
                             name,
                             &bound_ty,
-                            visible_structs,
+                            context.visible_structs,
                             &mut env,
                         );
                     }
-                } else if let Some(inferred_ty) =
-                    infer_local_binding_type(value, &env, function_table, module_impls)
-                {
+                } else if let Some(inferred_ty) = infer_local_binding_type(
+                    value,
+                    &env,
+                    context.function_table,
+                    context.module_impls,
+                ) {
                     env.insert(name.clone(), inferred_ty);
                 }
                 extend_local_field_bindings_from_expr(
                     name,
                     value,
                     &mut env,
-                    function_table,
-                    module_impls,
+                    context.function_table,
+                    context.module_impls,
                 );
             }
             AstStmt::AssignLocal { name, value } => {
-                if let Some(inferred_ty) =
-                    infer_local_binding_type(value, &env, function_table, module_impls)
-                {
+                if let Some(inferred_ty) = infer_local_binding_type(
+                    value,
+                    &env,
+                    context.function_table,
+                    context.module_impls,
+                ) {
                     env.insert(name.clone(), inferred_ty);
                 }
                 extend_local_field_bindings_from_expr(
                     name,
                     value,
                     &mut env,
-                    function_table,
-                    module_impls,
+                    context.function_table,
+                    context.module_impls,
                 );
             }
             _ => {}
@@ -139,14 +160,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
     current_return_type: Option<&AstTypeRef>,
     tail_expected: Option<&AstTypeRef>,
     local_types: &BTreeMap<String, AstTypeRef>,
-    templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    module_impls: &[AstImplDef],
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    method_template_lookup: &BTreeMap<(String, String), String>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    specialized_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
+    context: &mut HigherOrderRewriteContext<'_>,
 ) -> Result<AstStmt, String> {
     Ok(match stmt {
         AstStmt::Let {
@@ -163,14 +177,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 ty.as_ref(),
                 current_return_type,
                 local_types,
-                templates,
-                function_table,
-                module_impls,
-                visible_structs,
-                method_template_lookup,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
+                context,
             )?,
         },
         AstStmt::AssignLocal { name, value } => AstStmt::AssignLocal {
@@ -180,14 +187,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 current_return_type,
                 current_return_type,
                 local_types,
-                templates,
-                function_table,
-                module_impls,
-                visible_structs,
-                method_template_lookup,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
+                context,
             )?,
         },
         AstStmt::DestructureLet {
@@ -202,14 +202,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 type_ref.as_ref(),
                 current_return_type,
                 local_types,
-                templates,
-                function_table,
-                module_impls,
-                visible_structs,
-                method_template_lookup,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
+                context,
             )?,
         },
         AstStmt::Const { name, ty, value } => AstStmt::Const {
@@ -220,14 +213,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 ty.as_ref(),
                 current_return_type,
                 local_types,
-                templates,
-                function_table,
-                module_impls,
-                visible_structs,
-                method_template_lookup,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
+                context,
             )?,
         },
         AstStmt::Print(value) => AstStmt::Print(rewrite_higher_order_calls_in_expr(
@@ -235,28 +221,14 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             None,
             current_return_type,
             local_types,
-            templates,
-            function_table,
-            module_impls,
-            visible_structs,
-            method_template_lookup,
-            visible_type_aliases,
-            specialized_cache,
-            specialized_functions,
+            context,
         )?),
         AstStmt::Await(value) => AstStmt::Await(rewrite_higher_order_calls_in_expr(
             value,
             None,
             current_return_type,
             local_types,
-            templates,
-            function_table,
-            module_impls,
-            visible_structs,
-            method_template_lookup,
-            visible_type_aliases,
-            specialized_cache,
-            specialized_functions,
+            context,
         )?),
         AstStmt::If {
             condition,
@@ -268,42 +240,21 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 None,
                 current_return_type,
                 local_types,
-                templates,
-                function_table,
-                module_impls,
-                visible_structs,
-                method_template_lookup,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
+                context,
             )?,
             then_body: rewrite_higher_order_calls_in_block(
                 then_body,
                 current_return_type,
                 current_return_type,
                 local_types,
-                templates,
-                function_table,
-                module_impls,
-                visible_structs,
-                method_template_lookup,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
+                context,
             )?,
             else_body: rewrite_higher_order_calls_in_block(
                 else_body,
                 current_return_type,
                 current_return_type,
                 local_types,
-                templates,
-                function_table,
-                module_impls,
-                visible_structs,
-                method_template_lookup,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
+                context,
             )?,
         },
         AstStmt::Match { value, arms } => {
@@ -312,20 +263,13 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 None,
                 current_return_type,
                 local_types,
-                templates,
-                function_table,
-                module_impls,
-                visible_structs,
-                method_template_lookup,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
+                context,
             )?;
             let scrutinee_type = infer_local_binding_type(
                 &rewritten_value,
                 local_types,
-                function_table,
-                module_impls,
+                context.function_table,
+                context.module_impls,
             );
             AstStmt::Match {
                 value: rewritten_value,
@@ -337,8 +281,8 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                             bind_match_pattern_for_type(
                                 scrutinee_type,
                                 &arm.pattern,
-                                visible_type_aliases,
-                                visible_structs,
+                                context.visible_type_aliases,
+                                context.visible_structs,
                                 &mut arm_local_types,
                             )?;
                         }
@@ -353,14 +297,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                                         None,
                                         current_return_type,
                                         &arm_local_types,
-                                        templates,
-                                        function_table,
-                                        module_impls,
-                                        visible_structs,
-                                        method_template_lookup,
-                                        visible_type_aliases,
-                                        specialized_cache,
-                                        specialized_functions,
+                                        context,
                                     )
                                 })
                                 .transpose()?,
@@ -369,14 +306,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                                 current_return_type,
                                 current_return_type,
                                 &arm_local_types,
-                                templates,
-                                function_table,
-                                module_impls,
-                                visible_structs,
-                                method_template_lookup,
-                                visible_type_aliases,
-                                specialized_cache,
-                                specialized_functions,
+                                context,
                             )?,
                         })
                     })
@@ -389,28 +319,14 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                 None,
                 current_return_type,
                 local_types,
-                templates,
-                function_table,
-                module_impls,
-                visible_structs,
-                method_template_lookup,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
+                context,
             )?,
             body: rewrite_higher_order_calls_in_block(
                 body,
                 current_return_type,
                 current_return_type,
                 local_types,
-                templates,
-                function_table,
-                module_impls,
-                visible_structs,
-                method_template_lookup,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
+                context,
             )?,
         },
         AstStmt::Expr(expr) => AstStmt::Expr(rewrite_higher_order_calls_in_expr(
@@ -418,28 +334,14 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             tail_expected,
             current_return_type,
             local_types,
-            templates,
-            function_table,
-            module_impls,
-            visible_structs,
-            method_template_lookup,
-            visible_type_aliases,
-            specialized_cache,
-            specialized_functions,
+            context,
         )?),
         AstStmt::Return(Some(value)) => AstStmt::Return(Some(rewrite_higher_order_calls_in_expr(
             value,
             tail_expected.or(current_return_type),
             current_return_type,
             local_types,
-            templates,
-            function_table,
-            module_impls,
-            visible_structs,
-            method_template_lookup,
-            visible_type_aliases,
-            specialized_cache,
-            specialized_functions,
+            context,
         )?)),
         AstStmt::Return(None) => AstStmt::Return(None),
         AstStmt::Break => AstStmt::Break,

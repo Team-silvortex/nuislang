@@ -8,7 +8,7 @@ use super::super::validation_binding_env::bind_match_pattern_for_type;
 use super::super::{ast_named_type, FunctionSignature};
 use super::blocks_expected::let_binding_expected_type_from_following_use;
 use super::blocks_hoists::rewrite_generic_stmt_with_hoists;
-use super::exprs::rewrite_generic_calls_in_expr;
+use super::exprs::{rewrite_generic_calls_in_expr, GenericExprRewriteInput};
 use super::GenericImplMethodTemplate;
 
 #[allow(clippy::too_many_arguments)]
@@ -102,11 +102,11 @@ pub(super) fn rewrite_generic_calls_in_match_arms(
                 .guard
                 .as_ref()
                 .map(|guard| {
-                    rewrite_generic_calls_in_expr(
-                        guard,
+                    rewrite_generic_calls_in_expr(GenericExprRewriteInput {
+                        expr: guard,
                         context,
-                        Some(&ast_named_type("bool")),
-                        &mut arm_env,
+                        expected: Some(&ast_named_type("bool")),
+                        env: &arm_env,
                         visible_type_aliases,
                         generic_templates,
                         generic_impl_method_templates,
@@ -119,7 +119,7 @@ pub(super) fn rewrite_generic_calls_in_match_arms(
                         specialization_cache,
                         specialized_functions,
                         specialized_signatures,
-                    )
+                    })
                 })
                 .transpose()?,
             body: rewrite_generic_calls_in_block(

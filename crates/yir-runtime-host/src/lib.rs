@@ -25,7 +25,11 @@ pub fn render_module_to_ppm_bytes(module_source: &str, scale: usize) -> Result<V
 }
 
 #[no_mangle]
-pub extern "C" fn nuis_render_embedded_yir_ppm(
+/// # Safety
+///
+/// `source_ptr` must point to `source_len` readable bytes, and `out_buffer` must be a valid,
+/// writable pointer to a `NuisRenderedBuffer`.
+pub unsafe extern "C" fn nuis_render_embedded_yir_ppm(
     source_ptr: *const u8,
     source_len: usize,
     scale: usize,
@@ -56,7 +60,11 @@ pub extern "C" fn nuis_render_embedded_yir_ppm(
 }
 
 #[no_mangle]
-pub extern "C" fn nuis_rendered_buffer_free(ptr: *mut u8, len: usize) {
+/// # Safety
+///
+/// `ptr` and `len` must come from a successful `nuis_render_embedded_yir_ppm` call and must not
+/// have been freed already.
+pub unsafe extern "C" fn nuis_rendered_buffer_free(ptr: *mut u8, len: usize) {
     if ptr.is_null() || len == 0 {
         return;
     }
@@ -66,7 +74,10 @@ pub extern "C" fn nuis_rendered_buffer_free(ptr: *mut u8, len: usize) {
 }
 
 #[no_mangle]
-pub extern "C" fn nuis_rendered_buffer_reset(out_buffer: *mut NuisRenderedBuffer) {
+/// # Safety
+///
+/// `out_buffer` must be a valid, writable pointer to a `NuisRenderedBuffer`.
+pub unsafe extern "C" fn nuis_rendered_buffer_reset(out_buffer: *mut NuisRenderedBuffer) {
     if out_buffer.is_null() {
         return;
     }

@@ -7,8 +7,8 @@ use super::name_suggestions::suggest_similar_name;
 use super::{
     impl_method_symbol_names, infer_nir_expr_type, lower_binary_expr_with_async,
     lower_direct_call_builtin_or_named_call, lower_expr_with_async,
-    lower_routed_call_or_core_builtin, resolve_declared_or_inferred, FunctionSignature,
-    ModuleConstValue,
+    lower_routed_call_or_core_builtin, resolve_declared_or_inferred, BinaryLoweringInput,
+    FunctionSignature, ModuleConstValue,
 };
 
 #[allow(dead_code)]
@@ -21,59 +21,48 @@ pub(super) fn lower_binary_expr(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirExpr, String> {
-    lower_binary_expr_with_async(
+    lower_binary_expr_with_async(BinaryLoweringInput {
         op,
         lhs,
         rhs,
         current_domain,
-        false,
+        current_function_is_async: false,
         bindings,
-        &BTreeMap::new(),
+        module_consts: &BTreeMap::new(),
         signatures,
         struct_table,
-        None,
-    )
+        expected: None,
+    })
 }
 
-#[allow(dead_code)]
-pub(super) fn lower_call_expr(
-    callee: &str,
-    generic_args: &[nuis_semantics::model::AstTypeRef],
-    args: &[AstExpr],
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
-) -> Result<NirExpr, String> {
-    lower_call_expr_with_async(
+pub(super) struct CallLoweringInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) generic_args: &'a [nuis_semantics::model::AstTypeRef],
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) expected: Option<&'a NirTypeRef>,
+    pub(super) allow_async_calls: bool,
+}
+
+pub(super) fn lower_call_expr_with_async(input: CallLoweringInput<'_>) -> Result<NirExpr, String> {
+    let CallLoweringInput {
         callee,
         generic_args,
         args,
         current_domain,
-        false,
+        current_function_is_async,
         bindings,
-        &BTreeMap::new(),
+        module_consts,
         signatures,
         struct_table,
         expected,
-        false,
-    )
-}
-
-pub(super) fn lower_call_expr_with_async(
-    callee: &str,
-    generic_args: &[nuis_semantics::model::AstTypeRef],
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
-    allow_async_calls: bool,
-) -> Result<NirExpr, String> {
+        allow_async_calls,
+    } = input;
     if let Some(payload_struct_constructor) = lower_payload_struct_constructor_sugar(
         callee,
         generic_args,
@@ -118,20 +107,18 @@ pub(super) fn lower_call_expr_with_async(
     )? {
         return Ok(explicit_trait_call);
     }
-    match callee {
-        _ => lower_direct_call_builtin_or_named_call(
-            callee,
-            args,
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            signatures,
-            struct_table,
-            allow_async_calls,
-        )?
-        .ok_or_else(|| unknown_function_error(callee, signatures)),
-    }
+    lower_direct_call_builtin_or_named_call(
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        allow_async_calls,
+    )?
+    .ok_or_else(|| unknown_function_error(callee, signatures))
 }
 
 fn unknown_function_error(

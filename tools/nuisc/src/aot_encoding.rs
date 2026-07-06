@@ -19,7 +19,7 @@ pub(crate) fn hex_encode_bytes(bytes: &[u8]) -> String {
 }
 
 pub(crate) fn hex_decode_bytes(value: &str) -> Result<Vec<u8>, String> {
-    if value.len() % 2 != 0 {
+    if !value.len().is_multiple_of(2) {
         return Err("hex payload length must be even".to_owned());
     }
     let mut out = Vec::with_capacity(value.len() / 2);

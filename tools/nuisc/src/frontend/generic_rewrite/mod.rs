@@ -4,6 +4,7 @@ mod blocks_hoists;
 mod blocks_stmt;
 mod exprs;
 mod exprs_alias_expected;
+mod exprs_alias_inputs;
 mod exprs_aliases;
 mod exprs_calls;
 mod exprs_expected;

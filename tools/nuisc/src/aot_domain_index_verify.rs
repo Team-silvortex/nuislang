@@ -25,74 +25,73 @@ pub(crate) struct DomainIndexVerifyReport {
     pub hetero_calculate_plan_entries_checked: usize,
 }
 
+pub(crate) struct DomainIndexArtifactRef<'a> {
+    pub(crate) path: Option<&'a str>,
+    pub(crate) schema: Option<&'a str>,
+    pub(crate) count: usize,
+    pub(crate) inline: Option<&'a str>,
+}
+
+pub(crate) struct DomainIndexVerifyInput<'a> {
+    pub(crate) manifest_path: &'a Path,
+    pub(crate) bridge_registry: DomainIndexArtifactRef<'a>,
+    pub(crate) host_bridge_plan_index: DomainIndexArtifactRef<'a>,
+    pub(crate) lowering_plan_index: DomainIndexArtifactRef<'a>,
+    pub(crate) clock_protocol: DomainIndexArtifactRef<'a>,
+    pub(crate) hetero_calculate_plan: DomainIndexArtifactRef<'a>,
+    pub(crate) heterogeneous_domain_count: usize,
+    pub(crate) domain_build_units: &'a [BuildManifestDomainBuildUnit],
+}
+
 pub(crate) fn verify_domain_index_artifacts(
-    manifest_path: &Path,
-    bridge_registry_path: Option<&str>,
-    bridge_registry_schema: Option<&str>,
-    bridge_registry_units: usize,
-    bridge_registry_inline: Option<&str>,
-    host_bridge_plan_index_path: Option<&str>,
-    host_bridge_plan_index_schema: Option<&str>,
-    host_bridge_plan_units: usize,
-    host_bridge_plan_index_inline: Option<&str>,
-    lowering_plan_index_path: Option<&str>,
-    lowering_plan_index_schema: Option<&str>,
-    lowering_plan_units: usize,
-    lowering_plan_index_inline: Option<&str>,
-    clock_protocol_path: Option<&str>,
-    clock_protocol_schema: Option<&str>,
-    clock_protocol_domains: usize,
-    clock_protocol_inline: Option<&str>,
-    hetero_calculate_plan_path: Option<&str>,
-    hetero_calculate_plan_schema: Option<&str>,
-    hetero_calculate_plan_units: usize,
-    hetero_calculate_plan_inline: Option<&str>,
-    heterogeneous_domain_count: usize,
-    domain_build_units: &[BuildManifestDomainBuildUnit],
+    input: DomainIndexVerifyInput<'_>,
 ) -> Result<DomainIndexVerifyReport, String> {
+    let manifest_path = input.manifest_path;
+    let heterogeneous_domain_count = input.heterogeneous_domain_count;
+    let domain_build_units = input.domain_build_units;
     let (bridge_registry_checked, bridge_registry_entries_checked) = verify_bridge_registry(
         manifest_path,
-        bridge_registry_path,
-        bridge_registry_schema,
-        bridge_registry_units,
-        bridge_registry_inline,
+        input.bridge_registry.path,
+        input.bridge_registry.schema,
+        input.bridge_registry.count,
+        input.bridge_registry.inline,
         heterogeneous_domain_count,
         domain_build_units,
     )?;
     let (host_bridge_plan_checked, host_bridge_plan_entries_checked) =
         verify_host_bridge_plan_index(
             manifest_path,
-            host_bridge_plan_index_path,
-            host_bridge_plan_index_schema,
-            host_bridge_plan_units,
-            host_bridge_plan_index_inline,
+            input.host_bridge_plan_index.path,
+            input.host_bridge_plan_index.schema,
+            input.host_bridge_plan_index.count,
+            input.host_bridge_plan_index.inline,
             heterogeneous_domain_count,
             domain_build_units,
         )?;
     let (lowering_plan_index_checked, lowering_plan_entries_checked) = verify_lowering_plan_index(
         manifest_path,
-        lowering_plan_index_path,
-        lowering_plan_index_schema,
-        lowering_plan_units,
-        lowering_plan_index_inline,
+        input.lowering_plan_index.path,
+        input.lowering_plan_index.schema,
+        input.lowering_plan_index.count,
+        input.lowering_plan_index.inline,
         heterogeneous_domain_count,
         domain_build_units,
     )?;
     let (clock_protocol_checked, clock_protocol_entries_checked) = verify_clock_protocol(
         manifest_path,
-        clock_protocol_path,
-        clock_protocol_schema,
-        clock_protocol_domains,
-        clock_protocol_inline,
+        input.clock_protocol.path,
+        input.clock_protocol.schema,
+        input.clock_protocol.count,
+        input.clock_protocol.inline,
         domain_build_units,
     )?;
     let (hetero_calculate_plan_checked, hetero_calculate_plan_entries_checked) =
         verify_hetero_calculate_plan(
             manifest_path,
-            hetero_calculate_plan_path,
-            hetero_calculate_plan_schema,
-            hetero_calculate_plan_units,
-            hetero_calculate_plan_inline,
+            input.hetero_calculate_plan.path,
+            input.hetero_calculate_plan.schema,
+            input.hetero_calculate_plan.count,
+            input.hetero_calculate_plan.inline,
             heterogeneous_domain_count,
             domain_build_units,
         )?;

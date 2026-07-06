@@ -58,7 +58,7 @@ pub(super) fn lower_nova_view_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaTabsPacket".to_owned(),
                 type_args: Vec::new(),
@@ -112,7 +112,7 @@ pub(super) fn lower_nova_view_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(0));
+                .unwrap_or(NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaListPacket".to_owned(),
                 type_args: Vec::new(),
@@ -166,7 +166,7 @@ pub(super) fn lower_nova_view_builtin_call(
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| NirExpr::Int(1));
+                .unwrap_or(NirExpr::Int(1));
             NirExpr::StructLiteral {
                 type_name: "NovaTablePacket".to_owned(),
                 type_args: Vec::new(),

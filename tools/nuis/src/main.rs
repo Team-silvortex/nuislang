@@ -7335,13 +7335,16 @@ mod cpu Main {
     return deserialize_text_from(buffer, 0, len);
   }
 
-  fn main() -> i64 {
-    let buffer: ref Buffer = alloc_buffer(128, 0);
-    let len: i64 = serialize_text_into("hello", buffer, 0);
-    let handle: i64 = deserialize_text_from(buffer, 0, len);
-    return text_handle_helper() + handle;
-  }
-}
+	  fn main() -> i64 {
+	    let buffer: ref Buffer = alloc_buffer(128, 0);
+	    let len: i64 = serialize_text_into("hello", buffer, 0);
+	    let handle: i64 = deserialize_text_from(buffer, 0, len);
+	    if text_handle_helper() <= 0 || handle <= 0 {
+	      return 1;
+	    }
+	    return 0;
+	  }
+	}
 "#,
         );
         let output_dir = temp_dir("run_artifact_outputs");
@@ -7557,15 +7560,15 @@ mod cpu Main {
         assert!(json.contains("\"binary_exists\":true"));
         assert!(json.contains("\"manifest_verified\":true"));
         assert!(json.contains("\"artifact_verified\":true"));
-        assert!(json.contains("\"artifact_container_kind\":\"compiled-artifact-v1\""));
-        assert!(json.contains("\"artifact_container_version\":1"));
-        assert!(json.contains("\"artifact_section_count\":0"));
-        assert!(json.contains("\"artifact_section_names\":[]"));
+        assert!(json.contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\""));
+        assert!(json.contains("\"artifact_container_version\":2"));
+        assert!(json.contains("\"artifact_section_count\":6"));
+        assert!(json.contains("\"artifact_section_names\":[\"metadata_toml\""));
         assert!(json.contains("\"artifact_section_table_valid\":true"));
-        assert!(json.contains("\"lowering_unit_count\":0"));
-        assert!(json.contains("\"lowering_domain_families\":[]"));
-        assert!(json.contains("\"lowering_targets\":[]"));
-        assert!(json.contains("\"lowering_units\":[]"));
+        assert!(json.contains("\"lowering_unit_count\":1"));
+        assert!(json.contains("\"lowering_domain_families\":[\"cpu\"]"));
+        assert!(json.contains("\"lowering_targets\":[\"llvm\"]"));
+        assert!(json.contains("\"lowering_units\":[{"));
         assert!(json.contains("\"ready_to_run\":true"));
         assert!(json.contains("\"artifact_diagnostic_code\":\"ready_to_run\""));
         assert!(json.contains("\"self_check_ready\":true"));
@@ -8709,10 +8712,10 @@ mod cpu Main {
         assert!(json.contains("\"text_handle_rewrite_helper_hits\":1"));
         assert!(json.contains("\"text_handle_rewrite_local_hits\":1"));
         assert!(json.contains("\"text_handle_rewrite_total_hits\":2"));
-        assert!(json.contains("\"public_surface_modules\":3"));
-        assert!(json.contains("\"public_functions\":10"));
+        assert!(json.contains("\"public_surface_modules\":10"));
+        assert!(json.contains("\"public_functions\":165"));
         assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
-        assert!(json.contains("\"galaxy_surface_ids_count\":13"));
+        assert!(json.contains("\"galaxy_surface_ids_count\":18"));
         assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
         assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
         assert!(json.contains("\"surface.std.collections.v1\""));
@@ -8826,7 +8829,7 @@ mod cpu Main {
         assert!(json.contains("\"galaxy_check_status\":\"skipped\""));
         assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
         assert!(json.contains("\"galaxy_imports_count\":1"));
-        assert!(json.contains("\"galaxy_surface_ids_count\":13"));
+        assert!(json.contains("\"galaxy_surface_ids_count\":18"));
         assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
         assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
         assert!(json.contains("\"surface.std.collections.v1\""));
@@ -8911,7 +8914,7 @@ mod cpu Main {
 
         let json = render_project_doctor_json(&project_root).expect("render doctor json");
 
-        assert!(json.contains("\"galaxy_surface_ids_count\":13"));
+        assert!(json.contains("\"galaxy_surface_ids_count\":18"));
         assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
         assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
         assert!(json.contains("\"surface.std.collections.v1\""));
@@ -8951,7 +8954,7 @@ mod cpu Main {
         assert!(json.contains("\"source_kind\":\"project\""));
         assert!(json.contains("\"project\":\"imports_manual_only_hint\""));
         assert!(json.contains("\"explicit_galaxy_imports_count\":0"));
-        assert!(json.contains("\"visible_library_modules_count\":4"));
+        assert!(json.contains("\"visible_library_modules_count\":9"));
         assert!(json.contains("\"hidden_manual_only_library_modules_count\":1"));
         assert!(json.contains(
             "\"hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]"
@@ -9852,9 +9855,9 @@ mod cpu Main {
                 .expect("abi checks");
         assert!(!checks.is_empty());
         assert!(checks.iter().all(|check| check.ok));
-        assert!(checks.iter().any(|check| check.source == "recommended"));
+        assert!(checks.iter().any(|check| check.source == "explicit"));
         let json = project_abi_checks_json(&checks).join(",");
-        assert!(json.contains("\"source\":\"recommended\""));
+        assert!(json.contains("\"source\":\"explicit\""));
         assert!(json.contains("\"abi_registered\":true"));
         assert!(json.contains("\"issues\":[]"));
     }

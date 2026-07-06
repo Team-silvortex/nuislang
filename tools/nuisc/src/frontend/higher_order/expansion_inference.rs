@@ -92,16 +92,30 @@ pub(super) fn specialize_type_with_substitutions(
     }
 }
 
-fn infer_impl_method_substitutions(
-    definition: &AstImplDef,
+struct ImplMethodSubstitutionInput<'a> {
+    definition: &'a AstImplDef,
     method_index: usize,
-    receiver_ty: &AstTypeRef,
-    args: &[AstExpr],
-    expected_result_type: Option<&AstTypeRef>,
-    local_types: &BTreeMap<String, AstTypeRef>,
-    function_table: &BTreeMap<String, AstFunction>,
-    module_impls: &[AstImplDef],
+    receiver_ty: &'a AstTypeRef,
+    args: &'a [AstExpr],
+    expected_result_type: Option<&'a AstTypeRef>,
+    local_types: &'a BTreeMap<String, AstTypeRef>,
+    function_table: &'a BTreeMap<String, AstFunction>,
+    module_impls: &'a [AstImplDef],
+}
+
+fn infer_impl_method_substitutions(
+    input: ImplMethodSubstitutionInput<'_>,
 ) -> BTreeMap<String, AstTypeRef> {
+    let ImplMethodSubstitutionInput {
+        definition,
+        method_index,
+        receiver_ty,
+        args,
+        expected_result_type,
+        local_types,
+        function_table,
+        module_impls,
+    } = input;
     let generic_names = collect_generic_type_names(&definition.for_type);
     let mut substitutions = BTreeMap::new();
     unify_generic_receiver_pattern(
@@ -262,16 +276,16 @@ pub(super) fn infer_local_binding_type(
                 else {
                     continue;
                 };
-                let substitutions = infer_impl_method_substitutions(
+                let substitutions = infer_impl_method_substitutions(ImplMethodSubstitutionInput {
                     definition,
                     method_index,
-                    &receiver_ty,
+                    receiver_ty: &receiver_ty,
                     args,
-                    None,
+                    expected_result_type: None,
                     local_types,
                     function_table,
                     module_impls,
-                );
+                });
                 let specialized_for_type =
                     specialize_type_with_substitutions(&definition.for_type, &substitutions);
                 if lower_type_ref(&specialized_for_type).render()
@@ -406,17 +420,32 @@ pub(super) fn expected_await_operand_type(
     })
 }
 
+pub(super) struct HigherOrderSubstitutionInferenceInput<'a> {
+    pub(super) template: &'a AstFunction,
+    pub(super) explicit_substitutions: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) args: &'a [AstExpr],
+    pub(super) expected: Option<&'a AstTypeRef>,
+    pub(super) local_types: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) module_impls: &'a [AstImplDef],
+    pub(super) visible_structs: &'a BTreeMap<String, AstStructDef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+}
+
 pub(super) fn infer_higher_order_substitutions(
-    template: &AstFunction,
-    explicit_substitutions: &BTreeMap<String, AstTypeRef>,
-    args: &[AstExpr],
-    expected: Option<&AstTypeRef>,
-    local_types: &BTreeMap<String, AstTypeRef>,
-    function_table: &BTreeMap<String, AstFunction>,
-    module_impls: &[AstImplDef],
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    input: HigherOrderSubstitutionInferenceInput<'_>,
 ) -> Result<BTreeMap<String, nuis_semantics::model::NirTypeRef>, String> {
+    let HigherOrderSubstitutionInferenceInput {
+        template,
+        explicit_substitutions,
+        args,
+        expected,
+        local_types,
+        function_table,
+        module_impls,
+        visible_structs,
+        visible_type_aliases,
+    } = input;
     let generic_names = template
         .generic_params
         .iter()
