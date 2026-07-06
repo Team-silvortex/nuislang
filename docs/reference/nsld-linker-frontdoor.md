@@ -918,6 +918,12 @@ contract that such a linker must consume:
 the current plan and reports focused drift such as `plan_hash mismatch` or
 `input_count mismatch`. This gives Nsld, cache tooling, and future nsdb a stable
 surface for the executable boundary before real linker execution is owned.
+Internally, the alpha implementation now mirrors that protocol boundary:
+`final_stage.rs` is only the final-stage-plan frontdoor, while readiness,
+writer input, host finalizer gates, layout, dry-run image assembly, and blocked
+emission live in separate `final_executable_*` stage modules. That split is not
+just cleanup; it keeps future Mach-O, ELF, PE/COFF, and Nuis-native writers from
+turning the final-stage plan into a backend-specific dispatcher.
 `nsld final-executable-readiness` is a non-mutating query for the next boundary:
 it reports the would-be output path, blocked-report path, final-stage plan hash,
 driver, link mode, writer kind/status, writer blockers, blocker list, and notes

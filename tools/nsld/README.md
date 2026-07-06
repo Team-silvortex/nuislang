@@ -58,6 +58,27 @@ cosmetic CLI output.
 
 The CLI should remain a human and script entry point for those capabilities.
 
+## Current Module Map
+
+The alpha final executable pipeline is split by protocol boundary rather than
+by terminal command formatting:
+
+* `final_stage.rs` owns only the final-stage plan report, emitter, and verifier.
+* `final_executable_summary.rs` owns readiness and writer-plan summaries.
+* `final_executable_writer_input.rs` owns writer input emission and verification.
+* `final_executable_host.rs` owns host finalizer dry-run and invoke-plan gates.
+* `final_executable_layout_stage.rs` owns the Nsld final executable layout plan.
+* `final_executable_image_stage.rs` owns the `NUIFIMG` dry-run image checkpoint.
+* `final_executable_emit.rs` owns blocked final-executable emission and verify.
+* `final_executable_paths.rs`, `final_executable_render.rs`,
+  `final_executable_verify_helpers.rs`, `final_executable_layout.rs`, and
+  `final_executable_image.rs` hold shared path/render/verify/layout/image
+  helpers.
+
+Keep future linker execution work behind the same stage boundaries so Mach-O,
+ELF, PE/COFF, and future Nuis-native writers can evolve without coupling the
+front-door plan to one backend.
+
 ## Current Alpha Rule
 
 Do not add new linker semantics only as formatted command output. If a command
