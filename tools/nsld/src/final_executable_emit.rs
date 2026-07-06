@@ -21,7 +21,24 @@ pub(crate) fn nsld_emit_final_executable_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
 ) -> Result<NsldFinalExecutableEmitReport, String> {
-    let report = nsld_final_executable_emit_report_shape(manifest, plan);
+    let mut report = nsld_final_executable_emit_report_shape(manifest, plan);
+    if report.can_emit_final_executable {
+        if let Some(parent) = Path::new(&report.output_path).parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                format!(
+                    "failed to create nsld final executable output directory `{}`: {error}",
+                    parent.display()
+                )
+            })?;
+        }
+        fs::copy(&report.image_dry_run_bytes_path, &report.output_path).map_err(|error| {
+            format!(
+                "failed to write nsld final executable output `{}` from `{}`: {error}",
+                report.output_path, report.image_dry_run_bytes_path
+            )
+        })?;
+        report.emitted = true;
+    }
     let blocked_report_path = nsld_final_executable_blocked_path(plan);
     fs::write(
         &blocked_report_path,
@@ -68,6 +85,10 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         actual_host_invoke_plan_valid,
         actual_host_invoke_plan_would_invoke,
         actual_host_invoke_plan_hash,
+        actual_host_invoke_plan_invocation_policy,
+        actual_host_invoke_plan_requires_explicit_allow,
+        actual_host_invoke_plan_explicit_allow_present,
+        actual_host_invoke_plan_blocker_count,
         actual_host_invoke_plan_issues,
         actual_layout_plan_valid,
         actual_layout_plan_hash,
@@ -77,6 +98,7 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         actual_image_dry_run_size_bytes,
         actual_image_dry_run_issues,
         actual_blocker_count,
+        actual_blockers,
     ) = match actual.as_ref() {
         Ok(source) => (
             toml::string_value(source, "final_stage_plan_hash"),
@@ -97,6 +119,10 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
             toml::bool_value(source, "host_invoke_plan_valid"),
             toml::bool_value(source, "host_invoke_plan_would_invoke"),
             non_empty_toml_string(source, "host_invoke_plan_hash"),
+            non_empty_toml_string(source, "host_invoke_plan_invocation_policy"),
+            toml::bool_value(source, "host_invoke_plan_requires_explicit_allow"),
+            toml::bool_value(source, "host_invoke_plan_explicit_allow_present"),
+            toml::usize_value(source, "host_invoke_plan_blocker_count"),
             toml::string_array_value(source, "host_invoke_plan_issues"),
             toml::bool_value(source, "layout_plan_valid"),
             non_empty_toml_string(source, "layout_plan_hash"),
@@ -106,6 +132,7 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
             optional_usize_value(source, "image_dry_run_size_bytes"),
             toml::string_array_value(source, "image_dry_run_issues"),
             toml::usize_value(source, "blocker_count"),
+            toml::string_array_value(source, "blockers"),
         ),
         Err(error) => {
             issues.push(error.clone());
@@ -128,6 +155,10 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
                 None,       // host_invoke_plan_valid
                 None,       // host_invoke_plan_would_invoke
                 None,       // host_invoke_plan_hash
+                None,       // host_invoke_plan_invocation_policy
+                None,       // host_invoke_plan_requires_explicit_allow
+                None,       // host_invoke_plan_explicit_allow_present
+                None,       // host_invoke_plan_blocker_count
                 Vec::new(), // host_invoke_plan_issues
                 None,       // layout_plan_valid
                 None,       // layout_plan_hash
@@ -137,6 +168,7 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
                 None,       // image_dry_run_size_bytes
                 Vec::new(), // image_dry_run_issues
                 None,       // blocker_count
+                Vec::new(), // blockers
             )
         }
     };
@@ -319,6 +351,44 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
+        if actual_host_invoke_plan_invocation_policy != expected.host_invoke_plan_invocation_policy
+        {
+            issues.push(format!(
+                "host_invoke_plan_invocation_policy mismatch: expected {}, found {}",
+                expected
+                    .host_invoke_plan_invocation_policy
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned()),
+                actual_host_invoke_plan_invocation_policy
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_host_invoke_plan_requires_explicit_allow
+            != expected.host_invoke_plan_requires_explicit_allow
+        {
+            issues.push(format!(
+                "host_invoke_plan_requires_explicit_allow mismatch: expected {}, found {}",
+                optional_bool_toml(expected.host_invoke_plan_requires_explicit_allow),
+                optional_bool_toml(actual_host_invoke_plan_requires_explicit_allow)
+            ));
+        }
+        if actual_host_invoke_plan_explicit_allow_present
+            != expected.host_invoke_plan_explicit_allow_present
+        {
+            issues.push(format!(
+                "host_invoke_plan_explicit_allow_present mismatch: expected {}, found {}",
+                optional_bool_toml(expected.host_invoke_plan_explicit_allow_present),
+                optional_bool_toml(actual_host_invoke_plan_explicit_allow_present)
+            ));
+        }
+        if actual_host_invoke_plan_blocker_count != expected.host_invoke_plan_blocker_count {
+            issues.push(format!(
+                "host_invoke_plan_blocker_count mismatch: expected {}, found {}",
+                optional_usize_toml(expected.host_invoke_plan_blocker_count),
+                optional_usize_toml(actual_host_invoke_plan_blocker_count)
+            ));
+        }
         if actual_host_invoke_plan_issues != expected.host_invoke_plan_issues {
             issues.push(format!(
                 "host_invoke_plan_issues mismatch: expected [{}], found [{}]",
@@ -394,6 +464,13 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
+        if actual_blockers != expected.blockers {
+            issues.push(format!(
+                "blockers mismatch: expected [{}], found [{}]",
+                expected.blockers.join(", "),
+                actual_blockers.join(", ")
+            ));
+        }
     }
 
     NsldFinalExecutableEmitVerifyReport {
@@ -437,6 +514,16 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         actual_host_invoke_plan_would_invoke,
         expected_host_invoke_plan_hash: expected.host_invoke_plan_hash,
         actual_host_invoke_plan_hash,
+        expected_host_invoke_plan_invocation_policy: expected.host_invoke_plan_invocation_policy,
+        actual_host_invoke_plan_invocation_policy,
+        expected_host_invoke_plan_requires_explicit_allow: expected
+            .host_invoke_plan_requires_explicit_allow,
+        actual_host_invoke_plan_requires_explicit_allow,
+        expected_host_invoke_plan_explicit_allow_present: expected
+            .host_invoke_plan_explicit_allow_present,
+        actual_host_invoke_plan_explicit_allow_present,
+        expected_host_invoke_plan_blocker_count: expected.host_invoke_plan_blocker_count,
+        actual_host_invoke_plan_blocker_count,
         expected_host_invoke_plan_issues: expected.host_invoke_plan_issues,
         actual_host_invoke_plan_issues,
         expected_layout_plan_valid: expected.layout_plan_valid,
@@ -455,6 +542,8 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         actual_image_dry_run_issues,
         expected_blocker_count: expected.blockers.len(),
         actual_blocker_count,
+        expected_blockers: expected.blockers,
+        actual_blockers,
         issues,
     }
 }
@@ -486,8 +575,21 @@ pub(crate) fn nsld_final_executable_emit_report_shape(
     report.host_invoke_plan_path = host_invoke_plan.input_path;
     report.host_invoke_plan_valid = Some(host_invoke_plan.valid);
     report.host_invoke_plan_hash = host_invoke_plan.actual_invoke_plan_hash;
+    report.host_invoke_plan_invocation_policy = host_invoke_plan.actual_invocation_policy;
+    report.host_invoke_plan_requires_explicit_allow = Some(
+        host_invoke_plan
+            .actual_requires_explicit_allow
+            .unwrap_or(false),
+    );
+    report.host_invoke_plan_explicit_allow_present = Some(
+        host_invoke_plan
+            .actual_explicit_allow_present
+            .unwrap_or(false),
+    );
     report.host_invoke_plan_would_invoke =
         Some(host_invoke_plan.actual_would_invoke.unwrap_or(false));
+    report.host_invoke_plan_blocker_count =
+        Some(host_invoke_plan.actual_blocker_count.unwrap_or(0));
     report.host_invoke_plan_issues = host_invoke_plan.issues;
     report.layout_plan_path = layout_plan.input_path;
     report.layout_plan_valid = Some(layout_plan.valid);
@@ -512,18 +614,20 @@ pub(crate) fn nsld_final_executable_emit_report_shape(
         report.can_emit_final_executable = false;
     }
     if !host_dry_run.environment_ready {
-        report
-            .blockers
-            .push("host-finalizer-environment:not-ready".to_owned());
-        report.blockers.extend(
+        if report.host_wrapper_required {
             report
-                .host_dry_run_blockers
-                .iter()
-                .map(|blocker| format!("host-finalizer-dry-run:{blocker}")),
-        );
-        report.can_emit_final_executable = false;
+                .blockers
+                .push("host-finalizer-environment:not-ready".to_owned());
+            report.blockers.extend(
+                report
+                    .host_dry_run_blockers
+                    .iter()
+                    .map(|blocker| format!("host-finalizer-dry-run:{blocker}")),
+            );
+            report.can_emit_final_executable = false;
+        }
     }
-    if !host_invoke_plan.valid {
+    if report.host_wrapper_required && !host_invoke_plan.valid {
         report
             .blockers
             .push("host-finalizer-invoke-plan:invalid".to_owned());
@@ -535,7 +639,7 @@ pub(crate) fn nsld_final_executable_emit_report_shape(
         );
         report.can_emit_final_executable = false;
     }
-    if host_invoke_plan.actual_would_invoke != Some(true) {
+    if report.host_wrapper_required && host_invoke_plan.actual_would_invoke != Some(true) {
         report
             .blockers
             .push("host-finalizer-invoke-plan:not-allowed".to_owned());
@@ -565,5 +669,6 @@ pub(crate) fn nsld_final_executable_emit_report_shape(
         );
         report.can_emit_final_executable = false;
     }
+    report.emitted = report.can_emit_final_executable;
     report
 }

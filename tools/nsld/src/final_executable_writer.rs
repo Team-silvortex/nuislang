@@ -13,7 +13,7 @@ pub(crate) fn final_executable_writer_blockers(
     if final_stage.host_wrapper_required {
         vec!["final-executable-writer:host-assisted:not-implemented".to_owned()]
     } else {
-        vec!["final-executable-writer:self-contained:not-implemented".to_owned()]
+        Vec::new()
     }
 }
 

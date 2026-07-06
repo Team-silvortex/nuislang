@@ -453,6 +453,18 @@ pub(crate) fn nsld_check_report(
     let final_executable_host_invoke_plan_hash = final_executable_host_invoke_plan_verify_report
         .as_ref()
         .and_then(|report| report.actual_invoke_plan_hash.clone());
+    let final_executable_host_invoke_plan_invocation_policy =
+        final_executable_host_invoke_plan_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_invocation_policy.clone());
+    let final_executable_host_invoke_plan_requires_explicit_allow =
+        final_executable_host_invoke_plan_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_requires_explicit_allow);
+    let final_executable_host_invoke_plan_explicit_allow_present =
+        final_executable_host_invoke_plan_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_explicit_allow_present);
     let final_executable_host_invoke_plan_would_invoke =
         final_executable_host_invoke_plan_verify_report
             .as_ref()
@@ -818,6 +830,9 @@ pub(crate) fn nsld_check_report(
         final_executable_host_invoke_plan_present,
         final_executable_host_invoke_plan_valid,
         final_executable_host_invoke_plan_hash,
+        final_executable_host_invoke_plan_invocation_policy,
+        final_executable_host_invoke_plan_requires_explicit_allow,
+        final_executable_host_invoke_plan_explicit_allow_present,
         final_executable_host_invoke_plan_would_invoke,
         final_executable_host_invoke_plan_blocker_count,
         final_executable_host_invoke_plan_issues,

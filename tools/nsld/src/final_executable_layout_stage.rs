@@ -162,6 +162,9 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
     let (
         actual_layout_hash,
         actual_payload_count,
+        actual_payloads,
+        actual_payload_entry_count,
+        actual_byte_map_entry_count,
         actual_byte_span,
         actual_byte_map_hash,
         actual_lifecycle_entry_hook,
@@ -170,6 +173,9 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
         Ok(source) => (
             toml::string_value(source, "layout_hash"),
             toml::usize_value(source, "payload_count"),
+            toml::string_array_value(source, "payloads"),
+            table_entry_count(source, "payload"),
+            table_entry_count(source, "byte_map_entry"),
             toml::usize_value(source, "byte_span"),
             toml::string_value(source, "byte_map_hash"),
             toml::string_value(source, "lifecycle_entry_hook"),
@@ -177,7 +183,7 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None, None)
+            (None, None, Vec::new(), 0, 0, None, None, None, None)
         }
     };
     if let Ok(actual) = actual {
@@ -200,6 +206,27 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
                 actual_payload_count
                     .map(|value| value.to_string())
                     .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_payloads != expected.payload_names {
+            issues.push(format!(
+                "payloads mismatch: expected [{}], found [{}]",
+                expected.payload_names.join(", "),
+                actual_payloads.join(", ")
+            ));
+        }
+        if actual_payload_entry_count != expected.payloads.len() {
+            issues.push(format!(
+                "payload_entry_count mismatch: expected {}, found {}",
+                expected.payloads.len(),
+                actual_payload_entry_count
+            ));
+        }
+        if actual_byte_map_entry_count != expected.byte_map_entries.len() {
+            issues.push(format!(
+                "byte_map_entry_count mismatch: expected {}, found {}",
+                expected.byte_map_entries.len(),
+                actual_byte_map_entry_count
             ));
         }
         if actual_byte_span != Some(expected.byte_span) {
@@ -250,6 +277,12 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
         actual_layout_hash,
         expected_payload_count: expected.payload_count,
         actual_payload_count,
+        expected_payloads: expected.payload_names,
+        actual_payloads,
+        expected_payload_entry_count: expected.payloads.len(),
+        actual_payload_entry_count,
+        expected_byte_map_entry_count: expected.byte_map_entries.len(),
+        actual_byte_map_entry_count,
         expected_byte_span: expected.byte_span,
         actual_byte_span,
         expected_byte_map_hash: expected.byte_map_hash,
@@ -260,4 +293,9 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
         actual_platform_envelope_family,
         issues,
     }
+}
+
+fn table_entry_count(source: &str, table: &str) -> usize {
+    let header = format!("[[{table}]]");
+    source.lines().filter(|line| line.trim() == header).count()
 }

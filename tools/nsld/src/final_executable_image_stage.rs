@@ -140,6 +140,7 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
         actual_image_ready,
         actual_image_size_bytes,
         actual_image_hash,
+        actual_blockers,
     ) = match actual.as_ref() {
         Ok(source) => (
             toml::string_value(source, "layout_hash"),
@@ -150,10 +151,11 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
             toml::bool_value(source, "image_ready"),
             optional_usize_value(source, "image_size_bytes"),
             non_empty_toml_string(source, "image_hash"),
+            toml::string_array_value(source, "blockers"),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None, None, None, None)
+            (None, None, None, None, None, None, None, None, Vec::new())
         }
     };
     if let Ok(actual) = actual {
@@ -225,6 +227,13 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
                 actual_image_hash
                     .clone()
                     .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_blockers != expected.blockers {
+            issues.push(format!(
+                "blockers mismatch: expected [{}], found [{}]",
+                expected.blockers.join(", "),
+                actual_blockers.join(", ")
             ));
         }
     }
@@ -350,6 +359,8 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
         actual_image_size_bytes,
         expected_image_hash: expected.image_hash,
         actual_image_hash,
+        expected_blockers: expected.blockers,
+        actual_blockers,
         issues,
     }
 }

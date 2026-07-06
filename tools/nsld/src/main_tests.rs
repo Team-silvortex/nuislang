@@ -11,10 +11,10 @@ use super::{
     nsld_emit_final_executable_report, nsld_emit_final_executable_writer_input_report,
     nsld_emit_final_stage_plan_report, nsld_final_executable_host_dry_run_report,
     nsld_final_executable_host_invoke_plan_report, nsld_final_executable_image_dry_run_report,
-    nsld_final_executable_layout_plan_report, nsld_final_executable_readiness_report,
-    nsld_final_executable_writer_plan_report, nsld_final_stage_plan_report,
-    nsld_link_input_diagnostics, nsld_link_input_table_hash, nsld_prepare_report,
-    nsld_sidecar_capability_diagnostics, nsld_verify_closure_report,
+    nsld_final_executable_layout_plan_report, nsld_final_executable_output_report,
+    nsld_final_executable_readiness_report, nsld_final_executable_writer_plan_report,
+    nsld_final_stage_plan_report, nsld_link_input_diagnostics, nsld_link_input_table_hash,
+    nsld_prepare_report, nsld_sidecar_capability_diagnostics, nsld_verify_closure_report,
     nsld_verify_final_executable_emit_report, nsld_verify_final_executable_host_invoke_plan_report,
     nsld_verify_final_executable_image_dry_run_report,
     nsld_verify_final_executable_layout_plan_report,
@@ -95,6 +95,81 @@ fn closure_reports_container_metadata_fingerprint() {
     assert!(
         report_json.contains("\"compatibility_domain_summary\":{\"count\":1,\"table_hash\":\"0x")
     );
+}
+
+#[test]
+fn final_executable_output_reports_missing_until_real_output_exists() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-output-missing-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.final_stage.output_path = dir.join("nuis-app").display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_stage_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_final_executable_output_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_final_executable_output_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.present);
+    assert!(!report.runnable_candidate);
+    assert!(report
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "final-executable-output:missing"));
+    assert!(report
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "final-executable-emit:not-emitted"));
+    assert!(report_json.contains("\"kind\":\"nsld_final_executable_output\""));
+    assert!(report_json.contains("\"runnable_candidate\":false"));
+}
+
+#[test]
+fn self_contained_final_executable_emit_writes_nsld_owned_output() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-output-present-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.final_stage.kind = "nuis-self-contained-image".to_owned();
+    plan.final_stage.driver = "nsld-internal-image-writer".to_owned();
+    plan.final_stage.link_mode = "self-contained".to_owned();
+    plan.final_stage.output_path = dir.join("nuis-app.nsb").display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_stage_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit = nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let verify_emit = nsld_verify_final_executable_emit_report(Path::new("manifest.toml"), &plan);
+    let output = nsld_final_executable_output_report(Path::new("manifest.toml"), &plan);
+    let image_bytes = fs::read(&emit.image_dry_run_bytes_path).unwrap();
+    let output_bytes = fs::read(&plan.final_stage.output_path).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(emit.emitted);
+    assert!(emit.can_emit_final_executable);
+    assert_eq!(emit.writer_status, "ready");
+    assert!(verify_emit.valid, "{:?}", verify_emit.issues);
+    assert!(output.present);
+    assert!(output.runnable_candidate, "{:?}", output.blockers);
+    assert_eq!(output.size_bytes, Some(output_bytes.len()));
+    assert_eq!(output.output_hash, Some(fnv1a64_hex(&output_bytes)));
+    assert_eq!(image_bytes, output_bytes);
 }
 
 #[test]
@@ -596,6 +671,10 @@ fn verify_final_executable_host_invoke_plan_reports_gate_drift() {
         .replace(
             "command_args = [\"clang\",",
             "command_args = [\"clang-drift\",",
+        )
+        .replace(
+            "blockers = [\"final-executable-writer:host-assisted:not-implemented\", \"host-finalizer-policy:dry-run-only\", \"host-finalizer-explicit-allow:missing\"]",
+            "blockers = [\"tampered-host-finalizer-blocker\", \"host-finalizer-policy:dry-run-only\", \"host-finalizer-explicit-allow:missing\"]",
         );
     fs::write(&emit.output_path, damaged).unwrap();
     let verify =
@@ -620,6 +699,14 @@ fn verify_final_executable_host_invoke_plan_reports_gate_drift() {
         .iter()
         .any(|arg| arg == "clang-drift"));
     assert!(verify
+        .expected_blockers
+        .iter()
+        .any(|blocker| blocker == "final-executable-writer:host-assisted:not-implemented"));
+    assert!(verify
+        .actual_blockers
+        .iter()
+        .any(|blocker| blocker == "tampered-host-finalizer-blocker"));
+    assert!(verify
         .issues
         .iter()
         .any(|issue| issue.starts_with("command_arg_count mismatch: expected ")));
@@ -630,10 +717,15 @@ fn verify_final_executable_host_invoke_plan_reports_gate_drift() {
     assert!(verify
         .issues
         .iter()
+        .any(|issue| issue.starts_with("blockers mismatch")));
+    assert!(verify
+        .issues
+        .iter()
         .any(|issue| issue == "final-executable-host-invoke-plan-content-mismatch"));
     assert!(verify_json.contains("\"actual_would_invoke\":true"));
     assert!(verify_json.contains("\"actual_command_arg_count\":0"));
     assert!(verify_json.contains("\"clang-drift\""));
+    assert!(verify_json.contains("\"tampered-host-finalizer-blocker\""));
 }
 
 #[test]
@@ -910,6 +1002,12 @@ fn verify_final_executable_image_dry_run_reports_image_byte_drift() {
     nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
     let emit =
         nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report_source = fs::read_to_string(&emit.output_path).unwrap();
+    fs::write(
+        &emit.output_path,
+        report_source.replace("blockers = []", "blockers = [\"tampered-image-blocker\"]"),
+    )
+    .unwrap();
     fs::write(&emit.image_path, b"drifted-image").unwrap();
     let verify =
         nsld_verify_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan);
@@ -925,7 +1023,17 @@ fn verify_final_executable_image_dry_run_reports_image_byte_drift() {
         .issues
         .iter()
         .any(|issue| issue == "final-executable-image-header:invalid-or-too-short"));
+    assert!(verify.expected_blockers.is_empty());
+    assert_eq!(
+        verify.actual_blockers,
+        vec!["tampered-image-blocker".to_owned()]
+    );
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue == "blockers mismatch: expected [], found [tampered-image-blocker]"));
     assert!(verify_json.contains("\"valid\":false"));
+    assert!(verify_json.contains("\"actual_blockers\":[\"tampered-image-blocker\"]"));
 }
 
 #[test]
@@ -992,7 +1100,15 @@ fn verify_final_executable_layout_plan_reports_protocol_drift() {
         .find(|line| line.starts_with("byte_span = "))
         .unwrap()
         .to_owned();
+    let payloads_line = source
+        .lines()
+        .find(|line| line.starts_with("payloads = "))
+        .unwrap()
+        .to_owned();
+    let tampered_payloads_line = payloads_line.replacen('"', "\"tampered-", 1);
     let damaged = source
+        .replacen("[[payload]]", "[[payload_tampered]]", 1)
+        .replacen("[[byte_map_entry]]", "[[byte_map_entry_tampered]]", 1)
         .replace(
             "lifecycle_entry_hook = \"on_process_start\"",
             "lifecycle_entry_hook = \"drift\"",
@@ -1002,6 +1118,7 @@ fn verify_final_executable_layout_plan_reports_protocol_drift() {
             "platform_envelope_family = \"elf\"",
         )
         .replace(&byte_span_line, "byte_span = 0")
+        .replace(&payloads_line, &tampered_payloads_line)
         .replace("payload_count = 4", "payload_count = 0");
     fs::write(&emit.output_path, damaged).unwrap();
     let verify = nsld_verify_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan);
@@ -1015,6 +1132,18 @@ fn verify_final_executable_layout_plan_reports_protocol_drift() {
         Some("elf")
     );
     assert_eq!(verify.actual_payload_count, Some(0));
+    assert!(verify
+        .actual_payloads
+        .iter()
+        .any(|payload| payload.starts_with("tampered-")));
+    assert_eq!(
+        verify.actual_payload_entry_count + 1,
+        verify.expected_payload_entry_count
+    );
+    assert_eq!(
+        verify.actual_byte_map_entry_count + 1,
+        verify.expected_byte_map_entry_count
+    );
     assert_eq!(verify.actual_byte_span, Some(0));
     assert!(verify
         .issues
@@ -1027,10 +1156,25 @@ fn verify_final_executable_layout_plan_reports_protocol_drift() {
     assert!(verify
         .issues
         .iter()
+        .any(|issue| issue.starts_with("payloads mismatch")));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("payload_entry_count mismatch")));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("byte_map_entry_count mismatch")));
+    assert!(verify
+        .issues
+        .iter()
         .any(|issue| issue
             == "lifecycle_entry_hook mismatch: expected on_process_start, found drift"));
     assert!(verify_json.contains("\"actual_lifecycle_entry_hook\":\"drift\""));
     assert!(verify_json.contains("\"actual_platform_envelope_family\":\"elf\""));
+    assert!(verify_json.contains("tampered-"));
+    assert!(verify_json.contains("\"actual_payload_entry_count\":"));
+    assert!(verify_json.contains("\"actual_byte_map_entry_count\":"));
 }
 
 #[test]
@@ -1087,10 +1231,20 @@ fn verify_final_executable_writer_input_reports_plan_hash_drift() {
     nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
     let emit =
         nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
-    let damaged = fs::read_to_string(&emit.output_path).unwrap().replace(
-        &format!("final_stage_plan_hash = \"{}\"", emit.final_stage_plan_hash),
-        "final_stage_plan_hash = \"0x3333333333333333\"",
+    let writer_blockers_line = format!(
+        "writer_blockers = [{}]",
+        toml::toml_string_array_literal(&emit.writer_blockers)
     );
+    let damaged = fs::read_to_string(&emit.output_path)
+        .unwrap()
+        .replace(
+            &format!("final_stage_plan_hash = \"{}\"", emit.final_stage_plan_hash),
+            "final_stage_plan_hash = \"0x3333333333333333\"",
+        )
+        .replace(
+            &writer_blockers_line,
+            "writer_blockers = [\"tampered-writer-blocker\"]",
+        );
     fs::write(&emit.output_path, damaged).unwrap();
     let verify =
         nsld_verify_final_executable_writer_input_report(Path::new("manifest.toml"), &plan);
@@ -1105,6 +1259,14 @@ fn verify_final_executable_writer_input_reports_plan_hash_drift() {
         .issues
         .iter()
         .any(|issue| issue.contains("final_stage_plan_hash mismatch")));
+    assert_eq!(
+        verify.actual_writer_blockers,
+        vec!["tampered-writer-blocker".to_owned()]
+    );
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("writer_blockers mismatch")));
 }
 
 #[test]
@@ -1124,10 +1286,32 @@ fn verify_final_stage_plan_reports_plan_hash_drift() {
     let emit = nsld_emit_final_stage_plan_report(Path::new("manifest.toml"), &plan).unwrap();
     let verify = nsld_verify_final_stage_plan_report(Path::new("manifest.toml"), &plan);
     let plan_path = Path::new(&emit.output_path);
-    let damaged = fs::read_to_string(plan_path).unwrap().replace(
-        &format!("plan_hash = \"{}\"", emit.plan_hash),
-        "plan_hash = \"0x2222222222222222\"",
+    let expected_report = nsld_final_stage_plan_report(Path::new("manifest.toml"), &plan);
+    let blockers_line = format!(
+        "blockers = [{}]",
+        toml::toml_string_array_literal(&expected_report.blockers)
     );
+    let notes_line = format!(
+        "notes = [{}]",
+        toml::toml_string_array_literal(&expected_report.notes)
+    );
+    let damaged = fs::read_to_string(plan_path)
+        .unwrap()
+        .replace(
+            &format!("plan_hash = \"{}\"", emit.plan_hash),
+            "plan_hash = \"0x2222222222222222\"",
+        )
+        .replace(
+            &blockers_line,
+            "blockers = [\"tampered-final-stage-blocker\"]",
+        )
+        .replace(&notes_line, "notes = [\"tampered-final-stage-note\"]")
+        .replacen(
+            "input_id = \"fsi0001.container-payload\"",
+            "input_id = \"tampered-final-stage-input\"",
+            1,
+        )
+        .replacen("[[final_stage_input]]", "[[final_stage_input_tampered]]", 1);
     fs::write(plan_path, damaged).unwrap();
     let damaged_verify = nsld_verify_final_stage_plan_report(Path::new("manifest.toml"), &plan);
     let verify_json = super::json::nsld_final_stage_plan_verify_report_json(&damaged_verify);
@@ -1143,7 +1327,43 @@ fn verify_final_stage_plan_reports_plan_hash_drift() {
         issue.starts_with("plan_hash mismatch: expected 0x")
             && issue.ends_with("found 0x2222222222222222")
     }));
+    assert!(damaged_verify
+        .actual_input_ids
+        .iter()
+        .any(|input_id| input_id == "tampered-final-stage-input"));
+    assert_eq!(
+        damaged_verify.actual_input_entry_count + 1,
+        damaged_verify.expected_input_entry_count
+    );
+    assert!(damaged_verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("input_ids mismatch")));
+    assert!(damaged_verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("input_entry_count mismatch")));
+    assert_eq!(
+        damaged_verify.actual_blockers,
+        vec!["tampered-final-stage-blocker".to_owned()]
+    );
+    assert_eq!(
+        damaged_verify.actual_notes,
+        vec!["tampered-final-stage-note".to_owned()]
+    );
+    assert!(damaged_verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("blockers mismatch")));
+    assert!(damaged_verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("notes mismatch")));
     assert!(verify_json.contains("\"actual_plan_hash\":\"0x2222222222222222\""));
+    assert!(verify_json.contains("tampered-final-stage-input"));
+    assert!(verify_json.contains("tampered-final-stage-blocker"));
+    assert!(verify_json.contains("tampered-final-stage-note"));
+    assert!(verify_json.contains("\"actual_input_entry_count\":"));
 }
 
 #[test]
@@ -1199,6 +1419,10 @@ fn emit_final_executable_writes_blocked_boundary_report() {
     assert_eq!(emit.host_invoke_plan_valid, Some(false));
     assert_eq!(emit.host_invoke_plan_would_invoke, Some(false));
     assert!(emit.host_invoke_plan_hash.is_none());
+    assert!(emit.host_invoke_plan_invocation_policy.is_none());
+    assert_eq!(emit.host_invoke_plan_requires_explicit_allow, Some(false));
+    assert_eq!(emit.host_invoke_plan_explicit_allow_present, Some(false));
+    assert_eq!(emit.host_invoke_plan_blocker_count, Some(0));
     assert!(emit
         .host_invoke_plan_issues
         .iter()
@@ -1247,7 +1471,11 @@ fn emit_final_executable_writes_blocked_boundary_report() {
     assert!(report_source.contains("host_dry_run_can_invoke = "));
     assert!(report_source.contains("host_invoke_plan_valid = false"));
     assert!(report_source.contains("host_invoke_plan_hash = \"\""));
+    assert!(report_source.contains("host_invoke_plan_invocation_policy = \"\""));
+    assert!(report_source.contains("host_invoke_plan_requires_explicit_allow = false"));
+    assert!(report_source.contains("host_invoke_plan_explicit_allow_present = false"));
     assert!(report_source.contains("host_invoke_plan_would_invoke = false"));
+    assert!(report_source.contains("host_invoke_plan_blocker_count = 0"));
     assert!(report_source.contains("image_dry_run_valid = false"));
     assert!(report_source.contains("image_dry_run_hash = \"\""));
     assert!(report_source.contains("final-executable-image-dry-run:invalid"));
@@ -1260,7 +1488,11 @@ fn emit_final_executable_writes_blocked_boundary_report() {
     assert!(emit_json.contains("\"writer_input_valid\":true"));
     assert!(emit_json.contains("\"host_dry_run_environment_ready\":"));
     assert!(emit_json.contains("\"host_invoke_plan_valid\":false"));
+    assert!(emit_json.contains("\"host_invoke_plan_invocation_policy\":null"));
+    assert!(emit_json.contains("\"host_invoke_plan_requires_explicit_allow\":false"));
+    assert!(emit_json.contains("\"host_invoke_plan_explicit_allow_present\":false"));
     assert!(emit_json.contains("\"host_invoke_plan_would_invoke\":false"));
+    assert!(emit_json.contains("\"host_invoke_plan_blocker_count\":0"));
     assert!(emit_json.contains("\"image_dry_run_valid\":false"));
     assert!(emit_json.contains("\"final_stage_plan_hash\":\"0x"));
 }
@@ -1391,7 +1623,17 @@ fn emit_final_executable_consumes_valid_host_invoke_plan_snapshot() {
         emit.host_invoke_plan_hash.as_deref(),
         Some(invoke_plan.invoke_plan_hash.as_str())
     );
+    assert_eq!(
+        emit.host_invoke_plan_invocation_policy.as_deref(),
+        Some(invoke_plan.invocation_policy.as_str())
+    );
+    assert_eq!(emit.host_invoke_plan_requires_explicit_allow, Some(true));
+    assert_eq!(emit.host_invoke_plan_explicit_allow_present, Some(false));
     assert_eq!(emit.host_invoke_plan_would_invoke, Some(false));
+    assert_eq!(
+        emit.host_invoke_plan_blocker_count,
+        Some(invoke_plan.blocker_count)
+    );
     assert!(emit.host_invoke_plan_issues.is_empty());
     assert!(!emit
         .blockers
@@ -1406,10 +1648,24 @@ fn emit_final_executable_consumes_valid_host_invoke_plan_snapshot() {
         "host_invoke_plan_hash = \"{}\"",
         invoke_plan.invoke_plan_hash
     )));
+    assert!(report_source.contains(&format!(
+        "host_invoke_plan_invocation_policy = \"{}\"",
+        invoke_plan.invocation_policy
+    )));
+    assert!(report_source.contains("host_invoke_plan_requires_explicit_allow = true"));
+    assert!(report_source.contains("host_invoke_plan_explicit_allow_present = false"));
     assert!(report_source.contains("host_invoke_plan_would_invoke = false"));
+    assert!(report_source.contains(&format!(
+        "host_invoke_plan_blocker_count = {}",
+        invoke_plan.blocker_count
+    )));
     assert!(emit_json.contains("\"host_invoke_plan_valid\":true"));
     assert!(emit_json.contains("\"host_invoke_plan_hash\":\"0x"));
+    assert!(emit_json.contains("\"host_invoke_plan_invocation_policy\":\"dry-run-only\""));
+    assert!(emit_json.contains("\"host_invoke_plan_requires_explicit_allow\":true"));
+    assert!(emit_json.contains("\"host_invoke_plan_explicit_allow_present\":false"));
     assert!(emit_json.contains("\"host_invoke_plan_would_invoke\":false"));
+    assert!(emit_json.contains("\"host_invoke_plan_blocker_count\":"));
 }
 
 #[test]
@@ -1669,8 +1925,27 @@ fn verify_final_executable_emit_reports_host_invoke_plan_drift() {
             "host_invoke_plan_hash = \"0x9999999999999999\"",
         )
         .replace(
+            "host_invoke_plan_invocation_policy = \"dry-run-only\"",
+            "host_invoke_plan_invocation_policy = \"allow-host-invoke\"",
+        )
+        .replace(
+            "host_invoke_plan_requires_explicit_allow = true",
+            "host_invoke_plan_requires_explicit_allow = false",
+        )
+        .replace(
+            "host_invoke_plan_explicit_allow_present = false",
+            "host_invoke_plan_explicit_allow_present = true",
+        )
+        .replace(
             "host_invoke_plan_would_invoke = false",
             "host_invoke_plan_would_invoke = true",
+        )
+        .replace(
+            &format!(
+                "host_invoke_plan_blocker_count = {}",
+                invoke_plan.blocker_count
+            ),
+            "host_invoke_plan_blocker_count = 99",
         )
         .replace(
             "host_invoke_plan_issues = []",
@@ -1694,6 +1969,37 @@ fn verify_final_executable_emit_reports_host_invoke_plan_drift() {
         verify.actual_host_invoke_plan_hash.as_deref(),
         Some("0x9999999999999999")
     );
+    assert_eq!(
+        verify
+            .expected_host_invoke_plan_invocation_policy
+            .as_deref(),
+        Some("dry-run-only")
+    );
+    assert_eq!(
+        verify.actual_host_invoke_plan_invocation_policy.as_deref(),
+        Some("allow-host-invoke")
+    );
+    assert_eq!(
+        verify.expected_host_invoke_plan_requires_explicit_allow,
+        Some(true)
+    );
+    assert_eq!(
+        verify.actual_host_invoke_plan_requires_explicit_allow,
+        Some(false)
+    );
+    assert_eq!(
+        verify.expected_host_invoke_plan_explicit_allow_present,
+        Some(false)
+    );
+    assert_eq!(
+        verify.actual_host_invoke_plan_explicit_allow_present,
+        Some(true)
+    );
+    assert_eq!(
+        verify.expected_host_invoke_plan_blocker_count,
+        Some(invoke_plan.blocker_count)
+    );
+    assert_eq!(verify.actual_host_invoke_plan_blocker_count, Some(99));
     assert!(verify.expected_host_invoke_plan_issues.is_empty());
     assert_eq!(
         verify.actual_host_invoke_plan_issues,
@@ -1715,10 +2021,27 @@ fn verify_final_executable_emit_reports_host_invoke_plan_drift() {
         .iter()
         .any(|issue| issue.starts_with("host_invoke_plan_hash mismatch: expected 0x")));
     assert!(verify.issues.iter().any(|issue| issue
+        == "host_invoke_plan_invocation_policy mismatch: expected dry-run-only, found allow-host-invoke"));
+    assert!(verify.issues.iter().any(|issue| issue
+        == "host_invoke_plan_requires_explicit_allow mismatch: expected true, found false"));
+    assert!(verify.issues.iter().any(|issue| issue
+        == "host_invoke_plan_explicit_allow_present mismatch: expected false, found true"));
+    assert!(verify.issues.iter().any(|issue| issue
+        == &format!(
+            "host_invoke_plan_blocker_count mismatch: expected {}, found 99",
+            invoke_plan.blocker_count
+        )));
+    assert!(verify.issues.iter().any(|issue| issue
         == "host_invoke_plan_issues mismatch: expected [], found [tampered-invoke-plan]"));
     assert!(verify_json.contains("\"actual_host_invoke_plan_valid\":false"));
     assert!(verify_json.contains("\"actual_host_invoke_plan_would_invoke\":true"));
     assert!(verify_json.contains("\"actual_host_invoke_plan_hash\":\"0x9999999999999999\""));
+    assert!(
+        verify_json.contains("\"actual_host_invoke_plan_invocation_policy\":\"allow-host-invoke\"")
+    );
+    assert!(verify_json.contains("\"actual_host_invoke_plan_requires_explicit_allow\":false"));
+    assert!(verify_json.contains("\"actual_host_invoke_plan_explicit_allow_present\":true"));
+    assert!(verify_json.contains("\"actual_host_invoke_plan_blocker_count\":99"));
     assert!(verify_json.contains("\"actual_host_invoke_plan_issues\":[\"tampered-invoke-plan\"]"));
 }
 
@@ -1809,10 +2132,23 @@ fn verify_final_executable_emit_reports_plan_hash_drift() {
     nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
     let emit = nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
     let report_path = Path::new(&emit.blocked_report_path);
-    let damaged = fs::read_to_string(report_path).unwrap().replace(
-        &format!("final_stage_plan_hash = \"{}\"", emit.final_stage_plan_hash),
-        "final_stage_plan_hash = \"0x3333333333333333\"",
+    let original_blockers_line = format!(
+        "blockers = [{}]",
+        toml::toml_string_array_literal(&emit.blockers)
     );
+    let mut tampered_blockers = emit.blockers.clone();
+    tampered_blockers[0] = "tampered-final-executable-blocker".to_owned();
+    let tampered_blockers_line = format!(
+        "blockers = [{}]",
+        toml::toml_string_array_literal(&tampered_blockers)
+    );
+    let damaged = fs::read_to_string(report_path)
+        .unwrap()
+        .replace(
+            &format!("final_stage_plan_hash = \"{}\"", emit.final_stage_plan_hash),
+            "final_stage_plan_hash = \"0x3333333333333333\"",
+        )
+        .replace(&original_blockers_line, &tampered_blockers_line);
     fs::write(report_path, damaged).unwrap();
     let verify = nsld_verify_final_executable_emit_report(Path::new("manifest.toml"), &plan);
     let verify_json = super::json::nsld_final_executable_emit_verify_report_json(&verify);
@@ -1823,7 +2159,20 @@ fn verify_final_executable_emit_reports_plan_hash_drift() {
         issue.starts_with("final_stage_plan_hash mismatch: expected 0x")
             && issue.ends_with("found 0x3333333333333333")
     }));
+    assert!(verify
+        .expected_blockers
+        .iter()
+        .any(|blocker| blocker == &emit.blockers[0]));
+    assert!(verify
+        .actual_blockers
+        .iter()
+        .any(|blocker| blocker == "tampered-final-executable-blocker"));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("blockers mismatch")));
     assert!(verify_json.contains("\"actual_final_stage_plan_hash\":\"0x3333333333333333\""));
+    assert!(verify_json.contains("\"tampered-final-executable-blocker\""));
 }
 
 #[test]
@@ -2906,6 +3255,20 @@ fn check_reports_valid_final_executable_host_invoke_plan_when_present() {
         Some(emit.invoke_plan_hash.as_str())
     );
     assert_eq!(
+        report
+            .final_executable_host_invoke_plan_invocation_policy
+            .as_deref(),
+        Some(emit.invocation_policy.as_str())
+    );
+    assert_eq!(
+        report.final_executable_host_invoke_plan_requires_explicit_allow,
+        Some(true)
+    );
+    assert_eq!(
+        report.final_executable_host_invoke_plan_explicit_allow_present,
+        Some(false)
+    );
+    assert_eq!(
         report.final_executable_host_invoke_plan_would_invoke,
         Some(false)
     );
@@ -2917,6 +3280,14 @@ fn check_reports_valid_final_executable_host_invoke_plan_when_present() {
     assert!(report_json.contains("\"final_executable_host_invoke_plan_present\":true"));
     assert!(report_json.contains("\"final_executable_host_invoke_plan_valid\":true"));
     assert!(report_json.contains("\"final_executable_host_invoke_plan_hash\":\"0x"));
+    assert!(report_json
+        .contains("\"final_executable_host_invoke_plan_invocation_policy\":\"dry-run-only\""));
+    assert!(
+        report_json.contains("\"final_executable_host_invoke_plan_requires_explicit_allow\":true")
+    );
+    assert!(
+        report_json.contains("\"final_executable_host_invoke_plan_explicit_allow_present\":false")
+    );
     assert!(report_json.contains("\"final_executable_host_invoke_plan_would_invoke\":false"));
 }
 
@@ -2941,7 +3312,20 @@ fn check_reports_tampered_final_executable_host_invoke_plan() {
     let invoke_plan_source = fs::read_to_string(&emit.output_path).unwrap();
     fs::write(
         &emit.output_path,
-        invoke_plan_source.replace("would_invoke = false", "would_invoke = true"),
+        invoke_plan_source
+            .replace(
+                "invocation_policy = \"dry-run-only\"",
+                "invocation_policy = \"allow-host-invoke\"",
+            )
+            .replace(
+                "requires_explicit_allow = true",
+                "requires_explicit_allow = false",
+            )
+            .replace(
+                "explicit_allow_present = false",
+                "explicit_allow_present = true",
+            )
+            .replace("would_invoke = false", "would_invoke = true"),
     )
     .unwrap();
     let report = nsld_check_report(Path::new("manifest.toml"), &plan);
@@ -2952,9 +3336,36 @@ fn check_reports_tampered_final_executable_host_invoke_plan() {
     assert!(report.final_executable_host_invoke_plan_present);
     assert_eq!(report.final_executable_host_invoke_plan_valid, Some(false));
     assert_eq!(
+        report
+            .final_executable_host_invoke_plan_invocation_policy
+            .as_deref(),
+        Some("allow-host-invoke")
+    );
+    assert_eq!(
+        report.final_executable_host_invoke_plan_requires_explicit_allow,
+        Some(false)
+    );
+    assert_eq!(
+        report.final_executable_host_invoke_plan_explicit_allow_present,
+        Some(true)
+    );
+    assert_eq!(
         report.final_executable_host_invoke_plan_would_invoke,
         Some(true)
     );
+    assert!(report
+        .final_executable_host_invoke_plan_issues
+        .iter()
+        .any(|issue| issue
+            == "invocation_policy mismatch: expected dry-run-only, found allow-host-invoke"));
+    assert!(report
+        .final_executable_host_invoke_plan_issues
+        .iter()
+        .any(|issue| issue == "requires_explicit_allow mismatch: expected true, found false"));
+    assert!(report
+        .final_executable_host_invoke_plan_issues
+        .iter()
+        .any(|issue| issue == "explicit_allow_present mismatch: expected false, found true"));
     assert!(report
         .final_executable_host_invoke_plan_issues
         .iter()
@@ -2965,6 +3376,14 @@ fn check_reports_tampered_final_executable_host_invoke_plan() {
         .any(|issue| issue == "final executable host invoke plan verification failed"));
     assert!(report_json.contains("\"final_executable_host_invoke_plan_present\":true"));
     assert!(report_json.contains("\"final_executable_host_invoke_plan_valid\":false"));
+    assert!(report_json
+        .contains("\"final_executable_host_invoke_plan_invocation_policy\":\"allow-host-invoke\""));
+    assert!(
+        report_json.contains("\"final_executable_host_invoke_plan_requires_explicit_allow\":false")
+    );
+    assert!(
+        report_json.contains("\"final_executable_host_invoke_plan_explicit_allow_present\":true")
+    );
     assert!(report_json.contains("\"final_executable_host_invoke_plan_would_invoke\":true"));
 }
 

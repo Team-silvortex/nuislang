@@ -239,8 +239,29 @@ pub(crate) fn render_final_executable_blocked(report: &NsldFinalExecutableEmitRe
         toml::escape_toml_string(report.host_invoke_plan_hash.as_deref().unwrap_or(""))
     ));
     out.push_str(&format!(
+        "host_invoke_plan_invocation_policy = \"{}\"\n",
+        toml::escape_toml_string(
+            report
+                .host_invoke_plan_invocation_policy
+                .as_deref()
+                .unwrap_or("")
+        )
+    ));
+    out.push_str(&format!(
+        "host_invoke_plan_requires_explicit_allow = {}\n",
+        optional_bool_toml(report.host_invoke_plan_requires_explicit_allow)
+    ));
+    out.push_str(&format!(
+        "host_invoke_plan_explicit_allow_present = {}\n",
+        optional_bool_toml(report.host_invoke_plan_explicit_allow_present)
+    ));
+    out.push_str(&format!(
         "host_invoke_plan_would_invoke = {}\n",
         optional_bool_toml(report.host_invoke_plan_would_invoke)
+    ));
+    out.push_str(&format!(
+        "host_invoke_plan_blocker_count = {}\n",
+        optional_usize_toml(report.host_invoke_plan_blocker_count)
     ));
     out.push_str(&format!(
         "host_invoke_plan_issues = [{}]\n",

@@ -22,8 +22,13 @@ pub(crate) fn nsld_final_executable_readiness_report(
         "self-contained-final-executable"
     }
     .to_owned();
-    let writer_status = "blocked".to_owned();
     let writer_blockers = final_executable_writer_blockers(&final_stage);
+    let writer_status = if final_stage.ready && writer_blockers.is_empty() {
+        "ready"
+    } else {
+        "blocked"
+    }
+    .to_owned();
     blockers.extend(writer_blockers.iter().cloned());
     let emitted = false;
     let can_emit_final_executable = blockers.is_empty();
@@ -70,7 +75,11 @@ pub(crate) fn nsld_final_executable_readiness_report(
             .to_string(),
         host_invoke_plan_valid: None,
         host_invoke_plan_hash: None,
+        host_invoke_plan_invocation_policy: None,
+        host_invoke_plan_requires_explicit_allow: None,
+        host_invoke_plan_explicit_allow_present: None,
         host_invoke_plan_would_invoke: None,
+        host_invoke_plan_blocker_count: None,
         host_invoke_plan_issues: Vec::new(),
         layout_plan_path: nsld_final_executable_layout_plan_path(plan)
             .display()
@@ -105,8 +114,13 @@ pub(crate) fn nsld_final_executable_writer_plan_report(
         "self-contained-final-executable"
     }
     .to_owned();
-    let writer_status = "blocked".to_owned();
     let writer_blockers = final_executable_writer_blockers(&final_stage);
+    let writer_status = if final_stage.ready && writer_blockers.is_empty() {
+        "ready"
+    } else {
+        "blocked"
+    }
+    .to_owned();
     let writer_steps = final_executable_writer_steps(&final_stage);
     let mut notes = final_stage.notes.clone();
     notes.push("final-executable-writer-plan-is-non-mutating".to_owned());

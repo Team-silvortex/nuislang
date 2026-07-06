@@ -86,6 +86,8 @@ cargo run -p nsld -- emit-final-executable-image-dry-run <artifact-output-dir>
 cargo run -p nsld -- verify-final-executable-image-dry-run <artifact-output-dir> --json
 cargo run -p nsld -- emit-final-executable <artifact-output-dir>
 cargo run -p nsld -- verify-final-executable-emit <artifact-output-dir> --json
+cargo run -p nsld -- final-executable-output <artifact-output-dir>
+cargo run -p nsld -- final-executable-output <artifact-output-dir> --json
 cargo run -p nsld -- prepare <artifact-output-dir>
 cargo run -p nsld -- prepare <artifact-output-dir> --json
 cargo run -p nsld -- assemble-plan <artifact-output-dir>
@@ -916,7 +918,11 @@ contract that such a linker must consume:
 `nsld emit-final-stage-plan` materializes this to
 `nuis.nsld.final-stage-plan.toml`; `nsld verify-final-stage-plan` re-computes
 the current plan and reports focused drift such as `plan_hash mismatch` or
-`input_count mismatch`. This gives Nsld, cache tooling, and future nsdb a stable
+`input_count mismatch`. It also checks the `[[final_stage_input]]` entry count
+and input id list so final-stage inputs cannot be removed or retargeted without
+an explicit verification failure. The final-stage `blockers` and `notes`
+arrays are compared as arrays as well, so gate reasons and compatibility notes
+cannot drift silently. This gives Nsld, cache tooling, and future nsdb a stable
 surface for the executable boundary before real linker execution is owned.
 Internally, the alpha implementation now mirrors that protocol boundary:
 `final_stage.rs` is only the final-stage-plan frontdoor, while readiness,
@@ -937,7 +943,7 @@ committing Mach-O, ELF, or PE-specific object assembly behavior.
 `nuis.nsld.final-executable-writer-input.toml`; `nsld
 verify-final-executable-writer-input` re-renders it and checks the writer input
 hash, final-stage plan hash, writer identity, writer status, and planned command
-argument count and values. The current host-assisted command input records the
+argument count and values, plus the `writer_blockers` array. The current host-assisted command input records the
 selected driver, target triple, native object, and output path, but still does
 not invoke the host linker.
 `nsld final-executable-host-dry-run` consumes the verified writer input,
@@ -945,27 +951,37 @@ resolves the selected host driver through an explicit path or `PATH`, and
 reports `environment_ready`, `driver_available`, `driver_resolved_path`, and
 the exact command arguments. It is non-mutating and never invokes the host
 driver; alpha-0.8.x reports `invocation_policy = "dry-run-only"` with
-`alpha-host-finalizer-execution-disabled` so Nsld cannot accidentally execute a
-host linker before the execution policy is deliberately changed. The command
-exists to make the final host-assisted call boundary auditable before Nsld is
-allowed to execute it.
+`alpha-host-finalizer-execution-disabled` by default so Nsld cannot
+accidentally execute a host linker before the execution policy is deliberately
+changed. `NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke` (or `allow`) lets
+the report recognize the next policy state as `allow-host-invoke`; an empty,
+missing, or `dry-run-only` value stays blocked, and any other value is reported
+as `host-finalizer-policy-env:invalid:NUIS_NSLD_HOST_FINALIZER_POLICY`. This
+policy switch only changes the audited plan state: the dry-run command remains
+non-mutating and still never spawns the host driver. The command exists to make
+the final host-assisted call boundary auditable before Nsld is allowed to
+execute it.
 `nsld final-executable-host-invoke-plan` sits one step after dry-run and before
 any future mutating host finalizer invocation. It reuses the dry-run command
 shape, reports `invocation_kind = "host-finalizer-command"`, requires an
-explicit allow gate, and currently reports `explicit_allow_present = false` and
-`would_invoke = false`. The command is also non-mutating: it records
+explicit allow gate, and reports whether `NUIS_NSLD_ALLOW_HOST_FINALIZER` is
+present with an allow-like value (`1`, `true`, `yes`, or `allow`). By default
+`explicit_allow_present = false` and `would_invoke = false`. Even when the
+explicit allow marker and `NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke`
+are both present, alpha-0.8.x remains non-mutating because the writer blockers
+still prevent host linker execution. The command records
 `host-invoke-plan-is-non-mutating` and
 `host-finalizer-process-is-not-spawned`, adds
-`host-finalizer-explicit-allow:missing` to blockers, and never spawns the host
-driver. This gives alpha-0.8.x a stable audit surface for the future transition
-from “known finalizer command” to “deliberately invoked finalizer command”
-without weakening the current execution gate.
+`host-finalizer-explicit-allow:missing` to blockers when that marker is absent,
+and never spawns the host driver. This gives alpha-0.8.x a stable audit surface
+for the future transition from “known finalizer command” to “deliberately
+invoked finalizer command” without weakening the current execution gate.
 `nsld emit-final-executable-host-invoke-plan` writes the same gate as
 `nuis.nsld.final-executable-host-invoke-plan.toml`, and
 `nsld verify-final-executable-host-invoke-plan` re-renders it to catch content
 drift plus focused gate drift in `invocation_policy`,
 `requires_explicit_allow`, `explicit_allow_present`, `would_invoke`,
-`command_arg_count`, `command_args`, and `blocker_count`. This artifact is
+`command_arg_count`, `command_args`, `blocker_count`, and `blockers`. This artifact is
 optional in the chain for now, like the
 writer input and blocked executable report, but it gives CI and future nsdb a
 stable file-backed record of why the host finalizer was not allowed to run.
@@ -984,7 +1000,8 @@ records containing payload offset, size, alignment, and content hash.
 `nsld emit-final-executable-layout` writes this protocol snapshot as
 `nuis.nsld.final-executable-layout.toml`; `nsld verify-final-executable-layout`
 re-renders it and checks focused drift in `layout_hash`, `payload_count`,
-`byte_span`, `byte_map_hash`, `lifecycle_entry_hook`, and
+the payload-name array, `[[payload]]` entry count, `[[byte_map_entry]]` entry
+count, `byte_span`, `byte_map_hash`, `lifecycle_entry_hook`, and
 `platform_envelope_family`. This keeps Nsld's
 internal executable protocol decoupled from Mach-O, ELF, PE/COFF, or any
 future Nuis-native shell writer.
@@ -1007,12 +1024,19 @@ header size, payload offset, payload span, header `layout_hash`, and header
 `byte_map_hash`. It also verifies the payload region behind the header against
 the layout byte map, reporting payload-region count/hash drift and focused
 payload entry hash drift when a payload byte range no longer matches its source
-payload hash. This is the first file-backed final-image assembly checkpoint:
+payload hash. The TOML report-side `blockers` array is also compared against
+the expected dry-run blockers so report drift cannot hide why an image was not
+ready. This is the first file-backed final-image assembly checkpoint:
 still not a runnable Mach-O/ELF/PE binary, but no longer only a layout plan.
-`nsld emit-final-executable` materializes the same readiness shape. In
-alpha-0.8.x it does not fabricate a runnable executable and does not call the
-host toolchain; instead it writes `nuis.nsld.final-executable.blocked.toml`
-with `emitted = false`. The emit path now also consumes
+`nsld emit-final-executable` materializes the same readiness shape. For
+host-assisted routes it still does not fabricate a runnable executable and does
+not call the host toolchain; instead it writes
+`nuis.nsld.final-executable.blocked.toml` with `emitted = false`. For
+self-contained routes, once writer input, layout, and image dry-run snapshots
+all verify, it copies the Nsld-owned final executable image bytes to the
+final-stage output path and records `emitted = true`. This first mutating
+writer path produces a Nuis-owned unified binary image, not a Mach-O/ELF/PE
+host executable. The emit path now also consumes
 `verify-final-executable-writer-input`: if the writer input is missing or has
 drifted, the blocked report records `writer_input_valid = false`,
 `writer_input_issues`, and a `final-executable-writer-input:invalid` blocker.
@@ -1030,8 +1054,13 @@ the executable boundary. The blocked report now also consumes
 snapshots add `host-finalizer-invoke-plan:invalid`, and the current missing
 explicit allow gate adds `host-finalizer-invoke-plan:not-allowed`. The report
 records `host_invoke_plan_valid`, `host_invoke_plan_hash`,
-`host_invoke_plan_would_invoke`, and `host_invoke_plan_issues` so the final
-blocked executable boundary proves it did not bypass the invocation gate.
+`host_invoke_plan_invocation_policy`,
+`host_invoke_plan_requires_explicit_allow`,
+`host_invoke_plan_explicit_allow_present`, `host_invoke_plan_would_invoke`,
+`host_invoke_plan_blocker_count`, and `host_invoke_plan_issues` so the final
+blocked executable boundary proves it did not bypass the invocation gate and
+does not require consumers to reopen the invoke-plan artifact just to understand
+which gate remained closed.
 The blocked report also consumes `verify-final-executable-layout`: missing or
 drifted layout snapshots add `final-executable-layout-plan:invalid`, and the
 report records `layout_plan_valid`, `layout_plan_hash`, and
@@ -1045,15 +1074,19 @@ blocked boundary depend on the actual Nsld-owned image checkpoint, not only on
 the abstract byte-map layout.
 `nsld verify-final-executable-emit` re-computes that blocked report and catches
 drift in fields such as `final_stage_plan_hash`, `emitted`, and
-`blocker_count`; it also reports focused drift for writer input fields such as
+`blocker_count` plus the final `blockers` array; it also reports focused drift for writer input fields such as
 `writer_input_valid`, `writer_input_hash`, and `writer_input_issues`, host
 dry-run readiness fields such as `host_dry_run_environment_ready` and
 `host_dry_run_driver_available`, plus invocation fields such as
 `host_dry_run_can_invoke`, `host_dry_run_driver_resolved_path`,
 `host_dry_run_invocation_policy`, `host_dry_run_invocation_policy_reason`, and
-`host_dry_run_command_args`, plus `host_dry_run_blockers`, host invoke-plan fields such as
-`host_invoke_plan_valid`, `host_invoke_plan_would_invoke`,
-`host_invoke_plan_hash`, and `host_invoke_plan_issues`, and layout fields such
+`host_dry_run_command_args`, plus `host_dry_run_blockers`, host invoke-plan
+fields such as `host_invoke_plan_valid`, `host_invoke_plan_hash`,
+`host_invoke_plan_invocation_policy`,
+`host_invoke_plan_requires_explicit_allow`,
+`host_invoke_plan_explicit_allow_present`,
+`host_invoke_plan_would_invoke`, `host_invoke_plan_blocker_count`, and
+`host_invoke_plan_issues`, and layout fields such
 as `layout_plan_valid`, `layout_plan_hash`, and `layout_plan_issues`, plus
 image dry-run fields such as `image_dry_run_valid`, `image_dry_run_hash`,
 `image_dry_run_size_bytes`, and `image_dry_run_issues`. The
@@ -1065,6 +1098,15 @@ summary without parsing the blocker array. The readiness report currently expose
 `final-executable-writer:host-assisted:not-implemented` as the writer-level
 blocker for the default host-toolchain route. This keeps final executable
 readiness scriptable without binding Nsld to one platform object format.
+Self-contained routes report `writer_status = "ready"` when the final-stage
+inputs are ready and the writer has no own blockers.
+`nsld final-executable-output` is the read-only boundary for the real runnable
+candidate. It inspects the final output path from the final-stage plan and
+reports presence, size, and hash when a file exists. It keeps explicit blockers
+when the final-stage plan or final-executable emit report is invalid, when the
+blocked emit report still says `emitted = false`, or when the output file is
+missing. That separates "protocol snapshots are internally consistent" from "a
+controlled executable file actually exists".
 The final-stage plan file is also checked by `nsld check`, which exposes
 `final_stage_plan_present`, `final_stage_plan_valid`,
 `final_stage_plan_ready`, `final_stage_plan_hash`,
@@ -1084,6 +1126,9 @@ verifies it independently and exposes
 `final_executable_host_invoke_plan_present`,
 `final_executable_host_invoke_plan_valid`,
 `final_executable_host_invoke_plan_hash`,
+`final_executable_host_invoke_plan_invocation_policy`,
+`final_executable_host_invoke_plan_requires_explicit_allow`,
+`final_executable_host_invoke_plan_explicit_allow_present`,
 `final_executable_host_invoke_plan_would_invoke`,
 `final_executable_host_invoke_plan_blocker_count`, and
 `final_executable_host_invoke_plan_issues`. This keeps the execution gate

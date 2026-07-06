@@ -444,6 +444,32 @@ pub(crate) fn print_nsld_final_stage_plan_verify_report(report: &NsldFinalStageP
         "  actual_input_count: {}",
         optional_usize_text(report.actual_input_count)
     );
+    for input_id in &report.expected_input_ids {
+        println!("  expected_input_id: {input_id}");
+    }
+    for input_id in &report.actual_input_ids {
+        println!("  actual_input_id: {input_id}");
+    }
+    println!(
+        "  expected_input_entry_count: {}",
+        report.expected_input_entry_count
+    );
+    println!(
+        "  actual_input_entry_count: {}",
+        report.actual_input_entry_count
+    );
+    for blocker in &report.expected_blockers {
+        println!("  expected_blocker: {blocker}");
+    }
+    for blocker in &report.actual_blockers {
+        println!("  actual_blocker: {blocker}");
+    }
+    for note in &report.expected_notes {
+        println!("  expected_note: {note}");
+    }
+    for note in &report.actual_notes {
+        println!("  actual_note: {note}");
+    }
     for issue in &report.issues {
         println!("  issue: {issue}");
     }
@@ -564,6 +590,12 @@ pub(crate) fn print_nsld_final_executable_writer_input_verify_report(
     }
     for arg in &report.actual_command_args {
         println!("  actual_command_arg: {arg}");
+    }
+    for blocker in &report.expected_writer_blockers {
+        println!("  expected_writer_blocker: {blocker}");
+    }
+    for blocker in &report.actual_writer_blockers {
+        println!("  actual_writer_blocker: {blocker}");
     }
     for issue in &report.issues {
         println!("  issue: {issue}");
@@ -739,6 +771,12 @@ pub(crate) fn print_nsld_final_executable_host_invoke_plan_verify_report(
         "  actual_blocker_count: {}",
         optional_usize_text(report.actual_blocker_count)
     );
+    for blocker in &report.expected_blockers {
+        println!("  expected_blocker: {blocker}");
+    }
+    for blocker in &report.actual_blockers {
+        println!("  actual_blocker: {blocker}");
+    }
     for issue in &report.issues {
         println!("  issue: {issue}");
     }
@@ -847,6 +885,28 @@ pub(crate) fn print_nsld_final_executable_layout_plan_verify_report(
     println!(
         "  actual_payload_count: {}",
         optional_usize_text(report.actual_payload_count)
+    );
+    for payload in &report.expected_payloads {
+        println!("  expected_payload: {payload}");
+    }
+    for payload in &report.actual_payloads {
+        println!("  actual_payload: {payload}");
+    }
+    println!(
+        "  expected_payload_entry_count: {}",
+        report.expected_payload_entry_count
+    );
+    println!(
+        "  actual_payload_entry_count: {}",
+        report.actual_payload_entry_count
+    );
+    println!(
+        "  expected_byte_map_entry_count: {}",
+        report.expected_byte_map_entry_count
+    );
+    println!(
+        "  actual_byte_map_entry_count: {}",
+        report.actual_byte_map_entry_count
     );
     println!("  expected_byte_span: {}", report.expected_byte_span);
     println!(
@@ -1050,6 +1110,12 @@ pub(crate) fn print_nsld_final_executable_image_dry_run_verify_report(
         "  actual_image_hash: {}",
         optional_string_text(report.actual_image_hash.as_deref())
     );
+    for blocker in &report.expected_blockers {
+        println!("  expected_blocker: {blocker}");
+    }
+    for blocker in &report.actual_blockers {
+        println!("  actual_blocker: {blocker}");
+    }
     for issue in &report.issues {
         println!("  issue: {issue}");
     }
@@ -1152,8 +1218,24 @@ fn print_nsld_final_executable_report_with_title(
         optional_string_text(report.host_invoke_plan_hash.as_deref())
     );
     println!(
+        "  host_invoke_plan_invocation_policy: {}",
+        optional_string_text(report.host_invoke_plan_invocation_policy.as_deref())
+    );
+    println!(
+        "  host_invoke_plan_requires_explicit_allow: {}",
+        optional_bool_text(report.host_invoke_plan_requires_explicit_allow)
+    );
+    println!(
+        "  host_invoke_plan_explicit_allow_present: {}",
+        optional_bool_text(report.host_invoke_plan_explicit_allow_present)
+    );
+    println!(
         "  host_invoke_plan_would_invoke: {}",
         optional_bool_text(report.host_invoke_plan_would_invoke)
+    );
+    println!(
+        "  host_invoke_plan_blocker_count: {}",
+        optional_usize_text(report.host_invoke_plan_blocker_count)
     );
     for issue in &report.host_invoke_plan_issues {
         println!("  host_invoke_plan_issue: {issue}");
@@ -1351,6 +1433,42 @@ pub(crate) fn print_nsld_final_executable_emit_verify_report(
         "  actual_host_invoke_plan_hash: {}",
         optional_string_text(report.actual_host_invoke_plan_hash.as_deref())
     );
+    println!(
+        "  expected_host_invoke_plan_invocation_policy: {}",
+        optional_string_text(
+            report
+                .expected_host_invoke_plan_invocation_policy
+                .as_deref()
+        )
+    );
+    println!(
+        "  actual_host_invoke_plan_invocation_policy: {}",
+        optional_string_text(report.actual_host_invoke_plan_invocation_policy.as_deref())
+    );
+    println!(
+        "  expected_host_invoke_plan_requires_explicit_allow: {}",
+        optional_bool_text(report.expected_host_invoke_plan_requires_explicit_allow)
+    );
+    println!(
+        "  actual_host_invoke_plan_requires_explicit_allow: {}",
+        optional_bool_text(report.actual_host_invoke_plan_requires_explicit_allow)
+    );
+    println!(
+        "  expected_host_invoke_plan_explicit_allow_present: {}",
+        optional_bool_text(report.expected_host_invoke_plan_explicit_allow_present)
+    );
+    println!(
+        "  actual_host_invoke_plan_explicit_allow_present: {}",
+        optional_bool_text(report.actual_host_invoke_plan_explicit_allow_present)
+    );
+    println!(
+        "  expected_host_invoke_plan_blocker_count: {}",
+        optional_usize_text(report.expected_host_invoke_plan_blocker_count)
+    );
+    println!(
+        "  actual_host_invoke_plan_blocker_count: {}",
+        optional_usize_text(report.actual_host_invoke_plan_blocker_count)
+    );
     for issue in &report.expected_host_invoke_plan_issues {
         println!("  expected_host_invoke_plan_issue: {issue}");
     }
@@ -1417,6 +1535,51 @@ pub(crate) fn print_nsld_final_executable_emit_verify_report(
         "  actual_blocker_count: {}",
         optional_usize_text(report.actual_blocker_count)
     );
+    for blocker in &report.expected_blockers {
+        println!("  expected_blocker: {blocker}");
+    }
+    for blocker in &report.actual_blockers {
+        println!("  actual_blocker: {blocker}");
+    }
+    for issue in &report.issues {
+        println!("  issue: {issue}");
+    }
+}
+
+pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecutableOutputReport) {
+    println!("Nsld final executable output");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  present: {}", report.present);
+    println!("  size_bytes: {}", optional_usize_text(report.size_bytes));
+    println!(
+        "  output_hash: {}",
+        optional_string_text(report.output_hash.as_deref())
+    );
+    println!(
+        "  final_stage_plan_valid: {}",
+        report.final_stage_plan_valid
+    );
+    println!(
+        "  final_stage_plan_hash: {}",
+        optional_string_text(report.final_stage_plan_hash.as_deref())
+    );
+    println!(
+        "  final_executable_emit_valid: {}",
+        report.final_executable_emit_valid
+    );
+    println!(
+        "  final_executable_emitted: {}",
+        optional_bool_text(report.final_executable_emitted)
+    );
+    println!(
+        "  final_executable_blocker_count: {}",
+        optional_usize_text(report.final_executable_blocker_count)
+    );
+    println!("  runnable_candidate: {}", report.runnable_candidate);
+    for blocker in &report.blockers {
+        println!("  blocker: {blocker}");
+    }
     for issue in &report.issues {
         println!("  issue: {issue}");
     }

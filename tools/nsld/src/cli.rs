@@ -28,6 +28,7 @@ pub(crate) enum Command {
     VerifyFinalExecutableImageDryRun { input: PathBuf, json: bool },
     EmitFinalExecutable { input: PathBuf, json: bool },
     VerifyFinalExecutableEmit { input: PathBuf, json: bool },
+    FinalExecutableOutput { input: PathBuf, json: bool },
     Prepare { input: PathBuf, json: bool },
     AssemblePlan { input: PathBuf, json: bool },
     EmitAssemblePlan { input: PathBuf, json: bool },
@@ -106,6 +107,7 @@ where
         | "verify-final-executable-image-dry-run"
         | "emit-final-executable"
         | "verify-final-executable-emit"
+        | "final-executable-output"
         | "prepare"
         | "assemble-plan"
         | "emit-assemble-plan"
@@ -179,6 +181,7 @@ where
                 command == "verify-final-executable-image-dry-run";
             let is_emit_final_executable = command == "emit-final-executable";
             let is_verify_final_executable_emit = command == "verify-final-executable-emit";
+            let is_final_executable_output = command == "final-executable-output";
             let is_prepare = command == "prepare";
             let is_assemble_plan = command == "assemble-plan";
             let is_emit_assemble_plan = command == "emit-assemble-plan";
@@ -281,6 +284,8 @@ where
                 Ok(Command::EmitFinalExecutable { input, json })
             } else if is_verify_final_executable_emit {
                 Ok(Command::VerifyFinalExecutableEmit { input, json })
+            } else if is_final_executable_output {
+                Ok(Command::FinalExecutableOutput { input, json })
             } else if is_prepare {
                 Ok(Command::Prepare { input, json })
             } else if is_assemble_plan {
@@ -417,6 +422,7 @@ fn usage() -> &'static str {
         "  nsld verify-final-executable-image-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-final-executable <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-final-executable-emit <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-output <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld prepare <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",

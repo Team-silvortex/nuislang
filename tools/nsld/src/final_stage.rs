@@ -1,3 +1,5 @@
+// Compatibility facade: callers still import final executable commands through
+// `final_stage::*`, while implementation lives in focused stage modules.
 pub(crate) use super::final_executable_emit::{
     nsld_emit_final_executable_report, nsld_verify_final_executable_emit_report,
 };
@@ -14,6 +16,7 @@ pub(crate) use super::final_executable_layout_stage::{
     nsld_emit_final_executable_layout_plan_report, nsld_final_executable_layout_plan_report,
     nsld_verify_final_executable_layout_plan_report,
 };
+pub(crate) use super::final_executable_output::nsld_final_executable_output_report;
 pub(crate) use super::final_executable_summary::{
     nsld_final_executable_readiness_report, nsld_final_executable_writer_plan_report,
 };
@@ -149,6 +152,43 @@ pub(crate) fn nsld_final_stage_plan_report(
     }
 }
 
+fn table_entry_count(source: &str, table: &str) -> usize {
+    let header = format!("[[{table}]]");
+    source.lines().filter(|line| line.trim() == header).count()
+}
+
+fn table_string_values(source: &str, table: &str, key: &str) -> Vec<String> {
+    let header = format!("[[{table}]]");
+    let mut values = Vec::new();
+    let mut in_target_table = false;
+
+    for raw in source.lines() {
+        let line = raw.trim();
+        if line.starts_with("[[") && line.ends_with("]]") {
+            in_target_table = line == header;
+            continue;
+        }
+        if !in_target_table {
+            continue;
+        }
+        let Some((found_key, value)) = line.split_once('=') else {
+            continue;
+        };
+        if found_key.trim() != key {
+            continue;
+        }
+        if let Some(value) = value
+            .trim()
+            .strip_prefix('"')
+            .and_then(|value| value.strip_suffix('"'))
+        {
+            values.push(value.to_owned());
+        }
+    }
+
+    values
+}
+
 pub(crate) fn nsld_emit_final_stage_plan_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
@@ -185,16 +225,32 @@ pub(crate) fn nsld_verify_final_stage_plan_report(
             input_path.display()
         )
     });
-    let (actual_plan_hash, actual_input_count) = match actual.as_ref() {
+    let (
+        actual_plan_hash,
+        actual_input_count,
+        actual_input_ids,
+        actual_input_entry_count,
+        actual_blockers,
+        actual_notes,
+    ) = match actual.as_ref() {
         Ok(source) => (
             toml::string_value(source, "plan_hash"),
             toml::usize_value(source, "input_count"),
+            table_string_values(source, "final_stage_input", "input_id"),
+            table_entry_count(source, "final_stage_input"),
+            toml::string_array_value(source, "blockers"),
+            toml::string_array_value(source, "notes"),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None)
+            (None, None, Vec::new(), 0, Vec::new(), Vec::new())
         }
     };
+    let expected_input_ids = expected_report
+        .inputs
+        .iter()
+        .map(|input| input.input_id.clone())
+        .collect::<Vec<_>>();
     if let Ok(actual) = actual {
         let expected = render_final_stage_plan(&expected_report);
         if actual != expected {
@@ -218,6 +274,34 @@ pub(crate) fn nsld_verify_final_stage_plan_report(
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
+        if actual_input_ids != expected_input_ids {
+            issues.push(format!(
+                "input_ids mismatch: expected [{}], found [{}]",
+                expected_input_ids.join(", "),
+                actual_input_ids.join(", ")
+            ));
+        }
+        if actual_input_entry_count != expected_report.inputs.len() {
+            issues.push(format!(
+                "input_entry_count mismatch: expected {}, found {}",
+                expected_report.inputs.len(),
+                actual_input_entry_count
+            ));
+        }
+        if actual_blockers != expected_report.blockers {
+            issues.push(format!(
+                "blockers mismatch: expected [{}], found [{}]",
+                expected_report.blockers.join(", "),
+                actual_blockers.join(", ")
+            ));
+        }
+        if actual_notes != expected_report.notes {
+            issues.push(format!(
+                "notes mismatch: expected [{}], found [{}]",
+                expected_report.notes.join(", "),
+                actual_notes.join(", ")
+            ));
+        }
     }
 
     NsldFinalStagePlanVerifyReport {
@@ -226,6 +310,14 @@ pub(crate) fn nsld_verify_final_stage_plan_report(
         valid: issues.is_empty(),
         expected_plan_hash: expected_report.plan_hash,
         expected_input_count: expected_report.input_count,
+        expected_input_ids,
+        actual_input_ids,
+        expected_input_entry_count: expected_report.inputs.len(),
+        actual_input_entry_count,
+        expected_blockers: expected_report.blockers,
+        actual_blockers,
+        expected_notes: expected_report.notes,
+        actual_notes,
         actual_plan_hash,
         actual_input_count,
         issues,

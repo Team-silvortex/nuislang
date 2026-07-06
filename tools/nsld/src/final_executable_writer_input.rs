@@ -66,6 +66,7 @@ pub(crate) fn nsld_verify_final_executable_writer_input_report(
         actual_writer_status,
         actual_command_arg_count,
         actual_command_args,
+        actual_writer_blockers,
     ) = match actual.as_ref() {
         Ok(source) => (
             Some(fnv1a64_hex(source.as_bytes())),
@@ -74,10 +75,11 @@ pub(crate) fn nsld_verify_final_executable_writer_input_report(
             toml::string_value(source, "writer_status"),
             toml::usize_value(source, "command_arg_count"),
             toml::string_array_value(source, "command_args"),
+            toml::string_array_value(source, "writer_blockers"),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None, Vec::new())
+            (None, None, None, None, None, Vec::new(), Vec::new())
         }
     };
     if let Ok(actual) = actual {
@@ -130,6 +132,13 @@ pub(crate) fn nsld_verify_final_executable_writer_input_report(
                 actual_command_args.join(", ")
             ));
         }
+        if actual_writer_blockers != expected_plan.writer_blockers {
+            issues.push(format!(
+                "writer_blockers mismatch: expected [{}], found [{}]",
+                expected_plan.writer_blockers.join(", "),
+                actual_writer_blockers.join(", ")
+            ));
+        }
     }
 
     NsldFinalExecutableWriterInputVerifyReport {
@@ -148,6 +157,8 @@ pub(crate) fn nsld_verify_final_executable_writer_input_report(
         actual_command_arg_count,
         expected_command_args,
         actual_command_args,
+        expected_writer_blockers: expected_plan.writer_blockers,
+        actual_writer_blockers,
         issues,
     }
 }

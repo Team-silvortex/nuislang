@@ -10,7 +10,10 @@ use super::{
     },
     toml,
 };
-use std::{fs, path::Path};
+use std::{env, fs, path::Path};
+
+const HOST_FINALIZER_ALLOW_ENV: &str = "NUIS_NSLD_ALLOW_HOST_FINALIZER";
+const HOST_FINALIZER_POLICY_ENV: &str = "NUIS_NSLD_HOST_FINALIZER_POLICY";
 
 pub(crate) fn nsld_final_executable_host_dry_run_report(
     manifest: &Path,
@@ -43,9 +46,11 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
         blockers.push(format!("host-finalizer-driver-unavailable:{driver}"));
     }
     blockers.extend(writer_plan.writer_blockers.iter().cloned());
-    let invocation_policy = "dry-run-only".to_owned();
-    let invocation_policy_reason = "alpha-host-finalizer-execution-disabled".to_owned();
-    blockers.push(format!("host-finalizer-policy:{invocation_policy}"));
+    let (invocation_policy, invocation_policy_reason, policy_blocker) =
+        host_finalizer_invocation_policy();
+    if let Some(blocker) = policy_blocker {
+        blockers.push(blocker);
+    }
     let environment_ready = writer_input.valid && driver_available;
     let can_invoke_host_finalizer = environment_ready
         && writer_plan.writer_blockers.is_empty()
@@ -53,6 +58,10 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
     let mut notes = writer_plan.notes.clone();
     notes.push("host-finalizer-dry-run-is-non-mutating".to_owned());
     notes.push("host-finalizer-is-not-invoked".to_owned());
+    notes.push(format!(
+        "host-finalizer-policy-env:{HOST_FINALIZER_POLICY_ENV}={}",
+        invocation_policy
+    ));
 
     NsldFinalExecutableHostDryRunReport {
         manifest: manifest.display().to_string(),
@@ -79,7 +88,7 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_report(
 ) -> NsldFinalExecutableHostInvokePlanReport {
     let dry_run = nsld_final_executable_host_dry_run_report(manifest, plan);
     let requires_explicit_allow = true;
-    let explicit_allow_present = false;
+    let explicit_allow_present = host_finalizer_explicit_allow_present();
     let mut blockers = dry_run.blockers.clone();
     if requires_explicit_allow && !explicit_allow_present {
         blockers.push("host-finalizer-explicit-allow:missing".to_owned());
@@ -89,6 +98,14 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_report(
     let mut notes = dry_run.notes.clone();
     notes.push("host-invoke-plan-is-non-mutating".to_owned());
     notes.push("host-finalizer-process-is-not-spawned".to_owned());
+    notes.push(format!(
+        "host-finalizer-explicit-allow-env:{HOST_FINALIZER_ALLOW_ENV}={}",
+        if explicit_allow_present {
+            "present"
+        } else {
+            "missing"
+        }
+    ));
 
     NsldFinalExecutableHostInvokePlanReport {
         manifest: manifest.display().to_string(),
@@ -161,6 +178,7 @@ pub(crate) fn nsld_verify_final_executable_host_invoke_plan_report(
         actual_command_arg_count,
         actual_command_args,
         actual_blocker_count,
+        actual_blockers,
     ) = match actual.as_ref() {
         Ok(source) => (
             Some(fnv1a64_hex(source.as_bytes())),
@@ -171,10 +189,21 @@ pub(crate) fn nsld_verify_final_executable_host_invoke_plan_report(
             toml::usize_value(source, "command_arg_count"),
             toml::string_array_value(source, "command_args"),
             toml::usize_value(source, "blocker_count"),
+            toml::string_array_value(source, "blockers"),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None, None, Vec::new(), None)
+            (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Vec::new(),
+                None,
+                Vec::new(),
+            )
         }
     };
     if let Ok(actual) = actual {
@@ -242,6 +271,13 @@ pub(crate) fn nsld_verify_final_executable_host_invoke_plan_report(
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
+        if actual_blockers != expected_report.blockers {
+            issues.push(format!(
+                "blockers mismatch: expected [{}], found [{}]",
+                expected_report.blockers.join(", "),
+                actual_blockers.join(", ")
+            ));
+        }
     }
 
     NsldFinalExecutableHostInvokePlanVerifyReport {
@@ -264,6 +300,54 @@ pub(crate) fn nsld_verify_final_executable_host_invoke_plan_report(
         actual_command_args,
         expected_blocker_count: expected_report.blockers.len(),
         actual_blocker_count,
+        expected_blockers: expected_report.blockers,
+        actual_blockers,
         issues,
+    }
+}
+
+fn host_finalizer_explicit_allow_present() -> bool {
+    env::var(HOST_FINALIZER_ALLOW_ENV)
+        .map(|value| {
+            let value = value.trim();
+            value == "1"
+                || value.eq_ignore_ascii_case("true")
+                || value.eq_ignore_ascii_case("yes")
+                || value.eq_ignore_ascii_case("allow")
+        })
+        .unwrap_or(false)
+}
+
+fn host_finalizer_invocation_policy() -> (String, String, Option<String>) {
+    match env::var(HOST_FINALIZER_POLICY_ENV) {
+        Ok(value) => {
+            let value = value.trim();
+            if value == "allow-host-invoke" || value.eq_ignore_ascii_case("allow") {
+                (
+                    "allow-host-invoke".to_owned(),
+                    format!("explicit-policy-env:{HOST_FINALIZER_POLICY_ENV}"),
+                    None,
+                )
+            } else if value.is_empty() || value == "dry-run-only" {
+                (
+                    "dry-run-only".to_owned(),
+                    "alpha-host-finalizer-execution-disabled".to_owned(),
+                    Some("host-finalizer-policy:dry-run-only".to_owned()),
+                )
+            } else {
+                (
+                    "dry-run-only".to_owned(),
+                    format!("invalid-policy-env:{HOST_FINALIZER_POLICY_ENV}={value}"),
+                    Some(format!(
+                        "host-finalizer-policy-env:invalid:{HOST_FINALIZER_POLICY_ENV}"
+                    )),
+                )
+            }
+        }
+        Err(_) => (
+            "dry-run-only".to_owned(),
+            "alpha-host-finalizer-execution-disabled".to_owned(),
+            Some("host-finalizer-policy:dry-run-only".to_owned()),
+        ),
     }
 }

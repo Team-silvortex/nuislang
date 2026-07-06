@@ -28,6 +28,7 @@ mod final_executable_image;
 mod final_executable_image_stage;
 mod final_executable_layout;
 mod final_executable_layout_stage;
+mod final_executable_output;
 mod final_executable_paths;
 mod final_executable_render;
 mod final_executable_summary;
@@ -402,6 +403,15 @@ fn run() -> Result<(), String> {
             }
             if !report.valid {
                 return Err("nsld final executable emit verification failed".to_owned());
+            }
+        }
+        Command::FinalExecutableOutput { input, json } => {
+            let ctx = load_link_input_context(&input)?;
+            let report = nsld_final_executable_output_report(&ctx.manifest, &ctx.plan);
+            if json {
+                println!("{}", nsld_final_executable_output_report_json(&report));
+            } else {
+                print_nsld_final_executable_output_report(&report);
             }
         }
         Command::Prepare { input, json } => {

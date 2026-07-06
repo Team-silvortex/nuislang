@@ -190,10 +190,17 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_writer_input_issues.len()
     );
     println!(
-        "  final_executable_host_invoke_plan: present={} valid={} hash={} would_invoke={} blockers={} issues={}",
+        "  final_executable_host_invoke_plan: present={} valid={} hash={} policy={} explicit_allow={} allow_present={} would_invoke={} blockers={} issues={}",
         report.final_executable_host_invoke_plan_present,
         optional_bool_text(report.final_executable_host_invoke_plan_valid),
         optional_string_text(report.final_executable_host_invoke_plan_hash.as_deref()),
+        optional_string_text(
+            report
+                .final_executable_host_invoke_plan_invocation_policy
+                .as_deref()
+        ),
+        optional_bool_text(report.final_executable_host_invoke_plan_requires_explicit_allow),
+        optional_bool_text(report.final_executable_host_invoke_plan_explicit_allow_present),
         optional_bool_text(report.final_executable_host_invoke_plan_would_invoke),
         optional_usize_text(report.final_executable_host_invoke_plan_blocker_count),
         report.final_executable_host_invoke_plan_issues.len()
