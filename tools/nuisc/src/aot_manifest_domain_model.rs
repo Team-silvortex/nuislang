@@ -57,6 +57,12 @@ pub(crate) fn build_manifest_domain_units(
                 device_class,
                 selected_lowering_target,
             ) = resolve_domain_build_unit_target(&contract.domain_family, abi.as_deref())?;
+            let artifact_metadata = domain_artifact_metadata(
+                &contract.domain_family,
+                backend_family.as_deref(),
+                selected_lowering_target.as_deref(),
+                device_class.as_deref(),
+            );
             Ok(BuildManifestDomainBuildUnit {
                 package_id: contract.package_id.clone(),
                 domain_family: contract.domain_family.clone(),
@@ -66,6 +72,11 @@ pub(crate) fn build_manifest_domain_units(
                 backend_family,
                 vendor,
                 device_class,
+                target_device: artifact_metadata.target_device,
+                ir_format: artifact_metadata.ir_format,
+                dispatch_abi: artifact_metadata.dispatch_abi,
+                backend_priority: artifact_metadata.backend_priority,
+                verification: artifact_metadata.verification,
                 selected_lowering_target,
                 artifact_stub_path: None,
                 artifact_stub_inline: None,
@@ -161,6 +172,98 @@ fn resolve_domain_build_unit_target(
             ))
         }
         _ => Ok((None, None, None, None, None, None)),
+    }
+}
+
+struct DomainArtifactMetadata {
+    target_device: Option<String>,
+    ir_format: Option<String>,
+    dispatch_abi: Option<String>,
+    backend_priority: Option<usize>,
+    verification: Option<String>,
+}
+
+fn domain_artifact_metadata(
+    domain_family: &str,
+    backend_family: Option<&str>,
+    selected_lowering_target: Option<&str>,
+    device_class: Option<&str>,
+) -> DomainArtifactMetadata {
+    let backend = backend_family.unwrap_or("none");
+    let selected = selected_lowering_target.unwrap_or(backend);
+    let target_device = match domain_family {
+        "cpu" => Some("host-cpu".to_owned()),
+        "shader" | "kernel" => device_class
+            .map(str::to_owned)
+            .or_else(|| backend_target_device(backend).map(str::to_owned)),
+        "network" => Some(
+            match backend {
+                "urlsession" => "urlsession-stack",
+                "winsock" => "winsock-stack",
+                _ => "socket-io",
+            }
+            .to_owned(),
+        ),
+        _ => None,
+    };
+    let (ir_format, dispatch_abi, priority) = match domain_family {
+        "cpu" => ("llvm-bitcode", "nuis-host-call", 100),
+        "shader" => shader_artifact_metadata(backend),
+        "kernel" => kernel_artifact_metadata(backend, selected),
+        "network" => ("host-ffi-plan", "nuis-host-call", 700),
+        _ => ("unknown", "unknown", 900),
+    };
+    DomainArtifactMetadata {
+        target_device,
+        ir_format: Some(ir_format.to_owned()).filter(|value| value != "unknown"),
+        dispatch_abi: Some(dispatch_abi.to_owned()).filter(|value| value != "unknown"),
+        backend_priority: Some(priority),
+        verification: Some("contract-only".to_owned()),
+    }
+}
+
+fn backend_target_device(backend: &str) -> Option<&'static str> {
+    match backend {
+        "metal" | "mps-graph" => Some("apple-gpu"),
+        "coreml" => Some("apple-ane"),
+        "vulkan" => Some("vulkan-device"),
+        "directx" => Some("d3d12-device"),
+        "webgpu" => Some("webgpu-device"),
+        "opengl" => Some("opengl-device"),
+        "cpu-fallback" | "llvm" => Some("host-cpu"),
+        _ => None,
+    }
+}
+
+fn shader_artifact_metadata(backend: &str) -> (&'static str, &'static str, usize) {
+    match backend {
+        "metal" => ("msl", "metal-render-pipeline", 10),
+        "vulkan" => ("glsl450", "vulkan-graphics-pipeline", 20),
+        "directx" => ("hlsl", "d3d12-graphics-pipeline", 30),
+        "webgpu" => ("wgsl", "webgpu-render-pipeline", 40),
+        "opengl" => ("glsl460", "opengl-graphics-pipeline", 80),
+        _ => ("unknown", "unknown", 900),
+    }
+}
+
+fn kernel_artifact_metadata(
+    backend: &str,
+    selected_lowering_target: &str,
+) -> (&'static str, &'static str, usize) {
+    match backend {
+        "coreml" => (
+            if selected_lowering_target.contains("graph") {
+                "mlpackage"
+            } else {
+                "mlmodel"
+            },
+            "coreml-predict",
+            10,
+        ),
+        "mps-graph" => ("mps-graph-json", "mps-graph-dispatch", 20),
+        "vulkan" => ("spirv", "vulkan-compute-pipeline", 30),
+        "cpu-fallback" => ("llvm-bitcode", "nuis-host-call", 900),
+        _ => ("unknown", "unknown", 900),
     }
 }
 

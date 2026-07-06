@@ -184,12 +184,19 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
     }
     for unit in &plan.domain_units {
         lines.push(format!(
-            "domain_unit: kind={} domain={} package={} lowering={} backend={} role={}",
+            "domain_unit: kind={} domain={} package={} lowering={} backend={} target_device={} ir_format={} dispatch_abi={} backend_priority={} verification={} role={}",
             unit.kind,
             unit.domain_family,
             unit.package_id,
             unit.selected_lowering_target.as_deref().unwrap_or("none"),
             unit.backend_family.as_deref().unwrap_or("none"),
+            unit.target_device.as_deref().unwrap_or("none"),
+            unit.ir_format.as_deref().unwrap_or("none"),
+            unit.dispatch_abi.as_deref().unwrap_or("none"),
+            unit.backend_priority
+                .map(|priority| priority.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            unit.verification.as_deref().unwrap_or("none"),
             unit.packaging_role
         ));
     }

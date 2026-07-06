@@ -54,6 +54,21 @@ pub(crate) fn link_plan_domain_unit_json(unit: &linker::LinkPlanDomainUnit) -> S
     if let Some(value) = unit.device_class.as_deref() {
         fields.push(json_string_field("device_class", value));
     }
+    if let Some(value) = unit.target_device.as_deref() {
+        fields.push(json_string_field("target_device", value));
+    }
+    if let Some(value) = unit.ir_format.as_deref() {
+        fields.push(json_string_field("ir_format", value));
+    }
+    if let Some(value) = unit.dispatch_abi.as_deref() {
+        fields.push(json_string_field("dispatch_abi", value));
+    }
+    if let Some(value) = unit.backend_priority {
+        fields.push(json_usize_field("backend_priority", value));
+    }
+    if let Some(value) = unit.verification.as_deref() {
+        fields.push(json_string_field("verification", value));
+    }
     if let Some(value) = unit.selected_lowering_target.as_deref() {
         fields.push(json_string_field("selected_lowering_target", value));
     }

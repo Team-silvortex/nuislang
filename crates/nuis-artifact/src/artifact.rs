@@ -17,9 +17,9 @@ use crate::{
         COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION, DOMAIN_PAYLOAD_SECTION_CONTRACT_TOML,
     },
     toml::{
-        escape_toml_string, parse_optional_map_string, parse_optional_toml_string_array,
-        parse_required_map_string_in_block, parse_required_toml_string, parse_required_toml_usize,
-        render_string_array,
+        escape_toml_string, parse_optional_map_string, parse_optional_map_usize,
+        parse_optional_toml_string_array, parse_required_map_string_in_block,
+        parse_required_toml_string, parse_required_toml_usize, render_string_array,
     },
     ArtifactError, BuildManifestDomainBuildUnit, NuisExecutableEnvelope,
 };
@@ -78,6 +78,11 @@ pub struct NuisLoweringIndexUnit {
     pub package_id: String,
     pub domain_family: String,
     pub backend_family: Option<String>,
+    pub target_device: Option<String>,
+    pub ir_format: Option<String>,
+    pub dispatch_abi: Option<String>,
+    pub backend_priority: Option<usize>,
+    pub verification: Option<String>,
     pub selected_lowering_target: Option<String>,
     pub artifact_ir_sidecar_path: Option<String>,
     pub contract_family: String,
@@ -456,6 +461,16 @@ fn parse_lowering_unit_row(
             "lowering_unit",
         )?,
         backend_family: parse_optional_map_string(values, "backend_family"),
+        target_device: parse_optional_map_string(values, "target_device"),
+        ir_format: parse_optional_map_string(values, "ir_format"),
+        dispatch_abi: parse_optional_map_string(values, "dispatch_abi"),
+        backend_priority: parse_optional_map_usize(
+            values,
+            "backend_priority",
+            path,
+            "lowering_unit",
+        )?,
+        verification: parse_optional_map_string(values, "verification"),
         selected_lowering_target: parse_optional_map_string(values, "selected_lowering_target"),
         artifact_ir_sidecar_path: parse_optional_map_string(values, "artifact_ir_sidecar_path"),
         contract_family: parse_required_map_string_in_block(
@@ -922,6 +937,42 @@ fn validate_lowering_unit_matches_manifest_unit(
     )?;
     validate_lowering_unit_option(
         &unit_label,
+        "target_device",
+        lowering_unit.target_device.as_deref(),
+        manifest_unit.target_device.as_deref(),
+    )?;
+    validate_lowering_unit_option(
+        &unit_label,
+        "ir_format",
+        lowering_unit.ir_format.as_deref(),
+        manifest_unit.ir_format.as_deref(),
+    )?;
+    validate_lowering_unit_option(
+        &unit_label,
+        "dispatch_abi",
+        lowering_unit.dispatch_abi.as_deref(),
+        manifest_unit.dispatch_abi.as_deref(),
+    )?;
+    validate_lowering_unit_option(
+        &unit_label,
+        "backend_priority",
+        lowering_unit
+            .backend_priority
+            .map(|value| value.to_string())
+            .as_deref(),
+        manifest_unit
+            .backend_priority
+            .map(|value| value.to_string())
+            .as_deref(),
+    )?;
+    validate_lowering_unit_option(
+        &unit_label,
+        "verification",
+        lowering_unit.verification.as_deref(),
+        manifest_unit.verification.as_deref(),
+    )?;
+    validate_lowering_unit_option(
+        &unit_label,
         "selected_lowering_target",
         lowering_unit.selected_lowering_target.as_deref(),
         manifest_unit.selected_lowering_target.as_deref(),
@@ -1055,6 +1106,30 @@ fn render_lowering_index(artifact: &NuisCompiledArtifact) -> Result<String, Arti
         if let Some(value) = &unit.backend_family {
             out.push_str(&format!(
                 "backend_family = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &unit.target_device {
+            out.push_str(&format!(
+                "target_device = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &unit.ir_format {
+            out.push_str(&format!("ir_format = \"{}\"\n", escape_toml_string(value)));
+        }
+        if let Some(value) = &unit.dispatch_abi {
+            out.push_str(&format!(
+                "dispatch_abi = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = unit.backend_priority {
+            out.push_str(&format!("backend_priority = {}\n", value));
+        }
+        if let Some(value) = &unit.verification {
+            out.push_str(&format!(
+                "verification = \"{}\"\n",
                 escape_toml_string(value)
             ));
         }
@@ -1532,6 +1607,11 @@ packaging_role = "host-binary"
             backend_family: Some("urlsession".to_owned()),
             vendor: Some("apple".to_owned()),
             device_class: Some("socket-io".to_owned()),
+            target_device: Some("urlsession-stack".to_owned()),
+            ir_format: Some("host-ffi-plan".to_owned()),
+            dispatch_abi: Some("nuis-host-call".to_owned()),
+            backend_priority: Some(700),
+            verification: Some("contract-only".to_owned()),
             selected_lowering_target: Some("urlsession".to_owned()),
             contract_family: "nustar.network".to_owned(),
             packaging_role: "hetero-contract".to_owned(),

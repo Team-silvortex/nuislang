@@ -60,6 +60,14 @@ fn artifact_lowering_unit_json(unit: &aot::NuisCompiledArtifactLoweringUnitInspe
         json_string_field("package_id", &unit.package_id),
         json_string_field("domain_family", &unit.domain_family),
         json_optional_string_field("backend_family", unit.backend_family.as_deref()),
+        json_optional_string_field("target_device", unit.target_device.as_deref()),
+        json_optional_string_field("ir_format", unit.ir_format.as_deref()),
+        json_optional_string_field("dispatch_abi", unit.dispatch_abi.as_deref()),
+        match unit.backend_priority {
+            Some(value) => json_usize_field("backend_priority", value),
+            None => "\"backend_priority\":null".to_owned(),
+        },
+        json_optional_string_field("verification", unit.verification.as_deref()),
         json_optional_string_field(
             "selected_lowering_target",
             unit.selected_lowering_target.as_deref(),

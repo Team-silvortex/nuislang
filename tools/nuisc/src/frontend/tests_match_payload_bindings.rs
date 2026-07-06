@@ -1,6 +1,21 @@
 use super::parse_nuis_module;
 use nuis_semantics::model::{NirBinaryOp, NirExpr, NirStmt};
 
+fn is_payload_value_access(expr: &NirExpr) -> bool {
+    matches!(
+        expr,
+        NirExpr::Var(name) if name == "payload"
+    ) || matches!(
+        expr,
+        NirExpr::FieldAccess { field, .. } | NirExpr::VariantFieldAccess { field, .. }
+            if field == "value"
+    )
+}
+
+fn is_match_pattern_condition(expr: &NirExpr) -> bool {
+    matches!(expr, NirExpr::Bool(true) | NirExpr::VariantIs { .. })
+}
+
 #[test]
 fn lowers_payload_style_struct_match_binding_visible_in_guard_inside_while() {
     let module = parse_nuis_module(
@@ -42,17 +57,15 @@ fn lowers_payload_style_struct_match_binding_visible_in_guard_inside_while() {
                         op: NirBinaryOp::And,
                         lhs,
                         rhs
-                    } if matches!(lhs.as_ref(), NirExpr::Bool(true))
+                    } if is_match_pattern_condition(lhs.as_ref())
                         && matches!(
                             rhs.as_ref(),
                             NirExpr::Binary {
                                 op: NirBinaryOp::Eq,
                                 lhs,
                                 rhs
-                            } if matches!(
-                                lhs.as_ref(),
-                                NirExpr::FieldAccess { field, .. } if field == "value"
-                            ) && matches!(rhs.as_ref(), NirExpr::Int(2))
+                            } if is_payload_value_access(lhs.as_ref())
+                                && matches!(rhs.as_ref(), NirExpr::Int(2))
                         )
                 ));
                 assert!(matches!(
@@ -116,17 +129,15 @@ fn lowers_generic_payload_style_struct_match_binding_visible_in_guard_inside_whi
                         op: NirBinaryOp::And,
                         lhs,
                         rhs
-                    } if matches!(lhs.as_ref(), NirExpr::Bool(true))
+                    } if is_match_pattern_condition(lhs.as_ref())
                         && matches!(
                             rhs.as_ref(),
                             NirExpr::Binary {
                                 op: NirBinaryOp::Eq,
                                 lhs,
                                 rhs
-                            } if matches!(
-                                lhs.as_ref(),
-                                NirExpr::FieldAccess { field, .. } if field == "value"
-                            ) && matches!(rhs.as_ref(), NirExpr::Int(2))
+                            } if is_payload_value_access(lhs.as_ref())
+                                && matches!(rhs.as_ref(), NirExpr::Int(2))
                         )
                 ));
                 assert!(matches!(
@@ -194,17 +205,15 @@ fn lowers_explicit_generic_payload_style_struct_match_binding_visible_in_guard_i
                         op: NirBinaryOp::And,
                         lhs,
                         rhs
-                    } if matches!(lhs.as_ref(), NirExpr::Bool(true))
+                    } if is_match_pattern_condition(lhs.as_ref())
                         && matches!(
                             rhs.as_ref(),
                             NirExpr::Binary {
                                 op: NirBinaryOp::Eq,
                                 lhs,
                                 rhs
-                            } if matches!(
-                                lhs.as_ref(),
-                                NirExpr::FieldAccess { field, .. } if field == "value"
-                            ) && matches!(rhs.as_ref(), NirExpr::Int(2))
+                            } if is_payload_value_access(lhs.as_ref())
+                                && matches!(rhs.as_ref(), NirExpr::Int(2))
                         )
                 ));
                 assert!(matches!(
@@ -272,17 +281,15 @@ fn lowers_generic_alias_payload_style_struct_match_binding_visible_in_guard_insi
                         op: NirBinaryOp::And,
                         lhs,
                         rhs
-                    } if matches!(lhs.as_ref(), NirExpr::Bool(true))
+                    } if is_match_pattern_condition(lhs.as_ref())
                         && matches!(
                             rhs.as_ref(),
                             NirExpr::Binary {
                                 op: NirBinaryOp::Eq,
                                 lhs,
                                 rhs
-                            } if matches!(
-                                lhs.as_ref(),
-                                NirExpr::FieldAccess { field, .. } if field == "value"
-                            ) && matches!(rhs.as_ref(), NirExpr::Int(2))
+                            } if is_payload_value_access(lhs.as_ref())
+                                && matches!(rhs.as_ref(), NirExpr::Int(2))
                         )
                 ));
                 assert!(matches!(
@@ -351,17 +358,15 @@ fn lowers_inferred_generic_alias_payload_style_struct_match_binding_visible_in_g
                         op: NirBinaryOp::And,
                         lhs,
                         rhs
-                    } if matches!(lhs.as_ref(), NirExpr::Bool(true))
+                    } if is_match_pattern_condition(lhs.as_ref())
                         && matches!(
                             rhs.as_ref(),
                             NirExpr::Binary {
                                 op: NirBinaryOp::Eq,
                                 lhs,
                                 rhs
-                            } if matches!(
-                                lhs.as_ref(),
-                                NirExpr::FieldAccess { field, .. } if field == "value"
-                            ) && matches!(rhs.as_ref(), NirExpr::Int(2))
+                            } if is_payload_value_access(lhs.as_ref())
+                                && matches!(rhs.as_ref(), NirExpr::Int(2))
                         )
                 ));
                 assert!(matches!(

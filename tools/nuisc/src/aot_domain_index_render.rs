@@ -49,6 +49,7 @@ pub(crate) fn render_domain_bridge_registry(units: &[&BuildManifestDomainBuildUn
             "device_class = \"{}\"\n",
             escape_toml_string(unit.device_class.as_deref().unwrap_or("none"))
         ));
+        append_backend_artifact_metadata_fields(&mut out, unit);
         out.push_str(&format!(
             "selected_lowering_target = \"{}\"\n",
             escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
@@ -322,6 +323,7 @@ pub(crate) fn render_domain_lowering_plan_index(units: &[&BuildManifestDomainBui
             "backend_family = \"{}\"\n",
             escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
         ));
+        append_backend_artifact_metadata_fields(&mut out, unit);
         out.push_str(&format!(
             "selected_lowering_target = \"{}\"\n",
             escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
@@ -465,6 +467,7 @@ pub(crate) fn render_host_bridge_plan_index(units: &[&BuildManifestDomainBuildUn
             "device_class = \"{}\"\n",
             escape_toml_string(unit.device_class.as_deref().unwrap_or("none"))
         ));
+        append_backend_artifact_metadata_fields(&mut out, unit);
         out.push_str(&format!(
             "selected_lowering_target = \"{}\"\n",
             escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
@@ -511,4 +514,27 @@ pub(crate) fn render_host_bridge_plan_index(units: &[&BuildManifestDomainBuildUn
         ));
     }
     out
+}
+
+fn append_backend_artifact_metadata_fields(out: &mut String, unit: &BuildManifestDomainBuildUnit) {
+    out.push_str(&format!(
+        "target_device = \"{}\"\n",
+        escape_toml_string(unit.target_device.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "ir_format = \"{}\"\n",
+        escape_toml_string(unit.ir_format.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "dispatch_abi = \"{}\"\n",
+        escape_toml_string(unit.dispatch_abi.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "backend_priority = {}\n",
+        unit.backend_priority.unwrap_or(usize::MAX)
+    ));
+    out.push_str(&format!(
+        "verification = \"{}\"\n",
+        escape_toml_string(unit.verification.as_deref().unwrap_or("none"))
+    ));
 }

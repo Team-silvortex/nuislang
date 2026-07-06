@@ -93,6 +93,30 @@ pub(crate) fn render_domain_build_unit_payload(
             escape_toml_string(value)
         ));
     }
+    if let Some(value) = &unit.target_device {
+        out.push_str(&format!(
+            "target_device = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.ir_format {
+        out.push_str(&format!("ir_format = \"{}\"\n", escape_toml_string(value)));
+    }
+    if let Some(value) = &unit.dispatch_abi {
+        out.push_str(&format!(
+            "dispatch_abi = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = unit.backend_priority {
+        out.push_str(&format!("backend_priority = {}\n", value));
+    }
+    if let Some(value) = &unit.verification {
+        out.push_str(&format!(
+            "verification = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
     if let Some(value) = &unit.selected_lowering_target {
         out.push_str(&format!(
             "selected_lowering_target = \"{}\"\n",
@@ -239,9 +263,37 @@ fn append_common_unit_fields(out: &mut String, unit: &BuildManifestDomainBuildUn
             escape_toml_string(value)
         ));
     }
+    append_backend_artifact_metadata_fields(out, unit);
     if let Some(value) = &unit.selected_lowering_target {
         out.push_str(&format!(
             "selected_lowering_target = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+}
+
+fn append_backend_artifact_metadata_fields(out: &mut String, unit: &BuildManifestDomainBuildUnit) {
+    if let Some(value) = &unit.target_device {
+        out.push_str(&format!(
+            "target_device = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &unit.ir_format {
+        out.push_str(&format!("ir_format = \"{}\"\n", escape_toml_string(value)));
+    }
+    if let Some(value) = &unit.dispatch_abi {
+        out.push_str(&format!(
+            "dispatch_abi = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = unit.backend_priority {
+        out.push_str(&format!("backend_priority = {}\n", value));
+    }
+    if let Some(value) = &unit.verification {
+        out.push_str(&format!(
+            "verification = \"{}\"\n",
             escape_toml_string(value)
         ));
     }

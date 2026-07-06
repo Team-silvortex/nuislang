@@ -38,7 +38,7 @@ Current binary containers:
 * `NART` version `1`: compiled artifact container
 * `NART` version `2`: compiled artifact section-table container
 * `NENV` version `1`: executable envelope binary wrapper
-* `NDPB` version `2`: domain payload blob
+* `NDPB` version `3`: domain payload blob
 
 Short compatibility rule:
 
@@ -167,11 +167,20 @@ It currently records:
 * domain family
 * package id
 * backend/vendor/device metadata
+* multi-backend artifact metadata:
+  `target_device`, `ir_format`, `dispatch_abi`, `backend_priority`,
+  `verification`
 * selected lowering target
 * contract family
 * packaging role
 * payload kind and format
 * named sections
+
+Compatibility note:
+
+* v3 adds the multi-backend artifact metadata fields above
+* the current decoder still accepts v2 blobs and maps the v3-only fields to
+  absent values
 
 Current standard section names:
 

@@ -431,21 +431,30 @@ fn lowers_generic_payload_alias_method_hof_state_project_with_hof_and_lambda_sha
         .expect("expected monomorphized higher-order helper");
     assert!(matches!(
         hof.body.first(),
-        Some(NirStmt::Let {
-            name,
-            ty: Some(ty),
-            value: NirExpr::FieldAccess { field, .. },
-        }) if name == "payload" && ty.render() == "i64" && field == "value"
+        Some(NirStmt::If { then_body, .. })
+            if matches!(
+                then_body.first(),
+                Some(NirStmt::Let {
+                    name,
+                    ty: Some(ty),
+                    value: NirExpr::FieldAccess { field, .. }
+                        | NirExpr::VariantFieldAccess { field, .. },
+                }) if name == "payload" && ty.render() == "i64" && field == "value"
+            )
     ));
-    assert!(hof.body.iter().any(|stmt| {
-        matches!(
-            stmt,
-            NirStmt::Let {
-                value: NirExpr::Call { callee, .. },
-                ..
-            } if callee.starts_with("__lambda_main_")
-        )
-    }));
+    assert!(matches!(
+        hof.body.first(),
+        Some(NirStmt::If { then_body, .. })
+            if then_body.iter().any(|stmt| {
+                matches!(
+                    stmt,
+                    NirStmt::Let {
+                        value: NirExpr::Call { callee, .. },
+                        ..
+                    } if callee.starts_with("__lambda_main_")
+                )
+            })
+    ));
 }
 
 #[test]

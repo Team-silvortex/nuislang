@@ -32,6 +32,26 @@ pub(crate) fn render_domain_build_unit_shader_ir_sidecar(
         escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
     ));
     out.push_str(&format!(
+        "target_device = \"{}\"\n",
+        escape_toml_string(unit.target_device.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "ir_format = \"{}\"\n",
+        escape_toml_string(unit.ir_format.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "dispatch_abi = \"{}\"\n",
+        escape_toml_string(unit.dispatch_abi.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
+        "backend_priority = {}\n",
+        unit.backend_priority.unwrap_or(usize::MAX)
+    ));
+    out.push_str(&format!(
+        "verification = \"{}\"\n",
+        escape_toml_string(unit.verification.as_deref().unwrap_or("none"))
+    ));
+    out.push_str(&format!(
         "lowering_profile = \"{}\"\n",
         escape_toml_string(profile.profile_key)
     ));

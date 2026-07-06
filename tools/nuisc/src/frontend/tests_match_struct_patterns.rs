@@ -1,5 +1,15 @@
 use super::{parse_nuis_ast, parse_nuis_module};
-use nuis_semantics::model::{AstMatchPattern, NirBinaryOp, NirExpr, NirStmt};
+use nuis_semantics::model::{
+    AstExpr, AstMatchArm, AstMatchPattern, AstStmt, NirBinaryOp, NirExpr, NirStmt,
+};
+
+fn match_arms_from_stmt(stmt: &AstStmt) -> &[AstMatchArm] {
+    match stmt {
+        AstStmt::Match { arms, .. } => arms,
+        AstStmt::Return(Some(AstExpr::Match { arms, .. })) => arms,
+        other => panic!("expected match statement, found {other:?}"),
+    }
+}
 
 #[test]
 fn lowers_struct_field_match_arms_inside_while() {
@@ -325,19 +335,16 @@ fn parses_shorthand_generic_struct_match_pattern_into_ast() {
     )
     .unwrap();
 
-    match &ast.functions[0].body[1] {
-        nuis_semantics::model::AstStmt::Match { arms, .. } => match &arms[0].pattern {
-            AstMatchPattern::StructFields { type_ref, fields } => {
-                assert!(type_ref.is_none());
-                assert!(matches!(
-                    fields.as_slice(),
-                    [(field, AstMatchPattern::Bind(name))]
-                        if field == "value" && name == "payload"
-                ));
-            }
-            other => panic!("expected shorthand struct match pattern, found {other:?}"),
-        },
-        other => panic!("expected match statement, found {other:?}"),
+    match &match_arms_from_stmt(&ast.functions[0].body[1])[0].pattern {
+        AstMatchPattern::StructFields { type_ref, fields } => {
+            assert!(type_ref.is_none());
+            assert!(matches!(
+                fields.as_slice(),
+                [(field, AstMatchPattern::Bind(name))]
+                    if field == "value" && name == "payload"
+            ));
+        }
+        other => panic!("expected shorthand struct match pattern, found {other:?}"),
     }
 }
 
@@ -368,19 +375,16 @@ fn parses_aliased_generic_struct_match_pattern_into_ast() {
     )
     .unwrap();
 
-    match &ast.functions[0].body[1] {
-        nuis_semantics::model::AstStmt::Match { arms, .. } => match &arms[0].pattern {
-            AstMatchPattern::StructFields { type_ref, fields } => {
-                assert_eq!(type_ref.as_ref().unwrap().name, "BoxI64");
-                assert!(matches!(
-                    fields.as_slice(),
-                    [(field, AstMatchPattern::Bind(name))]
-                        if field == "value" && name == "payload"
-                ));
-            }
-            other => panic!("expected aliased generic struct match pattern, found {other:?}"),
-        },
-        other => panic!("expected match statement, found {other:?}"),
+    match &match_arms_from_stmt(&ast.functions[0].body[1])[0].pattern {
+        AstMatchPattern::StructFields { type_ref, fields } => {
+            assert_eq!(type_ref.as_ref().unwrap().name, "BoxI64");
+            assert!(matches!(
+                fields.as_slice(),
+                [(field, AstMatchPattern::Bind(name))]
+                    if field == "value" && name == "payload"
+            ));
+        }
+        other => panic!("expected aliased generic struct match pattern, found {other:?}"),
     }
 }
 
@@ -411,20 +415,17 @@ fn parses_generic_aliased_struct_match_pattern_into_ast() {
     )
     .unwrap();
 
-    match &ast.functions[0].body[1] {
-        nuis_semantics::model::AstStmt::Match { arms, .. } => match &arms[0].pattern {
-            AstMatchPattern::StructFields { type_ref, fields } => {
-                assert_eq!(type_ref.as_ref().unwrap().name, "BoxAlias");
-                assert_eq!(type_ref.as_ref().unwrap().generic_args[0].name, "i64");
-                assert!(matches!(
-                    fields.as_slice(),
-                    [(field, AstMatchPattern::Bind(name))]
-                        if field == "value" && name == "payload"
-                ));
-            }
-            other => panic!("expected generic-aliased struct match pattern, found {other:?}"),
-        },
-        other => panic!("expected match statement, found {other:?}"),
+    match &match_arms_from_stmt(&ast.functions[0].body[1])[0].pattern {
+        AstMatchPattern::StructFields { type_ref, fields } => {
+            assert_eq!(type_ref.as_ref().unwrap().name, "BoxAlias");
+            assert_eq!(type_ref.as_ref().unwrap().generic_args[0].name, "i64");
+            assert!(matches!(
+                fields.as_slice(),
+                [(field, AstMatchPattern::Bind(name))]
+                    if field == "value" && name == "payload"
+            ));
+        }
+        other => panic!("expected generic-aliased struct match pattern, found {other:?}"),
     }
 }
 

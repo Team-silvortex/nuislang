@@ -10,6 +10,11 @@ pub struct DomainBuildUnitPayloadBlob {
     pub backend_family: Option<String>,
     pub vendor: Option<String>,
     pub device_class: Option<String>,
+    pub target_device: Option<String>,
+    pub ir_format: Option<String>,
+    pub dispatch_abi: Option<String>,
+    pub backend_priority: Option<usize>,
+    pub verification: Option<String>,
     pub selected_lowering_target: Option<String>,
     pub contract_family: String,
     pub packaging_role: String,
@@ -38,6 +43,15 @@ pub fn encode_domain_payload_blob(
     let backend_family = blob.backend_family.as_deref().unwrap_or("").as_bytes();
     let vendor = blob.vendor.as_deref().unwrap_or("").as_bytes();
     let device_class = blob.device_class.as_deref().unwrap_or("").as_bytes();
+    let target_device = blob.target_device.as_deref().unwrap_or("").as_bytes();
+    let ir_format = blob.ir_format.as_deref().unwrap_or("").as_bytes();
+    let dispatch_abi = blob.dispatch_abi.as_deref().unwrap_or("").as_bytes();
+    let backend_priority = blob
+        .backend_priority
+        .map(|priority| priority.to_string())
+        .unwrap_or_default();
+    let backend_priority = backend_priority.as_bytes();
+    let verification = blob.verification.as_deref().unwrap_or("").as_bytes();
     let selected_lowering_target = blob
         .selected_lowering_target
         .as_deref()
@@ -67,6 +81,26 @@ pub fn encode_domain_payload_blob(
     out.extend_from_slice(&encode_u32_len(
         device_class.len(),
         "domain payload blob device_class",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        target_device.len(),
+        "domain payload blob target_device",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        ir_format.len(),
+        "domain payload blob ir_format",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        dispatch_abi.len(),
+        "domain payload blob dispatch_abi",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        backend_priority.len(),
+        "domain payload blob backend_priority",
+    )?);
+    out.extend_from_slice(&encode_u32_len(
+        verification.len(),
+        "domain payload blob verification",
     )?);
     out.extend_from_slice(&encode_u32_len(
         selected_lowering_target.len(),
@@ -107,6 +141,11 @@ pub fn encode_domain_payload_blob(
     out.extend_from_slice(backend_family);
     out.extend_from_slice(vendor);
     out.extend_from_slice(device_class);
+    out.extend_from_slice(target_device);
+    out.extend_from_slice(ir_format);
+    out.extend_from_slice(dispatch_abi);
+    out.extend_from_slice(backend_priority);
+    out.extend_from_slice(verification);
     out.extend_from_slice(selected_lowering_target);
     out.extend_from_slice(contract_family);
     out.extend_from_slice(packaging_role);
@@ -129,7 +168,7 @@ pub fn decode_domain_payload_blob(
         return Err(ArtifactError::new("domain payload blob has invalid magic"));
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if version != DOMAIN_PAYLOAD_BLOB_BINARY_VERSION {
+    if !(version == 2 || version == DOMAIN_PAYLOAD_BLOB_BINARY_VERSION) {
         return Err(ArtifactError::new(format!(
             "unsupported domain payload blob version `{version}`"
         )));
@@ -155,6 +194,23 @@ pub fn decode_domain_payload_blob(
     let backend_family_len = next_len(bytes, &mut offset)?;
     let vendor_len = next_len(bytes, &mut offset)?;
     let device_class_len = next_len(bytes, &mut offset)?;
+    let (
+        target_device_len,
+        ir_format_len,
+        dispatch_abi_len,
+        backend_priority_len,
+        verification_len,
+    ) = if version >= 3 {
+        (
+            next_len(bytes, &mut offset)?,
+            next_len(bytes, &mut offset)?,
+            next_len(bytes, &mut offset)?,
+            next_len(bytes, &mut offset)?,
+            next_len(bytes, &mut offset)?,
+        )
+    } else {
+        (0, 0, 0, 0, 0)
+    };
     let selected_lowering_target_len = next_len(bytes, &mut offset)?;
     let contract_family_len = next_len(bytes, &mut offset)?;
     let packaging_role_len = next_len(bytes, &mut offset)?;
@@ -174,6 +230,11 @@ pub fn decode_domain_payload_blob(
         + backend_family_len
         + vendor_len
         + device_class_len
+        + target_device_len
+        + ir_format_len
+        + dispatch_abi_len
+        + backend_priority_len
+        + verification_len
         + selected_lowering_target_len
         + contract_family_len
         + packaging_role_len
@@ -225,6 +286,45 @@ pub fn decode_domain_payload_blob(
         .map_err(|error| {
             ArtifactError::new(format!(
                 "domain payload blob device_class is not valid UTF-8: {error}"
+            ))
+        })?;
+    let target_device = String::from_utf8(take_bytes(bytes, &mut offset, target_device_len)?)
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob target_device is not valid UTF-8: {error}"
+            ))
+        })?;
+    let ir_format =
+        String::from_utf8(take_bytes(bytes, &mut offset, ir_format_len)?).map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob ir_format is not valid UTF-8: {error}"
+            ))
+        })?;
+    let dispatch_abi = String::from_utf8(take_bytes(bytes, &mut offset, dispatch_abi_len)?)
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob dispatch_abi is not valid UTF-8: {error}"
+            ))
+        })?;
+    let backend_priority = String::from_utf8(take_bytes(bytes, &mut offset, backend_priority_len)?)
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob backend_priority is not valid UTF-8: {error}"
+            ))
+        })?;
+    let backend_priority = if backend_priority.is_empty() {
+        None
+    } else {
+        Some(backend_priority.parse::<usize>().map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob backend_priority is not a usize: {error}"
+            ))
+        })?)
+    };
+    let verification = String::from_utf8(take_bytes(bytes, &mut offset, verification_len)?)
+        .map_err(|error| {
+            ArtifactError::new(format!(
+                "domain payload blob verification is not valid UTF-8: {error}"
             ))
         })?;
     let selected_lowering_target = String::from_utf8(take_bytes(
@@ -282,6 +382,11 @@ pub fn decode_domain_payload_blob(
         backend_family: (!backend_family.is_empty()).then_some(backend_family),
         vendor: (!vendor.is_empty()).then_some(vendor),
         device_class: (!device_class.is_empty()).then_some(device_class),
+        target_device: (!target_device.is_empty()).then_some(target_device),
+        ir_format: (!ir_format.is_empty()).then_some(ir_format),
+        dispatch_abi: (!dispatch_abi.is_empty()).then_some(dispatch_abi),
+        backend_priority,
+        verification: (!verification.is_empty()).then_some(verification),
         selected_lowering_target: (!selected_lowering_target.is_empty())
             .then_some(selected_lowering_target),
         contract_family,
@@ -303,6 +408,11 @@ impl DomainBuildUnitPayloadBlob {
             backend_family: unit.backend_family.clone(),
             vendor: unit.vendor.clone(),
             device_class: unit.device_class.clone(),
+            target_device: unit.target_device.clone(),
+            ir_format: unit.ir_format.clone(),
+            dispatch_abi: unit.dispatch_abi.clone(),
+            backend_priority: unit.backend_priority,
+            verification: unit.verification.clone(),
             selected_lowering_target: unit.selected_lowering_target.clone(),
             contract_family: unit.contract_family.clone(),
             packaging_role: unit.packaging_role.clone(),
@@ -351,6 +461,11 @@ mod tests {
             backend_family: Some("metal".to_owned()),
             vendor: Some("apple".to_owned()),
             device_class: Some("apple-silicon-gpu".to_owned()),
+            target_device: Some("apple-gpu".to_owned()),
+            ir_format: Some("msl".to_owned()),
+            dispatch_abi: Some("metal-render-pipeline".to_owned()),
+            backend_priority: Some(10),
+            verification: Some("contract-only".to_owned()),
             selected_lowering_target: Some("metal".to_owned()),
             contract_family: "nustar.shader".to_owned(),
             packaging_role: "hetero-contract".to_owned(),

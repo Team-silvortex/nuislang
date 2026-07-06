@@ -2,6 +2,14 @@ use super::parse_nuis_ast;
 use super::parse_nuis_module;
 use nuis_semantics::model::{AstExpr, AstStmt, NirExpr, NirStmt};
 
+fn is_payload_value_access(expr: &NirExpr) -> bool {
+    matches!(
+        expr,
+        NirExpr::FieldAccess { field, .. } | NirExpr::VariantFieldAccess { field, .. }
+            if field == "value"
+    )
+}
+
 #[test]
 fn parses_qualified_enum_variant_constructors_into_ast() {
     let ast = parse_nuis_ast(
@@ -151,9 +159,7 @@ fn lowers_unit_and_payload_variant_match_patterns() {
             [
                 NirStmt::Let { name, value, .. },
                 NirStmt::Return(Some(NirExpr::Var(result)))
-            ] if name == "payload"
-                && result == "payload"
-                && matches!(value, NirExpr::FieldAccess { field, .. } if field == "value")
+                ] if name == "payload" && result == "payload" && is_payload_value_access(value)
         )
     ));
 }
@@ -245,9 +251,7 @@ fn match_on_parent_enum_typed_value_accepts_variant_patterns() {
                 [
                     NirStmt::Let { name, value, .. },
                     NirStmt::Return(Some(NirExpr::Var(result)))
-                ] if name == "payload"
-                    && result == "payload"
-                    && matches!(value, NirExpr::FieldAccess { field, .. } if field == "value")
+                ] if name == "payload" && result == "payload" && is_payload_value_access(value)
             ) && matches!(
                 else_body.as_slice(),
                 [NirStmt::If { condition: NirExpr::Bool(true), .. }]
@@ -362,9 +366,7 @@ fn lowers_result_error_patterns_into_nested_variant_checks() {
                 [
                     NirStmt::Let { name, value, .. },
                     NirStmt::Return(Some(NirExpr::Var(result)))
-                ] if name == "value"
-                    && result == "value"
-                    && matches!(value, NirExpr::FieldAccess { field, .. } if field == "value")
+                ] if name == "value" && result == "value" && is_payload_value_access(value)
             )
     ));
 }

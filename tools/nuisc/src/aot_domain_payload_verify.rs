@@ -185,6 +185,36 @@ fn verify_payload_blob_header(
             blob_label, unit.domain_family
         ));
     }
+    if decoded_blob.target_device != unit.target_device {
+        return Err(format!(
+            "domain payload blob `{}` target_device mismatch for `{}`",
+            blob_label, unit.domain_family
+        ));
+    }
+    if decoded_blob.ir_format != unit.ir_format {
+        return Err(format!(
+            "domain payload blob `{}` ir_format mismatch for `{}`",
+            blob_label, unit.domain_family
+        ));
+    }
+    if decoded_blob.dispatch_abi != unit.dispatch_abi {
+        return Err(format!(
+            "domain payload blob `{}` dispatch_abi mismatch for `{}`",
+            blob_label, unit.domain_family
+        ));
+    }
+    if decoded_blob.backend_priority != unit.backend_priority {
+        return Err(format!(
+            "domain payload blob `{}` backend_priority mismatch for `{}`",
+            blob_label, unit.domain_family
+        ));
+    }
+    if decoded_blob.verification != unit.verification {
+        return Err(format!(
+            "domain payload blob `{}` verification mismatch for `{}`",
+            blob_label, unit.domain_family
+        ));
+    }
     if decoded_blob.selected_lowering_target != unit.selected_lowering_target {
         return Err(format!(
             "domain payload blob `{}` selected_lowering_target mismatch for `{}`",
