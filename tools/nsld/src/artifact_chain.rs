@@ -23,6 +23,10 @@ pub(crate) enum NsldArtifactStageKind {
     ClosureSnapshot,
     FinalStagePlan,
     FinalExecutableWriterInput,
+    FinalExecutableHostInvokePlan,
+    FinalExecutableLayoutPlan,
+    FinalExecutableImageDryRun,
+    FinalExecutableImageDryRunBytes,
     FinalExecutableBlocked,
 }
 
@@ -110,6 +114,22 @@ const ARTIFACT_STAGE_DEFINITIONS: &[(NsldArtifactStageKind, &str)] = &[
         "nuis.nsld.final-executable-writer-input.toml",
     ),
     (
+        NsldArtifactStageKind::FinalExecutableHostInvokePlan,
+        "nuis.nsld.final-executable-host-invoke-plan.toml",
+    ),
+    (
+        NsldArtifactStageKind::FinalExecutableLayoutPlan,
+        "nuis.nsld.final-executable-layout.toml",
+    ),
+    (
+        NsldArtifactStageKind::FinalExecutableImageDryRun,
+        "nuis.nsld.final-executable-image-dry-run.toml",
+    ),
+    (
+        NsldArtifactStageKind::FinalExecutableImageDryRunBytes,
+        "nuis.nsld.final-executable-image-dry-run.bin",
+    ),
+    (
         NsldArtifactStageKind::FinalExecutableBlocked,
         "nuis.nsld.final-executable.blocked.toml",
     ),
@@ -149,6 +169,12 @@ pub(crate) fn nsld_artifact_stage_id(kind: NsldArtifactStageKind) -> &'static st
         NsldArtifactStageKind::ClosureSnapshot => "closure-snapshot",
         NsldArtifactStageKind::FinalStagePlan => "final-stage-plan",
         NsldArtifactStageKind::FinalExecutableWriterInput => "final-executable-writer-input",
+        NsldArtifactStageKind::FinalExecutableHostInvokePlan => "final-executable-host-invoke-plan",
+        NsldArtifactStageKind::FinalExecutableLayoutPlan => "final-executable-layout",
+        NsldArtifactStageKind::FinalExecutableImageDryRun => "final-executable-image-dry-run",
+        NsldArtifactStageKind::FinalExecutableImageDryRunBytes => {
+            "final-executable-image-dry-run-bytes"
+        }
         NsldArtifactStageKind::FinalExecutableBlocked => "final-executable-blocked",
     }
 }
@@ -175,6 +201,14 @@ pub(crate) fn nsld_artifact_stage_suggested_command(kind: NsldArtifactStageKind)
         NsldArtifactStageKind::ClosureSnapshot => "emit-closure",
         NsldArtifactStageKind::FinalStagePlan => "emit-final-stage-plan",
         NsldArtifactStageKind::FinalExecutableWriterInput => "emit-final-executable-writer-input",
+        NsldArtifactStageKind::FinalExecutableHostInvokePlan => {
+            "emit-final-executable-host-invoke-plan"
+        }
+        NsldArtifactStageKind::FinalExecutableLayoutPlan => "emit-final-executable-layout",
+        NsldArtifactStageKind::FinalExecutableImageDryRun
+        | NsldArtifactStageKind::FinalExecutableImageDryRunBytes => {
+            "emit-final-executable-image-dry-run"
+        }
         NsldArtifactStageKind::FinalExecutableBlocked => "emit-final-executable",
     }
 }
@@ -214,6 +248,10 @@ pub(crate) fn nsld_artifact_stage_required(kind: NsldArtifactStageKind) -> bool 
             | NsldArtifactStageKind::ClosureSnapshot
             | NsldArtifactStageKind::FinalStagePlan
             | NsldArtifactStageKind::FinalExecutableWriterInput
+            | NsldArtifactStageKind::FinalExecutableHostInvokePlan
+            | NsldArtifactStageKind::FinalExecutableLayoutPlan
+            | NsldArtifactStageKind::FinalExecutableImageDryRun
+            | NsldArtifactStageKind::FinalExecutableImageDryRunBytes
             | NsldArtifactStageKind::FinalExecutableBlocked
     )
 }
@@ -293,6 +331,26 @@ pub(crate) fn nsld_artifact_chain_report(
     let suggested_command_reason = first_missing_required_stage
         .as_ref()
         .map(|stage_id| format!("first missing required artifact stage `{stage_id}`"));
+    let first_missing_optional = first_missing_required
+        .is_none()
+        .then(|| {
+            stages
+                .iter()
+                .find(|stage| !stage.required && !stage.present)
+        })
+        .flatten();
+    let next_optional_stage =
+        first_missing_optional.map(|stage| nsld_artifact_stage_id(stage.kind).to_owned());
+    let next_optional_command_id = first_missing_optional
+        .map(|stage| nsld_artifact_stage_suggested_command(stage.kind).to_owned());
+    let next_optional_command = first_missing_optional
+        .map(|stage| nsld_artifact_stage_suggested_command_template(stage.kind));
+    let next_optional_command_resolved = next_optional_command
+        .as_ref()
+        .map(|command| command.replace("<input>", &manifest.display().to_string()));
+    let next_optional_command_reason = next_optional_stage
+        .as_ref()
+        .map(|stage_id| format!("first missing optional artifact stage `{stage_id}`"));
 
     NsldArtifactChainReport {
         manifest: manifest.display().to_string(),
@@ -309,6 +367,11 @@ pub(crate) fn nsld_artifact_chain_report(
         suggested_command,
         suggested_command_resolved,
         suggested_command_reason,
+        next_optional_stage,
+        next_optional_command_id,
+        next_optional_command,
+        next_optional_command_resolved,
+        next_optional_command_reason,
         stages: diagnostics,
         issues,
     }

@@ -35,6 +35,23 @@ pub(crate) fn nsld_artifact_chain_report_json(report: &NsldArtifactChainReport) 
             "suggested_command_reason",
             report.suggested_command_reason.as_deref(),
         ),
+        json_optional_string_field("next_optional_stage", report.next_optional_stage.as_deref()),
+        json_optional_string_field(
+            "next_optional_command_id",
+            report.next_optional_command_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "next_optional_command",
+            report.next_optional_command.as_deref(),
+        ),
+        json_optional_string_field(
+            "next_optional_command_resolved",
+            report.next_optional_command_resolved.as_deref(),
+        ),
+        json_optional_string_field(
+            "next_optional_command_reason",
+            report.next_optional_command_reason.as_deref(),
+        ),
         format!(
             "\"stages\":[{}]",
             artifact_chain_stage_diagnostics_json(&report.stages)
@@ -265,6 +282,90 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
             report.final_stage_plan_blocker_count,
         ),
         json_string_array_field("final_stage_plan_issues", &report.final_stage_plan_issues),
+        json_bool_field(
+            "final_executable_writer_input_present",
+            report.final_executable_writer_input_present,
+        ),
+        json_optional_bool_field(
+            "final_executable_writer_input_valid",
+            report.final_executable_writer_input_valid,
+        ),
+        json_optional_string_field(
+            "final_executable_writer_input_hash",
+            report.final_executable_writer_input_hash.as_deref(),
+        ),
+        json_optional_usize_field(
+            "final_executable_writer_input_command_arg_count",
+            report.final_executable_writer_input_command_arg_count,
+        ),
+        json_string_array_field(
+            "final_executable_writer_input_issues",
+            &report.final_executable_writer_input_issues,
+        ),
+        json_bool_field(
+            "final_executable_host_invoke_plan_present",
+            report.final_executable_host_invoke_plan_present,
+        ),
+        json_optional_bool_field(
+            "final_executable_host_invoke_plan_valid",
+            report.final_executable_host_invoke_plan_valid,
+        ),
+        json_optional_string_field(
+            "final_executable_host_invoke_plan_hash",
+            report.final_executable_host_invoke_plan_hash.as_deref(),
+        ),
+        json_optional_bool_field(
+            "final_executable_host_invoke_plan_would_invoke",
+            report.final_executable_host_invoke_plan_would_invoke,
+        ),
+        json_optional_usize_field(
+            "final_executable_host_invoke_plan_blocker_count",
+            report.final_executable_host_invoke_plan_blocker_count,
+        ),
+        json_string_array_field(
+            "final_executable_host_invoke_plan_issues",
+            &report.final_executable_host_invoke_plan_issues,
+        ),
+        json_bool_field(
+            "final_executable_layout_plan_present",
+            report.final_executable_layout_plan_present,
+        ),
+        json_optional_bool_field(
+            "final_executable_layout_plan_valid",
+            report.final_executable_layout_plan_valid,
+        ),
+        json_optional_string_field(
+            "final_executable_layout_plan_hash",
+            report.final_executable_layout_plan_hash.as_deref(),
+        ),
+        json_optional_usize_field(
+            "final_executable_layout_plan_payload_count",
+            report.final_executable_layout_plan_payload_count,
+        ),
+        json_string_array_field(
+            "final_executable_layout_plan_issues",
+            &report.final_executable_layout_plan_issues,
+        ),
+        json_bool_field(
+            "final_executable_image_dry_run_present",
+            report.final_executable_image_dry_run_present,
+        ),
+        json_optional_bool_field(
+            "final_executable_image_dry_run_valid",
+            report.final_executable_image_dry_run_valid,
+        ),
+        json_optional_string_field(
+            "final_executable_image_dry_run_hash",
+            report.final_executable_image_dry_run_hash.as_deref(),
+        ),
+        json_optional_usize_field(
+            "final_executable_image_dry_run_size_bytes",
+            report.final_executable_image_dry_run_size_bytes,
+        ),
+        json_string_array_field(
+            "final_executable_image_dry_run_issues",
+            &report.final_executable_image_dry_run_issues,
+        ),
         json_bool_field(
             "final_executable_blocked_present",
             report.final_executable_blocked_present,
@@ -558,6 +659,30 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
         json_string_field("container_payload_path", &report.container_payload_path),
         json_string_field("closure_snapshot_path", &report.closure_snapshot_path),
         json_string_field("final_stage_plan_path", &report.final_stage_plan_path),
+        json_string_field(
+            "final_executable_writer_input_path",
+            &report.final_executable_writer_input_path,
+        ),
+        json_string_field(
+            "final_executable_host_invoke_plan_path",
+            &report.final_executable_host_invoke_plan_path,
+        ),
+        json_string_field(
+            "final_executable_layout_plan_path",
+            &report.final_executable_layout_plan_path,
+        ),
+        json_string_field(
+            "final_executable_image_dry_run_path",
+            &report.final_executable_image_dry_run_path,
+        ),
+        json_string_field(
+            "final_executable_image_dry_run_bytes_path",
+            &report.final_executable_image_dry_run_bytes_path,
+        ),
+        json_string_field(
+            "final_executable_blocked_path",
+            &report.final_executable_blocked_path,
+        ),
         json_usize_field("link_input_count", report.link_input_count),
         json_string_field("link_input_table_hash", &report.link_input_table_hash),
         json_usize_field("unit_count", report.unit_count),
@@ -1004,12 +1129,399 @@ pub(crate) fn nsld_final_executable_host_dry_run_report_json(
         json_usize_field("command_arg_count", report.command_arg_count),
         json_string_array_field("command_args", &report.command_args),
         json_bool_field("environment_ready", report.environment_ready),
+        json_string_field("invocation_policy", &report.invocation_policy),
+        json_string_field("invocation_policy_reason", &report.invocation_policy_reason),
         json_bool_field(
             "can_invoke_host_finalizer",
             report.can_invoke_host_finalizer,
         ),
         json_string_array_field("blockers", &report.blockers),
         json_string_array_field("notes", &report.notes),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_executable_host_invoke_plan_report_json(
+    report: &NsldFinalExecutableHostInvokePlanReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_executable_host_invoke_plan"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("writer_input_path", &report.writer_input_path),
+        json_string_field("invocation_kind", &report.invocation_kind),
+        json_string_field("invocation_policy", &report.invocation_policy),
+        json_string_field("invocation_policy_reason", &report.invocation_policy_reason),
+        json_bool_field("requires_explicit_allow", report.requires_explicit_allow),
+        json_bool_field("explicit_allow_present", report.explicit_allow_present),
+        json_bool_field("environment_ready", report.environment_ready),
+        json_bool_field("driver_available", report.driver_available),
+        json_optional_string_field(
+            "driver_resolved_path",
+            report.driver_resolved_path.as_deref(),
+        ),
+        json_bool_field(
+            "can_invoke_host_finalizer",
+            report.can_invoke_host_finalizer,
+        ),
+        json_bool_field("would_invoke", report.would_invoke),
+        json_usize_field("command_arg_count", report.command_arg_count),
+        json_string_array_field("command_args", &report.command_args),
+        json_string_array_field("blockers", &report.blockers),
+        json_string_array_field("notes", &report.notes),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_executable_host_invoke_plan_emit_report_json(
+    report: &NsldFinalExecutableHostInvokePlanEmitReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_executable_host_invoke_plan_emit"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("invoke_plan_hash", &report.invoke_plan_hash),
+        json_string_field("invocation_policy", &report.invocation_policy),
+        json_bool_field("requires_explicit_allow", report.requires_explicit_allow),
+        json_bool_field("explicit_allow_present", report.explicit_allow_present),
+        json_bool_field("would_invoke", report.would_invoke),
+        json_usize_field("blocker_count", report.blocker_count),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_executable_host_invoke_plan_verify_report_json(
+    report: &NsldFinalExecutableHostInvokePlanVerifyReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_executable_host_invoke_plan_verify"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("input_path", &report.input_path),
+        json_bool_field("valid", report.valid),
+        json_string_field(
+            "expected_invoke_plan_hash",
+            &report.expected_invoke_plan_hash,
+        ),
+        json_optional_string_field(
+            "actual_invoke_plan_hash",
+            report.actual_invoke_plan_hash.as_deref(),
+        ),
+        json_string_field(
+            "expected_invocation_policy",
+            &report.expected_invocation_policy,
+        ),
+        json_optional_string_field(
+            "actual_invocation_policy",
+            report.actual_invocation_policy.as_deref(),
+        ),
+        json_bool_field(
+            "expected_requires_explicit_allow",
+            report.expected_requires_explicit_allow,
+        ),
+        json_optional_bool_field(
+            "actual_requires_explicit_allow",
+            report.actual_requires_explicit_allow,
+        ),
+        json_bool_field(
+            "expected_explicit_allow_present",
+            report.expected_explicit_allow_present,
+        ),
+        json_optional_bool_field(
+            "actual_explicit_allow_present",
+            report.actual_explicit_allow_present,
+        ),
+        json_bool_field("expected_would_invoke", report.expected_would_invoke),
+        json_optional_bool_field("actual_would_invoke", report.actual_would_invoke),
+        json_usize_field(
+            "expected_command_arg_count",
+            report.expected_command_arg_count,
+        ),
+        json_optional_usize_field("actual_command_arg_count", report.actual_command_arg_count),
+        json_string_array_field("expected_command_args", &report.expected_command_args),
+        json_string_array_field("actual_command_args", &report.actual_command_args),
+        json_usize_field("expected_blocker_count", report.expected_blocker_count),
+        json_optional_usize_field("actual_blocker_count", report.actual_blocker_count),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_executable_layout_plan_report_json(
+    report: &NsldFinalExecutableLayoutPlanReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_executable_layout_plan"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("layout_hash", &report.layout_hash),
+        json_string_field("final_stage_plan_hash", &report.final_stage_plan_hash),
+        json_string_field("final_stage_link_mode", &report.final_stage_link_mode),
+        json_string_field("platform_envelope_family", &report.platform_envelope_family),
+        json_string_field("platform_envelope_policy", &report.platform_envelope_policy),
+        json_string_field("internal_binary_format", &report.internal_binary_format),
+        json_string_field("lifecycle_entry_hook", &report.lifecycle_entry_hook),
+        json_string_field("scheduler_contract", &report.scheduler_contract),
+        json_string_field("data_segment_ordering", &report.data_segment_ordering),
+        json_string_field("native_object_path", &report.native_object_path),
+        json_bool_field("native_object_required", report.native_object_required),
+        json_bool_field("native_object_present", report.native_object_present),
+        json_string_field("compatibility_domain", &report.compatibility_domain),
+        json_string_field(
+            "compatibility_lifecycle_hook",
+            &report.compatibility_lifecycle_hook,
+        ),
+        json_usize_field("payload_count", report.payload_count),
+        json_string_array_field("payloads", &report.payload_names),
+        json_usize_field("byte_alignment", report.byte_alignment),
+        json_usize_field("byte_span", report.byte_span),
+        json_string_field("byte_map_hash", &report.byte_map_hash),
+        format!(
+            "\"payload_diagnostics\":[{}]",
+            final_executable_payload_diagnostics_json(&report.payloads)
+        ),
+        format!(
+            "\"byte_map_entries\":[{}]",
+            final_executable_byte_map_entries_json(&report.byte_map_entries)
+        ),
+        json_string_array_field("notes", &report.notes),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn final_executable_payload_diagnostics_json(
+    payloads: &[NsldFinalExecutablePayloadDiagnostic],
+) -> String {
+    payloads
+        .iter()
+        .map(|payload| {
+            let fields = vec![
+                json_usize_field("order_index", payload.order_index),
+                json_string_field("payload_id", &payload.payload_id),
+                json_string_field("payload_kind", &payload.payload_kind),
+                json_string_field("lifecycle_hook", &payload.lifecycle_hook),
+                json_string_field("path", &payload.path),
+                json_string_field("content_hash", &payload.content_hash),
+                json_bool_field("required", payload.required),
+                json_bool_field("present", payload.present),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn final_executable_byte_map_entries_json(entries: &[NsldFinalExecutableByteMapEntry]) -> String {
+    entries
+        .iter()
+        .map(|entry| {
+            let fields = vec![
+                json_usize_field("order_index", entry.order_index),
+                json_string_field("payload_id", &entry.payload_id),
+                json_string_field("payload_kind", &entry.payload_kind),
+                json_usize_field("offset", entry.offset),
+                json_usize_field("size_bytes", entry.size_bytes),
+                json_usize_field("alignment", entry.alignment),
+                json_string_field("content_hash", &entry.content_hash),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+pub(crate) fn nsld_final_executable_layout_plan_emit_report_json(
+    report: &NsldFinalExecutableLayoutPlanEmitReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_executable_layout_plan_emit"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("layout_hash", &report.layout_hash),
+        json_string_field("final_stage_plan_hash", &report.final_stage_plan_hash),
+        json_usize_field("payload_count", report.payload_count),
+        json_bool_field("native_object_present", report.native_object_present),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_executable_layout_plan_verify_report_json(
+    report: &NsldFinalExecutableLayoutPlanVerifyReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_executable_layout_plan_verify"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("input_path", &report.input_path),
+        json_bool_field("valid", report.valid),
+        json_string_field("expected_layout_hash", &report.expected_layout_hash),
+        json_optional_string_field("actual_layout_hash", report.actual_layout_hash.as_deref()),
+        json_usize_field("expected_payload_count", report.expected_payload_count),
+        json_optional_usize_field("actual_payload_count", report.actual_payload_count),
+        json_usize_field("expected_byte_span", report.expected_byte_span),
+        json_optional_usize_field("actual_byte_span", report.actual_byte_span),
+        json_string_field("expected_byte_map_hash", &report.expected_byte_map_hash),
+        json_optional_string_field(
+            "actual_byte_map_hash",
+            report.actual_byte_map_hash.as_deref(),
+        ),
+        json_string_field(
+            "expected_lifecycle_entry_hook",
+            &report.expected_lifecycle_entry_hook,
+        ),
+        json_optional_string_field(
+            "actual_lifecycle_entry_hook",
+            report.actual_lifecycle_entry_hook.as_deref(),
+        ),
+        json_string_field(
+            "expected_platform_envelope_family",
+            &report.expected_platform_envelope_family,
+        ),
+        json_optional_string_field(
+            "actual_platform_envelope_family",
+            report.actual_platform_envelope_family.as_deref(),
+        ),
+        json_string_array_field("issues", &report.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_executable_image_dry_run_report_json(
+    report: &NsldFinalExecutableImageDryRunReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_executable_image_dry_run"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("image_path", &report.image_path),
+        json_string_field("image_format", &report.image_format),
+        json_string_field("image_magic", &report.image_magic),
+        json_usize_field("image_header_size", report.image_header_size),
+        json_usize_field("payload_byte_offset", report.payload_byte_offset),
+        json_usize_field("payload_byte_span", report.payload_byte_span),
+        json_string_field("layout_hash", &report.layout_hash),
+        json_string_field("byte_map_hash", &report.byte_map_hash),
+        json_usize_field("payload_count", report.payload_count),
+        json_usize_field("byte_span", report.byte_span),
+        json_bool_field("image_constructed", report.image_constructed),
+        json_bool_field("image_ready", report.image_ready),
+        json_optional_usize_field("image_size_bytes", report.image_size_bytes),
+        json_optional_string_field("image_hash", report.image_hash.as_deref()),
+        json_string_array_field("blockers", &report.blockers),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_executable_image_dry_run_emit_report_json(
+    report: &NsldFinalExecutableImageDryRunEmitReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_executable_image_dry_run_emit"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("output_path", &report.output_path),
+        json_string_field("image_path", &report.image_path),
+        json_bool_field("image_emitted", report.image_emitted),
+        json_bool_field("image_constructed", report.image_constructed),
+        json_bool_field("image_ready", report.image_ready),
+        json_string_field("image_format", &report.image_format),
+        json_usize_field("image_header_size", report.image_header_size),
+        json_usize_field("payload_byte_offset", report.payload_byte_offset),
+        json_optional_usize_field("image_size_bytes", report.image_size_bytes),
+        json_optional_string_field("image_hash", report.image_hash.as_deref()),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsld_final_executable_image_dry_run_verify_report_json(
+    report: &NsldFinalExecutableImageDryRunVerifyReport,
+) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_final_executable_image_dry_run_verify"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("input_path", &report.input_path),
+        json_string_field("image_path", &report.image_path),
+        json_bool_field("valid", report.valid),
+        json_string_field("expected_layout_hash", &report.expected_layout_hash),
+        json_optional_string_field("actual_layout_hash", report.actual_layout_hash.as_deref()),
+        json_string_field("expected_byte_map_hash", &report.expected_byte_map_hash),
+        json_optional_string_field(
+            "actual_byte_map_hash",
+            report.actual_byte_map_hash.as_deref(),
+        ),
+        json_string_field("expected_image_magic", &report.expected_image_magic),
+        json_optional_string_field("actual_image_magic", report.actual_image_magic.as_deref()),
+        json_usize_field(
+            "expected_image_version",
+            report.expected_image_version as usize,
+        ),
+        json_optional_usize_field(
+            "actual_image_version",
+            report.actual_image_version.map(|value| value as usize),
+        ),
+        json_usize_field(
+            "expected_image_header_size",
+            report.expected_image_header_size,
+        ),
+        json_optional_usize_field("actual_image_header_size", report.actual_image_header_size),
+        json_usize_field(
+            "expected_payload_byte_offset",
+            report.expected_payload_byte_offset,
+        ),
+        json_optional_usize_field(
+            "actual_payload_byte_offset",
+            report.actual_payload_byte_offset,
+        ),
+        json_usize_field(
+            "expected_payload_byte_span",
+            report.expected_payload_byte_span,
+        ),
+        json_optional_usize_field("actual_payload_byte_span", report.actual_payload_byte_span),
+        json_optional_string_field(
+            "actual_header_layout_hash",
+            report.actual_header_layout_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_header_byte_map_hash",
+            report.actual_header_byte_map_hash.as_deref(),
+        ),
+        json_usize_field(
+            "expected_payload_region_count",
+            report.expected_payload_region_count,
+        ),
+        json_optional_usize_field(
+            "actual_payload_region_count",
+            report.actual_payload_region_count,
+        ),
+        json_optional_string_field(
+            "expected_payload_region_hash",
+            report.expected_payload_region_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_payload_region_hash",
+            report.actual_payload_region_hash.as_deref(),
+        ),
+        json_bool_field(
+            "expected_image_constructed",
+            report.expected_image_constructed,
+        ),
+        json_optional_bool_field("actual_image_constructed", report.actual_image_constructed),
+        json_bool_field("expected_image_ready", report.expected_image_ready),
+        json_optional_bool_field("actual_image_ready", report.actual_image_ready),
+        json_optional_usize_field(
+            "expected_image_size_bytes",
+            report.expected_image_size_bytes,
+        ),
+        json_optional_usize_field("actual_image_size_bytes", report.actual_image_size_bytes),
+        json_optional_string_field("expected_image_hash", report.expected_image_hash.as_deref()),
+        json_optional_string_field("actual_image_hash", report.actual_image_hash.as_deref()),
+        json_string_array_field("issues", &report.issues),
     ];
     format!("{{{}}}", fields.join(","))
 }
@@ -1054,11 +1566,48 @@ fn nsld_final_executable_report_json_with_kind(
             report.host_dry_run_driver_resolved_path.as_deref(),
         ),
         json_optional_bool_field("host_dry_run_can_invoke", report.host_dry_run_can_invoke),
+        json_optional_string_field(
+            "host_dry_run_invocation_policy",
+            report.host_dry_run_invocation_policy.as_deref(),
+        ),
+        json_optional_string_field(
+            "host_dry_run_invocation_policy_reason",
+            report.host_dry_run_invocation_policy_reason.as_deref(),
+        ),
+        json_usize_field(
+            "host_dry_run_command_arg_count",
+            report.host_dry_run_command_arg_count,
+        ),
+        json_string_array_field(
+            "host_dry_run_command_args",
+            &report.host_dry_run_command_args,
+        ),
         json_usize_field(
             "host_dry_run_blocker_count",
             report.host_dry_run_blocker_count,
         ),
         json_string_array_field("host_dry_run_blockers", &report.host_dry_run_blockers),
+        json_string_field("host_invoke_plan_path", &report.host_invoke_plan_path),
+        json_optional_bool_field("host_invoke_plan_valid", report.host_invoke_plan_valid),
+        json_optional_string_field(
+            "host_invoke_plan_hash",
+            report.host_invoke_plan_hash.as_deref(),
+        ),
+        json_optional_bool_field(
+            "host_invoke_plan_would_invoke",
+            report.host_invoke_plan_would_invoke,
+        ),
+        json_string_array_field("host_invoke_plan_issues", &report.host_invoke_plan_issues),
+        json_string_field("layout_plan_path", &report.layout_plan_path),
+        json_optional_bool_field("layout_plan_valid", report.layout_plan_valid),
+        json_optional_string_field("layout_plan_hash", report.layout_plan_hash.as_deref()),
+        json_string_array_field("layout_plan_issues", &report.layout_plan_issues),
+        json_string_field("image_dry_run_path", &report.image_dry_run_path),
+        json_string_field("image_dry_run_bytes_path", &report.image_dry_run_bytes_path),
+        json_optional_bool_field("image_dry_run_valid", report.image_dry_run_valid),
+        json_optional_string_field("image_dry_run_hash", report.image_dry_run_hash.as_deref()),
+        json_optional_usize_field("image_dry_run_size_bytes", report.image_dry_run_size_bytes),
+        json_string_array_field("image_dry_run_issues", &report.image_dry_run_issues),
         json_usize_field("input_count", report.input_count),
         json_usize_field("blocker_count", report.blockers.len()),
         json_string_array_field("blockers", &report.blockers),
@@ -1086,6 +1635,30 @@ pub(crate) fn nsld_final_executable_emit_verify_report_json(
         ),
         json_bool_field("expected_emitted", report.expected_emitted),
         json_optional_bool_field("actual_emitted", report.actual_emitted),
+        json_optional_bool_field(
+            "expected_writer_input_valid",
+            report.expected_writer_input_valid,
+        ),
+        json_optional_bool_field(
+            "actual_writer_input_valid",
+            report.actual_writer_input_valid,
+        ),
+        json_optional_string_field(
+            "expected_writer_input_hash",
+            report.expected_writer_input_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_writer_input_hash",
+            report.actual_writer_input_hash.as_deref(),
+        ),
+        json_string_array_field(
+            "expected_writer_input_issues",
+            &report.expected_writer_input_issues,
+        ),
+        json_string_array_field(
+            "actual_writer_input_issues",
+            &report.actual_writer_input_issues,
+        ),
         json_optional_bool_field(
             "expected_host_dry_run_environment_ready",
             report.expected_host_dry_run_environment_ready,
@@ -1118,6 +1691,42 @@ pub(crate) fn nsld_final_executable_emit_verify_report_json(
             "actual_host_dry_run_driver_resolved_path",
             report.actual_host_dry_run_driver_resolved_path.as_deref(),
         ),
+        json_optional_string_field(
+            "expected_host_dry_run_invocation_policy",
+            report.expected_host_dry_run_invocation_policy.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_host_dry_run_invocation_policy",
+            report.actual_host_dry_run_invocation_policy.as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_host_dry_run_invocation_policy_reason",
+            report
+                .expected_host_dry_run_invocation_policy_reason
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_host_dry_run_invocation_policy_reason",
+            report
+                .actual_host_dry_run_invocation_policy_reason
+                .as_deref(),
+        ),
+        json_usize_field(
+            "expected_host_dry_run_command_arg_count",
+            report.expected_host_dry_run_command_arg_count,
+        ),
+        json_optional_usize_field(
+            "actual_host_dry_run_command_arg_count",
+            report.actual_host_dry_run_command_arg_count,
+        ),
+        json_string_array_field(
+            "expected_host_dry_run_command_args",
+            &report.expected_host_dry_run_command_args,
+        ),
+        json_string_array_field(
+            "actual_host_dry_run_command_args",
+            &report.actual_host_dry_run_command_args,
+        ),
         json_usize_field(
             "expected_host_dry_run_blocker_count",
             report.expected_host_dry_run_blocker_count,
@@ -1133,6 +1742,91 @@ pub(crate) fn nsld_final_executable_emit_verify_report_json(
         json_string_array_field(
             "actual_host_dry_run_blockers",
             &report.actual_host_dry_run_blockers,
+        ),
+        json_optional_bool_field(
+            "expected_host_invoke_plan_valid",
+            report.expected_host_invoke_plan_valid,
+        ),
+        json_optional_bool_field(
+            "actual_host_invoke_plan_valid",
+            report.actual_host_invoke_plan_valid,
+        ),
+        json_optional_bool_field(
+            "expected_host_invoke_plan_would_invoke",
+            report.expected_host_invoke_plan_would_invoke,
+        ),
+        json_optional_bool_field(
+            "actual_host_invoke_plan_would_invoke",
+            report.actual_host_invoke_plan_would_invoke,
+        ),
+        json_optional_string_field(
+            "expected_host_invoke_plan_hash",
+            report.expected_host_invoke_plan_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_host_invoke_plan_hash",
+            report.actual_host_invoke_plan_hash.as_deref(),
+        ),
+        json_string_array_field(
+            "expected_host_invoke_plan_issues",
+            &report.expected_host_invoke_plan_issues,
+        ),
+        json_string_array_field(
+            "actual_host_invoke_plan_issues",
+            &report.actual_host_invoke_plan_issues,
+        ),
+        json_optional_bool_field(
+            "expected_layout_plan_valid",
+            report.expected_layout_plan_valid,
+        ),
+        json_optional_bool_field("actual_layout_plan_valid", report.actual_layout_plan_valid),
+        json_optional_string_field(
+            "expected_layout_plan_hash",
+            report.expected_layout_plan_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_layout_plan_hash",
+            report.actual_layout_plan_hash.as_deref(),
+        ),
+        json_string_array_field(
+            "expected_layout_plan_issues",
+            &report.expected_layout_plan_issues,
+        ),
+        json_string_array_field(
+            "actual_layout_plan_issues",
+            &report.actual_layout_plan_issues,
+        ),
+        json_optional_bool_field(
+            "expected_image_dry_run_valid",
+            report.expected_image_dry_run_valid,
+        ),
+        json_optional_bool_field(
+            "actual_image_dry_run_valid",
+            report.actual_image_dry_run_valid,
+        ),
+        json_optional_string_field(
+            "expected_image_dry_run_hash",
+            report.expected_image_dry_run_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_image_dry_run_hash",
+            report.actual_image_dry_run_hash.as_deref(),
+        ),
+        json_optional_usize_field(
+            "expected_image_dry_run_size_bytes",
+            report.expected_image_dry_run_size_bytes,
+        ),
+        json_optional_usize_field(
+            "actual_image_dry_run_size_bytes",
+            report.actual_image_dry_run_size_bytes,
+        ),
+        json_string_array_field(
+            "expected_image_dry_run_issues",
+            &report.expected_image_dry_run_issues,
+        ),
+        json_string_array_field(
+            "actual_image_dry_run_issues",
+            &report.actual_image_dry_run_issues,
         ),
         json_usize_field("expected_blocker_count", report.expected_blocker_count),
         json_optional_usize_field("actual_blocker_count", report.actual_blocker_count),

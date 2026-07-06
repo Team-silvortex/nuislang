@@ -182,6 +182,39 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_stage_plan_issues.len()
     );
     println!(
+        "  final_executable_writer_input: present={} valid={} hash={} command_args={} issues={}",
+        report.final_executable_writer_input_present,
+        optional_bool_text(report.final_executable_writer_input_valid),
+        optional_string_text(report.final_executable_writer_input_hash.as_deref()),
+        optional_usize_text(report.final_executable_writer_input_command_arg_count),
+        report.final_executable_writer_input_issues.len()
+    );
+    println!(
+        "  final_executable_host_invoke_plan: present={} valid={} hash={} would_invoke={} blockers={} issues={}",
+        report.final_executable_host_invoke_plan_present,
+        optional_bool_text(report.final_executable_host_invoke_plan_valid),
+        optional_string_text(report.final_executable_host_invoke_plan_hash.as_deref()),
+        optional_bool_text(report.final_executable_host_invoke_plan_would_invoke),
+        optional_usize_text(report.final_executable_host_invoke_plan_blocker_count),
+        report.final_executable_host_invoke_plan_issues.len()
+    );
+    println!(
+        "  final_executable_layout_plan: present={} valid={} hash={} payloads={} issues={}",
+        report.final_executable_layout_plan_present,
+        optional_bool_text(report.final_executable_layout_plan_valid),
+        optional_string_text(report.final_executable_layout_plan_hash.as_deref()),
+        optional_usize_text(report.final_executable_layout_plan_payload_count),
+        report.final_executable_layout_plan_issues.len()
+    );
+    println!(
+        "  final_executable_image_dry_run: present={} valid={} hash={} size={} issues={}",
+        report.final_executable_image_dry_run_present,
+        optional_bool_text(report.final_executable_image_dry_run_valid),
+        optional_string_text(report.final_executable_image_dry_run_hash.as_deref()),
+        optional_usize_text(report.final_executable_image_dry_run_size_bytes),
+        report.final_executable_image_dry_run_issues.len()
+    );
+    println!(
         "  final_executable_blocked: present={} valid={} emitted={} hash={} blockers={} issues={}",
         report.final_executable_blocked_present,
         optional_bool_text(report.final_executable_blocked_valid),
@@ -353,6 +386,18 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     }
     for issue in &report.final_stage_plan_issues {
         println!("  final_stage_plan_issue: {issue}");
+    }
+    for issue in &report.final_executable_writer_input_issues {
+        println!("  final_executable_writer_input_issue: {issue}");
+    }
+    for issue in &report.final_executable_host_invoke_plan_issues {
+        println!("  final_executable_host_invoke_plan_issue: {issue}");
+    }
+    for issue in &report.final_executable_layout_plan_issues {
+        println!("  final_executable_layout_plan_issue: {issue}");
+    }
+    for issue in &report.final_executable_image_dry_run_issues {
+        println!("  final_executable_image_dry_run_issue: {issue}");
     }
     for issue in &report.final_executable_blocked_issues {
         println!("  final_executable_blocked_issue: {issue}");

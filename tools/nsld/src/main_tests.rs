@@ -6,13 +6,19 @@ use super::{
     fnv1a64_hex,
     main_test_support::empty_link_plan,
     nsld_check_report, nsld_closure_report, nsld_emit_closure_report,
+    nsld_emit_final_executable_host_invoke_plan_report,
+    nsld_emit_final_executable_image_dry_run_report, nsld_emit_final_executable_layout_plan_report,
     nsld_emit_final_executable_report, nsld_emit_final_executable_writer_input_report,
     nsld_emit_final_stage_plan_report, nsld_final_executable_host_dry_run_report,
-    nsld_final_executable_readiness_report, nsld_final_executable_writer_plan_report,
-    nsld_final_stage_plan_report, nsld_link_input_diagnostics, nsld_link_input_table_hash,
-    nsld_prepare_report, nsld_sidecar_capability_diagnostics, nsld_verify_closure_report,
-    nsld_verify_final_executable_emit_report, nsld_verify_final_executable_writer_input_report,
-    nsld_verify_final_stage_plan_report, toml,
+    nsld_final_executable_host_invoke_plan_report, nsld_final_executable_image_dry_run_report,
+    nsld_final_executable_layout_plan_report, nsld_final_executable_readiness_report,
+    nsld_final_executable_writer_plan_report, nsld_final_stage_plan_report,
+    nsld_link_input_diagnostics, nsld_link_input_table_hash, nsld_prepare_report,
+    nsld_sidecar_capability_diagnostics, nsld_verify_closure_report,
+    nsld_verify_final_executable_emit_report, nsld_verify_final_executable_host_invoke_plan_report,
+    nsld_verify_final_executable_image_dry_run_report,
+    nsld_verify_final_executable_layout_plan_report,
+    nsld_verify_final_executable_writer_input_report, nsld_verify_final_stage_plan_report, toml,
 };
 use crate::container_verify::{self, TomlFieldKind};
 use std::{env, fs, path::Path};
@@ -439,6 +445,11 @@ fn final_executable_host_dry_run_reports_missing_driver_without_invoking() {
     assert!(!report.driver_available);
     assert_eq!(report.driver_resolved_path, None);
     assert!(!report.environment_ready);
+    assert_eq!(report.invocation_policy, "dry-run-only");
+    assert_eq!(
+        report.invocation_policy_reason,
+        "alpha-host-finalizer-execution-disabled"
+    );
     assert!(!report.can_invoke_host_finalizer);
     assert!(report
         .command_args
@@ -451,12 +462,575 @@ fn final_executable_host_dry_run_reports_missing_driver_without_invoking() {
         .iter()
         .any(|blocker| blocker == "final-executable-writer:host-assisted:not-implemented"));
     assert!(report
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "host-finalizer-policy:dry-run-only"));
+    assert!(report
         .notes
         .iter()
         .any(|note| note == "host-finalizer-is-not-invoked"));
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_host_dry_run\""));
     assert!(report_json.contains("\"driver_available\":false"));
+    assert!(report_json.contains("\"invocation_policy\":\"dry-run-only\""));
     assert!(report_json.contains("\"can_invoke_host_finalizer\":false"));
+}
+
+#[test]
+fn final_executable_host_invoke_plan_requires_explicit_allow() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-host-invoke-plan-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.final_stage.driver = "definitely-missing-nsld-host-driver-for-invoke-plan-test".to_owned();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_final_executable_host_invoke_plan_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert_eq!(report.invocation_kind, "host-finalizer-command");
+    assert_eq!(report.invocation_policy, "dry-run-only");
+    assert!(report.requires_explicit_allow);
+    assert!(!report.explicit_allow_present);
+    assert!(!report.environment_ready);
+    assert!(!report.driver_available);
+    assert!(!report.can_invoke_host_finalizer);
+    assert!(!report.would_invoke);
+    assert!(report
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "host-finalizer-explicit-allow:missing"));
+    assert!(report
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "host-finalizer-policy:dry-run-only"));
+    assert!(report
+        .notes
+        .iter()
+        .any(|note| note == "host-finalizer-process-is-not-spawned"));
+    assert!(report_json.contains("\"kind\":\"nsld_final_executable_host_invoke_plan\""));
+    assert!(report_json.contains("\"requires_explicit_allow\":true"));
+    assert!(report_json.contains("\"would_invoke\":false"));
+}
+
+#[test]
+fn final_executable_host_invoke_plan_emit_and_verify_round_trip() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-host-invoke-plan-emit-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.final_stage.driver =
+        "definitely-missing-nsld-host-driver-for-invoke-plan-emit-test".to_owned();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan)
+            .unwrap();
+    let verify =
+        nsld_verify_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan);
+    let emit_json = super::json::nsld_final_executable_host_invoke_plan_emit_report_json(&emit);
+    let verify_json =
+        super::json::nsld_final_executable_host_invoke_plan_verify_report_json(&verify);
+    let report_source = fs::read_to_string(&emit.output_path).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(emit.invoke_plan_hash.starts_with("0x"));
+    assert_eq!(emit.invocation_policy, "dry-run-only");
+    assert!(emit.requires_explicit_allow);
+    assert!(!emit.explicit_allow_present);
+    assert!(!emit.would_invoke);
+    assert!(emit.blocker_count > 0);
+    assert!(verify.valid, "{:?}", verify.issues);
+    assert_eq!(
+        verify.actual_invoke_plan_hash.as_deref(),
+        Some(emit.invoke_plan_hash.as_str())
+    );
+    assert!(report_source.contains("schema = \"nuis-nsld-final-executable-host-invoke-plan-v1\""));
+    assert!(report_source.contains("would_invoke = false"));
+    assert!(emit_json.contains("\"kind\":\"nsld_final_executable_host_invoke_plan_emit\""));
+    assert!(verify_json.contains("\"kind\":\"nsld_final_executable_host_invoke_plan_verify\""));
+    assert!(verify_json.contains("\"valid\":true"));
+}
+
+#[test]
+fn verify_final_executable_host_invoke_plan_reports_gate_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-emit-host-invoke-plan-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan)
+            .unwrap();
+    let source = fs::read_to_string(&emit.output_path).unwrap();
+    let command_arg_count_line = source
+        .lines()
+        .find(|line| line.starts_with("command_arg_count = "))
+        .unwrap()
+        .to_owned();
+    let damaged = source
+        .replace("would_invoke = false", "would_invoke = true")
+        .replace(&command_arg_count_line, "command_arg_count = 0")
+        .replace(
+            "command_args = [\"clang\",",
+            "command_args = [\"clang-drift\",",
+        );
+    fs::write(&emit.output_path, damaged).unwrap();
+    let verify =
+        nsld_verify_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan);
+    let verify_json =
+        super::json::nsld_final_executable_host_invoke_plan_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue == "would_invoke mismatch: expected false, found true"));
+    assert!(verify.expected_command_arg_count > 0);
+    assert_eq!(verify.actual_command_arg_count, Some(0));
+    assert!(verify
+        .expected_command_args
+        .iter()
+        .any(|arg| arg == "clang"));
+    assert!(verify
+        .actual_command_args
+        .iter()
+        .any(|arg| arg == "clang-drift"));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("command_arg_count mismatch: expected ")));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("command_args mismatch")));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue == "final-executable-host-invoke-plan-content-mismatch"));
+    assert!(verify_json.contains("\"actual_would_invoke\":true"));
+    assert!(verify_json.contains("\"actual_command_arg_count\":0"));
+    assert!(verify_json.contains("\"clang-drift\""));
+}
+
+#[test]
+fn final_executable_layout_plan_captures_nsld_owned_binary_boundary() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-layout-plan-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_final_executable_layout_plan_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.layout_hash.starts_with("0x"));
+    assert_eq!(report.internal_binary_format, "nuis-hetero-unified-binary");
+    assert_eq!(report.lifecycle_entry_hook, "on_process_start");
+    assert_eq!(
+        report.scheduler_contract,
+        "deterministic-lifecycle-hook-order"
+    );
+    assert_eq!(
+        report.data_segment_ordering,
+        "deterministic-data-segment-order"
+    );
+    assert_eq!(report.compatibility_domain, "cffi-native-object");
+    assert_eq!(report.compatibility_lifecycle_hook, "on_cffi_native_object");
+    assert_eq!(report.payload_count, report.payloads.len());
+    assert!(report
+        .payload_names
+        .iter()
+        .any(|payload| payload == "nsld-container"));
+    assert!(report
+        .payload_names
+        .iter()
+        .any(|payload| payload == "native-object-output"));
+    assert!(report.payloads.iter().any(|payload| {
+        payload.payload_id == "payload0003.native-object"
+            && payload.lifecycle_hook == "on_cffi_native_object"
+            && payload.content_hash.starts_with("0x")
+    }));
+    assert_eq!(report.byte_alignment, 16);
+    assert!(report.byte_span > 0);
+    assert!(report.byte_map_hash.starts_with("0x"));
+    assert_eq!(report.byte_map_entries.len(), report.payloads.len());
+    assert!(report
+        .byte_map_entries
+        .iter()
+        .all(|entry| entry.offset % entry.alignment == 0));
+    assert!(report
+        .byte_map_entries
+        .windows(2)
+        .all(|entries| { entries[0].offset + entries[0].size_bytes <= entries[1].offset }));
+    assert!(report
+        .notes
+        .iter()
+        .any(|note| note == "platform-envelope-is-compatibility-shell"));
+    assert!(report_json.contains("\"kind\":\"nsld_final_executable_layout_plan\""));
+    assert!(report_json.contains("\"internal_binary_format\":\"nuis-hetero-unified-binary\""));
+    assert!(report_json.contains("\"lifecycle_entry_hook\":\"on_process_start\""));
+    assert!(report_json.contains("\"byte_map_hash\":\"0x"));
+    assert!(report_json.contains("\"byte_map_entries\":["));
+}
+
+#[test]
+fn final_executable_layout_plan_emit_and_verify_round_trip() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-layout-plan-emit-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    let verify = nsld_verify_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan);
+    let emit_json = super::json::nsld_final_executable_layout_plan_emit_report_json(&emit);
+    let verify_json = super::json::nsld_final_executable_layout_plan_verify_report_json(&verify);
+    let source = fs::read_to_string(&emit.output_path).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(emit.layout_hash.starts_with("0x"));
+    assert_eq!(
+        verify.actual_layout_hash.as_deref(),
+        Some(emit.layout_hash.as_str())
+    );
+    assert!(verify.valid, "{:?}", verify.issues);
+    assert!(source.contains("schema = \"nuis-nsld-final-executable-layout-plan-v1\""));
+    assert!(source.contains("platform_envelope_family = \"mach-o\""));
+    assert!(source.contains("payloads = ["));
+    assert!(source.contains("byte_alignment = 16"));
+    assert!(source.contains("byte_map_hash = \"0x"));
+    assert!(source.contains("[[byte_map_entry]]"));
+    assert!(emit_json.contains("\"kind\":\"nsld_final_executable_layout_plan_emit\""));
+    assert!(verify_json.contains("\"kind\":\"nsld_final_executable_layout_plan_verify\""));
+    assert!(verify_json.contains("\"valid\":true"));
+}
+
+#[test]
+fn final_executable_image_dry_run_emit_and_verify_round_trip() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-image-dry-run-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan);
+    let emit =
+        nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    let verify =
+        nsld_verify_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_final_executable_image_dry_run_report_json(&report);
+    let emit_json = super::json::nsld_final_executable_image_dry_run_emit_report_json(&emit);
+    let verify_json = super::json::nsld_final_executable_image_dry_run_verify_report_json(&verify);
+    let report_source = fs::read_to_string(&emit.output_path).unwrap();
+    let image_bytes = fs::read(&emit.image_path).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.image_constructed);
+    assert!(report.image_ready, "{:?}", report.blockers);
+    assert!(report
+        .image_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(emit.image_emitted);
+    assert_eq!(emit.image_hash, report.image_hash);
+    assert_eq!(emit.image_size_bytes, Some(image_bytes.len()));
+    assert!(image_bytes.starts_with(b"NUIFIMG\0"));
+    assert_eq!(
+        u32::from_le_bytes(image_bytes[8..12].try_into().unwrap()),
+        1
+    );
+    assert_eq!(
+        u32::from_le_bytes(image_bytes[12..16].try_into().unwrap()),
+        report.image_header_size as u32
+    );
+    assert_eq!(
+        u32::from_le_bytes(image_bytes[16..20].try_into().unwrap()),
+        report.payload_count as u32
+    );
+    assert_eq!(
+        u64::from_le_bytes(image_bytes[24..32].try_into().unwrap()),
+        report.payload_byte_span as u64
+    );
+    assert_eq!(
+        u64::from_le_bytes(image_bytes[32..40].try_into().unwrap()),
+        report.payload_byte_offset as u64
+    );
+    assert_eq!(
+        emit.image_size_bytes,
+        Some(report.image_header_size + report.payload_byte_span)
+    );
+    assert!(verify.valid, "{:?}", verify.issues);
+    assert_eq!(verify.actual_image_hash, emit.image_hash);
+    assert_eq!(
+        verify.actual_image_header_size,
+        Some(report.image_header_size)
+    );
+    assert_eq!(
+        verify.actual_payload_byte_offset,
+        Some(report.payload_byte_offset)
+    );
+    assert_eq!(verify.actual_image_magic.as_deref(), Some("NUIFIMG"));
+    assert_eq!(verify.actual_image_version, Some(1));
+    assert_eq!(
+        verify.actual_payload_byte_span,
+        Some(report.payload_byte_span)
+    );
+    assert_eq!(
+        verify.actual_header_layout_hash.as_deref(),
+        Some(report.layout_hash.as_str())
+    );
+    assert_eq!(
+        verify.actual_header_byte_map_hash.as_deref(),
+        Some(report.byte_map_hash.as_str())
+    );
+    assert_eq!(
+        verify.expected_payload_region_count,
+        verify.actual_payload_region_count.unwrap()
+    );
+    assert_eq!(
+        verify.expected_payload_region_hash,
+        verify.actual_payload_region_hash
+    );
+    assert!(verify
+        .actual_payload_region_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(report_source.contains("schema = \"nuis-nsld-final-executable-image-dry-run-v1\""));
+    assert!(report_source.contains("image_magic = \"NUIFIMG\""));
+    assert!(report_source.contains("image_header_size = 64"));
+    assert!(report_json.contains("\"kind\":\"nsld_final_executable_image_dry_run\""));
+    assert!(report_json.contains("\"image_magic\":\"NUIFIMG\""));
+    assert!(emit_json.contains("\"kind\":\"nsld_final_executable_image_dry_run_emit\""));
+    assert!(emit_json.contains("\"image_header_size\":64"));
+    assert!(verify_json.contains("\"kind\":\"nsld_final_executable_image_dry_run_verify\""));
+    assert!(verify_json.contains("\"actual_image_magic\":\"NUIFIMG\""));
+    assert!(verify_json.contains("\"actual_image_version\":1"));
+    assert!(verify_json.contains("\"actual_header_layout_hash\":\"0x"));
+    assert!(verify_json.contains("\"actual_payload_region_hash\":\"0x"));
+    assert!(verify_json.contains("\"actual_image_header_size\":64"));
+    assert!(verify_json.contains("\"valid\":true"));
+}
+
+#[test]
+fn verify_final_executable_image_dry_run_reports_header_magic_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-image-dry-run-header-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    let mut image_bytes = fs::read(&emit.image_path).unwrap();
+    image_bytes[0..8].copy_from_slice(b"BADMAGC\0");
+    fs::write(&emit.image_path, image_bytes).unwrap();
+    let verify =
+        nsld_verify_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_executable_image_dry_run_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert_eq!(verify.actual_image_magic.as_deref(), Some("BADMAGC"));
+    assert_eq!(verify.actual_image_version, Some(1));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue == "image_header_magic mismatch: expected NUIFIMG, found BADMAGC"));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("image_bytes_hash mismatch: expected 0x")));
+    assert!(verify_json.contains("\"actual_image_magic\":\"BADMAGC\""));
+    assert!(verify_json.contains("image_header_magic mismatch"));
+}
+
+#[test]
+fn verify_final_executable_image_dry_run_reports_image_byte_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-image-dry-run-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    fs::write(&emit.image_path, b"drifted-image").unwrap();
+    let verify =
+        nsld_verify_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_executable_image_dry_run_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("image_bytes_hash mismatch: expected 0x")));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue == "final-executable-image-header:invalid-or-too-short"));
+    assert!(verify_json.contains("\"valid\":false"));
+}
+
+#[test]
+fn verify_final_executable_image_dry_run_reports_payload_region_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-image-dry-run-payload-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    let mut image_bytes = fs::read(&emit.image_path).unwrap();
+    image_bytes[64] ^= 0xff;
+    fs::write(&emit.image_path, image_bytes).unwrap();
+    let verify =
+        nsld_verify_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_executable_image_dry_run_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert_eq!(verify.actual_image_magic.as_deref(), Some("NUIFIMG"));
+    assert_ne!(
+        verify.expected_payload_region_hash,
+        verify.actual_payload_region_hash
+    );
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("image_payload_region_hash mismatch")));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("image_payload_region_entry_hash mismatch for ")));
+    assert!(verify_json.contains("\"actual_payload_region_hash\":\"0x"));
+    assert!(verify_json.contains("image_payload_region_hash mismatch"));
+}
+
+#[test]
+fn verify_final_executable_layout_plan_reports_protocol_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-layout-plan-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    let source = fs::read_to_string(&emit.output_path).unwrap();
+    let byte_span_line = source
+        .lines()
+        .find(|line| line.starts_with("byte_span = "))
+        .unwrap()
+        .to_owned();
+    let damaged = source
+        .replace(
+            "lifecycle_entry_hook = \"on_process_start\"",
+            "lifecycle_entry_hook = \"drift\"",
+        )
+        .replace(
+            "platform_envelope_family = \"mach-o\"",
+            "platform_envelope_family = \"elf\"",
+        )
+        .replace(&byte_span_line, "byte_span = 0")
+        .replace("payload_count = 4", "payload_count = 0");
+    fs::write(&emit.output_path, damaged).unwrap();
+    let verify = nsld_verify_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_executable_layout_plan_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert_eq!(verify.actual_lifecycle_entry_hook.as_deref(), Some("drift"));
+    assert_eq!(
+        verify.actual_platform_envelope_family.as_deref(),
+        Some("elf")
+    );
+    assert_eq!(verify.actual_payload_count, Some(0));
+    assert_eq!(verify.actual_byte_span, Some(0));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue == "final-executable-layout-plan-content-mismatch"));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("byte_span mismatch: expected ")));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue
+            == "lifecycle_entry_hook mismatch: expected on_process_start, found drift"));
+    assert!(verify_json.contains("\"actual_lifecycle_entry_hook\":\"drift\""));
+    assert!(verify_json.contains("\"actual_platform_envelope_family\":\"elf\""));
 }
 
 #[test]
@@ -500,7 +1074,7 @@ fn verify_final_executable_writer_input_reports_command_args_drift() {
 #[test]
 fn verify_final_executable_writer_input_reports_plan_hash_drift() {
     let dir = env::temp_dir().join(format!(
-        "nsld-final-executable-writer-input-drift-{}",
+        "nsld-final-executable-emit-writer-input-drift-{}",
         std::process::id()
     ));
     fs::create_dir_all(&dir).unwrap();
@@ -614,6 +1188,22 @@ fn emit_final_executable_writes_blocked_boundary_report() {
     assert!(emit.host_dry_run_driver_available.is_some());
     assert!(emit.host_dry_run_can_invoke.is_some());
     assert_eq!(
+        emit.host_invoke_plan_path,
+        nsld_artifact_stage_kind_path(
+            &plan.output_dir,
+            NsldArtifactStageKind::FinalExecutableHostInvokePlan
+        )
+        .display()
+        .to_string()
+    );
+    assert_eq!(emit.host_invoke_plan_valid, Some(false));
+    assert_eq!(emit.host_invoke_plan_would_invoke, Some(false));
+    assert!(emit.host_invoke_plan_hash.is_none());
+    assert!(emit
+        .host_invoke_plan_issues
+        .iter()
+        .any(|issue| issue.starts_with("missing_or_unreadable_final_executable_host_invoke_plan")));
+    assert_eq!(
         emit.writer_blockers,
         vec!["final-executable-writer:host-assisted:not-implemented".to_owned()]
     );
@@ -622,6 +1212,14 @@ fn emit_final_executable_writes_blocked_boundary_report() {
         .blockers
         .iter()
         .any(|blocker| blocker == "self-owned-final-native-linker"));
+    assert!(emit
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "host-finalizer-invoke-plan:invalid"));
+    assert!(emit
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "host-finalizer-invoke-plan:not-allowed"));
     assert!(emit
         .notes
         .iter()
@@ -647,6 +1245,12 @@ fn emit_final_executable_writes_blocked_boundary_report() {
     assert!(report_source.contains("host_dry_run_environment_ready = "));
     assert!(report_source.contains("host_dry_run_driver_available = "));
     assert!(report_source.contains("host_dry_run_can_invoke = "));
+    assert!(report_source.contains("host_invoke_plan_valid = false"));
+    assert!(report_source.contains("host_invoke_plan_hash = \"\""));
+    assert!(report_source.contains("host_invoke_plan_would_invoke = false"));
+    assert!(report_source.contains("image_dry_run_valid = false"));
+    assert!(report_source.contains("image_dry_run_hash = \"\""));
+    assert!(report_source.contains("final-executable-image-dry-run:invalid"));
     assert!(report_source.contains("emitted = false"));
     assert!(report_source.contains("blocker_count = "));
     assert!(emit_json.contains("\"kind\":\"nsld_final_executable_emit\""));
@@ -655,7 +1259,49 @@ fn emit_final_executable_writes_blocked_boundary_report() {
     assert!(emit_json.contains("\"writer_kind\":\"host-assisted-final-executable\""));
     assert!(emit_json.contains("\"writer_input_valid\":true"));
     assert!(emit_json.contains("\"host_dry_run_environment_ready\":"));
+    assert!(emit_json.contains("\"host_invoke_plan_valid\":false"));
+    assert!(emit_json.contains("\"host_invoke_plan_would_invoke\":false"));
+    assert!(emit_json.contains("\"image_dry_run_valid\":false"));
     assert!(emit_json.contains("\"final_stage_plan_hash\":\"0x"));
+}
+
+#[test]
+fn emit_final_executable_consumes_valid_image_dry_run_snapshot() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-valid-image-dry-run-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let image =
+        nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit = nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit_json = super::json::nsld_final_executable_emit_report_json(&emit);
+    let verify = nsld_verify_final_executable_emit_report(Path::new("manifest.toml"), &plan);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert_eq!(emit.image_dry_run_valid, Some(true));
+    assert_eq!(emit.image_dry_run_hash, image.image_hash);
+    assert_eq!(emit.image_dry_run_size_bytes, image.image_size_bytes);
+    assert!(emit.image_dry_run_issues.is_empty());
+    assert!(!emit
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "final-executable-image-dry-run:invalid"));
+    assert!(emit_json.contains("\"image_dry_run_valid\":true"));
+    assert!(emit_json.contains("\"image_dry_run_hash\":\"0x"));
+    assert!(emit_json.contains("\"image_dry_run_size_bytes\":"));
+    assert!(verify.valid, "{:?}", verify.issues);
+    assert_eq!(verify.expected_image_dry_run_valid, Some(true));
+    assert_eq!(verify.actual_image_dry_run_valid, Some(true));
+    assert_eq!(verify.expected_image_dry_run_hash, image.image_hash);
+    assert_eq!(verify.actual_image_dry_run_hash, image.image_hash);
 }
 
 #[test]
@@ -684,6 +1330,14 @@ fn emit_final_executable_records_host_dry_run_driver_blocker() {
     assert_eq!(emit.host_dry_run_driver_resolved_path, None);
     assert_eq!(emit.host_dry_run_can_invoke, Some(false));
     assert_eq!(
+        emit.host_dry_run_invocation_policy.as_deref(),
+        Some("dry-run-only")
+    );
+    assert_eq!(
+        emit.host_dry_run_invocation_policy_reason.as_deref(),
+        Some("alpha-host-finalizer-execution-disabled")
+    );
+    assert_eq!(
         emit.host_dry_run_blocker_count,
         emit.host_dry_run_blockers.len()
     );
@@ -697,10 +1351,65 @@ fn emit_final_executable_records_host_dry_run_driver_blocker() {
     assert!(report_source.contains("host_dry_run_driver_available = false"));
     assert!(report_source.contains("host_dry_run_driver_resolved_path = \"\""));
     assert!(report_source.contains("host_dry_run_can_invoke = false"));
+    assert!(report_source.contains("host_dry_run_invocation_policy = \"dry-run-only\""));
+    assert!(report_source.contains(
+        "host_dry_run_invocation_policy_reason = \"alpha-host-finalizer-execution-disabled\""
+    ));
     assert!(report_source.contains("host_dry_run_blocker_count = "));
     assert!(report_source.contains(
         "host-finalizer-driver-unavailable:definitely-missing-nsld-host-driver-for-emit-test"
     ));
+}
+
+#[test]
+fn emit_final_executable_consumes_valid_host_invoke_plan_snapshot() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-valid-host-invoke-plan-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let invoke_plan =
+        nsld_emit_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan)
+            .unwrap();
+    let emit = nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let verify = nsld_verify_final_executable_emit_report(Path::new("manifest.toml"), &plan);
+    let emit_json = super::json::nsld_final_executable_emit_report_json(&emit);
+    let report_source = fs::read_to_string(&emit.blocked_report_path).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(verify.valid, "{:?}", verify.issues);
+    assert_eq!(emit.host_invoke_plan_valid, Some(true));
+    assert_eq!(
+        emit.host_invoke_plan_hash.as_deref(),
+        Some(invoke_plan.invoke_plan_hash.as_str())
+    );
+    assert_eq!(emit.host_invoke_plan_would_invoke, Some(false));
+    assert!(emit.host_invoke_plan_issues.is_empty());
+    assert!(!emit
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "host-finalizer-invoke-plan:invalid"));
+    assert!(emit
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "host-finalizer-invoke-plan:not-allowed"));
+    assert!(report_source.contains("host_invoke_plan_valid = true"));
+    assert!(report_source.contains(&format!(
+        "host_invoke_plan_hash = \"{}\"",
+        invoke_plan.invoke_plan_hash
+    )));
+    assert!(report_source.contains("host_invoke_plan_would_invoke = false"));
+    assert!(emit_json.contains("\"host_invoke_plan_valid\":true"));
+    assert!(emit_json.contains("\"host_invoke_plan_hash\":\"0x"));
+    assert!(emit_json.contains("\"host_invoke_plan_would_invoke\":false"));
 }
 
 #[test]
@@ -732,11 +1441,30 @@ fn verify_final_executable_emit_reports_host_dry_run_drift() {
             "host_dry_run_can_invoke = true",
         )
         .replace(
-            "host-finalizer-driver-unavailable:definitely-missing-nsld-host-driver-for-drift-test",
+            "host_dry_run_invocation_policy = \"dry-run-only\"",
+            "host_dry_run_invocation_policy = \"allow-host-invoke\"",
+        )
+        .replace(
+            "host_dry_run_invocation_policy_reason = \"alpha-host-finalizer-execution-disabled\"",
+            "host_dry_run_invocation_policy_reason = \"tampered-policy\"",
+        )
+        .replace(
+            &format!(
+                "host_dry_run_command_arg_count = {}",
+                emit.host_dry_run_command_arg_count
+            ),
+            "host_dry_run_command_arg_count = 0",
+        )
+        .replace(
+            "definitely-missing-nsld-host-driver-for-drift-test",
+            "tampered-host-driver-arg",
+        )
+        .replace(
+            "host-finalizer-driver-unavailable:tampered-host-driver-arg",
             "host-finalizer-driver-unavailable:tampered-driver",
         )
         .replace(
-            "host_dry_run_blocker_count = 2",
+            "host_dry_run_blocker_count = 3",
             "host_dry_run_blocker_count = 0",
         );
     fs::write(blocked_path, damaged).unwrap();
@@ -751,6 +1479,26 @@ fn verify_final_executable_emit_reports_host_dry_run_drift() {
     assert_eq!(verify.actual_host_dry_run_can_invoke, Some(true));
     assert_eq!(verify.expected_host_dry_run_driver_resolved_path, None);
     assert_eq!(verify.actual_host_dry_run_driver_resolved_path, None);
+    assert_eq!(
+        verify.expected_host_dry_run_invocation_policy.as_deref(),
+        Some("dry-run-only")
+    );
+    assert_eq!(
+        verify.actual_host_dry_run_invocation_policy.as_deref(),
+        Some("allow-host-invoke")
+    );
+    assert_eq!(
+        verify
+            .expected_host_dry_run_invocation_policy_reason
+            .as_deref(),
+        Some("alpha-host-finalizer-execution-disabled")
+    );
+    assert_eq!(
+        verify
+            .actual_host_dry_run_invocation_policy_reason
+            .as_deref(),
+        Some("tampered-policy")
+    );
     assert!(verify
         .expected_host_dry_run_blockers
         .iter()
@@ -760,8 +1508,21 @@ fn verify_final_executable_emit_reports_host_dry_run_drift() {
         .actual_host_dry_run_blockers
         .iter()
         .any(|blocker| blocker == "host-finalizer-driver-unavailable:tampered-driver"));
-    assert_eq!(verify.expected_host_dry_run_blocker_count, 2);
+    assert_eq!(verify.expected_host_dry_run_blocker_count, 3);
     assert_eq!(verify.actual_host_dry_run_blocker_count, Some(0));
+    assert_eq!(
+        verify.expected_host_dry_run_command_arg_count,
+        emit.host_dry_run_command_arg_count
+    );
+    assert_eq!(verify.actual_host_dry_run_command_arg_count, Some(0));
+    assert!(verify
+        .expected_host_dry_run_command_args
+        .iter()
+        .any(|arg| arg == "definitely-missing-nsld-host-driver-for-drift-test"));
+    assert!(verify
+        .actual_host_dry_run_command_args
+        .iter()
+        .any(|arg| arg == "tampered-host-driver-arg"));
     assert!(verify.issues.iter().any(
         |issue| issue == "host_dry_run_environment_ready mismatch: expected false, found true"
     ));
@@ -772,15 +1533,193 @@ fn verify_final_executable_emit_reports_host_dry_run_drift() {
     assert!(verify
         .issues
         .iter()
+        .any(|issue| issue
+            == "host_dry_run_invocation_policy mismatch: expected dry-run-only, found allow-host-invoke"));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue
+            == "host_dry_run_invocation_policy_reason mismatch: expected alpha-host-finalizer-execution-disabled, found tampered-policy"));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("host_dry_run_command_arg_count mismatch: expected ")));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("host_dry_run_command_args mismatch")));
+    assert!(verify
+        .issues
+        .iter()
         .any(|issue| issue.starts_with("host_dry_run_blockers mismatch")));
     assert!(verify
         .issues
         .iter()
-        .any(|issue| issue == "host_dry_run_blocker_count mismatch: expected 2, found 0"));
+        .any(|issue| issue == "host_dry_run_blocker_count mismatch: expected 3, found 0"));
     assert!(verify_json.contains("\"actual_host_dry_run_environment_ready\":true"));
     assert!(verify_json.contains("\"actual_host_dry_run_can_invoke\":true"));
+    assert!(verify_json.contains("\"actual_host_dry_run_invocation_policy\":\"allow-host-invoke\""));
+    assert!(verify_json
+        .contains("\"actual_host_dry_run_invocation_policy_reason\":\"tampered-policy\""));
+    assert!(verify_json.contains("\"actual_host_dry_run_command_arg_count\":0"));
+    assert!(verify_json.contains("\"tampered-host-driver-arg\""));
     assert!(verify_json.contains("\"actual_host_dry_run_blocker_count\":0"));
     assert!(verify_json.contains("host-finalizer-driver-unavailable:tampered-driver"));
+}
+
+#[test]
+fn verify_final_executable_emit_reports_writer_input_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-writer-input-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let writer_input =
+        nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit = nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let blocked_path = Path::new(&emit.blocked_report_path);
+    let damaged = fs::read_to_string(blocked_path)
+        .unwrap()
+        .replace("writer_input_valid = true", "writer_input_valid = false")
+        .replace(
+            &format!("writer_input_hash = \"{}\"", writer_input.writer_input_hash),
+            "writer_input_hash = \"0x8888888888888888\"",
+        )
+        .replace(
+            "writer_input_issues = []",
+            "writer_input_issues = [\"tampered-writer-input\"]",
+        );
+    fs::write(blocked_path, damaged).unwrap();
+    let verify = nsld_verify_final_executable_emit_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_executable_emit_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert_eq!(verify.expected_writer_input_valid, Some(true));
+    assert_eq!(verify.actual_writer_input_valid, Some(false));
+    assert_eq!(
+        verify.expected_writer_input_hash.as_deref(),
+        Some(writer_input.writer_input_hash.as_str())
+    );
+    assert_eq!(
+        verify.actual_writer_input_hash.as_deref(),
+        Some("0x8888888888888888")
+    );
+    assert!(verify.expected_writer_input_issues.is_empty());
+    assert_eq!(
+        verify.actual_writer_input_issues,
+        vec!["tampered-writer-input".to_owned()]
+    );
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue == "writer_input_valid mismatch: expected true, found false"));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("writer_input_hash mismatch: expected 0x")));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue
+            == "writer_input_issues mismatch: expected [], found [tampered-writer-input]"));
+    assert!(verify_json.contains("\"actual_writer_input_valid\":false"));
+    assert!(verify_json.contains("\"actual_writer_input_hash\":\"0x8888888888888888\""));
+    assert!(verify_json.contains("\"actual_writer_input_issues\":[\"tampered-writer-input\"]"));
+}
+
+#[test]
+fn verify_final_executable_emit_reports_host_invoke_plan_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-host-invoke-plan-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let invoke_plan =
+        nsld_emit_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan)
+            .unwrap();
+    let emit = nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let blocked_path = Path::new(&emit.blocked_report_path);
+    let damaged = fs::read_to_string(blocked_path)
+        .unwrap()
+        .replace(
+            "host_invoke_plan_valid = true",
+            "host_invoke_plan_valid = false",
+        )
+        .replace(
+            &format!(
+                "host_invoke_plan_hash = \"{}\"",
+                invoke_plan.invoke_plan_hash
+            ),
+            "host_invoke_plan_hash = \"0x9999999999999999\"",
+        )
+        .replace(
+            "host_invoke_plan_would_invoke = false",
+            "host_invoke_plan_would_invoke = true",
+        )
+        .replace(
+            "host_invoke_plan_issues = []",
+            "host_invoke_plan_issues = [\"tampered-invoke-plan\"]",
+        );
+    fs::write(blocked_path, damaged).unwrap();
+    let verify = nsld_verify_final_executable_emit_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_executable_emit_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert_eq!(verify.expected_host_invoke_plan_valid, Some(true));
+    assert_eq!(verify.actual_host_invoke_plan_valid, Some(false));
+    assert_eq!(verify.expected_host_invoke_plan_would_invoke, Some(false));
+    assert_eq!(verify.actual_host_invoke_plan_would_invoke, Some(true));
+    assert_eq!(
+        verify.expected_host_invoke_plan_hash.as_deref(),
+        Some(invoke_plan.invoke_plan_hash.as_str())
+    );
+    assert_eq!(
+        verify.actual_host_invoke_plan_hash.as_deref(),
+        Some("0x9999999999999999")
+    );
+    assert!(verify.expected_host_invoke_plan_issues.is_empty());
+    assert_eq!(
+        verify.actual_host_invoke_plan_issues,
+        vec!["tampered-invoke-plan".to_owned()]
+    );
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue == "host_invoke_plan_valid mismatch: expected true, found false"));
+    assert!(
+        verify
+            .issues
+            .iter()
+            .any(|issue| issue
+                == "host_invoke_plan_would_invoke mismatch: expected false, found true")
+    );
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("host_invoke_plan_hash mismatch: expected 0x")));
+    assert!(verify.issues.iter().any(|issue| issue
+        == "host_invoke_plan_issues mismatch: expected [], found [tampered-invoke-plan]"));
+    assert!(verify_json.contains("\"actual_host_invoke_plan_valid\":false"));
+    assert!(verify_json.contains("\"actual_host_invoke_plan_would_invoke\":true"));
+    assert!(verify_json.contains("\"actual_host_invoke_plan_hash\":\"0x9999999999999999\""));
+    assert!(verify_json.contains("\"actual_host_invoke_plan_issues\":[\"tampered-invoke-plan\"]"));
 }
 
 #[test]
@@ -1104,6 +2043,22 @@ fn artifact_stage_kind_paths_are_canonical() {
         "nuis.nsld.final-executable-writer-input.toml"
     );
     assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableHostInvokePlan),
+        "nuis.nsld.final-executable-host-invoke-plan.toml"
+    );
+    assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableLayoutPlan),
+        "nuis.nsld.final-executable-layout.toml"
+    );
+    assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableImageDryRun),
+        "nuis.nsld.final-executable-image-dry-run.toml"
+    );
+    assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableImageDryRunBytes),
+        "nuis.nsld.final-executable-image-dry-run.bin"
+    );
+    assert_eq!(
         nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableBlocked),
         "nuis.nsld.final-executable.blocked.toml"
     );
@@ -1126,7 +2081,7 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(report.valid, "{:?}", report.issues);
-    assert_eq!(report.stage_count, 21);
+    assert_eq!(report.stage_count, 25);
     assert!(report.present_count >= report.required_count);
     assert_eq!(report.missing_required_count, 0);
     assert!(report.optional_present_count >= 3);
@@ -1136,6 +2091,26 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
     assert_eq!(report.suggested_command, None);
     assert_eq!(report.suggested_command_resolved, None);
     assert_eq!(report.suggested_command_reason, None);
+    assert_eq!(
+        report.next_optional_stage.as_deref(),
+        Some("final-executable-writer-input")
+    );
+    assert_eq!(
+        report.next_optional_command_id.as_deref(),
+        Some("emit-final-executable-writer-input")
+    );
+    assert_eq!(
+        report.next_optional_command.as_deref(),
+        Some("nsld emit-final-executable-writer-input <input>")
+    );
+    assert_eq!(
+        report.next_optional_command_resolved.as_deref(),
+        Some("nsld emit-final-executable-writer-input manifest.toml")
+    );
+    assert_eq!(
+        report.next_optional_command_reason.as_deref(),
+        Some("first missing optional artifact stage `final-executable-writer-input`")
+    );
     assert!(report
         .stages
         .iter()
@@ -1144,10 +2119,28 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
         stage.stage_id == "final-executable-writer-input" && !stage.present && !stage.required
     }));
     assert!(report.stages.iter().any(|stage| {
+        stage.stage_id == "final-executable-host-invoke-plan" && !stage.present && !stage.required
+    }));
+    assert!(report.stages.iter().any(|stage| {
+        stage.stage_id == "final-executable-layout" && !stage.present && !stage.required
+    }));
+    assert!(report.stages.iter().any(|stage| {
+        stage.stage_id == "final-executable-image-dry-run" && !stage.present && !stage.required
+    }));
+    assert!(report.stages.iter().any(|stage| {
+        stage.stage_id == "final-executable-image-dry-run-bytes"
+            && !stage.present
+            && !stage.required
+    }));
+    assert!(report.stages.iter().any(|stage| {
         stage.stage_id == "final-executable-blocked" && stage.present && !stage.required
     }));
     assert!(report_json.contains("\"kind\":\"nsld_artifact_chain\""));
     assert!(report_json.contains("\"stage_id\":\"final-executable-writer-input\""));
+    assert!(report_json.contains("\"stage_id\":\"final-executable-host-invoke-plan\""));
+    assert!(report_json.contains("\"stage_id\":\"final-executable-layout\""));
+    assert!(report_json.contains("\"stage_id\":\"final-executable-image-dry-run\""));
+    assert!(report_json.contains("\"stage_id\":\"final-executable-image-dry-run-bytes\""));
     assert!(report_json.contains("\"stage_id\":\"final-executable-blocked\""));
     assert!(report_json.contains("\"missing_required_count\":0"));
     assert!(report_json.contains("\"first_missing_required_stage\":null"));
@@ -1156,6 +2149,86 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
     assert!(report_json.contains("\"suggested_command\":null"));
     assert!(report_json.contains("\"suggested_command_resolved\":null"));
     assert!(report_json.contains("\"suggested_command_reason\":null"));
+    assert!(report_json.contains("\"next_optional_stage\":\"final-executable-writer-input\""));
+    assert!(
+        report_json.contains("\"next_optional_command_id\":\"emit-final-executable-writer-input\"")
+    );
+    assert!(report_json
+        .contains("\"next_optional_command\":\"nsld emit-final-executable-writer-input <input>\""));
+    assert!(report_json.contains(
+        "\"next_optional_command_resolved\":\"nsld emit-final-executable-writer-input manifest.toml\""
+    ));
+}
+
+#[test]
+fn artifact_chain_next_optional_stage_advances_through_final_executable_tail() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-artifact-chain-final-executable-tail-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let after_prepare = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let after_writer_input = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    nsld_emit_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    let after_invoke_plan = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    nsld_emit_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    let after_layout_plan = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    let after_image_dry_run = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let after_blocked = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert_eq!(
+        after_prepare.next_optional_stage.as_deref(),
+        Some("final-executable-writer-input")
+    );
+    assert_eq!(
+        after_prepare.next_optional_command_id.as_deref(),
+        Some("emit-final-executable-writer-input")
+    );
+    assert_eq!(
+        after_writer_input.next_optional_stage.as_deref(),
+        Some("final-executable-host-invoke-plan")
+    );
+    assert_eq!(
+        after_writer_input.next_optional_command_id.as_deref(),
+        Some("emit-final-executable-host-invoke-plan")
+    );
+    assert_eq!(
+        after_invoke_plan.next_optional_stage.as_deref(),
+        Some("final-executable-layout")
+    );
+    assert_eq!(
+        after_invoke_plan.next_optional_command_id.as_deref(),
+        Some("emit-final-executable-layout")
+    );
+    assert_eq!(
+        after_layout_plan.next_optional_stage.as_deref(),
+        Some("final-executable-image-dry-run")
+    );
+    assert_eq!(
+        after_layout_plan.next_optional_command_id.as_deref(),
+        Some("emit-final-executable-image-dry-run")
+    );
+    assert_eq!(
+        after_image_dry_run.next_optional_stage.as_deref(),
+        Some("final-executable-blocked")
+    );
+    assert_eq!(
+        after_image_dry_run.next_optional_command_id.as_deref(),
+        Some("emit-final-executable")
+    );
+    assert_eq!(after_blocked.next_optional_stage, None);
+    assert_eq!(after_blocked.next_optional_command_id, None);
 }
 
 #[test]
@@ -1714,6 +2787,346 @@ fn check_reports_tampered_final_stage_plan() {
     assert!(report_json.contains("\"final_stage_plan_present\":true"));
     assert!(report_json.contains("\"final_stage_plan_valid\":false"));
     assert!(report_json.contains("plan_hash mismatch: expected 0x"));
+}
+
+#[test]
+fn check_reports_valid_final_executable_writer_input_when_present() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-executable-writer-input-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.valid, "{:?}", report.issues);
+    assert!(report.final_executable_writer_input_present);
+    assert_eq!(report.final_executable_writer_input_valid, Some(true));
+    assert_eq!(
+        report.final_executable_writer_input_hash.as_deref(),
+        Some(emit.writer_input_hash.as_str())
+    );
+    assert_eq!(
+        report.final_executable_writer_input_command_arg_count,
+        Some(emit.command_arg_count)
+    );
+    assert!(report.final_executable_writer_input_issues.is_empty());
+    assert!(report_json.contains("\"final_executable_writer_input_present\":true"));
+    assert!(report_json.contains("\"final_executable_writer_input_valid\":true"));
+    assert!(report_json.contains("\"final_executable_writer_input_hash\":\"0x"));
+    assert!(report_json.contains("\"final_executable_writer_input_command_arg_count\":"));
+}
+
+#[test]
+fn check_reports_tampered_final_executable_writer_input() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-executable-writer-input-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let writer_input_source = fs::read_to_string(&emit.output_path).unwrap();
+    fs::write(
+        &emit.output_path,
+        writer_input_source.replace(
+            &format!("command_arg_count = {}", emit.command_arg_count),
+            "command_arg_count = 999",
+        ),
+    )
+    .unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.valid);
+    assert!(report.final_executable_writer_input_present);
+    assert_eq!(report.final_executable_writer_input_valid, Some(false));
+    assert_eq!(
+        report.final_executable_writer_input_command_arg_count,
+        Some(999)
+    );
+    assert!(report
+        .final_executable_writer_input_issues
+        .iter()
+        .any(|issue| issue.starts_with("command_arg_count mismatch: expected ")));
+    assert!(report
+        .issues
+        .iter()
+        .any(|issue| issue == "final executable writer input verification failed"));
+    assert!(report_json.contains("\"final_executable_writer_input_present\":true"));
+    assert!(report_json.contains("\"final_executable_writer_input_valid\":false"));
+    assert!(report_json.contains("\"final_executable_writer_input_command_arg_count\":999"));
+}
+
+#[test]
+fn check_reports_valid_final_executable_host_invoke_plan_when_present() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-executable-host-invoke-plan-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan)
+            .unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.valid, "{:?}", report.issues);
+    assert!(report.final_executable_host_invoke_plan_present);
+    assert_eq!(report.final_executable_host_invoke_plan_valid, Some(true));
+    assert_eq!(
+        report.final_executable_host_invoke_plan_hash.as_deref(),
+        Some(emit.invoke_plan_hash.as_str())
+    );
+    assert_eq!(
+        report.final_executable_host_invoke_plan_would_invoke,
+        Some(false)
+    );
+    assert_eq!(
+        report.final_executable_host_invoke_plan_blocker_count,
+        Some(emit.blocker_count)
+    );
+    assert!(report.final_executable_host_invoke_plan_issues.is_empty());
+    assert!(report_json.contains("\"final_executable_host_invoke_plan_present\":true"));
+    assert!(report_json.contains("\"final_executable_host_invoke_plan_valid\":true"));
+    assert!(report_json.contains("\"final_executable_host_invoke_plan_hash\":\"0x"));
+    assert!(report_json.contains("\"final_executable_host_invoke_plan_would_invoke\":false"));
+}
+
+#[test]
+fn check_reports_tampered_final_executable_host_invoke_plan() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-executable-host-invoke-plan-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan)
+            .unwrap();
+    let invoke_plan_source = fs::read_to_string(&emit.output_path).unwrap();
+    fs::write(
+        &emit.output_path,
+        invoke_plan_source.replace("would_invoke = false", "would_invoke = true"),
+    )
+    .unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.valid);
+    assert!(report.final_executable_host_invoke_plan_present);
+    assert_eq!(report.final_executable_host_invoke_plan_valid, Some(false));
+    assert_eq!(
+        report.final_executable_host_invoke_plan_would_invoke,
+        Some(true)
+    );
+    assert!(report
+        .final_executable_host_invoke_plan_issues
+        .iter()
+        .any(|issue| issue == "would_invoke mismatch: expected false, found true"));
+    assert!(report
+        .issues
+        .iter()
+        .any(|issue| issue == "final executable host invoke plan verification failed"));
+    assert!(report_json.contains("\"final_executable_host_invoke_plan_present\":true"));
+    assert!(report_json.contains("\"final_executable_host_invoke_plan_valid\":false"));
+    assert!(report_json.contains("\"final_executable_host_invoke_plan_would_invoke\":true"));
+}
+
+#[test]
+fn check_reports_valid_final_executable_layout_plan_when_present() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-executable-layout-plan-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.valid, "{:?}", report.issues);
+    assert!(report.final_executable_layout_plan_present);
+    assert_eq!(report.final_executable_layout_plan_valid, Some(true));
+    assert_eq!(
+        report.final_executable_layout_plan_hash.as_deref(),
+        Some(emit.layout_hash.as_str())
+    );
+    assert_eq!(
+        report.final_executable_layout_plan_payload_count,
+        Some(emit.payload_count)
+    );
+    assert!(report.final_executable_layout_plan_issues.is_empty());
+    assert!(report_json.contains("\"final_executable_layout_plan_present\":true"));
+    assert!(report_json.contains("\"final_executable_layout_plan_valid\":true"));
+    assert!(report_json.contains("\"final_executable_layout_plan_hash\":\"0x"));
+}
+
+#[test]
+fn check_reports_tampered_final_executable_layout_plan() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-executable-layout-plan-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    let source = fs::read_to_string(&emit.output_path).unwrap();
+    fs::write(
+        &emit.output_path,
+        source.replace(
+            "lifecycle_entry_hook = \"on_process_start\"",
+            "lifecycle_entry_hook = \"drift\"",
+        ),
+    )
+    .unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.valid);
+    assert!(report.final_executable_layout_plan_present);
+    assert_eq!(report.final_executable_layout_plan_valid, Some(false));
+    assert!(report
+        .final_executable_layout_plan_issues
+        .iter()
+        .any(|issue| issue
+            == "lifecycle_entry_hook mismatch: expected on_process_start, found drift"));
+    assert!(report
+        .issues
+        .iter()
+        .any(|issue| issue == "final executable layout plan verification failed"));
+    assert!(report_json.contains("\"final_executable_layout_plan_present\":true"));
+    assert!(report_json.contains("\"final_executable_layout_plan_valid\":false"));
+}
+
+#[test]
+fn check_reports_valid_final_executable_image_dry_run_when_present() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-executable-image-dry-run-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.valid, "{:?}", report.issues);
+    assert!(report.final_executable_image_dry_run_present);
+    assert_eq!(report.final_executable_image_dry_run_valid, Some(true));
+    assert_eq!(
+        report.final_executable_image_dry_run_hash.as_deref(),
+        emit.image_hash.as_deref()
+    );
+    assert_eq!(
+        report.final_executable_image_dry_run_size_bytes,
+        emit.image_size_bytes
+    );
+    assert!(report.final_executable_image_dry_run_issues.is_empty());
+    assert!(report_json.contains("\"final_executable_image_dry_run_present\":true"));
+    assert!(report_json.contains("\"final_executable_image_dry_run_valid\":true"));
+    assert!(report_json.contains("\"final_executable_image_dry_run_hash\":\"0x"));
+    assert!(report_json.contains("\"final_executable_image_dry_run_size_bytes\":"));
+}
+
+#[test]
+fn check_reports_tampered_final_executable_image_dry_run_bytes() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-check-final-executable-image-dry-run-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    fs::write(&emit.image_path, b"drifted-final-image").unwrap();
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.valid);
+    assert!(report.final_executable_image_dry_run_present);
+    assert_eq!(report.final_executable_image_dry_run_valid, Some(false));
+    assert_eq!(
+        report.final_executable_image_dry_run_hash.as_deref(),
+        emit.image_hash.as_deref()
+    );
+    assert!(report
+        .final_executable_image_dry_run_issues
+        .iter()
+        .any(|issue| issue.starts_with("image_bytes_hash mismatch: expected 0x")));
+    assert!(report
+        .issues
+        .iter()
+        .any(|issue| issue == "final executable image dry-run verification failed"));
+    assert!(report_json.contains("\"final_executable_image_dry_run_present\":true"));
+    assert!(report_json.contains("\"final_executable_image_dry_run_valid\":false"));
+    assert!(report_json.contains("image_bytes_hash mismatch: expected 0x"));
 }
 
 #[test]

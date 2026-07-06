@@ -47,6 +47,26 @@ pub(crate) fn print_nsld_artifact_chain_report(report: &NsldArtifactChainReport)
         "  suggested_command_reason: {}",
         optional_string_text(report.suggested_command_reason.as_deref())
     );
+    println!(
+        "  next_optional_stage: {}",
+        optional_string_text(report.next_optional_stage.as_deref())
+    );
+    println!(
+        "  next_optional_command_id: {}",
+        optional_string_text(report.next_optional_command_id.as_deref())
+    );
+    println!(
+        "  next_optional_command: {}",
+        optional_string_text(report.next_optional_command.as_deref())
+    );
+    println!(
+        "  next_optional_command_resolved: {}",
+        optional_string_text(report.next_optional_command_resolved.as_deref())
+    );
+    println!(
+        "  next_optional_command_reason: {}",
+        optional_string_text(report.next_optional_command_reason.as_deref())
+    );
     for stage in &report.stages {
         println!(
             "  stage: order={} id={} required={} present={} file={} path={}",
@@ -569,6 +589,11 @@ pub(crate) fn print_nsld_final_executable_host_dry_run_report(
     );
     println!("  command_arg_count: {}", report.command_arg_count);
     println!("  environment_ready: {}", report.environment_ready);
+    println!("  invocation_policy: {}", report.invocation_policy);
+    println!(
+        "  invocation_policy_reason: {}",
+        report.invocation_policy_reason
+    );
     println!(
         "  can_invoke_host_finalizer: {}",
         report.can_invoke_host_finalizer
@@ -581,6 +606,452 @@ pub(crate) fn print_nsld_final_executable_host_dry_run_report(
     }
     for note in &report.notes {
         println!("  note: {note}");
+    }
+}
+
+pub(crate) fn print_nsld_final_executable_host_invoke_plan_report(
+    report: &NsldFinalExecutableHostInvokePlanReport,
+) {
+    println!("Nsld final executable host invoke plan");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  writer_input_path: {}", report.writer_input_path);
+    println!("  invocation_kind: {}", report.invocation_kind);
+    println!("  invocation_policy: {}", report.invocation_policy);
+    println!(
+        "  invocation_policy_reason: {}",
+        report.invocation_policy_reason
+    );
+    println!(
+        "  requires_explicit_allow: {}",
+        report.requires_explicit_allow
+    );
+    println!(
+        "  explicit_allow_present: {}",
+        report.explicit_allow_present
+    );
+    println!("  environment_ready: {}", report.environment_ready);
+    println!("  driver_available: {}", report.driver_available);
+    println!(
+        "  driver_resolved_path: {}",
+        optional_string_text(report.driver_resolved_path.as_deref())
+    );
+    println!(
+        "  can_invoke_host_finalizer: {}",
+        report.can_invoke_host_finalizer
+    );
+    println!("  would_invoke: {}", report.would_invoke);
+    println!("  command_arg_count: {}", report.command_arg_count);
+    for arg in &report.command_args {
+        println!("  command_arg: {arg}");
+    }
+    for blocker in &report.blockers {
+        println!("  blocker: {blocker}");
+    }
+    for note in &report.notes {
+        println!("  note: {note}");
+    }
+}
+
+pub(crate) fn print_nsld_final_executable_host_invoke_plan_emit_report(
+    report: &NsldFinalExecutableHostInvokePlanEmitReport,
+) {
+    println!("Nsld final executable host invoke plan emit");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  invoke_plan_hash: {}", report.invoke_plan_hash);
+    println!("  invocation_policy: {}", report.invocation_policy);
+    println!(
+        "  requires_explicit_allow: {}",
+        report.requires_explicit_allow
+    );
+    println!(
+        "  explicit_allow_present: {}",
+        report.explicit_allow_present
+    );
+    println!("  would_invoke: {}", report.would_invoke);
+    println!("  blocker_count: {}", report.blocker_count);
+}
+
+pub(crate) fn print_nsld_final_executable_host_invoke_plan_verify_report(
+    report: &NsldFinalExecutableHostInvokePlanVerifyReport,
+) {
+    println!("Nsld final executable host invoke plan verify");
+    println!("  manifest: {}", report.manifest);
+    println!("  input_path: {}", report.input_path);
+    println!("  valid: {}", report.valid);
+    println!(
+        "  expected_invoke_plan_hash: {}",
+        report.expected_invoke_plan_hash
+    );
+    println!(
+        "  actual_invoke_plan_hash: {}",
+        optional_string_text(report.actual_invoke_plan_hash.as_deref())
+    );
+    println!(
+        "  expected_invocation_policy: {}",
+        report.expected_invocation_policy
+    );
+    println!(
+        "  actual_invocation_policy: {}",
+        optional_string_text(report.actual_invocation_policy.as_deref())
+    );
+    println!(
+        "  expected_requires_explicit_allow: {}",
+        report.expected_requires_explicit_allow
+    );
+    println!(
+        "  actual_requires_explicit_allow: {}",
+        optional_bool_text(report.actual_requires_explicit_allow)
+    );
+    println!(
+        "  expected_explicit_allow_present: {}",
+        report.expected_explicit_allow_present
+    );
+    println!(
+        "  actual_explicit_allow_present: {}",
+        optional_bool_text(report.actual_explicit_allow_present)
+    );
+    println!("  expected_would_invoke: {}", report.expected_would_invoke);
+    println!(
+        "  actual_would_invoke: {}",
+        optional_bool_text(report.actual_would_invoke)
+    );
+    println!(
+        "  expected_command_arg_count: {}",
+        report.expected_command_arg_count
+    );
+    println!(
+        "  actual_command_arg_count: {}",
+        optional_usize_text(report.actual_command_arg_count)
+    );
+    for arg in &report.expected_command_args {
+        println!("  expected_command_arg: {arg}");
+    }
+    for arg in &report.actual_command_args {
+        println!("  actual_command_arg: {arg}");
+    }
+    println!(
+        "  expected_blocker_count: {}",
+        report.expected_blocker_count
+    );
+    println!(
+        "  actual_blocker_count: {}",
+        optional_usize_text(report.actual_blocker_count)
+    );
+    for issue in &report.issues {
+        println!("  issue: {issue}");
+    }
+}
+
+pub(crate) fn print_nsld_final_executable_layout_plan_report(
+    report: &NsldFinalExecutableLayoutPlanReport,
+) {
+    println!("Nsld final executable layout plan");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  layout_hash: {}", report.layout_hash);
+    println!("  final_stage_plan_hash: {}", report.final_stage_plan_hash);
+    println!("  final_stage_link_mode: {}", report.final_stage_link_mode);
+    println!(
+        "  platform_envelope_family: {}",
+        report.platform_envelope_family
+    );
+    println!(
+        "  platform_envelope_policy: {}",
+        report.platform_envelope_policy
+    );
+    println!(
+        "  internal_binary_format: {}",
+        report.internal_binary_format
+    );
+    println!("  lifecycle_entry_hook: {}", report.lifecycle_entry_hook);
+    println!("  scheduler_contract: {}", report.scheduler_contract);
+    println!("  data_segment_ordering: {}", report.data_segment_ordering);
+    println!("  native_object_path: {}", report.native_object_path);
+    println!(
+        "  native_object_required: {}",
+        report.native_object_required
+    );
+    println!("  native_object_present: {}", report.native_object_present);
+    println!("  compatibility_domain: {}", report.compatibility_domain);
+    println!(
+        "  compatibility_lifecycle_hook: {}",
+        report.compatibility_lifecycle_hook
+    );
+    println!("  payload_count: {}", report.payload_count);
+    println!("  byte_alignment: {}", report.byte_alignment);
+    println!("  byte_span: {}", report.byte_span);
+    println!("  byte_map_hash: {}", report.byte_map_hash);
+    for payload in &report.payload_names {
+        println!("  payload: {payload}");
+    }
+    for payload in &report.payloads {
+        println!(
+            "  payload_diagnostic: order={} id={} kind={} hook={} required={} present={} hash={} path={}",
+            payload.order_index,
+            payload.payload_id,
+            payload.payload_kind,
+            payload.lifecycle_hook,
+            payload.required,
+            payload.present,
+            payload.content_hash,
+            payload.path
+        );
+    }
+    for entry in &report.byte_map_entries {
+        println!(
+            "  byte_map_entry: order={} payload={} kind={} offset={} size={} align={} hash={}",
+            entry.order_index,
+            entry.payload_id,
+            entry.payload_kind,
+            entry.offset,
+            entry.size_bytes,
+            entry.alignment,
+            entry.content_hash
+        );
+    }
+    for note in &report.notes {
+        println!("  note: {note}");
+    }
+}
+
+pub(crate) fn print_nsld_final_executable_layout_plan_emit_report(
+    report: &NsldFinalExecutableLayoutPlanEmitReport,
+) {
+    println!("Nsld final executable layout plan emit");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  layout_hash: {}", report.layout_hash);
+    println!("  final_stage_plan_hash: {}", report.final_stage_plan_hash);
+    println!("  payload_count: {}", report.payload_count);
+    println!("  native_object_present: {}", report.native_object_present);
+}
+
+pub(crate) fn print_nsld_final_executable_layout_plan_verify_report(
+    report: &NsldFinalExecutableLayoutPlanVerifyReport,
+) {
+    println!("Nsld final executable layout plan verify");
+    println!("  manifest: {}", report.manifest);
+    println!("  input_path: {}", report.input_path);
+    println!("  valid: {}", report.valid);
+    println!("  expected_layout_hash: {}", report.expected_layout_hash);
+    println!(
+        "  actual_layout_hash: {}",
+        optional_string_text(report.actual_layout_hash.as_deref())
+    );
+    println!(
+        "  expected_payload_count: {}",
+        report.expected_payload_count
+    );
+    println!(
+        "  actual_payload_count: {}",
+        optional_usize_text(report.actual_payload_count)
+    );
+    println!("  expected_byte_span: {}", report.expected_byte_span);
+    println!(
+        "  actual_byte_span: {}",
+        optional_usize_text(report.actual_byte_span)
+    );
+    println!(
+        "  expected_byte_map_hash: {}",
+        report.expected_byte_map_hash
+    );
+    println!(
+        "  actual_byte_map_hash: {}",
+        optional_string_text(report.actual_byte_map_hash.as_deref())
+    );
+    println!(
+        "  expected_lifecycle_entry_hook: {}",
+        report.expected_lifecycle_entry_hook
+    );
+    println!(
+        "  actual_lifecycle_entry_hook: {}",
+        optional_string_text(report.actual_lifecycle_entry_hook.as_deref())
+    );
+    println!(
+        "  expected_platform_envelope_family: {}",
+        report.expected_platform_envelope_family
+    );
+    println!(
+        "  actual_platform_envelope_family: {}",
+        optional_string_text(report.actual_platform_envelope_family.as_deref())
+    );
+    for issue in &report.issues {
+        println!("  issue: {issue}");
+    }
+}
+
+pub(crate) fn print_nsld_final_executable_image_dry_run_report(
+    report: &NsldFinalExecutableImageDryRunReport,
+) {
+    println!("Nsld final executable image dry run");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  image_path: {}", report.image_path);
+    println!("  image_format: {}", report.image_format);
+    println!("  image_magic: {}", report.image_magic);
+    println!("  image_header_size: {}", report.image_header_size);
+    println!("  payload_byte_offset: {}", report.payload_byte_offset);
+    println!("  payload_byte_span: {}", report.payload_byte_span);
+    println!("  layout_hash: {}", report.layout_hash);
+    println!("  byte_map_hash: {}", report.byte_map_hash);
+    println!("  payload_count: {}", report.payload_count);
+    println!("  byte_span: {}", report.byte_span);
+    println!("  image_constructed: {}", report.image_constructed);
+    println!("  image_ready: {}", report.image_ready);
+    println!(
+        "  image_size_bytes: {}",
+        optional_usize_text(report.image_size_bytes)
+    );
+    println!(
+        "  image_hash: {}",
+        optional_string_text(report.image_hash.as_deref())
+    );
+    for blocker in &report.blockers {
+        println!("  blocker: {blocker}");
+    }
+}
+
+pub(crate) fn print_nsld_final_executable_image_dry_run_emit_report(
+    report: &NsldFinalExecutableImageDryRunEmitReport,
+) {
+    println!("Nsld final executable image dry run emit");
+    println!("  manifest: {}", report.manifest);
+    println!("  output_path: {}", report.output_path);
+    println!("  image_path: {}", report.image_path);
+    println!("  image_emitted: {}", report.image_emitted);
+    println!("  image_constructed: {}", report.image_constructed);
+    println!("  image_ready: {}", report.image_ready);
+    println!("  image_format: {}", report.image_format);
+    println!("  image_header_size: {}", report.image_header_size);
+    println!("  payload_byte_offset: {}", report.payload_byte_offset);
+    println!(
+        "  image_size_bytes: {}",
+        optional_usize_text(report.image_size_bytes)
+    );
+    println!(
+        "  image_hash: {}",
+        optional_string_text(report.image_hash.as_deref())
+    );
+}
+
+pub(crate) fn print_nsld_final_executable_image_dry_run_verify_report(
+    report: &NsldFinalExecutableImageDryRunVerifyReport,
+) {
+    println!("Nsld final executable image dry run verify");
+    println!("  manifest: {}", report.manifest);
+    println!("  input_path: {}", report.input_path);
+    println!("  image_path: {}", report.image_path);
+    println!("  valid: {}", report.valid);
+    println!("  expected_layout_hash: {}", report.expected_layout_hash);
+    println!(
+        "  actual_layout_hash: {}",
+        optional_string_text(report.actual_layout_hash.as_deref())
+    );
+    println!(
+        "  expected_byte_map_hash: {}",
+        report.expected_byte_map_hash
+    );
+    println!(
+        "  actual_byte_map_hash: {}",
+        optional_string_text(report.actual_byte_map_hash.as_deref())
+    );
+    println!("  expected_image_magic: {}", report.expected_image_magic);
+    println!(
+        "  actual_image_magic: {}",
+        optional_string_text(report.actual_image_magic.as_deref())
+    );
+    println!(
+        "  expected_image_version: {}",
+        report.expected_image_version
+    );
+    println!(
+        "  actual_image_version: {}",
+        report
+            .actual_image_version
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "missing".to_owned())
+    );
+    println!(
+        "  expected_image_header_size: {}",
+        report.expected_image_header_size
+    );
+    println!(
+        "  actual_image_header_size: {}",
+        optional_usize_text(report.actual_image_header_size)
+    );
+    println!(
+        "  expected_payload_byte_offset: {}",
+        report.expected_payload_byte_offset
+    );
+    println!(
+        "  actual_payload_byte_offset: {}",
+        optional_usize_text(report.actual_payload_byte_offset)
+    );
+    println!(
+        "  expected_payload_byte_span: {}",
+        report.expected_payload_byte_span
+    );
+    println!(
+        "  actual_payload_byte_span: {}",
+        optional_usize_text(report.actual_payload_byte_span)
+    );
+    println!(
+        "  actual_header_layout_hash: {}",
+        optional_string_text(report.actual_header_layout_hash.as_deref())
+    );
+    println!(
+        "  actual_header_byte_map_hash: {}",
+        optional_string_text(report.actual_header_byte_map_hash.as_deref())
+    );
+    println!(
+        "  expected_payload_region_count: {}",
+        report.expected_payload_region_count
+    );
+    println!(
+        "  actual_payload_region_count: {}",
+        optional_usize_text(report.actual_payload_region_count)
+    );
+    println!(
+        "  expected_payload_region_hash: {}",
+        optional_string_text(report.expected_payload_region_hash.as_deref())
+    );
+    println!(
+        "  actual_payload_region_hash: {}",
+        optional_string_text(report.actual_payload_region_hash.as_deref())
+    );
+    println!(
+        "  expected_image_constructed: {}",
+        report.expected_image_constructed
+    );
+    println!(
+        "  actual_image_constructed: {}",
+        optional_bool_text(report.actual_image_constructed)
+    );
+    println!("  expected_image_ready: {}", report.expected_image_ready);
+    println!(
+        "  actual_image_ready: {}",
+        optional_bool_text(report.actual_image_ready)
+    );
+    println!(
+        "  expected_image_size_bytes: {}",
+        optional_usize_text(report.expected_image_size_bytes)
+    );
+    println!(
+        "  actual_image_size_bytes: {}",
+        optional_usize_text(report.actual_image_size_bytes)
+    );
+    println!(
+        "  expected_image_hash: {}",
+        optional_string_text(report.expected_image_hash.as_deref())
+    );
+    println!(
+        "  actual_image_hash: {}",
+        optional_string_text(report.actual_image_hash.as_deref())
+    );
+    for issue in &report.issues {
+        println!("  issue: {issue}");
     }
 }
 
@@ -649,6 +1120,21 @@ fn print_nsld_final_executable_report_with_title(
             .map(|value| value.to_string())
             .unwrap_or_else(|| "not-checked".to_owned())
     );
+    println!(
+        "  host_dry_run_invocation_policy: {}",
+        optional_string_text(report.host_dry_run_invocation_policy.as_deref())
+    );
+    println!(
+        "  host_dry_run_invocation_policy_reason: {}",
+        optional_string_text(report.host_dry_run_invocation_policy_reason.as_deref())
+    );
+    println!(
+        "  host_dry_run_command_arg_count: {}",
+        report.host_dry_run_command_arg_count
+    );
+    for arg in &report.host_dry_run_command_args {
+        println!("  host_dry_run_command_arg: {arg}");
+    }
     for blocker in &report.host_dry_run_blockers {
         println!("  host_dry_run_blocker: {blocker}");
     }
@@ -656,6 +1142,54 @@ fn print_nsld_final_executable_report_with_title(
         "  host_dry_run_blocker_count: {}",
         report.host_dry_run_blocker_count
     );
+    println!("  host_invoke_plan_path: {}", report.host_invoke_plan_path);
+    println!(
+        "  host_invoke_plan_valid: {}",
+        optional_bool_text(report.host_invoke_plan_valid)
+    );
+    println!(
+        "  host_invoke_plan_hash: {}",
+        optional_string_text(report.host_invoke_plan_hash.as_deref())
+    );
+    println!(
+        "  host_invoke_plan_would_invoke: {}",
+        optional_bool_text(report.host_invoke_plan_would_invoke)
+    );
+    for issue in &report.host_invoke_plan_issues {
+        println!("  host_invoke_plan_issue: {issue}");
+    }
+    println!("  layout_plan_path: {}", report.layout_plan_path);
+    println!(
+        "  layout_plan_valid: {}",
+        optional_bool_text(report.layout_plan_valid)
+    );
+    println!(
+        "  layout_plan_hash: {}",
+        optional_string_text(report.layout_plan_hash.as_deref())
+    );
+    for issue in &report.layout_plan_issues {
+        println!("  layout_plan_issue: {issue}");
+    }
+    println!("  image_dry_run_path: {}", report.image_dry_run_path);
+    println!(
+        "  image_dry_run_bytes_path: {}",
+        report.image_dry_run_bytes_path
+    );
+    println!(
+        "  image_dry_run_valid: {}",
+        optional_bool_text(report.image_dry_run_valid)
+    );
+    println!(
+        "  image_dry_run_hash: {}",
+        optional_string_text(report.image_dry_run_hash.as_deref())
+    );
+    println!(
+        "  image_dry_run_size_bytes: {}",
+        optional_usize_text(report.image_dry_run_size_bytes)
+    );
+    for issue in &report.image_dry_run_issues {
+        println!("  image_dry_run_issue: {issue}");
+    }
     for blocker in &report.blockers {
         println!("  blocker: {blocker}");
     }
@@ -687,6 +1221,28 @@ pub(crate) fn print_nsld_final_executable_emit_verify_report(
             .map(|value| value.to_string())
             .unwrap_or_else(|| "missing".to_owned())
     );
+    println!(
+        "  expected_writer_input_valid: {}",
+        optional_bool_text(report.expected_writer_input_valid)
+    );
+    println!(
+        "  actual_writer_input_valid: {}",
+        optional_bool_text(report.actual_writer_input_valid)
+    );
+    println!(
+        "  expected_writer_input_hash: {}",
+        optional_string_text(report.expected_writer_input_hash.as_deref())
+    );
+    println!(
+        "  actual_writer_input_hash: {}",
+        optional_string_text(report.actual_writer_input_hash.as_deref())
+    );
+    for issue in &report.expected_writer_input_issues {
+        println!("  expected_writer_input_issue: {issue}");
+    }
+    for issue in &report.actual_writer_input_issues {
+        println!("  actual_writer_input_issue: {issue}");
+    }
     println!(
         "  expected_host_dry_run_environment_ready: {}",
         optional_bool_text(report.expected_host_dry_run_environment_ready)
@@ -720,6 +1276,44 @@ pub(crate) fn print_nsld_final_executable_emit_verify_report(
         optional_string_text(report.actual_host_dry_run_driver_resolved_path.as_deref())
     );
     println!(
+        "  expected_host_dry_run_invocation_policy: {}",
+        optional_string_text(report.expected_host_dry_run_invocation_policy.as_deref())
+    );
+    println!(
+        "  actual_host_dry_run_invocation_policy: {}",
+        optional_string_text(report.actual_host_dry_run_invocation_policy.as_deref())
+    );
+    println!(
+        "  expected_host_dry_run_invocation_policy_reason: {}",
+        optional_string_text(
+            report
+                .expected_host_dry_run_invocation_policy_reason
+                .as_deref()
+        )
+    );
+    println!(
+        "  actual_host_dry_run_invocation_policy_reason: {}",
+        optional_string_text(
+            report
+                .actual_host_dry_run_invocation_policy_reason
+                .as_deref()
+        )
+    );
+    println!(
+        "  expected_host_dry_run_command_arg_count: {}",
+        report.expected_host_dry_run_command_arg_count
+    );
+    println!(
+        "  actual_host_dry_run_command_arg_count: {}",
+        optional_usize_text(report.actual_host_dry_run_command_arg_count)
+    );
+    for arg in &report.expected_host_dry_run_command_args {
+        println!("  expected_host_dry_run_command_arg: {arg}");
+    }
+    for arg in &report.actual_host_dry_run_command_args {
+        println!("  actual_host_dry_run_command_arg: {arg}");
+    }
+    println!(
         "  expected_host_dry_run_blocker_count: {}",
         report.expected_host_dry_run_blocker_count
     );
@@ -732,6 +1326,88 @@ pub(crate) fn print_nsld_final_executable_emit_verify_report(
     }
     for blocker in &report.actual_host_dry_run_blockers {
         println!("  actual_host_dry_run_blocker: {blocker}");
+    }
+    println!(
+        "  expected_host_invoke_plan_valid: {}",
+        optional_bool_text(report.expected_host_invoke_plan_valid)
+    );
+    println!(
+        "  actual_host_invoke_plan_valid: {}",
+        optional_bool_text(report.actual_host_invoke_plan_valid)
+    );
+    println!(
+        "  expected_host_invoke_plan_would_invoke: {}",
+        optional_bool_text(report.expected_host_invoke_plan_would_invoke)
+    );
+    println!(
+        "  actual_host_invoke_plan_would_invoke: {}",
+        optional_bool_text(report.actual_host_invoke_plan_would_invoke)
+    );
+    println!(
+        "  expected_host_invoke_plan_hash: {}",
+        optional_string_text(report.expected_host_invoke_plan_hash.as_deref())
+    );
+    println!(
+        "  actual_host_invoke_plan_hash: {}",
+        optional_string_text(report.actual_host_invoke_plan_hash.as_deref())
+    );
+    for issue in &report.expected_host_invoke_plan_issues {
+        println!("  expected_host_invoke_plan_issue: {issue}");
+    }
+    for issue in &report.actual_host_invoke_plan_issues {
+        println!("  actual_host_invoke_plan_issue: {issue}");
+    }
+    println!(
+        "  expected_layout_plan_valid: {}",
+        optional_bool_text(report.expected_layout_plan_valid)
+    );
+    println!(
+        "  actual_layout_plan_valid: {}",
+        optional_bool_text(report.actual_layout_plan_valid)
+    );
+    println!(
+        "  expected_layout_plan_hash: {}",
+        optional_string_text(report.expected_layout_plan_hash.as_deref())
+    );
+    println!(
+        "  actual_layout_plan_hash: {}",
+        optional_string_text(report.actual_layout_plan_hash.as_deref())
+    );
+    for issue in &report.expected_layout_plan_issues {
+        println!("  expected_layout_plan_issue: {issue}");
+    }
+    for issue in &report.actual_layout_plan_issues {
+        println!("  actual_layout_plan_issue: {issue}");
+    }
+    println!(
+        "  expected_image_dry_run_valid: {}",
+        optional_bool_text(report.expected_image_dry_run_valid)
+    );
+    println!(
+        "  actual_image_dry_run_valid: {}",
+        optional_bool_text(report.actual_image_dry_run_valid)
+    );
+    println!(
+        "  expected_image_dry_run_hash: {}",
+        optional_string_text(report.expected_image_dry_run_hash.as_deref())
+    );
+    println!(
+        "  actual_image_dry_run_hash: {}",
+        optional_string_text(report.actual_image_dry_run_hash.as_deref())
+    );
+    println!(
+        "  expected_image_dry_run_size_bytes: {}",
+        optional_usize_text(report.expected_image_dry_run_size_bytes)
+    );
+    println!(
+        "  actual_image_dry_run_size_bytes: {}",
+        optional_usize_text(report.actual_image_dry_run_size_bytes)
+    );
+    for issue in &report.expected_image_dry_run_issues {
+        println!("  expected_image_dry_run_issue: {issue}");
+    }
+    for issue in &report.actual_image_dry_run_issues {
+        println!("  actual_image_dry_run_issue: {issue}");
     }
     println!(
         "  expected_blocker_count: {}",
@@ -779,6 +1455,30 @@ pub(crate) fn print_nsld_prepare_report(report: &NsldPrepareReport) {
     println!("  container_payload: {}", report.container_payload_path);
     println!("  closure_snapshot: {}", report.closure_snapshot_path);
     println!("  final_stage_plan: {}", report.final_stage_plan_path);
+    println!(
+        "  final_executable_writer_input: {}",
+        report.final_executable_writer_input_path
+    );
+    println!(
+        "  final_executable_host_invoke_plan: {}",
+        report.final_executable_host_invoke_plan_path
+    );
+    println!(
+        "  final_executable_layout_plan: {}",
+        report.final_executable_layout_plan_path
+    );
+    println!(
+        "  final_executable_image_dry_run: {}",
+        report.final_executable_image_dry_run_path
+    );
+    println!(
+        "  final_executable_image_dry_run_bytes: {}",
+        report.final_executable_image_dry_run_bytes_path
+    );
+    println!(
+        "  final_executable_blocked: {}",
+        report.final_executable_blocked_path
+    );
     println!("  link_input_count: {}", report.link_input_count);
     println!("  link_input_table_hash: {}", report.link_input_table_hash);
     println!("  unit_count: {}", report.unit_count);

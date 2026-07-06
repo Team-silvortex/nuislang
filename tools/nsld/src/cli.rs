@@ -17,6 +17,15 @@ pub(crate) enum Command {
     EmitFinalExecutableWriterInput { input: PathBuf, json: bool },
     VerifyFinalExecutableWriterInput { input: PathBuf, json: bool },
     FinalExecutableHostDryRun { input: PathBuf, json: bool },
+    FinalExecutableHostInvokePlan { input: PathBuf, json: bool },
+    EmitFinalExecutableHostInvokePlan { input: PathBuf, json: bool },
+    VerifyFinalExecutableHostInvokePlan { input: PathBuf, json: bool },
+    FinalExecutableLayout { input: PathBuf, json: bool },
+    EmitFinalExecutableLayout { input: PathBuf, json: bool },
+    VerifyFinalExecutableLayout { input: PathBuf, json: bool },
+    FinalExecutableImageDryRun { input: PathBuf, json: bool },
+    EmitFinalExecutableImageDryRun { input: PathBuf, json: bool },
+    VerifyFinalExecutableImageDryRun { input: PathBuf, json: bool },
     EmitFinalExecutable { input: PathBuf, json: bool },
     VerifyFinalExecutableEmit { input: PathBuf, json: bool },
     Prepare { input: PathBuf, json: bool },
@@ -86,6 +95,15 @@ where
         | "emit-final-executable-writer-input"
         | "verify-final-executable-writer-input"
         | "final-executable-host-dry-run"
+        | "final-executable-host-invoke-plan"
+        | "emit-final-executable-host-invoke-plan"
+        | "verify-final-executable-host-invoke-plan"
+        | "final-executable-layout"
+        | "emit-final-executable-layout"
+        | "verify-final-executable-layout"
+        | "final-executable-image-dry-run"
+        | "emit-final-executable-image-dry-run"
+        | "verify-final-executable-image-dry-run"
         | "emit-final-executable"
         | "verify-final-executable-emit"
         | "prepare"
@@ -145,6 +163,20 @@ where
             let is_verify_final_executable_writer_input =
                 command == "verify-final-executable-writer-input";
             let is_final_executable_host_dry_run = command == "final-executable-host-dry-run";
+            let is_final_executable_host_invoke_plan =
+                command == "final-executable-host-invoke-plan";
+            let is_emit_final_executable_host_invoke_plan =
+                command == "emit-final-executable-host-invoke-plan";
+            let is_verify_final_executable_host_invoke_plan =
+                command == "verify-final-executable-host-invoke-plan";
+            let is_final_executable_layout = command == "final-executable-layout";
+            let is_emit_final_executable_layout = command == "emit-final-executable-layout";
+            let is_verify_final_executable_layout = command == "verify-final-executable-layout";
+            let is_final_executable_image_dry_run = command == "final-executable-image-dry-run";
+            let is_emit_final_executable_image_dry_run =
+                command == "emit-final-executable-image-dry-run";
+            let is_verify_final_executable_image_dry_run =
+                command == "verify-final-executable-image-dry-run";
             let is_emit_final_executable = command == "emit-final-executable";
             let is_verify_final_executable_emit = command == "verify-final-executable-emit";
             let is_prepare = command == "prepare";
@@ -227,6 +259,24 @@ where
                 Ok(Command::VerifyFinalExecutableWriterInput { input, json })
             } else if is_final_executable_host_dry_run {
                 Ok(Command::FinalExecutableHostDryRun { input, json })
+            } else if is_final_executable_host_invoke_plan {
+                Ok(Command::FinalExecutableHostInvokePlan { input, json })
+            } else if is_emit_final_executable_host_invoke_plan {
+                Ok(Command::EmitFinalExecutableHostInvokePlan { input, json })
+            } else if is_verify_final_executable_host_invoke_plan {
+                Ok(Command::VerifyFinalExecutableHostInvokePlan { input, json })
+            } else if is_final_executable_layout {
+                Ok(Command::FinalExecutableLayout { input, json })
+            } else if is_emit_final_executable_layout {
+                Ok(Command::EmitFinalExecutableLayout { input, json })
+            } else if is_verify_final_executable_layout {
+                Ok(Command::VerifyFinalExecutableLayout { input, json })
+            } else if is_final_executable_image_dry_run {
+                Ok(Command::FinalExecutableImageDryRun { input, json })
+            } else if is_emit_final_executable_image_dry_run {
+                Ok(Command::EmitFinalExecutableImageDryRun { input, json })
+            } else if is_verify_final_executable_image_dry_run {
+                Ok(Command::VerifyFinalExecutableImageDryRun { input, json })
             } else if is_emit_final_executable {
                 Ok(Command::EmitFinalExecutable { input, json })
             } else if is_verify_final_executable_emit {
@@ -356,6 +406,15 @@ fn usage() -> &'static str {
         "  nsld emit-final-executable-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-final-executable-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld final-executable-host-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-host-invoke-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld emit-final-executable-host-invoke-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld verify-final-executable-host-invoke-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld emit-final-executable-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld verify-final-executable-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-image-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld emit-final-executable-image-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld verify-final-executable-image-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-final-executable <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-final-executable-emit <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld prepare <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",

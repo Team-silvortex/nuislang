@@ -42,6 +42,7 @@ Future `nsld-core` or equivalent galaxy-style capability should own:
 * object-plan target identity metadata for optional platform compatibility bytes
 * native object output verification when a compatibility object is emitted
 * unified heterogeneous container metadata
+* final executable layout and internal image dry-run metadata
 * lifecycle-scoped native-object lanes for CFFI/host compatibility payloads
 * static C-world compatibility wrapper policy
 * host-compat domain metadata that keeps C/von-Neumann execution explicit,

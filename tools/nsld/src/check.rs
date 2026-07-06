@@ -13,7 +13,10 @@ use super::{
     },
     final_stage::{
         nsld_final_stage_plan_report, nsld_verify_final_executable_emit_report,
-        nsld_verify_final_stage_plan_report,
+        nsld_verify_final_executable_host_invoke_plan_report,
+        nsld_verify_final_executable_image_dry_run_report,
+        nsld_verify_final_executable_layout_plan_report,
+        nsld_verify_final_executable_writer_input_report, nsld_verify_final_stage_plan_report,
     },
     link_units::{
         nsld_domain_diagnostics, nsld_sidecar_capability_diagnostics,
@@ -416,6 +419,92 @@ pub(crate) fn nsld_check_report(
     let final_stage_plan_blocker_count = expected_final_stage_plan_report
         .as_ref()
         .map(|report| report.blockers.len());
+    let final_executable_writer_input_path = nsld_artifact_stage_kind_path(
+        &plan.output_dir,
+        NsldArtifactStageKind::FinalExecutableWriterInput,
+    );
+    let final_executable_writer_input_present = final_executable_writer_input_path.exists();
+    let final_executable_writer_input_verify_report = final_executable_writer_input_present
+        .then(|| nsld_verify_final_executable_writer_input_report(manifest, plan));
+    let final_executable_writer_input_valid = final_executable_writer_input_verify_report
+        .as_ref()
+        .map(|report| report.valid);
+    let final_executable_writer_input_hash = final_executable_writer_input_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_writer_input_hash.clone());
+    let final_executable_writer_input_command_arg_count =
+        final_executable_writer_input_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_command_arg_count);
+    let final_executable_writer_input_issues = final_executable_writer_input_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
+    let final_executable_host_invoke_plan_path = nsld_artifact_stage_kind_path(
+        &plan.output_dir,
+        NsldArtifactStageKind::FinalExecutableHostInvokePlan,
+    );
+    let final_executable_host_invoke_plan_present = final_executable_host_invoke_plan_path.exists();
+    let final_executable_host_invoke_plan_verify_report = final_executable_host_invoke_plan_present
+        .then(|| nsld_verify_final_executable_host_invoke_plan_report(manifest, plan));
+    let final_executable_host_invoke_plan_valid = final_executable_host_invoke_plan_verify_report
+        .as_ref()
+        .map(|report| report.valid);
+    let final_executable_host_invoke_plan_hash = final_executable_host_invoke_plan_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_invoke_plan_hash.clone());
+    let final_executable_host_invoke_plan_would_invoke =
+        final_executable_host_invoke_plan_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_would_invoke);
+    let final_executable_host_invoke_plan_blocker_count =
+        final_executable_host_invoke_plan_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_blocker_count);
+    let final_executable_host_invoke_plan_issues = final_executable_host_invoke_plan_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
+    let final_executable_layout_plan_path = nsld_artifact_stage_kind_path(
+        &plan.output_dir,
+        NsldArtifactStageKind::FinalExecutableLayoutPlan,
+    );
+    let final_executable_layout_plan_present = final_executable_layout_plan_path.exists();
+    let final_executable_layout_plan_verify_report = final_executable_layout_plan_present
+        .then(|| nsld_verify_final_executable_layout_plan_report(manifest, plan));
+    let final_executable_layout_plan_valid = final_executable_layout_plan_verify_report
+        .as_ref()
+        .map(|report| report.valid);
+    let final_executable_layout_plan_hash = final_executable_layout_plan_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_layout_hash.clone());
+    let final_executable_layout_plan_payload_count = final_executable_layout_plan_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_payload_count);
+    let final_executable_layout_plan_issues = final_executable_layout_plan_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
+    let final_executable_image_dry_run_path = nsld_artifact_stage_kind_path(
+        &plan.output_dir,
+        NsldArtifactStageKind::FinalExecutableImageDryRun,
+    );
+    let final_executable_image_dry_run_present = final_executable_image_dry_run_path.exists();
+    let final_executable_image_dry_run_verify_report = final_executable_image_dry_run_present
+        .then(|| nsld_verify_final_executable_image_dry_run_report(manifest, plan));
+    let final_executable_image_dry_run_valid = final_executable_image_dry_run_verify_report
+        .as_ref()
+        .map(|report| report.valid);
+    let final_executable_image_dry_run_hash = final_executable_image_dry_run_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_image_hash.clone());
+    let final_executable_image_dry_run_size_bytes = final_executable_image_dry_run_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_image_size_bytes);
+    let final_executable_image_dry_run_issues = final_executable_image_dry_run_verify_report
+        .as_ref()
+        .map(|report| report.issues.clone())
+        .unwrap_or_default();
     let final_executable_blocked_path = nsld_artifact_stage_kind_path(
         &plan.output_dir,
         NsldArtifactStageKind::FinalExecutableBlocked,
@@ -580,6 +669,22 @@ pub(crate) fn nsld_check_report(
         issues.push("final-stage plan verification failed".to_owned());
         issues.extend(final_stage_plan_issues.iter().cloned());
     }
+    if final_executable_writer_input_valid == Some(false) {
+        issues.push("final executable writer input verification failed".to_owned());
+        issues.extend(final_executable_writer_input_issues.iter().cloned());
+    }
+    if final_executable_host_invoke_plan_valid == Some(false) {
+        issues.push("final executable host invoke plan verification failed".to_owned());
+        issues.extend(final_executable_host_invoke_plan_issues.iter().cloned());
+    }
+    if final_executable_layout_plan_valid == Some(false) {
+        issues.push("final executable layout plan verification failed".to_owned());
+        issues.extend(final_executable_layout_plan_issues.iter().cloned());
+    }
+    if final_executable_image_dry_run_valid == Some(false) {
+        issues.push("final executable image dry-run verification failed".to_owned());
+        issues.extend(final_executable_image_dry_run_issues.iter().cloned());
+    }
     if final_executable_blocked_valid == Some(false) {
         issues.push("final executable blocked report verification failed".to_owned());
         issues.extend(final_executable_blocked_issues.iter().cloned());
@@ -607,6 +712,10 @@ pub(crate) fn nsld_check_report(
     let checks = checks + usize::from(container_present || container_payload_present);
     let checks = checks + usize::from(closure_snapshot_present);
     let checks = checks + usize::from(final_stage_plan_present);
+    let checks = checks + usize::from(final_executable_writer_input_present);
+    let checks = checks + usize::from(final_executable_host_invoke_plan_present);
+    let checks = checks + usize::from(final_executable_layout_plan_present);
+    let checks = checks + usize::from(final_executable_image_dry_run_present);
     let checks = checks + usize::from(final_executable_blocked_present);
     let failures = issues.len();
     NsldCheckReport {
@@ -701,6 +810,27 @@ pub(crate) fn nsld_check_report(
         final_stage_plan_hash,
         final_stage_plan_blocker_count,
         final_stage_plan_issues,
+        final_executable_writer_input_present,
+        final_executable_writer_input_valid,
+        final_executable_writer_input_hash,
+        final_executable_writer_input_command_arg_count,
+        final_executable_writer_input_issues,
+        final_executable_host_invoke_plan_present,
+        final_executable_host_invoke_plan_valid,
+        final_executable_host_invoke_plan_hash,
+        final_executable_host_invoke_plan_would_invoke,
+        final_executable_host_invoke_plan_blocker_count,
+        final_executable_host_invoke_plan_issues,
+        final_executable_layout_plan_present,
+        final_executable_layout_plan_valid,
+        final_executable_layout_plan_hash,
+        final_executable_layout_plan_payload_count,
+        final_executable_layout_plan_issues,
+        final_executable_image_dry_run_present,
+        final_executable_image_dry_run_valid,
+        final_executable_image_dry_run_hash,
+        final_executable_image_dry_run_size_bytes,
+        final_executable_image_dry_run_issues,
         final_executable_blocked_present,
         final_executable_blocked_valid,
         final_executable_blocked_emitted,

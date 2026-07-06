@@ -1,4 +1,5 @@
 use super::{
+    artifact_chain::{nsld_artifact_stage_kind_path, NsldArtifactStageKind},
     assembly::{
         nsld_emit_assemble_plan_report, nsld_emit_link_bundle_report,
         nsld_emit_section_manifest_report, nsld_verify_assemble_plan_report,
@@ -236,6 +237,42 @@ pub(crate) fn nsld_prepare_report(
         container_payload_path: container_file_emit.payload_path,
         closure_snapshot_path: closure_emit.output_path,
         final_stage_plan_path: final_stage_plan_emit.output_path,
+        final_executable_writer_input_path: nsld_artifact_stage_kind_path(
+            &plan.output_dir,
+            NsldArtifactStageKind::FinalExecutableWriterInput,
+        )
+        .display()
+        .to_string(),
+        final_executable_host_invoke_plan_path: nsld_artifact_stage_kind_path(
+            &plan.output_dir,
+            NsldArtifactStageKind::FinalExecutableHostInvokePlan,
+        )
+        .display()
+        .to_string(),
+        final_executable_layout_plan_path: nsld_artifact_stage_kind_path(
+            &plan.output_dir,
+            NsldArtifactStageKind::FinalExecutableLayoutPlan,
+        )
+        .display()
+        .to_string(),
+        final_executable_image_dry_run_path: nsld_artifact_stage_kind_path(
+            &plan.output_dir,
+            NsldArtifactStageKind::FinalExecutableImageDryRun,
+        )
+        .display()
+        .to_string(),
+        final_executable_image_dry_run_bytes_path: nsld_artifact_stage_kind_path(
+            &plan.output_dir,
+            NsldArtifactStageKind::FinalExecutableImageDryRunBytes,
+        )
+        .display()
+        .to_string(),
+        final_executable_blocked_path: nsld_artifact_stage_kind_path(
+            &plan.output_dir,
+            NsldArtifactStageKind::FinalExecutableBlocked,
+        )
+        .display()
+        .to_string(),
         link_input_count: input_emit.link_input_count,
         link_input_table_hash: input_emit.link_input_table_hash,
         unit_count: unit_emit.unit_count,
