@@ -1,7 +1,7 @@
 # Toolchain Galaxy Core Boundary
 
-This note defines the intended boundary for toolchain members such as `nsld`
-and `nsdb`.
+This note defines the intended boundary for toolchain members such as `nsld`,
+`nsdb`, and `nsbdr`.
 
 The short rule is:
 
@@ -13,13 +13,15 @@ The CLI is a front door, not the long-lived capability boundary.
 
 ## Why This Exists
 
-`nsld` and `nsdb` are toolchain members, but they are also future reusable Nuis
-capabilities:
+`nsld`, `nsdb`, and `nsbdr` are toolchain members, but they are also future
+reusable Nuis capabilities:
 
 * `nsld` owns linker graph, lifecycle hook, deterministic section/container,
   and artifact manifest behavior.
 * `nsdb` owns YIR-level debug metadata, trace, replay, frame/slot mapping, and
   semantic inspection behavior.
+* `nsbdr` owns OS bundle and distribution adaptation over already-linked Nuis
+  final outputs, such as `.app`, `.dmg`, and future installer/package formats.
 
 If these capabilities only exist as shell commands, then `nuisc`, `yalivia`,
 future IDE surfaces, CI, self-hosting flows, and Nuis OS-facing runtimes would

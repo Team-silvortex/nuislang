@@ -532,8 +532,19 @@ fn render_shader_backend_validation(
                 .collect::<Vec<_>>()
                 .join(" ");
             lines.push(format!(
-                "  backend={} kind={} status={} {}",
-                variant.backend, variant.kind, status, check_summary
+                "  backend={} family={} target_os={} target_device={} ir_format={} dispatch_abi={} kind={} priority={} declared_status={} verification={} validation_status={} {}",
+                variant.backend,
+                variant.backend_family,
+                variant.target_os,
+                variant.target_device,
+                variant.ir_format,
+                variant.dispatch_abi,
+                variant.kind,
+                variant.priority,
+                variant.status,
+                variant.verification,
+                status,
+                check_summary
             ));
         }
     }
@@ -618,10 +629,8 @@ fn render_shader_artifact_stub(
         "metal" => render_shader_metal_scaffold(stage, variant, summary),
         "directx" => render_shader_hlsl_scaffold(stage, variant, summary),
         "vulkan" => render_shader_vulkan_glsl_scaffold(stage, variant, summary),
-        other => format!(
-            "# nuis shader backend scaffold\nbackend={other}\nkind={}\nstatus={}\nentry={}\nartifact={}\n\n{}",
-            variant.kind, variant.status, variant.entry, variant.artifact, summary
-        ),
+        "webgpu" => render_shader_wgsl_scaffold(stage, variant, summary),
+        _ => render_shader_text_scaffold(variant, summary),
     }
 }
 
@@ -674,10 +683,7 @@ fn render_kernel_graph_artifact_stub(
     match variant.kind {
         "graph" => render_kernel_json_scaffold("kernel_graph", variant, summary),
         "mlpackage" => render_kernel_manifest_scaffold("kernel_graph", variant, summary),
-        _ => format!(
-            "# nuis kernel graph backend scaffold\nbackend={}\nkind={}\nstatus={}\nentry={}\nartifact={}\n\n{}",
-            variant.backend, variant.kind, variant.status, variant.entry, variant.artifact, summary
-        ),
+        _ => render_kernel_text_scaffold("kernel graph", variant, summary),
     }
 }
 
@@ -724,11 +730,113 @@ fn render_kernel_stage_artifact_stub(
     match variant.kind {
         "graph" => render_kernel_json_scaffold("kernel_stage", variant, summary),
         "mlmodel" => render_kernel_manifest_scaffold("kernel_stage", variant, summary),
-        _ => format!(
-            "# nuis kernel stage backend scaffold\nbackend={}\nkind={}\nstatus={}\nentry={}\nartifact={}\n\n{}",
-            variant.backend, variant.kind, variant.status, variant.entry, variant.artifact, summary
-        ),
+        _ => render_kernel_text_scaffold("kernel stage", variant, summary),
     }
+}
+
+fn render_shader_text_scaffold(
+    variant: &yir_lower_contract::ShaderBackendVariant,
+    summary: &str,
+) -> String {
+    format!(
+        "# nuis shader backend scaffold\n{}{}",
+        render_shader_descriptor_lines(variant, ""),
+        render_summary_block(summary, "")
+    )
+}
+
+fn render_kernel_text_scaffold(
+    subject: &str,
+    variant: &yir_lower_contract::KernelBackendVariant,
+    summary: &str,
+) -> String {
+    format!(
+        "# nuis {subject} backend scaffold\n{}{}",
+        render_kernel_descriptor_lines(variant, ""),
+        render_summary_block(summary, "")
+    )
+}
+
+fn render_shader_descriptor_lines(
+    variant: &yir_lower_contract::ShaderBackendVariant,
+    prefix: &str,
+) -> String {
+    render_backend_descriptor_lines(
+        prefix,
+        variant.backend,
+        variant.backend_family,
+        variant.target_os,
+        variant.target_device,
+        variant.ir_format,
+        variant.dispatch_abi,
+        variant.kind,
+        variant.priority,
+        variant.status,
+        variant.verification,
+        &variant.entry,
+        &variant.artifact,
+    )
+}
+
+fn render_kernel_descriptor_lines(
+    variant: &yir_lower_contract::KernelBackendVariant,
+    prefix: &str,
+) -> String {
+    render_backend_descriptor_lines(
+        prefix,
+        variant.backend,
+        variant.backend_family,
+        variant.target_os,
+        variant.target_device,
+        variant.ir_format,
+        variant.dispatch_abi,
+        variant.kind,
+        variant.priority,
+        variant.status,
+        variant.verification,
+        &variant.entry,
+        &variant.artifact,
+    )
+}
+
+fn render_backend_descriptor_lines(
+    prefix: &str,
+    backend: &str,
+    backend_family: &str,
+    target_os: &str,
+    target_device: &str,
+    ir_format: &str,
+    dispatch_abi: &str,
+    kind: &str,
+    priority: usize,
+    status: &str,
+    verification: &str,
+    entry: &str,
+    artifact: &str,
+) -> String {
+    [
+        format!("{prefix}backend={backend}"),
+        format!("{prefix}backend_family={backend_family}"),
+        format!("{prefix}target_os={target_os}"),
+        format!("{prefix}target_device={target_device}"),
+        format!("{prefix}ir_format={ir_format}"),
+        format!("{prefix}dispatch_abi={dispatch_abi}"),
+        format!("{prefix}kind={kind}"),
+        format!("{prefix}priority={priority}"),
+        format!("{prefix}status={status}"),
+        format!("{prefix}verification={verification}"),
+        format!("{prefix}entry={entry}"),
+        format!("{prefix}artifact={artifact}"),
+        format!("{prefix}"),
+    ]
+    .join("\n")
+}
+
+fn render_summary_block(summary: &str, prefix: &str) -> String {
+    let mut lines = vec![format!("{prefix}contract:")];
+    lines.extend(summary.lines().map(|line| format!("{prefix}{line}")));
+    lines.push(String::new());
+    lines.join("\n")
 }
 
 fn render_shader_glsl_scaffold(
@@ -748,11 +856,7 @@ fn render_shader_glsl_scaffold(
     format!(
         r#"#version 460 core
 // nuis shader backend scaffold
-// backend={backend}
-// entry={entry}
-// kind={kind}
-// status={status}
-//
+{descriptor}
 {wgsl_comment}
 //
 // contract:
@@ -776,10 +880,7 @@ void main() {{
 }}
 #endif
 "#,
-        backend = variant.backend,
-        entry = variant.entry,
-        kind = variant.kind,
-        status = variant.status,
+        descriptor = render_shader_descriptor_lines(variant, "// "),
         wgsl_comment = wgsl_comment,
         texture_uniforms = if uses_texture {
             "layout(binding = 2) uniform sampler2D u_texture0;"
@@ -817,11 +918,7 @@ fn render_shader_metal_scaffold(
     );
     format!(
         r#"// nuis shader backend scaffold
-// backend={backend}
-// entry={entry}
-// kind={kind}
-// status={status}
-//
+{descriptor}
 {wgsl_comment}
 //
 // contract:
@@ -845,10 +942,8 @@ vertex VsOut {entry}_vs(uint vid [[vertex_id]]) {{
 {fragment_body}
 }}
 "#,
-        backend = variant.backend,
+        descriptor = render_shader_descriptor_lines(variant, "// "),
         entry = variant.entry,
-        kind = variant.kind,
-        status = variant.status,
         wgsl_comment = wgsl_comment,
         fragment_signature =
             fragment_signature.replace("frame_fs", &format!("{}_fs", variant.entry)),
@@ -883,11 +978,7 @@ fn render_shader_hlsl_scaffold(
     );
     format!(
         r#"// nuis shader backend scaffold
-// backend={backend}
-// entry={entry}
-// kind={kind}
-// status={status}
-//
+{descriptor}
 {wgsl_comment}
 //
 // contract:
@@ -909,10 +1000,8 @@ float4 {entry}_ps(VsOut input) : SV_Target0 {{
 {fragment_body}
 }}
 "#,
-        backend = variant.backend,
+        descriptor = render_shader_descriptor_lines(variant, "// "),
         entry = variant.entry,
-        kind = variant.kind,
-        status = variant.status,
         wgsl_comment = wgsl_comment,
         fragment_prelude = fragment_prelude,
         vertex_body = vertex_body,
@@ -942,11 +1031,7 @@ fn render_shader_vulkan_glsl_scaffold(
     format!(
         r#"#version 450
 // nuis shader backend scaffold
-// backend={backend}
-// entry={entry}
-// kind={kind}
-// status={status}
-//
+{descriptor}
 {wgsl_comment}
 //
 // contract:
@@ -970,10 +1055,7 @@ void main() {{
 }}
 #endif
 "#,
-        backend = variant.backend,
-        entry = variant.entry,
-        kind = variant.kind,
-        status = variant.status,
+        descriptor = render_shader_descriptor_lines(variant, "// "),
         wgsl_comment = wgsl_comment,
         texture_uniforms = if uses_texture {
             "layout(set = 0, binding = 2) uniform sampler2D u_texture0;"
@@ -987,6 +1069,34 @@ void main() {{
             .map(|line| format!("// {line}"))
             .collect::<Vec<_>>()
             .join("\n")
+    )
+}
+
+fn render_shader_wgsl_scaffold(
+    stage: &yir_lower_contract::ShaderStageContract,
+    variant: &yir_lower_contract::ShaderBackendVariant,
+    summary: &str,
+) -> String {
+    let source = stage.wgsl_source.as_deref().unwrap_or(
+        "@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {\n  let x = f32(i32(vid) - 1);\n  let y = select(-1.0, 1.0, vid == 2u);\n  return vec4<f32>(x, y, 0.0, 1.0);\n}\n\n@fragment\nfn fs_main() -> @location(0) vec4<f32> {\n  return vec4<f32>(1.0, 0.0, 1.0, 1.0);\n}\n",
+    );
+    format!(
+        r#"// nuis shader backend scaffold
+{descriptor}
+// contract:
+// {summary_comment}
+//
+// original_wgsl_begin
+{source}
+// original_wgsl_end
+"#,
+        descriptor = render_shader_descriptor_lines(variant, "// "),
+        summary_comment = summary
+            .lines()
+            .map(|line| format!("// {line}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        source = source
     )
 }
 
@@ -2114,6 +2224,14 @@ fn shader_backend_checks(
                 !expects_wgsl || artifact.contains("original_wgsl_begin"),
             ),
         ],
+        "webgpu" => vec![
+            ("wgsl_vertex", artifact.contains("@vertex")),
+            ("wgsl_fragment", artifact.contains("@fragment")),
+            (
+                "wgsl_origin",
+                !expects_wgsl || artifact.contains("original_wgsl_begin"),
+            ),
+        ],
         _ => vec![("non_empty", !artifact.trim().is_empty())],
     }
 }
@@ -2134,11 +2252,18 @@ fn render_kernel_json_scaffold(
         .collect::<Vec<_>>()
         .join(",\n");
     format!(
-        "{{\n  \"schema\": \"nuis-{subject}-backend-scaffold-v1\",\n  \"backend\": \"{backend}\",\n  \"kind\": \"{kind}\",\n  \"status\": \"{status}\",\n  \"entry\": \"{entry}\",\n  \"artifact\": \"{artifact}\",\n  \"summary\": [\n{summary_json}\n  ]\n}}\n",
+        "{{\n  \"schema\": \"nuis-{subject}-backend-scaffold-v1\",\n  \"backend\": \"{backend}\",\n  \"backend_family\": \"{backend_family}\",\n  \"target_os\": \"{target_os}\",\n  \"target_device\": \"{target_device}\",\n  \"ir_format\": \"{ir_format}\",\n  \"dispatch_abi\": \"{dispatch_abi}\",\n  \"kind\": \"{kind}\",\n  \"priority\": {priority},\n  \"status\": \"{status}\",\n  \"verification\": \"{verification}\",\n  \"entry\": \"{entry}\",\n  \"artifact\": \"{artifact}\",\n  \"summary\": [\n{summary_json}\n  ]\n}}\n",
         subject = subject,
         backend = variant.backend,
+        backend_family = variant.backend_family,
+        target_os = variant.target_os,
+        target_device = variant.target_device,
+        ir_format = variant.ir_format,
+        dispatch_abi = variant.dispatch_abi,
         kind = variant.kind,
+        priority = variant.priority,
         status = variant.status,
+        verification = variant.verification,
         entry = variant.entry,
         artifact = variant.artifact,
         summary_json = summary_json
@@ -2151,11 +2276,18 @@ fn render_kernel_manifest_scaffold(
     summary: &str,
 ) -> String {
     format!(
-        "schema = \"nuis-{subject}-backend-scaffold-v1\"\nbackend = \"{backend}\"\nkind = \"{kind}\"\nstatus = \"{status}\"\nentry = \"{entry}\"\nartifact = \"{artifact}\"\n\n[summary]\ntext = \"{summary_text}\"\n",
+        "schema = \"nuis-{subject}-backend-scaffold-v1\"\nbackend = \"{backend}\"\nbackend_family = \"{backend_family}\"\ntarget_os = \"{target_os}\"\ntarget_device = \"{target_device}\"\nir_format = \"{ir_format}\"\ndispatch_abi = \"{dispatch_abi}\"\nkind = \"{kind}\"\npriority = {priority}\nstatus = \"{status}\"\nverification = \"{verification}\"\nentry = \"{entry}\"\nartifact = \"{artifact}\"\n\n[summary]\ntext = \"{summary_text}\"\n",
         subject = subject,
         backend = variant.backend,
+        backend_family = variant.backend_family,
+        target_os = variant.target_os,
+        target_device = variant.target_device,
+        ir_format = variant.ir_format,
+        dispatch_abi = variant.dispatch_abi,
         kind = variant.kind,
+        priority = variant.priority,
         status = variant.status,
+        verification = variant.verification,
         entry = variant.entry,
         artifact = variant.artifact,
         summary_text = summary.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " | ")

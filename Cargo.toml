@@ -22,6 +22,7 @@ members = [
     "tools/nuisc",
     "tools/nsld",
     "tools/nsdb",
+    "tools/nsbdr",
     "tools/yir-export-ui-plan",
     "tools/yir-export-frame",
     "tools/yir-pack-aot",

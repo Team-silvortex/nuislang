@@ -1158,6 +1158,17 @@ verifies it and exposes `final_executable_blocked_present`,
 `final_executable_blocked_issues`. The file remains optional so `prepare` can
 stay a deterministic artifact preparation step while final executable emission
 remains an explicit boundary command.
+If the final-stage output file itself is present, `nsld check` runs the same
+read-only output boundary exposed by `final-executable-output` and reports
+`final_executable_output_present`,
+`final_executable_output_size_bytes`,
+`final_executable_output_hash`,
+`final_executable_output_runnable_candidate`,
+`final_executable_output_blocker_count`, and
+`final_executable_output_issues`. A missing final output remains non-fatal so
+ordinary preparation workflows can stop before the explicit final emit step,
+but a present output must be consistent with the emitted final-executable
+boundary.
 
 `nsld prepare` also returns the same compatibility-domain summary after it has
 emitted and verified the full artifact chain. This makes the prepare result a

@@ -30,10 +30,12 @@ Start in this order:
   - [nuis-binary-format-protocol.md](nuis-binary-format-protocol.md)
   - [nuis-native-artifact-workflow.md](nuis-native-artifact-workflow.md)
   - [toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md)
+  - [nustar-multi-backend-artifact-contract.md](nustar-multi-backend-artifact-contract.md)
   - [nsld-linker-frontdoor.md](nsld-linker-frontdoor.md)
   - [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md)
   - [cffi-von-neumann-domain-contract.md](cffi-von-neumann-domain-contract.md)
   - [nsdb-yir-debugger-frontdoor.md](nsdb-yir-debugger-frontdoor.md)
+  - [nsbdr-bundler-frontdoor.md](nsbdr-bundler-frontdoor.md)
 * `NIR` safety boundary
   - [nir-memory-model.md](nir-memory-model.md)
   - [nir-optimization-contract.md](nir-optimization-contract.md)

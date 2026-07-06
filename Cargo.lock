@@ -3,6 +3,10 @@
 version = 4
 
 [[package]]
+name = "nsbdr"
+version = "0.1.0"
+
+[[package]]
 name = "nsdb"
 version = "0.1.0"
 dependencies = [

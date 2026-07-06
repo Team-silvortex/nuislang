@@ -404,6 +404,30 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
             "final_executable_blocked_issues",
             &report.final_executable_blocked_issues,
         ),
+        json_bool_field(
+            "final_executable_output_present",
+            report.final_executable_output_present,
+        ),
+        json_optional_usize_field(
+            "final_executable_output_size_bytes",
+            report.final_executable_output_size_bytes,
+        ),
+        json_optional_string_field(
+            "final_executable_output_hash",
+            report.final_executable_output_hash.as_deref(),
+        ),
+        json_optional_bool_field(
+            "final_executable_output_runnable_candidate",
+            report.final_executable_output_runnable_candidate,
+        ),
+        json_optional_usize_field(
+            "final_executable_output_blocker_count",
+            report.final_executable_output_blocker_count,
+        ),
+        json_string_array_field(
+            "final_executable_output_issues",
+            &report.final_executable_output_issues,
+        ),
         json_optional_string_field(
             "container_loader_readiness",
             report.container_loader_readiness.as_deref(),

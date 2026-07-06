@@ -112,24 +112,28 @@ The visible workspace toolchain now includes:
   heterogeneous calculate contract inspection
 * `nsdb`: YIR-layer debugger metadata frontdoor; native debuggers can still
   attach to the host shell, but Nsdb owns Nuis semantic debug visibility
+* `nsbdr`: OS bundle/distribution frontdoor; consumes `nsld` final outputs and
+  owns platform package plans such as `.app` and `.dmg`
 * `nuis-rc`: local resident control prototype
 * `yir-*`: lower-level YIR inspection, packing, running, and export tools
 
 `nsld` is currently a separate tool boundary over `nuisc::linker`, not the
 finished self-owned object linker. The point of the split is to make linker
 ownership explicit before the implementation is fully extracted.
-Longer-term, `nsld` and `nsdb` should be CLI adapters over reusable
+Longer-term, `nsld`, `nsdb`, and `nsbdr` should be CLI adapters over reusable
 galaxy-style core toolchain capabilities, not CLI-only command surfaces.
 
 Reference:
 [docs/reference/nsld-linker-frontdoor.md](docs/reference/nsld-linker-frontdoor.md),
 [docs/reference/nsdb-yir-debugger-frontdoor.md](docs/reference/nsdb-yir-debugger-frontdoor.md),
+[docs/reference/nsbdr-bundler-frontdoor.md](docs/reference/nsbdr-bundler-frontdoor.md),
 [docs/reference/toolchain-galaxy-core-boundary.md](docs/reference/toolchain-galaxy-core-boundary.md)
 
 ```text
 nuis     -> front-door workflow tool
 nuis-rc  -> resident control tool (later-stage, still intentionally thin)
 nuisc    -> compiler/scheduler core
+nsbdr    -> OS bundle/distribution adapter for nsld final outputs
 yalivia  -> hosted future JIT/runtime subproject under `subprojects/yalivia`
 vulpoya  -> hosted future analyzer/verifier subproject under `subprojects/vulpoya`
 ```

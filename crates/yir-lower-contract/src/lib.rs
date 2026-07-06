@@ -196,16 +196,7 @@ impl KernelLoweringContract {
                 out.push_str(&format!("id = \"{}\"\n", escape_toml(stage)));
             }
             for variant in graph.backend_variants() {
-                out.push_str("\n[[graph.variant]]\n");
-                out.push_str(&format!("backend = \"{}\"\n", variant.backend));
-                out.push_str(&format!("kind = \"{}\"\n", variant.kind));
-                out.push_str(&format!("status = \"{}\"\n", variant.status));
-                out.push_str(&format!("entry = \"{}\"\n", escape_toml(&variant.entry)));
-                out.push_str(&format!(
-                    "artifact = \"{}\"\n",
-                    escape_toml(&variant.artifact)
-                ));
-                out.push_str(&format!("notes = \"{}\"\n", escape_toml(&variant.notes)));
+                out.push_str(&render_kernel_variant("graph.variant", &variant));
             }
         }
 
@@ -267,16 +258,7 @@ impl KernelLoweringContract {
                 out.push_str(&format!("source = \"{}\"\n", escape_toml(input)));
             }
             for variant in stage.backend_variants() {
-                out.push_str("\n[[stage.variant]]\n");
-                out.push_str(&format!("backend = \"{}\"\n", variant.backend));
-                out.push_str(&format!("kind = \"{}\"\n", variant.kind));
-                out.push_str(&format!("status = \"{}\"\n", variant.status));
-                out.push_str(&format!("entry = \"{}\"\n", escape_toml(&variant.entry)));
-                out.push_str(&format!(
-                    "artifact = \"{}\"\n",
-                    escape_toml(&variant.artifact)
-                ));
-                out.push_str(&format!("notes = \"{}\"\n", escape_toml(&variant.notes)));
+                out.push_str(&render_kernel_variant("stage.variant", &variant));
             }
         }
 
@@ -589,26 +571,27 @@ impl ShaderLoweringContract {
             }
 
             for variant in stage.backend_variants() {
-                out.push_str("\n[[stage.variant]]\n");
-                out.push_str(&format!("backend = \"{}\"\n", variant.backend));
-                out.push_str(&format!("kind = \"{}\"\n", variant.kind));
-                out.push_str(&format!("status = \"{}\"\n", variant.status));
-                out.push_str(&format!("entry = \"{}\"\n", escape_toml(&variant.entry)));
-                out.push_str(&format!(
-                    "artifact = \"{}\"\n",
-                    escape_toml(&variant.artifact)
-                ));
-                out.push_str(&format!("notes = \"{}\"\n", escape_toml(&variant.notes)));
+                out.push_str(&render_shader_variant("stage.variant", &variant));
             }
 
             if stage.lowering == ShaderLoweringMode::PrerenderOnly {
-                out.push_str("\n[[stage.variant]]\n");
-                out.push_str("backend = \"reference\"\n");
-                out.push_str("kind = \"prerender\"\n");
-                out.push_str("status = \"active\"\n");
-                out.push_str(&format!("entry = \"{}\"\n", stage.node));
-                out.push_str("artifact = \"assets/<stage>.ppm\"\n");
-                out.push_str("notes = \"reference fallback artifact\"\n");
+                out.push_str(&render_shader_variant(
+                    "stage.variant",
+                    &shader_backend_variant(
+                        "reference",
+                        "reference",
+                        "host",
+                        "host",
+                        "ppm",
+                        "prerender",
+                        "reference-raster",
+                        900,
+                        "active",
+                        stage.node.clone(),
+                        "assets/<stage>.ppm".to_owned(),
+                        "reference fallback artifact".to_owned(),
+                    ),
+                ));
             }
         }
 
@@ -707,8 +690,15 @@ pub struct ShaderResourceBinding {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShaderBackendVariant {
     pub backend: &'static str,
+    pub backend_family: &'static str,
+    pub target_os: &'static str,
+    pub target_device: &'static str,
+    pub ir_format: &'static str,
+    pub dispatch_abi: &'static str,
     pub kind: &'static str,
+    pub priority: usize,
     pub status: &'static str,
+    pub verification: &'static str,
     pub entry: String,
     pub artifact: String,
     pub notes: String,
@@ -739,8 +729,15 @@ pub struct KernelStageContract {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KernelBackendVariant {
     pub backend: &'static str,
+    pub backend_family: &'static str,
+    pub target_os: &'static str,
+    pub target_device: &'static str,
+    pub ir_format: &'static str,
+    pub dispatch_abi: &'static str,
     pub kind: &'static str,
+    pub priority: usize,
     pub status: &'static str,
+    pub verification: &'static str,
     pub entry: String,
     pub artifact: String,
     pub notes: String,
@@ -807,40 +804,227 @@ impl ShaderStageContract {
 
         let stage_id = self.node.clone();
         vec![
-            ShaderBackendVariant {
-                backend: "metal",
-                kind: "msl-source",
-                status: "active",
-                entry: stage_id.clone(),
-                artifact: format!("metal/{stage_id}.metal"),
-                notes: "Apple GPU backend source artifact".to_owned(),
-            },
-            ShaderBackendVariant {
-                backend: "vulkan",
-                kind: "glsl450-source",
-                status: "active",
-                entry: stage_id.clone(),
-                artifact: format!("vulkan/{stage_id}.vk.glsl"),
-                notes: "Portable Vulkan GLSL source artifact".to_owned(),
-            },
-            ShaderBackendVariant {
-                backend: "directx",
-                kind: "hlsl-source",
-                status: "active",
-                entry: stage_id.clone(),
-                artifact: format!("directx/{stage_id}.hlsl"),
-                notes: "Windows DirectX backend source artifact".to_owned(),
-            },
-            ShaderBackendVariant {
-                backend: "opengl",
-                kind: "glsl460-source",
-                status: "active",
-                entry: stage_id,
-                artifact: format!("opengl/{}.glsl", self.node),
-                notes: "OpenGL GLSL 460 source artifact".to_owned(),
-            },
+            shader_backend_variant(
+                "metal",
+                "gpu",
+                "macos",
+                "apple-gpu",
+                "msl",
+                "metal-render-pipeline",
+                "msl-source",
+                10,
+                "active",
+                stage_id.clone(),
+                format!("metal/{stage_id}.metal"),
+                "Apple GPU backend source artifact".to_owned(),
+            ),
+            shader_backend_variant(
+                "vulkan",
+                "gpu",
+                "cross-platform",
+                "vulkan-device",
+                "glsl450",
+                "vulkan-graphics-pipeline",
+                "glsl450-source",
+                20,
+                "active",
+                stage_id.clone(),
+                format!("vulkan/{stage_id}.vk.glsl"),
+                "Portable Vulkan GLSL source artifact".to_owned(),
+            ),
+            shader_backend_variant(
+                "directx",
+                "gpu",
+                "windows",
+                "d3d12-device",
+                "hlsl",
+                "d3d12-graphics-pipeline",
+                "hlsl-source",
+                30,
+                "active",
+                stage_id.clone(),
+                format!("directx/{stage_id}.hlsl"),
+                "Windows DirectX backend source artifact".to_owned(),
+            ),
+            shader_backend_variant(
+                "webgpu",
+                "gpu",
+                "cross-platform",
+                "webgpu-device",
+                "wgsl",
+                "webgpu-render-pipeline",
+                "wgsl-source",
+                40,
+                "planned",
+                stage_id.clone(),
+                format!("webgpu/{stage_id}.wgsl"),
+                "WebGPU/WGSL portable backend artifact".to_owned(),
+            ),
+            shader_backend_variant(
+                "opengl",
+                "gpu",
+                "cross-platform",
+                "opengl-device",
+                "glsl460",
+                "opengl-graphics-pipeline",
+                "glsl460-source",
+                80,
+                "active",
+                stage_id,
+                format!("opengl/{}.glsl", self.node),
+                "OpenGL GLSL 460 source artifact".to_owned(),
+            ),
         ]
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn shader_backend_variant(
+    backend: &'static str,
+    backend_family: &'static str,
+    target_os: &'static str,
+    target_device: &'static str,
+    ir_format: &'static str,
+    dispatch_abi: &'static str,
+    kind: &'static str,
+    priority: usize,
+    status: &'static str,
+    entry: String,
+    artifact: String,
+    notes: String,
+) -> ShaderBackendVariant {
+    ShaderBackendVariant {
+        backend,
+        backend_family,
+        target_os,
+        target_device,
+        ir_format,
+        dispatch_abi,
+        kind,
+        priority,
+        status,
+        verification: "contract-only",
+        entry,
+        artifact,
+        notes,
+    }
+}
+
+fn render_shader_variant(table: &str, variant: &ShaderBackendVariant) -> String {
+    render_backend_variant(
+        table,
+        variant.backend,
+        variant.backend_family,
+        variant.target_os,
+        variant.target_device,
+        variant.ir_format,
+        variant.dispatch_abi,
+        variant.kind,
+        variant.priority,
+        variant.status,
+        variant.verification,
+        &variant.entry,
+        &variant.artifact,
+        &variant.notes,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn kernel_backend_variant(
+    backend: &'static str,
+    backend_family: &'static str,
+    target_os: &'static str,
+    target_device: &'static str,
+    ir_format: &'static str,
+    dispatch_abi: &'static str,
+    kind: &'static str,
+    priority: usize,
+    status: &'static str,
+    entry: String,
+    artifact: String,
+    notes: String,
+) -> KernelBackendVariant {
+    KernelBackendVariant {
+        backend,
+        backend_family,
+        target_os,
+        target_device,
+        ir_format,
+        dispatch_abi,
+        kind,
+        priority,
+        status,
+        verification: "contract-only",
+        entry,
+        artifact,
+        notes,
+    }
+}
+
+fn render_kernel_variant(table: &str, variant: &KernelBackendVariant) -> String {
+    render_backend_variant(
+        table,
+        variant.backend,
+        variant.backend_family,
+        variant.target_os,
+        variant.target_device,
+        variant.ir_format,
+        variant.dispatch_abi,
+        variant.kind,
+        variant.priority,
+        variant.status,
+        variant.verification,
+        &variant.entry,
+        &variant.artifact,
+        &variant.notes,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_backend_variant(
+    table: &str,
+    backend: &str,
+    backend_family: &str,
+    target_os: &str,
+    target_device: &str,
+    ir_format: &str,
+    dispatch_abi: &str,
+    kind: &str,
+    priority: usize,
+    status: &str,
+    verification: &str,
+    entry: &str,
+    artifact: &str,
+    notes: &str,
+) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("\n[[{table}]]\n"));
+    out.push_str(&format!("backend = \"{}\"\n", escape_toml(backend)));
+    out.push_str(&format!(
+        "backend_family = \"{}\"\n",
+        escape_toml(backend_family)
+    ));
+    out.push_str(&format!("target_os = \"{}\"\n", escape_toml(target_os)));
+    out.push_str(&format!(
+        "target_device = \"{}\"\n",
+        escape_toml(target_device)
+    ));
+    out.push_str(&format!("ir_format = \"{}\"\n", escape_toml(ir_format)));
+    out.push_str(&format!(
+        "dispatch_abi = \"{}\"\n",
+        escape_toml(dispatch_abi)
+    ));
+    out.push_str(&format!("kind = \"{}\"\n", escape_toml(kind)));
+    out.push_str(&format!("priority = {}\n", priority));
+    out.push_str(&format!("status = \"{}\"\n", escape_toml(status)));
+    out.push_str(&format!(
+        "verification = \"{}\"\n",
+        escape_toml(verification)
+    ));
+    out.push_str(&format!("entry = \"{}\"\n", escape_toml(entry)));
+    out.push_str(&format!("artifact = \"{}\"\n", escape_toml(artifact)));
+    out.push_str(&format!("notes = \"{}\"\n", escape_toml(notes)));
+    out
 }
 
 impl KernelStageContract {
@@ -851,51 +1035,81 @@ impl KernelStageContract {
                 let preferred_backend = self.target_runtime.as_deref();
                 let mut variants = Vec::new();
                 if matches!(preferred_backend, Some("coreml")) {
-                    variants.push(KernelBackendVariant {
-                        backend: "coreml",
-                        kind: "mlmodel",
-                        status: "planned",
-                        entry: stage_id.clone(),
-                        artifact: format!("coreml/{stage_id}.mlmodel"),
-                        notes: "Apple ANE / CoreML compute artifact".to_owned(),
-                    });
-                    variants.push(KernelBackendVariant {
-                        backend: "mps-graph",
-                        kind: "graph",
-                        status: "planned",
-                        entry: stage_id.clone(),
-                        artifact: format!("mps-graph/{stage_id}.json"),
-                        notes: "Apple GPU graph fallback artifact".to_owned(),
-                    });
+                    variants.push(kernel_backend_variant(
+                        "coreml",
+                        "npu",
+                        "macos",
+                        "apple-ane",
+                        "mlmodel",
+                        "coreml-predict",
+                        "mlmodel",
+                        10,
+                        "planned",
+                        stage_id.clone(),
+                        format!("coreml/{stage_id}.mlmodel"),
+                        "Apple ANE / CoreML compute artifact".to_owned(),
+                    ));
+                    variants.push(kernel_backend_variant(
+                        "mps-graph",
+                        "gpu",
+                        "macos",
+                        "apple-gpu",
+                        "mps-graph-json",
+                        "mps-graph-dispatch",
+                        "graph",
+                        20,
+                        "planned",
+                        stage_id.clone(),
+                        format!("mps-graph/{stage_id}.json"),
+                        "Apple GPU graph fallback artifact".to_owned(),
+                    ));
                 }
                 if matches!(preferred_backend, Some("vulkan")) {
-                    variants.push(KernelBackendVariant {
-                        backend: "vulkan",
-                        kind: "spirv",
-                        status: "planned",
-                        entry: stage_id.clone(),
-                        artifact: format!("vulkan/{stage_id}.spv"),
-                        notes: "Portable Vulkan compute artifact".to_owned(),
-                    });
+                    variants.push(kernel_backend_variant(
+                        "vulkan",
+                        "gpu",
+                        "cross-platform",
+                        "vulkan-device",
+                        "spirv",
+                        "vulkan-compute-pipeline",
+                        "spirv",
+                        30,
+                        "planned",
+                        stage_id.clone(),
+                        format!("vulkan/{stage_id}.spv"),
+                        "Portable Vulkan compute artifact".to_owned(),
+                    ));
                 }
-                variants.push(KernelBackendVariant {
-                    backend: "cpu-fallback",
-                    kind: "native",
-                    status: "planned",
-                    entry: stage_id,
-                    artifact: format!("cpu-fallback/{}.bc", self.node),
-                    notes: "Host CPU fallback artifact".to_owned(),
-                });
+                variants.push(kernel_backend_variant(
+                    "cpu-fallback",
+                    "cpu",
+                    "cross-platform",
+                    "host-cpu",
+                    "llvm-bitcode",
+                    "nuis-host-call",
+                    "native",
+                    900,
+                    "planned",
+                    stage_id,
+                    format!("cpu-fallback/{}.bc", self.node),
+                    "Host CPU fallback artifact".to_owned(),
+                ));
                 variants
             }
-            KernelLoweringMode::CpuFallbackOnly => vec![KernelBackendVariant {
-                backend: "cpu-fallback",
-                kind: "native",
-                status: "active",
-                entry: stage_id,
-                artifact: format!("cpu-fallback/{}.bc", self.node),
-                notes: "Requires host CPU fallback because the op is outside the current backend portability subset".to_owned(),
-            }],
+            KernelLoweringMode::CpuFallbackOnly => vec![kernel_backend_variant(
+                "cpu-fallback",
+                "cpu",
+                "cross-platform",
+                "host-cpu",
+                "llvm-bitcode",
+                "nuis-host-call",
+                "native",
+                900,
+                "active",
+                stage_id,
+                format!("cpu-fallback/{}.bc", self.node),
+                "Requires host CPU fallback because the op is outside the current backend portability subset".to_owned(),
+            )],
         }
     }
 }
@@ -908,51 +1122,81 @@ impl KernelComputeGraphContract {
                 let preferred_backend = self.target_runtime.as_deref();
                 let mut variants = Vec::new();
                 if matches!(preferred_backend, Some("coreml")) {
-                    variants.push(KernelBackendVariant {
-                        backend: "coreml",
-                        kind: "mlpackage",
-                        status: "planned",
-                        entry: entry.clone(),
-                        artifact: format!("coreml/{}.mlpackage", self.id),
-                        notes: "Fused kernel compute graph for Apple ANE / CoreML".to_owned(),
-                    });
-                    variants.push(KernelBackendVariant {
-                        backend: "mps-graph",
-                        kind: "graph",
-                        status: "planned",
-                        entry: entry.clone(),
-                        artifact: format!("mps-graph/{}.json", self.id),
-                        notes: "Fused kernel compute graph for Apple GPU fallback".to_owned(),
-                    });
+                    variants.push(kernel_backend_variant(
+                        "coreml",
+                        "npu",
+                        "macos",
+                        "apple-ane",
+                        "mlpackage",
+                        "coreml-predict",
+                        "mlpackage",
+                        10,
+                        "planned",
+                        entry.clone(),
+                        format!("coreml/{}.mlpackage", self.id),
+                        "Fused kernel compute graph for Apple ANE / CoreML".to_owned(),
+                    ));
+                    variants.push(kernel_backend_variant(
+                        "mps-graph",
+                        "gpu",
+                        "macos",
+                        "apple-gpu",
+                        "mps-graph-json",
+                        "mps-graph-dispatch",
+                        "graph",
+                        20,
+                        "planned",
+                        entry.clone(),
+                        format!("mps-graph/{}.json", self.id),
+                        "Fused kernel compute graph for Apple GPU fallback".to_owned(),
+                    ));
                 }
                 if matches!(preferred_backend, Some("vulkan")) {
-                    variants.push(KernelBackendVariant {
-                        backend: "vulkan",
-                        kind: "spirv",
-                        status: "planned",
-                        entry: entry.clone(),
-                        artifact: format!("vulkan/{}.spv", self.id),
-                        notes: "Fused Vulkan compute graph artifact".to_owned(),
-                    });
+                    variants.push(kernel_backend_variant(
+                        "vulkan",
+                        "gpu",
+                        "cross-platform",
+                        "vulkan-device",
+                        "spirv",
+                        "vulkan-compute-pipeline",
+                        "spirv",
+                        30,
+                        "planned",
+                        entry.clone(),
+                        format!("vulkan/{}.spv", self.id),
+                        "Fused Vulkan compute graph artifact".to_owned(),
+                    ));
                 }
-                variants.push(KernelBackendVariant {
-                    backend: "cpu-fallback",
-                    kind: "native",
-                    status: "planned",
+                variants.push(kernel_backend_variant(
+                    "cpu-fallback",
+                    "cpu",
+                    "cross-platform",
+                    "host-cpu",
+                    "llvm-bitcode",
+                    "nuis-host-call",
+                    "native",
+                    900,
+                    "planned",
                     entry,
-                    artifact: format!("cpu-fallback/{}.bc", self.id),
-                    notes: "Fused host CPU fallback graph".to_owned(),
-                });
+                    format!("cpu-fallback/{}.bc", self.id),
+                    "Fused host CPU fallback graph".to_owned(),
+                ));
                 variants
             }
-            KernelLoweringMode::CpuFallbackOnly => vec![KernelBackendVariant {
-                backend: "cpu-fallback",
-                kind: "native",
-                status: "active",
+            KernelLoweringMode::CpuFallbackOnly => vec![kernel_backend_variant(
+                "cpu-fallback",
+                "cpu",
+                "cross-platform",
+                "host-cpu",
+                "llvm-bitcode",
+                "nuis-host-call",
+                "native",
+                900,
+                "active",
                 entry,
-                artifact: format!("cpu-fallback/{}.bc", self.id),
-                notes: "Graph requires host CPU fallback because one or more stages are outside the current backend portability subset".to_owned(),
-            }],
+                format!("cpu-fallback/{}.bc", self.id),
+                "Graph requires host CPU fallback because one or more stages are outside the current backend portability subset".to_owned(),
+            )],
         }
     }
 }
@@ -2177,10 +2421,15 @@ kernel.print trace kernel0 projected
         assert!(contract
             .render_package_manifest()
             .contains("execution_domain = \"kernel\""));
-        assert!(contract
-            .render_package_manifest()
-            .contains("backend = \"coreml\""));
-        assert!(contract.render_package_manifest().contains("[[graph]]"));
+        let manifest = contract.render_package_manifest();
+        assert!(manifest.contains("backend = \"coreml\""));
+        assert!(manifest.contains("backend_family = \"npu\""));
+        assert!(manifest.contains("target_device = \"apple-ane\""));
+        assert!(manifest.contains("ir_format = \"mlpackage\""));
+        assert!(manifest.contains("dispatch_abi = \"coreml-predict\""));
+        assert!(manifest.contains("priority = 10"));
+        assert!(manifest.contains("verification = \"contract-only\""));
+        assert!(manifest.contains("[[graph]]"));
     }
 
     #[test]
@@ -2280,14 +2529,16 @@ shader.draw_instanced frame shader0 main_pass lit_pipe 4 1 material_bindings
         assert!(contract
             .render_text()
             .contains("shader_ir_contract_family=nustar.shader"));
-        assert!(contract
-            .render_package_manifest()
-            .contains("shader_ir_instruction_count = 3"));
-        assert!(contract
-            .render_package_manifest()
-            .contains("shader_ir_execution_domain = \"shader\""));
-        assert!(contract
-            .render_package_manifest()
-            .contains("shader_ir_time_domain = \"shader.stage.fragment\""));
+        let manifest = contract.render_package_manifest();
+        assert!(manifest.contains("shader_ir_instruction_count = 3"));
+        assert!(manifest.contains("shader_ir_execution_domain = \"shader\""));
+        assert!(manifest.contains("shader_ir_time_domain = \"shader.stage.fragment\""));
+        assert!(manifest.contains("backend = \"webgpu\""));
+        assert!(manifest.contains("backend_family = \"gpu\""));
+        assert!(manifest.contains("target_device = \"webgpu-device\""));
+        assert!(manifest.contains("ir_format = \"wgsl\""));
+        assert!(manifest.contains("dispatch_abi = \"webgpu-render-pipeline\""));
+        assert!(manifest.contains("priority = 40"));
+        assert!(manifest.contains("verification = \"contract-only\""));
     }
 }

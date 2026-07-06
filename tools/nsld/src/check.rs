@@ -12,7 +12,8 @@ use super::{
         nsld_container_report, nsld_verify_container_plan_report, nsld_verify_container_report,
     },
     final_stage::{
-        nsld_final_stage_plan_report, nsld_verify_final_executable_emit_report,
+        nsld_final_executable_output_report, nsld_final_stage_plan_report,
+        nsld_verify_final_executable_emit_report,
         nsld_verify_final_executable_host_invoke_plan_report,
         nsld_verify_final_executable_image_dry_run_report,
         nsld_verify_final_executable_layout_plan_report,
@@ -540,6 +541,36 @@ pub(crate) fn nsld_check_report(
         .as_ref()
         .map(|report| report.issues.clone())
         .unwrap_or_default();
+    let final_executable_output_present = Path::new(&plan.final_stage.output_path).exists();
+    let final_executable_output_report = final_executable_output_present
+        .then(|| nsld_final_executable_output_report(manifest, plan));
+    let final_executable_output_size_bytes = final_executable_output_report
+        .as_ref()
+        .and_then(|report| report.size_bytes);
+    let final_executable_output_hash = final_executable_output_report
+        .as_ref()
+        .and_then(|report| report.output_hash.clone());
+    let final_executable_output_runnable_candidate = final_executable_output_report
+        .as_ref()
+        .map(|report| report.runnable_candidate);
+    let final_executable_output_blocker_count = final_executable_output_report
+        .as_ref()
+        .map(|report| report.blockers.len());
+    let final_executable_output_issues = final_executable_output_report
+        .as_ref()
+        .map(|report| {
+            let mut issues = report.issues.clone();
+            if !report.runnable_candidate {
+                issues.extend(
+                    report
+                        .blockers
+                        .iter()
+                        .map(|blocker| format!("final-executable-output:{blocker}")),
+                );
+            }
+            issues
+        })
+        .unwrap_or_default();
     let artifact_chain_issues = nsld_artifact_chain_issues(&nsld_artifact_stages(&plan.output_dir));
     let artifact_chain_valid = artifact_chain_issues.is_empty();
     let clock_edges = plan
@@ -701,6 +732,10 @@ pub(crate) fn nsld_check_report(
         issues.push("final executable blocked report verification failed".to_owned());
         issues.extend(final_executable_blocked_issues.iter().cloned());
     }
+    if final_executable_output_runnable_candidate == Some(false) {
+        issues.push("final executable output verification failed".to_owned());
+        issues.extend(final_executable_output_issues.iter().cloned());
+    }
     if !artifact_chain_valid {
         issues.push("nsld artifact chain is incomplete".to_owned());
         issues.extend(artifact_chain_issues.iter().cloned());
@@ -729,6 +764,7 @@ pub(crate) fn nsld_check_report(
     let checks = checks + usize::from(final_executable_layout_plan_present);
     let checks = checks + usize::from(final_executable_image_dry_run_present);
     let checks = checks + usize::from(final_executable_blocked_present);
+    let checks = checks + usize::from(final_executable_output_present);
     let failures = issues.len();
     NsldCheckReport {
         manifest: manifest.display().to_string(),
@@ -852,6 +888,12 @@ pub(crate) fn nsld_check_report(
         final_executable_blocked_plan_hash,
         final_executable_blocked_blocker_count,
         final_executable_blocked_issues,
+        final_executable_output_present,
+        final_executable_output_size_bytes,
+        final_executable_output_hash,
+        final_executable_output_runnable_candidate,
+        final_executable_output_blocker_count,
+        final_executable_output_issues,
         container_loader_readiness,
         container_loader_blockers,
         container_metadata_table_hash,

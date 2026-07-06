@@ -1,0 +1,11 @@
+[package]
+name = "nsbdr"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Nsbdr OS bundle/distribution front-door for Nuis final binary outputs."
+
+[dependencies]

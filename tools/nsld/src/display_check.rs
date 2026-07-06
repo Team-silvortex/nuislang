@@ -231,6 +231,15 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_blocked_issues.len()
     );
     println!(
+        "  final_executable_output: present={} runnable={} size={} hash={} blockers={} issues={}",
+        report.final_executable_output_present,
+        optional_bool_text(report.final_executable_output_runnable_candidate),
+        optional_usize_text(report.final_executable_output_size_bytes),
+        optional_string_text(report.final_executable_output_hash.as_deref()),
+        optional_usize_text(report.final_executable_output_blocker_count),
+        report.final_executable_output_issues.len()
+    );
+    println!(
         "  container_loader: readiness={} blockers={} metadata_table_hash={} external_imports={}",
         optional_string_text(report.container_loader_readiness.as_deref()),
         report.container_loader_blockers.len(),
@@ -408,6 +417,9 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     }
     for issue in &report.final_executable_blocked_issues {
         println!("  final_executable_blocked_issue: {issue}");
+    }
+    for issue in &report.final_executable_output_issues {
+        println!("  final_executable_output_issue: {issue}");
     }
     for blocker in &report.container_loader_blockers {
         println!("  container_loader_blocker: {blocker}");
