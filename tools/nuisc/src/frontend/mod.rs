@@ -38,6 +38,7 @@ mod signature_building;
 mod specialization_pipeline;
 mod stmt_lowering;
 mod stmt_lowering_control;
+mod stmt_lowering_control_rewrite;
 mod stmt_lowering_destructure;
 mod stmt_lowering_sequence;
 mod stmt_lowering_try;
