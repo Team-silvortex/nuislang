@@ -144,11 +144,43 @@ pub(crate) fn nsld_artifact_stage_path(output_dir: impl AsRef<Path>, file_name: 
 }
 
 pub(crate) fn nsld_artifact_stage_file_name(kind: NsldArtifactStageKind) -> &'static str {
-    ARTIFACT_STAGE_DEFINITIONS
-        .iter()
-        .find(|(stage_kind, _)| *stage_kind == kind)
-        .map(|(_, file_name)| *file_name)
-        .expect("nsld artifact stage kind must have a file name")
+    match kind {
+        NsldArtifactStageKind::LinkInputs => "nuis.nsld.link-inputs.toml",
+        NsldArtifactStageKind::LinkUnits => "nuis.nsld.link-units.toml",
+        NsldArtifactStageKind::LinkBundle => "nuis.nsld.link-bundle.toml",
+        NsldArtifactStageKind::AssemblePlan => "nuis.nsld.assemble-plan.toml",
+        NsldArtifactStageKind::SectionManifest => "nuis.nsld.section-manifest.toml",
+        NsldArtifactStageKind::ObjectPlan => "nuis.nsld.object-plan.toml",
+        NsldArtifactStageKind::ObjectWriterInput => "nuis.nsld.object-writer-input.toml",
+        NsldArtifactStageKind::ObjectByteLayout => "nuis.nsld.object-byte-layout.toml",
+        NsldArtifactStageKind::ObjectFileLayout => "nuis.nsld.object-file-layout.toml",
+        NsldArtifactStageKind::ObjectImageDryRun => "nuis.nsld.object-image-dry-run.toml",
+        NsldArtifactStageKind::ObjectImageDryRunBytes => "nuis.nsld.object-image-dry-run.bin",
+        NsldArtifactStageKind::ObjectEmitBlocked => "nuis.nsld.object.blocked.toml",
+        NsldArtifactStageKind::ObjectOutput => "nuis.nsld.mach-o",
+        NsldArtifactStageKind::ObjectWriterDryRun => "nuis.nsld.object-writer-dry-run.toml",
+        NsldArtifactStageKind::ContainerPlan => "nuis.nsld.container-plan.toml",
+        NsldArtifactStageKind::Container => "nuis.nsld.container",
+        NsldArtifactStageKind::ContainerPayload => "nuis.nsld.container.payload",
+        NsldArtifactStageKind::ClosureSnapshot => "nuis.nsld.closure.toml",
+        NsldArtifactStageKind::FinalStagePlan => "nuis.nsld.final-stage-plan.toml",
+        NsldArtifactStageKind::FinalExecutableWriterInput => {
+            "nuis.nsld.final-executable-writer-input.toml"
+        }
+        NsldArtifactStageKind::FinalExecutableHostInvokePlan => {
+            "nuis.nsld.final-executable-host-invoke-plan.toml"
+        }
+        NsldArtifactStageKind::FinalExecutableLayoutPlan => {
+            "nuis.nsld.final-executable-layout.toml"
+        }
+        NsldArtifactStageKind::FinalExecutableImageDryRun => {
+            "nuis.nsld.final-executable-image-dry-run.toml"
+        }
+        NsldArtifactStageKind::FinalExecutableImageDryRunBytes => {
+            "nuis.nsld.final-executable-image-dry-run.bin"
+        }
+        NsldArtifactStageKind::FinalExecutableBlocked => "nuis.nsld.final-executable.blocked.toml",
+    }
 }
 
 pub(crate) fn nsld_object_output_file_name(object_format: &str) -> String {
@@ -274,18 +306,17 @@ pub(crate) fn nsld_artifact_stage_kind_path_for_plan(
 pub(crate) fn nsld_artifact_stages_for_plan(
     plan: &nuisc::linker::LinkPlan,
 ) -> Vec<NsldArtifactStage> {
-    ARTIFACT_STAGE_DEFINITIONS
-        .iter()
-        .map(|(kind, _)| {
-            let file_name = nsld_artifact_stage_file_name_for_plan(*kind, plan);
-            NsldArtifactStage {
-                kind: *kind,
-                present: nsld_artifact_stage_path(&plan.output_dir, &file_name).exists(),
-                file_name,
-                required: nsld_artifact_stage_required(*kind),
-            }
-        })
-        .collect()
+    let mut stages = Vec::with_capacity(ARTIFACT_STAGE_DEFINITIONS.len());
+    for (kind, _) in ARTIFACT_STAGE_DEFINITIONS {
+        let file_name = nsld_artifact_stage_file_name_for_plan(*kind, plan);
+        stages.push(NsldArtifactStage {
+            kind: *kind,
+            present: nsld_artifact_stage_path(&plan.output_dir, &file_name).exists(),
+            file_name,
+            required: nsld_artifact_stage_required(*kind),
+        });
+    }
+    stages
 }
 
 pub(crate) fn nsld_artifact_stage_required(kind: NsldArtifactStageKind) -> bool {

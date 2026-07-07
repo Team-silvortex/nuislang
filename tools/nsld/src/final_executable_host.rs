@@ -12,6 +12,10 @@ use super::{
 };
 use std::{env, fs, path::Path};
 
+#[cfg(test)]
+#[path = "final_executable_host_tests.rs"]
+mod tests;
+
 const HOST_FINALIZER_ALLOW_ENV: &str = "NUIS_NSLD_ALLOW_HOST_FINALIZER";
 const HOST_FINALIZER_POLICY_ENV: &str = "NUIS_NSLD_HOST_FINALIZER_POLICY";
 

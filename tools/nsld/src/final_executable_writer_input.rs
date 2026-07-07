@@ -12,6 +12,10 @@ use super::{
 };
 use std::{fs, path::Path};
 
+#[cfg(test)]
+#[path = "final_executable_writer_input_tests.rs"]
+mod tests;
+
 pub(crate) fn nsld_emit_final_executable_writer_input_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,

@@ -94,7 +94,7 @@ pub(crate) fn nsld_final_stage_plan_report(
             native_object_required,
         ),
     ];
-    let mut blockers = Vec::new();
+    let mut blockers = Vec::with_capacity(6);
     for input in &inputs {
         if input.required && !input.present {
             blockers.push(format!("missing-final-stage-input:{}", input.input_id));

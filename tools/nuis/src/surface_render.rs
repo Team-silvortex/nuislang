@@ -947,8 +947,8 @@ pub(crate) fn write_project_doctor_text_summary<W: fmt::Write>(
     Ok(())
 }
 pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String> {
-    if nuisc::project::is_project_input(&input) {
-        let project = nuisc::project::load_project(&input)?;
+    if nuisc::project::is_project_input(input) {
+        let project = nuisc::project::load_project(input)?;
         let plan = nuisc::project::build_project_compilation_plan(&project)?;
         let declared_tests = project
             .manifest
@@ -1020,7 +1020,7 @@ pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String>
         return Ok(out);
     }
 
-    let artifacts = nuisc::pipeline::compile_source_path(&input)?;
+    let artifacts = nuisc::pipeline::compile_source_path(input)?;
     let manifests = nuisc::registry::load_required_manifests(
         std::path::Path::new("nustar-packages"),
         &artifacts.yir,
@@ -1064,11 +1064,11 @@ pub(crate) fn render_scheduler_view_json(input: &Path) -> Result<String, String>
 }
 
 pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String> {
-    let project = nuisc::project::load_project(&input)?;
+    let project = nuisc::project::load_project(input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let text_handle_rewrite = nuisc::project::summarize_project_text_handle_rewrites(&project)?;
     let public_surface = crate::public_surface_records(&project);
-    let galaxy_lock_status = crate::galaxy::verify_project_lock(&input);
+    let galaxy_lock_status = crate::galaxy::verify_project_lock(input);
     let galaxy_manifest_path = project.root.join("galaxy.toml");
     let include_galaxy_flow =
         galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
@@ -1257,7 +1257,7 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
 }
 
 pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String> {
-    let project = nuisc::project::load_project(&input)?;
+    let project = nuisc::project::load_project(input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let text_handle_rewrite = nuisc::project::summarize_project_text_handle_rewrites(&project)?;
     let public_surface = crate::public_surface_records(&project);

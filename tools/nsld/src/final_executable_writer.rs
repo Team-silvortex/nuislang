@@ -5,7 +5,7 @@ use super::{
     },
     toml,
 };
-use std::{env, path::Path};
+use std::{env, fmt::Write as _, path::Path};
 
 pub(crate) fn final_executable_writer_blockers(
     final_stage: &NsldFinalStagePlanReport,
@@ -41,7 +41,11 @@ pub(crate) fn final_executable_writer_command_args(
     report: &NsldFinalExecutableWriterPlanReport,
     plan: &nuisc::linker::LinkPlan,
 ) -> Vec<String> {
-    let mut args = Vec::new();
+    let mut args = Vec::with_capacity(if plan.cpu_target.clang_target.is_empty() {
+        4
+    } else {
+        6
+    });
     args.push(report.final_stage_driver.clone());
     if !plan.cpu_target.clang_target.is_empty() {
         args.push("-target".to_owned());
@@ -81,81 +85,108 @@ pub(crate) fn render_final_executable_writer_input(
     plan: &nuisc::linker::LinkPlan,
 ) -> String {
     let command_args = final_executable_writer_command_args(report, plan);
-    let mut out = String::new();
+    let mut out = String::with_capacity(1024 + report.inputs.len() * 192);
     out.push_str("schema = \"nuis-nsld-final-executable-writer-input-v1\"\n");
     out.push_str("schema_version = 1\n");
     out.push_str("producer = \"nsld\"\n");
     out.push_str("producer_phase = \"alpha-0.8.0\"\n");
-    out.push_str(&format!(
-        "manifest = \"{}\"\n",
+    writeln!(
+        out,
+        "manifest = \"{}\"",
         toml::escape_toml_string(&report.manifest)
-    ));
-    out.push_str(&format!(
-        "output_path = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "output_path = \"{}\"",
         toml::escape_toml_string(&report.output_path)
-    ));
-    out.push_str(&format!(
-        "writer_kind = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "writer_kind = \"{}\"",
         toml::escape_toml_string(&report.writer_kind)
-    ));
-    out.push_str(&format!(
-        "writer_status = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "writer_status = \"{}\"",
         toml::escape_toml_string(&report.writer_status)
-    ));
-    out.push_str(&format!(
-        "final_stage_plan_hash = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "final_stage_plan_hash = \"{}\"",
         toml::escape_toml_string(&report.final_stage_plan_hash)
-    ));
-    out.push_str(&format!(
-        "final_stage_driver = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "final_stage_driver = \"{}\"",
         toml::escape_toml_string(&report.final_stage_driver)
-    ));
-    out.push_str(&format!(
-        "final_stage_link_mode = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "final_stage_link_mode = \"{}\"",
         toml::escape_toml_string(&report.final_stage_link_mode)
-    ));
-    out.push_str(&format!(
-        "host_wrapper_required = {}\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "host_wrapper_required = {}",
         report.host_wrapper_required
-    ));
-    out.push_str(&format!("command_arg_count = {}\n", command_args.len()));
-    out.push_str(&format!(
-        "command_args = [{}]\n",
+    )
+    .unwrap();
+    writeln!(out, "command_arg_count = {}", command_args.len()).unwrap();
+    writeln!(
+        out,
+        "command_args = [{}]",
         toml::toml_string_array_literal(&command_args)
-    ));
-    out.push_str(&format!(
-        "writer_steps = [{}]\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "writer_steps = [{}]",
         toml::toml_string_array_literal(&report.writer_steps)
-    ));
-    out.push_str(&format!(
-        "writer_blockers = [{}]\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "writer_blockers = [{}]",
         toml::toml_string_array_literal(&report.writer_blockers)
-    ));
-    out.push_str(&format!(
-        "notes = [{}]\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "notes = [{}]",
         toml::toml_string_array_literal(&report.notes)
-    ));
+    )
+    .unwrap();
     for input in &report.inputs {
         out.push_str("\n[[final_stage_input]]\n");
-        out.push_str(&format!("order_index = {}\n", input.order_index));
-        out.push_str(&format!(
-            "input_id = \"{}\"\n",
+        writeln!(out, "order_index = {}", input.order_index).unwrap();
+        writeln!(
+            out,
+            "input_id = \"{}\"",
             toml::escape_toml_string(&input.input_id)
-        ));
-        out.push_str(&format!(
-            "input_kind = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "input_kind = \"{}\"",
             toml::escape_toml_string(&input.input_kind)
-        ));
-        out.push_str(&format!(
-            "path = \"{}\"\n",
-            toml::escape_toml_string(&input.path)
-        ));
-        out.push_str(&format!(
-            "content_hash = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(out, "path = \"{}\"", toml::escape_toml_string(&input.path)).unwrap();
+        writeln!(
+            out,
+            "content_hash = \"{}\"",
             toml::escape_toml_string(&input.content_hash)
-        ));
-        out.push_str(&format!("required = {}\n", input.required));
-        out.push_str(&format!("present = {}\n", input.present));
+        )
+        .unwrap();
+        writeln!(out, "required = {}", input.required).unwrap();
+        writeln!(out, "present = {}", input.present).unwrap();
     }
     out
 }
@@ -163,73 +194,93 @@ pub(crate) fn render_final_executable_writer_input(
 pub(crate) fn render_final_executable_host_invoke_plan(
     report: &NsldFinalExecutableHostInvokePlanReport,
 ) -> String {
-    let mut out = String::new();
+    let mut out = String::with_capacity(1024 + report.command_args.len() * 64);
     out.push_str("schema = \"nuis-nsld-final-executable-host-invoke-plan-v1\"\n");
     out.push_str("schema_version = 1\n");
     out.push_str("producer = \"nsld\"\n");
     out.push_str("producer_phase = \"alpha-0.8.0\"\n");
-    out.push_str(&format!(
-        "manifest = \"{}\"\n",
+    writeln!(
+        out,
+        "manifest = \"{}\"",
         toml::escape_toml_string(&report.manifest)
-    ));
-    out.push_str(&format!(
-        "output_path = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "output_path = \"{}\"",
         toml::escape_toml_string(&report.output_path)
-    ));
-    out.push_str(&format!(
-        "writer_input_path = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "writer_input_path = \"{}\"",
         toml::escape_toml_string(&report.writer_input_path)
-    ));
-    out.push_str(&format!(
-        "invocation_kind = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "invocation_kind = \"{}\"",
         toml::escape_toml_string(&report.invocation_kind)
-    ));
-    out.push_str(&format!(
-        "invocation_policy = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "invocation_policy = \"{}\"",
         toml::escape_toml_string(&report.invocation_policy)
-    ));
-    out.push_str(&format!(
-        "invocation_policy_reason = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "invocation_policy_reason = \"{}\"",
         toml::escape_toml_string(&report.invocation_policy_reason)
-    ));
-    out.push_str(&format!(
-        "requires_explicit_allow = {}\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "requires_explicit_allow = {}",
         report.requires_explicit_allow
-    ));
-    out.push_str(&format!(
-        "explicit_allow_present = {}\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "explicit_allow_present = {}",
         report.explicit_allow_present
-    ));
-    out.push_str(&format!(
-        "environment_ready = {}\n",
-        report.environment_ready
-    ));
-    out.push_str(&format!("driver_available = {}\n", report.driver_available));
-    out.push_str(&format!(
-        "driver_resolved_path = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(out, "environment_ready = {}", report.environment_ready).unwrap();
+    writeln!(out, "driver_available = {}", report.driver_available).unwrap();
+    writeln!(
+        out,
+        "driver_resolved_path = \"{}\"",
         toml::escape_toml_string(report.driver_resolved_path.as_deref().unwrap_or(""))
-    ));
-    out.push_str(&format!(
-        "can_invoke_host_finalizer = {}\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "can_invoke_host_finalizer = {}",
         report.can_invoke_host_finalizer
-    ));
-    out.push_str(&format!("would_invoke = {}\n", report.would_invoke));
-    out.push_str(&format!(
-        "command_arg_count = {}\n",
-        report.command_arg_count
-    ));
-    out.push_str(&format!(
-        "command_args = [{}]\n",
+    )
+    .unwrap();
+    writeln!(out, "would_invoke = {}", report.would_invoke).unwrap();
+    writeln!(out, "command_arg_count = {}", report.command_arg_count).unwrap();
+    writeln!(
+        out,
+        "command_args = [{}]",
         toml::toml_string_array_literal(&report.command_args)
-    ));
-    out.push_str(&format!("blocker_count = {}\n", report.blockers.len()));
-    out.push_str(&format!(
-        "blockers = [{}]\n",
+    )
+    .unwrap();
+    writeln!(out, "blocker_count = {}", report.blockers.len()).unwrap();
+    writeln!(
+        out,
+        "blockers = [{}]",
         toml::toml_string_array_literal(&report.blockers)
-    ));
-    out.push_str(&format!(
-        "notes = [{}]\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "notes = [{}]",
         toml::toml_string_array_literal(&report.notes)
-    ));
+    )
+    .unwrap();
     out
 }

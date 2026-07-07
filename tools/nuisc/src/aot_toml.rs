@@ -1,18 +1,29 @@
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, fmt::Write as _, path::Path};
 
 pub(crate) fn render_string_array(values: &[String]) -> String {
-    let quoted = values
-        .iter()
-        .map(|value| format!("\"{}\"", escape_toml_string(value)))
-        .collect::<Vec<_>>();
-    format!("[{}]", quoted.join(", "))
+    let mut out = String::with_capacity(2 + values.len() * 24);
+    out.push('[');
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            out.push_str(", ");
+        }
+        write!(out, "\"{}\"", escape_toml_string(value)).unwrap();
+    }
+    out.push(']');
+    out
 }
 
 pub(crate) fn escape_toml_string(value: &str) -> String {
-    value
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            _ => out.push(ch),
+        }
+    }
+    out
 }
 
 pub(crate) fn parse_required_toml_string(

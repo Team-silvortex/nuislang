@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fmt::Write as _, fs, path::Path};
 
 use nuis_artifact::{
     parse_domain_build_unit_blocks as shared_parse_domain_build_unit_blocks, NuisCompiledArtifact,
@@ -22,8 +22,8 @@ pub fn render_relocated_unpacked_build_manifest(
     artifact_path: &Path,
     binary_path: &Path,
 ) -> Result<String, String> {
-    let mut out = String::new();
     let source = &artifact.build_manifest_source;
+    let mut out = String::with_capacity(source.len() + 4096);
     let mut domain_build_units =
         shared_parse_domain_build_unit_blocks(source, Path::new("<artifact>"))
             .map_err(|error| error.to_string())?;
@@ -74,10 +74,12 @@ pub fn render_relocated_unpacked_build_manifest(
             continue;
         }
         if line.starts_with("output_dir = ") {
-            out.push_str(&format!(
-                "output_dir = \"{}\"\n",
+            writeln!(
+                out,
+                "output_dir = \"{}\"",
                 escape_toml_string(&output_dir.display().to_string())
-            ));
+            )
+            .unwrap();
             continue;
         }
         if strip_project_path_keys
@@ -117,72 +119,92 @@ pub fn render_relocated_unpacked_build_manifest(
     );
 
     out.push_str("[nuis_envelope]\n");
-    out.push_str(&format!(
-        "path = \"{}\"\n",
+    writeln!(
+        out,
+        "path = \"{}\"",
         escape_toml_string(&envelope_path.display().to_string())
-    ));
-    out.push_str(&format!(
-        "schema = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "schema = \"{}\"",
         escape_toml_string(&artifact.envelope.schema)
-    ));
-    out.push_str(&format!(
-        "executable_kind = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "executable_kind = \"{}\"",
         escape_toml_string(&artifact.envelope.executable_kind)
-    ));
-    out.push_str(&format!(
-        "package_count = {}\n",
-        artifact.envelope.package_count
-    ));
-    out.push_str(&format!(
-        "domain_families = {}\n",
+    )
+    .unwrap();
+    writeln!(out, "package_count = {}", artifact.envelope.package_count).unwrap();
+    writeln!(
+        out,
+        "domain_families = {}",
         render_string_array(&artifact.envelope.domain_families)
-    ));
-    out.push_str(&format!(
-        "contract_families = {}\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "contract_families = {}",
         render_string_array(&artifact.envelope.contract_families)
-    ));
-    out.push_str(&format!(
-        "function_kind = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "function_kind = \"{}\"",
         escape_toml_string(&artifact.envelope.function_kind)
-    ));
-    out.push_str(&format!(
-        "graph_kind = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "graph_kind = \"{}\"",
         escape_toml_string(&artifact.envelope.graph_kind)
-    ));
-    out.push_str(&format!(
-        "default_time_mode = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "default_time_mode = \"{}\"",
         escape_toml_string(&artifact.envelope.default_time_mode)
-    ));
+    )
+    .unwrap();
     out.push('\n');
 
     out.push_str("[nuis_artifact]\n");
-    out.push_str(&format!(
-        "artifact_path = \"{}\"\n",
+    writeln!(
+        out,
+        "artifact_path = \"{}\"",
         escape_toml_string(&artifact_path.display().to_string())
-    ));
-    out.push_str(&format!(
-        "artifact_schema = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "artifact_schema = \"{}\"",
         escape_toml_string(&artifact.schema)
-    ));
-    out.push_str(&format!(
-        "artifact_binary_name = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "artifact_binary_name = \"{}\"",
         escape_toml_string(&artifact.binary_name)
-    ));
-    out.push_str(&format!(
-        "artifact_binary_bytes = {}\n",
-        artifact.binary_bytes
-    ));
+    )
+    .unwrap();
+    writeln!(out, "artifact_binary_bytes = {}", artifact.binary_bytes).unwrap();
     out.push('\n');
 
     out.push_str("[artifacts]\n");
-    out.push_str(&format!(
-        "binary = \"{}\"\n",
+    writeln!(
+        out,
+        "binary = \"{}\"",
         escape_toml_string(&binary_path.display().to_string())
-    ));
-    out.push_str(&format!(
-        "envelope = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "envelope = \"{}\"",
         escape_toml_string(&envelope_path.display().to_string())
-    ));
+    )
+    .unwrap();
     out.push('\n');
 
     for (kind, path) in [("binary", binary_path), ("envelope", envelope_path)] {
@@ -193,13 +215,15 @@ pub fn render_relocated_unpacked_build_manifest(
             )
         })?;
         out.push_str("[[artifact_hash]]\n");
-        out.push_str(&format!("kind = \"{}\"\n", escape_toml_string(kind)));
-        out.push_str(&format!(
-            "path = \"{}\"\n",
+        writeln!(out, "kind = \"{}\"", escape_toml_string(kind)).unwrap();
+        writeln!(
+            out,
+            "path = \"{}\"",
             escape_toml_string(&path.display().to_string())
-        ));
-        out.push_str(&format!("bytes = {}\n", bytes.len()));
-        out.push_str(&format!("fnv1a64 = \"{}\"\n", fnv1a64_hex(&bytes)));
+        )
+        .unwrap();
+        writeln!(out, "bytes = {}", bytes.len()).unwrap();
+        writeln!(out, "fnv1a64 = \"{}\"", fnv1a64_hex(&bytes)).unwrap();
         out.push('\n');
     }
 

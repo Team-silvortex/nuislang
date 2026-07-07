@@ -2,9 +2,14 @@ use super::{
     reports::NsldObjectImageDryRunReport, toml::escape_toml_string, NSLD_LINK_INPUT_TABLE_PRODUCER,
     NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE,
 };
+use std::fmt::Write as _;
 
 pub(crate) fn render_object_image_dry_run(report: &NsldObjectImageDryRunReport) -> String {
-    let mut out = String::new();
+    let mut out = String::with_capacity(
+        1536 + report.backend_capabilities.len() * 96
+            + report.relocation_lowering_rules.len() * 192
+            + report.relocation_records.len() * 256,
+    );
     out.push_str("schema = \"nuis-nsld-object-image-dry-run-v1\"\n");
     out.push_str("schema_version = 1\n");
     out.push_str("kind = \"object-image-dry-run\"\n");
@@ -27,48 +32,57 @@ pub(crate) fn render_object_image_dry_run(report: &NsldObjectImageDryRunReport) 
     push_string(&mut out, "backend_status", &report.backend_status);
     push_string(&mut out, "object_format", &report.object_format);
     push_string(&mut out, "file_layout_hash", &report.file_layout_hash);
-    out.push_str(&format!("record_count = {}\n", report.record_count));
-    out.push_str(&format!(
-        "total_file_size_bytes = {}\n",
+    writeln!(out, "record_count = {}", report.record_count).unwrap();
+    writeln!(
+        out,
+        "total_file_size_bytes = {}",
         report.total_file_size_bytes
-    ));
-    out.push_str(&format!(
-        "image_constructed = {}\n",
-        report.image_constructed
-    ));
-    out.push_str(&format!("image_ready = {}\n", report.image_ready));
+    )
+    .unwrap();
+    writeln!(out, "image_constructed = {}", report.image_constructed).unwrap();
+    writeln!(out, "image_ready = {}", report.image_ready).unwrap();
     push_optional_usize(&mut out, "image_size_bytes", report.image_size_bytes);
     push_optional_string(&mut out, "image_hash", report.image_hash.as_deref());
-    out.push_str(&format!(
-        "relocation_lowering_valid = {}\n",
+    writeln!(
+        out,
+        "relocation_lowering_valid = {}",
         report.relocation_lowering_valid
-    ));
-    out.push_str(&format!(
-        "relocation_lowering_rule_count = {}\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "relocation_lowering_rule_count = {}",
         report.relocation_lowering_rule_count
-    ));
-    out.push_str(&format!(
-        "relocation_lowering_issues = [{}]\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "relocation_lowering_issues = [{}]",
         super::toml::toml_string_array_literal(&report.relocation_lowering_issues)
-    ));
-    out.push_str(&format!(
-        "relocation_record_count = {}\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "relocation_record_count = {}",
         report.relocation_record_count
-    ));
+    )
+    .unwrap();
     push_string(
         &mut out,
         "relocation_record_table_hash",
         &report.relocation_record_table_hash,
     );
-    out.push_str(&format!(
-        "blockers = [{}]\n",
+    writeln!(
+        out,
+        "blockers = [{}]",
         super::toml::toml_string_array_literal(&report.blockers)
-    ));
+    )
+    .unwrap();
     for capability in &report.backend_capabilities {
         out.push_str("\n[[backend_capability]]\n");
         push_string(&mut out, "capability_id", &capability.capability_id);
         push_string(&mut out, "status", &capability.status);
-        out.push_str(&format!("required = {}\n", capability.required));
+        writeln!(out, "required = {}", capability.required).unwrap();
     }
     for rule in &report.relocation_lowering_rules {
         out.push_str("\n[[relocation_lowering_rule]]\n");
@@ -79,46 +93,46 @@ pub(crate) fn render_object_image_dry_run(report: &NsldObjectImageDryRunReport) 
             "target_relocation_kind",
             &rule.target_relocation_kind,
         );
-        out.push_str(&format!("pc_relative = {}\n", rule.pc_relative));
-        out.push_str(&format!("length_power = {}\n", rule.length_power));
-        out.push_str(&format!("external = {}\n", rule.external));
-        out.push_str(&format!("relocation_type = {}\n", rule.relocation_type));
+        writeln!(out, "pc_relative = {}", rule.pc_relative).unwrap();
+        writeln!(out, "length_power = {}", rule.length_power).unwrap();
+        writeln!(out, "external = {}", rule.external).unwrap();
+        writeln!(out, "relocation_type = {}", rule.relocation_type).unwrap();
     }
     for record in &report.relocation_records {
         out.push_str("\n[[relocation_record]]\n");
         push_string(&mut out, "record_id", &record.record_id);
         push_string(&mut out, "relocation_seed_id", &record.relocation_seed_id);
         push_string(&mut out, "source_section_id", &record.source_section_id);
-        out.push_str(&format!("source_offset = {}\n", record.source_offset));
+        writeln!(out, "source_offset = {}", record.source_offset).unwrap();
         push_string(&mut out, "source_seed_kind", &record.source_seed_kind);
         push_string(
             &mut out,
             "target_relocation_kind",
             &record.target_relocation_kind,
         );
-        out.push_str(&format!("symbol_index = {}\n", record.symbol_index));
-        out.push_str(&format!("pc_relative = {}\n", record.pc_relative));
-        out.push_str(&format!("length_power = {}\n", record.length_power));
-        out.push_str(&format!("external = {}\n", record.external));
-        out.push_str(&format!("relocation_type = {}\n", record.relocation_type));
+        writeln!(out, "symbol_index = {}", record.symbol_index).unwrap();
+        writeln!(out, "pc_relative = {}", record.pc_relative).unwrap();
+        writeln!(out, "length_power = {}", record.length_power).unwrap();
+        writeln!(out, "external = {}", record.external).unwrap();
+        writeln!(out, "relocation_type = {}", record.relocation_type).unwrap();
     }
     out
 }
 
 fn push_string(out: &mut String, key: &str, value: &str) {
-    out.push_str(&format!("{key} = \"{}\"\n", escape_toml_string(value)));
+    writeln!(out, "{key} = \"{}\"", escape_toml_string(value)).unwrap();
 }
 
 fn push_optional_string(out: &mut String, key: &str, value: Option<&str>) {
     match value {
         Some(value) => push_string(out, key, value),
-        None => out.push_str(&format!("{key} = \"\"\n")),
+        None => writeln!(out, "{key} = \"\"").unwrap(),
     }
 }
 
 fn push_optional_usize(out: &mut String, key: &str, value: Option<usize>) {
     match value {
-        Some(value) => out.push_str(&format!("{key} = {value}\n")),
-        None => out.push_str(&format!("{key} = 0\n")),
+        Some(value) => writeln!(out, "{key} = {value}").unwrap(),
+        None => writeln!(out, "{key} = 0").unwrap(),
     }
 }

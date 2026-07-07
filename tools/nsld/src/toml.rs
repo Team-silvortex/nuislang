@@ -11,6 +11,7 @@ use super::{
     NSLD_LINK_UNIT_TABLE_SCHEMA_VERSION, NSLD_SECTION_MANIFEST_KIND, NSLD_SECTION_MANIFEST_SCHEMA,
     NSLD_SECTION_MANIFEST_SCHEMA_VERSION,
 };
+use std::fmt::Write as _;
 
 pub(crate) use super::object_emit_render::render_object_emit_blocked;
 pub(crate) use super::object_image_render::render_object_image_dry_run;
@@ -28,367 +29,486 @@ pub(crate) fn render_link_input_table(
     total_bytes: usize,
     table_hash: &str,
 ) -> String {
-    let mut out = String::new();
-    out.push_str(&format!(
-        "schema = \"{}\"\n",
+    let mut out = String::with_capacity(512 + inputs.len() * 448);
+    writeln!(
+        out,
+        "schema = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_SCHEMA)
-    ));
-    out.push_str(&format!(
-        "schema_version = {NSLD_LINK_INPUT_TABLE_SCHEMA_VERSION}\n"
-    ));
-    out.push_str(&format!(
-        "table_kind = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "schema_version = {NSLD_LINK_INPUT_TABLE_SCHEMA_VERSION}"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "table_kind = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_KIND)
-    ));
-    out.push_str(&format!(
-        "producer = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "producer = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
-    ));
-    out.push_str(&format!(
-        "producer_phase = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "producer_phase = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
-    ));
-    out.push_str(&format!("link_input_count = {}\n", inputs.len()));
-    out.push_str(&format!("link_input_total_bytes = {total_bytes}\n"));
-    out.push_str(&format!(
-        "link_input_table_hash = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(out, "link_input_count = {}", inputs.len()).unwrap();
+    writeln!(out, "link_input_total_bytes = {total_bytes}").unwrap();
+    writeln!(
+        out,
+        "link_input_table_hash = \"{}\"",
         escape_toml_string(table_hash)
-    ));
+    )
+    .unwrap();
     for input in inputs {
         out.push_str("\n[[link_input]]\n");
-        out.push_str(&format!("order_index = {}\n", input.order_index));
-        out.push_str(&format!(
-            "input_id = \"{}\"\n",
+        writeln!(out, "order_index = {}", input.order_index).unwrap();
+        writeln!(
+            out,
+            "input_id = \"{}\"",
             escape_toml_string(&input.input_id)
-        ));
-        out.push_str(&format!(
-            "input_kind = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "input_kind = \"{}\"",
             escape_toml_string(&input.input_kind)
-        ));
-        out.push_str(&format!(
-            "domain_family = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "domain_family = \"{}\"",
             escape_toml_string(&input.domain_family)
-        ));
-        out.push_str(&format!(
-            "package_id = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "package_id = \"{}\"",
             escape_toml_string(&input.package_id)
-        ));
-        out.push_str(&format!("path = \"{}\"\n", escape_toml_string(&input.path)));
-        out.push_str(&format!(
-            "native_ir = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(out, "path = \"{}\"", escape_toml_string(&input.path)).unwrap();
+        writeln!(
+            out,
+            "native_ir = \"{}\"",
             escape_toml_string(&input.native_ir)
-        ));
-        out.push_str(&format!(
-            "dispatch_lowering = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "dispatch_lowering = \"{}\"",
             escape_toml_string(&input.dispatch_lowering)
-        ));
-        out.push_str(&format!("contract_count = {}\n", input.contract_count));
-        out.push_str(&format!("content_bytes = {}\n", input.content_bytes));
-        out.push_str(&format!(
-            "content_hash = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(out, "contract_count = {}", input.contract_count).unwrap();
+        writeln!(out, "content_bytes = {}", input.content_bytes).unwrap();
+        writeln!(
+            out,
+            "content_hash = \"{}\"",
             escape_toml_string(&input.content_hash)
-        ));
+        )
+        .unwrap();
     }
     out
 }
 
 pub(crate) fn render_link_unit_table(report: &NsldLinkUnitReport) -> String {
-    let mut out = String::new();
-    out.push_str(&format!(
-        "schema = \"{}\"\n",
+    let mut out = String::with_capacity(512 + report.units.len() * 512);
+    writeln!(
+        out,
+        "schema = \"{}\"",
         escape_toml_string(NSLD_LINK_UNIT_TABLE_SCHEMA)
-    ));
-    out.push_str(&format!(
-        "schema_version = {NSLD_LINK_UNIT_TABLE_SCHEMA_VERSION}\n"
-    ));
-    out.push_str(&format!(
-        "table_kind = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "schema_version = {NSLD_LINK_UNIT_TABLE_SCHEMA_VERSION}"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "table_kind = \"{}\"",
         escape_toml_string(NSLD_LINK_UNIT_TABLE_KIND)
-    ));
-    out.push_str(&format!(
-        "producer = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "producer = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
-    ));
-    out.push_str(&format!(
-        "producer_phase = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "producer_phase = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
-    ));
-    out.push_str(&format!("unit_count = {}\n", report.unit_count));
-    out.push_str(&format!(
-        "hetero_unit_count = {}\n",
-        report.hetero_unit_count
-    ));
-    out.push_str(&format!("link_input_count = {}\n", report.link_input_count));
-    out.push_str(&format!("clock_edge_count = {}\n", report.clock_edge_count));
-    out.push_str(&format!(
-        "data_segment_count = {}\n",
-        report.data_segment_count
-    ));
-    out.push_str(&format!(
-        "unit_table_hash = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(out, "unit_count = {}", report.unit_count).unwrap();
+    writeln!(out, "hetero_unit_count = {}", report.hetero_unit_count).unwrap();
+    writeln!(out, "link_input_count = {}", report.link_input_count).unwrap();
+    writeln!(out, "clock_edge_count = {}", report.clock_edge_count).unwrap();
+    writeln!(out, "data_segment_count = {}", report.data_segment_count).unwrap();
+    writeln!(
+        out,
+        "unit_table_hash = \"{}\"",
         escape_toml_string(&report.unit_table_hash)
-    ));
+    )
+    .unwrap();
     for unit in &report.units {
         out.push_str("\n[[link_unit]]\n");
-        out.push_str(&format!("order_index = {}\n", unit.order_index));
-        out.push_str(&format!(
-            "unit_id = \"{}\"\n",
-            escape_toml_string(&unit.unit_id)
-        ));
-        out.push_str(&format!(
-            "unit_kind = \"{}\"\n",
+        writeln!(out, "order_index = {}", unit.order_index).unwrap();
+        writeln!(out, "unit_id = \"{}\"", escape_toml_string(&unit.unit_id)).unwrap();
+        writeln!(
+            out,
+            "unit_kind = \"{}\"",
             escape_toml_string(&unit.unit_kind)
-        ));
-        out.push_str(&format!(
-            "domain_family = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "domain_family = \"{}\"",
             escape_toml_string(&unit.domain_family)
-        ));
-        out.push_str(&format!(
-            "package_id = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "package_id = \"{}\"",
             escape_toml_string(&unit.package_id)
-        ));
-        out.push_str(&format!(
-            "backend_family = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "backend_family = \"{}\"",
             escape_toml_string(&unit.backend_family)
-        ));
-        out.push_str(&format!(
-            "lowering_target = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "lowering_target = \"{}\"",
             escape_toml_string(&unit.lowering_target)
-        ));
-        out.push_str(&format!(
-            "packaging_role = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "packaging_role = \"{}\"",
             escape_toml_string(&unit.packaging_role)
-        ));
-        out.push_str(&format!(
-            "link_input_ids = [{}]\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "link_input_ids = [{}]",
             toml_string_array_literal(&unit.link_input_ids)
-        ));
-        out.push_str(&format!("clock_edge_count = {}\n", unit.clock_edge_count));
-        out.push_str(&format!(
-            "data_segment_count = {}\n",
-            unit.data_segment_count
-        ));
-        out.push_str(&format!(
-            "requires_host_wrapper = {}\n",
+        )
+        .unwrap();
+        writeln!(out, "clock_edge_count = {}", unit.clock_edge_count).unwrap();
+        writeln!(out, "data_segment_count = {}", unit.data_segment_count).unwrap();
+        writeln!(
+            out,
+            "requires_host_wrapper = {}",
             unit.requires_host_wrapper
-        ));
-        out.push_str(&format!(
-            "deterministic_order_key = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "deterministic_order_key = \"{}\"",
             escape_toml_string(&unit.deterministic_order_key)
-        ));
+        )
+        .unwrap();
     }
     out
 }
 
 pub(crate) fn render_link_bundle(report: &NsldLinkBundleReport) -> String {
-    let mut out = String::new();
-    out.push_str(&format!(
-        "schema = \"{}\"\n",
+    let mut out = String::with_capacity(1024 + report.issues.len() * 64);
+    writeln!(
+        out,
+        "schema = \"{}\"",
         escape_toml_string(NSLD_LINK_BUNDLE_SCHEMA)
-    ));
-    out.push_str(&format!(
-        "schema_version = {NSLD_LINK_BUNDLE_SCHEMA_VERSION}\n"
-    ));
-    out.push_str(&format!(
-        "bundle_kind = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(out, "schema_version = {NSLD_LINK_BUNDLE_SCHEMA_VERSION}").unwrap();
+    writeln!(
+        out,
+        "bundle_kind = \"{}\"",
         escape_toml_string(NSLD_LINK_BUNDLE_KIND)
-    ));
-    out.push_str(&format!(
-        "producer = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "producer = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
-    ));
-    out.push_str(&format!(
-        "producer_phase = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "producer_phase = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
-    ));
-    out.push_str(&format!(
-        "bundle_id = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "bundle_id = \"{}\"",
         escape_toml_string(&report.bundle_id)
-    ));
-    out.push_str(&format!(
-        "bundle_hash = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "bundle_hash = \"{}\"",
         escape_toml_string(&report.bundle_hash)
-    ));
-    out.push_str(&format!("bundle_ready = {}\n", report.bundle_ready));
-    out.push_str(&format!("unit_count = {}\n", report.unit_count));
-    out.push_str(&format!(
-        "hetero_unit_count = {}\n",
-        report.hetero_unit_count
-    ));
-    out.push_str(&format!("link_input_count = {}\n", report.link_input_count));
-    out.push_str(&format!(
-        "link_input_total_bytes = {}\n",
+    )
+    .unwrap();
+    writeln!(out, "bundle_ready = {}", report.bundle_ready).unwrap();
+    writeln!(out, "unit_count = {}", report.unit_count).unwrap();
+    writeln!(out, "hetero_unit_count = {}", report.hetero_unit_count).unwrap();
+    writeln!(out, "link_input_count = {}", report.link_input_count).unwrap();
+    writeln!(
+        out,
+        "link_input_total_bytes = {}",
         report.link_input_total_bytes
-    ));
-    out.push_str(&format!(
-        "link_input_table_hash = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "link_input_table_hash = \"{}\"",
         escape_toml_string(&report.link_input_table_hash)
-    ));
-    out.push_str(&format!(
-        "unit_table_hash = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "unit_table_hash = \"{}\"",
         escape_toml_string(&report.unit_table_hash)
-    ));
-    out.push_str(&format!("clock_edge_count = {}\n", report.clock_edge_count));
-    out.push_str(&format!(
-        "data_segment_count = {}\n",
-        report.data_segment_count
-    ));
-    out.push_str(&format!(
-        "final_stage_link_mode = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(out, "clock_edge_count = {}", report.clock_edge_count).unwrap();
+    writeln!(out, "data_segment_count = {}", report.data_segment_count).unwrap();
+    writeln!(
+        out,
+        "final_stage_link_mode = \"{}\"",
         escape_toml_string(&report.final_stage_link_mode)
-    ));
-    out.push_str(&format!(
-        "host_wrapper_required = {}\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "host_wrapper_required = {}",
         report.host_wrapper_required
-    ));
-    out.push_str(&format!(
-        "compiled_artifact_path = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "compiled_artifact_path = \"{}\"",
         escape_toml_string(&report.compiled_artifact_path)
-    ));
-    out.push_str(&format!(
-        "native_output_path = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "native_output_path = \"{}\"",
         escape_toml_string(&report.native_output_path)
-    ));
-    out.push_str(&format!(
-        "issues = [{}]\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "issues = [{}]",
         toml_string_array_literal(&report.issues)
-    ));
+    )
+    .unwrap();
     out
 }
 
 pub(crate) fn render_assemble_plan(report: &NsldAssemblePlanReport) -> String {
-    let mut out = String::new();
-    out.push_str(&format!(
-        "schema = \"{}\"\n",
+    let mut out = String::with_capacity(768 + report.sections.len() * 256);
+    writeln!(
+        out,
+        "schema = \"{}\"",
         escape_toml_string(NSLD_ASSEMBLE_PLAN_SCHEMA)
-    ));
-    out.push_str(&format!(
-        "schema_version = {NSLD_ASSEMBLE_PLAN_SCHEMA_VERSION}\n"
-    ));
-    out.push_str(&format!(
-        "plan_kind = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(out, "schema_version = {NSLD_ASSEMBLE_PLAN_SCHEMA_VERSION}").unwrap();
+    writeln!(
+        out,
+        "plan_kind = \"{}\"",
         escape_toml_string(NSLD_ASSEMBLE_PLAN_KIND)
-    ));
-    out.push_str(&format!(
-        "producer = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "producer = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
-    ));
-    out.push_str(&format!(
-        "producer_phase = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "producer_phase = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
-    ));
-    out.push_str(&format!("ready = {}\n", report.ready));
-    out.push_str(&format!(
-        "bundle_id = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(out, "ready = {}", report.ready).unwrap();
+    writeln!(
+        out,
+        "bundle_id = \"{}\"",
         escape_toml_string(&report.bundle_id)
-    ));
-    out.push_str(&format!(
-        "bundle_hash = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "bundle_hash = \"{}\"",
         escape_toml_string(&report.bundle_hash)
-    ));
-    out.push_str(&format!(
-        "assemble_plan_hash = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "assemble_plan_hash = \"{}\"",
         escape_toml_string(&report.assemble_plan_hash)
-    ));
-    out.push_str(&format!("section_count = {}\n", report.section_count));
-    out.push_str(&format!(
-        "blockers = [{}]\n",
+    )
+    .unwrap();
+    writeln!(out, "section_count = {}", report.section_count).unwrap();
+    writeln!(
+        out,
+        "blockers = [{}]",
         toml_string_array_literal(&report.blockers)
-    ));
+    )
+    .unwrap();
     for section in &report.sections {
         out.push_str("\n[[section]]\n");
-        out.push_str(&format!("order_index = {}\n", section.order_index));
-        out.push_str(&format!(
-            "section_id = \"{}\"\n",
+        writeln!(out, "order_index = {}", section.order_index).unwrap();
+        writeln!(
+            out,
+            "section_id = \"{}\"",
             escape_toml_string(&section.section_id)
-        ));
-        out.push_str(&format!(
-            "section_kind = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "section_kind = \"{}\"",
             escape_toml_string(&section.section_kind)
-        ));
-        out.push_str(&format!(
-            "source_path = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "source_path = \"{}\"",
             escape_toml_string(&section.source_path)
-        ));
-        out.push_str(&format!(
-            "source_hash = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "source_hash = \"{}\"",
             escape_toml_string(&section.source_hash)
-        ));
-        out.push_str(&format!("required = {}\n", section.required));
+        )
+        .unwrap();
+        writeln!(out, "required = {}", section.required).unwrap();
     }
     out
 }
 
 pub(crate) fn render_section_manifest(report: &NsldSectionManifestReport) -> String {
-    let mut out = String::new();
-    out.push_str(&format!(
-        "schema = \"{}\"\n",
+    let mut out = String::with_capacity(768 + report.sections.len() * 256);
+    writeln!(
+        out,
+        "schema = \"{}\"",
         escape_toml_string(NSLD_SECTION_MANIFEST_SCHEMA)
-    ));
-    out.push_str(&format!(
-        "schema_version = {NSLD_SECTION_MANIFEST_SCHEMA_VERSION}\n"
-    ));
-    out.push_str(&format!(
-        "manifest_kind = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "schema_version = {NSLD_SECTION_MANIFEST_SCHEMA_VERSION}"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "manifest_kind = \"{}\"",
         escape_toml_string(NSLD_SECTION_MANIFEST_KIND)
-    ));
-    out.push_str(&format!(
-        "producer = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "producer = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER)
-    ));
-    out.push_str(&format!(
-        "producer_phase = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "producer_phase = \"{}\"",
         escape_toml_string(NSLD_LINK_INPUT_TABLE_PRODUCER_PHASE)
-    ));
-    out.push_str(&format!("ready = {}\n", report.ready));
-    out.push_str(&format!(
-        "assemble_plan_hash = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(out, "ready = {}", report.ready).unwrap();
+    writeln!(
+        out,
+        "assemble_plan_hash = \"{}\"",
         escape_toml_string(&report.assemble_plan_hash)
-    ));
-    out.push_str(&format!("section_count = {}\n", report.section_count));
-    out.push_str(&format!(
-        "section_table_hash = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(out, "section_count = {}", report.section_count).unwrap();
+    writeln!(
+        out,
+        "section_table_hash = \"{}\"",
         escape_toml_string(&report.section_table_hash)
-    ));
-    out.push_str(&format!(
-        "blockers = [{}]\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "blockers = [{}]",
         toml_string_array_literal(&report.blockers)
-    ));
+    )
+    .unwrap();
     for section in &report.sections {
         out.push_str("\n[[section]]\n");
-        out.push_str(&format!("order_index = {}\n", section.order_index));
-        out.push_str(&format!(
-            "section_id = \"{}\"\n",
+        writeln!(out, "order_index = {}", section.order_index).unwrap();
+        writeln!(
+            out,
+            "section_id = \"{}\"",
             escape_toml_string(&section.section_id)
-        ));
-        out.push_str(&format!(
-            "section_kind = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "section_kind = \"{}\"",
             escape_toml_string(&section.section_kind)
-        ));
-        out.push_str(&format!(
-            "source_path = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "source_path = \"{}\"",
             escape_toml_string(&section.source_path)
-        ));
-        out.push_str(&format!(
-            "source_hash = \"{}\"\n",
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "source_hash = \"{}\"",
             escape_toml_string(&section.source_hash)
-        ));
-        out.push_str(&format!("required = {}\n", section.required));
+        )
+        .unwrap();
+        writeln!(out, "required = {}", section.required).unwrap();
     }
     out
 }
 
 pub(crate) fn toml_string_array_literal(values: &[String]) -> String {
-    values
-        .iter()
-        .map(|value| format!("\"{}\"", escape_toml_string(value)))
-        .collect::<Vec<_>>()
-        .join(", ")
+    let mut out = String::with_capacity(values.len() * 24);
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            out.push_str(", ");
+        }
+        write!(out, "\"{}\"", escape_toml_string(value)).unwrap();
+    }
+    out
 }
 
 pub(crate) fn escape_toml_string(value: &str) -> String {
-    value
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            _ => out.push(ch),
+        }
+    }
+    out
 }

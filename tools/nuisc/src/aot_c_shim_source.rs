@@ -24,7 +24,7 @@ use crate::aot_c_shim_text_runtime::append_c_shim_text_runtime;
 use crate::aot_c_shim_time_debug_runtime::append_c_shim_time_debug_runtime;
 
 pub(crate) fn render_c_shim_source(ast: &AstModule) -> String {
-    let mut out = String::new();
+    let mut out = String::with_capacity(64 * 1024);
     let network_lifecycle_enabled = if ast_uses_network_lifecycle_surface(ast) {
         "1"
     } else {

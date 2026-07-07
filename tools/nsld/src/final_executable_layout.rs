@@ -10,34 +10,30 @@ use super::{
 pub(crate) fn final_executable_payloads(
     final_stage: &NsldFinalStagePlanReport,
 ) -> Vec<NsldFinalExecutablePayloadDiagnostic> {
-    final_stage
-        .inputs
-        .iter()
-        .filter_map(|input| {
-            let (payload_id, lifecycle_hook) = match input.input_id.as_str() {
-                "fsi0000.container" => ("payload0000.container", "on_process_start"),
-                "fsi0001.container-payload" => {
-                    ("payload0001.container-payload", "on_process_start")
-                }
-                "fsi0002.closure-snapshot" => ("payload0002.closure-snapshot", "on_debug_metadata"),
-                "fsi0003.native-object" => ("payload0003.native-object", "on_cffi_native_object"),
-                _ => return None,
-            };
-            if input.input_id == "fsi0003.native-object" && !final_stage.native_object_required {
-                return None;
-            }
-            Some(NsldFinalExecutablePayloadDiagnostic {
-                order_index: input.order_index,
-                payload_id: payload_id.to_owned(),
-                payload_kind: input.input_kind.clone(),
-                lifecycle_hook: lifecycle_hook.to_owned(),
-                path: input.path.clone(),
-                content_hash: input.content_hash.clone(),
-                required: input.required,
-                present: input.present,
-            })
-        })
-        .collect()
+    let mut payloads = Vec::with_capacity(final_stage.inputs.len());
+    for input in &final_stage.inputs {
+        let (payload_id, lifecycle_hook) = match input.input_id.as_str() {
+            "fsi0000.container" => ("payload0000.container", "on_process_start"),
+            "fsi0001.container-payload" => ("payload0001.container-payload", "on_process_start"),
+            "fsi0002.closure-snapshot" => ("payload0002.closure-snapshot", "on_debug_metadata"),
+            "fsi0003.native-object" => ("payload0003.native-object", "on_cffi_native_object"),
+            _ => continue,
+        };
+        if input.input_id == "fsi0003.native-object" && !final_stage.native_object_required {
+            continue;
+        }
+        payloads.push(NsldFinalExecutablePayloadDiagnostic {
+            order_index: input.order_index,
+            payload_id: payload_id.to_owned(),
+            payload_kind: input.input_kind.clone(),
+            lifecycle_hook: lifecycle_hook.to_owned(),
+            path: input.path.clone(),
+            content_hash: input.content_hash.clone(),
+            required: input.required,
+            present: input.present,
+        });
+    }
+    payloads
 }
 
 pub(crate) fn final_executable_byte_map_entries(
@@ -45,24 +41,22 @@ pub(crate) fn final_executable_byte_map_entries(
     alignment: usize,
 ) -> Vec<NsldFinalExecutableByteMapEntry> {
     let mut offset = 0usize;
-    payloads
-        .iter()
-        .map(|payload| {
-            offset = align_to(offset, alignment);
-            let size_bytes = final_executable_payload_size(payload);
-            let entry = NsldFinalExecutableByteMapEntry {
-                order_index: payload.order_index,
-                payload_id: payload.payload_id.clone(),
-                payload_kind: payload.payload_kind.clone(),
-                offset,
-                size_bytes,
-                alignment,
-                content_hash: payload.content_hash.clone(),
-            };
-            offset += size_bytes;
-            entry
-        })
-        .collect()
+    let mut entries = Vec::with_capacity(payloads.len());
+    for payload in payloads {
+        offset = align_to(offset, alignment);
+        let size_bytes = final_executable_payload_size(payload);
+        entries.push(NsldFinalExecutableByteMapEntry {
+            order_index: payload.order_index,
+            payload_id: payload.payload_id.clone(),
+            payload_kind: payload.payload_kind.clone(),
+            offset,
+            size_bytes,
+            alignment,
+            content_hash: payload.content_hash.clone(),
+        });
+        offset += size_bytes;
+    }
+    entries
 }
 
 #[allow(clippy::too_many_arguments)]

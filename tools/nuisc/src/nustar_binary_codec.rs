@@ -15,7 +15,16 @@ pub fn encode(binary: &NustarBinary) -> Vec<u8> {
     let format = binary.implementation_format.as_bytes();
     let blob = &binary.implementation_blob;
 
-    let mut out = Vec::new();
+    let mut out = Vec::with_capacity(
+        46 + manifest.len()
+            + abi.len()
+            + machine_arch.len()
+            + machine_os.len()
+            + object_format.len()
+            + calling_abi.len()
+            + format.len()
+            + blob.len(),
+    );
     out.extend_from_slice(NUSTAR_MAGIC);
     out.extend_from_slice(&binary.format_version.to_le_bytes());
     out.extend_from_slice(&(manifest.len() as u32).to_le_bytes());

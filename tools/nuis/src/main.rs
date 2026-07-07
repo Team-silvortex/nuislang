@@ -6,6 +6,7 @@ mod surface_render;
 
 use std::{
     collections::BTreeSet,
+    fmt::Write as _,
     fs,
     io::Read,
     path::{Path, PathBuf},
@@ -852,16 +853,16 @@ fn run_language_tests_for_source_file(
                 line.push_str(" [should_fail]");
             }
             if let Some(reason) = &function.test_reason {
-                line.push_str(&format!(" [reason: {}]", reason));
+                write!(line, " [reason: {}]", reason).unwrap();
             }
             if let Some(timeout_ms) = function.test_timeout_ms {
-                line.push_str(&format!(" [timeout_ms: {}]", timeout_ms));
+                write!(line, " [timeout_ms: {}]", timeout_ms).unwrap();
             }
             if let Some(clock_domain) = &function.test_clock_domain {
-                line.push_str(&format!(" [clock_domain: {}]", clock_domain.as_str()));
+                write!(line, " [clock_domain: {}]", clock_domain.as_str()).unwrap();
             }
             if let Some(clock_policy) = &function.test_clock_policy {
-                line.push_str(&format!(" [clock_policy: {}]", clock_policy.as_str()));
+                write!(line, " [clock_policy: {}]", clock_policy.as_str()).unwrap();
             }
             println!("{line}");
         }
@@ -919,16 +920,16 @@ fn run_language_tests_for_source_file(
             } else {
                 let mut line = format!("  {} {}", verdict.status, label);
                 if let Some(reason) = &function.test_reason {
-                    line.push_str(&format!(" [reason={}]", reason));
+                    write!(line, " [reason={}]", reason).unwrap();
                 }
                 if let Some(clock_domain) = verdict.resolved_clock_domain {
-                    line.push_str(&format!(" [clock={}]", clock_domain));
+                    write!(line, " [clock={}]", clock_domain).unwrap();
                 }
                 if let Some(clock_policy) = verdict.clock_policy {
-                    line.push_str(&format!(" [policy={}]", clock_policy));
+                    write!(line, " [policy={}]", clock_policy).unwrap();
                 }
                 if let Some(note) = &verdict.note {
-                    line.push_str(&format!(" [note={}]", note));
+                    write!(line, " [note={}]", note).unwrap();
                 }
                 println!("{line}");
             }
@@ -996,19 +997,19 @@ fn run_language_benchmarks_for_source_file(
         for record in &report.records {
             let mut line = format!("  bench_fn: {} ({})", record.function_name, record.label);
             if record.warmup_iters > 0 {
-                line.push_str(&format!(" [warmup_iters: {}]", record.warmup_iters));
+                write!(line, " [warmup_iters: {}]", record.warmup_iters).unwrap();
             }
-            line.push_str(&format!(" [measure_iters: {}]", record.measure_iters));
+            write!(line, " [measure_iters: {}]", record.measure_iters).unwrap();
             if let Some(note) = &record.note {
                 if record.status == "DISCOVERED" {
-                    line.push_str(&format!(" [note: {}]", note));
+                    write!(line, " [note: {}]", note).unwrap();
                 }
             }
             if let Some(clock_domain) = record.declared_clock_domain {
-                line.push_str(&format!(" [clock_domain: {}]", clock_domain));
+                write!(line, " [clock_domain: {}]", clock_domain).unwrap();
             }
             if let Some(clock_policy) = record.clock_policy {
-                line.push_str(&format!(" [clock_policy: {}]", clock_policy));
+                write!(line, " [clock_policy: {}]", clock_policy).unwrap();
             }
             println!("{line}");
         }
@@ -1070,13 +1071,13 @@ fn run_language_benchmarks_for_source_file(
                     record.status, record.label, record.warmup_iters, record.measure_iters
                 );
                 if let Some(clock_domain) = record.resolved_clock_domain {
-                    line.push_str(&format!(" [clock={}]", clock_domain));
+                    write!(line, " [clock={}]", clock_domain).unwrap();
                 }
                 if let Some(clock_policy) = record.clock_policy {
-                    line.push_str(&format!(" [policy={}]", clock_policy));
+                    write!(line, " [policy={}]", clock_policy).unwrap();
                 }
                 if let Some(note) = &record.note {
-                    line.push_str(&format!(" [note={}]", note));
+                    write!(line, " [note={}]", note).unwrap();
                 }
                 println!("{line}");
             }
@@ -1105,66 +1106,26 @@ fn collect_language_benchmarks_for_source_file(
     let ast = nuisc::frontend::parse_nuis_ast(&source)?;
     let nir = nuisc::frontend::lower_ast_to_nir(&ast)?;
     let text_handle_rewrite = summarize_text_handle_rewrites_from_nir(&nir);
-    let benchmarks = nuisc::frontend::collect_nir_benchmarks(&nir);
-    let matched = ast
+    let benchmarks = ast
         .functions
         .iter()
         .filter(|function| function.benchmark_name.is_some())
-        .filter(|function| {
-            test_matches_filter(
-                function.name.as_str(),
-                function.benchmark_name.as_deref(),
-                filter,
-                exact,
-            )
-        })
         .collect::<Vec<_>>();
-    let discovered = benchmarks
-        .iter()
-        .filter(|function| {
-            test_matches_filter(
-                function.name.as_str(),
-                function.benchmark_name.as_deref(),
-                filter,
-                exact,
-            )
-        })
-        .map(|function| BenchmarkRunRecord {
-            source: path.display().to_string(),
-            function_name: function.name.clone(),
-            label: function
-                .benchmark_name
-                .clone()
-                .unwrap_or_else(|| function.name.clone()),
-            status: "DISCOVERED",
-            warmup_iters: function
-                .benchmark_warmup_iters
-                .unwrap_or(0)
-                .try_into()
-                .unwrap_or(0),
-            measure_iters: function
-                .benchmark_measure_iters
-                .unwrap_or(1)
-                .try_into()
-                .unwrap_or(1),
-            note: function
-                .benchmark_timeout_ms
-                .map(|timeout_ms| format!("timeout_ms={timeout_ms}")),
-            measurement: None,
-            clock_policy: function
-                .benchmark_clock_policy
-                .map(|policy| policy.as_str()),
-            resolved_clock_bridge: None,
-            resolved_clock_surface: None,
-            declared_clock_domain: function
-                .benchmark_clock_domain
-                .map(|domain| domain.as_str()),
-            declared_clock_domain_code: function.benchmark_clock_domain.map(|domain| domain.code()),
-            resolved_clock_domain: None,
-            resolved_clock_domain_code: None,
-            resolved_clock_source: None,
-        })
-        .collect::<Vec<_>>();
+    let source_label = path.display().to_string();
+    let mut matched = Vec::with_capacity(benchmarks.len());
+    let mut discovered = Vec::with_capacity(benchmarks.len());
+    for function in benchmarks {
+        if !test_matches_filter(
+            function.name.as_str(),
+            function.benchmark_name.as_deref(),
+            filter,
+            exact,
+        ) {
+            continue;
+        }
+        discovered.push(discovered_benchmark_record(&source_label, function));
+        matched.push(function);
+    }
     if list_only {
         return Ok(LanguageBenchmarkRunReport {
             collected: matched.len(),
@@ -1192,7 +1153,7 @@ fn collect_language_benchmarks_for_source_file(
             _ => failed += 1,
         }
         records.push(BenchmarkRunRecord {
-            source: path.display().to_string(),
+            source: source_label.clone(),
             function_name: function.name.clone(),
             label,
             status: verdict.status,
@@ -1211,17 +1172,7 @@ fn collect_language_benchmarks_for_source_file(
         });
     }
     Ok(LanguageBenchmarkRunReport {
-        collected: benchmarks
-            .iter()
-            .filter(|function| {
-                test_matches_filter(
-                    function.name.as_str(),
-                    function.benchmark_name.as_deref(),
-                    filter,
-                    exact,
-                )
-            })
-            .count(),
+        collected: completed + failed + timed_out,
         completed,
         failed,
         timed_out,
@@ -1229,6 +1180,44 @@ fn collect_language_benchmarks_for_source_file(
         text_handle_rewrite_local_hits: text_handle_rewrite.local_hits,
         records,
     })
+}
+
+fn discovered_benchmark_record(source: &str, function: &AstFunction) -> BenchmarkRunRecord {
+    BenchmarkRunRecord {
+        source: source.to_owned(),
+        function_name: function.name.clone(),
+        label: function
+            .benchmark_name
+            .clone()
+            .unwrap_or_else(|| function.name.clone()),
+        status: "DISCOVERED",
+        warmup_iters: function
+            .benchmark_warmup_iters
+            .unwrap_or(0)
+            .try_into()
+            .unwrap_or(0),
+        measure_iters: function
+            .benchmark_measure_iters
+            .unwrap_or(1)
+            .try_into()
+            .unwrap_or(1),
+        note: function
+            .benchmark_timeout_ms
+            .map(|timeout_ms| format!("timeout_ms={timeout_ms}")),
+        measurement: None,
+        clock_policy: function
+            .benchmark_clock_policy
+            .map(|policy| policy.as_str()),
+        resolved_clock_bridge: None,
+        resolved_clock_surface: None,
+        declared_clock_domain: function
+            .benchmark_clock_domain
+            .map(|domain| domain.as_str()),
+        declared_clock_domain_code: function.benchmark_clock_domain.map(|domain| domain.code()),
+        resolved_clock_domain: None,
+        resolved_clock_domain_code: None,
+        resolved_clock_source: None,
+    }
 }
 
 fn summarize_text_handle_rewrites_from_nir(
@@ -2628,7 +2617,7 @@ fn render_artifact_materialization_json(
         .join(",");
     format!(
         "{{{}}}",
-        vec![
+        [
             json_field("kind", kind),
             json_field("input", &input.display().to_string()),
             json_field("output_dir", &output_dir.display().to_string()),
@@ -5162,7 +5151,7 @@ pub(crate) fn json_string_array_field(name: &str, values: &[String]) -> String {
 fn artifact_lowering_unit_json(
     unit: &nuisc::aot::NuisCompiledArtifactLoweringUnitInspect,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_field("package_id", &unit.package_id),
         json_field("domain_family", &unit.domain_family),
         json_optional_string_field("backend_family", unit.backend_family.as_deref()),
@@ -5748,62 +5737,59 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
         println!("  abi: {}={}", item.domain, item.abi);
         print_project_scheduler_contract_view(&item.domain)?;
     }
-    match nova_profile.as_ref() {
-        Some(profile) => {
-            println!(
-                "  ns_nova_stdlib_schema: {}",
-                profile.stdlib_schema.as_deref().unwrap_or("<none>")
-            );
-            println!(
-                "  ns_nova_stdlib_manifest_ref: {}",
-                profile.stdlib_manifest.as_deref().unwrap_or("<none>")
-            );
-            println!(
-                "  ns_nova_stdlib_declared_sources: {}",
-                profile.stdlib_sources.len()
-            );
-            println!(
-                "  ns_nova_family_schema: {}",
-                profile.family_schema.as_deref().unwrap_or("<none>")
-            );
-            println!(
-                "  ns_nova_family_layers: {}",
-                if profile.family_layers.is_empty() {
-                    "<none>".to_owned()
-                } else {
-                    profile.family_layers.join(", ")
-                }
-            );
-            println!(
-                "  ns_nova_render_schema: {}",
-                profile.render_schema.as_deref().unwrap_or("<none>")
-            );
-            println!(
-                "  ns_nova_render_units: owner={} bridge={} surface={}",
-                profile.render_owner_unit.as_deref().unwrap_or("<none>"),
-                profile.render_bridge_unit.as_deref().unwrap_or("<none>"),
-                profile.render_surface_unit.as_deref().unwrap_or("<none>")
-            );
-            println!(
-                "  ns_nova_selection_schema: {}",
-                profile.selection_schema.as_deref().unwrap_or("<none>")
-            );
-            println!(
-                "  ns_nova_selection_units: owner={} bridge={} render={}",
-                profile.selection_owner_unit.as_deref().unwrap_or("<none>"),
-                profile.selection_bridge_unit.as_deref().unwrap_or("<none>"),
-                profile.selection_render_unit.as_deref().unwrap_or("<none>")
-            );
-            println!(
-                "  ns_nova_selection_controls: {}",
-                if profile.selection_controls.is_empty() {
-                    "<none>".to_owned()
-                } else {
-                    profile.selection_controls.join(", ")
-                }
-            );
-        }
-        None => {}
+    if let Some(profile) = nova_profile.as_ref() {
+        println!(
+            "  ns_nova_stdlib_schema: {}",
+            profile.stdlib_schema.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  ns_nova_stdlib_manifest_ref: {}",
+            profile.stdlib_manifest.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  ns_nova_stdlib_declared_sources: {}",
+            profile.stdlib_sources.len()
+        );
+        println!(
+            "  ns_nova_family_schema: {}",
+            profile.family_schema.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  ns_nova_family_layers: {}",
+            if profile.family_layers.is_empty() {
+                "<none>".to_owned()
+            } else {
+                profile.family_layers.join(", ")
+            }
+        );
+        println!(
+            "  ns_nova_render_schema: {}",
+            profile.render_schema.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  ns_nova_render_units: owner={} bridge={} surface={}",
+            profile.render_owner_unit.as_deref().unwrap_or("<none>"),
+            profile.render_bridge_unit.as_deref().unwrap_or("<none>"),
+            profile.render_surface_unit.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  ns_nova_selection_schema: {}",
+            profile.selection_schema.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  ns_nova_selection_units: owner={} bridge={} render={}",
+            profile.selection_owner_unit.as_deref().unwrap_or("<none>"),
+            profile.selection_bridge_unit.as_deref().unwrap_or("<none>"),
+            profile.selection_render_unit.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  ns_nova_selection_controls: {}",
+            if profile.selection_controls.is_empty() {
+                "<none>".to_owned()
+            } else {
+                profile.selection_controls.join(", ")
+            }
+        );
     }
 
     Ok(())
@@ -6165,7 +6151,7 @@ pub(crate) fn render_project_imports_json(input: &Path) -> Result<String, String
         .records
         .iter()
         .map(|record| {
-            let fields = vec![
+            let fields = [
                 json_field("galaxy", &record.galaxy),
                 json_field("library_module", &record.library_module),
                 json_field("import_policy", &record.import_policy),

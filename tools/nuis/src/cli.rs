@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandKind {
@@ -470,13 +470,14 @@ where
             let mut input = None;
             let mut keep = 4usize;
             let mut json = false;
-            while let Some(arg) = args.next() {
+            let iter = args.by_ref();
+            while let Some(arg) = iter.next() {
                 if arg == "--all" {
                     all = true;
                 } else if arg == "--json" {
                     json = true;
                 } else if arg == "--keep" {
-                    let raw = args.next().ok_or_else(|| {
+                    let raw = iter.next().ok_or_else(|| {
                         "usage: nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]"
                             .to_owned()
                     })?;
@@ -507,14 +508,15 @@ where
             let mut cpu_abi = None;
             let mut target = None;
             let mut positional = Vec::new();
-            while let Some(arg) = args.next() {
+            let iter = args.by_ref();
+            while let Some(arg) = iter.next() {
                 if arg == "--cpu-abi" {
-                    cpu_abi = Some(args.next().ok_or_else(|| {
+                    cpu_abi = Some(iter.next().ok_or_else(|| {
                         "usage: nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
                             .to_owned()
                     })?);
                 } else if arg == "--target" {
-                    target = Some(args.next().ok_or_else(|| {
+                    target = Some(iter.next().ok_or_else(|| {
                         "usage: nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
                             .to_owned()
                     })?);
@@ -557,7 +559,7 @@ where
             let mut include_ignored = false;
             let mut exact = false;
             let mut positional = Vec::new();
-            while let Some(arg) = args.next() {
+            for arg in args.by_ref() {
                 if arg == "--list" {
                     list = true;
                 } else if arg == "--ignored" {
@@ -596,7 +598,7 @@ where
             let mut json = false;
             let mut exact = false;
             let mut positional = Vec::new();
-            while let Some(arg) = args.next() {
+            for arg in args.by_ref() {
                 if arg == "--list" {
                     list = true;
                 } else if arg == "--json" {
@@ -824,7 +826,7 @@ where
                     framework = Some(args.next().ok_or_else(|| {
                         "usage: nuis galaxy init [project-dir] [--framework <name>]".to_owned()
                     })?);
-                } else if input == PathBuf::from(".") {
+                } else if input == Path::new(".") {
                     input = PathBuf::from(arg);
                 } else {
                     return Err(format!(
@@ -1137,7 +1139,6 @@ mod tests {
             }
         );
     }
-
     #[test]
     fn parses_materialize_artifact_with_output_dir() {
         let command = parse_args(
@@ -1158,7 +1159,6 @@ mod tests {
             }
         );
     }
-
     #[test]
     fn parses_bench_with_default_input() {
         let command = parse_args(["bench".to_owned()].into_iter()).expect("bench parses");
