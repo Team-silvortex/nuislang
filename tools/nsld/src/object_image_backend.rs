@@ -5,8 +5,8 @@ use super::{
         mach_o_arm64_relocation_records, mach_o_arm64_relocation_resolution_issues,
     },
     reports::{
-        NsldObjectFileLayoutReport, NsldObjectImageRelocationRecordDiagnostic,
-        NsldRelocationLoweringRuleDiagnostic,
+        NsldObjectFileLayoutReport, NsldObjectImageBackendCapabilityDiagnostic,
+        NsldObjectImageRelocationRecordDiagnostic, NsldRelocationLoweringRuleDiagnostic,
     },
 };
 use std::path::Path;
@@ -78,10 +78,44 @@ pub(crate) fn object_image_backend_family(backend_kind: &str) -> &'static str {
         .unwrap_or("unknown")
 }
 
+pub(crate) fn object_image_backend_capabilities(
+    backend_kind: &str,
+) -> Vec<NsldObjectImageBackendCapabilityDiagnostic> {
+    match backend_kind {
+        "mach-o-arm64" => vec![
+            backend_capability("file-layout-consumer", "ready"),
+            backend_capability("relocation-lowering", "ready"),
+            backend_capability("object-image-encoder", "ready"),
+        ],
+        "elf-aarch64" | "elf-amd64" => vec![
+            backend_capability("file-layout-consumer", "ready"),
+            backend_capability("relocation-lowering", "not-implemented"),
+            backend_capability("object-image-encoder", "not-implemented"),
+        ],
+        "coff-amd64" => vec![
+            backend_capability("file-layout-consumer", "ready"),
+            backend_capability("relocation-lowering", "not-implemented"),
+            backend_capability("object-image-encoder", "not-implemented"),
+        ],
+        _ => vec![backend_capability("backend-selection", "unsupported")],
+    }
+}
+
 pub(crate) fn object_image_backend_relocation_lowering_rule_count(backend_kind: &str) -> usize {
     match backend_kind {
         "mach-o-arm64" => mach_o_arm64_relocation_lowering_rule_count(),
         _ => 0,
+    }
+}
+
+fn backend_capability(
+    capability_id: &str,
+    status: &str,
+) -> NsldObjectImageBackendCapabilityDiagnostic {
+    NsldObjectImageBackendCapabilityDiagnostic {
+        capability_id: capability_id.to_owned(),
+        status: status.to_owned(),
+        required: true,
     }
 }
 
@@ -156,8 +190,8 @@ fn object_image_backend_resolution_issues(
 #[cfg(test)]
 mod tests {
     use super::{
-        encode_object_image_for_backend, object_image_backend_family,
-        object_image_backend_relocation_lowering_rule_count,
+        encode_object_image_for_backend, object_image_backend_capabilities,
+        object_image_backend_family, object_image_backend_relocation_lowering_rule_count,
         object_image_backend_relocation_lowering_rules, object_image_backend_status,
     };
     use crate::{
@@ -189,6 +223,12 @@ mod tests {
         assert_eq!(object_image_backend_status("coff-amd64"), "not-implemented");
         assert_eq!(object_image_backend_family("elf-amd64"), "elf");
         assert_eq!(object_image_backend_family("coff-amd64"), "coff");
+        assert!(object_image_backend_capabilities("elf-amd64")
+            .iter()
+            .any(
+                |capability| capability.capability_id == "object-image-encoder"
+                    && capability.status == "not-implemented"
+            ));
     }
 
     #[test]

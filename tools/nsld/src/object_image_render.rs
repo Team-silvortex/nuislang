@@ -64,6 +64,12 @@ pub(crate) fn render_object_image_dry_run(report: &NsldObjectImageDryRunReport) 
         "blockers = [{}]\n",
         super::toml::toml_string_array_literal(&report.blockers)
     ));
+    for capability in &report.backend_capabilities {
+        out.push_str("\n[[backend_capability]]\n");
+        push_string(&mut out, "capability_id", &capability.capability_id);
+        push_string(&mut out, "status", &capability.status);
+        out.push_str(&format!("required = {}\n", capability.required));
+    }
     for rule in &report.relocation_lowering_rules {
         out.push_str("\n[[relocation_lowering_rule]]\n");
         push_string(&mut out, "rule_id", &rule.rule_id);

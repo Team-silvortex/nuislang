@@ -13,7 +13,7 @@ pub(crate) fn nsld_link_inputs_json(inputs: &[NsldLinkInputDiagnostic]) -> Strin
     inputs
         .iter()
         .map(|input| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", input.order_index),
                 json_string_field("input_id", &input.input_id),
                 json_string_field("input_kind", &input.input_kind),
@@ -36,7 +36,7 @@ pub(crate) fn nsld_link_units_json(units: &[NsldLinkUnitDiagnostic]) -> String {
     units
         .iter()
         .map(|unit| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", unit.order_index),
                 json_string_field("unit_id", &unit.unit_id),
                 json_string_field("unit_kind", &unit.unit_kind),
@@ -61,7 +61,7 @@ pub(crate) fn nsld_assemble_sections_json(sections: &[NsldAssembleSectionDiagnos
     sections
         .iter()
         .map(|section| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", section.order_index),
                 json_string_field("section_id", &section.section_id),
                 json_string_field("section_kind", &section.section_kind),
@@ -79,7 +79,7 @@ pub(crate) fn nsld_container_sections_json(sections: &[NsldContainerSectionEntry
     sections
         .iter()
         .map(|section| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", section.order_index),
                 json_string_field("section_id", &section.section_id),
                 json_string_field("section_kind", &section.section_kind),
@@ -96,6 +96,7 @@ pub(crate) fn nsld_container_sections_json(sections: &[NsldContainerSectionEntry
         .join(",")
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn compatibility_domain_summary_json(
     count: Option<usize>,
     table_hash: Option<&str>,
@@ -107,7 +108,7 @@ pub(crate) fn compatibility_domain_summary_json(
     wrapper_policy: Option<&str>,
     required: Option<bool>,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_optional_usize_field("count", count),
         json_optional_string_field("table_hash", table_hash),
         json_optional_string_field("domain_id", domain_id),
@@ -125,7 +126,7 @@ pub(crate) fn nsld_object_sections_json(sections: &[NsldObjectSectionDiagnostic]
     sections
         .iter()
         .map(|section| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", section.order_index),
                 json_string_field("source_section_id", &section.source_section_id),
                 json_string_field("source_section_kind", &section.source_section_kind),
@@ -152,7 +153,7 @@ pub(crate) fn nsld_object_relocation_seeds_json(
     seeds
         .iter()
         .map(|seed| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", seed.order_index),
                 json_string_field("relocation_seed_id", &seed.relocation_seed_id),
                 json_string_field("relocation_seed_kind", &seed.relocation_seed_kind),
@@ -174,7 +175,7 @@ pub(crate) fn nsld_object_file_layout_records_json(
     records
         .iter()
         .map(|record| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", record.order_index),
                 json_string_field("record_id", &record.record_id),
                 json_string_field("record_kind", &record.record_kind),
@@ -192,7 +193,7 @@ pub(crate) fn domains_json(domains: &[NsldDomainDiagnostic]) -> String {
     domains
         .iter()
         .map(|domain| {
-            let fields = vec![
+            let fields = [
                 json_string_field("domain_family", &domain.domain_family),
                 json_string_field("package_id", &domain.package_id),
                 json_string_field("kind", &domain.kind),
@@ -214,7 +215,7 @@ pub(crate) fn sidecar_capabilities_json(
     capabilities
         .iter()
         .map(|capability| {
-            let fields = vec![
+            let fields = [
                 json_string_field("domain_family", &capability.domain_family),
                 json_string_field("package_id", &capability.package_id),
                 json_string_field("path", &capability.path),
@@ -238,7 +239,7 @@ pub(crate) fn clock_edges_json(edges: &[NsldClockEdgeDiagnostic]) -> String {
     edges
         .iter()
         .map(|edge| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("index", edge.index),
                 json_string_field("from", &edge.from),
                 json_string_field("to", &edge.to),
@@ -255,7 +256,7 @@ pub(crate) fn data_segments_json(segments: &[NsldDataSegmentDiagnostic]) -> Stri
     segments
         .iter()
         .map(|segment| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("index", segment.index),
                 json_string_field("segment_id", &segment.segment_id),
                 json_string_field("domain_family", &segment.domain_family),

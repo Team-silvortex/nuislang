@@ -83,7 +83,7 @@ pub(crate) fn object_writer_backend_readiness(
 }
 
 pub(crate) fn object_format_family(object_format: &str) -> &'static str {
-    match object_format {
+    match canonical_object_format(object_format) {
         "mach-o" => "mach-o",
         "elf" => "elf",
         "coff" => "coff",
@@ -100,12 +100,39 @@ fn object_writer_backend_kind(
     machine_os: &str,
     object_format: &str,
 ) -> &'static str {
-    match (machine_arch, machine_os, object_format) {
+    match (
+        canonical_machine_arch(machine_arch),
+        canonical_machine_os(machine_os),
+        canonical_object_format(object_format),
+    ) {
         ("arm64", "macos", "mach-o") => "mach-o-arm64",
         ("aarch64", "linux", "elf") => "elf-aarch64",
         ("x86_64", "linux", "elf") => "elf-amd64",
         ("x86_64", "windows", "coff") => "coff-amd64",
         _ => "unknown-object-writer",
+    }
+}
+
+fn canonical_machine_arch(machine_arch: &str) -> &str {
+    match machine_arch {
+        "amd64" => "x86_64",
+        "arm64" => "arm64",
+        "aarch64" => "aarch64",
+        other => other,
+    }
+}
+
+fn canonical_machine_os(machine_os: &str) -> &str {
+    match machine_os {
+        "darwin" => "macos",
+        other => other,
+    }
+}
+
+fn canonical_object_format(object_format: &str) -> &str {
+    match object_format {
+        "pe" | "pe-coff" | "pe/coff" => "coff",
+        other => other,
     }
 }
 
@@ -271,5 +298,22 @@ mod tests {
             backend.unsupported_features,
             vec!["object-writer-target".to_owned()]
         );
+    }
+
+    #[test]
+    fn recognizes_common_arch_and_coff_aliases() {
+        let backend = object_writer_backend("amd64", "windows", "pe/coff");
+
+        assert_eq!(backend.target_id, "amd64-windows-pe/coff");
+        assert_eq!(backend.backend_kind, "coff-amd64");
+        assert_eq!(backend.status, "recognized-blocked");
+        assert_eq!(
+            super::object_format_family("pe-coff"),
+            "coff",
+            "PE/COFF aliases should normalize to the COFF object family"
+        );
+        assert!(backend
+            .unsupported_features
+            .contains(&"object-byte-emitter".to_owned()));
     }
 }

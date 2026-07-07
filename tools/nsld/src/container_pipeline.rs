@@ -1,7 +1,7 @@
 pub(crate) use super::container_pipeline_verify::nsld_verify_container_report;
 
 use super::{
-    artifact_chain::{nsld_artifact_stage_kind_path, NsldArtifactStageKind},
+    artifact_chain::{nsld_artifact_stage_kind_path_for_plan, NsldArtifactStageKind},
     assembly::nsld_section_manifest_report,
     container, fnv1a64_hex,
     object_output::nsld_object_output_issues,
@@ -78,7 +78,7 @@ fn append_object_output_section(
     blockers: &mut Vec<String>,
 ) {
     let object_output_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectOutput);
+        nsld_artifact_stage_kind_path_for_plan(plan, NsldArtifactStageKind::ObjectOutput);
     if !object_output_path.exists() {
         return;
     }

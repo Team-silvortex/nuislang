@@ -1,5 +1,8 @@
 use super::{
-    artifact_chain::{nsld_artifact_stage_kind_path, NsldArtifactStageKind},
+    artifact_chain::{
+        nsld_artifact_stage_kind_path, nsld_artifact_stage_kind_path_for_plan,
+        NsldArtifactStageKind,
+    },
     fnv1a64_hex,
     reports::NsldObjectOutputVerifyReport,
 };
@@ -10,7 +13,7 @@ pub(crate) fn nsld_verify_object_output_report(
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldObjectOutputVerifyReport {
     let object_output_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectOutput);
+        nsld_artifact_stage_kind_path_for_plan(plan, NsldArtifactStageKind::ObjectOutput);
     let image_dry_run_path = nsld_artifact_stage_kind_path(
         &plan.output_dir,
         NsldArtifactStageKind::ObjectImageDryRunBytes,

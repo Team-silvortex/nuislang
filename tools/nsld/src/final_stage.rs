@@ -25,7 +25,10 @@ pub(crate) use super::final_executable_writer_input::{
     nsld_verify_final_executable_writer_input_report,
 };
 use super::{
-    artifact_chain::{nsld_artifact_stage_kind_path, NsldArtifactStageKind},
+    artifact_chain::{
+        nsld_artifact_stage_kind_path, nsld_artifact_stage_kind_path_for_plan,
+        NsldArtifactStageKind,
+    },
     closure::{nsld_closure_report, nsld_verify_closure_report},
     final_executable_paths::nsld_final_stage_plan_path,
     final_executable_render::render_final_stage_plan,
@@ -40,6 +43,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(test)]
+#[path = "final_stage_tests.rs"]
+mod tests;
+
 pub(crate) fn nsld_final_stage_plan_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
@@ -48,7 +55,7 @@ pub(crate) fn nsld_final_stage_plan_report(
     let closure_snapshot_path =
         nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ClosureSnapshot);
     let native_object_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectOutput);
+        nsld_artifact_stage_kind_path_for_plan(plan, NsldArtifactStageKind::ObjectOutput);
     let host_wrapper_required = matches!(
         plan.final_stage.link_mode.as_str(),
         "host-toolchain-finalize" | "bundle-packaging"
@@ -142,8 +149,8 @@ pub(crate) fn nsld_final_stage_plan_report(
         payload_hash: closure.payload_hash,
         linker_contract_hash: closure.linker_contract_hash,
         native_object_required,
-        native_object_present: nsld_artifact_stage_kind_path(
-            &plan.output_dir,
+        native_object_present: nsld_artifact_stage_kind_path_for_plan(
+            plan,
             NsldArtifactStageKind::ObjectOutput,
         )
         .exists(),

@@ -1,7 +1,7 @@
 use super::{
     artifact_chain::{
         nsld_artifact_chain_issues, nsld_artifact_stage_kind_path, nsld_artifact_stage_present,
-        nsld_artifact_stages, NsldArtifactStageKind,
+        nsld_artifact_stages_for_plan, NsldArtifactStageKind,
     },
     container_pipeline::nsld_container_report,
     fnv1a64_hex,
@@ -25,7 +25,6 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-
 pub(crate) fn nsld_closure_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
@@ -114,7 +113,7 @@ pub(crate) fn nsld_closure_report(
             unresolved.push(format!("link-input-table:{issue}"));
         }
     }
-    let prepared_artifact_stages = nsld_artifact_stages(&plan.output_dir)
+    let prepared_artifact_stages = nsld_artifact_stages_for_plan(plan)
         .into_iter()
         .filter(|stage| {
             stage.kind != NsldArtifactStageKind::ClosureSnapshot
@@ -563,6 +562,7 @@ fn push_usize_mismatch(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn nsld_linker_contract_hash(
     internal_contracts: &[String],
     link_input_table_hash: &str,

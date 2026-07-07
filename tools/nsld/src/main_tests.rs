@@ -1,7 +1,8 @@
 use super::{
     artifact_chain::{
         nsld_artifact_chain_issues, nsld_artifact_chain_report, nsld_artifact_stage_file_name,
-        nsld_artifact_stage_kind_path, NsldArtifactStage, NsldArtifactStageKind,
+        nsld_artifact_stage_kind_path, nsld_object_output_file_name, NsldArtifactStage,
+        NsldArtifactStageKind,
     },
     fnv1a64_hex,
     main_test_support::empty_link_plan,
@@ -22,7 +23,6 @@ use super::{
 };
 use crate::container_verify::{self, TomlFieldKind};
 use std::{env, fs, path::Path};
-
 #[test]
 fn closure_reports_container_metadata_fingerprint() {
     let dir = env::temp_dir().join(format!("nsld-closure-{}", std::process::id()));
@@ -36,7 +36,6 @@ fn closure_reports_container_metadata_fingerprint() {
     let report = nsld_closure_report(Path::new("manifest.toml"), &plan);
     let report_json = super::json::nsld_closure_report_json(&report);
     fs::remove_dir_all(dir).unwrap();
-
     assert!(report.container_metadata_table_hash.starts_with("0x"));
     assert!(report.container_layout_hash.starts_with("0x"));
     assert!(report.container_hash.starts_with("0x"));
@@ -2411,6 +2410,7 @@ fn artifact_stage_kind_paths_are_canonical() {
         nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableBlocked),
         "nuis.nsld.final-executable.blocked.toml"
     );
+    assert_eq!(nsld_object_output_file_name("pe/coff"), "nuis.nsld.pe-coff");
 }
 
 #[test]
@@ -2629,7 +2629,7 @@ fn artifact_chain_report_points_to_first_missing_required_stage() {
 fn test_artifact_stage(file_name: &'static str, present: bool) -> NsldArtifactStage {
     NsldArtifactStage {
         kind: NsldArtifactStageKind::LinkInputs,
-        file_name,
+        file_name: file_name.to_owned(),
         present,
         required: true,
     }
@@ -2638,7 +2638,7 @@ fn test_artifact_stage(file_name: &'static str, present: bool) -> NsldArtifactSt
 fn test_optional_artifact_stage(file_name: &'static str, present: bool) -> NsldArtifactStage {
     NsldArtifactStage {
         kind: NsldArtifactStageKind::ObjectOutput,
-        file_name,
+        file_name: file_name.to_owned(),
         present,
         required: false,
     }

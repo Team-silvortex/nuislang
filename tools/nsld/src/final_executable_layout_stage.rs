@@ -1,5 +1,5 @@
 use super::{
-    artifact_chain::{nsld_artifact_stage_kind_path, NsldArtifactStageKind},
+    artifact_chain::{nsld_artifact_stage_kind_path_for_plan, NsldArtifactStageKind},
     final_executable_layout::{
         final_executable_byte_map_entries, final_executable_payloads,
         nsld_final_executable_byte_map_hash, nsld_final_executable_layout_hash,
@@ -27,7 +27,7 @@ pub(crate) fn nsld_final_executable_layout_plan_report(
     let native_object_path = native_object
         .map(|input| input.path.clone())
         .unwrap_or_else(|| {
-            nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectOutput)
+            nsld_artifact_stage_kind_path_for_plan(plan, NsldArtifactStageKind::ObjectOutput)
                 .display()
                 .to_string()
         });

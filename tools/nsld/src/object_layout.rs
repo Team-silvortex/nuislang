@@ -7,6 +7,7 @@ use super::{
 };
 use std::fs;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn nsld_object_plan_hash(
     target_arch: &str,
     target_os: &str,

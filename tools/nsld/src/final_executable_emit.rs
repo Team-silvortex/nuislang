@@ -613,19 +613,17 @@ pub(crate) fn nsld_final_executable_emit_report_shape(
         );
         report.can_emit_final_executable = false;
     }
-    if !host_dry_run.environment_ready {
-        if report.host_wrapper_required {
+    if !host_dry_run.environment_ready && report.host_wrapper_required {
+        report
+            .blockers
+            .push("host-finalizer-environment:not-ready".to_owned());
+        report.blockers.extend(
             report
-                .blockers
-                .push("host-finalizer-environment:not-ready".to_owned());
-            report.blockers.extend(
-                report
-                    .host_dry_run_blockers
-                    .iter()
-                    .map(|blocker| format!("host-finalizer-dry-run:{blocker}")),
-            );
-            report.can_emit_final_executable = false;
-        }
+                .host_dry_run_blockers
+                .iter()
+                .map(|blocker| format!("host-finalizer-dry-run:{blocker}")),
+        );
+        report.can_emit_final_executable = false;
     }
     if report.host_wrapper_required && !host_invoke_plan.valid {
         report

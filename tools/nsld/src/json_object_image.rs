@@ -3,7 +3,7 @@ use super::{json_fields::*, reports::*};
 pub(crate) fn nsld_object_image_dry_run_report_json(
     report: &NsldObjectImageDryRunReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_object_image_dry_run"),
         json_string_field("manifest", &report.manifest),
@@ -15,6 +15,10 @@ pub(crate) fn nsld_object_image_dry_run_report_json(
         json_string_field("backend_kind", &report.backend_kind),
         json_string_field("backend_family", &report.backend_family),
         json_string_field("backend_status", &report.backend_status),
+        format!(
+            "\"backend_capabilities\":[{}]",
+            backend_capabilities_json(&report.backend_capabilities)
+        ),
         json_string_field("object_format", &report.object_format),
         json_string_field("file_layout_hash", &report.file_layout_hash),
         json_usize_field("record_count", report.record_count),
@@ -53,13 +57,30 @@ pub(crate) fn nsld_object_image_dry_run_report_json(
     format!("{{{}}}", fields.join(","))
 }
 
+fn backend_capabilities_json(
+    capabilities: &[NsldObjectImageBackendCapabilityDiagnostic],
+) -> String {
+    capabilities
+        .iter()
+        .map(|capability| {
+            let fields = [
+                json_string_field("capability_id", &capability.capability_id),
+                json_string_field("status", &capability.status),
+                json_bool_field("required", capability.required),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 pub(crate) fn relocation_lowering_rules_json(
     rules: &[NsldRelocationLoweringRuleDiagnostic],
 ) -> String {
     rules
         .iter()
         .map(|rule| {
-            let fields = vec![
+            let fields = [
                 json_string_field("rule_id", &rule.rule_id),
                 json_string_field("source_seed_kind", &rule.source_seed_kind),
                 json_string_field("target_relocation_kind", &rule.target_relocation_kind),
@@ -80,7 +101,7 @@ pub(crate) fn relocation_records_json(
     records
         .iter()
         .map(|record| {
-            let fields = vec![
+            let fields = [
                 json_string_field("record_id", &record.record_id),
                 json_string_field("relocation_seed_id", &record.relocation_seed_id),
                 json_string_field("source_section_id", &record.source_section_id),
@@ -102,7 +123,7 @@ pub(crate) fn relocation_records_json(
 pub(crate) fn nsld_object_image_dry_run_emit_report_json(
     report: &NsldObjectImageDryRunEmitReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_object_image_dry_run_emit"),
         json_string_field("manifest", &report.manifest),
@@ -120,7 +141,7 @@ pub(crate) fn nsld_object_image_dry_run_emit_report_json(
 pub(crate) fn nsld_object_image_dry_run_verify_report_json(
     report: &NsldObjectImageDryRunVerifyReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_object_image_dry_run_verify"),
         json_string_field("manifest", &report.manifest),

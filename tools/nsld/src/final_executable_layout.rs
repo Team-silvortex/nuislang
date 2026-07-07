@@ -65,6 +65,7 @@ pub(crate) fn final_executable_byte_map_entries(
         .collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn nsld_final_executable_layout_hash(
     final_stage_plan_hash: &str,
     output_path: &str,

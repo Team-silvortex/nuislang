@@ -1,6 +1,10 @@
 use super::reports::{NsldArtifactChainReport, NsldArtifactStageDiagnostic};
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+#[path = "main_artifact_chain_tests.rs"]
+mod tests;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum NsldArtifactStageKind {
     LinkInputs,
@@ -33,7 +37,7 @@ pub(crate) enum NsldArtifactStageKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldArtifactStage {
     pub(crate) kind: NsldArtifactStageKind,
-    pub(crate) file_name: &'static str,
+    pub(crate) file_name: String,
     pub(crate) present: bool,
     pub(crate) required: bool,
 }
@@ -147,6 +151,34 @@ pub(crate) fn nsld_artifact_stage_file_name(kind: NsldArtifactStageKind) -> &'st
         .expect("nsld artifact stage kind must have a file name")
 }
 
+pub(crate) fn nsld_object_output_file_name(object_format: &str) -> String {
+    let format = object_format.trim();
+    let format = if format.is_empty() { "object" } else { format };
+    let safe_format = format
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+    format!("nuis.nsld.{safe_format}")
+}
+
+pub(crate) fn nsld_artifact_stage_file_name_for_plan(
+    kind: NsldArtifactStageKind,
+    plan: &nuisc::linker::LinkPlan,
+) -> String {
+    match kind {
+        NsldArtifactStageKind::ObjectOutput => {
+            nsld_object_output_file_name(&plan.cpu_target.object_format)
+        }
+        _ => nsld_artifact_stage_file_name(kind).to_owned(),
+    }
+}
+
 pub(crate) fn nsld_artifact_stage_id(kind: NsldArtifactStageKind) -> &'static str {
     match kind {
         NsldArtifactStageKind::LinkInputs => "link-inputs",
@@ -229,14 +261,29 @@ pub(crate) fn nsld_artifact_stage_kind_path(
     nsld_artifact_stage_path(output_dir, nsld_artifact_stage_file_name(kind))
 }
 
-pub(crate) fn nsld_artifact_stages(output_dir: impl AsRef<Path>) -> Vec<NsldArtifactStage> {
+pub(crate) fn nsld_artifact_stage_kind_path_for_plan(
+    plan: &nuisc::linker::LinkPlan,
+    kind: NsldArtifactStageKind,
+) -> PathBuf {
+    nsld_artifact_stage_path(
+        &plan.output_dir,
+        &nsld_artifact_stage_file_name_for_plan(kind, plan),
+    )
+}
+
+pub(crate) fn nsld_artifact_stages_for_plan(
+    plan: &nuisc::linker::LinkPlan,
+) -> Vec<NsldArtifactStage> {
     ARTIFACT_STAGE_DEFINITIONS
         .iter()
-        .map(|(kind, file_name)| NsldArtifactStage {
-            kind: *kind,
-            file_name,
-            present: nsld_artifact_stage_path(&output_dir, file_name).exists(),
-            required: nsld_artifact_stage_required(*kind),
+        .map(|(kind, _)| {
+            let file_name = nsld_artifact_stage_file_name_for_plan(*kind, plan);
+            NsldArtifactStage {
+                kind: *kind,
+                present: nsld_artifact_stage_path(&plan.output_dir, &file_name).exists(),
+                file_name,
+                required: nsld_artifact_stage_required(*kind),
+            }
         })
         .collect()
 }
@@ -272,14 +319,14 @@ pub(crate) fn nsld_artifact_chain_issues(stages: &[NsldArtifactStage]) -> Vec<St
 
     for stage in stages {
         if stage.present {
-            if let Some(missing) = first_missing_before_present {
+            if let Some(missing) = first_missing_before_present.as_ref() {
                 issues.push(format!(
                     "artifact `{}` is present but prerequisite `{missing}` is missing",
                     stage.file_name
                 ));
             }
         } else if stage.required && first_missing_before_present.is_none() {
-            first_missing_before_present = Some(stage.file_name);
+            first_missing_before_present = Some(stage.file_name.clone());
         }
     }
 
@@ -290,7 +337,7 @@ pub(crate) fn nsld_artifact_chain_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldArtifactChainReport {
-    let stages = nsld_artifact_stages(&plan.output_dir);
+    let stages = nsld_artifact_stages_for_plan(plan);
     let issues = nsld_artifact_chain_issues(&stages);
     let diagnostics = stages
         .iter()
@@ -298,8 +345,8 @@ pub(crate) fn nsld_artifact_chain_report(
         .map(|(order_index, stage)| NsldArtifactStageDiagnostic {
             order_index,
             stage_id: nsld_artifact_stage_id(stage.kind).to_owned(),
-            file_name: stage.file_name.to_owned(),
-            path: nsld_artifact_stage_path(&plan.output_dir, stage.file_name)
+            file_name: stage.file_name.clone(),
+            path: nsld_artifact_stage_path(&plan.output_dir, &stage.file_name)
                 .display()
                 .to_string(),
             required: stage.required,

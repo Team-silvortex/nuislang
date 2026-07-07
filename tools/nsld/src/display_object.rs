@@ -110,6 +110,12 @@ pub(crate) fn print_nsld_object_writer_readiness_report(report: &NsldObjectWrite
     println!("  object_plan_hash: {}", report.object_plan_hash);
     println!("  section_count: {}", report.section_count);
     println!("  can_emit_object: {}", report.can_emit_object);
+    for stage in &report.writer_stages {
+        println!(
+            "  writer_stage: id={} status={} required={}",
+            stage.stage_id, stage.status, stage.required
+        );
+    }
     for feature in &report.unsupported_features {
         println!("  unsupported_feature: {feature}");
     }

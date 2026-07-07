@@ -88,16 +88,11 @@ fn write_section_payloads(
         .iter()
         .filter(|record| record.record_kind == "section-payload")
     {
-        let Some(source_section_id) = record.record_id.strip_prefix("section.") else {
-            return None;
-        };
-        let Some(section) = object_plan
+        let source_section_id = record.record_id.strip_prefix("section.")?;
+        let section = object_plan
             .object_sections
             .iter()
-            .find(|section| section.source_section_id == source_section_id)
-        else {
-            return None;
-        };
+            .find(|section| section.source_section_id == source_section_id)?;
         let Ok(payload) = fs::read(&section.source_path) else {
             continue;
         };

@@ -85,8 +85,16 @@ pub(crate) struct NsldObjectWriterReadinessReport {
     pub(crate) object_plan_hash: String,
     pub(crate) section_count: usize,
     pub(crate) can_emit_object: bool,
+    pub(crate) writer_stages: Vec<NsldObjectWriterStageDiagnostic>,
     pub(crate) unsupported_features: Vec<String>,
     pub(crate) blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectWriterStageDiagnostic {
+    pub(crate) stage_id: String,
+    pub(crate) status: String,
+    pub(crate) required: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -328,6 +336,7 @@ pub(crate) struct NsldObjectImageDryRunReport {
     pub(crate) backend_kind: String,
     pub(crate) backend_family: String,
     pub(crate) backend_status: String,
+    pub(crate) backend_capabilities: Vec<NsldObjectImageBackendCapabilityDiagnostic>,
     pub(crate) object_format: String,
     pub(crate) file_layout_hash: String,
     pub(crate) record_count: usize,
@@ -344,6 +353,13 @@ pub(crate) struct NsldObjectImageDryRunReport {
     pub(crate) relocation_record_table_hash: String,
     pub(crate) relocation_records: Vec<NsldObjectImageRelocationRecordDiagnostic>,
     pub(crate) blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldObjectImageBackendCapabilityDiagnostic {
+    pub(crate) capability_id: String,
+    pub(crate) status: String,
+    pub(crate) required: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

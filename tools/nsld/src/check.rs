@@ -1,6 +1,7 @@
 use super::{
     artifact_chain::{
-        nsld_artifact_chain_issues, nsld_artifact_stage_kind_path, nsld_artifact_stages,
+        nsld_artifact_chain_issues, nsld_artifact_stage_kind_path,
+        nsld_artifact_stage_kind_path_for_plan, nsld_artifact_stages_for_plan,
         NsldArtifactStageKind,
     },
     assembly::{
@@ -35,7 +36,6 @@ use super::{
     reports::{NsldCheckReport, NsldClockEdgeDiagnostic, NsldDataSegmentDiagnostic},
 };
 use std::path::Path;
-
 pub(crate) fn nsld_check_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
@@ -224,7 +224,7 @@ pub(crate) fn nsld_check_report(
         .map(|report| report.issues.clone())
         .unwrap_or_default();
     let object_output_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectOutput);
+        nsld_artifact_stage_kind_path_for_plan(plan, NsldArtifactStageKind::ObjectOutput);
     let object_output_present = object_output_path.exists();
     let object_output_verify_report =
         object_output_present.then(|| nsld_verify_object_output_report(manifest, plan));
@@ -571,7 +571,7 @@ pub(crate) fn nsld_check_report(
             issues
         })
         .unwrap_or_default();
-    let artifact_chain_issues = nsld_artifact_chain_issues(&nsld_artifact_stages(&plan.output_dir));
+    let artifact_chain_issues = nsld_artifact_chain_issues(&nsld_artifact_stages_for_plan(plan));
     let artifact_chain_valid = artifact_chain_issues.is_empty();
     let clock_edges = plan
         .clock_protocol

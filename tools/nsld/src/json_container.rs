@@ -13,7 +13,7 @@ use super::{
 };
 
 pub(crate) fn nsld_container_plan_report_json(report: &NsldContainerPlanReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_container_plan"),
         json_string_field("manifest", &report.manifest),
@@ -34,7 +34,7 @@ pub(crate) fn nsld_container_plan_report_json(report: &NsldContainerPlanReport) 
 }
 
 pub(crate) fn nsld_container_plan_emit_report_json(report: &NsldContainerPlanEmitReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_container_plan_emit"),
         json_string_field("manifest", &report.manifest),
@@ -49,7 +49,7 @@ pub(crate) fn nsld_container_plan_emit_report_json(report: &NsldContainerPlanEmi
 pub(crate) fn nsld_container_plan_verify_report_json(
     report: &NsldContainerPlanVerifyReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_container_plan_verify"),
         json_string_field("manifest", &report.manifest),
@@ -72,7 +72,7 @@ pub(crate) fn nsld_container_plan_verify_report_json(
 
 pub(crate) fn nsld_container_report_json(report: &NsldContainerReport) -> String {
     let compatibility_domain = report.compatibility_domains.first();
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_container"),
         json_string_field("manifest", &report.manifest),
@@ -149,7 +149,7 @@ fn nsld_container_loader_symbols_json(symbols: &[NsldContainerLoaderSymbol]) -> 
     symbols
         .iter()
         .map(|symbol| {
-            let fields = vec![
+            let fields = [
                 json_string_field("symbol_id", &symbol.symbol_id),
                 json_string_field("symbol_kind", &symbol.symbol_kind),
                 json_string_field("symbol_name", &symbol.symbol_name),
@@ -169,7 +169,7 @@ fn nsld_container_relocations_json(relocations: &[NsldContainerRelocationEntry])
     relocations
         .iter()
         .map(|relocation| {
-            let fields = vec![
+            let fields = [
                 json_string_field("relocation_id", &relocation.relocation_id),
                 json_string_field("relocation_kind", &relocation.relocation_kind),
                 json_string_field("source_section_id", &relocation.source_section_id),
@@ -187,7 +187,7 @@ fn nsld_container_external_imports_json(imports: &[NsldContainerExternalImport])
     imports
         .iter()
         .map(|external_import| {
-            let fields = vec![
+            let fields = [
                 json_string_field("import_id", &external_import.import_id),
                 json_string_field("import_kind", &external_import.import_kind),
                 json_string_field("import_name", &external_import.import_name),
@@ -206,7 +206,7 @@ fn nsld_container_compatibility_domains_json(
     domains
         .iter()
         .map(|domain| {
-            let fields = vec![
+            let fields = [
                 json_string_field("domain_id", &domain.domain_id),
                 json_string_field("domain_kind", &domain.domain_kind),
                 json_string_field("paradigm", &domain.paradigm),
@@ -222,7 +222,7 @@ fn nsld_container_compatibility_domains_json(
 }
 
 pub(crate) fn nsld_container_emit_report_json(report: &NsldContainerEmitReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_container_emit"),
         json_string_field("manifest", &report.manifest),
@@ -240,7 +240,7 @@ pub(crate) fn nsld_container_emit_report_json(report: &NsldContainerEmitReport) 
 }
 
 pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_container_verify"),
         json_string_field("manifest", &report.manifest),

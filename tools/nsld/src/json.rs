@@ -6,7 +6,7 @@ pub(crate) use super::json_object_image::*;
 use super::{json_fields::*, json_fragments::*, reports::*};
 
 pub(crate) fn nsld_artifact_chain_report_json(report: &NsldArtifactChainReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_artifact_chain"),
         json_string_field("manifest", &report.manifest),
@@ -62,7 +62,7 @@ pub(crate) fn nsld_artifact_chain_report_json(report: &NsldArtifactChainReport) 
 }
 
 pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_linker_check"),
         json_string_field("manifest", &report.manifest),
@@ -551,7 +551,7 @@ fn artifact_chain_stage_diagnostics_json(stages: &[NsldArtifactStageDiagnostic])
     stages
         .iter()
         .map(|stage| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", stage.order_index),
                 json_string_field("stage_id", &stage.stage_id),
                 json_string_field("file_name", &stage.file_name),
@@ -566,7 +566,7 @@ fn artifact_chain_stage_diagnostics_json(stages: &[NsldArtifactStageDiagnostic])
 }
 
 pub(crate) fn nsld_link_units_emit_report_json(report: &NsldLinkUnitsEmitReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_link_units_emit"),
         json_string_field("manifest", &report.manifest),
@@ -580,7 +580,7 @@ pub(crate) fn nsld_link_units_emit_report_json(report: &NsldLinkUnitsEmitReport)
 }
 
 pub(crate) fn nsld_link_units_verify_report_json(report: &NsldLinkUnitsVerifyReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_link_units_verify"),
         json_string_field("manifest", &report.manifest),
@@ -609,7 +609,7 @@ pub(crate) fn nsld_link_units_verify_report_json(report: &NsldLinkUnitsVerifyRep
 }
 
 pub(crate) fn nsld_link_bundle_report_json(report: &NsldLinkBundleReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_link_bundle"),
         json_string_field("manifest", &report.manifest),
@@ -634,7 +634,7 @@ pub(crate) fn nsld_link_bundle_report_json(report: &NsldLinkBundleReport) -> Str
 }
 
 pub(crate) fn nsld_link_bundle_emit_report_json(report: &NsldLinkBundleEmitReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_link_bundle_emit"),
         json_string_field("manifest", &report.manifest),
@@ -647,7 +647,7 @@ pub(crate) fn nsld_link_bundle_emit_report_json(report: &NsldLinkBundleEmitRepor
 }
 
 pub(crate) fn nsld_link_bundle_verify_report_json(report: &NsldLinkBundleVerifyReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_link_bundle_verify"),
         json_string_field("manifest", &report.manifest),
@@ -663,7 +663,7 @@ pub(crate) fn nsld_link_bundle_verify_report_json(report: &NsldLinkBundleVerifyR
 }
 
 pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_prepare"),
         json_string_field("manifest", &report.manifest),
@@ -830,7 +830,7 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
 }
 
 pub(crate) fn nsld_assemble_plan_report_json(report: &NsldAssemblePlanReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_assemble_plan"),
         json_string_field("manifest", &report.manifest),
@@ -849,7 +849,7 @@ pub(crate) fn nsld_assemble_plan_report_json(report: &NsldAssemblePlanReport) ->
 }
 
 pub(crate) fn nsld_assemble_plan_emit_report_json(report: &NsldAssemblePlanEmitReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_assemble_plan_emit"),
         json_string_field("manifest", &report.manifest),
@@ -864,7 +864,7 @@ pub(crate) fn nsld_assemble_plan_emit_report_json(report: &NsldAssemblePlanEmitR
 pub(crate) fn nsld_assemble_plan_verify_report_json(
     report: &NsldAssemblePlanVerifyReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_assemble_plan_verify"),
         json_string_field("manifest", &report.manifest),
@@ -886,7 +886,7 @@ pub(crate) fn nsld_assemble_plan_verify_report_json(
 }
 
 pub(crate) fn nsld_section_manifest_report_json(report: &NsldSectionManifestReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_section_manifest"),
         json_string_field("manifest", &report.manifest),
@@ -906,7 +906,7 @@ pub(crate) fn nsld_section_manifest_report_json(report: &NsldSectionManifestRepo
 pub(crate) fn nsld_section_manifest_emit_report_json(
     report: &NsldSectionManifestEmitReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_section_manifest_emit"),
         json_string_field("manifest", &report.manifest),
@@ -921,7 +921,7 @@ pub(crate) fn nsld_section_manifest_emit_report_json(
 pub(crate) fn nsld_section_manifest_verify_report_json(
     report: &NsldSectionManifestVerifyReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_section_manifest_verify"),
         json_string_field("manifest", &report.manifest),
@@ -943,7 +943,7 @@ pub(crate) fn nsld_section_manifest_verify_report_json(
 }
 
 pub(crate) fn nsld_link_inputs_emit_report_json(report: &NsldLinkInputsEmitReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_link_inputs_emit"),
         json_string_field("manifest", &report.manifest),
@@ -956,7 +956,7 @@ pub(crate) fn nsld_link_inputs_emit_report_json(report: &NsldLinkInputsEmitRepor
 }
 
 pub(crate) fn nsld_link_inputs_verify_report_json(report: &NsldLinkInputsVerifyReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_link_inputs_verify"),
         json_string_field("manifest", &report.manifest),
@@ -989,7 +989,7 @@ pub(crate) fn nsld_link_inputs_verify_report_json(report: &NsldLinkInputsVerifyR
 }
 
 pub(crate) fn nsld_final_stage_plan_report_json(report: &NsldFinalStagePlanReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_stage_plan"),
         json_string_field("manifest", &report.manifest),
@@ -1017,7 +1017,7 @@ pub(crate) fn nsld_final_stage_plan_report_json(report: &NsldFinalStagePlanRepor
 pub(crate) fn nsld_final_stage_plan_emit_report_json(
     report: &NsldFinalStagePlanEmitReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_stage_plan_emit"),
         json_string_field("manifest", &report.manifest),
@@ -1033,7 +1033,7 @@ pub(crate) fn nsld_final_stage_plan_emit_report_json(
 pub(crate) fn nsld_final_stage_plan_verify_report_json(
     report: &NsldFinalStagePlanVerifyReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_stage_plan_verify"),
         json_string_field("manifest", &report.manifest),
@@ -1074,7 +1074,7 @@ pub(crate) fn nsld_final_executable_readiness_report_json(
 pub(crate) fn nsld_final_executable_writer_plan_report_json(
     report: &NsldFinalExecutableWriterPlanReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_writer_plan"),
         json_string_field("manifest", &report.manifest),
@@ -1097,7 +1097,7 @@ pub(crate) fn nsld_final_executable_writer_plan_report_json(
 pub(crate) fn nsld_final_executable_writer_input_emit_report_json(
     report: &NsldFinalExecutableWriterInputEmitReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_writer_input_emit"),
         json_string_field("manifest", &report.manifest),
@@ -1118,7 +1118,7 @@ pub(crate) fn nsld_final_executable_writer_input_emit_report_json(
 pub(crate) fn nsld_final_executable_writer_input_verify_report_json(
     report: &NsldFinalExecutableWriterInputVerifyReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_writer_input_verify"),
         json_string_field("manifest", &report.manifest),
@@ -1164,7 +1164,7 @@ pub(crate) fn nsld_final_executable_writer_input_verify_report_json(
 pub(crate) fn nsld_final_executable_host_dry_run_report_json(
     report: &NsldFinalExecutableHostDryRunReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_host_dry_run"),
         json_string_field("manifest", &report.manifest),
@@ -1195,7 +1195,7 @@ pub(crate) fn nsld_final_executable_host_dry_run_report_json(
 pub(crate) fn nsld_final_executable_host_invoke_plan_report_json(
     report: &NsldFinalExecutableHostInvokePlanReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_host_invoke_plan"),
         json_string_field("manifest", &report.manifest),
@@ -1228,7 +1228,7 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_report_json(
 pub(crate) fn nsld_final_executable_host_invoke_plan_emit_report_json(
     report: &NsldFinalExecutableHostInvokePlanEmitReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_host_invoke_plan_emit"),
         json_string_field("manifest", &report.manifest),
@@ -1246,7 +1246,7 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_emit_report_json(
 pub(crate) fn nsld_final_executable_host_invoke_plan_verify_report_json(
     report: &NsldFinalExecutableHostInvokePlanVerifyReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_host_invoke_plan_verify"),
         json_string_field("manifest", &report.manifest),
@@ -1305,7 +1305,7 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_verify_report_json(
 pub(crate) fn nsld_final_executable_layout_plan_report_json(
     report: &NsldFinalExecutableLayoutPlanReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_layout_plan"),
         json_string_field("manifest", &report.manifest),
@@ -1351,7 +1351,7 @@ fn final_executable_payload_diagnostics_json(
     payloads
         .iter()
         .map(|payload| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", payload.order_index),
                 json_string_field("payload_id", &payload.payload_id),
                 json_string_field("payload_kind", &payload.payload_kind),
@@ -1371,7 +1371,7 @@ fn final_executable_byte_map_entries_json(entries: &[NsldFinalExecutableByteMapE
     entries
         .iter()
         .map(|entry| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", entry.order_index),
                 json_string_field("payload_id", &entry.payload_id),
                 json_string_field("payload_kind", &entry.payload_kind),
@@ -1389,7 +1389,7 @@ fn final_executable_byte_map_entries_json(entries: &[NsldFinalExecutableByteMapE
 pub(crate) fn nsld_final_executable_layout_plan_emit_report_json(
     report: &NsldFinalExecutableLayoutPlanEmitReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_layout_plan_emit"),
         json_string_field("manifest", &report.manifest),
@@ -1405,7 +1405,7 @@ pub(crate) fn nsld_final_executable_layout_plan_emit_report_json(
 pub(crate) fn nsld_final_executable_layout_plan_verify_report_json(
     report: &NsldFinalExecutableLayoutPlanVerifyReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_layout_plan_verify"),
         json_string_field("manifest", &report.manifest),
@@ -1464,7 +1464,7 @@ pub(crate) fn nsld_final_executable_layout_plan_verify_report_json(
 pub(crate) fn nsld_final_executable_image_dry_run_report_json(
     report: &NsldFinalExecutableImageDryRunReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_image_dry_run"),
         json_string_field("manifest", &report.manifest),
@@ -1491,7 +1491,7 @@ pub(crate) fn nsld_final_executable_image_dry_run_report_json(
 pub(crate) fn nsld_final_executable_image_dry_run_emit_report_json(
     report: &NsldFinalExecutableImageDryRunEmitReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_image_dry_run_emit"),
         json_string_field("manifest", &report.manifest),
@@ -1512,7 +1512,7 @@ pub(crate) fn nsld_final_executable_image_dry_run_emit_report_json(
 pub(crate) fn nsld_final_executable_image_dry_run_verify_report_json(
     report: &NsldFinalExecutableImageDryRunVerifyReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_image_dry_run_verify"),
         json_string_field("manifest", &report.manifest),
@@ -1603,7 +1603,7 @@ fn nsld_final_executable_report_json_with_kind(
     report: &NsldFinalExecutableEmitReport,
     kind: &str,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", kind),
         json_string_field("manifest", &report.manifest),
@@ -1708,7 +1708,7 @@ fn nsld_final_executable_report_json_with_kind(
 pub(crate) fn nsld_final_executable_emit_verify_report_json(
     report: &NsldFinalExecutableEmitVerifyReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_emit_verify"),
         json_string_field("manifest", &report.manifest),
@@ -1963,7 +1963,7 @@ pub(crate) fn nsld_final_executable_emit_verify_report_json(
 pub(crate) fn nsld_final_executable_output_report_json(
     report: &NsldFinalExecutableOutputReport,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_output"),
         json_string_field("manifest", &report.manifest),
@@ -1996,7 +1996,7 @@ fn final_stage_inputs_json(inputs: &[NsldFinalStageInputDiagnostic]) -> String {
     inputs
         .iter()
         .map(|input| {
-            let fields = vec![
+            let fields = [
                 json_usize_field("order_index", input.order_index),
                 json_string_field("input_id", &input.input_id),
                 json_string_field("input_kind", &input.input_kind),
@@ -2012,7 +2012,7 @@ fn final_stage_inputs_json(inputs: &[NsldFinalStageInputDiagnostic]) -> String {
 }
 
 pub(crate) fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_linker_closure"),
         json_string_field("manifest", &report.manifest),
@@ -2140,7 +2140,7 @@ pub(crate) fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
 }
 
 pub(crate) fn nsld_closure_emit_report_json(report: &NsldClosureEmitReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_linker_closure_emit"),
         json_string_field("manifest", &report.manifest),
@@ -2154,7 +2154,7 @@ pub(crate) fn nsld_closure_emit_report_json(report: &NsldClosureEmitReport) -> S
 }
 
 pub(crate) fn nsld_closure_verify_report_json(report: &NsldClosureVerifyReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_linker_closure_verify"),
         json_string_field("manifest", &report.manifest),
@@ -2204,7 +2204,7 @@ pub(crate) fn nsld_closure_verify_report_json(report: &NsldClosureVerifyReport) 
 }
 
 pub(crate) fn nsld_link_unit_report_json(report: &NsldLinkUnitReport) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_link_units"),
         json_string_field("manifest", &report.manifest),

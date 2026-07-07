@@ -11,6 +11,12 @@ pub(crate) fn print_nsld_object_image_dry_run_report(report: &NsldObjectImageDry
     println!("  backend_kind: {}", report.backend_kind);
     println!("  backend_family: {}", report.backend_family);
     println!("  backend_status: {}", report.backend_status);
+    for capability in &report.backend_capabilities {
+        println!(
+            "  backend_capability: id={} status={} required={}",
+            capability.capability_id, capability.status, capability.required
+        );
+    }
     println!("  object_format: {}", report.object_format);
     println!("  file_layout_hash: {}", report.file_layout_hash);
     println!("  record_count: {}", report.record_count);

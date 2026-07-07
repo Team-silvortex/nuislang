@@ -146,13 +146,11 @@ pub(crate) fn compatibility_domains(
         domain_kind: "cffi-host-compat".to_owned(),
         paradigm: "classic-von-neumann-host".to_owned(),
         lifecycle_hook: "on_cffi_native_object".to_owned(),
-        abi_family: plan
-            .cpu_target
-            .object_format
-            .is_empty()
-            .then_some("host-native")
-            .unwrap_or(&plan.cpu_target.object_format)
-            .to_owned(),
+        abi_family: if plan.cpu_target.object_format.is_empty() {
+            "host-native".to_owned()
+        } else {
+            plan.cpu_target.object_format.clone()
+        },
         wrapper_policy: if has_c_world_policy {
             plan.hetero_calculate.c_world_policy.clone()
         } else {
@@ -432,6 +430,7 @@ pub(crate) fn metadata_table_hash(
     hash_bytes(material.as_bytes())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn file_hash(
     container_plan: &NsldContainerPlanReport,
     sections: &[NsldContainerSectionEntry],

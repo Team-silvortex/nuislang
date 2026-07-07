@@ -1,4 +1,5 @@
 use super::{
+    artifact_chain::{nsld_artifact_stage_kind_path_for_plan, NsldArtifactStageKind},
     container_verify::{self, TomlFieldKind},
     object_plan::nsld_object_plan_report,
     object_plan_verify::{
@@ -185,10 +186,12 @@ pub(crate) fn nsld_object_writer_dry_run_report(
     NsldObjectWriterDryRunReport {
         manifest: manifest.display().to_string(),
         writer_input_path: verify.input_path,
-        planned_output_path: PathBuf::from(&plan.output_dir)
-            .join(format!("nuis.nsld.{}", object_plan.object_format))
-            .display()
-            .to_string(),
+        planned_output_path: nsld_artifact_stage_kind_path_for_plan(
+            plan,
+            NsldArtifactStageKind::ObjectOutput,
+        )
+        .display()
+        .to_string(),
         writer_target_id: readiness.target_id,
         writer_backend_kind: object_plan.writer_backend_kind,
         object_family: object_plan.object_family,
@@ -616,10 +619,8 @@ mod tests {
             "writer_backend_kind = \"elf-amd64\"",
         );
         fs::write(&input_path, damaged).unwrap();
-
         let verify = nsld_verify_object_writer_dry_run_report(Path::new("manifest.toml"), &plan);
         fs::remove_dir_all(dir).unwrap();
-
         assert!(!verify.valid);
         assert!(verify.issues.iter().any(|issue| {
             issue == "writer_backend_kind mismatch: expected mach-o-arm64, found elf-amd64"
@@ -643,7 +644,6 @@ mod tests {
         let dry_run_artifact =
             fs::read_to_string(dir.join("nuis.nsld.object-writer-dry-run.toml")).unwrap();
         fs::remove_dir_all(dir).unwrap();
-
         assert!(emit
             .output_path
             .ends_with("nuis.nsld.object-writer-dry-run.toml"));
