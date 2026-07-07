@@ -83,9 +83,7 @@ pub(super) fn required_project_link_stage_contract(
     }
 
     if !supports_staged_data_bridge_pair(&from_domain, &to_domain) {
-        return Err(format!(
-            "current staged bridges only support cpu<->cpu, cpu<->shader, cpu<->kernel, and cpu<->network over `data.*`"
-        ));
+        return Err("current staged bridges only support cpu<->cpu, cpu<->shader, cpu<->kernel, and cpu<->network over `data.*`".to_owned());
     }
 
     Ok(ProjectLinkStageContract::windowed_data_bridge())
@@ -151,7 +149,7 @@ impl BridgeDirection {
         }
     }
 
-    fn payload<'a>(self, contract: &'a ProjectLinkBridgeContract) -> Option<&'a NirTypeRef> {
+    fn payload(self, contract: &ProjectLinkBridgeContract) -> Option<&NirTypeRef> {
         contract.payload(self.is_uplink)
     }
 }

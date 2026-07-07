@@ -5,8 +5,10 @@ use nuis_semantics::model::{
 };
 
 use super::ast_calls::infer_ast_call_type;
+use super::ast_calls_views::AstCallInferenceInput;
 use super::ast_patterns::{
     infer_struct_literal_ast_type_seeded, type_args_are_pattern_placeholders,
+    SeededStructLiteralAstTypeInput,
 };
 use super::{ast_generic_named_type, ast_named_type, impl_lookup_types};
 use crate::frontend::validation_binding_env::instantiate_ast_struct_field_type;
@@ -129,7 +131,7 @@ pub(crate) fn infer_ast_expr_type_inner(
             callee,
             generic_args,
             args,
-        } => infer_ast_call_type(
+        } => infer_ast_call_type(AstCallInferenceInput {
             callee,
             generic_args,
             args,
@@ -138,7 +140,7 @@ pub(crate) fn infer_ast_expr_type_inner(
             struct_table,
             function_return_types,
             active_exprs,
-        ),
+        }),
         AstExpr::MethodCall {
             receiver,
             method,
@@ -419,16 +421,16 @@ fn infer_struct_literal_ast_type(
         .iter()
         .map(|param| param.name.clone())
         .collect::<BTreeSet<_>>();
-    infer_struct_literal_ast_type_seeded(
+    infer_struct_literal_ast_type_seeded(SeededStructLiteralAstTypeInput {
         type_name,
         definition,
         fields,
-        &generic_names,
-        BTreeMap::new(),
+        generic_names: &generic_names,
+        substitutions: BTreeMap::new(),
         env,
         impl_lookup,
         struct_table,
         function_return_types,
         active_exprs,
-    )
+    })
 }

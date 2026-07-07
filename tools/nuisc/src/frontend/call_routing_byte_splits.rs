@@ -1,21 +1,22 @@
-use std::collections::BTreeMap;
-
 use super::call_routing_slice_helpers::{
     ensure_byte_slice_input, lower_byte_slice_parts, lower_byte_split_struct,
 };
+use super::call_routing_slices::SliceCallRoutingInput;
 use super::expr_lowering::lower_expr;
-use super::{i64_type, AstExpr, FunctionSignature, NirExpr, NirStructDef, NirTypeRef};
+use super::{i64_type, NirExpr};
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_byte_split_builtin(
-    callee: &str,
-    generic_args: &[nuis_semantics::model::AstTypeRef],
-    args: &[AstExpr],
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: SliceCallRoutingInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let SliceCallRoutingInput {
+        callee,
+        generic_args,
+        args,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+    } = input;
     let expr = match callee {
         "bytes_slice_before" => {
             let [base, index] = args else {

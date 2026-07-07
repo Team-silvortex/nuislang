@@ -8,7 +8,9 @@ use crate::aot_domain_unit_verify::verify_domain_build_units;
 use crate::aot_manifest_core_verify::{verify_manifest_artifacts, verify_manifest_core};
 use crate::aot_manifest_fields::verify_manifest_fields;
 use crate::aot_manifest_report::build_manifest_verify_report;
-use crate::aot_project_metadata_verify::verify_project_metadata_artifacts;
+use crate::aot_project_metadata_verify::{
+    verify_project_metadata_artifacts, ProjectMetadataArtifactsVerifyInput,
+};
 use crate::aot_verify_report::BuildManifestVerifyReport;
 
 pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, String> {
@@ -68,33 +70,37 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         domain_build_units,
     })?;
 
-    let project_metadata_report = verify_project_metadata_artifacts(
-        path,
-        &core.input,
-        &core.output_dir,
-        fields.doc_index_path.as_deref(),
-        fields.doc_index_module_count,
-        fields.doc_index_documented_item_count,
-        fields.project_plan_index.as_deref(),
-        fields.project_plan_summary.as_deref(),
-        fields.project_docs_index.as_deref(),
-        fields.project_docs_module_count,
-        fields.project_docs_documented_module_count,
-        fields.project_docs_documented_item_count,
-        fields.project_imports_index.as_deref(),
-        fields.project_imports_library_count,
-        fields.project_imports_visible_library_count,
-        fields.project_imports_visible_module_count,
-        fields.project_imports_documented_visible_module_count,
-        fields.project_imports_documented_visible_item_count,
-        fields.project_galaxy_index.as_deref(),
-        fields.project_galaxy_count,
-        fields.project_documented_galaxy_count,
-        fields.project_documented_galaxy_library_module_count,
-        fields.project_documented_galaxy_item_count,
-        fields.project_packet_index.as_deref(),
-        fields.project_host_ffi_index.as_deref(),
-    )?;
+    let project_metadata_report =
+        verify_project_metadata_artifacts(ProjectMetadataArtifactsVerifyInput {
+            manifest_path: path,
+            input: &core.input,
+            output_dir: &core.output_dir,
+            doc_index_path: fields.doc_index_path.as_deref(),
+            doc_index_module_count: fields.doc_index_module_count,
+            doc_index_documented_item_count: fields.doc_index_documented_item_count,
+            project_plan_index: fields.project_plan_index.as_deref(),
+            project_plan_summary: fields.project_plan_summary.as_deref(),
+            project_docs_index: fields.project_docs_index.as_deref(),
+            project_docs_module_count: fields.project_docs_module_count,
+            project_docs_documented_module_count: fields.project_docs_documented_module_count,
+            project_docs_documented_item_count: fields.project_docs_documented_item_count,
+            project_imports_index: fields.project_imports_index.as_deref(),
+            project_imports_library_count: fields.project_imports_library_count,
+            project_imports_visible_library_count: fields.project_imports_visible_library_count,
+            project_imports_visible_module_count: fields.project_imports_visible_module_count,
+            project_imports_documented_visible_module_count: fields
+                .project_imports_documented_visible_module_count,
+            project_imports_documented_visible_item_count: fields
+                .project_imports_documented_visible_item_count,
+            project_galaxy_index: fields.project_galaxy_index.as_deref(),
+            project_galaxy_count: fields.project_galaxy_count,
+            project_documented_galaxy_count: fields.project_documented_galaxy_count,
+            project_documented_galaxy_library_module_count: fields
+                .project_documented_galaxy_library_module_count,
+            project_documented_galaxy_item_count: fields.project_documented_galaxy_item_count,
+            project_packet_index: fields.project_packet_index.as_deref(),
+            project_host_ffi_index: fields.project_host_ffi_index.as_deref(),
+        })?;
     Ok(build_manifest_verify_report(
         core,
         fields,

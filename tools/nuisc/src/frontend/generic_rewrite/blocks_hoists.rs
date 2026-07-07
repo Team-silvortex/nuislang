@@ -6,31 +6,53 @@ use nuis_semantics::model::{
 
 use super::super::{infer_ast_expr_type, FunctionSignature};
 use super::blocks_expected::contains_unresolved_struct_placeholder;
-use super::blocks_stmt::rewrite_generic_calls_in_stmt;
+use super::blocks_stmt::{rewrite_generic_calls_in_stmt, GenericStmtRewriteInput};
 use super::exprs::{rewrite_generic_calls_in_expr, GenericExprRewriteInput};
-use super::hoists::hoist_direct_result_wrapper_args;
+use super::hoists::{hoist_direct_result_wrapper_args, DirectResultWrapperHoistInput};
 use super::GenericImplMethodTemplate;
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct GenericStmtHoistRewriteInput<'a> {
+    pub(super) stmt: &'a AstStmt,
+    pub(super) context: &'a str,
+    pub(super) let_fallback_expected: Option<&'a AstTypeRef>,
+    pub(super) current_return_type: Option<&'a AstTypeRef>,
+    pub(super) env: &'a mut BTreeMap<String, AstTypeRef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) generic_impl_method_templates: &'a [GenericImplMethodTemplate],
+    pub(super) higher_order_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) specialization_cache: &'a mut BTreeSet<String>,
+    pub(super) specialized_functions: &'a mut Vec<AstFunction>,
+    pub(super) specialized_signatures: &'a mut Vec<(String, FunctionSignature)>,
+}
+
 pub(super) fn rewrite_generic_stmt_with_hoists(
-    stmt: &AstStmt,
-    context: &str,
-    let_fallback_expected: Option<&AstTypeRef>,
-    current_return_type: Option<&AstTypeRef>,
-    env: &mut BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    generic_impl_method_templates: &[GenericImplMethodTemplate],
-    higher_order_templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    specialization_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
-    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+    input: GenericStmtHoistRewriteInput<'_>,
 ) -> Result<Vec<AstStmt>, String> {
+    let GenericStmtHoistRewriteInput {
+        stmt,
+        context,
+        let_fallback_expected,
+        current_return_type,
+        env,
+        visible_type_aliases,
+        generic_templates,
+        generic_impl_method_templates,
+        higher_order_templates,
+        function_table,
+        signatures,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    } = input;
     match stmt {
         AstStmt::Let {
             name,
@@ -45,31 +67,58 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
             } = value
             else {
                 return Ok(vec![rewrite_generic_calls_in_stmt(
-                    stmt,
-                    context,
-                    let_fallback_expected,
-                    current_return_type,
-                    env,
-                    visible_type_aliases,
-                    generic_templates,
-                    generic_impl_method_templates,
-                    higher_order_templates,
-                    function_table,
-                    signatures,
-                    impl_lookup,
-                    struct_table,
-                    function_return_types,
-                    specialization_cache,
-                    specialized_functions,
-                    specialized_signatures,
+                    GenericStmtRewriteInput {
+                        stmt,
+                        context,
+                        let_fallback_expected,
+                        current_return_type,
+                        env,
+                        visible_type_aliases,
+                        generic_templates,
+                        generic_impl_method_templates,
+                        higher_order_templates,
+                        function_table,
+                        signatures,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        specialization_cache,
+                        specialized_functions,
+                        specialized_signatures,
+                    },
                 )?]);
             };
             if !generic_templates.contains_key(callee) {
                 return Ok(vec![rewrite_generic_calls_in_stmt(
-                    stmt,
-                    context,
-                    let_fallback_expected,
-                    current_return_type,
+                    GenericStmtRewriteInput {
+                        stmt,
+                        context,
+                        let_fallback_expected,
+                        current_return_type,
+                        env,
+                        visible_type_aliases,
+                        generic_templates,
+                        generic_impl_method_templates,
+                        higher_order_templates,
+                        function_table,
+                        signatures,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        specialization_cache,
+                        specialized_functions,
+                        specialized_signatures,
+                    },
+                )?]);
+            }
+            let (mut hoisted, rewritten_args) =
+                hoist_direct_result_wrapper_args(DirectResultWrapperHoistInput {
+                    callee,
+                    generic_args,
+                    args,
+                    expected: ty.as_ref(),
+                    temp_prefix: name,
+                    context: &format!("{context} local `{name}`"),
                     env,
                     visible_type_aliases,
                     generic_templates,
@@ -83,29 +132,7 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
                     specialization_cache,
                     specialized_functions,
                     specialized_signatures,
-                )?]);
-            }
-            let (mut hoisted, rewritten_args) = hoist_direct_result_wrapper_args(
-                callee,
-                generic_args,
-                args,
-                ty.as_ref(),
-                name,
-                &format!("{context} local `{name}`"),
-                env,
-                visible_type_aliases,
-                generic_templates,
-                generic_impl_method_templates,
-                higher_order_templates,
-                function_table,
-                signatures,
-                impl_lookup,
-                struct_table,
-                function_return_types,
-                specialization_cache,
-                specialized_functions,
-                specialized_signatures,
-            )?;
+                })?;
             let rewritten_call_expr = AstExpr::Call {
                 callee: callee.clone(),
                 generic_args: generic_args.clone(),
@@ -165,27 +192,28 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
             generic_args,
             args,
         })) if generic_templates.contains_key(callee) => {
-            let (mut hoisted, rewritten_args) = hoist_direct_result_wrapper_args(
-                callee,
-                generic_args,
-                args,
-                current_return_type,
-                "__nuis_generic_return_arg",
-                context,
-                env,
-                visible_type_aliases,
-                generic_templates,
-                generic_impl_method_templates,
-                higher_order_templates,
-                function_table,
-                signatures,
-                impl_lookup,
-                struct_table,
-                function_return_types,
-                specialization_cache,
-                specialized_functions,
-                specialized_signatures,
-            )?;
+            let (mut hoisted, rewritten_args) =
+                hoist_direct_result_wrapper_args(DirectResultWrapperHoistInput {
+                    callee,
+                    generic_args,
+                    args,
+                    expected: current_return_type,
+                    temp_prefix: "__nuis_generic_return_arg",
+                    context,
+                    env,
+                    visible_type_aliases,
+                    generic_templates,
+                    generic_impl_method_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                })?;
             let rewritten_call_expr = AstExpr::Call {
                 callee: callee.clone(),
                 generic_args: generic_args.clone(),
@@ -213,23 +241,25 @@ pub(super) fn rewrite_generic_stmt_with_hoists(
             Ok(hoisted)
         }
         _ => Ok(vec![rewrite_generic_calls_in_stmt(
-            stmt,
-            context,
-            let_fallback_expected,
-            current_return_type,
-            env,
-            visible_type_aliases,
-            generic_templates,
-            generic_impl_method_templates,
-            higher_order_templates,
-            function_table,
-            signatures,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-            specialization_cache,
-            specialized_functions,
-            specialized_signatures,
+            GenericStmtRewriteInput {
+                stmt,
+                context,
+                let_fallback_expected,
+                current_return_type,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                generic_impl_method_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            },
         )?]),
     }
 }

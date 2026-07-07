@@ -190,18 +190,32 @@ pub(super) fn validate_generic_receiver_method_bound(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct GenericReceiverOperatorBoundInput<'a> {
+    pub(super) receiver_ty: &'a AstTypeRef,
+    pub(super) operator: &'a str,
+    pub(super) method: &'a str,
+    pub(super) required_bound: &'a str,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) trait_methods: &'a BTreeMap<String, BTreeSet<String>>,
+    pub(super) generic_param_names: &'a BTreeSet<String>,
+    pub(super) generic_bounds: &'a BTreeMap<String, Vec<String>>,
+    pub(super) context: &'a str,
+}
+
 pub(super) fn validate_generic_receiver_operator_bound(
-    receiver_ty: &AstTypeRef,
-    operator: &str,
-    method: &str,
-    required_bound: &str,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    trait_methods: &BTreeMap<String, BTreeSet<String>>,
-    generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, Vec<String>>,
-    context: &str,
+    input: GenericReceiverOperatorBoundInput<'_>,
 ) -> Result<(), String> {
+    let GenericReceiverOperatorBoundInput {
+        receiver_ty,
+        operator,
+        method,
+        required_bound,
+        visible_type_aliases,
+        trait_methods,
+        generic_param_names,
+        generic_bounds,
+        context,
+    } = input;
     let Some((generic_name, context, bounds)) = resolve_generic_receiver_bound_context(
         receiver_ty,
         visible_type_aliases,
@@ -236,21 +250,38 @@ pub(super) fn validate_generic_receiver_operator_bound(
     ))
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct ExplicitTraitCallBoundInput<'a> {
+    pub(super) trait_name: &'a str,
+    pub(super) method: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) visible_structs: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) trait_methods: &'a BTreeMap<String, BTreeSet<String>>,
+    pub(super) generic_param_names: &'a BTreeSet<String>,
+    pub(super) generic_bounds: &'a BTreeMap<String, Vec<String>>,
+    pub(super) local_type_env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) context: &'a str,
+}
+
 pub(super) fn validate_explicit_trait_call_bound(
-    trait_name: &str,
-    method: &str,
-    args: &[AstExpr],
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    trait_methods: &BTreeMap<String, BTreeSet<String>>,
-    generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, Vec<String>>,
-    local_type_env: &BTreeMap<String, AstTypeRef>,
-    context: &str,
+    input: ExplicitTraitCallBoundInput<'_>,
 ) -> Result<(), String> {
+    let ExplicitTraitCallBoundInput {
+        trait_name,
+        method,
+        args,
+        visible_type_aliases,
+        impl_lookup,
+        visible_structs,
+        function_return_types,
+        trait_methods,
+        generic_param_names,
+        generic_bounds,
+        local_type_env,
+        context,
+    } = input;
     let Some(receiver) = args.first() else {
         return Ok(());
     };

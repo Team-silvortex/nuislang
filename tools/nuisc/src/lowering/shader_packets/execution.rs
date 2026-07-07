@@ -87,6 +87,7 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
             ],
             &[self.toggle_name.clone(), self.accent_name.clone()],
         );
+        let resource_set_deps = [self.accent_name.clone()];
         let resource_set = self.push_struct(
             "nova_panel_resource_set",
             "NovaResourceSetPacket",
@@ -96,7 +97,7 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 "samplers=1".to_owned(),
                 format!("residency={}", self.accent_name),
             ],
-            &[self.accent_name.clone()],
+            &resource_set_deps,
         );
         let schedule = self.push_struct(
             "nova_panel_schedule",

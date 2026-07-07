@@ -1,8 +1,7 @@
-use std::collections::BTreeMap;
+use nuis_semantics::model::NirExpr;
 
-use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
-
-use crate::frontend::{lower_expr, named_type, FunctionSignature, ModuleConstValue};
+use crate::frontend::nova_builtins::NovaBuiltinInput;
+use crate::frontend::{lower_expr, named_type};
 
 fn build_four_field_state(
     packet: NirExpr,
@@ -45,17 +44,18 @@ fn build_four_field_state(
     }))
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_nova_execution_state_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    _current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    _module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: NovaBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let NovaBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        ..
+    } = input;
     let (packet_type, state_type, fields) = match callee {
         "nova_pass_state" => (
             "NovaPassPacket",

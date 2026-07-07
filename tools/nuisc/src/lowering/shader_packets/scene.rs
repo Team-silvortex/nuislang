@@ -200,6 +200,7 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 self.toggle_name.clone(),
             ],
         );
+        let scene_graph_deps = [self.focus_name.clone()];
         let scene_graph = self.push_struct(
             "nova_panel_scene_graph",
             "NovaSceneGraphPacket",
@@ -210,7 +211,7 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 "instance_count=3".to_owned(),
                 "active_layer=1".to_owned(),
             ],
-            &[self.focus_name.clone()],
+            &scene_graph_deps,
         );
         let scene_node = self.push_struct(
             "nova_panel_scene_node",

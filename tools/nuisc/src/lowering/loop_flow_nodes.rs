@@ -30,7 +30,7 @@ fn encode_mixed_loop_flow_control_args(
     control: &PreparedLoopFlowControl,
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
-) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
+) -> Result<EncodedLoopArgs, String> {
     match control {
         PreparedLoopFlowControl::Terminal { condition, action } => {
             let (mut condition_args, dep_inputs, effect_inputs) =
@@ -64,7 +64,7 @@ fn encode_loop_flow_control_args(
     control: &PreparedLoopFlowControl,
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
-) -> Result<(Vec<String>, Vec<String>, Vec<String>, bool), String> {
+) -> Result<EncodedLoopControlArgs, String> {
     let Some((condition, action)) = flatten_uniform_loop_flow_control(control) else {
         let (args, dep_inputs, effect_inputs) =
             encode_mixed_loop_flow_control_args(control, state, bindings)?;
@@ -110,7 +110,7 @@ fn encode_carry_condition_args(
     condition: &PreparedLoopFlowCondition,
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
-) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
+) -> Result<EncodedLoopArgs, String> {
     match condition {
         PreparedLoopFlowCondition::Simple(condition) => {
             let rhs_name = lower_expr(&condition.rhs, state, bindings)?;

@@ -6,6 +6,8 @@ mod command_artifact_inspect;
 mod command_artifact_report_cmd;
 #[path = "command_artifact_verify.rs"]
 mod command_artifact_verify;
+#[path = "command_artifact_verify_manifest.rs"]
+mod command_artifact_verify_manifest;
 
 pub(crate) use command_artifact_envelope::{
     run_inspect_envelope, run_pack_envelope, run_unpack_envelope,

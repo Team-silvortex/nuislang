@@ -5,31 +5,56 @@ use nuis_semantics::model::{
 };
 
 use super::super::{infer_ast_expr_type, FunctionSignature};
-use super::blocks::{rewrite_generic_calls_in_block, rewrite_generic_calls_in_match_arms};
+use super::blocks::{
+    rewrite_generic_calls_in_block, rewrite_generic_calls_in_match_arms, GenericBlockRewriteInput,
+    GenericMatchArmsRewriteInput,
+};
 use super::blocks_expected::contains_unresolved_struct_placeholder;
 use super::exprs::{rewrite_generic_calls_in_expr, GenericExprRewriteInput};
 use super::GenericImplMethodTemplate;
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct GenericStmtRewriteInput<'a> {
+    pub(super) stmt: &'a AstStmt,
+    pub(super) context: &'a str,
+    pub(super) let_fallback_expected: Option<&'a AstTypeRef>,
+    pub(super) current_return_type: Option<&'a AstTypeRef>,
+    pub(super) env: &'a mut BTreeMap<String, AstTypeRef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) generic_impl_method_templates: &'a [GenericImplMethodTemplate],
+    pub(super) higher_order_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) specialization_cache: &'a mut BTreeSet<String>,
+    pub(super) specialized_functions: &'a mut Vec<AstFunction>,
+    pub(super) specialized_signatures: &'a mut Vec<(String, FunctionSignature)>,
+}
+
 pub(super) fn rewrite_generic_calls_in_stmt(
-    stmt: &AstStmt,
-    context: &str,
-    let_fallback_expected: Option<&AstTypeRef>,
-    current_return_type: Option<&AstTypeRef>,
-    env: &mut BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    generic_impl_method_templates: &[GenericImplMethodTemplate],
-    higher_order_templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    specialization_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
-    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+    input: GenericStmtRewriteInput<'_>,
 ) -> Result<AstStmt, String> {
+    let GenericStmtRewriteInput {
+        stmt,
+        context,
+        let_fallback_expected,
+        current_return_type,
+        env,
+        visible_type_aliases,
+        generic_templates,
+        generic_impl_method_templates,
+        higher_order_templates,
+        function_table,
+        signatures,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    } = input;
     Ok(match stmt {
         AstStmt::Let {
             name,
@@ -250,11 +275,11 @@ pub(super) fn rewrite_generic_calls_in_stmt(
             let mut else_env = env.clone();
             AstStmt::If {
                 condition: rewritten_condition,
-                then_body: rewrite_generic_calls_in_block(
-                    then_body,
-                    &format!("{context} if-then"),
+                then_body: rewrite_generic_calls_in_block(GenericBlockRewriteInput {
+                    body: then_body,
+                    context: &format!("{context} if-then"),
                     current_return_type,
-                    &mut then_env,
+                    env: &mut then_env,
                     visible_type_aliases,
                     generic_templates,
                     generic_impl_method_templates,
@@ -267,12 +292,12 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                     specialization_cache,
                     specialized_functions,
                     specialized_signatures,
-                )?,
-                else_body: rewrite_generic_calls_in_block(
-                    else_body,
-                    &format!("{context} if-else"),
+                })?,
+                else_body: rewrite_generic_calls_in_block(GenericBlockRewriteInput {
+                    body: else_body,
+                    context: &format!("{context} if-else"),
                     current_return_type,
-                    &mut else_env,
+                    env: &mut else_env,
                     visible_type_aliases,
                     generic_templates,
                     generic_impl_method_templates,
@@ -285,7 +310,7 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                     specialization_cache,
                     specialized_functions,
                     specialized_signatures,
-                )?,
+                })?,
             }
         }
         AstStmt::Match { value, arms } => {
@@ -316,10 +341,10 @@ pub(super) fn rewrite_generic_calls_in_stmt(
             );
             AstStmt::Match {
                 value: rewritten_value,
-                arms: rewrite_generic_calls_in_match_arms(
+                arms: rewrite_generic_calls_in_match_arms(GenericMatchArmsRewriteInput {
                     arms,
                     context,
-                    scrutinee_type.as_ref(),
+                    scrutinee_type: scrutinee_type.as_ref(),
                     current_return_type,
                     env,
                     visible_type_aliases,
@@ -334,7 +359,7 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                     specialization_cache,
                     specialized_functions,
                     specialized_signatures,
-                )?,
+                })?,
             }
         }
         AstStmt::While { condition, body } => {
@@ -359,11 +384,11 @@ pub(super) fn rewrite_generic_calls_in_stmt(
             let mut loop_env = env.clone();
             AstStmt::While {
                 condition: rewritten_condition,
-                body: rewrite_generic_calls_in_block(
+                body: rewrite_generic_calls_in_block(GenericBlockRewriteInput {
                     body,
-                    &format!("{context} while-body"),
+                    context: &format!("{context} while-body"),
                     current_return_type,
-                    &mut loop_env,
+                    env: &mut loop_env,
                     visible_type_aliases,
                     generic_templates,
                     generic_impl_method_templates,
@@ -376,7 +401,7 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                     specialization_cache,
                     specialized_functions,
                     specialized_signatures,
-                )?,
+                })?,
             }
         }
         AstStmt::Expr(expr) => {

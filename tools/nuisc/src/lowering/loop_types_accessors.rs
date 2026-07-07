@@ -109,12 +109,7 @@ impl PreparedCarrySource {
 
     pub(in crate::lowering) fn scaled_state_list_by_factor_state_list(
         &self,
-    ) -> Option<(
-        &[PreparedLoopStateRef],
-        &[PreparedLoopStateRef],
-        Option<&NirExpr>,
-        Option<&NirExpr>,
-    )> {
+    ) -> Option<PreparedFactorStateListView<'_>> {
         match self {
             Self::ScaledStateListByFactorStateList {
                 terms,
@@ -133,13 +128,7 @@ impl PreparedCarrySource {
 
     pub(in crate::lowering) fn scaled_state_list_by_factor_state_list_times_invariant(
         &self,
-    ) -> Option<(
-        &[PreparedLoopStateRef],
-        &[PreparedLoopStateRef],
-        &NirExpr,
-        Option<&NirExpr>,
-        Option<&NirExpr>,
-    )> {
+    ) -> Option<PreparedScaledFactorStateListView<'_>> {
         match self {
             Self::ScaledStateListByFactorStateListTimesInvariant {
                 terms,
@@ -160,14 +149,7 @@ impl PreparedCarrySource {
 
     pub(in crate::lowering) fn scaled_state_list_by_factor_group_product(
         &self,
-    ) -> Option<(
-        &[PreparedLoopStateRef],
-        &[PreparedLoopStateRef],
-        Option<&NirExpr>,
-        &[PreparedLoopStateRef],
-        Option<&NirExpr>,
-        Option<&NirExpr>,
-    )> {
+    ) -> Option<PreparedFactorGroupProductView<'_>> {
         match self {
             Self::ScaledStateListByFactorGroupProduct {
                 terms,
@@ -190,15 +172,7 @@ impl PreparedCarrySource {
 
     pub(in crate::lowering) fn scaled_state_list_by_factor_group_product_times_invariant(
         &self,
-    ) -> Option<(
-        &[PreparedLoopStateRef],
-        &[PreparedLoopStateRef],
-        Option<&NirExpr>,
-        &[PreparedLoopStateRef],
-        Option<&NirExpr>,
-        &NirExpr,
-        Option<&NirExpr>,
-    )> {
+    ) -> Option<PreparedScaledFactorGroupProductView<'_>> {
         match self {
             Self::ScaledStateListByFactorGroupProductTimesInvariant {
                 terms,
@@ -252,7 +226,10 @@ impl PreparedCarryBranchSource {
         op: PreparedCarryLinearOp,
         source: PreparedCarrySource,
     ) -> Self {
-        Self::Source { op, source }
+        Self::Source {
+            op,
+            source: Box::new(source),
+        }
     }
 
     pub(in crate::lowering) fn value_kind(&self) -> PreparedCarryBranchValueKind {
@@ -278,7 +255,7 @@ impl PreparedCarryBranchSource {
                 PreparedCarryBranchView::Source {
                     op,
                     source: match self {
-                        Self::Source { source, .. } => source,
+                        Self::Source { source, .. } => source.as_ref(),
                         Self::KeepCurrentValue | Self::KeepPreviousValue => {
                             unreachable!("keep branch cannot expose source view")
                         }

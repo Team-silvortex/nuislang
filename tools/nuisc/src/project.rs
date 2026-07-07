@@ -20,6 +20,7 @@ mod packet;
 mod planning;
 mod profile_apply;
 mod profile_refs;
+mod profile_refs_data;
 mod profile_targets;
 mod profile_usage;
 mod rendering;

@@ -986,7 +986,7 @@ fn lowers_if_return_chain_with_shared_suffix_after_branch_local_binding() {
         "expected shared-suffix return chain to select the branch-local binding"
     );
     assert!(
-        adds.len() >= 1,
+        !adds.is_empty(),
         "expected shared suffix arithmetic to remain lowered after branch selection"
     );
 }
@@ -1031,7 +1031,7 @@ fn lowers_match_return_chain_with_shared_suffix_after_branch_local_binding() {
         "expected lowered match shared-suffix return chain to select the branch-local binding"
     );
     assert!(
-        adds.len() >= 1,
+        !adds.is_empty(),
         "expected shared suffix arithmetic to survive match lowering"
     );
 }

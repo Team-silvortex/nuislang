@@ -1090,7 +1090,7 @@ fn ensure_project_domain_registry_valid_accepts_registered_abi() {
         .unwrap();
     assert_eq!(network.issue_count(), 0);
     assert!(network.summary_line().contains(": ok"));
-    assert_eq!(network.abi_registered, true);
+    assert!(network.abi_registered);
     ensure_project_domain_registry_valid(&plan).unwrap();
 }
 

@@ -7,29 +7,70 @@ use nuis_semantics::model::{
 use super::super::validation_binding_env::bind_match_pattern_for_type;
 use super::super::{ast_named_type, FunctionSignature};
 use super::blocks_expected::let_binding_expected_type_from_following_use;
-use super::blocks_hoists::rewrite_generic_stmt_with_hoists;
+use super::blocks_hoists::{rewrite_generic_stmt_with_hoists, GenericStmtHoistRewriteInput};
 use super::exprs::{rewrite_generic_calls_in_expr, GenericExprRewriteInput};
 use super::GenericImplMethodTemplate;
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct GenericBlockRewriteInput<'a> {
+    pub(super) body: &'a [AstStmt],
+    pub(super) context: &'a str,
+    pub(super) current_return_type: Option<&'a AstTypeRef>,
+    pub(super) env: &'a mut BTreeMap<String, AstTypeRef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) generic_impl_method_templates: &'a [GenericImplMethodTemplate],
+    pub(super) higher_order_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) specialization_cache: &'a mut BTreeSet<String>,
+    pub(super) specialized_functions: &'a mut Vec<AstFunction>,
+    pub(super) specialized_signatures: &'a mut Vec<(String, FunctionSignature)>,
+}
+
+pub(super) struct GenericMatchArmsRewriteInput<'a> {
+    pub(super) arms: &'a [AstMatchArm],
+    pub(super) context: &'a str,
+    pub(super) scrutinee_type: Option<&'a AstTypeRef>,
+    pub(super) current_return_type: Option<&'a AstTypeRef>,
+    pub(super) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) generic_impl_method_templates: &'a [GenericImplMethodTemplate],
+    pub(super) higher_order_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) specialization_cache: &'a mut BTreeSet<String>,
+    pub(super) specialized_functions: &'a mut Vec<AstFunction>,
+    pub(super) specialized_signatures: &'a mut Vec<(String, FunctionSignature)>,
+}
+
 pub(super) fn rewrite_generic_calls_in_block(
-    body: &[AstStmt],
-    context: &str,
-    current_return_type: Option<&AstTypeRef>,
-    env: &mut BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    generic_impl_method_templates: &[GenericImplMethodTemplate],
-    higher_order_templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    specialization_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
-    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+    input: GenericBlockRewriteInput<'_>,
 ) -> Result<Vec<AstStmt>, String> {
+    let GenericBlockRewriteInput {
+        body,
+        context,
+        current_return_type,
+        env,
+        visible_type_aliases,
+        generic_templates,
+        generic_impl_method_templates,
+        higher_order_templates,
+        function_table,
+        signatures,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    } = input;
     let mut rewritten = Vec::new();
     for (index, stmt) in body.iter().enumerate() {
         let let_fallback_expected = let_binding_expected_type_from_following_use(
@@ -42,48 +83,52 @@ pub(super) fn rewrite_generic_calls_in_block(
             struct_table,
         );
         rewritten.extend(rewrite_generic_stmt_with_hoists(
-            stmt,
-            context,
-            let_fallback_expected.as_ref(),
-            current_return_type,
-            env,
-            visible_type_aliases,
-            generic_templates,
-            generic_impl_method_templates,
-            higher_order_templates,
-            function_table,
-            signatures,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-            specialization_cache,
-            specialized_functions,
-            specialized_signatures,
+            GenericStmtHoistRewriteInput {
+                stmt,
+                context,
+                let_fallback_expected: let_fallback_expected.as_ref(),
+                current_return_type,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                generic_impl_method_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            },
         )?);
     }
     Ok(rewritten)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn rewrite_generic_calls_in_match_arms(
-    arms: &[AstMatchArm],
-    context: &str,
-    scrutinee_type: Option<&AstTypeRef>,
-    current_return_type: Option<&AstTypeRef>,
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    generic_impl_method_templates: &[GenericImplMethodTemplate],
-    higher_order_templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    specialization_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
-    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+    input: GenericMatchArmsRewriteInput<'_>,
 ) -> Result<Vec<AstMatchArm>, String> {
+    let GenericMatchArmsRewriteInput {
+        arms,
+        context,
+        scrutinee_type,
+        current_return_type,
+        env,
+        visible_type_aliases,
+        generic_templates,
+        generic_impl_method_templates,
+        higher_order_templates,
+        function_table,
+        signatures,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    } = input;
     let mut rewritten = Vec::with_capacity(arms.len());
     for arm in arms {
         let mut arm_env = env.clone();
@@ -122,11 +167,11 @@ pub(super) fn rewrite_generic_calls_in_match_arms(
                     })
                 })
                 .transpose()?,
-            body: rewrite_generic_calls_in_block(
-                &arm.body,
-                &format!("{context} match-arm"),
+            body: rewrite_generic_calls_in_block(GenericBlockRewriteInput {
+                body: &arm.body,
+                context: &format!("{context} match-arm"),
                 current_return_type,
-                &mut arm_env,
+                env: &mut arm_env,
                 visible_type_aliases,
                 generic_templates,
                 generic_impl_method_templates,
@@ -139,7 +184,7 @@ pub(super) fn rewrite_generic_calls_in_match_arms(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-            )?,
+            })?,
         });
     }
     Ok(rewritten)

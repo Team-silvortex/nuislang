@@ -69,18 +69,14 @@ pub(super) fn diagnose_unsupported_loop_carry_update(
         NirStmt::If { .. } => {
             let carry_name =
                 extract_single_stmt_carry_name(stmt, pure_helpers, inlineable_pure_helpers)?;
-            if parse_stmt_carry_decision_tree(
+            parse_stmt_carry_decision_tree(
                 stmt,
                 &carry_name,
                 binding_name,
                 carries,
                 pure_helpers,
                 inlineable_pure_helpers,
-            )
-            .is_none()
-            {
-                return None;
-            }
+            )?;
             diagnose_unsupported_stmt_carry_tree(
                 stmt,
                 &carry_name,
@@ -116,7 +112,10 @@ fn parse_linear_loop_carry_update_stmt(
     ) {
         Some(PreparedCarryUpdate {
             binding_name: carry_name,
-            kind: PreparedCarryUpdateKind::Linear { op, source },
+            kind: PreparedCarryUpdateKind::Linear {
+                op,
+                source: Box::new(source),
+            },
         })
     } else {
         Some(PreparedCarryUpdate {
@@ -158,8 +157,8 @@ fn parse_conditional_loop_carry_update_stmt(
         binding_name: carry_name,
         kind: PreparedCarryUpdateKind::Conditional {
             condition,
-            then_source,
-            else_source,
+            then_source: Box::new(then_source),
+            else_source: Box::new(else_source),
         },
     })
 }
@@ -222,81 +221,79 @@ pub(super) fn parse_derived_conditional_temp_binding(
 ) -> Option<PreparedConditionalTempBinding> {
     let (derived_binding_name, expr) = extract_pure_branch_binding(stmt, pure_helpers)?;
     let normalized = inline_pure_helper_calls(&expr, inlineable_pure_helpers);
-    let (source_temp_name, make_branch_expr): (&str, Box<dyn Fn(&NirExpr) -> NirExpr>) =
-        match &normalized {
-            NirExpr::Binary {
-                op: NirBinaryOp::Add,
-                lhs,
-                rhs,
-            } if is_terminal_branch_pure_expr(rhs, pure_helpers) => match lhs.as_ref() {
-                NirExpr::Var(name) => {
-                    let rhs = (**rhs).clone();
-                    (
-                        name.as_str(),
-                        Box::new(move |base| NirExpr::Binary {
-                            op: NirBinaryOp::Add,
-                            lhs: Box::new(base.clone()),
-                            rhs: Box::new(rhs.clone()),
-                        }),
-                    )
-                }
-                _ => return None,
-            },
-            NirExpr::Binary {
-                op: NirBinaryOp::Add,
-                lhs,
-                rhs,
-            } => match (lhs.as_ref(), rhs.as_ref()) {
-                (NirExpr::Var(name), other)
-                    if parse_prepared_loop_state_ref_expr(other, binding_name, carries)
-                        .is_some() =>
-                {
-                    let rhs = other.clone();
-                    (
-                        name.as_str(),
-                        Box::new(move |base| NirExpr::Binary {
-                            op: NirBinaryOp::Add,
-                            lhs: Box::new(base.clone()),
-                            rhs: Box::new(rhs.clone()),
-                        }),
-                    )
-                }
-                (other, NirExpr::Var(name))
-                    if parse_prepared_loop_state_ref_expr(other, binding_name, carries)
-                        .is_some() =>
-                {
-                    let lhs = other.clone();
-                    (
-                        name.as_str(),
-                        Box::new(move |base| NirExpr::Binary {
-                            op: NirBinaryOp::Add,
-                            lhs: Box::new(lhs.clone()),
-                            rhs: Box::new(base.clone()),
-                        }),
-                    )
-                }
-                _ => return None,
-            },
-            NirExpr::Binary {
-                op: NirBinaryOp::Mul,
-                lhs,
-                rhs,
-            } if is_terminal_branch_pure_expr(rhs, pure_helpers) => match lhs.as_ref() {
-                NirExpr::Var(name) => {
-                    let rhs = (**rhs).clone();
-                    (
-                        name.as_str(),
-                        Box::new(move |base| NirExpr::Binary {
-                            op: NirBinaryOp::Mul,
-                            lhs: Box::new(base.clone()),
-                            rhs: Box::new(rhs.clone()),
-                        }),
-                    )
-                }
-                _ => return None,
-            },
+    let (source_temp_name, make_branch_expr): (&str, ConditionalTempExprBuilder) = match &normalized
+    {
+        NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => match lhs.as_ref() {
+            NirExpr::Var(name) => {
+                let rhs = (**rhs).clone();
+                (
+                    name.as_str(),
+                    Box::new(move |base| NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(base.clone()),
+                        rhs: Box::new(rhs.clone()),
+                    }),
+                )
+            }
             _ => return None,
-        };
+        },
+        NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs,
+            rhs,
+        } => match (lhs.as_ref(), rhs.as_ref()) {
+            (NirExpr::Var(name), other)
+                if parse_prepared_loop_state_ref_expr(other, binding_name, carries).is_some() =>
+            {
+                let rhs = other.clone();
+                (
+                    name.as_str(),
+                    Box::new(move |base| NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(base.clone()),
+                        rhs: Box::new(rhs.clone()),
+                    }),
+                )
+            }
+            (other, NirExpr::Var(name))
+                if parse_prepared_loop_state_ref_expr(other, binding_name, carries).is_some() =>
+            {
+                let lhs = other.clone();
+                (
+                    name.as_str(),
+                    Box::new(move |base| NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(lhs.clone()),
+                        rhs: Box::new(base.clone()),
+                    }),
+                )
+            }
+            _ => return None,
+        },
+        NirExpr::Binary {
+            op: NirBinaryOp::Mul,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => match lhs.as_ref() {
+            NirExpr::Var(name) => {
+                let rhs = (**rhs).clone();
+                (
+                    name.as_str(),
+                    Box::new(move |base| NirExpr::Binary {
+                        op: NirBinaryOp::Mul,
+                        lhs: Box::new(base.clone()),
+                        rhs: Box::new(rhs.clone()),
+                    }),
+                )
+            }
+            _ => return None,
+        },
+        _ => return None,
+    };
     let source = conditional_temps.get(source_temp_name)?;
     Some(PreparedConditionalTempBinding {
         binding_name: derived_binding_name,

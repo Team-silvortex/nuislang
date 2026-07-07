@@ -19,56 +19,69 @@ mod direct_calls_serialization;
 #[path = "direct_calls_text.rs"]
 mod direct_calls_text;
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn lower_direct_call_builtin_or_named_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
+#[derive(Clone, Copy)]
+pub(super) struct DirectCallLoweringContext<'a> {
+    pub(super) current_domain: &'a str,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
+pub(super) struct DirectCallBuiltinInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) _module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) allow_async_calls: bool,
+}
+
+struct NamedCallLoweringInput<'a> {
+    callee: &'a str,
+    args: &'a [AstExpr],
+    current_domain: &'a str,
     current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    _module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    bindings: &'a BTreeMap<String, NirTypeRef>,
+    signatures: &'a BTreeMap<String, FunctionSignature>,
+    struct_table: &'a BTreeMap<String, NirStructDef>,
     allow_async_calls: bool,
+}
+
+pub(super) fn lower_direct_call_builtin_or_named_call(
+    input: DirectCallBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
-    if let Some(lowered) = direct_calls_serialization::lower_serialization_call(
+    let DirectCallBuiltinInput {
         callee,
         args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        _module_consts,
+        signatures,
+        struct_table,
+        allow_async_calls,
+    } = input;
+    let context = DirectCallLoweringContext {
         current_domain,
         bindings,
         signatures,
         struct_table,
-    )? {
+    };
+    if let Some(lowered) =
+        direct_calls_serialization::lower_serialization_call(callee, args, context)?
+    {
         return Ok(Some(lowered));
     }
-    if let Some(lowered) = direct_calls_http::lower_http_call(
-        callee,
-        args,
-        current_domain,
-        bindings,
-        signatures,
-        struct_table,
-    )? {
+    if let Some(lowered) = direct_calls_http::lower_http_call(callee, args, context)? {
         return Ok(Some(lowered));
     }
-    if let Some(lowered) = direct_calls_text::lower_text_call(
-        callee,
-        args,
-        current_domain,
-        bindings,
-        signatures,
-        struct_table,
-    )? {
+    if let Some(lowered) = direct_calls_text::lower_text_call(callee, args, context)? {
         return Ok(Some(lowered));
     }
-    if let Some(lowered) = direct_calls_buffer::lower_buffer_call(
-        callee,
-        args,
-        current_domain,
-        bindings,
-        signatures,
-        struct_table,
-    )? {
+    if let Some(lowered) = direct_calls_buffer::lower_buffer_call(callee, args, context)? {
         return Ok(Some(lowered));
     }
 
@@ -103,7 +116,7 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
             ensure_ref_like("is_null", &lowered, bindings, signatures, struct_table)?;
             Ok(Some(NirExpr::IsNull(Box::new(lowered))))
         }
-        _ => lower_named_call(
+        _ => lower_named_call(NamedCallLoweringInput {
             callee,
             args,
             current_domain,
@@ -112,21 +125,21 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
             signatures,
             struct_table,
             allow_async_calls,
-        ),
+        }),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn lower_named_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    allow_async_calls: bool,
-) -> Result<Option<NirExpr>, String> {
+fn lower_named_call(input: NamedCallLoweringInput<'_>) -> Result<Option<NirExpr>, String> {
+    let NamedCallLoweringInput {
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        signatures,
+        struct_table,
+        allow_async_calls,
+    } = input;
     let Some(signature) = signatures.get(callee) else {
         return Ok(None);
     };

@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::NirExpr;
 
+use super::optimize_expr_data::simplify_data_expr;
 use super::optimize_expr_helpers::{is_inline_safe_arg, simplify_expr_vec};
 use super::{
     fold_int_binary, simplify_optional_box_expr, substitute_inline_params, InlineTemplate,
@@ -13,6 +14,10 @@ pub(super) fn simplify_expr(
     inline_templates: &BTreeMap<String, InlineTemplate>,
     active_inline: &mut BTreeSet<String>,
 ) -> (NirExpr, bool) {
+    if let Some(result) = simplify_data_expr(expr.clone(), env, inline_templates, active_inline) {
+        return result;
+    }
+
     match expr {
         NirExpr::Var(name) => match env.get(&name) {
             Some(value) => (value.clone(), true),
@@ -118,98 +123,6 @@ pub(super) fn simplify_expr(
                     buffer: Box::new(buffer),
                     index: Box::new(index),
                     value: Box::new(value),
-                },
-                a || b || c,
-            )
-        }
-        NirExpr::DataOutputPipe(inner) => {
-            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
-            (NirExpr::DataOutputPipe(Box::new(inner)), changed)
-        }
-        NirExpr::DataInputPipe(inner) => {
-            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
-            (NirExpr::DataInputPipe(Box::new(inner)), changed)
-        }
-        NirExpr::DataResult { value, state } => {
-            let (value, changed) = simplify_expr(*value, env, inline_templates, active_inline);
-            (
-                NirExpr::DataResult {
-                    value: Box::new(value),
-                    state,
-                },
-                changed,
-            )
-        }
-        NirExpr::DataReady(inner) => {
-            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
-            (NirExpr::DataReady(Box::new(inner)), changed)
-        }
-        NirExpr::DataMoved(inner) => {
-            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
-            (NirExpr::DataMoved(Box::new(inner)), changed)
-        }
-        NirExpr::DataWindowed(inner) => {
-            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
-            (NirExpr::DataWindowed(Box::new(inner)), changed)
-        }
-        NirExpr::DataValue(inner) => {
-            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
-            (NirExpr::DataValue(Box::new(inner)), changed)
-        }
-        NirExpr::DataCopyWindow { input, offset, len } => {
-            let (input, a) = simplify_expr(*input, env, inline_templates, active_inline);
-            let (offset, b) = simplify_expr(*offset, env, inline_templates, active_inline);
-            let (len, c) = simplify_expr(*len, env, inline_templates, active_inline);
-            (
-                NirExpr::DataCopyWindow {
-                    input: Box::new(input),
-                    offset: Box::new(offset),
-                    len: Box::new(len),
-                },
-                a || b || c,
-            )
-        }
-        NirExpr::DataReadWindow { window, index } => {
-            let (window, left) = simplify_expr(*window, env, inline_templates, active_inline);
-            let (index, right) = simplify_expr(*index, env, inline_templates, active_inline);
-            (
-                NirExpr::DataReadWindow {
-                    window: Box::new(window),
-                    index: Box::new(index),
-                },
-                left || right,
-            )
-        }
-        NirExpr::DataWriteWindow {
-            window,
-            index,
-            value,
-        } => {
-            let (window, a) = simplify_expr(*window, env, inline_templates, active_inline);
-            let (index, b) = simplify_expr(*index, env, inline_templates, active_inline);
-            let (value, c) = simplify_expr(*value, env, inline_templates, active_inline);
-            (
-                NirExpr::DataWriteWindow {
-                    window: Box::new(window),
-                    index: Box::new(index),
-                    value: Box::new(value),
-                },
-                a || b || c,
-            )
-        }
-        NirExpr::DataFreezeWindow(inner) => {
-            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
-            (NirExpr::DataFreezeWindow(Box::new(inner)), changed)
-        }
-        NirExpr::DataImmutableWindow { input, offset, len } => {
-            let (input, a) = simplify_expr(*input, env, inline_templates, active_inline);
-            let (offset, b) = simplify_expr(*offset, env, inline_templates, active_inline);
-            let (len, c) = simplify_expr(*len, env, inline_templates, active_inline);
-            (
-                NirExpr::DataImmutableWindow {
-                    input: Box::new(input),
-                    offset: Box::new(offset),
-                    len: Box::new(len),
                 },
                 a || b || c,
             )
@@ -375,26 +288,6 @@ pub(super) fn simplify_expr(
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::KernelValue(Box::new(inner)), changed)
         }
-        NirExpr::DataProfileSendUplink { unit, input } => {
-            let (input, changed) = simplify_expr(*input, env, inline_templates, active_inline);
-            (
-                NirExpr::DataProfileSendUplink {
-                    unit,
-                    input: Box::new(input),
-                },
-                changed,
-            )
-        }
-        NirExpr::DataProfileSendDownlink { unit, input } => {
-            let (input, changed) = simplify_expr(*input, env, inline_templates, active_inline);
-            (
-                NirExpr::DataProfileSendDownlink {
-                    unit,
-                    input: Box::new(input),
-                },
-                changed,
-            )
-        }
         NirExpr::ShaderResult { value, state } => {
             let (value, changed) = simplify_expr(*value, env, inline_templates, active_inline);
             (
@@ -507,10 +400,10 @@ pub(super) fn simplify_expr(
                     }
                     active_inline.insert(callee.clone());
                     let substituted = substitute_inline_params(&template.value, &substitutions);
-                    let (inlined, inner_changed) =
+                    let (inlined, _) =
                         simplify_expr(substituted, env, inline_templates, active_inline);
                     active_inline.remove(&callee);
-                    return (inlined, true || changed || inner_changed);
+                    return (inlined, true);
                 }
             }
             (NirExpr::Call { callee, args }, changed)

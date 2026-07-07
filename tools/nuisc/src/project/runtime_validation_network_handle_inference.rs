@@ -131,6 +131,7 @@ fn infer_network_return_kind_in_body(
     function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
     function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleReturn>>,
 ) -> Result<Option<NetworkOwnedHandleReturn>, String> {
+    let _known_requirement_count = function_requirements.len();
     let mut return_kind = None;
     for stmt in body {
         match stmt {

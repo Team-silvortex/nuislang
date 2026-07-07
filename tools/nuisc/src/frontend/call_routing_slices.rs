@@ -9,17 +9,21 @@ use super::{
     NirStructDef, NirTypeRef,
 };
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Clone, Copy)]
+pub(super) struct SliceCallRoutingInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) generic_args: &'a [nuis_semantics::model::AstTypeRef],
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
 pub(super) fn lower_slice_or_byte_builtin(
-    callee: &str,
-    generic_args: &[nuis_semantics::model::AstTypeRef],
-    args: &[AstExpr],
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: SliceCallRoutingInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
-    if let Some(byte_builtin) = super::call_routing_bytes::lower_byte_builtin(
+    let SliceCallRoutingInput {
         callee,
         generic_args,
         args,
@@ -27,7 +31,8 @@ pub(super) fn lower_slice_or_byte_builtin(
         bindings,
         signatures,
         struct_table,
-    )? {
+    } = input;
+    if let Some(byte_builtin) = super::call_routing_bytes::lower_byte_builtin(input)? {
         return Ok(Some(byte_builtin));
     }
 

@@ -62,7 +62,7 @@ fn normalize_loop_control_temp_bindings(
 pub(super) fn split_temp_prefixed_loop_flow_control<'a>(
     stmts: &'a [NirStmt],
     pure_helpers: &BTreeSet<String>,
-) -> Option<(Vec<(String, NirExpr)>, &'a NirStmt, &'a [NirStmt])> {
+) -> Option<LoopTempPrefixedSplit<'a>> {
     let mut temp_bindings = Vec::<(String, NirExpr)>::new();
     for (index, stmt) in stmts.iter().enumerate() {
         let remaining = &stmts[index + 1..];
@@ -86,7 +86,7 @@ pub(super) fn split_trailing_loop_control_temp_bindings<'a>(
     stmts: &'a [NirStmt],
     control_stmt: &'a NirStmt,
     pure_helpers: &BTreeSet<String>,
-) -> Option<(&'a [NirStmt], Vec<(String, NirExpr)>)> {
+) -> Option<LoopTrailingTempSplit<'a>> {
     let mut accepted = Vec::<(String, NirExpr)>::new();
     let mut consumer_stmts = vec![control_stmt];
     let mut split_index = stmts.len();
@@ -112,7 +112,7 @@ pub(super) fn split_temp_prefixed_loop_step_bindings<'a>(
     binding_name: &str,
     pure_helpers: &BTreeSet<String>,
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
-) -> Option<(Vec<(String, NirExpr)>, &'a NirStmt, &'a [NirStmt])> {
+) -> Option<LoopTempPrefixedSplit<'a>> {
     let mut temp_bindings = Vec::<(String, NirExpr)>::new();
     let prev_current = NirExpr::Var(TAIL_RECURSIVE_PREV_CURRENT_BINDING.to_owned());
     for (index, stmt) in body.iter().enumerate() {

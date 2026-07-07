@@ -6,16 +6,28 @@ use super::{
     lower_expr, select_expected_semantic_token_type, validate_type_ref, FunctionSignature,
 };
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct DataProfileBuiltinInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) expected: Option<&'a NirTypeRef>,
+}
+
 pub(super) fn lower_data_profile_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
+    input: DataProfileBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let DataProfileBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        expected,
+    } = input;
     let expr = match callee {
         "data_profile_bind_core" => {
             let unit = require_cpu_unit_name(callee, args, current_domain)?;

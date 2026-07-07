@@ -33,6 +33,8 @@ pub struct PipelineArtifacts {
     pub loaded_nustar: Vec<String>,
 }
 
+type PreparedProjectNir = (AstModule, NirModule, BTreeSet<(String, String)>);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilePipelineStage {
     pub id: &'static str,
@@ -335,7 +337,7 @@ fn collect_stdlib_library_module_paths(
 
 fn prepare_project_nir(
     project: &crate::project::LoadedProject,
-) -> Result<(AstModule, NirModule, BTreeSet<(String, String)>), String> {
+) -> Result<PreparedProjectNir, String> {
     let local_units = project
         .modules
         .iter()

@@ -5,6 +5,7 @@ use nuis_semantics::model::{AstBinaryOp, AstExpr, NirBinaryOp, NirExpr, NirStruc
 use super::{
     bool_type, compatible_types, find_impl_method_signature, infer_nir_expr_type,
     lower_nested_expr_with_async_and_consts, FunctionSignature, ModuleConstValue,
+    NestedExprWithConstsInput,
 };
 
 pub(super) struct BinaryLoweringInput<'a> {
@@ -43,56 +44,56 @@ pub(super) fn lower_binary_expr_with_async(
         | AstBinaryOp::Rem => expected,
         _ => None,
     };
-    let mut lowered_lhs = lower_nested_expr_with_async_and_consts(
-        lhs,
+    let mut lowered_lhs = lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+        expr: lhs,
         current_domain,
         current_function_is_async,
         bindings,
         module_consts,
         signatures,
         struct_table,
-        operand_expected,
-    )?;
-    let mut lowered_rhs = lower_nested_expr_with_async_and_consts(
-        rhs,
+        expected: operand_expected,
+    })?;
+    let mut lowered_rhs = lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+        expr: rhs,
         current_domain,
         current_function_is_async,
         bindings,
         module_consts,
         signatures,
         struct_table,
-        operand_expected,
-    )?;
+        expected: operand_expected,
+    })?;
     let mut lhs_ty = infer_nir_expr_type(&lowered_lhs, bindings, signatures, struct_table)
         .ok_or_else(|| "cannot infer binary lhs type".to_owned())?;
     let mut rhs_ty = infer_nir_expr_type(&lowered_rhs, bindings, signatures, struct_table)
         .ok_or_else(|| "cannot infer binary rhs type".to_owned())?;
     if !compatible_types(&lhs_ty, &rhs_ty) {
         if matches!(lhs, AstExpr::Float(_)) && rhs_ty.is_float_scalar() {
-            lowered_lhs = lower_nested_expr_with_async_and_consts(
-                lhs,
+            lowered_lhs = lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+                expr: lhs,
                 current_domain,
                 current_function_is_async,
                 bindings,
                 module_consts,
                 signatures,
                 struct_table,
-                Some(&rhs_ty),
-            )?;
+                expected: Some(&rhs_ty),
+            })?;
             lhs_ty = infer_nir_expr_type(&lowered_lhs, bindings, signatures, struct_table)
                 .ok_or_else(|| "cannot infer binary lhs type".to_owned())?;
         }
         if matches!(rhs, AstExpr::Float(_)) && lhs_ty.is_float_scalar() {
-            lowered_rhs = lower_nested_expr_with_async_and_consts(
-                rhs,
+            lowered_rhs = lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+                expr: rhs,
                 current_domain,
                 current_function_is_async,
                 bindings,
                 module_consts,
                 signatures,
                 struct_table,
-                Some(&lhs_ty),
-            )?;
+                expected: Some(&lhs_ty),
+            })?;
             rhs_ty = infer_nir_expr_type(&lowered_rhs, bindings, signatures, struct_table)
                 .ok_or_else(|| "cannot infer binary rhs type".to_owned())?;
         }

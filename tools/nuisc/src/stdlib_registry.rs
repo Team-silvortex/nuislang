@@ -84,125 +84,6 @@ pub fn load_stdlib_module_manifest(
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pixelmagic_manifest_exposes_canonical_surface_registry_ids() {
-        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
-        let manifest =
-            load_stdlib_module_manifest(&stdlib_root, "pixelmagic").expect("load pixelmagic");
-        assert_eq!(manifest.name, "pixelmagic");
-        assert_eq!(
-            manifest.surfaces,
-            vec![
-                "contract.pixelmagic.image-resource-shaping.v1".to_owned(),
-                "contract.pixelmagic.texture-handoff.v1".to_owned(),
-                "contract.pixelmagic.shader-facing-image-prep.v1".to_owned(),
-                "contract.pixelmagic.render-plan.v1".to_owned(),
-                "surface.pixelmagic.shader.contracts.v1".to_owned(),
-                "surface.pixelmagic.shader.packet-bridge.v1".to_owned(),
-                "surface.pixelmagic.shader.render.v1".to_owned(),
-                "surface.pixelmagic.shader.texture.v1".to_owned(),
-                "surface.pixelmagic.shader.pipeline.v1".to_owned(),
-            ]
-        );
-        assert_eq!(
-            manifest.library_modules,
-            vec![
-                "lib/image_contracts.ns".to_owned(),
-                "lib/shader_contracts.ns".to_owned(),
-                "lib/packet_bridge_surface.ns".to_owned(),
-                "lib/render_surface.ns".to_owned(),
-                "lib/texture_surface.ns".to_owned(),
-                "lib/pipeline_surface.ns".to_owned(),
-            ]
-        );
-    }
-
-    #[test]
-    fn string_array_parser_preserves_commas_inside_quoted_stdlib_values() {
-        let values = parse_optional_string_array(
-            r#"surfaces = ["surface.std.text,json.v1", "surface.std.io.v1"]"#,
-            "surfaces",
-        )
-        .expect("array should parse");
-
-        assert_eq!(
-            values,
-            vec![
-                "surface.std.text,json.v1".to_owned(),
-                "surface.std.io.v1".to_owned()
-            ]
-        );
-    }
-
-    #[test]
-    fn core_manifest_exposes_canonical_surface_registry_ids() {
-        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
-        let manifest = load_stdlib_module_manifest(&stdlib_root, "core").expect("load core");
-        assert_eq!(
-            manifest.surfaces,
-            vec![
-                "contract.core.prelude.primitive-values.v1".to_owned(),
-                "contract.core.prelude.ref-ownership-conventions.v1".to_owned(),
-                "contract.core.prelude.basic-math.v1".to_owned(),
-                "contract.core.prelude.structural-source.v1".to_owned(),
-            ]
-        );
-    }
-
-    #[test]
-    fn std_manifest_exposes_canonical_surface_registry_ids() {
-        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
-        let manifest = load_stdlib_module_manifest(&stdlib_root, "std").expect("load std");
-        assert_eq!(
-            manifest.surfaces,
-            vec![
-                "surface.std.collections.v1".to_owned(),
-                "surface.std.host-ffi-helpers.v1".to_owned(),
-                "surface.std.data-plane-helpers.v1".to_owned(),
-                "surface.std.project-utility.v1".to_owned(),
-                "surface.std.cli-workflow-contracts.v1".to_owned(),
-                "surface.std.net-session-contracts.v1".to_owned(),
-                "surface.std.text-json-contracts.v1".to_owned(),
-                "surface.std.time-benchmark-contracts.v1".to_owned(),
-                "surface.std.hetero-test-benchmark-contracts.v1".to_owned(),
-            ]
-        );
-        assert_eq!(
-            manifest.library_modules,
-            vec![
-                "lib/task_contracts.ns".to_owned(),
-                "lib/io_contracts.ns".to_owned(),
-                "lib/fs_contracts.ns".to_owned(),
-                "lib/cli_contracts.ns".to_owned(),
-                "lib/net_contracts.ns".to_owned(),
-                "lib/text_contracts.ns".to_owned(),
-                "lib/time_contracts.ns".to_owned(),
-                "lib/hetero_contracts.ns".to_owned(),
-            ]
-        );
-    }
-
-    #[test]
-    fn ns_nova_manifest_exposes_canonical_surface_registry_ids() {
-        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
-        let manifest = load_stdlib_module_manifest(&stdlib_root, "ns-nova").expect("load ns-nova");
-        assert_eq!(
-            manifest.surfaces,
-            vec![
-                "surface.ns-nova.renderer.v1".to_owned(),
-                "surface.ns-nova.scene-frame-graph.v1".to_owned(),
-                "surface.ns-nova.window-input-lifecycle.v1".to_owned(),
-                "surface.ns-nova.material-shader-packaging.v1".to_owned(),
-                "surface.ns-nova.gpu-ui-3d-runtime.v1".to_owned(),
-            ]
-        );
-    }
-}
-
 pub fn resolve_galaxy_dependencies(
     stdlib_root: &Path,
     requested: &[crate::project::ProjectGalaxyDependency],
@@ -341,4 +222,123 @@ fn detect_auto_injectability(
         }
     }
     Ok((blockers.is_empty(), blockers))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pixelmagic_manifest_exposes_canonical_surface_registry_ids() {
+        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
+        let manifest =
+            load_stdlib_module_manifest(&stdlib_root, "pixelmagic").expect("load pixelmagic");
+        assert_eq!(manifest.name, "pixelmagic");
+        assert_eq!(
+            manifest.surfaces,
+            vec![
+                "contract.pixelmagic.image-resource-shaping.v1".to_owned(),
+                "contract.pixelmagic.texture-handoff.v1".to_owned(),
+                "contract.pixelmagic.shader-facing-image-prep.v1".to_owned(),
+                "contract.pixelmagic.render-plan.v1".to_owned(),
+                "surface.pixelmagic.shader.contracts.v1".to_owned(),
+                "surface.pixelmagic.shader.packet-bridge.v1".to_owned(),
+                "surface.pixelmagic.shader.render.v1".to_owned(),
+                "surface.pixelmagic.shader.texture.v1".to_owned(),
+                "surface.pixelmagic.shader.pipeline.v1".to_owned(),
+            ]
+        );
+        assert_eq!(
+            manifest.library_modules,
+            vec![
+                "lib/image_contracts.ns".to_owned(),
+                "lib/shader_contracts.ns".to_owned(),
+                "lib/packet_bridge_surface.ns".to_owned(),
+                "lib/render_surface.ns".to_owned(),
+                "lib/texture_surface.ns".to_owned(),
+                "lib/pipeline_surface.ns".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn string_array_parser_preserves_commas_inside_quoted_stdlib_values() {
+        let values = parse_optional_string_array(
+            r#"surfaces = ["surface.std.text,json.v1", "surface.std.io.v1"]"#,
+            "surfaces",
+        )
+        .expect("array should parse");
+
+        assert_eq!(
+            values,
+            vec![
+                "surface.std.text,json.v1".to_owned(),
+                "surface.std.io.v1".to_owned()
+            ]
+        );
+    }
+
+    #[test]
+    fn core_manifest_exposes_canonical_surface_registry_ids() {
+        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
+        let manifest = load_stdlib_module_manifest(&stdlib_root, "core").expect("load core");
+        assert_eq!(
+            manifest.surfaces,
+            vec![
+                "contract.core.prelude.primitive-values.v1".to_owned(),
+                "contract.core.prelude.ref-ownership-conventions.v1".to_owned(),
+                "contract.core.prelude.basic-math.v1".to_owned(),
+                "contract.core.prelude.structural-source.v1".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn std_manifest_exposes_canonical_surface_registry_ids() {
+        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
+        let manifest = load_stdlib_module_manifest(&stdlib_root, "std").expect("load std");
+        assert_eq!(
+            manifest.surfaces,
+            vec![
+                "surface.std.collections.v1".to_owned(),
+                "surface.std.host-ffi-helpers.v1".to_owned(),
+                "surface.std.data-plane-helpers.v1".to_owned(),
+                "surface.std.project-utility.v1".to_owned(),
+                "surface.std.cli-workflow-contracts.v1".to_owned(),
+                "surface.std.net-session-contracts.v1".to_owned(),
+                "surface.std.text-json-contracts.v1".to_owned(),
+                "surface.std.time-benchmark-contracts.v1".to_owned(),
+                "surface.std.hetero-test-benchmark-contracts.v1".to_owned(),
+            ]
+        );
+        assert_eq!(
+            manifest.library_modules,
+            vec![
+                "lib/task_contracts.ns".to_owned(),
+                "lib/io_contracts.ns".to_owned(),
+                "lib/fs_contracts.ns".to_owned(),
+                "lib/cli_contracts.ns".to_owned(),
+                "lib/net_contracts.ns".to_owned(),
+                "lib/text_contracts.ns".to_owned(),
+                "lib/time_contracts.ns".to_owned(),
+                "lib/hetero_contracts.ns".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn ns_nova_manifest_exposes_canonical_surface_registry_ids() {
+        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
+        let manifest = load_stdlib_module_manifest(&stdlib_root, "ns-nova").expect("load ns-nova");
+        assert_eq!(
+            manifest.surfaces,
+            vec![
+                "surface.ns-nova.renderer.v1".to_owned(),
+                "surface.ns-nova.scene-frame-graph.v1".to_owned(),
+                "surface.ns-nova.window-input-lifecycle.v1".to_owned(),
+                "surface.ns-nova.material-shader-packaging.v1".to_owned(),
+                "surface.ns-nova.gpu-ui-3d-runtime.v1".to_owned(),
+            ]
+        );
+    }
 }

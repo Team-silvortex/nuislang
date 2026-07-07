@@ -10,7 +10,7 @@ enum PreparedReturnDecisionTree {
 }
 
 pub(super) enum PreparedCarryDecisionTree {
-    Leaf(PreparedCarryBranchSource),
+    Leaf(Box<PreparedCarryBranchSource>),
     Branch {
         condition: PreparedLoopFlowCondition,
         then_tree: Box<PreparedCarryDecisionTree>,
@@ -50,9 +50,7 @@ fn normalize_pure_helper_body(
 ) -> Option<Vec<NirStmt>> {
     let mut current = body.to_vec();
     loop {
-        let Some((first, tail)) = current.split_first() else {
-            return None;
-        };
+        let (first, tail) = current.split_first()?;
         let Some((name, value)) = extract_pure_branch_binding(first, pure_helpers) else {
             return Some(current);
         };
@@ -182,13 +180,13 @@ fn lower_helper_return_tree_to_carry_tree(
 ) -> Option<PreparedCarryDecisionTree> {
     match tree {
         PreparedReturnDecisionTree::Return(expr) => Some(PreparedCarryDecisionTree::Leaf(
-            parse_loop_carry_branch_source(
+            Box::new(parse_loop_carry_branch_source(
                 carry_name,
                 &expr,
                 binding_name,
                 carries,
                 inlineable_pure_helpers,
-            )?,
+            )?),
         )),
         PreparedReturnDecisionTree::Branch {
             condition,
@@ -231,7 +229,7 @@ pub(super) fn collapse_carry_decision_tree(
 )> {
     fn leaf_source(tree: &PreparedCarryDecisionTree) -> Option<PreparedCarryBranchSource> {
         match tree {
-            PreparedCarryDecisionTree::Leaf(source) => Some(source.clone()),
+            PreparedCarryDecisionTree::Leaf(source) => Some((**source).clone()),
             PreparedCarryDecisionTree::Branch { .. } => None,
         }
     }
@@ -314,8 +312,8 @@ pub(super) fn parse_helper_conditional_carry_update(
     let (condition, then_source, else_source) = collapse_carry_decision_tree(&carry_tree)?;
     Some(PreparedCarryUpdateKind::Conditional {
         condition,
-        then_source,
-        else_source,
+        then_source: Box::new(then_source),
+        else_source: Box::new(else_source),
     })
 }
 
@@ -417,7 +415,7 @@ pub(super) fn parse_stmt_carry_decision_tree(
             if branch_name != carry_name {
                 return None;
             }
-            Some(PreparedCarryDecisionTree::Leaf(
+            Some(PreparedCarryDecisionTree::Leaf(Box::new(
                 parse_loop_carry_branch_source(
                     &branch_name,
                     &branch_expr,
@@ -425,7 +423,7 @@ pub(super) fn parse_stmt_carry_decision_tree(
                     carries,
                     inlineable_pure_helpers,
                 )?,
-            ))
+            )))
         }
         NirStmt::If {
             condition,

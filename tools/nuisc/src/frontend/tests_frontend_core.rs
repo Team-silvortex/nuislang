@@ -707,7 +707,7 @@ fn rewrites_local_i64_text_handle_pattern_when_buffer_is_not_reused() {
         .find(|function| function.name == "main")
         .unwrap();
     assert!(matches!(
-        main.body.get(0),
+        main.body.first(),
         Some(NirStmt::Let {
             name,
             ty: Some(ty),

@@ -204,7 +204,7 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
 }
 
 pub fn render_link_plan_json(plan: &LinkPlan) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("tool", "nsld"),
         json_string_field("toolchain_phase", "alpha-0.6.0-linker-boundary"),
         json_string_field("schema", &plan.schema),
@@ -303,7 +303,7 @@ fn render_host_ffi_abi_group_json(group: &LinkPlanHostFfiAbiGroup) -> String {
         .map(render_host_ffi_abi_entry_json)
         .collect::<Vec<_>>()
         .join(",");
-    let fields = vec![
+    let fields = [
         json_string_field("abi", &group.abi),
         json_usize_field("symbol_count", group.symbol_count),
         json_usize_field("policy_count", group.policy_count),
@@ -318,7 +318,7 @@ fn render_host_ffi_abi_group_json(group: &LinkPlanHostFfiAbiGroup) -> String {
 }
 
 fn render_host_ffi_validation_json(validation: &LinkPlanHostFfiValidationSummary) -> String {
-    let fields = vec![
+    let fields = [
         json_usize_field("checked", validation.checked),
         json_bool_field("valid", validation.valid),
         json_bool_field("link_allowed", validation.link_allowed),
@@ -329,7 +329,7 @@ fn render_host_ffi_validation_json(validation: &LinkPlanHostFfiValidationSummary
 }
 
 fn render_host_ffi_abi_entry_json(entry: &LinkPlanHostFfiAbiEntry) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("symbol", &entry.symbol),
         json_string_field("signature_pattern", &entry.signature_pattern),
         json_string_field("signature_hash", &entry.signature_hash),
@@ -339,7 +339,7 @@ fn render_host_ffi_abi_entry_json(entry: &LinkPlanHostFfiAbiEntry) -> String {
 }
 
 fn render_host_ffi_entry_json(entry: &LinkPlanHostFfiEntry) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("abi", &entry.abi),
         json_string_field("symbol", &entry.symbol),
         json_string_field("signature_pattern", &entry.signature_pattern),

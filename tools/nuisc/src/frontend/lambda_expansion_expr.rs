@@ -13,21 +13,54 @@ use super::lambda_expansion_synth::{
 };
 use super::lambda_expansion_types::{build_lambda_binding_value, build_lambda_call, LambdaBinding};
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn rewrite_lambda_expr(
-    expr: &AstExpr,
-    expected_expr_type: Option<&AstTypeRef>,
-    inherited_generic_params: &[AstGenericParam],
-    lambda_aliases: &BTreeMap<String, LambdaBinding>,
-    visible_locals: &BTreeSet<String>,
-    visible_local_types: &BTreeMap<String, AstTypeRef>,
-    module_impls: &[AstImplDef],
-    module_const_names: &BTreeSet<String>,
-    module_function_table: &BTreeMap<String, AstFunction>,
-    owning_function_name: &str,
-    counter: &mut usize,
-    synthesized: &mut Vec<AstFunction>,
-) -> Result<AstExpr, String> {
+pub(super) struct LambdaExprRewriteInput<'a> {
+    pub(super) expr: &'a AstExpr,
+    pub(super) expected_expr_type: Option<&'a AstTypeRef>,
+    pub(super) inherited_generic_params: &'a [AstGenericParam],
+    pub(super) lambda_aliases: &'a BTreeMap<String, LambdaBinding>,
+    pub(super) visible_locals: &'a BTreeSet<String>,
+    pub(super) visible_local_types: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) module_impls: &'a [AstImplDef],
+    pub(super) module_const_names: &'a BTreeSet<String>,
+    pub(super) module_function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) owning_function_name: &'a str,
+    pub(super) counter: &'a mut usize,
+    pub(super) synthesized: &'a mut Vec<AstFunction>,
+}
+
+pub(super) fn rewrite_lambda_expr(input: LambdaExprRewriteInput<'_>) -> Result<AstExpr, String> {
+    let LambdaExprRewriteInput {
+        expr,
+        expected_expr_type,
+        inherited_generic_params,
+        lambda_aliases,
+        visible_locals,
+        visible_local_types,
+        module_impls,
+        module_const_names,
+        module_function_table,
+        owning_function_name,
+        counter,
+        synthesized,
+    } = input;
+    macro_rules! rewrite_nested_expr {
+        ($expr:expr, $expected:expr) => {
+            rewrite_lambda_expr(LambdaExprRewriteInput {
+                expr: $expr,
+                expected_expr_type: $expected,
+                inherited_generic_params,
+                lambda_aliases,
+                visible_locals,
+                visible_local_types,
+                module_impls,
+                module_const_names,
+                module_function_table,
+                owning_function_name,
+                counter,
+                synthesized,
+            })
+        };
+    }
     Ok(match expr {
         AstExpr::Var(name)
             if lambda_aliases.contains_key(name) && !module_const_names.contains(name) =>
@@ -43,20 +76,7 @@ pub(super) fn rewrite_lambda_expr(
             then_body,
             else_body,
         } => AstExpr::If {
-            condition: Box::new(rewrite_lambda_expr(
-                condition,
-                None,
-                inherited_generic_params,
-                lambda_aliases,
-                visible_locals,
-                visible_local_types,
-                module_impls,
-                module_const_names,
-                module_function_table,
-                owning_function_name,
-                counter,
-                synthesized,
-            )?),
+            condition: Box::new(rewrite_nested_expr!(condition, None)?),
             then_body: expand_lambda_block(ExpandLambdaBlockInput {
                 body: then_body,
                 current_return_type: expected_expr_type,
@@ -89,40 +109,14 @@ pub(super) fn rewrite_lambda_expr(
             })?,
         },
         AstExpr::Match { value, arms } => AstExpr::Match {
-            value: Box::new(rewrite_lambda_expr(
-                value,
-                None,
-                inherited_generic_params,
-                lambda_aliases,
-                visible_locals,
-                visible_local_types,
-                module_impls,
-                module_const_names,
-                module_function_table,
-                owning_function_name,
-                counter,
-                synthesized,
-            )?),
+            value: Box::new(rewrite_nested_expr!(value, None)?),
             arms: arms
                 .iter()
                 .map(|arm| {
                     Ok(AstMatchArm {
                         pattern: arm.pattern.clone(),
                         guard: match &arm.guard {
-                            Some(guard) => Some(rewrite_lambda_expr(
-                                guard,
-                                None,
-                                inherited_generic_params,
-                                lambda_aliases,
-                                visible_locals,
-                                visible_local_types,
-                                module_impls,
-                                module_const_names,
-                                module_function_table,
-                                owning_function_name,
-                                counter,
-                                synthesized,
-                            )?),
+                            Some(guard) => Some(rewrite_nested_expr!(guard, None)?),
                             None => None,
                         },
                         body: expand_lambda_block(ExpandLambdaBlockInput {
@@ -167,53 +161,12 @@ pub(super) fn rewrite_lambda_expr(
             })?;
             build_lambda_binding_value(&binding)
         }
-        AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_lambda_expr(
-            value,
-            None,
-            inherited_generic_params,
-            lambda_aliases,
-            visible_locals,
-            visible_local_types,
-            module_impls,
-            module_const_names,
-            module_function_table,
-            owning_function_name,
-            counter,
-            synthesized,
-        )?)),
-        AstExpr::Try(value) => AstExpr::Try(Box::new(rewrite_lambda_expr(
-            value,
-            None,
-            inherited_generic_params,
-            lambda_aliases,
-            visible_locals,
-            visible_local_types,
-            module_impls,
-            module_const_names,
-            module_function_table,
-            owning_function_name,
-            counter,
-            synthesized,
-        )?)),
+        AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_nested_expr!(value, None)?)),
+        AstExpr::Try(value) => AstExpr::Try(Box::new(rewrite_nested_expr!(value, None)?)),
         AstExpr::Invoke { callee, args } => {
             let rewritten_args = args
                 .iter()
-                .map(|arg| {
-                    rewrite_lambda_expr(
-                        arg,
-                        None,
-                        inherited_generic_params,
-                        lambda_aliases,
-                        visible_locals,
-                        visible_local_types,
-                        module_impls,
-                        module_const_names,
-                        module_function_table,
-                        owning_function_name,
-                        counter,
-                        synthesized,
-                    )
-                })
+                .map(|arg| rewrite_nested_expr!(arg, None))
                 .collect::<Result<Vec<_>, _>>()?;
             match callee.as_ref() {
                 AstExpr::Lambda {
@@ -311,20 +264,7 @@ pub(super) fn rewrite_lambda_expr(
                         )?;
                         Ok(build_lambda_binding_value(&binding))
                     } else {
-                        rewrite_lambda_expr(
-                            arg,
-                            None,
-                            inherited_generic_params,
-                            lambda_aliases,
-                            visible_locals,
-                            visible_local_types,
-                            module_impls,
-                            module_const_names,
-                            module_function_table,
-                            owning_function_name,
-                            counter,
-                            synthesized,
-                        )
+                        rewrite_nested_expr!(arg, None)
                     }
                 })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -344,20 +284,7 @@ pub(super) fn rewrite_lambda_expr(
             generic_args,
             args,
         } => {
-            let rewritten_receiver = Box::new(rewrite_lambda_expr(
-                receiver,
-                None,
-                inherited_generic_params,
-                lambda_aliases,
-                visible_locals,
-                visible_local_types,
-                module_impls,
-                module_const_names,
-                module_function_table,
-                owning_function_name,
-                counter,
-                synthesized,
-            )?);
+            let rewritten_receiver = Box::new(rewrite_nested_expr!(receiver, None)?);
             let rewritten_args = args
                 .iter()
                 .enumerate()
@@ -406,20 +333,7 @@ pub(super) fn rewrite_lambda_expr(
                         )?;
                         Ok(build_lambda_binding_value(&binding))
                     } else {
-                        rewrite_lambda_expr(
-                            arg,
-                            None,
-                            inherited_generic_params,
-                            lambda_aliases,
-                            visible_locals,
-                            visible_local_types,
-                            module_impls,
-                            module_const_names,
-                            module_function_table,
-                            owning_function_name,
-                            counter,
-                            synthesized,
-                        )
+                        rewrite_nested_expr!(arg, None)
                     }
                 })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -439,91 +353,21 @@ pub(super) fn rewrite_lambda_expr(
             type_args: type_args.clone(),
             fields: fields
                 .iter()
-                .map(|(name, value)| {
-                    Ok((
-                        name.clone(),
-                        rewrite_lambda_expr(
-                            value,
-                            None,
-                            inherited_generic_params,
-                            lambda_aliases,
-                            visible_locals,
-                            visible_local_types,
-                            module_impls,
-                            module_const_names,
-                            module_function_table,
-                            owning_function_name,
-                            counter,
-                            synthesized,
-                        )?,
-                    ))
-                })
+                .map(|(name, value)| Ok((name.clone(), rewrite_nested_expr!(value, None)?)))
                 .collect::<Result<Vec<_>, String>>()?,
         },
         AstExpr::FieldAccess { base, field } => AstExpr::FieldAccess {
-            base: Box::new(rewrite_lambda_expr(
-                base,
-                None,
-                inherited_generic_params,
-                lambda_aliases,
-                visible_locals,
-                visible_local_types,
-                module_impls,
-                module_const_names,
-                module_function_table,
-                owning_function_name,
-                counter,
-                synthesized,
-            )?),
+            base: Box::new(rewrite_nested_expr!(base, None)?),
             field: field.clone(),
         },
         AstExpr::Unary { op, operand } => AstExpr::Unary {
             op: *op,
-            operand: Box::new(rewrite_lambda_expr(
-                operand,
-                None,
-                inherited_generic_params,
-                lambda_aliases,
-                visible_locals,
-                visible_local_types,
-                module_impls,
-                module_const_names,
-                module_function_table,
-                owning_function_name,
-                counter,
-                synthesized,
-            )?),
+            operand: Box::new(rewrite_nested_expr!(operand, None)?),
         },
         AstExpr::Binary { op, lhs, rhs } => AstExpr::Binary {
             op: *op,
-            lhs: Box::new(rewrite_lambda_expr(
-                lhs,
-                None,
-                inherited_generic_params,
-                lambda_aliases,
-                visible_locals,
-                visible_local_types,
-                module_impls,
-                module_const_names,
-                module_function_table,
-                owning_function_name,
-                counter,
-                synthesized,
-            )?),
-            rhs: Box::new(rewrite_lambda_expr(
-                rhs,
-                None,
-                inherited_generic_params,
-                lambda_aliases,
-                visible_locals,
-                visible_local_types,
-                module_impls,
-                module_const_names,
-                module_function_table,
-                owning_function_name,
-                counter,
-                synthesized,
-            )?),
+            lhs: Box::new(rewrite_nested_expr!(lhs, None)?),
+            rhs: Box::new(rewrite_nested_expr!(rhs, None)?),
         },
         AstExpr::Bool(_)
         | AstExpr::Text(_)

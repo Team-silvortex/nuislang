@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nuis_semantics::model::{AstExpr, AstImplDef, AstStructDef, AstTypeAlias, AstTypeRef};
+use nuis_semantics::model::{AstExpr, AstTypeAlias, AstTypeRef};
 
 use super::super::generics::{infer_alias_aware_ast_expr_type, unify_generic_type_pattern};
 use super::super::types::infer_ast_expr_type_for_pattern;
@@ -12,6 +12,7 @@ use super::exprs_alias_expected::{
     seed_alias_generic_substitutions_from_expected_pattern,
 };
 pub(super) use super::exprs_alias_inputs::{
+    AliasAwarePatternTypeInput, AliasInferenceContext, AliasUsageInferenceInput,
     MethodCallReceiverExpectedTypeInput, StructConstructorAliasInput, StructLiteralAliasInput,
 };
 
@@ -54,6 +55,13 @@ pub(super) fn resolved_struct_constructor_alias(
         struct_table,
         function_return_types,
     } = input;
+    let context = AliasInferenceContext {
+        env,
+        visible_type_aliases,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+    };
     let alias_placeholder_names = visible_type_aliases
         .get(callee)
         .map(|alias| {
@@ -75,15 +83,9 @@ pub(super) fn resolved_struct_constructor_alias(
         )? {
             return Ok(Some(from_expected));
         }
-        if let Some(inferred) = infer_alias_struct_constructor_type_from_args(
-            callee,
-            args,
-            env,
-            visible_type_aliases,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-        )? {
+        if let Some(inferred) =
+            infer_alias_struct_constructor_type_from_args(callee, args, context)?
+        {
             return Ok(Some(inferred));
         }
     }
@@ -97,15 +99,9 @@ pub(super) fn resolved_struct_constructor_alias(
         Ok(resolved) => resolved,
         Err(error) => {
             if has_placeholder_generic_args {
-                if let Some(inferred) = infer_alias_struct_constructor_type_from_args(
-                    callee,
-                    args,
-                    env,
-                    visible_type_aliases,
-                    impl_lookup,
-                    struct_table,
-                    function_return_types,
-                )? {
+                if let Some(inferred) =
+                    infer_alias_struct_constructor_type_from_args(callee, args, context)?
+                {
                     return Ok(Some(inferred));
                 }
             }
@@ -134,6 +130,13 @@ pub(super) fn resolved_struct_literal_alias(
         struct_table,
         function_return_types,
     } = input;
+    let context = AliasInferenceContext {
+        env,
+        visible_type_aliases,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+    };
     let alias_placeholder_names = visible_type_aliases
         .get(type_name)
         .map(|alias| {
@@ -155,16 +158,9 @@ pub(super) fn resolved_struct_literal_alias(
         )? {
             return Ok(Some(from_expected));
         }
-        if let Some(inferred) = infer_alias_struct_literal_type_from_fields(
-            type_name,
-            fields,
-            expected,
-            env,
-            visible_type_aliases,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-        )? {
+        if let Some(inferred) =
+            infer_alias_struct_literal_type_from_fields(type_name, fields, expected, context)?
+        {
             return Ok(Some(inferred));
         }
     }
@@ -264,25 +260,20 @@ pub(super) fn method_call_receiver_expected_type(
     None
 }
 
-#[allow(clippy::too_many_arguments)]
 fn infer_alias_struct_constructor_type_from_args(
     alias_name: &str,
     args: &[AstExpr],
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    context: AliasInferenceContext<'_>,
 ) -> Result<Option<(String, Vec<AstTypeRef>)>, String> {
-    let Some(alias_definition) = visible_type_aliases.get(alias_name) else {
+    let Some(alias_definition) = context.visible_type_aliases.get(alias_name) else {
         return Ok(None);
     };
     if alias_definition.generic_params.is_empty() {
         return Ok(None);
     }
     let resolved_target_pattern =
-        resolve_ast_type_ref_aliases(&alias_definition.target, visible_type_aliases)?;
-    let Some(target_definition) = struct_table.get(&resolved_target_pattern.name) else {
+        resolve_ast_type_ref_aliases(&alias_definition.target, context.visible_type_aliases)?;
+    let Some(target_definition) = context.struct_table.get(&resolved_target_pattern.name) else {
         return Err(format!(
             "payload-style alias constructor `{alias_name}(...)` is not yet supported for generic alias target `{}`; current frontend only supports aliases that resolve to struct targets",
             lower_type_ref(&alias_definition.target).render()
@@ -301,41 +292,32 @@ fn infer_alias_struct_constructor_type_from_args(
         .iter()
         .map(|param| param.name.clone())
         .collect::<BTreeSet<_>>();
-    infer_alias_struct_target_from_usage_seeded(
+    infer_alias_struct_target_from_usage_seeded(AliasUsageInferenceInput {
         alias_name,
         alias_definition,
-        &[field_pattern],
-        &[args[0].clone()],
-        visible_type_aliases,
-        env,
-        impl_lookup,
-        struct_table,
-        function_return_types,
-        &generic_names,
-        BTreeMap::new(),
-    )
+        patterns: &[field_pattern],
+        concrete_exprs: &[args[0].clone()],
+        context,
+        generic_names: &generic_names,
+        substitutions: BTreeMap::new(),
+    })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn infer_alias_struct_literal_type_from_fields(
     alias_name: &str,
     fields: &[(String, AstExpr)],
     expected: Option<&AstTypeRef>,
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    context: AliasInferenceContext<'_>,
 ) -> Result<Option<(String, Vec<AstTypeRef>)>, String> {
-    let Some(alias_definition) = visible_type_aliases.get(alias_name) else {
+    let Some(alias_definition) = context.visible_type_aliases.get(alias_name) else {
         return Ok(None);
     };
     if alias_definition.generic_params.is_empty() {
         return Ok(None);
     }
     let resolved_target_pattern =
-        resolve_ast_type_ref_aliases(&alias_definition.target, visible_type_aliases)?;
-    let Some(target_definition) = struct_table.get(&resolved_target_pattern.name) else {
+        resolve_ast_type_ref_aliases(&alias_definition.target, context.visible_type_aliases)?;
+    let Some(target_definition) = context.struct_table.get(&resolved_target_pattern.name) else {
         return Err(format!(
             "struct literal alias `{alias_name}` is not yet supported for generic alias target `{}`; current frontend only supports aliases that resolve to struct targets",
             lower_type_ref(&alias_definition.target).render()
@@ -367,41 +349,42 @@ fn infer_alias_struct_literal_type_from_fields(
         alias_definition,
         &resolved_target_pattern,
         expected,
-        visible_type_aliases,
+        context.visible_type_aliases,
         &generic_names,
     )?;
-    infer_alias_struct_target_from_usage_seeded(
+    infer_alias_struct_target_from_usage_seeded(AliasUsageInferenceInput {
         alias_name,
         alias_definition,
-        &field_patterns,
-        &fields
+        patterns: &field_patterns,
+        concrete_exprs: &fields
             .iter()
             .map(|(_, value)| value.clone())
             .collect::<Vec<_>>(),
-        visible_type_aliases,
+        context,
+        generic_names: &generic_names,
+        substitutions: seed,
+    })
+}
+
+fn infer_alias_struct_target_from_usage_seeded(
+    input: AliasUsageInferenceInput<'_>,
+) -> Result<Option<(String, Vec<AstTypeRef>)>, String> {
+    let AliasUsageInferenceInput {
+        alias_name,
+        alias_definition,
+        patterns,
+        concrete_exprs,
+        context,
+        generic_names,
+        mut substitutions,
+    } = input;
+    let AliasInferenceContext {
         env,
+        visible_type_aliases,
         impl_lookup,
         struct_table,
         function_return_types,
-        &generic_names,
-        seed,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn infer_alias_struct_target_from_usage_seeded(
-    alias_name: &str,
-    alias_definition: &AstTypeAlias,
-    patterns: &[AstTypeRef],
-    concrete_exprs: &[AstExpr],
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    env: &BTreeMap<String, AstTypeRef>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    generic_names: &BTreeSet<String>,
-    mut substitutions: BTreeMap<String, AstTypeRef>,
-) -> Result<Option<(String, Vec<AstTypeRef>)>, String> {
+    } = context;
     let mut pending = patterns
         .iter()
         .zip(concrete_exprs.iter())
@@ -412,36 +395,33 @@ fn infer_alias_struct_target_from_usage_seeded(
         for (pattern, concrete_expr) in pending {
             let expected_pattern =
                 specialize_ast_type_pattern_with_known_substitutions(pattern, &substitutions);
-            let concrete = infer_alias_aware_ast_expr_type_for_pattern(
-                concrete_expr,
-                &expected_pattern,
-                env,
-                visible_type_aliases,
-                impl_lookup,
-                struct_table,
-                function_return_types,
-            )
-            .or_else(|| {
-                infer_ast_expr_type_for_pattern(
-                    concrete_expr,
-                    &expected_pattern,
-                    generic_names,
-                    env,
-                    impl_lookup,
-                    struct_table,
-                    function_return_types,
-                )
-            })
-            .or_else(|| {
-                infer_alias_aware_ast_expr_type(
-                    concrete_expr,
-                    env,
-                    visible_type_aliases,
-                    impl_lookup,
-                    struct_table,
-                    function_return_types,
-                )
-            });
+            let concrete =
+                infer_alias_aware_ast_expr_type_for_pattern(AliasAwarePatternTypeInput {
+                    expr: concrete_expr,
+                    expected_pattern: &expected_pattern,
+                    context,
+                })
+                .or_else(|| {
+                    infer_ast_expr_type_for_pattern(
+                        concrete_expr,
+                        &expected_pattern,
+                        generic_names,
+                        env,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                    )
+                })
+                .or_else(|| {
+                    infer_alias_aware_ast_expr_type(
+                        concrete_expr,
+                        env,
+                        visible_type_aliases,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                    )
+                });
             let Some(concrete) = concrete else {
                 next_pending.push((pattern, concrete_expr));
                 continue;
@@ -501,16 +481,21 @@ fn infer_alias_struct_target_from_usage_seeded(
         .then_some((resolved.name, resolved.generic_args)))
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn infer_alias_aware_ast_expr_type_for_pattern(
-    expr: &AstExpr,
-    expected_pattern: &AstTypeRef,
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+fn infer_alias_aware_ast_expr_type_for_pattern(
+    input: AliasAwarePatternTypeInput<'_>,
 ) -> Option<AstTypeRef> {
+    let AliasAwarePatternTypeInput {
+        expr,
+        expected_pattern,
+        context,
+    } = input;
+    let AliasInferenceContext {
+        env,
+        visible_type_aliases,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+    } = context;
     match expr {
         AstExpr::StructLiteral {
             type_name,

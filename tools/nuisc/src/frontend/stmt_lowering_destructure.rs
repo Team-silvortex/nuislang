@@ -8,20 +8,33 @@ use super::validation_helpers::validate_type_ref;
 use super::{
     infer_nir_expr_type, instantiate_struct_field_type, lower_expr_with_async,
     lower_type_ref_with_aliases, resolve_declared_or_inferred, AstStmt, AstTypeAlias,
-    FunctionSignature, NirStmt, NirStructDef, NirTypeRef,
+    ExprWithAsyncInput, FunctionSignature, NirStmt, NirStructDef, NirTypeRef,
 };
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct DestructureLetLoweringInput<'a> {
+    pub(super) stmt: &'a AstStmt,
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a mut BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
 pub(super) fn lower_destructure_let_stmt_with_async(
-    stmt: &AstStmt,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &mut BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    type_aliases: &BTreeMap<String, AstTypeAlias>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: DestructureLetLoweringInput<'_>,
 ) -> Result<Vec<NirStmt>, String> {
+    let DestructureLetLoweringInput {
+        stmt,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        type_aliases,
+        signatures,
+        struct_table,
+    } = input;
     let AstStmt::DestructureLet {
         type_ref,
         fields,
@@ -37,17 +50,17 @@ pub(super) fn lower_destructure_let_stmt_with_async(
     if let Some(expected) = expected.as_ref() {
         validate_type_ref(expected)?;
     }
-    let lowered = lower_expr_with_async(
-        value,
+    let lowered = lower_expr_with_async(ExprWithAsyncInput {
+        expr: value,
         current_domain,
         current_function_is_async,
         bindings,
         module_consts,
         signatures,
         struct_table,
-        expected.as_ref(),
-        false,
-    )?;
+        expected: expected.as_ref(),
+        allow_async_calls: false,
+    })?;
     match nir_expr_effect_class(&lowered) {
         nuis_semantics::model::NirExprEffectClass::Pure
         | nuis_semantics::model::NirExprEffectClass::LocalReadOnly => {}

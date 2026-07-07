@@ -25,7 +25,7 @@ fn helper_pub_consts_can_cross_module_but_private_ones_cannot() {
         "#,
     )
     .unwrap();
-    let module = super::lower_project_ast_to_nir(&entry, &[helper.clone()]).unwrap();
+    let module = super::lower_project_ast_to_nir(&entry, std::slice::from_ref(&helper)).unwrap();
     let main_function = module
         .functions
         .iter()

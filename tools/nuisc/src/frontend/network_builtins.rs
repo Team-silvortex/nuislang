@@ -6,20 +6,33 @@ use nuis_semantics::model::{
 
 use super::{
     lower_result_observer_call_with_consts, lower_result_wrapper_call_with_consts,
-    FunctionSignature, ModuleConstValue,
+    FunctionSignature, ModuleConstValue, ResultObserverCallInput, ResultWrapperCallInput,
 };
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct NetworkBuiltinInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
 pub(super) fn lower_network_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: NetworkBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let NetworkBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    } = input;
     let expr = match callee {
         "network_profile_bind_core" => {
             let [unit] = args else {
@@ -307,8 +320,8 @@ pub(super) fn lower_network_builtin_call(
             };
             NirExpr::NetworkProfileProtocolHeaderBytesRef { unit: unit.clone() }
         }
-        "network_result" => lower_result_wrapper_call_with_consts(
-            "network_result",
+        "network_result" => lower_result_wrapper_call_with_consts(ResultWrapperCallInput {
+            name: "network_result",
             args,
             current_domain,
             current_function_is_async,
@@ -316,18 +329,32 @@ pub(super) fn lower_network_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Network,
-            |value, stage| match stage {
+            family: NirResultFamily::Network,
+            build: |value, stage| match stage {
                 NirResultStage::Network(state) => Ok(NirExpr::NetworkResult { value, state }),
                 other => Err(format!(
                     "expected network result stage, found `{}`",
                     other.render()
                 )),
             },
-            "expects a direct network profile/config expression",
-        )?,
-        "network_config_ready" => lower_result_observer_call_with_consts(
-            "network_config_ready",
+            expected_shape: "expects a direct network profile/config expression",
+        })?,
+        "network_config_ready" => {
+            lower_result_observer_call_with_consts(ResultObserverCallInput {
+                name: "network_config_ready",
+                args,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                family: NirResultFamily::Network,
+                build: |expr| NirExpr::NetworkConfigReady(Box::new(expr)),
+            })?
+        }
+        "network_send_ready" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "network_send_ready",
             args,
             current_domain,
             current_function_is_async,
@@ -335,11 +362,11 @@ pub(super) fn lower_network_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Network,
-            |expr| NirExpr::NetworkConfigReady(Box::new(expr)),
-        )?,
-        "network_send_ready" => lower_result_observer_call_with_consts(
-            "network_send_ready",
+            family: NirResultFamily::Network,
+            build: |expr| NirExpr::NetworkSendReady(Box::new(expr)),
+        })?,
+        "network_recv_ready" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "network_recv_ready",
             args,
             current_domain,
             current_function_is_async,
@@ -347,11 +374,25 @@ pub(super) fn lower_network_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Network,
-            |expr| NirExpr::NetworkSendReady(Box::new(expr)),
-        )?,
-        "network_recv_ready" => lower_result_observer_call_with_consts(
-            "network_recv_ready",
+            family: NirResultFamily::Network,
+            build: |expr| NirExpr::NetworkRecvReady(Box::new(expr)),
+        })?,
+        "network_accept_ready" => {
+            lower_result_observer_call_with_consts(ResultObserverCallInput {
+                name: "network_accept_ready",
+                args,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                family: NirResultFamily::Network,
+                build: |expr| NirExpr::NetworkAcceptReady(Box::new(expr)),
+            })?
+        }
+        "network_value" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "network_value",
             args,
             current_domain,
             current_function_is_async,
@@ -359,33 +400,9 @@ pub(super) fn lower_network_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Network,
-            |expr| NirExpr::NetworkRecvReady(Box::new(expr)),
-        )?,
-        "network_accept_ready" => lower_result_observer_call_with_consts(
-            "network_accept_ready",
-            args,
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            signatures,
-            struct_table,
-            NirResultFamily::Network,
-            |expr| NirExpr::NetworkAcceptReady(Box::new(expr)),
-        )?,
-        "network_value" => lower_result_observer_call_with_consts(
-            "network_value",
-            args,
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            signatures,
-            struct_table,
-            NirResultFamily::Network,
-            |expr| NirExpr::NetworkValue(Box::new(expr)),
-        )?,
+            family: NirResultFamily::Network,
+            build: |expr| NirExpr::NetworkValue(Box::new(expr)),
+        })?,
         _ => return Ok(None),
     };
     Ok(Some(expr))

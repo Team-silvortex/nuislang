@@ -7,20 +7,33 @@ use nuis_semantics::model::{
 use super::{
     compatible_types, expr_type, i64_type, lower_expr, lower_result_observer_call_with_consts,
     lower_result_wrapper_call_with_consts, select_expected_semantic_token_type, validate_type_ref,
-    FunctionSignature, ModuleConstValue,
+    FunctionSignature, ModuleConstValue, ResultObserverCallInput, ResultWrapperCallInput,
 };
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct DataBuiltinInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) expected: Option<&'a NirTypeRef>,
+}
+
 pub(super) fn lower_data_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
+    input: DataBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let DataBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected,
+    } = input;
     let expr = match callee {
         "data_bind_core" => {
             let [core] = args else {
@@ -70,73 +83,73 @@ pub(super) fn lower_data_builtin_call(
             )?;
             NirExpr::DataInputPipe(Box::new(lowered))
         }
-        "data_result" => lower_result_wrapper_call_with_consts(
-            "data_result",
+        "data_result" => lower_result_wrapper_call_with_consts(ResultWrapperCallInput {
+            name: "data_result",
             args,
             current_domain,
-            false,
+            current_function_is_async: false,
             bindings,
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Data,
-            |value, stage| match stage {
+            family: NirResultFamily::Data,
+            build: |value, stage| match stage {
                 NirResultStage::Data(state) => Ok(NirExpr::DataResult { value, state }),
                 other => Err(format!(
                     "expected data result stage, found `{}`",
                     other.render()
                 )),
             },
-            "expects a direct data operation like pipe/window/profile send",
-        )?,
-        "data_ready" => lower_result_observer_call_with_consts(
-            "data_ready",
+            expected_shape: "expects a direct data operation like pipe/window/profile send",
+        })?,
+        "data_ready" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "data_ready",
             args,
             current_domain,
-            false,
+            current_function_is_async: false,
             bindings,
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Data,
-            |expr| NirExpr::DataReady(Box::new(expr)),
-        )?,
-        "data_moved" => lower_result_observer_call_with_consts(
-            "data_moved",
+            family: NirResultFamily::Data,
+            build: |expr| NirExpr::DataReady(Box::new(expr)),
+        })?,
+        "data_moved" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "data_moved",
             args,
             current_domain,
-            false,
+            current_function_is_async: false,
             bindings,
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Data,
-            |expr| NirExpr::DataMoved(Box::new(expr)),
-        )?,
-        "data_windowed" => lower_result_observer_call_with_consts(
-            "data_windowed",
+            family: NirResultFamily::Data,
+            build: |expr| NirExpr::DataMoved(Box::new(expr)),
+        })?,
+        "data_windowed" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "data_windowed",
             args,
             current_domain,
-            false,
+            current_function_is_async: false,
             bindings,
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Data,
-            |expr| NirExpr::DataWindowed(Box::new(expr)),
-        )?,
-        "data_value" => lower_result_observer_call_with_consts(
-            "data_value",
+            family: NirResultFamily::Data,
+            build: |expr| NirExpr::DataWindowed(Box::new(expr)),
+        })?,
+        "data_value" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "data_value",
             args,
             current_domain,
-            false,
+            current_function_is_async: false,
             bindings,
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Data,
-            |expr| NirExpr::DataValue(Box::new(expr)),
-        )?,
+            family: NirResultFamily::Data,
+            build: |expr| NirExpr::DataValue(Box::new(expr)),
+        })?,
         "data_copy_window" => {
             let [input, offset, len] = args else {
                 return Err("data_copy_window(...) expects 3 args".to_owned());

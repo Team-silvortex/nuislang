@@ -19,6 +19,7 @@ pub fn project_domain_registry_check_json(check: &ProjectDomainRegistryCheck) ->
         .map(project_domain_registry_issue_json)
         .collect::<Vec<_>>()
         .join(",");
+    let issues_field = format!("\"issues\":[{}]", issue_json);
     format!(
         "{{{},{},{},{},{},{},{}}}",
         json_field("domain", &check.domain),
@@ -27,7 +28,7 @@ pub fn project_domain_registry_check_json(check: &ProjectDomainRegistryCheck) ->
         json_optional_string_field("abi", check.abi.as_deref()),
         json_bool_field("abi_registered", check.abi_registered),
         json_bool_field("ok", check.ok),
-        format!("\"issues\":[{}]", issue_json)
+        issues_field
     )
 }
 

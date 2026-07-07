@@ -17,6 +17,7 @@ use super::exprs_operators::{
 use super::exprs_specialization::{
     ensure_generic_impl_method_specialization,
     ensure_generic_impl_method_specialization_from_receiver_expected,
+    GenericImplMethodSpecializationInput, ReceiverExpectedImplMethodSpecializationInput,
 };
 use super::GenericImplMethodTemplate;
 
@@ -60,6 +61,54 @@ pub(super) fn rewrite_generic_calls_in_expr(
         specialized_functions,
         specialized_signatures,
     } = input;
+    macro_rules! ensure_impl_method_specialization {
+        ($trait_name:expr, $method_name:expr, $args:expr) => {
+            ensure_generic_impl_method_specialization(GenericImplMethodSpecializationInput {
+                trait_name: $trait_name,
+                method_name: $method_name,
+                args: $args,
+                expected,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                generic_impl_method_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            })
+        };
+    }
+    macro_rules! ensure_receiver_expected_impl_method_specialization {
+        ($method_name:expr, $receiver_expected:expr, $actual_args:expr) => {
+            ensure_generic_impl_method_specialization_from_receiver_expected(
+                ReceiverExpectedImplMethodSpecializationInput {
+                    method_name: $method_name,
+                    receiver_expected: $receiver_expected,
+                    actual_args: $actual_args,
+                    expected,
+                    env,
+                    visible_type_aliases,
+                    generic_templates,
+                    generic_impl_method_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                },
+            )
+        };
+    }
     Ok(match expr {
         AstExpr::If {
             condition,
@@ -88,40 +137,44 @@ pub(super) fn rewrite_generic_calls_in_expr(
                     specialized_signatures,
                 })?),
                 then_body: super::blocks::rewrite_generic_calls_in_block(
-                    then_body,
-                    &format!("{context} if-then"),
-                    expected,
-                    &mut then_env,
-                    visible_type_aliases,
-                    generic_templates,
-                    generic_impl_method_templates,
-                    higher_order_templates,
-                    function_table,
-                    signatures,
-                    impl_lookup,
-                    struct_table,
-                    function_return_types,
-                    specialization_cache,
-                    specialized_functions,
-                    specialized_signatures,
+                    super::blocks::GenericBlockRewriteInput {
+                        body: then_body,
+                        context: &format!("{context} if-then"),
+                        current_return_type: expected,
+                        env: &mut then_env,
+                        visible_type_aliases,
+                        generic_templates,
+                        generic_impl_method_templates,
+                        higher_order_templates,
+                        function_table,
+                        signatures,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        specialization_cache,
+                        specialized_functions,
+                        specialized_signatures,
+                    },
                 )?,
                 else_body: super::blocks::rewrite_generic_calls_in_block(
-                    else_body,
-                    &format!("{context} if-else"),
-                    expected,
-                    &mut else_env,
-                    visible_type_aliases,
-                    generic_templates,
-                    generic_impl_method_templates,
-                    higher_order_templates,
-                    function_table,
-                    signatures,
-                    impl_lookup,
-                    struct_table,
-                    function_return_types,
-                    specialization_cache,
-                    specialized_functions,
-                    specialized_signatures,
+                    super::blocks::GenericBlockRewriteInput {
+                        body: else_body,
+                        context: &format!("{context} if-else"),
+                        current_return_type: expected,
+                        env: &mut else_env,
+                        visible_type_aliases,
+                        generic_templates,
+                        generic_impl_method_templates,
+                        higher_order_templates,
+                        function_table,
+                        signatures,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        specialization_cache,
+                        specialized_functions,
+                        specialized_signatures,
+                    },
                 )?,
             }
         }
@@ -155,23 +208,25 @@ pub(super) fn rewrite_generic_calls_in_expr(
             AstExpr::Match {
                 value: Box::new(rewritten_value),
                 arms: super::blocks::rewrite_generic_calls_in_match_arms(
-                    arms,
-                    context,
-                    scrutinee_type.as_ref(),
-                    expected,
-                    env,
-                    visible_type_aliases,
-                    generic_templates,
-                    generic_impl_method_templates,
-                    higher_order_templates,
-                    function_table,
-                    signatures,
-                    impl_lookup,
-                    struct_table,
-                    function_return_types,
-                    specialization_cache,
-                    specialized_functions,
-                    specialized_signatures,
+                    super::blocks::GenericMatchArmsRewriteInput {
+                        arms,
+                        context,
+                        scrutinee_type: scrutinee_type.as_ref(),
+                        current_return_type: expected,
+                        env,
+                        visible_type_aliases,
+                        generic_templates,
+                        generic_impl_method_templates,
+                        higher_order_templates,
+                        function_table,
+                        signatures,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        specialization_cache,
+                        specialized_functions,
+                        specialized_signatures,
+                    },
                 )?,
             }
         }
@@ -227,24 +282,10 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 {
                     if !builtin_unary_supported_ast(*op, &operand_ty) {
                         let call_args = vec![rewritten_operand.clone()];
-                        if let Some(specialized_name) = ensure_generic_impl_method_specialization(
+                        if let Some(specialized_name) = ensure_impl_method_specialization!(
                             Some(trait_name),
                             method_name,
-                            &call_args,
-                            expected,
-                            env,
-                            visible_type_aliases,
-                            generic_templates,
-                            generic_impl_method_templates,
-                            higher_order_templates,
-                            function_table,
-                            signatures,
-                            impl_lookup,
-                            struct_table,
-                            function_return_types,
-                            specialization_cache,
-                            specialized_functions,
-                            specialized_signatures,
+                            &call_args
                         )? {
                             return Ok(AstExpr::Call {
                                 callee: specialized_name,
@@ -265,24 +306,26 @@ pub(super) fn rewrite_generic_calls_in_expr(
             generic_args,
             args,
         } => super::exprs_calls::rewrite_generic_call_expr(
-            callee,
-            generic_args,
-            args,
-            context,
-            expected,
-            env,
-            visible_type_aliases,
-            generic_templates,
-            generic_impl_method_templates,
-            higher_order_templates,
-            function_table,
-            signatures,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-            specialization_cache,
-            specialized_functions,
-            specialized_signatures,
+            super::exprs_calls::GenericCallExprRewriteInput {
+                callee,
+                generic_args,
+                args,
+                context,
+                expected,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                generic_impl_method_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            },
         )?,
         AstExpr::MethodCall {
             receiver,
@@ -358,25 +401,9 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 );
             let mut call_args = vec![rewritten_receiver.clone()];
             call_args.extend(rewritten_args.clone());
-            if let Some(specialized_name) = ensure_generic_impl_method_specialization(
-                None,
-                method,
-                &call_args,
-                expected,
-                env,
-                visible_type_aliases,
-                generic_templates,
-                generic_impl_method_templates,
-                higher_order_templates,
-                function_table,
-                signatures,
-                impl_lookup,
-                struct_table,
-                function_return_types,
-                specialization_cache,
-                specialized_functions,
-                specialized_signatures,
-            )? {
+            if let Some(specialized_name) =
+                ensure_impl_method_specialization!(None, method, &call_args)?
+            {
                 AstExpr::Call {
                     callee: specialized_name,
                     generic_args: Vec::new(),
@@ -384,27 +411,11 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 }
             } else {
                 if let Some(explicit_receiver_expected) = receiver_expected.as_ref() {
-                    if let Some(specialized_name) =
-                        ensure_generic_impl_method_specialization_from_receiver_expected(
-                            method,
-                            explicit_receiver_expected,
-                            &call_args,
-                            expected,
-                            env,
-                            visible_type_aliases,
-                            generic_templates,
-                            generic_impl_method_templates,
-                            higher_order_templates,
-                            function_table,
-                            signatures,
-                            impl_lookup,
-                            struct_table,
-                            function_return_types,
-                            specialization_cache,
-                            specialized_functions,
-                            specialized_signatures,
-                        )?
-                    {
+                    if let Some(specialized_name) = ensure_receiver_expected_impl_method_specialization!(
+                        method,
+                        explicit_receiver_expected,
+                        &call_args
+                    )? {
                         return Ok(AstExpr::Call {
                             callee: specialized_name,
                             generic_args: Vec::new(),
@@ -425,29 +436,10 @@ pub(super) fn rewrite_generic_calls_in_expr(
             type_args,
             fields,
         } => super::exprs_structs::rewrite_generic_struct_literal_expr(
-            type_name,
-            type_args,
-            fields,
-            context,
-            expected,
-            env,
-            visible_type_aliases,
-            generic_templates,
-            generic_impl_method_templates,
-            higher_order_templates,
-            function_table,
-            signatures,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-            specialization_cache,
-            specialized_functions,
-            specialized_signatures,
-        )?,
-        AstExpr::FieldAccess { base, field } => {
-            super::exprs_structs::rewrite_generic_field_access_expr(
-                base,
-                field,
+            super::exprs_structs::GenericStructLiteralRewriteInput {
+                type_name,
+                type_args,
+                fields,
                 context,
                 expected,
                 env,
@@ -463,6 +455,29 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
+            },
+        )?,
+        AstExpr::FieldAccess { base, field } => {
+            super::exprs_structs::rewrite_generic_field_access_expr(
+                super::exprs_structs::GenericFieldAccessRewriteInput {
+                    base,
+                    field,
+                    context,
+                    expected,
+                    env,
+                    visible_type_aliases,
+                    generic_templates,
+                    generic_impl_method_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                },
             )?
         }
         AstExpr::Binary { op, lhs, rhs } => {
@@ -526,24 +541,10 @@ pub(super) fn rewrite_generic_calls_in_expr(
                         && lower_type_ref(&lhs_ty).render() == lower_type_ref(&rhs_ty).render()
                     {
                         let call_args = vec![rewritten_lhs.clone(), rewritten_rhs.clone()];
-                        if let Some(specialized_name) = ensure_generic_impl_method_specialization(
+                        if let Some(specialized_name) = ensure_impl_method_specialization!(
                             Some(trait_name),
                             method_name,
-                            &call_args,
-                            expected,
-                            env,
-                            visible_type_aliases,
-                            generic_templates,
-                            generic_impl_method_templates,
-                            higher_order_templates,
-                            function_table,
-                            signatures,
-                            impl_lookup,
-                            struct_table,
-                            function_return_types,
-                            specialization_cache,
-                            specialized_functions,
-                            specialized_signatures,
+                            &call_args
                         )? {
                             let call = AstExpr::Call {
                                 callee: specialized_name,

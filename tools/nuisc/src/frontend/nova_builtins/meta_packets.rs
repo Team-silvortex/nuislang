@@ -2,19 +2,21 @@ use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 
-use super::super::{i64_type, lower_expr, FunctionSignature, ModuleConstValue};
+use super::super::{i64_type, lower_expr, FunctionSignature};
+use super::NovaBuiltinInput;
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_nova_meta_packet_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    _current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    _module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: NovaBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let NovaBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        ..
+    } = input;
     let (type_name, fields) = match callee {
         "nova_feedback_packet" => (
             "NovaFeedbackPacket",

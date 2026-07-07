@@ -1,39 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nuis_semantics::model::{AstBinaryOp, AstExpr, NirExpr, NirStructDef, NirTypeRef};
+use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 
 use super::metadata::hidden_private_field_count;
 use super::name_suggestions::suggest_similar_name;
 use super::{
-    impl_method_symbol_names, infer_nir_expr_type, lower_binary_expr_with_async,
-    lower_direct_call_builtin_or_named_call, lower_expr_with_async,
-    lower_routed_call_or_core_builtin, resolve_declared_or_inferred, BinaryLoweringInput,
-    FunctionSignature, ModuleConstValue,
+    impl_method_symbol_names, infer_nir_expr_type, lower_direct_call_builtin_or_named_call,
+    lower_expr_with_async, lower_routed_call_or_core_builtin, resolve_declared_or_inferred,
+    DirectCallBuiltinInput, ExprWithAsyncInput, FunctionSignature, ModuleConstValue,
+    RoutedCallLoweringInput,
 };
-
-#[allow(dead_code)]
-pub(super) fn lower_binary_expr(
-    op: &AstBinaryOp,
-    lhs: &AstExpr,
-    rhs: &AstExpr,
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-) -> Result<NirExpr, String> {
-    lower_binary_expr_with_async(BinaryLoweringInput {
-        op,
-        lhs,
-        rhs,
-        current_domain,
-        current_function_is_async: false,
-        bindings,
-        module_consts: &BTreeMap::new(),
-        signatures,
-        struct_table,
-        expected: None,
-    })
-}
 
 pub(super) struct CallLoweringInput<'a> {
     pub(super) callee: &'a str,
@@ -63,22 +39,24 @@ pub(super) fn lower_call_expr_with_async(input: CallLoweringInput<'_>) -> Result
         expected,
         allow_async_calls,
     } = input;
-    if let Some(payload_struct_constructor) = lower_payload_struct_constructor_sugar(
-        callee,
-        generic_args,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-        expected,
-        allow_async_calls,
-    )? {
+    if let Some(payload_struct_constructor) =
+        lower_payload_struct_constructor_sugar(PayloadStructConstructorInput {
+            callee,
+            generic_args,
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            signatures,
+            struct_table,
+            expected,
+            allow_async_calls,
+        })?
+    {
         return Ok(payload_struct_constructor);
     }
-    if let Some(routed_or_core) = lower_routed_call_or_core_builtin(
+    if let Some(routed_or_core) = lower_routed_call_or_core_builtin(RoutedCallLoweringInput {
         callee,
         generic_args,
         args,
@@ -89,35 +67,37 @@ pub(super) fn lower_call_expr_with_async(input: CallLoweringInput<'_>) -> Result
         signatures,
         struct_table,
         expected,
-    )? {
+    })? {
         return Ok(routed_or_core);
     }
-    if let Some(explicit_trait_call) = lower_explicit_trait_qualified_call(
-        callee,
-        generic_args,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-        expected,
-        allow_async_calls,
-    )? {
+    if let Some(explicit_trait_call) =
+        lower_explicit_trait_qualified_call(ExplicitTraitQualifiedCallInput {
+            callee,
+            generic_args,
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            signatures,
+            struct_table,
+            expected,
+            allow_async_calls,
+        })?
+    {
         return Ok(explicit_trait_call);
     }
-    lower_direct_call_builtin_or_named_call(
+    lower_direct_call_builtin_or_named_call(DirectCallBuiltinInput {
         callee,
         args,
         current_domain,
         current_function_is_async,
         bindings,
-        module_consts,
+        _module_consts: module_consts,
         signatures,
         struct_table,
         allow_async_calls,
-    )?
+    })?
     .ok_or_else(|| unknown_function_error(callee, signatures))
 }
 
@@ -143,20 +123,36 @@ fn suggest_function_name(
     suggest_similar_name(callee, &candidates)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn lower_explicit_trait_qualified_call(
-    callee: &str,
-    generic_args: &[nuis_semantics::model::AstTypeRef],
-    args: &[AstExpr],
-    current_domain: &str,
+struct ExplicitTraitQualifiedCallInput<'a> {
+    callee: &'a str,
+    generic_args: &'a [nuis_semantics::model::AstTypeRef],
+    args: &'a [AstExpr],
+    current_domain: &'a str,
     current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
+    bindings: &'a BTreeMap<String, NirTypeRef>,
+    module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    signatures: &'a BTreeMap<String, FunctionSignature>,
+    struct_table: &'a BTreeMap<String, NirStructDef>,
+    expected: Option<&'a NirTypeRef>,
     allow_async_calls: bool,
+}
+
+fn lower_explicit_trait_qualified_call(
+    input: ExplicitTraitQualifiedCallInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let ExplicitTraitQualifiedCallInput {
+        callee,
+        generic_args,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected,
+        allow_async_calls,
+    } = input;
     let Some((trait_name, method)) = callee.rsplit_once('.') else {
         return Ok(None);
     };
@@ -167,17 +163,17 @@ fn lower_explicit_trait_qualified_call(
     let lowered_args = args
         .iter()
         .map(|arg| {
-            lower_expr_with_async(
-                arg,
+            lower_expr_with_async(ExprWithAsyncInput {
+                expr: arg,
                 current_domain,
                 current_function_is_async,
                 bindings,
                 module_consts,
                 signatures,
                 struct_table,
-                None,
+                expected: None,
                 allow_async_calls,
-            )
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
     let receiver_ty = if let Some(first_arg) = lowered_args.first() {
@@ -231,20 +227,36 @@ fn lower_explicit_trait_qualified_call(
     }))
 }
 
-#[allow(clippy::too_many_arguments)]
-fn lower_payload_struct_constructor_sugar(
-    callee: &str,
-    generic_args: &[nuis_semantics::model::AstTypeRef],
-    args: &[AstExpr],
-    current_domain: &str,
+struct PayloadStructConstructorInput<'a> {
+    callee: &'a str,
+    generic_args: &'a [nuis_semantics::model::AstTypeRef],
+    args: &'a [AstExpr],
+    current_domain: &'a str,
     current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
+    bindings: &'a BTreeMap<String, NirTypeRef>,
+    module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    signatures: &'a BTreeMap<String, FunctionSignature>,
+    struct_table: &'a BTreeMap<String, NirStructDef>,
+    expected: Option<&'a NirTypeRef>,
     allow_async_calls: bool,
+}
+
+fn lower_payload_struct_constructor_sugar(
+    input: PayloadStructConstructorInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let PayloadStructConstructorInput {
+        callee,
+        generic_args,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected,
+        allow_async_calls,
+    } = input;
     if signatures.contains_key(callee) {
         return Ok(None);
     }
@@ -322,17 +334,17 @@ fn lower_payload_struct_constructor_sugar(
             is_ref: false,
         }
     } else {
-        let lowered_arg = lower_expr_with_async(
-            &args[0],
+        let lowered_arg = lower_expr_with_async(ExprWithAsyncInput {
+            expr: &args[0],
             current_domain,
             current_function_is_async,
             bindings,
             module_consts,
             signatures,
             struct_table,
-            None,
+            expected: None,
             allow_async_calls,
-        )?;
+        })?;
         let Some(inferred_arg_ty) =
             infer_nir_expr_type(&lowered_arg, bindings, signatures, struct_table)
         else {
@@ -347,17 +359,17 @@ fn lower_payload_struct_constructor_sugar(
     } else {
         super::instantiate_struct_field_type(&constructor_ty, definition, &field.ty)
     };
-    let lowered = lower_expr_with_async(
-        &args[0],
+    let lowered = lower_expr_with_async(ExprWithAsyncInput {
+        expr: &args[0],
         current_domain,
         current_function_is_async,
         bindings,
         module_consts,
         signatures,
         struct_table,
-        Some(&field_ty),
+        expected: Some(&field_ty),
         allow_async_calls,
-    )?;
+    })?;
     let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
     let _ = resolve_declared_or_inferred(&field.name, Some(field_ty), inferred)?;
     Ok(Some(NirExpr::StructLiteral {

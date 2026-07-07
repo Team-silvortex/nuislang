@@ -128,19 +128,18 @@ use self::annotations::{
     validate_export_annotations, validate_extern_host_symbols, validate_function_annotations,
     validate_host_symbol_bridge_annotations, validate_struct_annotations,
 };
-use self::binary_lowering::{lower_binary_expr_with_async, BinaryLoweringInput};
 use self::call_helpers::{
     ensure_mutex_guard_like, ensure_mutex_like, ensure_ref_like, ensure_spawn_input_safe,
     ensure_task_like, ensure_thread_like, lower_result_observer_call_with_consts,
-    lower_result_wrapper_call_with_consts,
+    lower_result_wrapper_call_with_consts, ResultObserverCallInput, ResultWrapperCallInput,
 };
 use self::call_lowering::{lower_call_expr_with_async, CallLoweringInput};
-use self::call_routing::lower_routed_call_or_core_builtin;
+use self::call_routing::{lower_routed_call_or_core_builtin, RoutedCallLoweringInput};
 use self::const_assembly::assemble_module_consts;
-use self::direct_calls::lower_direct_call_builtin_or_named_call;
+use self::direct_calls::{lower_direct_call_builtin_or_named_call, DirectCallBuiltinInput};
 use self::expr_lowering::{
     lower_expr, lower_expr_with_async, lower_nested_expr_with_async,
-    lower_nested_expr_with_async_and_consts,
+    lower_nested_expr_with_async_and_consts, ExprWithAsyncInput, NestedExprWithConstsInput,
 };
 use self::function_lowering::find_impl_method_signature;
 use self::function_lowering::{
@@ -148,7 +147,9 @@ use self::function_lowering::{
     impl_method_lookup_key, impl_method_lookup_keys, impl_method_symbol_name,
     impl_method_symbol_names, lower_function,
 };
-use self::generic_rewrite::{rewrite_generic_calls_in_function, GenericImplMethodTemplate};
+use self::generic_rewrite::{
+    rewrite_generic_calls_in_function, GenericFunctionRewriteInput, GenericImplMethodTemplate,
+};
 use self::higher_order::expand_higher_order_functions;
 use self::lambda_expansion::expand_module_lambdas;
 use self::match_hoist::expand_effectful_match_scrutinees;

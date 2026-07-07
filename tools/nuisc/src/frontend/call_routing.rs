@@ -1,125 +1,140 @@
 use std::collections::BTreeMap;
 
 use super::call_helpers::ensure_ref_like;
-use super::data_builtins::lower_data_builtin_call;
-use super::data_profile_builtins::lower_data_profile_builtin_call;
-use super::expr_lowering::{lower_expr, lower_nested_expr_with_async_and_consts};
-use super::kernel_builtins::lower_kernel_builtin_call;
+use super::data_builtins::{lower_data_builtin_call, DataBuiltinInput};
+use super::data_profile_builtins::{lower_data_profile_builtin_call, DataProfileBuiltinInput};
+use super::expr_lowering::lower_expr;
+use super::kernel_builtins::{lower_kernel_builtin_call, KernelBuiltinInput};
 use super::metadata::ModuleConstValue;
-use super::network_builtins::lower_network_builtin_call;
-use super::nova_builtins::lower_nova_builtin_call;
-use super::shader_builtins::lower_shader_builtin_call;
-use super::task_builtins::lower_task_builtin_call;
+use super::network_builtins::{lower_network_builtin_call, NetworkBuiltinInput};
+use super::nova_builtins::{lower_nova_builtin_call, NovaBuiltinInput};
+use super::shader_builtins::{lower_shader_builtin_call, ShaderBuiltinInput};
+use super::task_builtins::{lower_task_builtin_call, TaskBuiltinInput};
 use super::{
-    i64_type, infer_nir_expr_type, ref_type, AstExpr, FunctionSignature, NirExpr, NirStructDef,
-    NirTypeRef,
+    i64_type, infer_nir_expr_type, lower_nested_expr_with_async_and_consts, ref_type, AstExpr,
+    FunctionSignature, NestedExprWithConstsInput, NirExpr, NirStructDef, NirTypeRef,
 };
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn lower_routed_call_or_core_builtin(
-    callee: &str,
-    generic_args: &[nuis_semantics::model::AstTypeRef],
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
-) -> Result<Option<NirExpr>, String> {
-    if let Some(task_builtin) = lower_task_builtin_call(
-        callee,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-    )? {
-        return Ok(Some(task_builtin));
-    }
-    if let Some(data_builtin) = lower_data_builtin_call(
-        callee,
-        args,
-        current_domain,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-        expected,
-    )? {
-        return Ok(Some(data_builtin));
-    }
-    if let Some(data_profile_builtin) = lower_data_profile_builtin_call(
-        callee,
-        args,
-        current_domain,
-        bindings,
-        signatures,
-        struct_table,
-        expected,
-    )? {
-        return Ok(Some(data_profile_builtin));
-    }
-    if let Some(shader_builtin) = lower_shader_builtin_call(
-        callee,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-    )? {
-        return Ok(Some(shader_builtin));
-    }
-    if let Some(network_builtin) = lower_network_builtin_call(
-        callee,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-    )? {
-        return Ok(Some(network_builtin));
-    }
-    if let Some(kernel_builtin) = lower_kernel_builtin_call(
-        callee,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-    )? {
-        return Ok(Some(kernel_builtin));
-    }
-    if let Some(nova_builtin) = lower_nova_builtin_call(
-        callee,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-    )? {
-        return Ok(Some(nova_builtin));
-    }
+pub(super) struct RoutedCallLoweringInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) generic_args: &'a [nuis_semantics::model::AstTypeRef],
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) expected: Option<&'a NirTypeRef>,
+}
 
-    if let Some(slice_builtin) = super::call_routing_slices::lower_slice_or_byte_builtin(
+pub(super) fn lower_routed_call_or_core_builtin(
+    input: RoutedCallLoweringInput<'_>,
+) -> Result<Option<NirExpr>, String> {
+    let RoutedCallLoweringInput {
         callee,
         generic_args,
         args,
         current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected,
+    } = input;
+    if let Some(task_builtin) = lower_task_builtin_call(TaskBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    })? {
+        return Ok(Some(task_builtin));
+    }
+    if let Some(data_builtin) = lower_data_builtin_call(DataBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected,
+    })? {
+        return Ok(Some(data_builtin));
+    }
+    if let Some(data_profile_builtin) = lower_data_profile_builtin_call(DataProfileBuiltinInput {
+        callee,
+        args,
+        current_domain,
         bindings,
         signatures,
         struct_table,
+        expected,
+    })? {
+        return Ok(Some(data_profile_builtin));
+    }
+    if let Some(shader_builtin) = lower_shader_builtin_call(ShaderBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    })? {
+        return Ok(Some(shader_builtin));
+    }
+    if let Some(network_builtin) = lower_network_builtin_call(NetworkBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    })? {
+        return Ok(Some(network_builtin));
+    }
+    if let Some(kernel_builtin) = lower_kernel_builtin_call(KernelBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    })? {
+        return Ok(Some(kernel_builtin));
+    }
+    if let Some(nova_builtin) = lower_nova_builtin_call(NovaBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+    })? {
+        return Ok(Some(nova_builtin));
+    }
+
+    if let Some(slice_builtin) = super::call_routing_slices::lower_slice_or_byte_builtin(
+        super::call_routing_slices::SliceCallRoutingInput {
+            callee,
+            generic_args,
+            args,
+            current_domain,
+            bindings,
+            signatures,
+            struct_table,
+        },
     )? {
         return Ok(Some(slice_builtin));
     }
@@ -129,16 +144,16 @@ pub(super) fn lower_routed_call_or_core_builtin(
             let [value] = args else {
                 return Err("i32_from_i64(...) expects exactly one argument".to_owned());
             };
-            let lowered = lower_nested_expr_with_async_and_consts(
-                value,
+            let lowered = lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+                expr: value,
                 current_domain,
                 current_function_is_async,
                 bindings,
                 module_consts,
                 signatures,
                 struct_table,
-                Some(&i64_type()),
-            )?;
+                expected: Some(&i64_type()),
+            })?;
             let lowered_ty = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
                 .ok_or_else(|| {
                     "i32_from_i64(...) requires an explicit integer input type".to_owned()

@@ -16,6 +16,7 @@ pub(super) fn validate_network_owned_handle_provenance_in_expr(
     function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
     function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleReturn>>,
 ) -> Result<(), String> {
+    let _known_return_kind_count = function_return_kinds.len();
     match expr {
         NirExpr::CpuExternCall { callee, args, .. } => {
             validate_network_owned_handle_call(callee, args, from, to, bindings)?;

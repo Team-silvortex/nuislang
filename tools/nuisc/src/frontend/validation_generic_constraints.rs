@@ -1,8 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstEnumDef, AstEnumVariantKind, AstFunction, AstImplDef, AstModule, AstStructDef, AstTypeAlias,
-    AstTypeRef,
+    AstEnumDef, AstEnumVariantKind, AstFunction, AstImplDef, AstModule, AstTypeAlias, AstTypeRef,
 };
 
 use super::build_function_return_type_table;
@@ -23,8 +22,34 @@ mod validation_generic_constraints_types;
 use self::validation_generic_constraints_coherence::{
     render_impl_target_type, validate_trait_impl_coherence,
 };
-use self::validation_generic_constraints_stmt::validate_stmt_generic_constraints;
-use self::validation_generic_constraints_types::validate_ast_type_ref_generic_constraints;
+use self::validation_generic_constraints_stmt::{
+    validate_stmt_generic_constraints, StmtGenericConstraintInput,
+};
+use self::validation_generic_constraints_types::{
+    validate_ast_type_ref_generic_constraints, AstTypeConstraintInput,
+    GenericConstraintValidationContext,
+};
+
+fn validate_type_constraints(
+    ty: &AstTypeRef,
+    generic_bounds: &BTreeMap<String, Vec<String>>,
+    context: &str,
+    validation: GenericConstraintValidationContext<'_>,
+) -> Result<(), String> {
+    validate_ast_type_ref_generic_constraints(AstTypeConstraintInput {
+        ty,
+        validation,
+        generic_bounds,
+        context,
+    })
+}
+
+struct FunctionGenericConstraintInput<'a> {
+    function: &'a AstFunction,
+    visible_trait_methods: &'a BTreeMap<String, BTreeSet<String>>,
+    function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    validation: GenericConstraintValidationContext<'a>,
+}
 
 fn collect_visible_enums(
     module: &AstModule,
@@ -57,6 +82,13 @@ pub(super) fn validate_ast_generic_constraints(
     let visible_trait_methods = collect_visible_trait_methods(module, local_cpu_helpers);
     let visible_structs = collect_visible_structs(module, local_cpu_helpers);
     let visible_enums = collect_visible_enums(module, local_cpu_helpers);
+    let validation = GenericConstraintValidationContext {
+        visible_type_aliases,
+        impl_lookup,
+        visible_trait_names: &visible_trait_names,
+        visible_structs: &visible_structs,
+        visible_enums: &visible_enums,
+    };
     let concrete_module_functions = module
         .functions
         .iter()
@@ -84,15 +116,11 @@ pub(super) fn validate_ast_generic_constraints(
             &visible_trait_names,
             &format!("type alias `{}`", alias.name),
         )?;
-        validate_ast_type_ref_generic_constraints(
+        validate_type_constraints(
             &alias.target,
-            visible_type_aliases,
-            impl_lookup,
-            &visible_trait_names,
-            &visible_structs,
-            &visible_enums,
             &generic_bounds,
             &format!("type alias `{}` target", alias.name),
+            validation,
         )?;
     }
 
@@ -104,15 +132,11 @@ pub(super) fn validate_ast_generic_constraints(
             &format!("struct `{}`", definition.name),
         )?;
         for field in &definition.fields {
-            validate_ast_type_ref_generic_constraints(
+            validate_type_constraints(
                 &field.ty,
-                visible_type_aliases,
-                impl_lookup,
-                &visible_trait_names,
-                &visible_structs,
-                &visible_enums,
                 &generic_bounds,
                 &format!("struct `{}` field `{}`", definition.name, field.name),
+                validation,
             )?;
         }
     }
@@ -129,35 +153,27 @@ pub(super) fn validate_ast_generic_constraints(
                 AstEnumVariantKind::Unit => {}
                 AstEnumVariantKind::Tuple(fields) => {
                     for (index, field_ty) in fields.iter().enumerate() {
-                        validate_ast_type_ref_generic_constraints(
+                        validate_type_constraints(
                             field_ty,
-                            visible_type_aliases,
-                            impl_lookup,
-                            &visible_trait_names,
-                            &visible_structs,
-                            &visible_enums,
                             &generic_bounds,
                             &format!(
                                 "enum `{}` variant `{}` tuple field #{}",
                                 definition.name, variant.name, index
                             ),
+                            validation,
                         )?;
                     }
                 }
                 AstEnumVariantKind::Struct(fields) => {
                     for field in fields {
-                        validate_ast_type_ref_generic_constraints(
+                        validate_type_constraints(
                             &field.ty,
-                            visible_type_aliases,
-                            impl_lookup,
-                            &visible_trait_names,
-                            &visible_structs,
-                            &visible_enums,
                             &generic_bounds,
                             &format!(
                                 "enum `{}` variant `{}` field `{}`",
                                 definition.name, variant.name, field.name
                             ),
+                            validation,
                         )?;
                     }
                 }
@@ -167,61 +183,45 @@ pub(super) fn validate_ast_generic_constraints(
 
     for function in &module.externs {
         for param in &function.params {
-            validate_ast_type_ref_generic_constraints(
+            validate_type_constraints(
                 &param.ty,
-                visible_type_aliases,
-                impl_lookup,
-                &visible_trait_names,
-                &visible_structs,
-                &visible_enums,
                 &BTreeMap::new(),
                 &format!(
                     "extern function `{}` parameter `{}`",
                     function.name, param.name
                 ),
+                validation,
             )?;
         }
-        validate_ast_type_ref_generic_constraints(
+        validate_type_constraints(
             &function.return_type,
-            visible_type_aliases,
-            impl_lookup,
-            &visible_trait_names,
-            &visible_structs,
-            &visible_enums,
             &BTreeMap::new(),
             &format!("extern function `{}` return type", function.name),
+            validation,
         )?;
     }
 
     for interface in &module.extern_interfaces {
         for method in &interface.methods {
             for param in &method.params {
-                validate_ast_type_ref_generic_constraints(
+                validate_type_constraints(
                     &param.ty,
-                    visible_type_aliases,
-                    impl_lookup,
-                    &visible_trait_names,
-                    &visible_structs,
-                    &visible_enums,
                     &BTreeMap::new(),
                     &format!(
                         "extern interface `{}` method `{}` parameter `{}`",
                         interface.name, method.name, param.name
                     ),
+                    validation,
                 )?;
             }
-            validate_ast_type_ref_generic_constraints(
+            validate_type_constraints(
                 &method.return_type,
-                visible_type_aliases,
-                impl_lookup,
-                &visible_trait_names,
-                &visible_structs,
-                &visible_enums,
                 &BTreeMap::new(),
                 &format!(
                     "extern interface `{}` method `{}` return type",
                     interface.name, method.name
                 ),
+                validation,
             )?;
         }
     }
@@ -229,33 +229,25 @@ pub(super) fn validate_ast_generic_constraints(
     for definition in &module.traits {
         for method in &definition.methods {
             for param in &method.params {
-                validate_ast_type_ref_generic_constraints(
+                validate_type_constraints(
                     &param.ty,
-                    visible_type_aliases,
-                    impl_lookup,
-                    &visible_trait_names,
-                    &visible_structs,
-                    &visible_enums,
                     &BTreeMap::new(),
                     &format!(
                         "trait `{}` method `{}` parameter `{}`",
                         definition.name, method.name, param.name
                     ),
+                    validation,
                 )?;
             }
             if let Some(return_type) = &method.return_type {
-                validate_ast_type_ref_generic_constraints(
+                validate_type_constraints(
                     return_type,
-                    visible_type_aliases,
-                    impl_lookup,
-                    &visible_trait_names,
-                    &visible_structs,
-                    &visible_enums,
                     &BTreeMap::new(),
                     &format!(
                         "trait `{}` method `{}` return type",
                         definition.name, method.name
                     ),
+                    validation,
                 )?;
             }
         }
@@ -278,45 +270,33 @@ pub(super) fn validate_ast_generic_constraints(
             .iter()
             .map(|param| param.name.clone())
             .collect::<BTreeSet<_>>();
-        validate_ast_type_ref_generic_constraints(
+        validate_type_constraints(
             &definition.for_type,
-            visible_type_aliases,
-            impl_lookup,
-            &visible_trait_names,
-            &visible_structs,
-            &visible_enums,
             &generic_bounds,
             &format!("impl `{}` target type", definition.trait_name),
+            validation,
         )?;
         for method in &definition.methods {
             for param in &method.params {
-                validate_ast_type_ref_generic_constraints(
+                validate_type_constraints(
                     &param.ty,
-                    visible_type_aliases,
-                    impl_lookup,
-                    &visible_trait_names,
-                    &visible_structs,
-                    &visible_enums,
                     &generic_bounds,
                     &format!(
                         "impl `{}` method `{}` parameter `{}`",
                         definition.trait_name, method.name, param.name
                     ),
+                    validation,
                 )?;
             }
             if let Some(return_type) = &method.return_type {
-                validate_ast_type_ref_generic_constraints(
+                validate_type_constraints(
                     return_type,
-                    visible_type_aliases,
-                    impl_lookup,
-                    &visible_trait_names,
-                    &visible_structs,
-                    &visible_enums,
                     &generic_bounds,
                     &format!(
                         "impl `{}` method `{}` return type",
                         definition.trait_name, method.name
                     ),
+                    validation,
                 )?;
             }
             let synthetic_function = AstFunction {
@@ -343,36 +323,28 @@ pub(super) fn validate_ast_generic_constraints(
                 return_type: method.return_type.clone(),
                 body: method.body.clone(),
             };
-            validate_function_generic_constraints(
-                &synthetic_function,
-                visible_type_aliases,
-                impl_lookup,
-                &visible_trait_names,
-                &visible_trait_methods,
-                &visible_structs,
-                &visible_enums,
-                &function_return_types,
-            )?;
+            validate_function_generic_constraints(FunctionGenericConstraintInput {
+                function: &synthetic_function,
+                visible_trait_methods: &visible_trait_methods,
+                function_return_types: &function_return_types,
+                validation,
+            })?;
             let mut local_type_env = method
                 .params
                 .iter()
                 .map(|param| (param.name.clone(), param.ty.clone()))
                 .collect::<BTreeMap<_, _>>();
             for stmt in &method.body {
-                validate_stmt_generic_constraints(
+                validate_stmt_generic_constraints(StmtGenericConstraintInput {
                     stmt,
-                    visible_type_aliases,
-                    impl_lookup,
-                    &visible_trait_names,
-                    &visible_trait_methods,
-                    &visible_structs,
-                    &visible_enums,
-                    &function_return_types,
-                    &generic_param_names,
-                    &generic_bounds,
-                    &mut local_type_env,
-                    &format!("{impl_context} method `{}` body", method.name),
-                )?;
+                    validation,
+                    visible_trait_methods: &visible_trait_methods,
+                    function_return_types: &function_return_types,
+                    generic_param_names: &generic_param_names,
+                    generic_bounds: &generic_bounds,
+                    local_type_env: &mut local_type_env,
+                    context: &format!("{impl_context} method `{}` body", method.name),
+                })?;
             }
         }
     }
@@ -386,50 +358,41 @@ pub(super) fn validate_ast_generic_constraints(
 
     for constant in &module.consts {
         if let Some(ty) = &constant.ty {
-            validate_ast_type_ref_generic_constraints(
+            validate_type_constraints(
                 ty,
-                visible_type_aliases,
-                impl_lookup,
-                &visible_trait_names,
-                &visible_structs,
-                &visible_enums,
                 &BTreeMap::new(),
                 &format!("const `{}` type", constant.name),
+                validation,
             )?;
         }
     }
 
     for function in &module.functions {
-        validate_function_generic_constraints(
+        validate_function_generic_constraints(FunctionGenericConstraintInput {
             function,
-            visible_type_aliases,
-            impl_lookup,
-            &visible_trait_names,
-            &visible_trait_methods,
-            &visible_structs,
-            &visible_enums,
-            &function_return_types,
-        )?;
+            visible_trait_methods: &visible_trait_methods,
+            function_return_types: &function_return_types,
+            validation,
+        })?;
     }
 
     Ok(())
 }
 
 fn validate_function_generic_constraints(
-    function: &AstFunction,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    visible_trait_names: &BTreeSet<String>,
-    visible_trait_methods: &BTreeMap<String, BTreeSet<String>>,
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    visible_enums: &BTreeMap<String, AstEnumDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    input: FunctionGenericConstraintInput<'_>,
 ) -> Result<(), String> {
+    let FunctionGenericConstraintInput {
+        function,
+        visible_trait_methods,
+        function_return_types,
+        validation,
+    } = input;
     let function_context = render_function_validation_context(&function.name);
     let generic_bounds = build_generic_bound_env(
         &function.generic_params,
         &function.where_bounds,
-        visible_trait_names,
+        validation.visible_trait_names,
         &function_context,
     )?;
     let generic_param_names = function
@@ -443,44 +406,32 @@ fn validate_function_generic_constraints(
         .map(|param| (param.name.clone(), param.ty.clone()))
         .collect::<BTreeMap<_, _>>();
     for param in &function.params {
-        validate_ast_type_ref_generic_constraints(
+        validate_type_constraints(
             &param.ty,
-            visible_type_aliases,
-            impl_lookup,
-            visible_trait_names,
-            visible_structs,
-            visible_enums,
             &generic_bounds,
             &format!("{function_context} parameter `{}`", param.name),
+            validation,
         )?;
     }
     if let Some(return_type) = &function.return_type {
-        validate_ast_type_ref_generic_constraints(
+        validate_type_constraints(
             return_type,
-            visible_type_aliases,
-            impl_lookup,
-            visible_trait_names,
-            visible_structs,
-            visible_enums,
             &generic_bounds,
             &format!("{function_context} return type"),
+            validation,
         )?;
     }
     for stmt in &function.body {
-        validate_stmt_generic_constraints(
+        validate_stmt_generic_constraints(StmtGenericConstraintInput {
             stmt,
-            visible_type_aliases,
-            impl_lookup,
-            visible_trait_names,
+            validation,
             visible_trait_methods,
-            visible_structs,
-            visible_enums,
             function_return_types,
-            &generic_param_names,
-            &generic_bounds,
-            &mut local_type_env,
-            &format!("{function_context} body"),
-        )?;
+            generic_param_names: &generic_param_names,
+            generic_bounds: &generic_bounds,
+            local_type_env: &mut local_type_env,
+            context: &format!("{function_context} body"),
+        })?;
     }
     Ok(())
 }

@@ -7,37 +7,23 @@ use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 
 use super::{FunctionSignature, ModuleConstValue};
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Clone, Copy)]
+pub(super) struct ShaderBuiltinInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
 pub(super) fn lower_shader_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: ShaderBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
-    if let Some(profile_builtin) = profile::lower_shader_profile_builtin_call(
-        callee,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-    )? {
+    if let Some(profile_builtin) = profile::lower_shader_profile_builtin_call(input)? {
         return Ok(Some(profile_builtin));
     }
-    runtime::lower_shader_runtime_builtin_call(
-        callee,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-    )
+    runtime::lower_shader_runtime_builtin_call(input)
 }

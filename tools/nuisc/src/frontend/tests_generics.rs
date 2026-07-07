@@ -2278,17 +2278,14 @@ fn monomorphizes_generic_function_from_data_result_shaped_argument() {
         .iter()
         .find(|function| function.name == "main")
         .unwrap();
-    assert!(matches!(
-        main.body.iter().find(|stmt| matches!(
-            stmt,
-            NirStmt::Let {
-                name,
-                value: NirExpr::Call { callee, .. },
-                ..
-            } if name == "result" && callee == "keep_data__i64"
-        )),
-        Some(_)
-    ));
+    assert!(main.body.iter().any(|stmt| matches!(
+        stmt,
+        NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        } if name == "result" && callee == "keep_data__i64"
+    )));
 
     let specialized = module
         .functions
@@ -2478,17 +2475,14 @@ fn monomorphizes_generic_function_from_nested_alias_shaped_argument() {
         .iter()
         .find(|function| function.name == "main")
         .unwrap();
-    assert!(matches!(
-        main.body.iter().find(|stmt| matches!(
-            stmt,
-            NirStmt::Let {
-                name,
-                value: NirExpr::Call { callee, .. },
-                ..
-            } if name == "wrapped" && callee == "keep_wrapped__i64"
-        )),
-        Some(_)
-    ));
+    assert!(main.body.iter().any(|stmt| matches!(
+        stmt,
+        NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        } if name == "wrapped" && callee == "keep_wrapped__i64"
+    )));
 
     let specialized = module
         .functions

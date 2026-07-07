@@ -10,21 +10,19 @@ pub(super) enum AstCallInference {
     Unhandled,
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn infer_view_call_type(
-    callee: &str,
-    generic_args: &[AstTypeRef],
-    args: &[AstExpr],
-    env: &BTreeMap<String, AstTypeRef>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    active_exprs: &mut BTreeSet<usize>,
-) -> AstCallInference {
-    if !is_view_call(callee) {
-        return AstCallInference::Unhandled;
-    }
-    AstCallInference::Handled(infer_view_call_type_inner(
+pub(super) struct AstCallInferenceInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) generic_args: &'a [AstTypeRef],
+    pub(super) args: &'a [AstExpr],
+    pub(super) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) active_exprs: &'a mut BTreeSet<usize>,
+}
+
+pub(super) fn infer_view_call_type(input: AstCallInferenceInput<'_>) -> AstCallInference {
+    let AstCallInferenceInput {
         callee,
         generic_args,
         args,
@@ -33,7 +31,20 @@ pub(super) fn infer_view_call_type(
         struct_table,
         function_return_types,
         active_exprs,
-    ))
+    } = input;
+    if !is_view_call(callee) {
+        return AstCallInference::Unhandled;
+    }
+    AstCallInference::Handled(infer_view_call_type_inner(AstCallInferenceInput {
+        callee,
+        generic_args,
+        args,
+        env,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        active_exprs,
+    }))
 }
 
 fn is_view_call(callee: &str) -> bool {
@@ -70,17 +81,17 @@ fn is_view_call(callee: &str) -> bool {
     )
 }
 
-#[allow(clippy::too_many_arguments)]
-fn infer_view_call_type_inner(
-    callee: &str,
-    generic_args: &[AstTypeRef],
-    args: &[AstExpr],
-    env: &BTreeMap<String, AstTypeRef>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    active_exprs: &mut BTreeSet<usize>,
-) -> Option<AstTypeRef> {
+fn infer_view_call_type_inner(input: AstCallInferenceInput<'_>) -> Option<AstTypeRef> {
+    let AstCallInferenceInput {
+        callee,
+        generic_args,
+        args,
+        env,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        active_exprs,
+    } = input;
     match callee {
         "buffer_len" => Some(ast_named_type("i64")),
         "slice" => {

@@ -54,13 +54,11 @@ fn parse_loop_flow_condition_atom(
         }
         _ => return None,
     };
-    let lhs = match lhs {
-        _ => loop_state_ref_into_cond_source(parse_prepared_loop_state_ref_expr(
-            lhs,
-            binding_name,
-            carries,
-        )?),
-    };
+    let lhs = loop_state_ref_into_cond_source(parse_prepared_loop_state_ref_expr(
+        lhs,
+        binding_name,
+        carries,
+    )?);
     Some(PreparedLoopCarryCondition { lhs, compare, rhs })
 }
 

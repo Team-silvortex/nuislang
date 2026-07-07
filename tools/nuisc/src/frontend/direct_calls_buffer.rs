@@ -1,18 +1,20 @@
-use std::collections::BTreeMap;
+use nuis_semantics::model::{AstExpr, NirExpr};
 
-use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
+use crate::frontend::{i64_type, lower_expr, ref_type};
 
-use crate::frontend::{i64_type, lower_expr, ref_type, FunctionSignature};
+use super::DirectCallLoweringContext;
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_buffer_call(
     callee: &str,
     args: &[AstExpr],
-    current_domain: &str,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    context: DirectCallLoweringContext<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let DirectCallLoweringContext {
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+    } = context;
     match callee {
         "buffer_find_byte" => {
             if current_domain != "cpu" {

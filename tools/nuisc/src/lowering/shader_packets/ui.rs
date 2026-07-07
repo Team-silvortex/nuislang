@@ -2,6 +2,7 @@ use super::*;
 
 impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
     pub(super) fn build_ui_fields(&mut self) -> Vec<(String, String)> {
+        let color_slider_deps = [self.color_name.clone()];
         let color_slider = self.push_struct(
             "nova_slider_color",
             "NovaSliderPacket",
@@ -12,8 +13,9 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 "step=4".to_owned(),
                 "disabled=0".to_owned(),
             ],
-            &[self.color_name.clone()],
+            &color_slider_deps,
         );
+        let speed_slider_deps = [self.speed_name.clone()];
         let speed_slider = self.push_struct(
             "nova_slider_speed",
             "NovaSliderPacket",
@@ -24,8 +26,9 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 "step=2".to_owned(),
                 "disabled=0".to_owned(),
             ],
-            &[self.speed_name.clone()],
+            &speed_slider_deps,
         );
+        let radius_slider_deps = [self.radius_name.clone()];
         let radius_slider = self.push_struct(
             "nova_slider_radius",
             "NovaSliderPacket",
@@ -36,7 +39,7 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 "step=3".to_owned(),
                 "disabled=0".to_owned(),
             ],
-            &[self.radius_name.clone()],
+            &radius_slider_deps,
         );
         let sliders = self.push_struct(
             "nova_panel_sliders",
@@ -61,6 +64,7 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
             ],
             &[self.accent_name.clone(), self.focus_name.clone()],
         );
+        let toggle_deps = [self.toggle_name.clone()];
         let toggle = self.push_struct(
             "nova_panel_toggle",
             "NovaTogglePacket",
@@ -68,19 +72,21 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 format!("live={}", self.toggle_name),
                 "disabled=0".to_owned(),
             ],
-            &[self.toggle_name.clone()],
+            &toggle_deps,
         );
+        let progress_deps = [self.speed_name.clone()];
         let progress = self.push_struct(
             "nova_panel_progress",
             "NovaProgressPacket",
             vec![format!("value={}", self.speed_name), "max=63".to_owned()],
-            &[self.speed_name.clone()],
+            &progress_deps,
         );
+        let meter_deps = [self.radius_name.clone()];
         let meter = self.push_struct(
             "nova_panel_meter",
             "NovaMeterPacket",
             vec![format!("value={}", self.radius_name), "max=127".to_owned()],
-            &[self.radius_name.clone()],
+            &meter_deps,
         );
         let button = self.push_struct(
             "nova_panel_button",
@@ -179,6 +185,7 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
             ],
             &[self.focus_name.clone(), self.accent_name.clone()],
         );
+        let table_deps = [self.focus_name.clone()];
         let table = self.push_struct(
             "nova_panel_table",
             "NovaTablePacket",
@@ -188,7 +195,7 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 format!("selected_row={}", self.focus_name),
                 "zebra=1".to_owned(),
             ],
-            &[self.focus_name.clone()],
+            &table_deps,
         );
         let tree = self.push_struct(
             "nova_panel_tree",

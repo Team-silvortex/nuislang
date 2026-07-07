@@ -8,24 +8,55 @@ use crate::frontend::call_helpers::{
 use crate::frontend::metadata::ModuleConstValue;
 use crate::frontend::{
     i32_type, infer_nir_expr_type, lower_nested_expr_with_async_and_consts, AstExpr,
-    FunctionSignature, NirExpr, NirStructDef, NirTypeRef,
+    FunctionSignature, NestedExprWithConstsInput, NirExpr, NirStructDef, NirTypeRef,
 };
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct MethodCallLoweringInput<'a> {
+    pub(super) receiver: &'a AstExpr,
+    pub(super) method: &'a str,
+    pub(super) generic_args: &'a [AstTypeRef],
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) _expected: Option<&'a NirTypeRef>,
+    pub(super) allow_async_calls: bool,
+}
+
 pub(super) fn lower_method_call_with_async(
-    receiver: &AstExpr,
-    method: &str,
-    generic_args: &[AstTypeRef],
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    _expected: Option<&NirTypeRef>,
-    allow_async_calls: bool,
+    input: MethodCallLoweringInput<'_>,
 ) -> Result<NirExpr, String> {
+    let MethodCallLoweringInput {
+        receiver,
+        method,
+        generic_args,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        _expected,
+        allow_async_calls,
+    } = input;
+    macro_rules! lower_method_expr {
+        ($expr:expr, $expected:expr) => {
+            lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+                expr: $expr,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                expected: $expected,
+            })
+        };
+    }
     let receiver_expected = crate::frontend::receiver_expected::explicit_receiver_expected_nir_type(
         receiver,
         generic_args,
@@ -41,18 +72,7 @@ pub(super) fn lower_method_call_with_async(
             let lowered_args = args
                 .iter()
                 .zip(signature.params.iter())
-                .map(|(arg, expected_param)| {
-                    lower_nested_expr_with_async_and_consts(
-                        arg,
-                        current_domain,
-                        current_function_is_async,
-                        bindings,
-                        module_consts,
-                        signatures,
-                        struct_table,
-                        Some(expected_param),
-                    )
-                })
+                .map(|(arg, expected_param)| lower_method_expr!(arg, Some(expected_param)))
                 .collect::<Result<Vec<_>, _>>()?;
             if signature.params.len() != lowered_args.len() {
                 return Err(format!(
@@ -128,16 +148,7 @@ pub(super) fn lower_method_call_with_async(
                     "trait method `{signature_key}` expects at least 1 arg"
                 ));
             };
-            let lowered_first_arg = lower_nested_expr_with_async_and_consts(
-                first_arg_expr,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                module_consts,
-                signatures,
-                struct_table,
-                None,
-            )?;
+            let lowered_first_arg = lower_method_expr!(first_arg_expr, None)?;
             if let Some(receiver_ty) =
                 infer_nir_expr_type(&lowered_first_arg, bindings, signatures, struct_table)
             {
@@ -160,16 +171,7 @@ pub(super) fn lower_method_call_with_async(
                                 .skip(1)
                                 .zip(signature.params.iter().skip(1))
                                 .map(|(arg, expected_param)| {
-                                    lower_nested_expr_with_async_and_consts(
-                                        arg,
-                                        current_domain,
-                                        current_function_is_async,
-                                        bindings,
-                                        module_consts,
-                                        signatures,
-                                        struct_table,
-                                        Some(expected_param),
-                                    )
+                                    lower_method_expr!(arg, Some(expected_param))
                                 })
                                 .collect::<Result<Vec<_>, _>>()?,
                         );
@@ -194,16 +196,7 @@ pub(super) fn lower_method_call_with_async(
             }
         }
     }
-    let lowered_receiver = lower_nested_expr_with_async_and_consts(
-        receiver,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-        receiver_expected.as_ref(),
-    )?;
+    let lowered_receiver = lower_method_expr!(receiver, receiver_expected.as_ref())?;
     if let Some(receiver_ty) =
         infer_nir_expr_type(&lowered_receiver, bindings, signatures, struct_table)
     {
@@ -238,18 +231,7 @@ pub(super) fn lower_method_call_with_async(
                 lowered_args.extend(
                     args.iter()
                         .zip(signature.params.iter().skip(1))
-                        .map(|(arg, expected_param)| {
-                            lower_nested_expr_with_async_and_consts(
-                                arg,
-                                current_domain,
-                                current_function_is_async,
-                                bindings,
-                                module_consts,
-                                signatures,
-                                struct_table,
-                                Some(expected_param),
-                            )
-                        })
+                        .map(|(arg, expected_param)| lower_method_expr!(arg, Some(expected_param)))
                         .collect::<Result<Vec<_>, _>>()?,
                 );
                 if signature.params.len() != lowered_args.len() {
@@ -273,18 +255,7 @@ pub(super) fn lower_method_call_with_async(
         method: method.to_owned(),
         args: args
             .iter()
-            .map(|arg| {
-                lower_nested_expr_with_async_and_consts(
-                    arg,
-                    current_domain,
-                    current_function_is_async,
-                    bindings,
-                    module_consts,
-                    signatures,
-                    struct_table,
-                    None,
-                )
-            })
+            .map(|arg| lower_method_expr!(arg, None))
             .collect::<Result<Vec<_>, _>>()?,
     })
 }

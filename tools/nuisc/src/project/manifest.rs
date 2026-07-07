@@ -158,9 +158,7 @@ fn parse_optional_abi_array(source: &str, key: &str) -> Option<Vec<ProjectAbiReq
     let values = parse_optional_string_array(source, key)?;
     let mut items = Vec::new();
     for value in values {
-        let Some((domain, abi)) = value.split_once('=') else {
-            return None;
-        };
+        let (domain, abi) = value.split_once('=')?;
         let domain = domain.trim().to_owned();
         let abi = abi.trim().to_owned();
         if domain.is_empty() || abi.is_empty() {
@@ -178,9 +176,7 @@ fn parse_optional_galaxy_dependency_array(
     let values = parse_optional_string_array(source, key)?;
     let mut items = Vec::new();
     for value in values {
-        let Some((name, version)) = value.split_once('=') else {
-            return None;
-        };
+        let (name, version) = value.split_once('=')?;
         let name = name.trim().to_owned();
         let version = version.trim().to_owned();
         if name.is_empty() || version.is_empty() {
@@ -195,9 +191,7 @@ fn parse_optional_galaxy_import_array(source: &str, key: &str) -> Option<Vec<Pro
     let values = parse_optional_string_array(source, key)?;
     let mut items = Vec::new();
     for value in values {
-        let Some((galaxy, library_module)) = value.split_once(':') else {
-            return None;
-        };
+        let (galaxy, library_module) = value.split_once(':')?;
         let galaxy = galaxy.trim().to_owned();
         let library_module = library_module.trim().to_owned();
         if galaxy.is_empty() || library_module.is_empty() {

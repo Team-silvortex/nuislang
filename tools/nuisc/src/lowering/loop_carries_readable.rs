@@ -165,7 +165,7 @@ pub(in crate::lowering) fn encode_loop_carry_source_args(
     source: &PreparedCarrySource,
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
-) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
+) -> Result<EncodedLoopArgs, String> {
     let kind = render_loop_carry_kind(op, source);
     if let Some(expr) = source.invariant_expr() {
         let expr_name = lower_expr(expr, state, bindings)?;
@@ -380,7 +380,7 @@ pub(in crate::lowering) fn encode_loop_carry_branch_source_args(
     source: &PreparedCarryBranchSource,
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
-) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
+) -> Result<EncodedLoopArgs, String> {
     match source.view() {
         PreparedCarryBranchView::KeepCurrentValue => Ok((vec!["keep".to_owned()], vec![], vec![])),
         PreparedCarryBranchView::KeepPreviousValue => {

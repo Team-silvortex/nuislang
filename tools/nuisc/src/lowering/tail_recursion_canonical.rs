@@ -16,9 +16,7 @@ pub(super) fn canonicalize_tail_recursive_loop_arg(
             NirExpr::Var(TAIL_RECURSIVE_PREV_CURRENT_BINDING.to_owned())
         }
         NirExpr::Var(name) => {
-            if target_carry_name.is_some() && Some(name.as_str()) == target_carry_name {
-                expr.clone()
-            } else if invariant_param_names.contains(name) {
+            if Some(name.as_str()) == target_carry_name || invariant_param_names.contains(name) {
                 expr.clone()
             } else {
                 non_current_param_names

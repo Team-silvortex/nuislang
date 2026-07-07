@@ -2,8 +2,9 @@ use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 
-use super::super::{i64_type, lower_expr, FunctionSignature, ModuleConstValue};
+use super::super::{i64_type, lower_expr, FunctionSignature};
 use super::packet_helpers::{build_struct_literal, lower_i64_arg_list};
+use super::NovaBuiltinInput;
 
 struct NovaRenderPacketEnv<'a> {
     current_domain: &'a str,
@@ -12,17 +13,18 @@ struct NovaRenderPacketEnv<'a> {
     struct_table: &'a BTreeMap<String, NirStructDef>,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_nova_render_packet_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    _current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    _module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: NovaBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let NovaBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        ..
+    } = input;
     let env = NovaRenderPacketEnv {
         current_domain,
         bindings,

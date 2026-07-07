@@ -5,7 +5,7 @@ use nuis_semantics::model::{
     AstMatchArm, AstStmt, AstStructDef, AstTypeRef,
 };
 
-use super::lambda_expansion_expr::rewrite_lambda_expr;
+use super::lambda_expansion_expr::{rewrite_lambda_expr, LambdaExprRewriteInput};
 use super::lambda_expansion_synth::{synthesize_lambda_function, LambdaSynthesisInput};
 use super::lambda_expansion_types::{
     callable_binding_return_type, callable_type_from_function, callable_type_from_signature,
@@ -51,6 +51,24 @@ pub(super) fn expand_lambda_block(
     let mut locals = visible_locals.clone();
     let mut local_types = visible_local_types.clone();
     let mut rewritten = Vec::new();
+    macro_rules! rewrite_block_expr {
+        ($expr:expr, $expected:expr) => {
+            rewrite_lambda_expr(LambdaExprRewriteInput {
+                expr: $expr,
+                expected_expr_type: $expected,
+                inherited_generic_params,
+                lambda_aliases: &aliases,
+                visible_locals: &locals,
+                visible_local_types: &local_types,
+                module_impls,
+                module_const_names,
+                module_function_table,
+                owning_function_name,
+                counter,
+                synthesized,
+            })
+        };
+    }
     for stmt in body {
         match stmt {
             AstStmt::Let {
@@ -160,20 +178,7 @@ pub(super) fn expand_lambda_block(
                 value,
                 mutable,
             } => {
-                let rewritten_value = rewrite_lambda_expr(
-                    value,
-                    ty.as_ref(),
-                    inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
-                    module_impls,
-                    module_const_names,
-                    module_function_table,
-                    owning_function_name,
-                    counter,
-                    synthesized,
-                )?;
+                let rewritten_value = rewrite_block_expr!(value, ty.as_ref())?;
                 rewritten.push(AstStmt::Let {
                     mutable: *mutable,
                     name: name.clone(),
@@ -209,20 +214,7 @@ pub(super) fn expand_lambda_block(
                 );
             }
             AstStmt::AssignLocal { name, value } => {
-                let rewritten_value = rewrite_lambda_expr(
-                    value,
-                    local_types.get(name),
-                    inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
-                    module_impls,
-                    module_const_names,
-                    module_function_table,
-                    owning_function_name,
-                    counter,
-                    synthesized,
-                )?;
+                let rewritten_value = rewrite_block_expr!(value, local_types.get(name))?;
                 rewritten.push(AstStmt::AssignLocal {
                     name: name.clone(),
                     value: rewritten_value.clone(),
@@ -248,20 +240,7 @@ pub(super) fn expand_lambda_block(
                 fields,
                 value,
             } => {
-                let rewritten_value = rewrite_lambda_expr(
-                    value,
-                    type_ref.as_ref(),
-                    inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
-                    module_impls,
-                    module_const_names,
-                    module_function_table,
-                    owning_function_name,
-                    counter,
-                    synthesized,
-                )?;
+                let rewritten_value = rewrite_block_expr!(value, type_ref.as_ref())?;
                 rewritten.push(AstStmt::DestructureLet {
                     type_ref: type_ref.clone(),
                     fields: fields.clone(),
@@ -276,20 +255,7 @@ pub(super) fn expand_lambda_block(
                 }
             }
             AstStmt::Const { name, ty, value } => {
-                let rewritten_value = rewrite_lambda_expr(
-                    value,
-                    ty.as_ref(),
-                    inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
-                    module_impls,
-                    module_const_names,
-                    module_function_table,
-                    owning_function_name,
-                    counter,
-                    synthesized,
-                )?;
+                let rewritten_value = rewrite_block_expr!(value, ty.as_ref())?;
                 rewritten.push(AstStmt::Const {
                     name: name.clone(),
                     ty: ty.clone(),
@@ -323,53 +289,18 @@ pub(super) fn expand_lambda_block(
                     module_impls,
                 );
             }
-            AstStmt::Print(value) => rewritten.push(AstStmt::Print(rewrite_lambda_expr(
-                value,
-                None,
-                inherited_generic_params,
-                &aliases,
-                &locals,
-                &local_types,
-                module_impls,
-                module_const_names,
-                module_function_table,
-                owning_function_name,
-                counter,
-                synthesized,
-            )?)),
-            AstStmt::Await(value) => rewritten.push(AstStmt::Await(rewrite_lambda_expr(
-                value,
-                None,
-                inherited_generic_params,
-                &aliases,
-                &locals,
-                &local_types,
-                module_impls,
-                module_const_names,
-                module_function_table,
-                owning_function_name,
-                counter,
-                synthesized,
-            )?)),
+            AstStmt::Print(value) => {
+                rewritten.push(AstStmt::Print(rewrite_block_expr!(value, None)?))
+            }
+            AstStmt::Await(value) => {
+                rewritten.push(AstStmt::Await(rewrite_block_expr!(value, None)?))
+            }
             AstStmt::If {
                 condition,
                 then_body,
                 else_body,
             } => rewritten.push(AstStmt::If {
-                condition: rewrite_lambda_expr(
-                    condition,
-                    None,
-                    inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
-                    module_impls,
-                    module_const_names,
-                    module_function_table,
-                    owning_function_name,
-                    counter,
-                    synthesized,
-                )?,
+                condition: rewrite_block_expr!(condition, None)?,
                 then_body: expand_lambda_block(ExpandLambdaBlockInput {
                     body: then_body,
                     current_return_type,
@@ -402,20 +333,7 @@ pub(super) fn expand_lambda_block(
                 })?,
             }),
             AstStmt::Match { value, arms } => rewritten.push(AstStmt::Match {
-                value: rewrite_lambda_expr(
-                    value,
-                    None,
-                    inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
-                    module_impls,
-                    module_const_names,
-                    module_function_table,
-                    owning_function_name,
-                    counter,
-                    synthesized,
-                )?,
+                value: rewrite_block_expr!(value, None)?,
                 arms: arms
                     .iter()
                     .map(|arm| {
@@ -424,22 +342,7 @@ pub(super) fn expand_lambda_block(
                             guard: arm
                                 .guard
                                 .clone()
-                                .map(|guard| {
-                                    rewrite_lambda_expr(
-                                        &guard,
-                                        None,
-                                        inherited_generic_params,
-                                        &aliases,
-                                        &locals,
-                                        &local_types,
-                                        module_impls,
-                                        module_const_names,
-                                        module_function_table,
-                                        owning_function_name,
-                                        counter,
-                                        synthesized,
-                                    )
-                                })
+                                .map(|guard| rewrite_block_expr!(&guard, None))
                                 .transpose()?,
                             body: expand_lambda_block(ExpandLambdaBlockInput {
                                 body: &arm.body,
@@ -461,20 +364,7 @@ pub(super) fn expand_lambda_block(
                     .collect::<Result<Vec<_>, String>>()?,
             }),
             AstStmt::While { condition, body } => rewritten.push(AstStmt::While {
-                condition: rewrite_lambda_expr(
-                    condition,
-                    None,
-                    inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
-                    module_impls,
-                    module_const_names,
-                    module_function_table,
-                    owning_function_name,
-                    counter,
-                    synthesized,
-                )?,
+                condition: rewrite_block_expr!(condition, None)?,
                 body: expand_lambda_block(ExpandLambdaBlockInput {
                     body,
                     current_return_type,
@@ -491,35 +381,9 @@ pub(super) fn expand_lambda_block(
                     synthesized,
                 })?,
             }),
-            AstStmt::Expr(expr) => rewritten.push(AstStmt::Expr(rewrite_lambda_expr(
-                expr,
-                None,
-                inherited_generic_params,
-                &aliases,
-                &locals,
-                &local_types,
-                module_impls,
-                module_const_names,
-                module_function_table,
-                owning_function_name,
-                counter,
-                synthesized,
-            )?)),
+            AstStmt::Expr(expr) => rewritten.push(AstStmt::Expr(rewrite_block_expr!(expr, None)?)),
             AstStmt::Return(value) => rewritten.push(AstStmt::Return(match value {
-                Some(value) => Some(rewrite_lambda_expr(
-                    value,
-                    current_return_type,
-                    inherited_generic_params,
-                    &aliases,
-                    &locals,
-                    &local_types,
-                    module_impls,
-                    module_const_names,
-                    module_function_table,
-                    owning_function_name,
-                    counter,
-                    synthesized,
-                )?),
+                Some(value) => Some(rewrite_block_expr!(value, current_return_type)?),
                 None => None,
             })),
             AstStmt::Break => rewritten.push(AstStmt::Break),

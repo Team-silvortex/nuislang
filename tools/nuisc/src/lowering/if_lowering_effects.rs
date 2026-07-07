@@ -143,9 +143,9 @@ pub(super) fn expr_contains_conditional_effect_primitive(expr: &NirExpr) -> bool
         }
         NirExpr::Call { args, .. }
         | NirExpr::MethodCall { args, .. }
-        | NirExpr::CpuExternCall { args, .. } => args
-            .iter()
-            .any(|arg| expr_contains_conditional_effect_primitive(arg)),
+        | NirExpr::CpuExternCall { args, .. } => {
+            args.iter().any(expr_contains_conditional_effect_primitive)
+        }
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .any(|(_, value)| expr_contains_conditional_effect_primitive(value)),

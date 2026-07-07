@@ -67,12 +67,16 @@ fn lower_selected_cpu_unary_runtime_effect(
         ) {
             if let Some(lowered) = lower_selected_cpu_binary_runtime_effect(
                 condition_name.clone(),
-                lhs_bin_op,
-                lhs_bin_lhs,
-                lhs_bin_rhs,
-                rhs_bin_op,
-                rhs_bin_lhs,
-                rhs_bin_rhs,
+                SelectableCpuBinaryRuntimeCandidate {
+                    op: lhs_bin_op,
+                    lhs: lhs_bin_lhs,
+                    rhs: lhs_bin_rhs,
+                },
+                SelectableCpuBinaryRuntimeCandidate {
+                    op: rhs_bin_op,
+                    lhs: rhs_bin_lhs,
+                    rhs: rhs_bin_rhs,
+                },
                 state,
                 bindings,
             )? {
@@ -91,12 +95,16 @@ fn lower_selected_cpu_unary_runtime_effect(
         ) {
             if let Some(lowered) = lower_selected_cpu_call_runtime_effect(
                 condition_name.clone(),
-                lhs_call_op,
-                lhs_callee,
-                lhs_args,
-                rhs_call_op,
-                rhs_callee,
-                rhs_args,
+                SelectableCpuCallRuntimeCandidate {
+                    op: lhs_call_op,
+                    callee: lhs_callee,
+                    args: lhs_args,
+                },
+                SelectableCpuCallRuntimeCandidate {
+                    op: rhs_call_op,
+                    callee: rhs_callee,
+                    args: rhs_args,
+                },
                 state,
                 bindings,
             )? {
@@ -135,24 +143,26 @@ fn lower_selected_cpu_unary_runtime_effect(
     Ok(Some(name))
 }
 
+struct SelectableCpuCallRuntimeCandidate<'a> {
+    op: SelectableCpuCallRuntimeOp,
+    callee: &'a str,
+    args: &'a [NirExpr],
+}
+
 fn lower_selected_cpu_call_runtime_effect(
     condition_name: String,
-    lhs_op: SelectableCpuCallRuntimeOp,
-    lhs_callee: &str,
-    lhs_args: &[NirExpr],
-    rhs_op: SelectableCpuCallRuntimeOp,
-    rhs_callee: &str,
-    rhs_args: &[NirExpr],
+    lhs: SelectableCpuCallRuntimeCandidate<'_>,
+    rhs: SelectableCpuCallRuntimeCandidate<'_>,
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<Option<String>, String> {
-    if lhs_op != rhs_op || lhs_callee != rhs_callee || lhs_args.len() != rhs_args.len() {
+    if lhs.op != rhs.op || lhs.callee != rhs.callee || lhs.args.len() != rhs.args.len() {
         return Ok(None);
     }
 
     let mut selected_bindings = bindings.clone();
-    let mut selected_args = Vec::with_capacity(lhs_args.len());
-    for (index, (lhs_arg, rhs_arg)) in lhs_args.iter().zip(rhs_args.iter()).enumerate() {
+    let mut selected_args = Vec::with_capacity(lhs.args.len());
+    for (index, (lhs_arg, rhs_arg)) in lhs.args.iter().zip(rhs.args.iter()).enumerate() {
         let lhs_name = lower_expr(lhs_arg, state, bindings)?;
         let rhs_name = lower_expr(rhs_arg, state, bindings)?;
         let selected_name = lower_select(condition_name.clone(), lhs_name, rhs_name, state)?;
@@ -162,19 +172,19 @@ fn lower_selected_cpu_call_runtime_effect(
     }
 
     let returned = super::body_lowering::lower_async_call_boundary(
-        lhs_callee,
+        lhs.callee,
         &selected_args,
         state,
         &selected_bindings,
     )?;
-    let name = next_name(state, lhs_op.prefix());
+    let name = next_name(state, lhs.op.prefix());
     state.yir.nodes.push(Node {
         name: name.clone(),
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
-            instruction: lhs_op.instruction().to_owned(),
-            args: vec![lhs_callee.to_owned(), returned.clone()],
+            instruction: lhs.op.instruction().to_owned(),
+            args: vec![lhs.callee.to_owned(), returned.clone()],
         },
     });
     push_dep_edges(state, &returned, &name);
@@ -186,26 +196,28 @@ fn lower_selected_cpu_call_runtime_effect(
     Ok(Some(name))
 }
 
+struct SelectableCpuBinaryRuntimeCandidate<'a> {
+    op: SelectableCpuBinaryRuntimeOp,
+    lhs: &'a NirExpr,
+    rhs: &'a NirExpr,
+}
+
 fn lower_selected_cpu_binary_runtime_effect(
     condition_name: String,
-    lhs_op: SelectableCpuBinaryRuntimeOp,
-    lhs_lhs: &NirExpr,
-    lhs_rhs: &NirExpr,
-    rhs_op: SelectableCpuBinaryRuntimeOp,
-    rhs_lhs: &NirExpr,
-    rhs_rhs: &NirExpr,
+    lhs: SelectableCpuBinaryRuntimeCandidate<'_>,
+    rhs: SelectableCpuBinaryRuntimeCandidate<'_>,
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<Option<String>, String> {
-    if lhs_op != rhs_op {
+    if lhs.op != rhs.op {
         return Ok(None);
     }
 
-    let selected_lhs = if lhs_op == SelectableCpuBinaryRuntimeOp::Timeout {
+    let selected_lhs = if lhs.op == SelectableCpuBinaryRuntimeOp::Timeout {
         if let Some(lowered) = lower_selected_cpu_unary_runtime_effect(
             condition_name.clone(),
-            lhs_lhs,
-            rhs_lhs,
+            lhs.lhs,
+            rhs.lhs,
             state,
             bindings,
         )? {
@@ -214,17 +226,21 @@ fn lower_selected_cpu_binary_runtime_effect(
             Some((lhs_call_op, lhs_callee, lhs_args)),
             Some((rhs_call_op, rhs_callee, rhs_args)),
         ) = (
-            extract_selectable_cpu_call_runtime_expr(lhs_lhs),
-            extract_selectable_cpu_call_runtime_expr(rhs_lhs),
+            extract_selectable_cpu_call_runtime_expr(lhs.lhs),
+            extract_selectable_cpu_call_runtime_expr(rhs.lhs),
         ) {
             if let Some(lowered) = lower_selected_cpu_call_runtime_effect(
                 condition_name.clone(),
-                lhs_call_op,
-                lhs_callee,
-                lhs_args,
-                rhs_call_op,
-                rhs_callee,
-                rhs_args,
+                SelectableCpuCallRuntimeCandidate {
+                    op: lhs_call_op,
+                    callee: lhs_callee,
+                    args: lhs_args,
+                },
+                SelectableCpuCallRuntimeCandidate {
+                    op: rhs_call_op,
+                    callee: rhs_callee,
+                    args: rhs_args,
+                },
                 state,
                 bindings,
             )? {
@@ -232,41 +248,41 @@ fn lower_selected_cpu_binary_runtime_effect(
             } else {
                 lower_select(
                     condition_name.clone(),
-                    lower_expr(lhs_lhs, state, bindings)?,
-                    lower_expr(rhs_lhs, state, bindings)?,
+                    lower_expr(lhs.lhs, state, bindings)?,
+                    lower_expr(rhs.lhs, state, bindings)?,
                     state,
                 )?
             }
         } else {
             lower_select(
                 condition_name.clone(),
-                lower_expr(lhs_lhs, state, bindings)?,
-                lower_expr(rhs_lhs, state, bindings)?,
+                lower_expr(lhs.lhs, state, bindings)?,
+                lower_expr(rhs.lhs, state, bindings)?,
                 state,
             )?
         }
     } else {
         lower_select(
             condition_name.clone(),
-            lower_expr(lhs_lhs, state, bindings)?,
-            lower_expr(rhs_lhs, state, bindings)?,
+            lower_expr(lhs.lhs, state, bindings)?,
+            lower_expr(rhs.lhs, state, bindings)?,
             state,
         )?
     };
     let selected_rhs = lower_select(
         condition_name,
-        lower_expr(lhs_rhs, state, bindings)?,
-        lower_expr(rhs_rhs, state, bindings)?,
+        lower_expr(lhs.rhs, state, bindings)?,
+        lower_expr(rhs.rhs, state, bindings)?,
         state,
     )?;
 
-    let name = next_name(state, lhs_op.prefix());
+    let name = next_name(state, lhs.op.prefix());
     state.yir.nodes.push(Node {
         name: name.clone(),
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
-            instruction: lhs_op.instruction().to_owned(),
+            instruction: lhs.op.instruction().to_owned(),
             args: vec![selected_lhs.clone(), selected_rhs.clone()],
         },
     });
@@ -348,12 +364,16 @@ pub(super) fn lower_direct_selectable_call_runtime_binding(
 
     let Some(value) = lower_selected_cpu_call_runtime_effect(
         condition_name,
-        lhs_op,
-        lhs_callee,
-        lhs_args,
-        rhs_op,
-        rhs_callee,
-        rhs_args,
+        SelectableCpuCallRuntimeCandidate {
+            op: lhs_op,
+            callee: lhs_callee,
+            args: lhs_args,
+        },
+        SelectableCpuCallRuntimeCandidate {
+            op: rhs_op,
+            callee: rhs_callee,
+            args: rhs_args,
+        },
         state,
         bindings,
     )?
@@ -390,12 +410,16 @@ pub(super) fn lower_direct_selectable_binary_runtime_binding(
 
     let Some(value) = lower_selected_cpu_binary_runtime_effect(
         condition_name,
-        lhs_op,
-        lhs_lhs,
-        lhs_rhs,
-        rhs_op,
-        rhs_lhs,
-        rhs_rhs,
+        SelectableCpuBinaryRuntimeCandidate {
+            op: lhs_op,
+            lhs: lhs_lhs,
+            rhs: lhs_rhs,
+        },
+        SelectableCpuBinaryRuntimeCandidate {
+            op: rhs_op,
+            lhs: rhs_lhs,
+            rhs: rhs_rhs,
+        },
         state,
         bindings,
     )?
@@ -463,12 +487,16 @@ pub(super) fn lower_direct_selectable_call_runtime_return(
 
     let Some(value) = lower_selected_cpu_call_runtime_effect(
         condition_name,
-        lhs_op,
-        lhs_callee,
-        lhs_args,
-        rhs_op,
-        rhs_callee,
-        rhs_args,
+        SelectableCpuCallRuntimeCandidate {
+            op: lhs_op,
+            callee: lhs_callee,
+            args: lhs_args,
+        },
+        SelectableCpuCallRuntimeCandidate {
+            op: rhs_op,
+            callee: rhs_callee,
+            args: rhs_args,
+        },
         state,
         bindings,
     )?
@@ -498,12 +526,16 @@ pub(super) fn lower_direct_selectable_binary_runtime_return(
 
     let Some(value) = lower_selected_cpu_binary_runtime_effect(
         condition_name,
-        lhs_op,
-        lhs_lhs,
-        lhs_rhs,
-        rhs_op,
-        rhs_lhs,
-        rhs_rhs,
+        SelectableCpuBinaryRuntimeCandidate {
+            op: lhs_op,
+            lhs: lhs_lhs,
+            rhs: lhs_rhs,
+        },
+        SelectableCpuBinaryRuntimeCandidate {
+            op: rhs_op,
+            lhs: rhs_lhs,
+            rhs: rhs_rhs,
+        },
         state,
         bindings,
     )?

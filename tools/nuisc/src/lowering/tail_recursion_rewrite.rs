@@ -345,9 +345,7 @@ fn tail_recursive_invariant_param_names(
     function: &NirFunction,
     recursive_step: &SelfTailRecursiveStep,
 ) -> Option<BTreeSet<String>> {
-    fn step_args<'a>(
-        step: &'a SelfTailRecursiveStep,
-    ) -> Option<(&'a [NirExpr], Option<&'a [NirExpr]>)> {
+    fn step_args(step: &SelfTailRecursiveStep) -> Option<(&[NirExpr], Option<&[NirExpr]>)> {
         match step {
             SelfTailRecursiveStep::Linear(args) => Some((args.as_slice(), None)),
             SelfTailRecursiveStep::Branch {

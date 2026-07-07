@@ -5,6 +5,7 @@ use nuis_semantics::model::{AstExpr, AstUnaryOp, NirBinaryOp, NirExpr, NirStruct
 use super::{
     bool_type, compatible_types, find_impl_method_signature, infer_nir_expr_type,
     lower_nested_expr_with_async_and_consts, FunctionSignature, ModuleConstValue,
+    NestedExprWithConstsInput,
 };
 
 pub(super) struct UnaryLoweringInput<'a> {
@@ -33,8 +34,8 @@ pub(super) fn lower_unary_expr_with_async(
         struct_table,
         expected,
     } = input;
-    let lowered_operand = lower_nested_expr_with_async_and_consts(
-        operand,
+    let lowered_operand = lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+        expr: operand,
         current_domain,
         current_function_is_async,
         bindings,
@@ -42,7 +43,7 @@ pub(super) fn lower_unary_expr_with_async(
         signatures,
         struct_table,
         expected,
-    )?;
+    })?;
     let operand_ty = infer_nir_expr_type(&lowered_operand, bindings, signatures, struct_table)
         .ok_or_else(|| "cannot infer unary operand type".to_owned())?;
     if let Some(overloaded) =

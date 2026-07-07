@@ -1,20 +1,20 @@
-use std::collections::BTreeMap;
+use nuis_semantics::model::NirExpr;
 
-use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
+use super::super::{i64_type, lower_expr};
+use super::NovaBuiltinInput;
 
-use super::super::{i64_type, lower_expr, FunctionSignature, ModuleConstValue};
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_nova_control_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    _current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    _module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: NovaBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let NovaBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        ..
+    } = input;
     let expr = match callee {
         "nova_slider_packet" => {
             let (value, min_value, max_value, step_value, disabled) = match args {

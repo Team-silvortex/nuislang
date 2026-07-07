@@ -9,7 +9,9 @@ use super::super::generics::{
 };
 use super::super::{lower_type_ref_with_aliases, FunctionSignature};
 use super::GenericImplMethodTemplate;
-use crate::frontend::generic_rewrite::rewrite_generic_calls_in_function;
+use crate::frontend::generic_rewrite::{
+    rewrite_generic_calls_in_function, GenericFunctionRewriteInput,
+};
 use crate::frontend::higher_order::{
     rewrite_higher_order_calls_in_function, HigherOrderFunctionRewriteInput,
 };
@@ -105,11 +107,11 @@ pub(super) fn ensure_generic_specialization(
                 extended_generic_templates.insert(template.name.clone(), template);
             }
         }
-        let rewritten = rewrite_generic_calls_in_function(
-            &higher_order_rewritten,
-            &BTreeMap::new(),
+        let rewritten = rewrite_generic_calls_in_function(GenericFunctionRewriteInput {
+            function: &higher_order_rewritten,
+            module_const_env: &BTreeMap::new(),
             visible_type_aliases,
-            &extended_generic_templates,
+            generic_templates: &extended_generic_templates,
             generic_impl_method_templates,
             higher_order_templates,
             function_table,
@@ -120,7 +122,7 @@ pub(super) fn ensure_generic_specialization(
             specialization_cache,
             specialized_functions,
             specialized_signatures,
-        )?;
+        })?;
         specialized_signatures.push((
             specialized_name.clone(),
             FunctionSignature {
@@ -160,26 +162,68 @@ pub(super) fn generic_arg_contains_definition_placeholder(
             .any(|arg| generic_arg_contains_definition_placeholder(arg, placeholder_names))
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct GenericImplMethodSpecializationInput<'a> {
+    pub(super) trait_name: Option<&'a str>,
+    pub(super) method_name: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) expected: Option<&'a AstTypeRef>,
+    pub(super) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) generic_impl_method_templates: &'a [GenericImplMethodTemplate],
+    pub(super) higher_order_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) specialization_cache: &'a mut BTreeSet<String>,
+    pub(super) specialized_functions: &'a mut Vec<AstFunction>,
+    pub(super) specialized_signatures: &'a mut Vec<(String, FunctionSignature)>,
+}
+
+pub(super) struct ReceiverExpectedImplMethodSpecializationInput<'a> {
+    pub(super) method_name: &'a str,
+    pub(super) receiver_expected: &'a AstTypeRef,
+    pub(super) actual_args: &'a [AstExpr],
+    pub(super) expected: Option<&'a AstTypeRef>,
+    pub(super) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) generic_impl_method_templates: &'a [GenericImplMethodTemplate],
+    pub(super) higher_order_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) specialization_cache: &'a mut BTreeSet<String>,
+    pub(super) specialized_functions: &'a mut Vec<AstFunction>,
+    pub(super) specialized_signatures: &'a mut Vec<(String, FunctionSignature)>,
+}
+
 pub(super) fn ensure_generic_impl_method_specialization(
-    trait_name: Option<&str>,
-    method_name: &str,
-    args: &[AstExpr],
-    expected: Option<&AstTypeRef>,
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    generic_impl_method_templates: &[GenericImplMethodTemplate],
-    higher_order_templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    specialization_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
-    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+    input: GenericImplMethodSpecializationInput<'_>,
 ) -> Result<Option<String>, String> {
+    let GenericImplMethodSpecializationInput {
+        trait_name,
+        method_name,
+        args,
+        expected,
+        env,
+        visible_type_aliases,
+        generic_templates,
+        generic_impl_method_templates,
+        higher_order_templates,
+        function_table,
+        signatures,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    } = input;
     let mut candidates = Vec::new();
     for template in generic_impl_method_templates.iter().filter(|template| {
         template.method_name == method_name
@@ -250,26 +294,28 @@ pub(super) fn ensure_generic_impl_method_specialization(
     )?))
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn ensure_generic_impl_method_specialization_from_receiver_expected(
-    method_name: &str,
-    receiver_expected: &AstTypeRef,
-    actual_args: &[AstExpr],
-    expected: Option<&AstTypeRef>,
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    generic_impl_method_templates: &[GenericImplMethodTemplate],
-    higher_order_templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    specialization_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
-    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+    input: ReceiverExpectedImplMethodSpecializationInput<'_>,
 ) -> Result<Option<String>, String> {
+    let ReceiverExpectedImplMethodSpecializationInput {
+        method_name,
+        receiver_expected,
+        actual_args,
+        expected,
+        env,
+        visible_type_aliases,
+        generic_templates,
+        generic_impl_method_templates,
+        higher_order_templates,
+        function_table,
+        signatures,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    } = input;
     let inference_receiver = AstExpr::StructLiteral {
         type_name: receiver_expected.name.clone(),
         type_args: receiver_expected.generic_args.clone(),

@@ -2,25 +2,16 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{AstExpr, AstImplDef, AstStructDef, AstTypeRef, NirResultFamily};
 
-use super::ast_calls_views::{infer_view_call_type, AstCallInference};
+use super::ast_calls_views::{infer_view_call_type, AstCallInference, AstCallInferenceInput};
 use super::ast_infer::infer_ast_expr_type_inner;
 use super::ast_patterns::{
     infer_payload_constructor_ast_type_seeded, type_args_are_pattern_placeholders,
+    SeededPayloadConstructorAstTypeInput,
 };
 use super::{ast_generic_named_type, ast_make_result_type, ast_named_type, impl_lookup_types};
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn infer_ast_call_type(
-    callee: &str,
-    generic_args: &[AstTypeRef],
-    args: &[AstExpr],
-    env: &BTreeMap<String, AstTypeRef>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    active_exprs: &mut BTreeSet<usize>,
-) -> Option<AstTypeRef> {
-    if let AstCallInference::Handled(inferred) = infer_view_call_type(
+pub(super) fn infer_ast_call_type(input: AstCallInferenceInput<'_>) -> Option<AstTypeRef> {
+    let AstCallInferenceInput {
         callee,
         generic_args,
         args,
@@ -29,7 +20,17 @@ pub(super) fn infer_ast_call_type(
         struct_table,
         function_return_types,
         active_exprs,
-    ) {
+    } = input;
+    if let AstCallInference::Handled(inferred) = infer_view_call_type(AstCallInferenceInput {
+        callee,
+        generic_args,
+        args,
+        env,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        active_exprs,
+    }) {
         return inferred;
     }
 
@@ -468,16 +469,16 @@ fn infer_payload_constructor_ast_type(
         .iter()
         .map(|param| param.name.clone())
         .collect::<BTreeSet<_>>();
-    infer_payload_constructor_ast_type_seeded(
+    infer_payload_constructor_ast_type_seeded(SeededPayloadConstructorAstTypeInput {
         callee,
         definition,
-        &args[0],
-        &generic_names,
-        BTreeMap::new(),
+        arg: &args[0],
+        generic_names: &generic_names,
+        substitutions: BTreeMap::new(),
         env,
         impl_lookup,
         struct_table,
         function_return_types,
         active_exprs,
-    )
+    })
 }

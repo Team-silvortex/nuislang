@@ -262,12 +262,7 @@ fn parse_loop_carry_delta_branch_source(
         expr: &NirExpr,
         binding_name: &str,
         carries: &[PreparedCarryUpdate],
-    ) -> Option<(
-        Vec<PreparedLoopStateRef>,
-        Option<NirExpr>,
-        Vec<PreparedLoopStateRef>,
-        Option<NirExpr>,
-    )> {
+    ) -> Option<PreparedFactorGroupProduct> {
         let NirExpr::Binary {
             op: NirBinaryOp::Mul,
             lhs,
@@ -285,13 +280,7 @@ fn parse_loop_carry_delta_branch_source(
         expr: &NirExpr,
         binding_name: &str,
         carries: &[PreparedCarryUpdate],
-    ) -> Option<(
-        Vec<PreparedLoopStateRef>,
-        Option<NirExpr>,
-        Vec<PreparedLoopStateRef>,
-        Option<NirExpr>,
-        NirExpr,
-    )> {
+    ) -> Option<PreparedScaledFactorGroupProduct> {
         let NirExpr::Binary {
             op: NirBinaryOp::Mul,
             lhs,
@@ -538,20 +527,20 @@ pub(super) fn parse_conditional_temp_driven_loop_carry_update(
         binding_name: carry_name,
         kind: PreparedCarryUpdateKind::Conditional {
             condition: temp.condition.clone(),
-            then_source: parse_loop_carry_delta_branch_source(
+            then_source: Box::new(parse_loop_carry_delta_branch_source(
                 op,
                 &temp.then_expr,
                 binding_name,
                 carries,
                 inlineable_pure_helpers,
-            )?,
-            else_source: parse_loop_carry_delta_branch_source(
+            )?),
+            else_source: Box::new(parse_loop_carry_delta_branch_source(
                 op,
                 &temp.else_expr,
                 binding_name,
                 carries,
                 inlineable_pure_helpers,
-            )?,
+            )?),
         },
     })
 }

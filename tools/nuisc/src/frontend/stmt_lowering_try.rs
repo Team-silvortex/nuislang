@@ -6,26 +6,35 @@ use nuis_semantics::model::{AstMatchArm, NirExpr};
 use super::metadata::ModuleConstValue;
 use super::{
     ast_type_from_nir, compatible_types, infer_nir_expr_type, lower_expr_with_async,
-    lower_type_ref_with_aliases, AstStmt, AstTypeAlias, AstTypeRef, FunctionSignature,
-    NirStructDef, NirTypeRef,
+    lower_type_ref_with_aliases, AstStmt, AstTypeAlias, AstTypeRef, ExprWithAsyncInput,
+    FunctionSignature, NirStructDef, NirTypeRef,
 };
 
 static TRY_EXPANSION_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 use super::stmt_lowering_try_helpers::{ast_expr_from_nir, rewrite_try_payload_placeholder};
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Clone, Copy)]
+pub(super) struct TryStmtExpansionContext<'a> {
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) return_type: Option<&'a AstTypeRef>,
+    pub(super) type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
+pub(super) struct TryStmtExpansionInput<'a> {
+    pub(super) stmt: &'a AstStmt,
+    pub(super) context: TryStmtExpansionContext<'a>,
+}
+
 pub(super) fn expand_try_stmt(
-    stmt: &AstStmt,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    return_type: Option<&AstTypeRef>,
-    type_aliases: &BTreeMap<String, AstTypeAlias>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: TryStmtExpansionInput<'_>,
 ) -> Result<Option<Vec<AstStmt>>, String> {
+    let TryStmtExpansionInput { stmt, context } = input;
     let (inner, expansion) = match stmt {
         AstStmt::Let {
             mutable,
@@ -57,20 +66,26 @@ pub(super) fn expand_try_stmt(
         _ => return Ok(None),
     };
 
-    let function_result_ty = current_function_result_type(return_type, type_aliases)?;
-    let lowered_inner = lower_expr_with_async(
-        inner,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-        None,
-        false,
-    )?;
-    let inner_ty = infer_nir_expr_type(&lowered_inner, bindings, signatures, struct_table)
-        .ok_or_else(|| "could not infer operand type for `?`".to_owned())?;
+    let function_result_ty =
+        current_function_result_type(context.return_type, context.type_aliases)?;
+    let lowered_inner = lower_expr_with_async(ExprWithAsyncInput {
+        expr: inner,
+        current_domain: context.current_domain,
+        current_function_is_async: context.current_function_is_async,
+        bindings: context.bindings,
+        module_consts: context.module_consts,
+        signatures: context.signatures,
+        struct_table: context.struct_table,
+        expected: None,
+        allow_async_calls: false,
+    })?;
+    let inner_ty = infer_nir_expr_type(
+        &lowered_inner,
+        context.bindings,
+        context.signatures,
+        context.struct_table,
+    )
+    .ok_or_else(|| "could not infer operand type for `?`".to_owned())?;
     let (payload_ty, error_ty) = split_result_type(&inner_ty)?;
     if !compatible_types(&function_result_ty.1, &error_ty) {
         return Err(format!(
@@ -88,7 +103,8 @@ pub(super) fn expand_try_stmt(
         } => {
             let final_payload_ty = match declared_ty {
                 Some(declared_ty) => {
-                    let lowered_declared = lower_type_ref_with_aliases(&declared_ty, type_aliases)?;
+                    let lowered_declared =
+                        lower_type_ref_with_aliases(&declared_ty, context.type_aliases)?;
                     if !compatible_types(&lowered_declared, &payload_ty) {
                         return Err(format!(
                             "`?` payload type `{}` does not match declared type `{}` for `{}`",
@@ -115,7 +131,8 @@ pub(super) fn expand_try_stmt(
         TryConsumer::Const { name, declared_ty } => {
             let final_payload_ty = match declared_ty {
                 Some(declared_ty) => {
-                    let lowered_declared = lower_type_ref_with_aliases(&declared_ty, type_aliases)?;
+                    let lowered_declared =
+                        lower_type_ref_with_aliases(&declared_ty, context.type_aliases)?;
                     if !compatible_types(&lowered_declared, &payload_ty) {
                         return Err(format!(
                             "`?` payload type `{}` does not match declared type `{}` for `{}`",

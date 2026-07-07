@@ -1,4 +1,6 @@
-use super::*;
+use crate::aot;
+
+use super::LinkPlanFinalStage;
 
 pub(super) fn derive_final_stage(
     report: &aot::BuildManifestVerifyReport,

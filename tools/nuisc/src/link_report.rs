@@ -6,7 +6,7 @@ use crate::{
 pub(crate) fn artifact_lowering_alignment_check_json(
     check: &linker::ArtifactLoweringAlignmentCheck,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_usize_field("index", check.index),
         json_string_field("package_id", &check.package_id),
         json_string_field("domain_family", &check.domain_family),
@@ -25,7 +25,7 @@ pub(crate) fn artifact_lowering_alignment_summary_json(
         .map(artifact_lowering_alignment_check_json)
         .collect::<Vec<_>>()
         .join(",");
-    let fields = vec![
+    let fields = [
         json_usize_field("checked", summary.checked),
         json_usize_field("mismatches", summary.mismatches),
         json_bool_field("consistent", summary.consistent),
@@ -79,7 +79,7 @@ pub(crate) fn link_plan_domain_unit_json(unit: &linker::LinkPlanDomainUnit) -> S
 }
 
 pub(crate) fn link_plan_hetero_node_json(node: &linker::LinkPlanHeteroNode) -> String {
-    let fields = vec![
+    let fields = [
         json_usize_field("index", node.index),
         json_string_field("timestamp", &node.timestamp),
         json_string_field("domain_family", &node.domain_family),
@@ -94,7 +94,7 @@ pub(crate) fn link_plan_hetero_node_json(node: &linker::LinkPlanHeteroNode) -> S
 }
 
 pub(crate) fn link_plan_data_segment_json(segment: &linker::LinkPlanDataSegment) -> String {
-    let fields = vec![
+    let fields = [
         json_usize_field("index", segment.index),
         json_string_field("segment_id", &segment.segment_id),
         json_string_field("domain_family", &segment.domain_family),
@@ -109,7 +109,7 @@ pub(crate) fn link_plan_data_segment_json(segment: &linker::LinkPlanDataSegment)
 pub(crate) fn link_plan_hetero_validation_json(
     validation: &linker::LinkPlanHeteroValidationSummary,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_usize_field("checked", validation.checked),
         json_bool_field("valid", validation.valid),
         json_string_array_field("issues", &validation.issues),
@@ -130,7 +130,7 @@ pub(crate) fn link_plan_hetero_calculate_json(plan: &linker::LinkPlanHeteroCalcu
         .map(link_plan_data_segment_json)
         .collect::<Vec<_>>()
         .join(",");
-    let fields = vec![
+    let fields = [
         json_string_field("schema", &plan.schema),
         json_string_field("mode", &plan.mode),
         json_bool_field("static_link", plan.static_link),
@@ -161,7 +161,7 @@ pub(crate) fn link_plan_host_ffi_json(footprint: &linker::LinkPlanHostFfiFootpri
         .map(link_plan_host_ffi_abi_group_json)
         .collect::<Vec<_>>()
         .join(",");
-    let fields = vec![
+    let fields = [
         json_optional_string_field("index_path", footprint.index_path.as_deref()),
         json_usize_field("symbol_count", footprint.symbol_count),
         json_usize_field("policy_count", footprint.policy_count),
@@ -183,7 +183,7 @@ fn link_plan_host_ffi_abi_group_json(group: &linker::LinkPlanHostFfiAbiGroup) ->
         .map(link_plan_host_ffi_abi_entry_json)
         .collect::<Vec<_>>()
         .join(",");
-    let fields = vec![
+    let fields = [
         json_string_field("abi", &group.abi),
         json_usize_field("symbol_count", group.symbol_count),
         json_usize_field("policy_count", group.policy_count),
@@ -198,7 +198,7 @@ fn link_plan_host_ffi_abi_group_json(group: &linker::LinkPlanHostFfiAbiGroup) ->
 }
 
 fn link_plan_host_ffi_abi_entry_json(entry: &linker::LinkPlanHostFfiAbiEntry) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("symbol", &entry.symbol),
         json_string_field("signature_pattern", &entry.signature_pattern),
         json_string_field("signature_hash", &entry.signature_hash),
@@ -210,7 +210,7 @@ fn link_plan_host_ffi_abi_entry_json(entry: &linker::LinkPlanHostFfiAbiEntry) ->
 fn link_plan_host_ffi_validation_json(
     validation: &linker::LinkPlanHostFfiValidationSummary,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_usize_field("checked", validation.checked),
         json_bool_field("valid", validation.valid),
         json_bool_field("link_allowed", validation.link_allowed),
@@ -221,7 +221,7 @@ fn link_plan_host_ffi_validation_json(
 }
 
 fn link_plan_host_ffi_entry_json(entry: &linker::LinkPlanHostFfiEntry) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("abi", &entry.abi),
         json_string_field("symbol", &entry.symbol),
         json_string_field("signature_pattern", &entry.signature_pattern),

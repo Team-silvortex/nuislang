@@ -1,8 +1,7 @@
-use std::collections::BTreeMap;
+use nuis_semantics::model::NirExpr;
 
-use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
-
-use super::super::{lower_expr, named_type, FunctionSignature, ModuleConstValue};
+use super::super::{lower_expr, named_type};
+use super::NovaBuiltinInput;
 
 const PANEL_FIELD_TYPES: [(&str, &str); 75] = [
     ("header", "NovaHeaderPacket"),
@@ -82,17 +81,18 @@ const PANEL_FIELD_TYPES: [(&str, &str); 75] = [
     ("focus", "NovaFocusPacket"),
 ];
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_nova_panel_parts_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    _current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    _module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: NovaBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let NovaBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        ..
+    } = input;
     if callee != "nova_panel_from_parts" {
         return Ok(None);
     }

@@ -6,142 +6,128 @@ use super::stmt_lowering_try::{
 };
 use super::{
     compatible_types, infer_nir_expr_type, lower_expr_with_async, AstStmt, AstTypeAlias,
-    AstTypeRef, FunctionSignature, NirStructDef, NirTypeRef,
+    AstTypeRef, ExprWithAsyncInput, FunctionSignature, NirStructDef, NirTypeRef,
 };
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Clone, Copy)]
+pub(super) struct TryExpansionContext<'a> {
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) return_type: Option<&'a AstTypeRef>,
+    pub(super) type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
+pub(super) struct NestedTryStmtExpansionInput<'a> {
+    pub(super) stmt: &'a AstStmt,
+    pub(super) context: TryExpansionContext<'a>,
+}
+
+struct TryWrappedStatementsInput<'a> {
+    inner: &'a super::AstExpr,
+    wrap: &'a dyn Fn(super::AstExpr) -> AstStmt,
+    context: TryExpansionContext<'a>,
+}
+
+struct NestedTryExprExpansionInput<'a> {
+    expr: &'a super::AstExpr,
+    wrap: &'a dyn Fn(super::AstExpr) -> AstStmt,
+    context: TryExpansionContext<'a>,
+}
+
 pub(super) fn expand_nested_try_stmt(
-    stmt: &AstStmt,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    return_type: Option<&AstTypeRef>,
-    type_aliases: &BTreeMap<String, AstTypeAlias>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: NestedTryStmtExpansionInput<'_>,
 ) -> Result<Option<Vec<AstStmt>>, String> {
+    let NestedTryStmtExpansionInput { stmt, context } = input;
     match stmt {
         AstStmt::Let {
             mutable,
             name,
             ty,
             value,
-        } => expand_nested_try_expr_as_stmt(
-            value,
-            &|value| AstStmt::Let {
+        } => expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+            expr: value,
+            wrap: &|value| AstStmt::Let {
                 mutable: *mutable,
                 name: name.clone(),
                 ty: ty.clone(),
                 value,
             },
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        ),
-        AstStmt::AssignLocal { name, value } => expand_nested_try_expr_as_stmt(
-            value,
-            &|value| AstStmt::AssignLocal {
-                name: name.clone(),
-                value,
-            },
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        ),
-        AstStmt::Const { name, ty, value } => expand_nested_try_expr_as_stmt(
-            value,
-            &|value| AstStmt::Const {
-                name: name.clone(),
-                ty: ty.clone(),
-                value,
-            },
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        ),
-        AstStmt::Print(value) => expand_nested_try_expr_as_stmt(
-            value,
-            &AstStmt::Print,
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        ),
-        AstStmt::Expr(value) => expand_nested_try_expr_as_stmt(
-            value,
-            &AstStmt::Expr,
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        ),
-        AstStmt::Return(Some(value)) => expand_nested_try_expr_as_stmt(
-            value,
-            &|value| AstStmt::Return(Some(value)),
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        ),
+            context,
+        }),
+        AstStmt::AssignLocal { name, value } => {
+            expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                expr: value,
+                wrap: &|value| AstStmt::AssignLocal {
+                    name: name.clone(),
+                    value,
+                },
+                context,
+            })
+        }
+        AstStmt::Const { name, ty, value } => {
+            expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                expr: value,
+                wrap: &|value| AstStmt::Const {
+                    name: name.clone(),
+                    ty: ty.clone(),
+                    value,
+                },
+                context,
+            })
+        }
+        AstStmt::Print(value) => expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+            expr: value,
+            wrap: &AstStmt::Print,
+            context,
+        }),
+        AstStmt::Expr(value) => expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+            expr: value,
+            wrap: &AstStmt::Expr,
+            context,
+        }),
+        AstStmt::Return(Some(value)) => {
+            expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                expr: value,
+                wrap: &|value| AstStmt::Return(Some(value)),
+                context,
+            })
+        }
         _ => Ok(None),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn synthesize_try_wrapped_statements(
-    inner: &super::AstExpr,
-    wrap: &dyn Fn(super::AstExpr) -> AstStmt,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    return_type: Option<&AstTypeRef>,
-    type_aliases: &BTreeMap<String, AstTypeAlias>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: TryWrappedStatementsInput<'_>,
 ) -> Result<Vec<AstStmt>, String> {
-    let function_result_ty = current_function_result_type(return_type, type_aliases)?;
-    let lowered_inner = lower_expr_with_async(
+    let TryWrappedStatementsInput {
         inner,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-        None,
-        false,
-    )?;
-    let inner_ty = infer_nir_expr_type(&lowered_inner, bindings, signatures, struct_table)
-        .ok_or_else(|| "could not infer operand type for `?`".to_owned())?;
+        wrap,
+        context,
+    } = input;
+    let function_result_ty =
+        current_function_result_type(context.return_type, context.type_aliases)?;
+    let lowered_inner = lower_expr_with_async(ExprWithAsyncInput {
+        expr: inner,
+        current_domain: context.current_domain,
+        current_function_is_async: context.current_function_is_async,
+        bindings: context.bindings,
+        module_consts: context.module_consts,
+        signatures: context.signatures,
+        struct_table: context.struct_table,
+        expected: None,
+        allow_async_calls: false,
+    })?;
+    let inner_ty = infer_nir_expr_type(
+        &lowered_inner,
+        context.bindings,
+        context.signatures,
+        context.struct_table,
+    )
+    .ok_or_else(|| "could not infer operand type for `?`".to_owned())?;
     let (_payload_ty, error_ty) = split_result_type(&inner_ty)?;
     if !compatible_types(&function_result_ty.1, &error_ty) {
         return Err(format!(
@@ -157,101 +143,69 @@ fn synthesize_try_wrapped_statements(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn expand_nested_try_expr_as_stmt(
-    expr: &super::AstExpr,
-    wrap: &dyn Fn(super::AstExpr) -> AstStmt,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    return_type: Option<&AstTypeRef>,
-    type_aliases: &BTreeMap<String, AstTypeAlias>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: NestedTryExprExpansionInput<'_>,
 ) -> Result<Option<Vec<AstStmt>>, String> {
+    let NestedTryExprExpansionInput {
+        expr,
+        wrap,
+        context,
+    } = input;
     match expr {
         super::AstExpr::Try(inner) => Ok(Some(synthesize_try_wrapped_statements(
-            inner,
-            wrap,
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        )?)),
-        super::AstExpr::Await(value) => expand_nested_try_expr_as_stmt(
-            value,
-            &|rewritten| wrap(super::AstExpr::Await(Box::new(rewritten))),
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        ),
-        super::AstExpr::Unary { op, operand } => expand_nested_try_expr_as_stmt(
-            operand,
-            &|rewritten| {
-                wrap(super::AstExpr::Unary {
-                    op: *op,
-                    operand: Box::new(rewritten),
-                })
+            TryWrappedStatementsInput {
+                inner,
+                wrap,
+                context,
             },
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        ),
+        )?)),
+        super::AstExpr::Await(value) => {
+            expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                expr: value,
+                wrap: &|rewritten| wrap(super::AstExpr::Await(Box::new(rewritten))),
+                context,
+            })
+        }
+        super::AstExpr::Unary { op, operand } => {
+            expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                expr: operand,
+                wrap: &|rewritten| {
+                    wrap(super::AstExpr::Unary {
+                        op: *op,
+                        operand: Box::new(rewritten),
+                    })
+                },
+                context,
+            })
+        }
         super::AstExpr::Invoke { callee, args } => {
-            if let Some(expanded) = expand_nested_try_expr_as_stmt(
-                callee,
-                &|rewritten| {
+            if let Some(expanded) = expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                expr: callee,
+                wrap: &|rewritten| {
                     wrap(super::AstExpr::Invoke {
                         callee: Box::new(rewritten),
                         args: args.clone(),
                     })
                 },
-                current_domain,
-                current_function_is_async,
-                bindings,
-                module_consts,
-                return_type,
-                type_aliases,
-                signatures,
-                struct_table,
-            )? {
+                context,
+            })? {
                 return Ok(Some(expanded));
             }
             for (index, arg) in args.iter().enumerate() {
-                if let Some(expanded) = expand_nested_try_expr_as_stmt(
-                    arg,
-                    &|rewritten| {
-                        let mut rewritten_args = args.clone();
-                        rewritten_args[index] = rewritten;
-                        wrap(super::AstExpr::Invoke {
-                            callee: callee.clone(),
-                            args: rewritten_args,
-                        })
-                    },
-                    current_domain,
-                    current_function_is_async,
-                    bindings,
-                    module_consts,
-                    return_type,
-                    type_aliases,
-                    signatures,
-                    struct_table,
-                )? {
+                if let Some(expanded) =
+                    expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                        expr: arg,
+                        wrap: &|rewritten| {
+                            let mut rewritten_args = args.clone();
+                            rewritten_args[index] = rewritten;
+                            wrap(super::AstExpr::Invoke {
+                                callee: callee.clone(),
+                                args: rewritten_args,
+                            })
+                        },
+                        context,
+                    })?
+                {
                     return Ok(Some(expanded));
                 }
             }
@@ -263,26 +217,21 @@ fn expand_nested_try_expr_as_stmt(
             args,
         } => {
             for (index, arg) in args.iter().enumerate() {
-                if let Some(expanded) = expand_nested_try_expr_as_stmt(
-                    arg,
-                    &|rewritten| {
-                        let mut rewritten_args = args.clone();
-                        rewritten_args[index] = rewritten;
-                        wrap(super::AstExpr::Call {
-                            callee: callee.clone(),
-                            generic_args: generic_args.clone(),
-                            args: rewritten_args,
-                        })
-                    },
-                    current_domain,
-                    current_function_is_async,
-                    bindings,
-                    module_consts,
-                    return_type,
-                    type_aliases,
-                    signatures,
-                    struct_table,
-                )? {
+                if let Some(expanded) =
+                    expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                        expr: arg,
+                        wrap: &|rewritten| {
+                            let mut rewritten_args = args.clone();
+                            rewritten_args[index] = rewritten;
+                            wrap(super::AstExpr::Call {
+                                callee: callee.clone(),
+                                generic_args: generic_args.clone(),
+                                args: rewritten_args,
+                            })
+                        },
+                        context,
+                    })?
+                {
                     return Ok(Some(expanded));
                 }
             }
@@ -294,9 +243,9 @@ fn expand_nested_try_expr_as_stmt(
             generic_args,
             args,
         } => {
-            if let Some(expanded) = expand_nested_try_expr_as_stmt(
-                receiver,
-                &|rewritten| {
+            if let Some(expanded) = expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                expr: receiver,
+                wrap: &|rewritten| {
                     wrap(super::AstExpr::MethodCall {
                         receiver: Box::new(rewritten),
                         method: method.clone(),
@@ -304,39 +253,27 @@ fn expand_nested_try_expr_as_stmt(
                         args: args.clone(),
                     })
                 },
-                current_domain,
-                current_function_is_async,
-                bindings,
-                module_consts,
-                return_type,
-                type_aliases,
-                signatures,
-                struct_table,
-            )? {
+                context,
+            })? {
                 return Ok(Some(expanded));
             }
             for (index, arg) in args.iter().enumerate() {
-                if let Some(expanded) = expand_nested_try_expr_as_stmt(
-                    arg,
-                    &|rewritten| {
-                        let mut rewritten_args = args.clone();
-                        rewritten_args[index] = rewritten;
-                        wrap(super::AstExpr::MethodCall {
-                            receiver: receiver.clone(),
-                            method: method.clone(),
-                            generic_args: generic_args.clone(),
-                            args: rewritten_args,
-                        })
-                    },
-                    current_domain,
-                    current_function_is_async,
-                    bindings,
-                    module_consts,
-                    return_type,
-                    type_aliases,
-                    signatures,
-                    struct_table,
-                )? {
+                if let Some(expanded) =
+                    expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                        expr: arg,
+                        wrap: &|rewritten| {
+                            let mut rewritten_args = args.clone();
+                            rewritten_args[index] = rewritten;
+                            wrap(super::AstExpr::MethodCall {
+                                receiver: receiver.clone(),
+                                method: method.clone(),
+                                generic_args: generic_args.clone(),
+                                args: rewritten_args,
+                            })
+                        },
+                        context,
+                    })?
+                {
                     return Ok(Some(expanded));
                 }
             }
@@ -348,87 +285,63 @@ fn expand_nested_try_expr_as_stmt(
             fields,
         } => {
             for (index, (_, value)) in fields.iter().enumerate() {
-                if let Some(expanded) = expand_nested_try_expr_as_stmt(
-                    value,
-                    &|rewritten| {
-                        let mut rewritten_fields = fields.clone();
-                        rewritten_fields[index].1 = rewritten;
-                        wrap(super::AstExpr::StructLiteral {
-                            type_name: type_name.clone(),
-                            type_args: type_args.clone(),
-                            fields: rewritten_fields,
-                        })
-                    },
-                    current_domain,
-                    current_function_is_async,
-                    bindings,
-                    module_consts,
-                    return_type,
-                    type_aliases,
-                    signatures,
-                    struct_table,
-                )? {
+                if let Some(expanded) =
+                    expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                        expr: value,
+                        wrap: &|rewritten| {
+                            let mut rewritten_fields = fields.clone();
+                            rewritten_fields[index].1 = rewritten;
+                            wrap(super::AstExpr::StructLiteral {
+                                type_name: type_name.clone(),
+                                type_args: type_args.clone(),
+                                fields: rewritten_fields,
+                            })
+                        },
+                        context,
+                    })?
+                {
                     return Ok(Some(expanded));
                 }
             }
             Ok(None)
         }
-        super::AstExpr::FieldAccess { base, field } => expand_nested_try_expr_as_stmt(
-            base,
-            &|rewritten| {
-                wrap(super::AstExpr::FieldAccess {
-                    base: Box::new(rewritten),
-                    field: field.clone(),
-                })
-            },
-            current_domain,
-            current_function_is_async,
-            bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        ),
+        super::AstExpr::FieldAccess { base, field } => {
+            expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                expr: base,
+                wrap: &|rewritten| {
+                    wrap(super::AstExpr::FieldAccess {
+                        base: Box::new(rewritten),
+                        field: field.clone(),
+                    })
+                },
+                context,
+            })
+        }
         super::AstExpr::Binary { op, lhs, rhs } => {
-            if let Some(expanded) = expand_nested_try_expr_as_stmt(
-                lhs,
-                &|rewritten| {
+            if let Some(expanded) = expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                expr: lhs,
+                wrap: &|rewritten| {
                     wrap(super::AstExpr::Binary {
                         op: *op,
                         lhs: Box::new(rewritten),
                         rhs: rhs.clone(),
                     })
                 },
-                current_domain,
-                current_function_is_async,
-                bindings,
-                module_consts,
-                return_type,
-                type_aliases,
-                signatures,
-                struct_table,
-            )? {
+                context,
+            })? {
                 return Ok(Some(expanded));
             }
-            expand_nested_try_expr_as_stmt(
-                rhs,
-                &|rewritten| {
+            expand_nested_try_expr_as_stmt(NestedTryExprExpansionInput {
+                expr: rhs,
+                wrap: &|rewritten| {
                     wrap(super::AstExpr::Binary {
                         op: *op,
                         lhs: lhs.clone(),
                         rhs: Box::new(rewritten),
                     })
                 },
-                current_domain,
-                current_function_is_async,
-                bindings,
-                module_consts,
-                return_type,
-                type_aliases,
-                signatures,
-                struct_table,
-            )
+                context,
+            })
         }
         super::AstExpr::Bool(_)
         | super::AstExpr::Text(_)

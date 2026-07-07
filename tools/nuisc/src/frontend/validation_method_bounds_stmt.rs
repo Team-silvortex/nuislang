@@ -1,10 +1,10 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
-use nuis_semantics::model::{
-    AstImplDef, AstMatchArm, AstStmt, AstStructDef, AstTypeAlias, AstTypeRef,
+use nuis_semantics::model::{AstMatchArm, AstStmt, AstTypeRef};
+
+use super::validation_method_bounds_expr::{
+    validate_expr_generic_method_bounds, MethodBoundsContext, MethodBoundsExprInput,
 };
-
-use super::validation_method_bounds_expr::validate_expr_generic_method_bounds;
 use super::{inferred_match_value_type, normalize_method_bound_context};
 use crate::frontend::infer_ast_expr_type;
 use crate::frontend::validation_binding_env::{
@@ -12,107 +12,94 @@ use crate::frontend::validation_binding_env::{
 };
 
 pub(super) fn validate_stmt_generic_method_bounds_block(
-    body: &[AstStmt],
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    trait_methods: &BTreeMap<String, BTreeSet<String>>,
-    generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, Vec<String>>,
-    local_type_env: &mut BTreeMap<String, AstTypeRef>,
-    context: &str,
+    input: MethodBoundsBlockInput<'_>,
 ) -> Result<(), String> {
+    let MethodBoundsBlockInput {
+        body,
+        bounds,
+        local_type_env,
+        context,
+    } = input;
     for stmt in body {
-        validate_stmt_generic_method_bounds(
+        validate_stmt_generic_method_bounds(MethodBoundsStmtInput {
             stmt,
-            visible_type_aliases,
-            impl_lookup,
-            visible_structs,
-            function_return_types,
-            trait_methods,
-            generic_param_names,
-            generic_bounds,
+            bounds,
             local_type_env,
             context,
-        )?;
+        })?;
     }
     Ok(())
 }
 
-fn validate_stmt_generic_method_bounds(
-    stmt: &AstStmt,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    trait_methods: &BTreeMap<String, BTreeSet<String>>,
-    generic_param_names: &BTreeSet<String>,
-    generic_bounds: &BTreeMap<String, Vec<String>>,
-    local_type_env: &mut BTreeMap<String, AstTypeRef>,
-    context: &str,
-) -> Result<(), String> {
+pub(super) struct MethodBoundsBlockInput<'a> {
+    pub(super) body: &'a [AstStmt],
+    pub(super) bounds: MethodBoundsContext<'a>,
+    pub(super) local_type_env: &'a mut BTreeMap<String, AstTypeRef>,
+    pub(super) context: &'a str,
+}
+
+struct MethodBoundsStmtInput<'a> {
+    stmt: &'a AstStmt,
+    bounds: MethodBoundsContext<'a>,
+    local_type_env: &'a mut BTreeMap<String, AstTypeRef>,
+    context: &'a str,
+}
+
+fn validate_stmt_generic_method_bounds(input: MethodBoundsStmtInput<'_>) -> Result<(), String> {
+    let MethodBoundsStmtInput {
+        stmt,
+        bounds,
+        local_type_env,
+        context,
+    } = input;
     let normalized_context = normalize_method_bound_context(context);
     let context = normalized_context.as_str();
+    macro_rules! validate_expr {
+        ($expr:expr, $local_type_env:expr, $context:expr) => {
+            validate_expr_generic_method_bounds(MethodBoundsExprInput {
+                expr: $expr,
+                bounds,
+                local_type_env: $local_type_env,
+                context: $context,
+            })
+        };
+    }
+    macro_rules! validate_block {
+        ($body:expr, $local_type_env:expr, $context:expr) => {
+            validate_stmt_generic_method_bounds_block(MethodBoundsBlockInput {
+                body: $body,
+                bounds,
+                local_type_env: $local_type_env,
+                context: $context,
+            })
+        };
+    }
     match stmt {
         AstStmt::Let {
             name, ty, value, ..
         }
         | AstStmt::Const { name, ty, value } => {
-            validate_expr_generic_method_bounds(
-                value,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                local_type_env,
-                context,
-            )?;
+            validate_expr!(value, local_type_env, context)?;
             if let Some(ty) = ty.clone().or_else(|| {
                 infer_ast_expr_type(
                     value,
                     local_type_env,
-                    impl_lookup,
-                    visible_structs,
-                    function_return_types,
+                    bounds.impl_lookup,
+                    bounds.visible_structs,
+                    bounds.function_return_types,
                 )
             }) {
                 local_type_env.insert(name.clone(), ty);
             }
         }
         AstStmt::AssignLocal { name, value } => {
-            validate_expr_generic_method_bounds(
-                value,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                local_type_env,
-                context,
-            )?;
+            validate_expr!(value, local_type_env, context)?;
             if let Some(ty) = local_type_env.get(name).cloned() {
                 local_type_env.insert(name.clone(), ty);
             }
         }
         AstStmt::DestructureLet { value, .. } => {
-            validate_expr_generic_method_bounds(
-                value,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                local_type_env,
-                context,
-            )?;
+            validate_expr!(value, local_type_env, context)?;
             let AstStmt::DestructureLet {
                 type_ref, fields, ..
             } = stmt
@@ -123,17 +110,17 @@ fn validate_stmt_generic_method_bounds(
                 infer_ast_expr_type(
                     value,
                     local_type_env,
-                    impl_lookup,
-                    visible_structs,
-                    function_return_types,
+                    bounds.impl_lookup,
+                    bounds.visible_structs,
+                    bounds.function_return_types,
                 )
             });
             if let Some(root_type) = root_type.as_ref() {
                 bind_destructure_fields_for_type(
                     root_type,
                     fields,
-                    visible_type_aliases,
-                    visible_structs,
+                    bounds.visible_type_aliases,
+                    bounds.visible_structs,
                     local_type_env,
                 )?;
             }
@@ -143,64 +130,20 @@ fn validate_stmt_generic_method_bounds(
             then_body,
             else_body,
         } => {
-            validate_expr_generic_method_bounds(
-                condition,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                local_type_env,
-                context,
-            )?;
+            validate_expr!(condition, local_type_env, context)?;
             let mut then_env = local_type_env.clone();
-            validate_stmt_generic_method_bounds_block(
-                then_body,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                &mut then_env,
-                context,
-            )?;
+            validate_block!(then_body, &mut then_env, context)?;
             let mut else_env = local_type_env.clone();
-            validate_stmt_generic_method_bounds_block(
-                else_body,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                &mut else_env,
-                context,
-            )?;
+            validate_block!(else_body, &mut else_env, context)?;
         }
         AstStmt::Match { value, arms } => {
-            validate_expr_generic_method_bounds(
-                value,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                local_type_env,
-                context,
-            )?;
+            validate_expr!(value, local_type_env, context)?;
             let match_value_ty = inferred_match_value_type(
                 value,
                 local_type_env,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
+                bounds.impl_lookup,
+                bounds.visible_structs,
+                bounds.function_return_types,
             );
             for AstMatchArm {
                 pattern,
@@ -213,93 +156,27 @@ fn validate_stmt_generic_method_bounds(
                     bind_match_pattern_for_type(
                         match_value_ty,
                         pattern,
-                        visible_type_aliases,
-                        visible_structs,
+                        bounds.visible_type_aliases,
+                        bounds.visible_structs,
                         &mut arm_env,
                     )?;
                 }
                 if let Some(guard) = guard {
-                    validate_expr_generic_method_bounds(
-                        guard,
-                        visible_type_aliases,
-                        impl_lookup,
-                        visible_structs,
-                        function_return_types,
-                        trait_methods,
-                        generic_param_names,
-                        generic_bounds,
-                        &arm_env,
-                        context,
-                    )?;
+                    validate_expr!(guard, &arm_env, context)?;
                 }
-                validate_stmt_generic_method_bounds_block(
-                    body,
-                    visible_type_aliases,
-                    impl_lookup,
-                    visible_structs,
-                    function_return_types,
-                    trait_methods,
-                    generic_param_names,
-                    generic_bounds,
-                    &mut arm_env,
-                    context,
-                )?;
+                validate_block!(body, &mut arm_env, context)?;
             }
         }
         AstStmt::While { condition, body } => {
-            validate_expr_generic_method_bounds(
-                condition,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                local_type_env,
-                context,
-            )?;
+            validate_expr!(condition, local_type_env, context)?;
             let mut loop_env = local_type_env.clone();
-            validate_stmt_generic_method_bounds_block(
-                body,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                &mut loop_env,
-                context,
-            )?;
+            validate_block!(body, &mut loop_env, context)?;
         }
         AstStmt::Print(value) | AstStmt::Await(value) | AstStmt::Expr(value) => {
-            validate_expr_generic_method_bounds(
-                value,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                local_type_env,
-                context,
-            )?;
+            validate_expr!(value, local_type_env, context)?;
         }
         AstStmt::Return(Some(value)) => {
-            validate_expr_generic_method_bounds(
-                value,
-                visible_type_aliases,
-                impl_lookup,
-                visible_structs,
-                function_return_types,
-                trait_methods,
-                generic_param_names,
-                generic_bounds,
-                local_type_env,
-                context,
-            )?;
+            validate_expr!(value, local_type_env, context)?;
         }
         AstStmt::Return(None) | AstStmt::Break | AstStmt::Continue => {}
     }

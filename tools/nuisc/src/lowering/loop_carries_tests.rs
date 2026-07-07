@@ -72,7 +72,7 @@ fn parse_prepared_dynamic_read_carry_source_accepts_prior_carry_index_driver() {
         binding_name: "slot".to_owned(),
         kind: PreparedCarryUpdateKind::Linear {
             op: PreparedCarryLinearOp::Add,
-            source: PreparedCarrySource::Current,
+            source: Box::new(PreparedCarrySource::Current),
         },
     }];
     let source = parse_prepared_dynamic_read_carry_source(&expr, "current", &carries)
@@ -195,7 +195,7 @@ fn parse_loop_carry_linear_accepts_multiplicative_multi_state_additive_source() 
         binding_name: "slot".to_owned(),
         kind: PreparedCarryUpdateKind::Linear {
             op: PreparedCarryLinearOp::Add,
-            source: PreparedCarrySource::Current,
+            source: Box::new(PreparedCarrySource::Current),
         },
     }];
     let expr = NirExpr::Binary {
@@ -246,7 +246,7 @@ fn parse_loop_carry_linear_accepts_state_scaled_multiplicative_additive_source()
         binding_name: "sum".to_owned(),
         kind: PreparedCarryUpdateKind::Linear {
             op: PreparedCarryLinearOp::Add,
-            source: PreparedCarrySource::Current,
+            source: Box::new(PreparedCarrySource::Current),
         },
     }];
     let expr = NirExpr::Binary {
@@ -277,7 +277,7 @@ fn parse_loop_carry_linear_accepts_state_plus_invariant_scaled_multiplicative_ad
         binding_name: "sum".to_owned(),
         kind: PreparedCarryUpdateKind::Linear {
             op: PreparedCarryLinearOp::Add,
-            source: PreparedCarrySource::Current,
+            source: Box::new(PreparedCarrySource::Current),
         },
     }];
     let expr = NirExpr::Binary {
@@ -312,7 +312,7 @@ fn parses_loop_state_refs_for_current_prev_and_carry_slots() {
         binding_name: "slot".to_owned(),
         kind: PreparedCarryUpdateKind::Linear {
             op: PreparedCarryLinearOp::Add,
-            source: PreparedCarrySource::Current,
+            source: Box::new(PreparedCarrySource::Current),
         },
     }];
     assert_eq!(
@@ -364,7 +364,7 @@ fn parses_loop_state_refs_directly_from_var_exprs() {
         binding_name: "slot".to_owned(),
         kind: PreparedCarryUpdateKind::Linear {
             op: PreparedCarryLinearOp::Add,
-            source: PreparedCarrySource::Current,
+            source: Box::new(PreparedCarrySource::Current),
         },
     }];
     assert_eq!(
@@ -420,7 +420,7 @@ fn parses_loop_carry_keep_source_for_explicit_previous_value_placeholder() {
         binding_name: "acc".to_owned(),
         kind: PreparedCarryUpdateKind::Linear {
             op: PreparedCarryLinearOp::Add,
-            source: PreparedCarrySource::Current,
+            source: Box::new(PreparedCarrySource::Current),
         },
     }];
     let previous_name = tail_recursive_prev_carry_binding(carries.len());
@@ -461,20 +461,20 @@ fn prepared_carry_branch_source_helpers_round_trip_keep_and_source_variants() {
         PreparedCarryLinearOp::Add,
         PreparedCarrySource::Current,
     );
-    assert!(matches!(
-        source.value_kind(),
-        PreparedCarryBranchValueKind::LinearSource {
-            op: PreparedCarryLinearOp::Add,
-            source: PreparedCarrySource::Current
+    match source.value_kind() {
+        PreparedCarryBranchValueKind::LinearSource { op, source } => {
+            assert!(op == PreparedCarryLinearOp::Add);
+            assert!(matches!(*source, PreparedCarrySource::Current));
         }
-    ));
-    assert!(matches!(
-        source.view(),
-        PreparedCarryBranchView::Source {
-            op: PreparedCarryLinearOp::Add,
-            source: PreparedCarrySource::Current
+        _ => panic!("expected linear source branch value kind"),
+    }
+    match source.view() {
+        PreparedCarryBranchView::Source { op, source } => {
+            assert!(op == PreparedCarryLinearOp::Add);
+            assert!(matches!(source, PreparedCarrySource::Current));
         }
-    ));
+        _ => panic!("expected linear source branch view"),
+    }
 }
 
 #[test]

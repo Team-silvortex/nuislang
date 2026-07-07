@@ -8,6 +8,7 @@ use super::{
     async_parameter_violation_detail, compatible_types, ensure_result_like, expr_type,
     infer_nir_expr_address_class, infer_nir_expr_type, infer_result_stage,
     lower_nested_expr_with_async_and_consts, render_type_name, FunctionSignature, ModuleConstValue,
+    NestedExprWithConstsInput,
 };
 
 pub(super) fn ensure_ref_like(
@@ -227,6 +228,160 @@ fn buffer_ref_type() -> NirTypeRef {
     }
 }
 
+pub(super) struct SingleNestedExprLoweringInput<'a> {
+    pub(super) name: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
+pub(super) fn lower_single_nested_expr_with_consts(
+    input: SingleNestedExprLoweringInput<'_>,
+) -> Result<NirExpr, String> {
+    let SingleNestedExprLoweringInput {
+        name,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    } = input;
+    let [value] = args else {
+        return Err(format!("{name}(...) expects exactly one argument"));
+    };
+    lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+        expr: value,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected: None,
+    })
+}
+
+pub(super) struct ResultWrapperCallInput<'a> {
+    pub(super) name: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) family: NirResultFamily,
+    pub(super) build: fn(Box<NirExpr>, NirResultStage) -> Result<NirExpr, String>,
+    pub(super) expected_shape: &'a str,
+}
+
+pub(super) fn lower_result_wrapper_call_with_consts(
+    input: ResultWrapperCallInput<'_>,
+) -> Result<NirExpr, String> {
+    let ResultWrapperCallInput {
+        name,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        family,
+        build,
+        expected_shape,
+    } = input;
+    let [value] = args else {
+        return Err(format!("{name}(...) expects 1 arg"));
+    };
+    let lowered = lower_single_nested_expr_with_consts(SingleNestedExprLoweringInput {
+        name,
+        args: std::slice::from_ref(value),
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    })?;
+    let Some(stage) = infer_result_stage(&lowered) else {
+        return Err(format!("{name}(...) {expected_shape}"));
+    };
+    if !family.supports_stage(stage) {
+        return Err(format!(
+            "{name}(...) inferred incompatible `{}` stage `{}`",
+            family.type_name(),
+            stage.render()
+        ));
+    }
+    let payload = expr_type(&lowered, bindings, signatures, struct_table)
+        .ok_or_else(|| format!("{name}(...) could not infer payload type for result wrapper"))?;
+    validate_result_stage_payload(stage, &payload)
+        .map_err(|error| format!("{name}(...): {error}"))?;
+    build(Box::new(lowered), stage)
+}
+
+fn validate_result_stage_payload(
+    stage: NirResultStage,
+    payload: &NirTypeRef,
+) -> Result<(), String> {
+    stage.validate_payload(payload)
+}
+
+pub(super) struct ResultObserverCallInput<'a, FBuild>
+where
+    FBuild: Fn(NirExpr) -> NirExpr,
+{
+    pub(super) name: &'a str,
+    pub(super) args: &'a [AstExpr],
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) family: NirResultFamily,
+    pub(super) build: FBuild,
+}
+
+pub(super) fn lower_result_observer_call_with_consts<FBuild>(
+    input: ResultObserverCallInput<'_, FBuild>,
+) -> Result<NirExpr, String>
+where
+    FBuild: Fn(NirExpr) -> NirExpr,
+{
+    let ResultObserverCallInput {
+        name,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        family,
+        build,
+    } = input;
+    let lowered = lower_single_nested_expr_with_consts(SingleNestedExprLoweringInput {
+        name,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    })?;
+    ensure_result_like(name, &lowered, family, bindings, signatures, struct_table)?;
+    Ok(build(lowered))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -348,124 +503,4 @@ mod tests {
         assert!(error.contains("nested payloads cross the async boundary"));
         assert!(error.contains("Thread<i64>"));
     }
-}
-
-pub(super) struct SingleNestedExprLoweringInput<'a> {
-    pub(super) name: &'a str,
-    pub(super) args: &'a [AstExpr],
-    pub(super) current_domain: &'a str,
-    pub(super) current_function_is_async: bool,
-    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
-    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
-    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
-    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
-}
-
-pub(super) fn lower_single_nested_expr_with_consts(
-    input: SingleNestedExprLoweringInput<'_>,
-) -> Result<NirExpr, String> {
-    let SingleNestedExprLoweringInput {
-        name,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-    } = input;
-    let [value] = args else {
-        return Err(format!("{name}(...) expects exactly one argument"));
-    };
-    lower_nested_expr_with_async_and_consts(
-        value,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-        None,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(super) fn lower_result_wrapper_call_with_consts(
-    name: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    family: NirResultFamily,
-    build: fn(Box<NirExpr>, NirResultStage) -> Result<NirExpr, String>,
-    expected_shape: &str,
-) -> Result<NirExpr, String> {
-    let [value] = args else {
-        return Err(format!("{name}(...) expects 1 arg"));
-    };
-    let lowered = lower_single_nested_expr_with_consts(SingleNestedExprLoweringInput {
-        name,
-        args: std::slice::from_ref(value),
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-    })?;
-    let Some(stage) = infer_result_stage(&lowered) else {
-        return Err(format!("{name}(...) {expected_shape}"));
-    };
-    if !family.supports_stage(stage) {
-        return Err(format!(
-            "{name}(...) inferred incompatible `{}` stage `{}`",
-            family.type_name(),
-            stage.render()
-        ));
-    }
-    let payload = expr_type(&lowered, bindings, signatures, struct_table)
-        .ok_or_else(|| format!("{name}(...) could not infer payload type for result wrapper"))?;
-    validate_result_stage_payload(stage, &payload)
-        .map_err(|error| format!("{name}(...): {error}"))?;
-    build(Box::new(lowered), stage)
-}
-
-fn validate_result_stage_payload(
-    stage: NirResultStage,
-    payload: &NirTypeRef,
-) -> Result<(), String> {
-    stage.validate_payload(payload)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(super) fn lower_result_observer_call_with_consts<FBuild>(
-    name: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    family: NirResultFamily,
-    build: FBuild,
-) -> Result<NirExpr, String>
-where
-    FBuild: Fn(NirExpr) -> NirExpr,
-{
-    let lowered = lower_single_nested_expr_with_consts(SingleNestedExprLoweringInput {
-        name,
-        args,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-    })?;
-    ensure_result_like(name, &lowered, family, bindings, signatures, struct_table)?;
-    Ok(build(lowered))
 }

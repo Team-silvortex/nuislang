@@ -9,14 +9,14 @@ use super::higher_order::{
     is_callable_type_with_aliases, rewrite_higher_order_calls_in_function,
     HigherOrderFunctionRewriteInput,
 };
-use super::stmt_lowering::lower_stmt_sequence_with_async;
+use super::stmt_lowering::{lower_stmt_sequence_with_async, StmtSequenceLoweringInput};
 use super::{
     build_default_impl_method, build_default_impl_method_function,
     build_function_return_type_table, build_impl_method_function, impl_method_lookup_key,
     impl_method_symbol_name, infer_missing_function_return_type, is_public_visibility,
     lower_function, lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
-    rewrite_generic_calls_in_function, FunctionSignature, GenericImplMethodTemplate,
-    ModuleConstValue,
+    rewrite_generic_calls_in_function, FunctionSignature, GenericFunctionRewriteInput,
+    GenericImplMethodTemplate, ModuleConstValue,
 };
 use nuis_semantics::model::{
     NirImplDef, NirImplMethod, NirTraitDef, NirTraitMethodSig, NirTypeRef,
@@ -150,22 +150,22 @@ pub(super) fn build_lowered_functions_and_impls(
     let mut rewritten_module_functions = concrete_module_functions
         .iter()
         .map(|function| {
-            rewrite_generic_calls_in_function(
+            rewrite_generic_calls_in_function(GenericFunctionRewriteInput {
                 function,
                 module_const_env,
                 visible_type_aliases,
                 generic_templates,
-                &generic_impl_method_templates,
-                &higher_order_templates,
-                &higher_order_function_table,
+                generic_impl_method_templates: &generic_impl_method_templates,
+                higher_order_templates: &higher_order_templates,
+                function_table: &higher_order_function_table,
                 signatures,
                 impl_lookup,
-                module_struct_table,
-                &inferred_function_return_types,
-                &mut specialization_cache,
-                &mut specialized_functions,
-                &mut specialized_signatures,
-            )
+                struct_table: module_struct_table,
+                function_return_types: &inferred_function_return_types,
+                specialization_cache: &mut specialization_cache,
+                specialized_functions: &mut specialized_functions,
+                specialized_signatures: &mut specialized_signatures,
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -225,22 +225,22 @@ pub(super) fn build_lowered_functions_and_impls(
                 extended_generic_templates.insert(template.name.clone(), template);
             }
         }
-        let rewritten = rewrite_generic_calls_in_function(
-            &higher_order_rewritten,
-            &BTreeMap::new(),
+        let rewritten = rewrite_generic_calls_in_function(GenericFunctionRewriteInput {
+            function: &higher_order_rewritten,
+            module_const_env: &BTreeMap::new(),
             visible_type_aliases,
-            &extended_generic_templates,
-            &generic_impl_method_templates,
-            &higher_order_templates,
-            &higher_order_function_table,
+            generic_templates: &extended_generic_templates,
+            generic_impl_method_templates: &generic_impl_method_templates,
+            higher_order_templates: &higher_order_templates,
+            function_table: &higher_order_function_table,
             signatures,
             impl_lookup,
-            module_struct_table,
-            &inferred_function_return_types,
-            &mut specialization_cache,
-            &mut postprocessed_specialized_functions,
-            &mut postprocessed_specialized_signatures,
-        )?;
+            struct_table: module_struct_table,
+            function_return_types: &inferred_function_return_types,
+            specialization_cache: &mut specialization_cache,
+            specialized_functions: &mut postprocessed_specialized_functions,
+            specialized_signatures: &mut postprocessed_specialized_signatures,
+        })?;
         postprocessed_specialized_functions.push(rewritten);
     }
     specialized_functions = postprocessed_specialized_functions;
@@ -465,17 +465,17 @@ pub(super) fn build_lowered_functions_and_impls(
                 .body
                 .iter()
                 .map(|stmt| {
-                    lower_stmt_sequence_with_async(
+                    lower_stmt_sequence_with_async(StmtSequenceLoweringInput {
                         stmt,
-                        &module.domain,
-                        false,
-                        &mut bindings,
-                        module_const_values,
-                        method.return_type.as_ref(),
-                        visible_type_aliases,
+                        current_domain: &module.domain,
+                        current_function_is_async: false,
+                        bindings: &mut bindings,
+                        module_consts: module_const_values,
+                        return_type: method.return_type.as_ref(),
+                        type_aliases: visible_type_aliases,
                         signatures,
                         struct_table,
-                    )
+                    })
                 })
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()

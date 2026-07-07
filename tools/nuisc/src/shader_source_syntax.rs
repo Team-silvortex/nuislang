@@ -173,7 +173,7 @@ pub(super) fn starts_with_bare_attribute_keyword(chars: &[char], index: usize) -
         .iter()
         .any(|keyword| {
             starts_with_keyword(chars, index, keyword)
-                && !previous_significant_char(chars, index).is_some_and(|ch| ch == '@')
+                && previous_significant_char(chars, index).is_none_or(|ch| ch != '@')
         })
 }
 

@@ -48,6 +48,32 @@ struct PatternExprInferenceInput<'a> {
     active_exprs: &'a mut BTreeSet<usize>,
 }
 
+pub(super) struct SeededStructLiteralAstTypeInput<'a> {
+    pub(super) type_name: &'a str,
+    pub(super) definition: &'a AstStructDef,
+    pub(super) fields: &'a [(String, AstExpr)],
+    pub(super) generic_names: &'a BTreeSet<String>,
+    pub(super) substitutions: BTreeMap<String, AstTypeRef>,
+    pub(super) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) active_exprs: &'a mut BTreeSet<usize>,
+}
+
+pub(super) struct SeededPayloadConstructorAstTypeInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) definition: &'a AstStructDef,
+    pub(super) arg: &'a AstExpr,
+    pub(super) generic_names: &'a BTreeSet<String>,
+    pub(super) substitutions: BTreeMap<String, AstTypeRef>,
+    pub(super) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) active_exprs: &'a mut BTreeSet<usize>,
+}
+
 fn infer_ast_expr_type_for_pattern_inner(
     input: PatternExprInferenceInput<'_>,
 ) -> Option<AstTypeRef> {
@@ -88,18 +114,18 @@ fn infer_ast_expr_type_for_pattern_inner(
                 expected_pattern,
                 placeholder_names,
             );
-            infer_struct_literal_ast_type_seeded(
+            infer_struct_literal_ast_type_seeded(SeededStructLiteralAstTypeInput {
                 type_name,
                 definition,
                 fields,
-                &generic_names,
-                seed,
+                generic_names: &generic_names,
+                substitutions: seed,
                 env,
                 impl_lookup,
                 struct_table,
                 function_return_types,
                 active_exprs,
-            )
+            })
         }
         AstExpr::Call {
             callee,
@@ -130,18 +156,18 @@ fn infer_ast_expr_type_for_pattern_inner(
                 expected_pattern,
                 placeholder_names,
             );
-            infer_payload_constructor_ast_type_seeded(
+            infer_payload_constructor_ast_type_seeded(SeededPayloadConstructorAstTypeInput {
                 callee,
                 definition,
-                &args[0],
-                &generic_names,
-                seed,
+                arg: &args[0],
+                generic_names: &generic_names,
+                substitutions: seed,
                 env,
                 impl_lookup,
                 struct_table,
                 function_return_types,
                 active_exprs,
-            )
+            })
         }
         _ => infer_ast_expr_type_inner(
             expr,
@@ -154,19 +180,21 @@ fn infer_ast_expr_type_for_pattern_inner(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn infer_struct_literal_ast_type_seeded(
-    type_name: &str,
-    definition: &AstStructDef,
-    fields: &[(String, AstExpr)],
-    generic_names: &BTreeSet<String>,
-    mut substitutions: BTreeMap<String, AstTypeRef>,
-    env: &BTreeMap<String, AstTypeRef>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    active_exprs: &mut BTreeSet<usize>,
+    input: SeededStructLiteralAstTypeInput<'_>,
 ) -> Option<AstTypeRef> {
+    let SeededStructLiteralAstTypeInput {
+        type_name,
+        definition,
+        fields,
+        generic_names,
+        mut substitutions,
+        env,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        active_exprs,
+    } = input;
     let mut pending = fields
         .iter()
         .map(|(name, value)| (name.as_str(), value))
@@ -214,19 +242,21 @@ pub(super) fn infer_struct_literal_ast_type_seeded(
     Some(ast_generic_named_type(type_name, generic_args))
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn infer_payload_constructor_ast_type_seeded(
-    callee: &str,
-    definition: &AstStructDef,
-    arg: &AstExpr,
-    generic_names: &BTreeSet<String>,
-    mut substitutions: BTreeMap<String, AstTypeRef>,
-    env: &BTreeMap<String, AstTypeRef>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    active_exprs: &mut BTreeSet<usize>,
+    input: SeededPayloadConstructorAstTypeInput<'_>,
 ) -> Option<AstTypeRef> {
+    let SeededPayloadConstructorAstTypeInput {
+        callee,
+        definition,
+        arg,
+        generic_names,
+        mut substitutions,
+        env,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        active_exprs,
+    } = input;
     let field_pattern = specialize_ast_type_pattern_with_known_substitutions(
         &definition.fields[0].ty,
         &substitutions,

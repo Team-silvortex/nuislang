@@ -129,8 +129,8 @@ fn materialize_project_abi_graph_summary_node(
         .iter()
         .map(|item| item.domain.as_str())
         .collect::<Vec<_>>();
-    let has_cpu_summary = domains.iter().any(|domain| *domain == "cpu");
-    let has_data_summary = domains.iter().any(|domain| *domain == "data");
+    let has_cpu_summary = domains.contains(&"cpu");
+    let has_data_summary = domains.contains(&"data");
     let has_kernel_target = module.nodes.iter().any(|node| {
         node.name.ends_with("_kernel_target_config_auto")
             && node.op.module == "kernel"

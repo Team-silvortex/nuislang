@@ -92,7 +92,7 @@ pub(crate) fn inspect_benchmarks_json(
     let entries = benchmarks
         .iter()
         .map(|entry| {
-            let fields = vec![
+            let fields = [
                 json_string_field("symbol", &entry.symbol),
                 json_string_field("label", &entry.label),
                 json_bool_field("async", entry.is_async),
@@ -107,7 +107,7 @@ pub(crate) fn inspect_benchmarks_json(
         })
         .collect::<Vec<_>>()
         .join(",");
-    let fields = vec![
+    let fields = [
         json_string_field("kind", "nuis_benchmark_inventory"),
         json_string_field("input", &input.display().to_string()),
         json_string_field("domain", &artifacts.nir.domain),
@@ -156,7 +156,7 @@ pub(crate) fn inspect_docs_json(input: &Path, indexes: &[frontend::AstDocIndex])
                 .items
                 .iter()
                 .map(|item| {
-                    let fields = vec![
+                    let fields = [
                         json_string_field("kind", &item.kind),
                         json_string_field("path", &item.path),
                         json_string_array_field("docs", &item.docs),
@@ -166,7 +166,7 @@ pub(crate) fn inspect_docs_json(input: &Path, indexes: &[frontend::AstDocIndex])
                 })
                 .collect::<Vec<_>>()
                 .join(",");
-            let fields = vec![
+            let fields = [
                 json_string_field("module_path", &index.module_path),
                 json_usize_field("item_count", index.items.len()),
                 format!("\"items\":[{}]", items),
@@ -176,7 +176,7 @@ pub(crate) fn inspect_docs_json(input: &Path, indexes: &[frontend::AstDocIndex])
         .collect::<Vec<_>>()
         .join(",");
     let total_items = indexes.iter().map(|index| index.items.len()).sum::<usize>();
-    let fields = vec![
+    let fields = [
         json_string_field("kind", "nuis_doc_index"),
         json_string_field("input", &input.display().to_string()),
         json_usize_field("module_count", indexes.len()),
@@ -320,13 +320,14 @@ pub(crate) fn inspect_stdlib_docs_json(summary: &StdlibDocSummary) -> String {
         })
         .collect::<Vec<_>>()
         .join(",");
+    let galaxies_field = format!("\"galaxies\":[{}]", galaxies);
     format!(
         "{{{},{},{},{},{}}}",
         json_string_field("kind", "nuis_stdlib_doc_index"),
         json_usize_field("galaxy_count", summary.galaxy_count),
         json_usize_field("documented_galaxy_count", summary.documented_galaxy_count),
         json_usize_field("documented_item_count", summary.documented_item_count),
-        format!("\"galaxies\":[{}]", galaxies)
+        galaxies_field
     )
 }
 

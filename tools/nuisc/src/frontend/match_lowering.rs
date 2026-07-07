@@ -1,44 +1,65 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    nir_expr_effect_class, AstExpr, AstMatchArm, AstMatchPattern, AstTypeAlias, AstTypeRef,
-    NirBinaryOp, NirExpr, NirExprEffectClass, NirStmt, NirStructDef, NirTypeRef,
+    nir_expr_effect_class, AstMatchArm, AstMatchPattern, AstTypeAlias, AstTypeRef, NirBinaryOp,
+    NirExpr, NirExprEffectClass, NirStmt, NirStructDef, NirTypeRef,
 };
 
-use super::stmt_lowering::lower_stmt_block_with_async;
+use super::stmt_lowering::{lower_stmt_block_with_async, StmtBlockLoweringInput};
 use super::{
     bool_type, compatible_types, infer_nir_expr_type, instantiate_struct_field_type,
     lower_expr_with_async, lower_type_ref, lower_type_ref_with_aliases,
-    resolve_ast_type_ref_aliases, FunctionSignature, ModuleConstValue,
+    resolve_ast_type_ref_aliases, ExprWithAsyncInput, FunctionSignature, ModuleConstValue,
 };
 
-#[allow(clippy::too_many_arguments)]
+#[path = "match_lowering_input.rs"]
+mod match_lowering_input;
+pub(super) use match_lowering_input::MatchStmtLoweringInput;
+
 pub(super) fn lower_match_stmt_with_async(
-    value: &AstExpr,
-    arms: &[AstMatchArm],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &mut BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    return_type: Option<&AstTypeRef>,
-    type_aliases: &BTreeMap<String, AstTypeAlias>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: MatchStmtLoweringInput<'_>,
 ) -> Result<NirStmt, String> {
+    let MatchStmtLoweringInput {
+        value,
+        arms,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        return_type,
+        type_aliases,
+        signatures,
+        struct_table,
+    } = input;
     if arms.is_empty() {
         return Err("`match` requires at least one arm".to_owned());
     }
-    let lowered_value = lower_expr_with_async(
-        value,
+    macro_rules! lower_block {
+        ($body:expr, $bindings:expr) => {
+            lower_stmt_block_with_async(StmtBlockLoweringInput {
+                stmts: $body,
+                current_domain,
+                current_function_is_async,
+                bindings: $bindings,
+                module_consts,
+                return_type,
+                type_aliases,
+                signatures,
+                struct_table,
+            })
+        };
+    }
+    let lowered_value = lower_expr_with_async(ExprWithAsyncInput {
+        expr: value,
         current_domain,
         current_function_is_async,
         bindings,
         module_consts,
         signatures,
         struct_table,
-        None,
-        false,
-    )?;
+        expected: None,
+        allow_async_calls: false,
+    })?;
     let Some(value_ty) = infer_nir_expr_type(&lowered_value, bindings, signatures, struct_table)
     else {
         return Err("could not infer scrutinee type for `match`".to_owned());
@@ -71,17 +92,7 @@ pub(super) fn lower_match_stmt_with_async(
             );
         }
         let mut wildcard_bindings = bindings.clone();
-        let else_body = lower_stmt_block_with_async(
-            &arms[wildcard_index].body,
-            current_domain,
-            current_function_is_async,
-            &mut wildcard_bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        )?;
+        let else_body = lower_block!(&arms[wildcard_index].body, &mut wildcard_bindings)?;
         (&arms[..wildcard_index], else_body)
     } else if is_exhaustive_option_or_result_match(arms, &value_ty, type_aliases)? {
         let (last_arm, arms_to_lower) = arms
@@ -104,17 +115,7 @@ pub(super) fn lower_match_stmt_with_async(
                 value,
             });
         }
-        else_body.extend(lower_stmt_block_with_async(
-            &last_arm.body,
-            current_domain,
-            current_function_is_async,
-            &mut last_bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        )?);
+        else_body.extend(lower_block!(&last_arm.body, &mut last_bindings)?);
         (arms_to_lower, else_body)
     } else {
         return Err(
@@ -136,17 +137,17 @@ pub(super) fn lower_match_stmt_with_async(
             for (name, ty, _) in &pattern_bindings {
                 guard_bindings.insert(name.clone(), ty.clone());
             }
-            let lowered_guard = lower_expr_with_async(
-                guard,
+            let lowered_guard = lower_expr_with_async(ExprWithAsyncInput {
+                expr: guard,
                 current_domain,
                 current_function_is_async,
-                &guard_bindings,
+                bindings: &guard_bindings,
                 module_consts,
                 signatures,
                 struct_table,
-                Some(&bool_type()),
-                false,
-            )?;
+                expected: Some(&bool_type()),
+                allow_async_calls: false,
+            })?;
             let lowered_guard = substitute_pattern_binding_vars(&lowered_guard, &pattern_bindings);
             match nir_expr_effect_class(&lowered_guard) {
                 NirExprEffectClass::Pure | NirExprEffectClass::LocalReadOnly => {}
@@ -173,17 +174,7 @@ pub(super) fn lower_match_stmt_with_async(
                 value,
             });
         }
-        then_body.extend(lower_stmt_block_with_async(
-            &arm.body,
-            current_domain,
-            current_function_is_async,
-            &mut then_bindings,
-            module_consts,
-            return_type,
-            type_aliases,
-            signatures,
-            struct_table,
-        )?);
+        then_body.extend(lower_block!(&arm.body, &mut then_bindings)?);
         else_body = vec![NirStmt::If {
             condition,
             then_body,

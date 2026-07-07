@@ -27,14 +27,16 @@ pub(super) fn lower_shader_packet_expr(
             toggle_state,
             focus_index,
         } => Some(lower_shader_profile_packet(
-            unit,
-            packet_type_name.as_deref(),
-            color,
-            speed,
-            radius,
-            accent.as_deref(),
-            toggle_state.as_deref(),
-            focus_index.as_deref(),
+            ShaderProfilePacketInput {
+                unit,
+                packet_type_name: packet_type_name.as_deref(),
+                color,
+                speed,
+                radius,
+                accent: accent.as_deref(),
+                toggle_state: toggle_state.as_deref(),
+                focus_index: focus_index.as_deref(),
+            },
             state,
             bindings,
         )),
@@ -42,34 +44,42 @@ pub(super) fn lower_shader_packet_expr(
     }
 }
 
+struct ShaderProfilePacketInput<'a> {
+    unit: &'a str,
+    packet_type_name: Option<&'a str>,
+    color: &'a NirExpr,
+    speed: &'a NirExpr,
+    radius: &'a NirExpr,
+    accent: Option<&'a NirExpr>,
+    toggle_state: Option<&'a NirExpr>,
+    focus_index: Option<&'a NirExpr>,
+}
+
 fn lower_shader_profile_packet(
-    unit: &str,
-    packet_type_name: Option<&str>,
-    color: &NirExpr,
-    speed: &NirExpr,
-    radius: &NirExpr,
-    accent: Option<&NirExpr>,
-    toggle_state: Option<&NirExpr>,
-    focus_index: Option<&NirExpr>,
+    input: ShaderProfilePacketInput<'_>,
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
-    let color_name = lower_expr(color, state, bindings)?;
-    let speed_name = lower_expr(speed, state, bindings)?;
-    let radius_name = lower_expr(radius, state, bindings)?;
-    let accent_name = accent
+    let color_name = lower_expr(input.color, state, bindings)?;
+    let speed_name = lower_expr(input.speed, state, bindings)?;
+    let radius_name = lower_expr(input.radius, state, bindings)?;
+    let accent_name = input
+        .accent
         .map(|expr| lower_expr(expr, state, bindings))
         .transpose()?;
-    let toggle_name = toggle_state
+    let toggle_name = input
+        .toggle_state
         .map(|expr| lower_expr(expr, state, bindings))
         .transpose()?;
-    let focus_name = focus_index
+    let focus_name = input
+        .focus_index
         .map(|expr| lower_expr(expr, state, bindings))
         .transpose()?;
     let name = next_name(state, "shader_profile_packet");
-    let packet_type = packet_type_name
+    let packet_type = input
+        .packet_type_name
         .map(str::to_owned)
-        .unwrap_or_else(|| format!("{unit}Packet"));
+        .unwrap_or_else(|| format!("{}Packet", input.unit));
 
     if packet_type == "NovaPanelPacket" {
         let mut builder = NovaPanelPacketBuilder {

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{AstExpr, AstImplDef, AstStructDef, AstTypeAlias, AstTypeRef};
 
@@ -36,4 +36,29 @@ pub(super) struct MethodCallReceiverExpectedTypeInput<'a> {
     pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
     pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
     pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct AliasInferenceContext<'a> {
+    pub(super) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+}
+
+pub(super) struct AliasUsageInferenceInput<'a> {
+    pub(super) alias_name: &'a str,
+    pub(super) alias_definition: &'a AstTypeAlias,
+    pub(super) patterns: &'a [AstTypeRef],
+    pub(super) concrete_exprs: &'a [AstExpr],
+    pub(super) context: AliasInferenceContext<'a>,
+    pub(super) generic_names: &'a BTreeSet<String>,
+    pub(super) substitutions: BTreeMap<String, AstTypeRef>,
+}
+
+pub(super) struct AliasAwarePatternTypeInput<'a> {
+    pub(super) expr: &'a AstExpr,
+    pub(super) expected_pattern: &'a AstTypeRef,
+    pub(super) context: AliasInferenceContext<'a>,
 }

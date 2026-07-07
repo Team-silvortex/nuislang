@@ -10,31 +10,54 @@ use super::exprs_aliases::{resolved_struct_constructor_alias, StructConstructorA
 use super::exprs_expected::{call_arg_expected_type, CallArgExpectedTypeInput};
 use super::exprs_specialization::{
     ensure_generic_impl_method_specialization, ensure_generic_specialization,
-    GenericSpecializationInput,
+    GenericImplMethodSpecializationInput, GenericSpecializationInput,
 };
 use super::GenericImplMethodTemplate;
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct GenericCallExprRewriteInput<'a> {
+    pub(super) callee: &'a str,
+    pub(super) generic_args: &'a [AstTypeRef],
+    pub(super) args: &'a [AstExpr],
+    pub(super) context: &'a str,
+    pub(super) expected: Option<&'a AstTypeRef>,
+    pub(super) env: &'a BTreeMap<String, AstTypeRef>,
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) generic_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) generic_impl_method_templates: &'a [GenericImplMethodTemplate],
+    pub(super) higher_order_templates: &'a BTreeMap<String, AstFunction>,
+    pub(super) function_table: &'a BTreeMap<String, AstFunction>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) struct_table: &'a BTreeMap<String, AstStructDef>,
+    pub(super) function_return_types: &'a BTreeMap<String, Option<AstTypeRef>>,
+    pub(super) specialization_cache: &'a mut BTreeSet<String>,
+    pub(super) specialized_functions: &'a mut Vec<AstFunction>,
+    pub(super) specialized_signatures: &'a mut Vec<(String, FunctionSignature)>,
+}
+
 pub(super) fn rewrite_generic_call_expr(
-    callee: &str,
-    generic_args: &[AstTypeRef],
-    args: &[AstExpr],
-    context: &str,
-    expected: Option<&AstTypeRef>,
-    env: &BTreeMap<String, AstTypeRef>,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    generic_templates: &BTreeMap<String, AstFunction>,
-    generic_impl_method_templates: &[GenericImplMethodTemplate],
-    higher_order_templates: &BTreeMap<String, AstFunction>,
-    function_table: &BTreeMap<String, AstFunction>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    struct_table: &BTreeMap<String, AstStructDef>,
-    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
-    specialization_cache: &mut BTreeSet<String>,
-    specialized_functions: &mut Vec<AstFunction>,
-    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+    input: GenericCallExprRewriteInput<'_>,
 ) -> Result<AstExpr, String> {
+    let GenericCallExprRewriteInput {
+        callee,
+        generic_args,
+        args,
+        context,
+        expected,
+        env,
+        visible_type_aliases,
+        generic_templates,
+        generic_impl_method_templates,
+        higher_order_templates,
+        function_table,
+        signatures,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    } = input;
     let rewritten_generic_args = generic_args
         .iter()
         .map(|arg| resolve_ast_type_ref_aliases(arg, visible_type_aliases))
@@ -74,25 +97,27 @@ pub(super) fn rewrite_generic_call_expr(
         })
         .collect::<Result<Vec<_>, _>>()?;
     if let Some((trait_name, method_name)) = callee.rsplit_once('.') {
-        if let Some(specialized_name) = ensure_generic_impl_method_specialization(
-            Some(trait_name),
-            method_name,
-            &rewritten_args,
-            expected,
-            env,
-            visible_type_aliases,
-            generic_templates,
-            generic_impl_method_templates,
-            higher_order_templates,
-            function_table,
-            signatures,
-            impl_lookup,
-            struct_table,
-            function_return_types,
-            specialization_cache,
-            specialized_functions,
-            specialized_signatures,
-        )? {
+        if let Some(specialized_name) =
+            ensure_generic_impl_method_specialization(GenericImplMethodSpecializationInput {
+                trait_name: Some(trait_name),
+                method_name,
+                args: &rewritten_args,
+                expected,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                generic_impl_method_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            })?
+        {
             return Ok(AstExpr::Call {
                 callee: specialized_name,
                 generic_args: Vec::new(),

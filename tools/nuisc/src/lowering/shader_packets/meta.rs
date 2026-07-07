@@ -130,11 +130,12 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 self.accent_name.clone(),
             ],
         );
+        let focus_deps = [self.focus_name.clone()];
         let focus = self.push_struct(
             "nova_panel_focus",
             "NovaFocusPacket",
             vec![format!("slot={}", self.focus_name)],
-            &[self.focus_name.clone()],
+            &focus_deps,
         );
         vec![
             ("feedback".to_owned(), feedback),

@@ -290,7 +290,7 @@ fn runtime_role_json_value(role: RuntimeRole) -> String {
 }
 
 fn execution_resource_binding_json(binding: &ExecutionResourceBinding) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("key", &binding.key),
         json_string_field("kind", &format!("{:?}", binding.kind)),
         json_optional_string_field("capability_label", binding.capability_label.as_deref()),
@@ -306,7 +306,7 @@ fn execution_state_snapshot_json(snapshot: &ExecutionStateSnapshot) -> String {
         .map(execution_resource_binding_json)
         .collect::<Vec<_>>()
         .join(",");
-    let fields = vec![
+    let fields = [
         json_string_array_field("available_handles", &snapshot.available_handles),
         format!("\"handle_slots\":[{}]", handle_slots),
     ];
@@ -314,7 +314,7 @@ fn execution_state_snapshot_json(snapshot: &ExecutionStateSnapshot) -> String {
 }
 
 fn execution_clock_gate_json(gate: &nuis_runtime::ExecutionClockGate) -> String {
-    let fields = vec![
+    let fields = [
         json_string_array_field("wait_on", &gate.wait_on),
         json_string_array_field("emits", &gate.emits),
     ];
@@ -334,13 +334,13 @@ fn execution_clock_validation_json(
     error: Option<&str>,
 ) -> String {
     let Some(validation) = validation else {
-        let fields = vec![
+        let fields = [
             json_bool_field("valid", false),
             json_optional_string_field("error", error),
         ];
         return format!("{{{}}}", fields.join(","));
     };
-    let fields = vec![
+    let fields = [
         json_bool_field("valid", true),
         json_string_array_field("initial_timestamps", &validation.initial_timestamps),
         json_string_array_field("observed_emits", &validation.observed_emits),
@@ -351,7 +351,7 @@ fn execution_clock_validation_json(
 }
 
 fn inspect_clock_validation_summary_json(summary: &InspectClockValidationSummary) -> String {
-    let fields = vec![
+    let fields = [
         json_bool_field("valid", summary.valid),
         json_usize_field("checked_domains", summary.checked_domains),
         json_usize_field("failed_domains", summary.failed_domains),
@@ -382,7 +382,7 @@ fn execution_phase_action_json(action: &ExecutionPhaseAction) -> String {
         .map(execution_resource_binding_json)
         .collect::<Vec<_>>()
         .join(",");
-    let fields = vec![
+    let fields = [
         json_string_field("kind", &action.kind),
         json_string_array_field("input_handles", &action.input_handles),
         format!("\"resolved_inputs\":[{}]", resolved_inputs),
@@ -402,7 +402,7 @@ fn execution_phase_outcome_json(outcome: &ExecutionPhaseOutcome) -> String {
         .map(execution_resource_binding_json)
         .collect::<Vec<_>>()
         .join(",");
-    let fields = vec![
+    let fields = [
         json_string_field("status", &outcome.status),
         json_string_array_field("produced_handles", &outcome.produced_handles),
         format!("\"produced_slots\":[{}]", produced_slots),
@@ -412,7 +412,7 @@ fn execution_phase_outcome_json(outcome: &ExecutionPhaseOutcome) -> String {
 }
 
 fn execution_phase_binding_json(phase: &ExecutionPhaseBinding) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("phase", &phase.phase),
         json_string_field("role", &runtime_role_json_value(phase.role)),
         json_string_field("bridge_surface", &phase.bridge_surface),
@@ -431,7 +431,7 @@ fn execution_phase_binding_json(phase: &ExecutionPhaseBinding) -> String {
 }
 
 fn execution_trace_event_json(event: &ExecutionTraceEvent) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("phase", &event.phase),
         json_string_field("role", &runtime_role_json_value(event.role)),
         json_string_field("adapter_id", &event.adapter_id),
@@ -459,7 +459,7 @@ fn execution_trace_event_json(event: &ExecutionTraceEvent) -> String {
 }
 
 fn execution_inspect_issue_json(issue: &ExecutionInspectIssue) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("domain_family", &issue.domain_family),
         json_string_field("issue", &issue.issue),
     ];
@@ -496,7 +496,7 @@ pub(crate) fn inspect_execution_json(input: &Path) -> Result<String, String> {
                 .map(execution_trace_event_json)
                 .collect::<Vec<_>>()
                 .join(",");
-            let fields = vec![
+            let fields = [
                 json_string_field("domain_family", &section.domain_family),
                 json_usize_field("plan_phase_count", section.plan.phases.len()),
                 json_usize_field("trace_phase_count", section.trace.events.len()),
@@ -536,7 +536,7 @@ pub(crate) fn inspect_execution_json(input: &Path) -> Result<String, String> {
         .map(execution_inspect_issue_json)
         .collect::<Vec<_>>()
         .join(",");
-    let fields = vec![
+    let fields = [
         json_string_field("kind", "nuis_execution_inspect"),
         json_string_field("input", &input.display().to_string()),
         json_string_field("packaging_mode", &artifact.packaging_mode),
@@ -555,7 +555,7 @@ fn clock_protocol_summary_json(summary: Option<&ClockProtocolRuntimeSummary>) ->
     let Some(summary) = summary else {
         return "\"clock_protocol\":null".to_owned();
     };
-    let fields = vec![
+    let fields = [
         json_string_field("schema", &summary.schema),
         json_string_field("mode", &summary.mode),
         json_usize_field("domains", summary.domains),

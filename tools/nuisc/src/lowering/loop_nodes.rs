@@ -6,7 +6,7 @@ fn encode_carry_condition_args(
     condition: &PreparedLoopFlowCondition,
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
-) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
+) -> Result<EncodedLoopArgs, String> {
     match condition {
         PreparedLoopFlowCondition::Simple(condition) => {
             let rhs_name = lower_expr(&condition.rhs, state, bindings)?;

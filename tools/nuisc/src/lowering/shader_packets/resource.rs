@@ -106,6 +106,7 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
             ],
             &[self.speed_name.clone(), self.toggle_name.clone()],
         );
+        let pressure_deps = [self.toggle_name.clone()];
         let pressure = self.push_struct(
             "nova_panel_pressure",
             "NovaPressurePacket",
@@ -116,8 +117,9 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 format!("throttled={}", self.toggle_name),
                 "pressure_mask=6".to_owned(),
             ],
-            &[self.toggle_name.clone()],
+            &pressure_deps,
         );
+        let thermal_deps = [self.toggle_name.clone()];
         let thermal = self.push_struct(
             "nova_panel_thermal",
             "NovaThermalPacket",
@@ -128,8 +130,9 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 format!("throttled={}", self.toggle_name),
                 "thermal_mask=6".to_owned(),
             ],
-            &[self.toggle_name.clone()],
+            &thermal_deps,
         );
+        let power_deps = [self.toggle_name.clone()];
         let power = self.push_struct(
             "nova_panel_power",
             "NovaPowerPacket",
@@ -140,8 +143,9 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 format!("capped={}", self.toggle_name),
                 "power_mask=6".to_owned(),
             ],
-            &[self.toggle_name.clone()],
+            &power_deps,
         );
+        let latency_deps = [self.toggle_name.clone()];
         let latency = self.push_struct(
             "nova_panel_latency",
             "NovaLatencyPacket",
@@ -152,8 +156,9 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 format!("jitter={}", self.toggle_name),
                 "latency_mask=7".to_owned(),
             ],
-            &[self.toggle_name.clone()],
+            &latency_deps,
         );
+        let frame_pacing_deps = [self.toggle_name.clone()];
         let frame_pacing = self.push_struct(
             "nova_panel_frame_pacing",
             "NovaFramePacingPacket",
@@ -164,8 +169,9 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 format!("vsync_mode={}", self.toggle_name),
                 "pacing_mask=7".to_owned(),
             ],
-            &[self.toggle_name.clone()],
+            &frame_pacing_deps,
         );
+        let frame_variance_deps = [self.toggle_name.clone()];
         let frame_variance = self.push_struct(
             "nova_panel_frame_variance",
             "NovaFrameVariancePacket",
@@ -176,8 +182,9 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 "burst_mode=4".to_owned(),
                 "variance_mask=7".to_owned(),
             ],
-            &[self.toggle_name.clone()],
+            &frame_variance_deps,
         );
+        let jank_deps = [self.toggle_name.clone()];
         let jank = self.push_struct(
             "nova_panel_jank",
             "NovaJankPacket",
@@ -188,7 +195,7 @@ impl<'a, 'b> NovaPanelPacketBuilder<'a, 'b> {
                 "recovery=4".to_owned(),
                 "jank_mask=7".to_owned(),
             ],
-            &[self.toggle_name.clone()],
+            &jank_deps,
         );
         vec![
             ("scene_visibility".to_owned(), visibility),

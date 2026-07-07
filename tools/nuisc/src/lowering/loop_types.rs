@@ -12,6 +12,55 @@ pub(super) enum LoweredIfOutcome {
     Returned(String),
 }
 
+pub(super) type EncodedLoopArgs = (Vec<String>, Vec<String>, Vec<String>);
+pub(super) type EncodedLoopControlArgs = (Vec<String>, Vec<String>, Vec<String>, bool);
+pub(super) type LoopTempPrefixedSplit<'a> = (Vec<(String, NirExpr)>, &'a NirStmt, &'a [NirStmt]);
+pub(super) type LoopTrailingTempSplit<'a> = (&'a [NirStmt], Vec<(String, NirExpr)>);
+pub(super) type ConditionalTempExprBuilder = Box<dyn Fn(&NirExpr) -> NirExpr>;
+pub(super) type PreparedFactorGroupProduct = (
+    Vec<PreparedLoopStateRef>,
+    Option<NirExpr>,
+    Vec<PreparedLoopStateRef>,
+    Option<NirExpr>,
+);
+pub(super) type PreparedScaledFactorGroupProduct = (
+    Vec<PreparedLoopStateRef>,
+    Option<NirExpr>,
+    Vec<PreparedLoopStateRef>,
+    Option<NirExpr>,
+    NirExpr,
+);
+pub(in crate::lowering) type PreparedFactorStateListView<'a> = (
+    &'a [PreparedLoopStateRef],
+    &'a [PreparedLoopStateRef],
+    Option<&'a NirExpr>,
+    Option<&'a NirExpr>,
+);
+pub(in crate::lowering) type PreparedScaledFactorStateListView<'a> = (
+    &'a [PreparedLoopStateRef],
+    &'a [PreparedLoopStateRef],
+    &'a NirExpr,
+    Option<&'a NirExpr>,
+    Option<&'a NirExpr>,
+);
+pub(in crate::lowering) type PreparedFactorGroupProductView<'a> = (
+    &'a [PreparedLoopStateRef],
+    &'a [PreparedLoopStateRef],
+    Option<&'a NirExpr>,
+    &'a [PreparedLoopStateRef],
+    Option<&'a NirExpr>,
+    Option<&'a NirExpr>,
+);
+pub(in crate::lowering) type PreparedScaledFactorGroupProductView<'a> = (
+    &'a [PreparedLoopStateRef],
+    &'a [PreparedLoopStateRef],
+    Option<&'a NirExpr>,
+    &'a [PreparedLoopStateRef],
+    Option<&'a NirExpr>,
+    &'a NirExpr,
+    Option<&'a NirExpr>,
+);
+
 pub(super) enum PreparedTerminalBranch {
     Return(NirExpr),
     PrintReturn { print: NirExpr, returned: NirExpr },
@@ -241,12 +290,12 @@ pub(super) enum PreparedCarryLinearOp {
 pub(super) enum PreparedCarryUpdateKind {
     Linear {
         op: PreparedCarryLinearOp,
-        source: PreparedCarrySource,
+        source: Box<PreparedCarrySource>,
     },
     Conditional {
         condition: PreparedLoopFlowCondition,
-        then_source: PreparedCarryBranchSource,
-        else_source: PreparedCarryBranchSource,
+        then_source: Box<PreparedCarryBranchSource>,
+        else_source: Box<PreparedCarryBranchSource>,
     },
 }
 
@@ -271,7 +320,7 @@ pub(super) enum PreparedCarryBranchSource {
     KeepPreviousValue,
     Source {
         op: PreparedCarryLinearOp,
-        source: PreparedCarrySource,
+        source: Box<PreparedCarrySource>,
     },
 }
 
@@ -281,7 +330,7 @@ pub(super) enum PreparedCarryBranchValueKind {
     #[allow(dead_code)]
     LinearSource {
         op: PreparedCarryLinearOp,
-        source: PreparedCarrySource,
+        source: Box<PreparedCarrySource>,
     },
 }
 

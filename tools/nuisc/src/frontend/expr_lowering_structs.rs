@@ -6,7 +6,7 @@ use crate::frontend::metadata::ModuleConstValue;
 use crate::frontend::name_suggestions::suggest_similar_name;
 use crate::frontend::{
     infer_nir_expr_type, lower_nested_expr_with_async_and_consts, AstExpr, FunctionSignature,
-    NirStructDef, NirTypeRef,
+    NestedExprWithConstsInput, NirStructDef, NirTypeRef,
 };
 
 pub(super) fn suggest_struct_field_name(
@@ -23,18 +23,59 @@ pub(super) fn suggest_struct_field_name(
     suggest_similar_name(field, &candidates)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Clone, Copy)]
+pub(super) struct StructLiteralInferenceContext<'a> {
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+}
+
+pub(super) struct GenericStructLiteralInferenceInput<'a> {
+    pub(super) type_name: &'a str,
+    pub(super) definition: &'a NirStructDef,
+    pub(super) fields: &'a [(String, AstExpr)],
+    pub(super) context: StructLiteralInferenceContext<'a>,
+}
+
+struct SeededStructLiteralInferenceInput<'a> {
+    type_name: &'a str,
+    definition: &'a NirStructDef,
+    fields: &'a [(String, AstExpr)],
+    context: StructLiteralInferenceContext<'a>,
+    generic_names: &'a [&'a str],
+    generic_name_set: &'a BTreeSet<String>,
+    substitutions: BTreeMap<String, NirTypeRef>,
+}
+
+struct FieldPatternInferenceInput<'a> {
+    value: &'a AstExpr,
+    expected_pattern: &'a NirTypeRef,
+    context: StructLiteralInferenceContext<'a>,
+    placeholder_names: &'a BTreeSet<String>,
+}
+
+struct PayloadConstructorInferenceInput<'a> {
+    callee: &'a str,
+    definition: &'a NirStructDef,
+    field_ty: &'a NirTypeRef,
+    arg: &'a AstExpr,
+    expected_pattern: &'a NirTypeRef,
+    context: StructLiteralInferenceContext<'a>,
+    placeholder_names: &'a BTreeSet<String>,
+}
+
 pub(super) fn infer_generic_struct_literal_type_from_fields(
-    type_name: &str,
-    definition: &NirStructDef,
-    fields: &[(String, AstExpr)],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: GenericStructLiteralInferenceInput<'_>,
 ) -> Result<NirTypeRef, String> {
+    let GenericStructLiteralInferenceInput {
+        type_name,
+        definition,
+        fields,
+        context,
+    } = input;
     let generic_names = definition
         .generic_params
         .iter()
@@ -45,37 +86,29 @@ pub(super) fn infer_generic_struct_literal_type_from_fields(
         .iter()
         .map(|param| param.name.clone())
         .collect::<BTreeSet<_>>();
-    infer_generic_struct_literal_type_from_fields_seeded(
+    infer_generic_struct_literal_type_from_fields_seeded(SeededStructLiteralInferenceInput {
         type_name,
         definition,
         fields,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-        &generic_names,
-        &generic_name_set,
-        BTreeMap::new(),
-    )
+        context,
+        generic_names: &generic_names,
+        generic_name_set: &generic_name_set,
+        substitutions: BTreeMap::new(),
+    })
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn infer_generic_struct_literal_type_from_fields_seeded(
-    type_name: &str,
-    definition: &NirStructDef,
-    fields: &[(String, AstExpr)],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    generic_names: &[&str],
-    generic_name_set: &BTreeSet<String>,
-    mut substitutions: BTreeMap<String, NirTypeRef>,
+fn infer_generic_struct_literal_type_from_fields_seeded(
+    input: SeededStructLiteralInferenceInput<'_>,
 ) -> Result<NirTypeRef, String> {
+    let SeededStructLiteralInferenceInput {
+        type_name,
+        definition,
+        fields,
+        context,
+        generic_names,
+        generic_name_set,
+        mut substitutions,
+    } = input;
     let mut pending = fields
         .iter()
         .map(|(name, value)| (name.as_str(), value))
@@ -91,17 +124,12 @@ pub(super) fn infer_generic_struct_literal_type_from_fields_seeded(
                 .ok_or_else(|| format!("struct `{}` has no field `{}`", type_name, name))?;
             let field_pattern =
                 specialize_nir_type_pattern_with_known_substitutions(&field.ty, &substitutions);
-            let inferred = infer_field_expr_type_for_generic_pattern(
+            let inferred = infer_field_expr_type_for_generic_pattern(FieldPatternInferenceInput {
                 value,
-                &field_pattern,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                module_consts,
-                signatures,
-                struct_table,
-                generic_name_set,
-            )?;
+                expected_pattern: &field_pattern,
+                context,
+                placeholder_names: generic_name_set,
+            })?;
             let Some(inferred) = inferred else {
                 next_pending.push((name, value));
                 continue;
@@ -146,18 +174,23 @@ pub(super) fn infer_generic_struct_literal_type_from_fields_seeded(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn infer_field_expr_type_for_generic_pattern(
-    value: &AstExpr,
-    expected_pattern: &NirTypeRef,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    placeholder_names: &BTreeSet<String>,
+    input: FieldPatternInferenceInput<'_>,
 ) -> Result<Option<NirTypeRef>, String> {
+    let FieldPatternInferenceInput {
+        value,
+        expected_pattern,
+        context,
+        placeholder_names,
+    } = input;
+    let StructLiteralInferenceContext {
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    } = context;
     match value {
         AstExpr::StructLiteral {
             type_name,
@@ -185,18 +218,15 @@ fn infer_field_expr_type_for_generic_pattern(
                 placeholder_names,
             );
             return match infer_generic_struct_literal_type_from_fields_seeded(
-                type_name,
-                definition,
-                fields,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                module_consts,
-                signatures,
-                struct_table,
-                &generic_names,
-                &generic_name_set,
-                seed,
+                SeededStructLiteralInferenceInput {
+                    type_name,
+                    definition,
+                    fields,
+                    context,
+                    generic_names: &generic_names,
+                    generic_name_set: &generic_name_set,
+                    substitutions: seed,
+                },
             ) {
                 Ok(inferred) => Ok(Some(inferred)),
                 Err(error)
@@ -221,18 +251,15 @@ fn infer_field_expr_type_for_generic_pattern(
                 return Ok(None);
             }
             return match infer_generic_payload_constructor_type_from_arg_seeded(
-                callee,
-                definition,
-                &definition.fields[0].ty,
-                &args[0],
-                expected_pattern,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                module_consts,
-                signatures,
-                struct_table,
-                placeholder_names,
+                PayloadConstructorInferenceInput {
+                    callee,
+                    definition,
+                    field_ty: &definition.fields[0].ty,
+                    arg: &args[0],
+                    expected_pattern,
+                    context,
+                    placeholder_names,
+                },
             ) {
                 Ok(inferred) => Ok(Some(inferred)),
                 Err(error)
@@ -247,16 +274,16 @@ fn infer_field_expr_type_for_generic_pattern(
         }
         _ => {}
     }
-    let lowered = lower_nested_expr_with_async_and_consts(
-        value,
+    let lowered = lower_nested_expr_with_async_and_consts(NestedExprWithConstsInput {
+        expr: value,
         current_domain,
         current_function_is_async,
         bindings,
         module_consts,
         signatures,
         struct_table,
-        None,
-    )?;
+        expected: None,
+    })?;
     Ok(infer_nir_expr_type(
         &lowered,
         bindings,
@@ -265,21 +292,18 @@ fn infer_field_expr_type_for_generic_pattern(
     ))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn infer_generic_payload_constructor_type_from_arg_seeded(
-    callee: &str,
-    definition: &NirStructDef,
-    field_ty: &NirTypeRef,
-    arg: &AstExpr,
-    expected_pattern: &NirTypeRef,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    placeholder_names: &BTreeSet<String>,
+    input: PayloadConstructorInferenceInput<'_>,
 ) -> Result<NirTypeRef, String> {
+    let PayloadConstructorInferenceInput {
+        callee,
+        definition,
+        field_ty,
+        arg,
+        expected_pattern,
+        context,
+        placeholder_names,
+    } = input;
     let generic_names = definition
         .generic_params
         .iter()
@@ -292,21 +316,16 @@ fn infer_generic_payload_constructor_type_from_arg_seeded(
     );
     let arg_pattern =
         specialize_nir_type_pattern_with_known_substitutions(field_ty, &substitutions);
-    let Some(arg_ty) = infer_field_expr_type_for_generic_pattern(
-        arg,
-        &arg_pattern,
-        current_domain,
-        current_function_is_async,
-        bindings,
-        module_consts,
-        signatures,
-        struct_table,
-        &definition
+    let Some(arg_ty) = infer_field_expr_type_for_generic_pattern(FieldPatternInferenceInput {
+        value: arg,
+        expected_pattern: &arg_pattern,
+        context,
+        placeholder_names: &definition
             .generic_params
             .iter()
             .map(|param| param.name.clone())
             .collect::<BTreeSet<_>>(),
-    )?
+    })?
     else {
         return Err(format!(
             "cannot infer generic arguments for payload-style struct constructor `{callee}(...)`; add an explicit expected type"

@@ -134,13 +134,14 @@ pub(super) fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> boo
     }
 }
 
-pub(super) fn expr_uses_shader_profile_draw_instanced(expr: &NirExpr, unit: &str) -> bool {
-    match expr {
-        NirExpr::ShaderDrawInstanced { .. } => true,
-        _ => expr_walk_any(expr, &|inner| {
-            expr_uses_shader_profile_draw_instanced(inner, unit)
-        }),
+pub(super) fn expr_uses_shader_profile_draw_instanced(expr: &NirExpr, _unit: &str) -> bool {
+    fn expr_uses_draw_instanced(expr: &NirExpr) -> bool {
+        match expr {
+            NirExpr::ShaderDrawInstanced { .. } => true,
+            _ => expr_walk_any(expr, &expr_uses_draw_instanced),
+        }
     }
+    expr_uses_draw_instanced(expr)
 }
 
 pub(super) fn expr_uses_shader_profile_packet(expr: &NirExpr, unit: &str) -> bool {

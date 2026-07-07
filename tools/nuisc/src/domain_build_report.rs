@@ -58,7 +58,7 @@ pub(crate) fn load_manifest_for_build_unit(
 }
 
 pub(crate) fn domain_build_unit_contract_json(unit: &aot::BuildManifestDomainBuildUnit) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("package_id", &unit.package_id),
         json_string_field("domain_family", &unit.domain_family),
         json_optional_string_field("abi", unit.abi.as_deref()),
@@ -150,7 +150,7 @@ pub(crate) fn evaluate_domain_build_contract_drift(
 }
 
 pub(crate) fn domain_build_contract_drift_json(check: &DomainBuildContractDriftCheck) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("package_id", &check.package_id),
         json_string_field("domain_family", &check.domain_family),
         json_bool_field("consistent", check.consistent),
@@ -265,7 +265,7 @@ pub(crate) fn domain_build_unit_verification_verdict(
 pub(crate) fn domain_build_unit_verification_verdict_json(
     verdict: &DomainBuildUnitVerificationVerdict,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("package_id", &verdict.package_id),
         json_string_field("domain_family", &verdict.domain_family),
         json_string_field("kind", &verdict.kind),
@@ -327,7 +327,7 @@ pub(crate) fn summarize_domain_build_verification(
 pub(crate) fn domain_build_verification_summary_json(
     summary: &DomainBuildVerificationSummary,
 ) -> String {
-    let fields = vec![
+    let fields = [
         json_bool_field("all_units_consistent", summary.all_units_consistent),
         json_usize_field("total_units", summary.total_units),
         json_usize_field("host_units_checked", summary.host_units_checked),

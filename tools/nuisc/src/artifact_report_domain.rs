@@ -3,12 +3,12 @@ use super::*;
 pub(crate) fn domain_build_contract_summary_json(
     summary: &registry::NustarDomainBuildContractSummary,
 ) -> String {
-    let lowering_fields = vec![
+    let lowering_fields = [
         json_string_field("lane_policy", &summary.lowering.lane_policy),
         json_string_field("bridge_surface", &summary.lowering.bridge_surface),
         json_string_field("emission_kind", &summary.lowering.emission_kind),
     ];
-    let backend_fields = vec![
+    let backend_fields = [
         json_string_field("stub_kind", &summary.backend.stub_kind),
         json_string_field("bridge_entry", &summary.backend.bridge_entry),
         json_string_field("submission_mode", &summary.backend.submission_mode),
@@ -35,7 +35,7 @@ pub(crate) fn domain_build_contract_summary_json(
             summary.backend.completion_model.as_deref(),
         ),
     ];
-    let bridge_fields = vec![
+    let bridge_fields = [
         json_string_field("bridge_surface", &summary.bridge.bridge_surface),
         json_string_field("bridge_entry", &summary.bridge.bridge_entry),
         json_string_field("scheduler_binding", &summary.bridge.scheduler_binding),
@@ -45,7 +45,7 @@ pub(crate) fn domain_build_contract_summary_json(
         json_string_field("phase_finalize", &summary.bridge.phase_finalize),
         json_string_field("bridge_kind", &summary.bridge.bridge_kind),
     ];
-    let host_bridge_fields = vec![
+    let host_bridge_fields = [
         json_string_field("host_ffi_surface", &summary.host_bridge.host_ffi_surface),
         json_string_field("handle_family", &summary.host_bridge.handle_family),
         json_string_array_field("phase_order", &summary.host_bridge.phase_order),
@@ -109,7 +109,7 @@ pub(crate) fn domain_registry_json(
 }
 
 pub(crate) fn domain_build_unit_json(unit: &aot::BuildManifestDomainBuildUnit) -> String {
-    let fields = vec![
+    let fields = [
         json_string_field("package_id", &unit.package_id),
         json_string_field("domain_family", &unit.domain_family),
         json_optional_string_field("abi", unit.abi.as_deref()),

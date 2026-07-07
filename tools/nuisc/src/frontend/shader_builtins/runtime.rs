@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
-use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
+use nuis_semantics::model::{AstExpr, NirExpr, NirTypeRef};
 
-use super::super::{i64_type, lower_expr, named_type, FunctionSignature, ModuleConstValue};
+use super::super::{i64_type, lower_expr, named_type};
+use super::ShaderBuiltinInput;
 
 fn shader_packet_contract_for_type(packet_type_name: Option<&str>) -> String {
     match packet_type_name {
@@ -30,17 +31,18 @@ fn infer_shader_packet_profile_contract(
     shader_packet_contract_for_type(None)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_shader_runtime_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    _current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    _module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: ShaderBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let ShaderBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        ..
+    } = input;
     let expr = match callee {
         "shader_target" => {
             let [format, width, height] = args else {

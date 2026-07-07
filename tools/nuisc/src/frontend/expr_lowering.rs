@@ -17,10 +17,49 @@ mod expr_lowering_structs;
 
 use expr_lowering_structs::{
     ast_type_args_are_placeholder_generics, infer_generic_struct_literal_type_from_fields,
-    suggest_struct_field_name,
+    suggest_struct_field_name, GenericStructLiteralInferenceInput, StructLiteralInferenceContext,
 };
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Clone, Copy)]
+struct ExprLoweringContext<'a> {
+    current_domain: &'a str,
+    current_function_is_async: bool,
+    bindings: &'a BTreeMap<String, NirTypeRef>,
+    module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    signatures: &'a BTreeMap<String, FunctionSignature>,
+    struct_table: &'a BTreeMap<String, NirStructDef>,
+    expected: Option<&'a NirTypeRef>,
+    allow_async_calls: bool,
+}
+
+struct ExprLoweringInput<'a> {
+    expr: &'a AstExpr,
+    context: ExprLoweringContext<'a>,
+}
+
+pub(super) struct ExprWithAsyncInput<'a> {
+    pub(super) expr: &'a AstExpr,
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) expected: Option<&'a NirTypeRef>,
+    pub(super) allow_async_calls: bool,
+}
+
+pub(super) struct NestedExprWithConstsInput<'a> {
+    pub(super) expr: &'a AstExpr,
+    pub(super) current_domain: &'a str,
+    pub(super) current_function_is_async: bool,
+    pub(super) bindings: &'a BTreeMap<String, NirTypeRef>,
+    pub(super) module_consts: &'a BTreeMap<String, ModuleConstValue>,
+    pub(super) signatures: &'a BTreeMap<String, FunctionSignature>,
+    pub(super) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(super) expected: Option<&'a NirTypeRef>,
+}
+
 pub(super) fn lower_expr(
     expr: &AstExpr,
     current_domain: &str,
@@ -29,20 +68,19 @@ pub(super) fn lower_expr(
     struct_table: &BTreeMap<String, NirStructDef>,
     expected: Option<&NirTypeRef>,
 ) -> Result<NirExpr, String> {
-    lower_expr_with_async(
+    lower_expr_with_async(ExprWithAsyncInput {
         expr,
         current_domain,
-        false,
+        current_function_is_async: false,
         bindings,
-        &BTreeMap::new(),
+        module_consts: &BTreeMap::new(),
         signatures,
         struct_table,
         expected,
-        false,
-    )
+        allow_async_calls: false,
+    })
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_nested_expr_with_async(
     expr: &AstExpr,
     current_domain: &str,
@@ -52,31 +90,23 @@ pub(super) fn lower_nested_expr_with_async(
     struct_table: &BTreeMap<String, NirStructDef>,
     expected: Option<&NirTypeRef>,
 ) -> Result<NirExpr, String> {
-    lower_expr_with_async(
+    lower_expr_with_async(ExprWithAsyncInput {
         expr,
         current_domain,
         current_function_is_async,
         bindings,
-        &BTreeMap::new(),
+        module_consts: &BTreeMap::new(),
         signatures,
         struct_table,
         expected,
-        false,
-    )
+        allow_async_calls: false,
+    })
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_nested_expr_with_async_and_consts(
-    expr: &AstExpr,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
+    input: NestedExprWithConstsInput<'_>,
 ) -> Result<NirExpr, String> {
-    lower_expr_with_async(
+    let NestedExprWithConstsInput {
         expr,
         current_domain,
         current_function_is_async,
@@ -85,22 +115,59 @@ pub(super) fn lower_nested_expr_with_async_and_consts(
         signatures,
         struct_table,
         expected,
-        false,
-    )
+    } = input;
+    lower_expr_with_async(ExprWithAsyncInput {
+        expr,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected,
+        allow_async_calls: false,
+    })
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn lower_expr_with_async(
-    expr: &AstExpr,
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-    expected: Option<&NirTypeRef>,
-    allow_async_calls: bool,
-) -> Result<NirExpr, String> {
+pub(super) fn lower_expr_with_async(input: ExprWithAsyncInput<'_>) -> Result<NirExpr, String> {
+    let ExprWithAsyncInput {
+        expr,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected,
+        allow_async_calls,
+    } = input;
+    lower_expr_with_context(ExprLoweringInput {
+        expr,
+        context: ExprLoweringContext {
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            signatures,
+            struct_table,
+            expected,
+            allow_async_calls,
+        },
+    })
+}
+
+fn lower_expr_with_context(input: ExprLoweringInput<'_>) -> Result<NirExpr, String> {
+    let ExprLoweringInput { expr, context } = input;
+    let ExprLoweringContext {
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        expected,
+        allow_async_calls,
+    } = context;
     Ok(match expr {
         AstExpr::Bool(value) => NirExpr::Bool(*value),
         AstExpr::Text(text) => NirExpr::Text(text.clone()),
@@ -170,17 +237,13 @@ pub(super) fn lower_expr_with_async(
             if !current_function_is_async {
                 return Err("`await` is only allowed inside `async fn`".to_owned());
             }
-            NirExpr::Await(Box::new(lower_expr_with_async(
-                value,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                module_consts,
-                signatures,
-                struct_table,
-                expected,
-                true,
-            )?))
+            NirExpr::Await(Box::new(lower_expr_with_context(ExprLoweringInput {
+                expr: value,
+                context: ExprLoweringContext {
+                    allow_async_calls: true,
+                    ..context
+                },
+            })?))
         }
         AstExpr::Try(_) => {
             return Err(
@@ -223,6 +286,7 @@ pub(super) fn lower_expr_with_async(
             generic_args,
             args,
         } => expr_lowering_methods::lower_method_call_with_async(
+            expr_lowering_methods::MethodCallLoweringInput {
             receiver,
             method,
             generic_args,
@@ -233,8 +297,9 @@ pub(super) fn lower_expr_with_async(
             module_consts,
             signatures,
             struct_table,
-            expected,
+            _expected: expected,
             allow_async_calls,
+            },
         )?,
         AstExpr::StructLiteral {
             type_name,
@@ -292,17 +357,19 @@ pub(super) fn lower_expr_with_async(
                     is_ref: false,
                 }
             } else {
-                infer_generic_struct_literal_type_from_fields(
+                infer_generic_struct_literal_type_from_fields(GenericStructLiteralInferenceInput {
                     type_name,
                     definition,
                     fields,
-                    current_domain,
-                    current_function_is_async,
-                    bindings,
-                    module_consts,
-                    signatures,
-                    struct_table,
-                )?
+                    context: StructLiteralInferenceContext {
+                        current_domain,
+                        current_function_is_async,
+                        bindings,
+                        module_consts,
+                        signatures,
+                        struct_table,
+                    },
+                })?
             };
             let hidden_private_fields = hidden_private_field_count(definition);
             if hidden_private_fields > 0 {
@@ -325,19 +392,17 @@ pub(super) fn lower_expr_with_async(
                         type_name, name
                     ));
                 }
-                let lowered = lower_nested_expr_with_async_and_consts(
-                    value,
-                    current_domain,
-                    current_function_is_async,
-                    bindings,
-                    module_consts,
-                    signatures,
-                    struct_table,
-                    Some(&instantiate_struct_field_type(&literal_ty, definition, &field.ty)),
-                )?;
-                let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
                 let expected_field_ty =
                     instantiate_struct_field_type(&literal_ty, definition, &field.ty);
+                let lowered = lower_expr_with_context(ExprLoweringInput {
+                    expr: value,
+                    context: ExprLoweringContext {
+                        expected: Some(&expected_field_ty),
+                        allow_async_calls: false,
+                        ..context
+                    },
+                })?;
+                let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
                 let _ = resolve_declared_or_inferred(name, Some(expected_field_ty), inferred)?;
                 lowered_fields.push((name.clone(), lowered));
             }
@@ -375,16 +440,14 @@ pub(super) fn lower_expr_with_async(
                     }
                 }
             }
-            let lowered_base = lower_nested_expr_with_async_and_consts(
-                base,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                module_consts,
-                signatures,
-                struct_table,
-                None,
-            )?;
+            let lowered_base = lower_expr_with_context(ExprLoweringInput {
+                expr: base,
+                context: ExprLoweringContext {
+                    expected: None,
+                    allow_async_calls: false,
+                    ..context
+                },
+            })?;
             let base_ty = infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table)
                 .ok_or_else(|| format!("cannot infer base type for field access `.{} `", field))?;
             if base_ty.is_ref && !base_ty.is_optional && base_ty.name == "Node" {

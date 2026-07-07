@@ -81,8 +81,7 @@ pub fn build_artifact_lowering_alignment_summary(
         })
         .collect::<Vec<_>>();
     if artifact_units.len() < domain_units.len() {
-        for index in artifact_units.len()..domain_units.len() {
-            let domain_unit = &domain_units[index];
+        for (index, domain_unit) in domain_units.iter().enumerate().skip(artifact_units.len()) {
             checks.push(ArtifactLoweringAlignmentCheck {
                 index,
                 package_id: domain_unit.package_id.clone(),

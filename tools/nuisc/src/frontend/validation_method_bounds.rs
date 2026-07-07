@@ -115,7 +115,9 @@ mod validation_method_bounds_expr;
 #[path = "validation_method_bounds_stmt.rs"]
 mod validation_method_bounds_stmt;
 
-pub(in crate::frontend) use validation_method_bounds_expr::validate_expr_generic_method_bounds;
+pub(in crate::frontend) use validation_method_bounds_expr::{
+    validate_expr_generic_method_bounds, MethodBoundsContext, MethodBoundsExprInput,
+};
 
 fn insert_trait_methods(
     methods: &mut BTreeMap<String, BTreeSet<String>>,

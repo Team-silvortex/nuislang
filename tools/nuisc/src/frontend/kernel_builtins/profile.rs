@@ -1,25 +1,24 @@
-use std::collections::BTreeMap;
-
-use nuis_semantics::model::{
-    AstExpr, NirExpr, NirResultFamily, NirResultStage, NirStructDef, NirTypeRef,
-};
+use nuis_semantics::model::{AstExpr, NirExpr, NirResultFamily, NirResultStage};
 
 use super::super::{
     lower_result_observer_call_with_consts, lower_result_wrapper_call_with_consts,
-    FunctionSignature, ModuleConstValue,
+    ResultObserverCallInput, ResultWrapperCallInput,
 };
+use super::KernelBuiltinInput;
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_kernel_profile_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: KernelBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let KernelBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    } = input;
     let expr = match callee {
         "kernel_profile_bind_core" => {
             let [unit] = args else {
@@ -72,8 +71,8 @@ pub(super) fn lower_kernel_profile_builtin_call(
             };
             NirExpr::KernelProfileBatchLanesRef { unit: unit.clone() }
         }
-        "kernel_result" => lower_result_wrapper_call_with_consts(
-            "kernel_result",
+        "kernel_result" => lower_result_wrapper_call_with_consts(ResultWrapperCallInput {
+            name: "kernel_result",
             args,
             current_domain,
             current_function_is_async,
@@ -81,18 +80,18 @@ pub(super) fn lower_kernel_profile_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Kernel,
-            |value, stage| match stage {
+            family: NirResultFamily::Kernel,
+            build: |value, stage| match stage {
                 NirResultStage::Kernel(state) => Ok(NirExpr::KernelResult { value, state }),
                 other => Err(format!(
                     "expected kernel result stage, found `{}`",
                     other.render()
                 )),
             },
-            "expects a direct kernel profile/config expression",
-        )?,
-        "kernel_config_ready" => lower_result_observer_call_with_consts(
-            "kernel_config_ready",
+            expected_shape: "expects a direct kernel profile/config expression",
+        })?,
+        "kernel_config_ready" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "kernel_config_ready",
             args,
             current_domain,
             current_function_is_async,
@@ -100,11 +99,11 @@ pub(super) fn lower_kernel_profile_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Kernel,
-            |expr| NirExpr::KernelConfigReady(Box::new(expr)),
-        )?,
-        "kernel_value" => lower_result_observer_call_with_consts(
-            "kernel_value",
+            family: NirResultFamily::Kernel,
+            build: |expr| NirExpr::KernelConfigReady(Box::new(expr)),
+        })?,
+        "kernel_value" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "kernel_value",
             args,
             current_domain,
             current_function_is_async,
@@ -112,9 +111,9 @@ pub(super) fn lower_kernel_profile_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Kernel,
-            |expr| NirExpr::KernelValue(Box::new(expr)),
-        )?,
+            family: NirResultFamily::Kernel,
+            build: |expr| NirExpr::KernelValue(Box::new(expr)),
+        })?,
         _ => return Ok(None),
     };
     Ok(Some(expr))

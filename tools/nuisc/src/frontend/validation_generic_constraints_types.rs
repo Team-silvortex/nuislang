@@ -8,18 +8,61 @@ use super::super::validation_trait_bounds::{
 };
 use super::super::{lower_type_ref, substitute_ast_type_alias_target};
 
+#[derive(Clone, Copy)]
+pub(super) struct GenericConstraintValidationContext<'a> {
+    pub(super) visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    pub(super) impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    pub(super) visible_trait_names: &'a BTreeSet<String>,
+    pub(super) visible_structs: &'a BTreeMap<String, AstStructDef>,
+    pub(super) visible_enums: &'a BTreeMap<String, AstEnumDef>,
+}
+
+pub(super) struct AstTypeConstraintInput<'a> {
+    pub(super) ty: &'a AstTypeRef,
+    pub(super) validation: GenericConstraintValidationContext<'a>,
+    pub(super) generic_bounds: &'a BTreeMap<String, Vec<String>>,
+    pub(super) context: &'a str,
+}
+
+struct AstTypeConstraintInnerInput<'a> {
+    ty: &'a AstTypeRef,
+    visible_type_aliases: &'a BTreeMap<String, AstTypeAlias>,
+    impl_lookup: &'a BTreeMap<(String, String), AstImplDef>,
+    visible_trait_names: &'a BTreeSet<String>,
+    visible_structs: &'a BTreeMap<String, AstStructDef>,
+    visible_enums: &'a BTreeMap<String, AstEnumDef>,
+    generic_bounds: &'a BTreeMap<String, Vec<String>>,
+    context: &'a str,
+    visiting: &'a mut BTreeSet<String>,
+}
+
 pub(super) fn validate_ast_type_ref_generic_constraints(
-    ty: &AstTypeRef,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    visible_trait_names: &BTreeSet<String>,
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    visible_enums: &BTreeMap<String, AstEnumDef>,
-    generic_bounds: &BTreeMap<String, Vec<String>>,
-    context: &str,
+    input: AstTypeConstraintInput<'_>,
 ) -> Result<(), String> {
+    let AstTypeConstraintInput {
+        ty,
+        validation,
+        generic_bounds,
+        context,
+    } = input;
     let mut visiting = BTreeSet::new();
-    validate_ast_type_ref_generic_constraints_inner(
+    validate_ast_type_ref_generic_constraints_inner(AstTypeConstraintInnerInput {
+        ty,
+        visible_type_aliases: validation.visible_type_aliases,
+        impl_lookup: validation.impl_lookup,
+        visible_trait_names: validation.visible_trait_names,
+        visible_structs: validation.visible_structs,
+        visible_enums: validation.visible_enums,
+        generic_bounds,
+        context,
+        visiting: &mut visiting,
+    })
+}
+
+fn validate_ast_type_ref_generic_constraints_inner(
+    input: AstTypeConstraintInnerInput<'_>,
+) -> Result<(), String> {
+    let AstTypeConstraintInnerInput {
         ty,
         visible_type_aliases,
         impl_lookup,
@@ -28,24 +71,11 @@ pub(super) fn validate_ast_type_ref_generic_constraints(
         visible_enums,
         generic_bounds,
         context,
-        &mut visiting,
-    )
-}
-
-fn validate_ast_type_ref_generic_constraints_inner(
-    ty: &AstTypeRef,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    visible_trait_names: &BTreeSet<String>,
-    visible_structs: &BTreeMap<String, AstStructDef>,
-    visible_enums: &BTreeMap<String, AstEnumDef>,
-    generic_bounds: &BTreeMap<String, Vec<String>>,
-    context: &str,
-    visiting: &mut BTreeSet<String>,
-) -> Result<(), String> {
+        visiting,
+    } = input;
     for arg in &ty.generic_args {
-        validate_ast_type_ref_generic_constraints_inner(
-            arg,
+        validate_ast_type_ref_generic_constraints_inner(AstTypeConstraintInnerInput {
+            ty: arg,
             visible_type_aliases,
             impl_lookup,
             visible_trait_names,
@@ -54,7 +84,7 @@ fn validate_ast_type_ref_generic_constraints_inner(
             generic_bounds,
             context,
             visiting,
-        )?;
+        })?;
     }
 
     if let Some(struct_definition) = visible_structs.get(&ty.name) {
@@ -162,17 +192,17 @@ fn validate_ast_type_ref_generic_constraints_inner(
         .collect::<BTreeMap<_, _>>();
     let expanded = substitute_ast_type_alias_target(&alias_definition.target, &substitutions)?;
     let expanded_context = alias_target_context(context, &alias_definition.name);
-    validate_ast_type_ref_generic_constraints_inner(
-        &expanded,
+    validate_ast_type_ref_generic_constraints_inner(AstTypeConstraintInnerInput {
+        ty: &expanded,
         visible_type_aliases,
         impl_lookup,
         visible_trait_names,
         visible_structs,
         visible_enums,
         generic_bounds,
-        &expanded_context,
+        context: &expanded_context,
         visiting,
-    )?;
+    })?;
     visiting.remove(&visit_key);
     Ok(())
 }

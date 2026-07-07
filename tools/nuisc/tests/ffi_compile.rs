@@ -84,7 +84,7 @@ fn parse_source_extern_signatures(source: &str) -> Vec<(String, String, String)>
         };
         let after_return = &after_close[return_index + 2..];
         let return_type = after_return
-            .split(|ch| ch == ';' || ch == '{' || ch == '\n')
+            .split([';', '{', '\n'])
             .next()
             .unwrap_or_default()
             .trim();

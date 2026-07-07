@@ -2,6 +2,8 @@
 mod optimize_dead_bindings;
 #[path = "optimize_expr.rs"]
 mod optimize_expr;
+#[path = "optimize_expr_data.rs"]
+mod optimize_expr_data;
 #[path = "optimize_expr_helpers.rs"]
 mod optimize_expr_helpers;
 

@@ -1,36 +1,35 @@
-use std::collections::BTreeMap;
-
-use nuis_semantics::model::{
-    AstExpr, NirExpr, NirResultFamily, NirResultStage, NirStructDef, NirTypeRef,
-};
+use nuis_semantics::model::{AstExpr, NirExpr, NirResultFamily, NirResultStage};
 
 use super::super::{
     i64_type, lower_expr, lower_result_observer_call_with_consts,
-    lower_result_wrapper_call_with_consts, FunctionSignature, ModuleConstValue,
+    lower_result_wrapper_call_with_consts, ResultObserverCallInput, ResultWrapperCallInput,
 };
+use super::ShaderBuiltinInput;
 
 #[path = "profile_refs.rs"]
 mod profile_refs;
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_shader_profile_builtin_call(
-    callee: &str,
-    args: &[AstExpr],
-    current_domain: &str,
-    current_function_is_async: bool,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    module_consts: &BTreeMap<String, ModuleConstValue>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
+    input: ShaderBuiltinInput<'_>,
 ) -> Result<Option<NirExpr>, String> {
+    let ShaderBuiltinInput {
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    } = input;
     if let Some(unit_ref) =
         profile_refs::lower_shader_profile_unit_ref(callee, args, current_domain)?
     {
         return Ok(Some(unit_ref));
     }
     let expr = match callee {
-        "shader_result" => lower_result_wrapper_call_with_consts(
-            "shader_result",
+        "shader_result" => lower_result_wrapper_call_with_consts(ResultWrapperCallInput {
+            name: "shader_result",
             args,
             current_domain,
             current_function_is_async,
@@ -38,18 +37,18 @@ pub(super) fn lower_shader_profile_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Shader,
-            |value, stage| match stage {
+            family: NirResultFamily::Shader,
+            build: |value, stage| match stage {
                 NirResultStage::Shader(state) => Ok(NirExpr::ShaderResult { value, state }),
                 other => Err(format!(
                     "expected shader result stage, found `{}`",
                     other.render()
                 )),
             },
-            "expects a direct shader operation like begin_pass/render",
-        )?,
-        "shader_pass_ready" => lower_result_observer_call_with_consts(
-            "shader_pass_ready",
+            expected_shape: "expects a direct shader operation like begin_pass/render",
+        })?,
+        "shader_pass_ready" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "shader_pass_ready",
             args,
             current_domain,
             current_function_is_async,
@@ -57,11 +56,11 @@ pub(super) fn lower_shader_profile_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Shader,
-            |expr| NirExpr::ShaderPassReady(Box::new(expr)),
-        )?,
-        "shader_frame_ready" => lower_result_observer_call_with_consts(
-            "shader_frame_ready",
+            family: NirResultFamily::Shader,
+            build: |expr| NirExpr::ShaderPassReady(Box::new(expr)),
+        })?,
+        "shader_frame_ready" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "shader_frame_ready",
             args,
             current_domain,
             current_function_is_async,
@@ -69,11 +68,11 @@ pub(super) fn lower_shader_profile_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Shader,
-            |expr| NirExpr::ShaderFrameReady(Box::new(expr)),
-        )?,
-        "shader_value" => lower_result_observer_call_with_consts(
-            "shader_value",
+            family: NirResultFamily::Shader,
+            build: |expr| NirExpr::ShaderFrameReady(Box::new(expr)),
+        })?,
+        "shader_value" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "shader_value",
             args,
             current_domain,
             current_function_is_async,
@@ -81,9 +80,9 @@ pub(super) fn lower_shader_profile_builtin_call(
             module_consts,
             signatures,
             struct_table,
-            NirResultFamily::Shader,
-            |expr| NirExpr::ShaderValue(Box::new(expr)),
-        )?,
+            family: NirResultFamily::Shader,
+            build: |expr| NirExpr::ShaderValue(Box::new(expr)),
+        })?,
         "shader_profile_color_seed" => {
             let [unit, base, delta] = args else {
                 return Err("shader_profile_color_seed(...) expects 3 args".to_owned());
