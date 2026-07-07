@@ -142,7 +142,12 @@ fn verify_bridge_registry(
     let (registry_source, registry_label) = if let Some(source) = bridge_registry_inline {
         (source.to_owned(), "<embedded-bridge-registry>".to_owned())
     } else {
-        let bridge_registry_path = bridge_registry_path.unwrap();
+        let Some(bridge_registry_path) = bridge_registry_path else {
+            return Err(format!(
+                "`{}` is missing bridge registry path",
+                manifest_path.display()
+            ));
+        };
         (
             fs::read_to_string(bridge_registry_path).map_err(|error| {
                 format!(
@@ -228,7 +233,12 @@ fn verify_host_bridge_plan_index(
             "<embedded-host-bridge-plan-index>".to_owned(),
         )
     } else {
-        let host_bridge_plan_index_path = host_bridge_plan_index_path.unwrap();
+        let Some(host_bridge_plan_index_path) = host_bridge_plan_index_path else {
+            return Err(format!(
+                "`{}` is missing host bridge plan index path",
+                manifest_path.display()
+            ));
+        };
         (
             fs::read_to_string(host_bridge_plan_index_path).map_err(|error| {
                 format!(
@@ -317,7 +327,12 @@ fn verify_lowering_plan_index(
             "<embedded-domain-lowering-plan-index>".to_owned(),
         )
     } else {
-        let lowering_plan_index_path = lowering_plan_index_path.unwrap();
+        let Some(lowering_plan_index_path) = lowering_plan_index_path else {
+            return Err(format!(
+                "`{}` is missing domain lowering plan index path",
+                manifest_path.display()
+            ));
+        };
         (
             fs::read_to_string(lowering_plan_index_path).map_err(|error| {
                 format!(

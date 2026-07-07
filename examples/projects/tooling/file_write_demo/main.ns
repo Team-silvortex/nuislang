@@ -35,16 +35,16 @@ mod cpu Main {
       summary.written_bytes,
       summary.close_code
     ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle);
-    if !StdFsContracts.file_handle_ok(summary.file_handle) {
+    let validation_total: i64 = StdFsContracts.file_write_validation_total(
+      summary.file_handle,
+      summary.payload_len,
+      summary.written_bytes,
+      summary.close_code
+    );
+    if validation_total < 3 {
       return StdFsContracts.fs_error();
     }
-    if !StdFsContracts.write_covers_payload(summary.payload_len, summary.written_bytes) {
-      return StdFsContracts.fs_error();
-    }
-    if !StdFsContracts.close_ok(summary.close_code) {
-      return StdFsContracts.fs_error();
-    }
-    if total > 0 {
+    if total + validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

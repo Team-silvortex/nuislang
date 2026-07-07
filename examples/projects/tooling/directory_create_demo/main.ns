@@ -30,13 +30,14 @@ mod cpu Main {
       + StdFsContracts.host_fs_value_exit_code(summary.cleanup_code)
       + StdFsContracts.host_fs_value_exit_code(summary.create_code)
       + StdFsContracts.host_fs_value_or_zero(summary.exists_code);
-    if !StdFsContracts.close_ok(summary.create_code) {
+    let validation_total: i64 = StdFsContracts.directory_create_validation_total(
+      summary.create_code,
+      summary.exists_code
+    );
+    if validation_total < 2 {
       return StdFsContracts.fs_error();
     }
-    if !StdFsContracts.metadata_exists(summary.exists_code) {
-      return StdFsContracts.fs_error();
-    }
-    if total > 0 {
+    if total + validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

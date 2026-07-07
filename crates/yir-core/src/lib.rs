@@ -1,5 +1,4 @@
 use std::{collections::BTreeMap, fmt};
-
 pub mod ffi;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -799,14 +798,15 @@ impl Operation {
             | "loop_while_scalar_async_post_flow_cond_chain"
             | "guard_print"
             | "guard_return"
+            | "guard_host_call_return"
             | "guard_print_return"
-            | "branch_print_return" => CpuLlvmLoweringClass::Effect,
+            | "branch_print_return"
+            | "branch_host_call_return" => CpuLlvmLoweringClass::Effect,
             _ if self.is_async_core_op() => CpuLlvmLoweringClass::Effect,
             _ => CpuLlvmLoweringClass::Other,
         }
     }
 }
-
 fn semantic_op_display_name(op: SemanticOp) -> &'static str {
     let (module, instruction) = match op {
         SemanticOp::CpuProjectProfileRef => ("cpu", "project_profile_ref"),

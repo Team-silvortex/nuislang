@@ -1,4 +1,5 @@
 use cpu StdFsContracts;
+use cpu StdIoContracts;
 
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
@@ -7,32 +8,15 @@ mod cpu Main {
   extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
   extern "c" fn host_file_close(file_handle: i64) -> i64;
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
   extern "c" fn host_deserialize_text_from(
     buffer_handle: i64,
     offset: i64,
     len: i64
   ) -> i64;
 
-  fn usage_text() -> i64 {
-    return text_handle("usage: cli_cat_demo <path>\n");
-  }
-
-  fn error_text() -> i64 {
-    return text_handle("error: unable to read input file\n");
-  }
-
   fn buffer_text(buffer: ref Buffer, len: i64) -> i64 {
     return deserialize_text_from(buffer, 0, len);
-  }
-
-  fn emit_usage() -> i64 {
-    host_stdout_write(usage_text());
-    return 1;
-  }
-
-  fn emit_error(code: i64) -> i64 {
-    host_stdout_write(error_text());
-    return code;
   }
 
   fn run_cat(path_handle: i64) -> i64 {
@@ -40,14 +24,24 @@ mod cpu Main {
     let input_buffer: ref Buffer = alloc_buffer(read_len, 0);
     let input_file: i64 = host_file_open(path_handle, 0);
     if input_file <= 0 {
-      return emit_error(2);
+      let wrote: i64 = host_stdout_write(text_handle("error: unable to read input file\n"));
+      let flushed: i64 = host_stdout_flush();
+      return StdIoContracts.write_flush_exit_code(wrote, flushed) + 2;
     }
 
     let bytes_read: i64 =
       host_file_read(input_file, host_buffer_handle(input_buffer), read_len);
     let close_code: i64 = host_file_close(input_file);
-    if !StdFsContracts.host_fs_value_ok(bytes_read) || close_code <= 0 {
-      return emit_error(3);
+    let read_validation_total: i64 = StdFsContracts.file_read_chunk_validation_total(
+      input_file,
+      read_len,
+      bytes_read,
+      close_code
+    );
+    if read_validation_total < 4 {
+      let wrote: i64 = host_stdout_write(text_handle("error: unable to read input file\n"));
+      let flushed: i64 = host_stdout_flush();
+      return StdIoContracts.write_flush_exit_code(wrote, flushed) + 3;
     }
 
     let wrote: i64 = host_stdout_write(buffer_text(input_buffer, bytes_read));
@@ -60,7 +54,9 @@ mod cpu Main {
   fn main() -> i64 {
     let argv_count: i64 = host_argv_count();
     if argv_count < 2 {
-      return emit_usage();
+      let wrote: i64 = host_stdout_write(text_handle("usage: cli_cat_demo <path>\n"));
+      let flushed: i64 = host_stdout_flush();
+      return StdIoContracts.write_flush_exit_code(wrote, flushed) + 1;
     }
     let input_path: i64 = host_argv_at(1);
     return run_cat(input_path);

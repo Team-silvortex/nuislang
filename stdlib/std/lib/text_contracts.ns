@@ -140,6 +140,22 @@ mod cpu StdTextContracts {
       + encode_text_gate(text_nonempty(report_len));
   }
 
+  /// Encodes text pipeline readiness, text stats, and JSON shape gates.
+  pub fn pipeline_validation_total(
+    pipeline_handle: i64,
+    pipeline_len: i64,
+    pipeline_lines: i64,
+    pipeline_words: i64,
+    json_pair_len: i64,
+    json_array_len: i64,
+    json_object_len: i64
+  ) -> i64 {
+    return encode_text_gate(report_ready(pipeline_handle, pipeline_len))
+      + encode_text_gate(text_stats_ready(pipeline_len, pipeline_lines, pipeline_words))
+      + encode_text_gate(json_pair_ready(json_pair_len))
+      + encode_text_gate(json_container_shape_ok(json_array_len, json_object_len));
+  }
+
   /// Combines text, formatting, pipeline, and JSON probes for text pipeline recipes.
   pub fn pipeline_status_total(
     lhs_len: i64,

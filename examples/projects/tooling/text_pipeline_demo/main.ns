@@ -77,17 +77,19 @@ mod cpu Main {
       summary.array_len,
       summary.object_len
     );
-    if !StdTextContracts.text_stats_ready(
+    let validation_total: i64 = StdTextContracts.pipeline_validation_total(
+      summary.pipeline_handle,
       summary.pipeline_len,
       summary.pipeline_lines,
-      summary.pipeline_words
-    ) {
+      summary.pipeline_words,
+      summary.pair_len,
+      summary.array_len,
+      summary.object_len
+    );
+    if validation_total < 4 {
       return StdTextContracts.text_error();
     }
-    if !StdTextContracts.json_pair_ready(summary.pair_len) {
-      return StdTextContracts.text_error();
-    }
-    if total > 0 {
+    if total + validation_total > 0 {
       return StdTextContracts.text_ok();
     }
     return StdTextContracts.text_error();

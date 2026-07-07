@@ -1,5 +1,7 @@
+use std::fmt::Write as _;
+
 pub(crate) fn json_escape(value: &str) -> String {
-    let mut out = String::new();
+    let mut out = String::with_capacity(value.len());
     for ch in value.chars() {
         match ch {
             '\\' => out.push_str("\\\\"),
@@ -7,7 +9,7 @@ pub(crate) fn json_escape(value: &str) -> String {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
-            ch if ch.is_control() => out.push_str(&format!("\\u{:04x}", ch as u32)),
+            ch if ch.is_control() => write!(out, "\\u{:04x}", ch as u32).unwrap(),
             ch => out.push(ch),
         }
     }
@@ -30,14 +32,37 @@ pub(crate) fn json_bool_field(name: &str, value: bool) -> String {
 }
 
 pub(crate) fn json_string_array_field(name: &str, values: &[String]) -> String {
-    let entries = values
-        .iter()
-        .map(|value| format!("\"{}\"", json_escape(value)))
-        .collect::<Vec<_>>()
-        .join(",");
-    format!("\"{}\":[{}]", name, entries)
+    let mut out = String::with_capacity(name.len() + values.len() * 16 + 4);
+    write!(out, "\"{}\":[", name).unwrap();
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        write!(out, "\"{}\"", json_escape(value)).unwrap();
+    }
+    out.push(']');
+    out
 }
 
 pub(crate) fn json_object_field(name: &str, fields: &[String]) -> String {
     format!("\"{}\":{{{}}}", name, fields.join(","))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_string_array_field_escapes_values_without_intermediate_join() {
+        let values = vec![
+            "plain".to_owned(),
+            "quote\"slash\\line\n".to_owned(),
+            "tab\tcarriage\r".to_owned(),
+        ];
+
+        assert_eq!(
+            json_string_array_field("items", &values),
+            "\"items\":[\"plain\",\"quote\\\"slash\\\\line\\n\",\"tab\\tcarriage\\r\"]"
+        );
+    }
 }

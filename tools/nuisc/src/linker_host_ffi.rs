@@ -108,34 +108,33 @@ pub(super) fn derive_host_ffi_abi_groups(
     for entry in entries {
         groups.entry(entry.abi.as_str()).or_default().push(entry);
     }
-    groups
-        .into_iter()
-        .map(|(abi, entries)| {
-            let abi_entries = entries
-                .iter()
-                .map(|entry| LinkPlanHostFfiAbiEntry {
-                    symbol: entry.symbol.clone(),
-                    signature_pattern: entry.signature_pattern.clone(),
-                    signature_hash: entry.signature_hash.clone(),
-                    policy: entry.policy.clone(),
-                })
-                .collect::<Vec<_>>();
-            LinkPlanHostFfiAbiGroup {
-                abi: abi.to_owned(),
-                symbol_count: entries.len(),
-                policy_count: entries
-                    .iter()
-                    .filter(|entry| !entry.policy.is_empty())
-                    .count(),
-                symbols: entries
-                    .iter()
-                    .map(|entry| format!("{}:{}", entry.symbol, entry.signature_pattern))
-                    .collect(),
-                validation: validate_host_ffi_abi_group(abi, &abi_entries),
-                entries: abi_entries,
+    let mut abi_groups = Vec::with_capacity(groups.len());
+    for (abi, entries) in groups {
+        let mut abi_entries = Vec::with_capacity(entries.len());
+        let mut symbols = Vec::with_capacity(entries.len());
+        let mut policy_count = 0usize;
+        for entry in &entries {
+            if !entry.policy.is_empty() {
+                policy_count += 1;
             }
-        })
-        .collect()
+            symbols.push(format!("{}:{}", entry.symbol, entry.signature_pattern));
+            abi_entries.push(LinkPlanHostFfiAbiEntry {
+                symbol: entry.symbol.clone(),
+                signature_pattern: entry.signature_pattern.clone(),
+                signature_hash: entry.signature_hash.clone(),
+                policy: entry.policy.clone(),
+            });
+        }
+        abi_groups.push(LinkPlanHostFfiAbiGroup {
+            abi: abi.to_owned(),
+            symbol_count: entries.len(),
+            policy_count,
+            symbols,
+            validation: validate_host_ffi_abi_group(abi, &abi_entries),
+            entries: abi_entries,
+        });
+    }
+    abi_groups
 }
 
 fn validate_host_ffi_abi_group(

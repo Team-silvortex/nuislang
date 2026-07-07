@@ -169,4 +169,25 @@ mod cpu StdIoContracts {
     ) + read_progress_score(requested_len, stdin_read_len)
       + tty_status_total(fd, is_tty, width, height);
   }
+
+  /// Encodes terminal console, stdin, and TTY readiness as validation gates.
+  pub fn terminal_validation_total(
+    stdout_written: i64,
+    stderr_written: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64,
+    requested_len: i64,
+    stdin_read_len: i64,
+    is_tty: i64,
+    width: i64,
+    height: i64
+  ) -> i64 {
+    return encode_io_gate(write_flush_ok(stdout_written, stdout_flushed))
+      + encode_io_gate(write_flush_ok(stderr_written, stderr_flushed))
+      + encode_io_gate(requested_len >= 0)
+      + encode_io_gate(byte_count_ok(stdin_read_len))
+      + encode_io_gate(tty_value_ok(is_tty))
+      + encode_io_gate(tty_value_ok(width))
+      + encode_io_gate(tty_value_ok(height));
+  }
 }

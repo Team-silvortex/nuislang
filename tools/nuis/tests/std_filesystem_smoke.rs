@@ -38,12 +38,32 @@ const STD_TOOLING_LIGHT_SMOKE_PROJECTS: &[(&str, &str)] = &[
         "../../examples/projects/tooling/file_read_demo",
     ),
     (
+        "file_write",
+        "../../examples/projects/tooling/file_write_demo",
+    ),
+    (
+        "file_roundtrip",
+        "../../examples/projects/tooling/file_roundtrip_demo",
+    ),
+    (
+        "directory_create",
+        "../../examples/projects/tooling/directory_create_demo",
+    ),
+    (
         "path_analysis",
         "../../examples/projects/tooling/path_analysis_demo",
     ),
     (
         "text_pipeline",
         "../../examples/projects/tooling/text_pipeline_demo",
+    ),
+    (
+        "io_runtime",
+        "../../examples/projects/tooling/io_runtime_demo",
+    ),
+    (
+        "terminal_io",
+        "../../examples/projects/tooling/terminal_io_demo",
     ),
     (
         "argv_runtime",

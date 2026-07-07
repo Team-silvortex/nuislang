@@ -5,33 +5,44 @@ use crate::aot_domain_profile::{
     render_target_specific_lowering_fields,
 };
 use crate::aot_toml::escape_toml_string;
+use std::fmt::Write as _;
 
 pub(crate) fn render_domain_build_unit_network_ir_sidecar(
     unit: &BuildManifestDomainBuildUnit,
 ) -> String {
     let profile = derived_lowering_profile_for_unit(unit);
-    let mut out = String::new();
+    let mut out = String::with_capacity(4096);
     out.push_str("schema = \"nuis-network-ir-sidecar-v1\"\n");
-    out.push_str(&format!(
-        "domain_family = \"{}\"\n",
+    writeln!(
+        out,
+        "domain_family = \"{}\"",
         escape_toml_string(&unit.domain_family)
-    ));
-    out.push_str(&format!(
-        "package_id = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "package_id = \"{}\"",
         escape_toml_string(&unit.package_id)
-    ));
-    out.push_str(&format!(
-        "backend_family = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "backend_family = \"{}\"",
         escape_toml_string(unit.backend_family.as_deref().unwrap_or("none"))
-    ));
-    out.push_str(&format!(
-        "selected_lowering_target = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "selected_lowering_target = \"{}\"",
         escape_toml_string(unit.selected_lowering_target.as_deref().unwrap_or("none"))
-    ));
-    out.push_str(&format!(
-        "lowering_profile = \"{}\"\n",
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "lowering_profile = \"{}\"",
         escape_toml_string(profile.profile_key)
-    ));
+    )
+    .unwrap();
     out.push_str(&render_target_specific_lowering_fields(unit, &profile));
     out.push_str(&render_target_specific_backend_fields(unit, &profile));
     out.push_str("[lowering_capabilities]\n");

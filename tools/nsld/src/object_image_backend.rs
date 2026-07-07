@@ -51,11 +51,13 @@ pub(crate) fn encode_object_image_for_backend(
         };
     };
     let image = encoder(manifest, plan, file_layout);
-    let mut blockers = image
-        .is_none()
-        .then(|| format!("object-image-backend:{}:encode-failed", entry.backend_kind))
-        .into_iter()
-        .collect::<Vec<_>>();
+    let mut blockers = Vec::with_capacity(if image.is_none() { 1 } else { 0 });
+    if image.is_none() {
+        blockers.push(format!(
+            "object-image-backend:{}:encode-failed",
+            entry.backend_kind
+        ));
+    }
     blockers.extend(object_image_backend_resolution_issues(
         entry.backend_kind,
         manifest,

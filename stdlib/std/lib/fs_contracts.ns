@@ -113,6 +113,63 @@ mod cpu StdFsContracts {
       + encode_fs_gate(close_ok(close_status));
   }
 
+  /// Scores whether a file write opened, covered its payload, and closed.
+  pub fn file_write_validation_total(
+    file_handle: i64,
+    payload_len: i64,
+    written_len: i64,
+    close_status: i64
+  ) -> i64 {
+    return encode_fs_gate(file_handle_ok(file_handle))
+      + encode_fs_gate(write_covers_payload(payload_len, written_len))
+      + encode_fs_gate(close_ok(close_status));
+  }
+
+  /// Scores whether a prepared file opened, read the requested payload, and closed.
+  pub fn file_read_validation_total(
+    payload_len: i64,
+    written_len: i64,
+    read_file_handle: i64,
+    requested_len: i64,
+    read_len: i64,
+    close_status: i64
+  ) -> i64 {
+    return encode_fs_gate(write_covers_payload(payload_len, written_len))
+      + encode_fs_gate(file_handle_ok(read_file_handle))
+      + encode_fs_gate(read_covers_request(requested_len, read_len))
+      + encode_fs_gate(close_ok(close_status));
+  }
+
+  /// Scores whether a chunk read opened, produced a non-negative count, and closed.
+  pub fn file_read_chunk_validation_total(
+    file_handle: i64,
+    requested_len: i64,
+    read_len: i64,
+    close_status: i64
+  ) -> i64 {
+    return encode_fs_gate(file_handle_ok(file_handle))
+      + encode_fs_gate(requested_len >= 0)
+      + encode_fs_gate(host_fs_value_ok(read_len))
+      + encode_fs_gate(close_ok(close_status));
+  }
+
+  /// Scores whether a temp file roundtrip wrote, reopened, read, and closed.
+  pub fn file_roundtrip_validation_total(
+    payload_len: i64,
+    write_status: i64,
+    write_close_status: i64,
+    read_file_handle: i64,
+    read_len: i64,
+    read_status: i64,
+    read_close_status: i64
+  ) -> i64 {
+    return encode_fs_gate(write_covers_payload(payload_len, write_status))
+      + encode_fs_gate(close_ok(write_close_status))
+      + encode_fs_gate(file_handle_ok(read_file_handle))
+      + encode_fs_gate(read_covers_request(read_len, read_status))
+      + encode_fs_gate(close_ok(read_close_status));
+  }
+
   /// Combines open/read/close outcomes into a compact file I/O score.
   pub fn file_io_status_total(open_handle: i64, read_len: i64, close_status: i64) -> i64 {
     return host_fs_value_or_zero(open_handle)
@@ -172,6 +229,41 @@ mod cpu StdFsContracts {
       + host_fs_value_or_zero(dst_exists);
   }
 
+  /// Scores whether a source file was prepared and copied to the destination.
+  pub fn path_copy_validation_total(
+    src_file_handle: i64,
+    close_status: i64,
+    copy_status: i64,
+    src_exists: i64,
+    dst_exists: i64
+  ) -> i64 {
+    return encode_fs_gate(file_handle_ok(src_file_handle))
+      + encode_fs_gate(close_ok(close_status))
+      + encode_fs_gate(copy_status > 0)
+      + encode_fs_gate(metadata_exists(src_exists))
+      + encode_fs_gate(metadata_exists(dst_exists));
+  }
+
+  /// Scores whether copied source/destination paths were removed cleanly.
+  pub fn path_copy_remove_validation_total(
+    payload_len: i64,
+    write_status: i64,
+    copy_status: i64,
+    dst_size: i64,
+    src_remove_status: i64,
+    dst_remove_status: i64,
+    src_exists_after_remove: i64,
+    dst_exists_after_remove: i64
+  ) -> i64 {
+    return encode_fs_gate(write_covers_payload(payload_len, write_status))
+      + encode_fs_gate(copy_status > 0)
+      + encode_fs_gate(dst_size >= payload_len)
+      + encode_fs_gate(close_ok(src_remove_status))
+      + encode_fs_gate(close_ok(dst_remove_status))
+      + encode_fs_gate(!metadata_exists(src_exists_after_remove))
+      + encode_fs_gate(!metadata_exists(dst_exists_after_remove));
+  }
+
   /// Combines directory open/count/close outcomes into a compact directory score.
   pub fn directory_status_total(dir_handle: i64, entry_count: i64, close_status: i64) -> i64 {
     return host_fs_value_or_zero(dir_handle)
@@ -190,6 +282,25 @@ mod cpu StdFsContracts {
       + host_fs_value_or_zero(exists_after_create)
       + host_fs_value_exit_code(remove_status)
       + host_fs_value_or_zero(exists_after_remove);
+  }
+
+  /// Scores whether directory creation succeeded and the directory exists.
+  pub fn directory_create_validation_total(create_status: i64, exists_after_create: i64) -> i64 {
+    return encode_fs_gate(close_ok(create_status))
+      + encode_fs_gate(metadata_exists(exists_after_create));
+  }
+
+  /// Scores whether directory create/remove lifecycle probes are consistent.
+  pub fn directory_remove_validation_total(
+    create_status: i64,
+    exists_before_remove: i64,
+    remove_status: i64,
+    exists_after_remove: i64
+  ) -> i64 {
+    return encode_fs_gate(close_ok(create_status))
+      + encode_fs_gate(metadata_exists(exists_before_remove))
+      + encode_fs_gate(close_ok(remove_status))
+      + encode_fs_gate(!metadata_exists(exists_after_remove));
   }
 
   /// Combines basic path probes into a compact path analysis score.

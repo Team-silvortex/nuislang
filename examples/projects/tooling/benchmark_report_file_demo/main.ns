@@ -189,9 +189,6 @@ mod cpu Main {
     if summary.file_validation_total < 3 {
       return StdTimeContracts.time_error();
     }
-    if summary.write_code <= 0 {
-      return StdTimeContracts.time_error();
-    }
     if !StdTextContracts.text_stats_ready(
       summary.report_len,
       summary.report_lines,

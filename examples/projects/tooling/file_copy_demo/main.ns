@@ -55,19 +55,17 @@ mod cpu Main {
       summary.src_exists,
       summary.dst_exists
     );
-    if !StdFsContracts.file_handle_ok(summary.src_file_handle) {
+    let validation_total: i64 = StdFsContracts.path_copy_validation_total(
+      summary.src_file_handle,
+      summary.close_code,
+      summary.copy_code,
+      summary.src_exists,
+      summary.dst_exists
+    );
+    if validation_total < 5 {
       return StdFsContracts.fs_error();
     }
-    if !StdFsContracts.close_ok(summary.close_code) {
-      return StdFsContracts.fs_error();
-    }
-    if !StdFsContracts.metadata_exists(summary.src_exists) {
-      return StdFsContracts.fs_error();
-    }
-    if !StdFsContracts.metadata_exists(summary.dst_exists) {
-      return StdFsContracts.fs_error();
-    }
-    if total > 0 {
+    if total + validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

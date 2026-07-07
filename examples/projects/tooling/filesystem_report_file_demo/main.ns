@@ -107,6 +107,16 @@ mod cpu Main {
       summary.report_lines,
       summary.report_words
     );
+    let file_validation_total: i64 = StdFsContracts.file_report_output_validation_total(
+      summary.output_path_handle,
+      summary.output_file_handle,
+      summary.report_len,
+      summary.write_code,
+      summary.output_close_code
+    );
+    if file_validation_total < 4 {
+      return StdFsContracts.fs_error();
+    }
     if !StdTextContracts.text_stats_ready(
       summary.report_len,
       summary.report_lines,
@@ -114,7 +124,7 @@ mod cpu Main {
     ) {
       return StdFsContracts.fs_error();
     }
-    if total > 0 {
+    if total + file_validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

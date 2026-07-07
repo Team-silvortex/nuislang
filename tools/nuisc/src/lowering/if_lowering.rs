@@ -20,15 +20,85 @@ use if_lowering_runtime::{
 };
 
 fn unsupported_if_shape_message(then_body: &[NirStmt], else_body: &[NirStmt]) -> String {
+    let shape = format!(
+        "then=[{}]; else=[{}]",
+        then_body
+            .iter()
+            .map(describe_if_stmt_shape)
+            .collect::<Vec<_>>()
+            .join(","),
+        else_body
+            .iter()
+            .map(describe_if_stmt_shape)
+            .collect::<Vec<_>>()
+            .join(",")
+    );
     if stmts_contain_conditional_effect_primitive(then_body)
         || stmts_contain_conditional_effect_primitive(else_body)
     {
-        "conditional `if`/lowered-`match` lowering does not yet support branch-local consuming task/thread/mutex runtime primitives such as join-result, lock, unlock, spawn, join, or timeout; hoist those effects before the branch or reduce each branch to pure/select-compatible values"
-            .to_owned()
+        format!("conditional `if`/lowered-`match` lowering does not yet support branch-local consuming task/thread/mutex runtime primitives such as join-result, lock, unlock, spawn, join, or timeout; hoist those effects before the branch or reduce each branch to pure/select-compatible values ({shape})")
     } else {
-        "minimal nuisc lowering currently only supports `if` as matching `print`, matching `let/const`, `return <expr>`, or small terminal branches like `print(...); return ...`"
-            .to_owned()
+        format!("minimal nuisc lowering currently only supports `if` as matching `print`, matching `let/const`, `return <expr>`, or small terminal branches like `print(...); return ...` ({shape})")
     }
+}
+
+fn describe_if_stmt_shape(stmt: &NirStmt) -> &'static str {
+    match stmt {
+        NirStmt::Let { .. } => "let",
+        NirStmt::Const { .. } => "const",
+        NirStmt::Expr(NirExpr::Call { .. }) => "expr-call",
+        NirStmt::Expr(NirExpr::CpuExternCall { .. }) => "expr-cpu-extern",
+        NirStmt::Expr(_) => "expr",
+        NirStmt::Return(Some(NirExpr::Call { .. })) => "return-call",
+        NirStmt::Return(Some(NirExpr::CpuExternCall { .. })) => "return-cpu-extern",
+        NirStmt::Return(Some(_)) => "return",
+        NirStmt::Return(None) => "return-empty",
+        NirStmt::Print(_) => "print",
+        NirStmt::If { .. } => "if",
+        NirStmt::While { .. } => "while",
+        NirStmt::Await(_) => "await",
+        NirStmt::Break => "break",
+        NirStmt::Continue => "continue",
+    }
+}
+
+fn lower_prepared_host_call_return(
+    calls: &[PreparedHostCall],
+    returned: &PreparedHostCallReturn,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<(LoweredHostCallChain, PreparedHostCallReturnSpec), String> {
+    let calls = calls
+        .iter()
+        .map(|call| {
+            let args = call
+                .args
+                .iter()
+                .map(|arg| lower_expr(arg, state, bindings))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok((
+                call.result_name.clone(),
+                call.abi.clone(),
+                call.callee.clone(),
+                args,
+            ))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let returned = match returned {
+        PreparedHostCallReturn::Expr(returned) => {
+            PreparedHostCallReturnSpec::Value(lower_expr(returned, state, bindings)?)
+        }
+        PreparedHostCallReturn::WriteFlushExitCode {
+            write_name,
+            flush_name,
+            offset,
+        } => PreparedHostCallReturnSpec::WriteFlushExitCode {
+            write_name: write_name.clone(),
+            flush_name: flush_name.clone(),
+            offset: *offset,
+        },
+    };
+    Ok((calls, returned))
 }
 
 pub(super) fn lower_if_pair(
@@ -64,6 +134,11 @@ pub(super) fn lower_if_pair(
                         let print_name = lower_expr(&print, state, bindings)?;
                         let return_name = lower_expr(&returned, state, bindings)?;
                         lower_guard_print_return(condition_name, print_name, return_name, state);
+                    }
+                    PreparedTerminalBranch::HostCallReturn { calls, returned } => {
+                        let (calls, returned) =
+                            lower_prepared_host_call_return(&calls, &returned, state, bindings)?;
+                        lower_guard_host_call_return(condition_name, calls, returned, state);
                     }
                 }
                 return Ok(LoweredIfOutcome::Continued);
@@ -103,6 +178,38 @@ pub(super) fn lower_if_pair(
                     let rhs_name = lower_expr(&rhs, state, bindings)?;
                     let selected = lower_select(condition_name, lhs_name, rhs_name, state)?;
                     return Ok(LoweredIfOutcome::Returned(selected));
+                }
+                (
+                    PreparedTerminalBranch::HostCallReturn {
+                        calls: then_calls,
+                        returned: then_returned,
+                    },
+                    PreparedTerminalBranch::HostCallReturn {
+                        calls: else_calls,
+                        returned: else_returned,
+                    },
+                ) => {
+                    let (then_calls, then_returned) = lower_prepared_host_call_return(
+                        &then_calls,
+                        &then_returned,
+                        state,
+                        bindings,
+                    )?;
+                    let (else_calls, else_returned) = lower_prepared_host_call_return(
+                        &else_calls,
+                        &else_returned,
+                        state,
+                        bindings,
+                    )?;
+                    lower_branch_host_call_return(
+                        condition_name,
+                        then_calls,
+                        then_returned,
+                        else_calls,
+                        else_returned,
+                        state,
+                    );
+                    return Ok(LoweredIfOutcome::Continued);
                 }
                 _ => {}
             }
@@ -337,6 +444,11 @@ pub(super) fn lower_if_pair(
             })
         }
         (NirStmt::Return(Some(lhs)), NirStmt::Return(Some(rhs))) => {
+            if !is_terminal_branch_pure_expr(lhs, &state.pure_helpers)
+                || !is_terminal_branch_pure_expr(rhs, &state.pure_helpers)
+            {
+                return Err(unsupported_if_shape_message(then_body, else_body));
+            }
             let lhs_name = lower_expr(lhs, state, bindings)?;
             let rhs_name = lower_expr(rhs, state, bindings)?;
             let selected = lower_select(condition_name, lhs_name, rhs_name, state)?;

@@ -1,4 +1,5 @@
 use super::*;
+use std::fmt::Write as _;
 
 pub(super) fn render_ast_unary_op(op: AstUnaryOp) -> &'static str {
     match op {
@@ -25,12 +26,14 @@ pub(super) fn render_ast_generic_args(args: &[AstTypeRef]) -> String {
 pub(super) fn render_ast_trait(definition: &AstTraitDef) -> String {
     let mut out = String::new();
     out.push_str(&render_ast_doc_comments("  ", &definition.attributes));
-    out.push_str(&format!(
-        "  {}{}trait {}\n",
+    writeln!(
+        out,
+        "  {}{}trait {}",
         render_ast_attributes(&definition.attributes),
         render_ast_visibility(definition.visibility),
         definition.name
-    ));
+    )
+    .unwrap();
     for method in &definition.methods {
         out.push_str(&render_ast_trait_method_sig(method));
     }
@@ -51,12 +54,14 @@ pub(super) fn render_ast_impl(definition: &AstImplDef) -> String {
 
 pub(super) fn render_ast_extern_interface(interface: &AstExternInterface) -> String {
     let mut out = String::new();
-    out.push_str(&format!(
-        "  {}extern \"{}\" interface {}\n",
+    writeln!(
+        out,
+        "  {}extern \"{}\" interface {}",
         render_ast_visibility(interface.visibility),
         interface.abi,
         interface.name
-    ));
+    )
+    .unwrap();
     for function in &interface.methods {
         let params = function
             .params
@@ -69,14 +74,16 @@ pub(super) fn render_ast_extern_interface(interface: &AstExternInterface) -> Str
             .as_ref()
             .map(|symbol| format!("@host_symbol(\"{}\") ", escape_debug(symbol)))
             .unwrap_or_default();
-        out.push_str(&format!(
-            "    {}{}fn {}({}) -> {}\n",
+        writeln!(
+            out,
+            "    {}{}fn {}({}) -> {}",
             render_ast_visibility(function.visibility),
             host_prefix,
             function.name,
             params,
             render_ast_type(&function.return_type)
-        ));
+        )
+        .unwrap();
     }
     out
 }
@@ -107,12 +114,14 @@ pub(super) fn render_nir_impl(definition: &NirImplDef) -> String {
 
 pub(super) fn render_nir_extern_interface(interface: &NirExternInterface) -> String {
     let mut out = String::new();
-    out.push_str(&format!(
-        "  {}extern \"{}\" interface {}\n",
+    writeln!(
+        out,
+        "  {}extern \"{}\" interface {}",
         render_nir_visibility(interface.visibility),
         interface.abi,
         interface.name
-    ));
+    )
+    .unwrap();
     for function in &interface.methods {
         let params = function
             .params
@@ -125,14 +134,16 @@ pub(super) fn render_nir_extern_interface(interface: &NirExternInterface) -> Str
             .as_ref()
             .map(|symbol| format!("@host_symbol(\"{}\") ", escape_debug(symbol)))
             .unwrap_or_default();
-        out.push_str(&format!(
-            "    {}{}fn {}({}) -> {}\n",
+        writeln!(
+            out,
+            "    {}{}fn {}({}) -> {}",
             render_nir_visibility(function.visibility),
             host_prefix,
             function.name,
             params,
             render_nir_type(&function.return_type)
-        ));
+        )
+        .unwrap();
     }
     out
 }
@@ -336,10 +347,12 @@ pub(super) fn render_shader_inline_wgsl_expr(entry: &str, source: &str) -> Strin
 
     let trimmed = source.trim();
     let mut out = String::new();
-    out.push_str(&format!(
-        "shader_inline_wgsl(\"{}\", wgsl {{\n",
+    writeln!(
+        out,
+        "shader_inline_wgsl(\"{}\", wgsl {{",
         escape_debug(entry)
-    ));
+    )
+    .unwrap();
     for line in trimmed.lines() {
         out.push_str("  ");
         out.push_str(line);

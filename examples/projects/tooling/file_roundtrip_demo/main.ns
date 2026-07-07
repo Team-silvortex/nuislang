@@ -59,13 +59,19 @@ mod cpu Main {
       summary.read_code,
       summary.read_close_code
     );
-    if !StdFsContracts.write_covers_payload(summary.payload_len, summary.write_code) {
+    let validation_total: i64 = StdFsContracts.file_roundtrip_validation_total(
+      summary.payload_len,
+      summary.write_code,
+      summary.write_close_code,
+      summary.read_file_handle,
+      summary.read_len,
+      summary.read_code,
+      summary.read_close_code
+    );
+    if validation_total < 5 {
       return StdFsContracts.fs_error();
     }
-    if !StdFsContracts.read_covers_request(summary.read_len, summary.read_code) {
-      return StdFsContracts.fs_error();
-    }
-    if total > 0 {
+    if total + validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

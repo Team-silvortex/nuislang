@@ -1,13 +1,10 @@
 use std::{collections::BTreeMap, env};
-
 use yir_core::{
     DataHandleTable, DataMarker, ExecutionState, InstructionSemantics, Node, RegisteredMod,
     RenderPipeline, Resource, StructValue, SurfaceTarget, TaskLifecycleState, Value,
     VariantUnionValue, Viewport,
 };
-
 pub struct CpuMod;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum LoopCondExpr {
     Leaf {
@@ -20,7 +17,6 @@ enum LoopCondExpr {
         rhs: Box<LoopCondExpr>,
     },
 }
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum LoopFlowExpr {
     Legacy {
@@ -37,7 +33,6 @@ enum LoopFlowExpr {
         rhs: Box<LoopFlowExpr>,
     },
 }
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ParsedConditionalCarry {
     initial: String,
@@ -45,13 +40,11 @@ struct ParsedConditionalCarry {
     then_source: ParsedCarryBranchSource,
     else_source: ParsedCarryBranchSource,
 }
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ParsedCarryBranchSource {
     kind: String,
     payload: Vec<String>,
 }
-
 fn carry_state_fragment_is_valid(fragment: &str) -> bool {
     match fragment {
         "current" | "prev_current" => true,
@@ -61,7 +54,6 @@ fn carry_state_fragment_is_valid(fragment: &str) -> bool {
             .is_some_and(|index| index.parse::<usize>().is_ok()),
     }
 }
-
 fn add_state_list_payload_len(kind: &str) -> Option<usize> {
     let (terms_part, payload_len) = if let Some(prefix) = kind.strip_prefix("add_scaled_by_") {
         if let Some((lhs_group, rest)) = prefix.split_once("_times_factor_group_") {
@@ -234,7 +226,6 @@ fn add_state_list_payload_len(kind: &str) -> Option<usize> {
         None
     }
 }
-
 fn validate_loop_compare_kind(kind: &str, node_name: &str) -> Result<(), String> {
     match kind {
         "eq" | "ne" | "lt" | "le" | "gt" | "ge" => Ok(()),
@@ -244,7 +235,6 @@ fn validate_loop_compare_kind(kind: &str, node_name: &str) -> Result<(), String>
         )),
     }
 }
-
 fn validate_loop_step_kind(kind: &str, node_name: &str) -> Result<(), String> {
     match kind {
         "add" | "sub" => Ok(()),
@@ -254,7 +244,6 @@ fn validate_loop_step_kind(kind: &str, node_name: &str) -> Result<(), String> {
         )),
     }
 }
-
 fn validate_indexed_compare_kind(
     kind: &str,
     node_name: &str,
@@ -278,7 +267,6 @@ fn validate_indexed_compare_kind(
         node_name, label, kind
     ))
 }
-
 fn validate_flow_control_kind(kind: &str, node_name: &str) -> Result<(), String> {
     match kind {
         "current_eq" | "current_ne" | "current_lt" | "current_le" | "current_gt" | "current_ge" => {
@@ -287,7 +275,6 @@ fn validate_flow_control_kind(kind: &str, node_name: &str) -> Result<(), String>
         other => validate_indexed_compare_kind(other, node_name, "flow control kind", &["carry"]),
     }
 }
-
 fn validate_carry_condition_kind(
     kind: &str,
     node_name: &str,
@@ -817,10 +804,8 @@ impl RegisteredMod for CpuMod {
     fn module_name(&self) -> &'static str {
         "cpu"
     }
-
     fn describe(&self, node: &Node, resource: &Resource) -> Result<InstructionSemantics, String> {
         require_cpu_resource(node, resource)?;
-
         match node.op.instruction.as_str() {
             "text" => {
                 if node.op.args.len() != 1 {
@@ -829,7 +814,6 @@ impl RegisteredMod for CpuMod {
                         node.name
                     ));
                 }
-
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
             "const" => {
@@ -839,14 +823,12 @@ impl RegisteredMod for CpuMod {
                         node.name
                     ));
                 }
-
                 node.op.args[0].parse::<i64>().map_err(|_| {
                     format!(
                         "node `{}` has invalid integer literal `{}`",
                         node.name, node.op.args[0]
                     )
                 })?;
-
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
             "project_profile_ref" => {
@@ -856,7 +838,6 @@ impl RegisteredMod for CpuMod {
                         node.name
                     ));
                 }
-
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
             "const_bool" => {
@@ -1012,7 +993,6 @@ impl RegisteredMod for CpuMod {
                         node.name, node.op.instruction
                     ));
                 }
-
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
             "param_bool" | "param_i32" | "param_i64" | "param_f32" | "param_f64" => {
@@ -1110,7 +1090,6 @@ impl RegisteredMod for CpuMod {
                         node.name, node.op.instruction
                     ));
                 }
-
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
             "cast_bool_to_i64" | "cast_i32_to_i64" | "cast_i64_to_bool" | "cast_i64_to_i32"
@@ -1140,7 +1119,6 @@ impl RegisteredMod for CpuMod {
                         node.name
                     ));
                 }
-
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
             "alloc_buffer" => {
@@ -1150,7 +1128,6 @@ impl RegisteredMod for CpuMod {
                         node.name
                     ));
                 }
-
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
             "load_value" | "load_next" | "is_null" => {
@@ -1160,7 +1137,6 @@ impl RegisteredMod for CpuMod {
                         node.name, node.op.instruction
                     ));
                 }
-
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
             "buffer_len" => {
@@ -1170,7 +1146,6 @@ impl RegisteredMod for CpuMod {
                         node.name
                     ));
                 }
-
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
             "load_at" => {
@@ -1180,7 +1155,6 @@ impl RegisteredMod for CpuMod {
                         node.name
                     ));
                 }
-
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
             "store_value" | "store_next" => {
@@ -1190,7 +1164,6 @@ impl RegisteredMod for CpuMod {
                         node.name, node.op.instruction
                     ));
                 }
-
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
             "store_at" => {
@@ -1200,7 +1173,6 @@ impl RegisteredMod for CpuMod {
                         node.name
                     ));
                 }
-
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
             "free" => {
@@ -1220,7 +1192,6 @@ impl RegisteredMod for CpuMod {
                         node.name
                     ));
                 }
-
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
             "target_config" => {
@@ -1237,7 +1208,6 @@ impl RegisteredMod for CpuMod {
                         node.name, node.op.args[2]
                     )
                 })?;
-
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
             "instantiate_unit" => {
@@ -2148,6 +2118,23 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
+            "guard_host_call_return" => {
+                if node.op.args.len() < 4 {
+                    return Err(
+                        "cpu.guard_host_call_return expects condition return call-chain".to_owned(),
+                    );
+                }
+                let mut inputs = vec![node.op.args[0].clone()];
+                match node.op.args.get(1).map(String::as_str) {
+                    Some("value") => inputs.push(node.op.args[3].clone()),
+                    Some("write_flush_exit_code") => {}
+                    _ if node.op.args[2].parse::<usize>().is_ok() => {
+                        inputs.push(node.op.args[1].clone())
+                    }
+                    _ => inputs.push(node.op.args[3].clone()),
+                }
+                Ok(InstructionSemantics::effect(inputs))
+            }
             "branch_print_return" => {
                 if node.op.args.len() != 5 {
                     return Err(format!(
@@ -2155,13 +2142,20 @@ impl RegisteredMod for CpuMod {
                         node.name
                     ));
                 }
-
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
+            "branch_host_call_return" => {
+                if node.op.args.len() < 9 {
+                    return Err(
+                        "cpu.branch_host_call_return expects condition then-chain else-chain"
+                            .to_owned(),
+                    );
+                }
+                Ok(InstructionSemantics::effect(vec![node.op.args[0].clone()]))
             }
             other => Err(format!("unknown cpu instruction `{other}`")),
         }
     }
-
     fn execute(
         &self,
         node: &Node,
@@ -3969,6 +3963,15 @@ impl RegisteredMod for CpuMod {
                         node.resource, resource.kind.raw, condition, printed, returned
                     ),
                 );
+                Ok(Value::Unit)
+            }
+            "guard_host_call_return" => {
+                state.push_resource_event(resource, "effect cpu.guard_host_call_return".to_owned());
+                Ok(Value::Unit)
+            }
+            "branch_host_call_return" => {
+                state
+                    .push_resource_event(resource, "effect cpu.branch_host_call_return".to_owned());
                 Ok(Value::Unit)
             }
             "branch_print_return" => {

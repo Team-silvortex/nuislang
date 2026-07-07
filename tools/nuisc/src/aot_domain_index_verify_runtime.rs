@@ -37,7 +37,12 @@ pub(super) fn verify_hetero_calculate_plan(
             "<embedded-hetero-calculate-plan>".to_owned(),
         )
     } else {
-        let hetero_calculate_plan_path = hetero_calculate_plan_path.unwrap();
+        let Some(hetero_calculate_plan_path) = hetero_calculate_plan_path else {
+            return Err(format!(
+                "`{}` is missing hetero calculate plan path",
+                manifest_path.display()
+            ));
+        };
         (
             fs::read_to_string(hetero_calculate_plan_path).map_err(|error| {
                 format!(
@@ -139,7 +144,12 @@ pub(super) fn verify_clock_protocol(
     let (protocol_source, protocol_label) = if let Some(source) = clock_protocol_inline {
         (source.to_owned(), "<embedded-clock-protocol>".to_owned())
     } else {
-        let clock_protocol_path = clock_protocol_path.unwrap();
+        let Some(clock_protocol_path) = clock_protocol_path else {
+            return Err(format!(
+                "`{}` is missing clock protocol path",
+                manifest_path.display()
+            ));
+        };
         (
             fs::read_to_string(clock_protocol_path).map_err(|error| {
                 format!(
@@ -188,10 +198,15 @@ pub(super) fn verify_clock_protocol(
     }
     let mut entries_checked = 0usize;
     for domain_family in unique_domains {
-        let unit = domain_build_units
+        let Some(unit) = domain_build_units
             .iter()
             .find(|unit| unit.domain_family == domain_family)
-            .expect("unique domain must have source unit");
+        else {
+            return Err(format!(
+                "`{}` clock protocol domain `{domain_family}` has no source build unit",
+                manifest_path.display()
+            ));
+        };
         if !protocol_source.contains(&format!(
             "domain_family = \"{}\"",
             escape_toml_string(&unit.domain_family)

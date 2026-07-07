@@ -8,7 +8,9 @@ pub(super) fn lower_return_if_chain(
 ) -> Result<Option<String>, String> {
     match stmts {
         [NirStmt::Return(Some(value))] | [NirStmt::Expr(value)] => {
-            if expr_contains_conditional_effect_primitive(value) {
+            if !is_terminal_branch_pure_expr(value, &state.pure_helpers)
+                || expr_contains_conditional_effect_primitive(value)
+            {
                 return Ok(None);
             }
             Ok(Some(lower_expr(value, state, bindings)?))
@@ -54,7 +56,9 @@ pub(in crate::lowering) fn lower_guard_return_chain(
 ) -> Result<Option<String>, String> {
     match stmts {
         [NirStmt::Return(Some(value))] | [NirStmt::Expr(value)] => {
-            if expr_contains_conditional_effect_primitive(value) {
+            if !is_terminal_branch_pure_expr(value, &state.pure_helpers)
+                || expr_contains_conditional_effect_primitive(value)
+            {
                 return Ok(None);
             }
             Ok(Some(lower_expr(value, state, bindings)?))
@@ -103,7 +107,9 @@ pub(super) fn lower_binding_if_chain(
 ) -> Result<Option<(String, String)>, String> {
     match stmts {
         [NirStmt::Let { name, value, .. }] | [NirStmt::Const { name, value, .. }] => {
-            if expr_contains_conditional_effect_primitive(value) {
+            if !is_terminal_branch_pure_expr(value, pure_helpers)
+                || expr_contains_conditional_effect_primitive(value)
+            {
                 return Ok(None);
             }
             Ok(Some((name.clone(), lower_expr(value, state, bindings)?)))

@@ -11,6 +11,7 @@ mod cpu Main {
   extern "c" fn host_stdout_flush() -> i64;
   extern "c" fn host_monotonic_time_ns() -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_serialize_text_into(
     text_handle: i64,
     buffer_handle: i64,
@@ -45,14 +46,6 @@ mod cpu Main {
     let buffer: ref Buffer = alloc_buffer(32, 0);
     let len: i64 = serialize_i64_into(value, buffer, 0);
     return deserialize_text_from(buffer, 0, len);
-  }
-
-  fn usage_text() -> i64 {
-    return text_from_literal("usage: cli_wc_demo <path>\n");
-  }
-
-  fn error_text() -> i64 {
-    return text_from_literal("error: unable to read input file\n");
   }
 
   fn colon_space_text() -> i64 {
@@ -92,29 +85,27 @@ mod cpu Main {
     return host_text_concat(with_words, scan_line);
   }
 
-  fn emit_usage() -> i64 {
-    host_stdout_write(usage_text());
-    host_stdout_flush();
-    return 1;
-  }
-
-  fn emit_error(code: i64) -> i64 {
-    host_stdout_write(error_text());
-    host_stdout_flush();
-    return code;
-  }
-
   fn read_and_count(path_handle: i64) -> i64 {
     let read_len: i64 = 4096;
     let buffer: ref Buffer = alloc_buffer(read_len, 0);
     let file_handle: i64 = host_file_open(path_handle, 0);
     if file_handle <= 0 {
-      return emit_error(2);
+      let wrote: i64 = host_stdout_write(text_handle("error: unable to read input file\n"));
+      let flushed: i64 = host_stdout_flush();
+      return StdIoContracts.write_flush_exit_code(wrote, flushed) + 2;
     }
     let bytes_read: i64 = host_file_read(file_handle, host_buffer_handle(buffer), read_len);
     let close_code: i64 = host_file_close(file_handle);
-    if !StdFsContracts.host_fs_value_ok(bytes_read) || close_code <= 0 {
-      return emit_error(3);
+    let read_validation_total: i64 = StdFsContracts.file_read_chunk_validation_total(
+      file_handle,
+      read_len,
+      bytes_read,
+      close_code
+    );
+    if read_validation_total < 4 {
+      let wrote: i64 = host_stdout_write(text_handle("error: unable to read input file\n"));
+      let flushed: i64 = host_stdout_flush();
+      return StdIoContracts.write_flush_exit_code(wrote, flushed) + 3;
     }
     let started_ns: i64 = host_monotonic_time_ns();
     let measured: WcSummary = scan_counts(buffer, bytes_read);
@@ -128,7 +119,7 @@ mod cpu Main {
     };
     let wrote: i64 = host_stdout_write(summary_text(summary));
     let flushed: i64 = host_stdout_flush();
-    if !StdIoContracts.write_flush_ok(wrote, flushed) || wrote == 0 || flushed == 0 {
+    if !StdIoContracts.write_flush_ok(wrote, flushed) || wrote == 0 {
       return 4;
     }
     return 0;
@@ -154,7 +145,7 @@ mod cpu Main {
   benchmark("wc_number_text_fixture", warmup_iters=0, measure_iters=1, timeout_ms=5000, clock_domain="global", clock_policy="bridge")
   fn wc_number_text_fixture() -> i64 {
     let rendered: i64 = text_i64(123456789);
-    return text_len(rendered);
+    return host_text_len(rendered);
   }
 
   benchmark("wc_concat_fixture", warmup_iters=0, measure_iters=1, timeout_ms=5000, clock_domain="global", clock_policy="bridge")
@@ -162,7 +153,7 @@ mod cpu Main {
     let lhs: i64 = text_from_literal("alpha beta\n");
     let rhs: i64 = text_from_literal("gamma delta\n");
     let merged: i64 = host_text_concat(lhs, rhs);
-    return text_len(merged);
+    return host_text_len(merged);
   }
 
   benchmark("wc_scan_fixture", warmup_iters=0, measure_iters=1, timeout_ms=5000, clock_domain="global", clock_policy="bridge")
@@ -180,7 +171,9 @@ mod cpu Main {
   fn main() -> i64 {
     let argv_count: i64 = host_argv_count();
     if argv_count < 2 {
-      return emit_usage();
+      let wrote: i64 = host_stdout_write(text_handle("usage: cli_wc_demo <path>\n"));
+      let flushed: i64 = host_stdout_flush();
+      return StdIoContracts.write_flush_exit_code(wrote, flushed) + 1;
     }
     let path_handle: i64 = host_argv_at(1);
     return read_and_count(path_handle);

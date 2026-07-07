@@ -30,6 +30,7 @@ pub(super) type PreparedScaledFactorGroupProduct = (
     Option<NirExpr>,
     NirExpr,
 );
+pub(super) type LoweredHostCallChain = Vec<(Option<String>, String, String, Vec<String>)>;
 pub(in crate::lowering) type PreparedFactorStateListView<'a> = (
     &'a [PreparedLoopStateRef],
     &'a [PreparedLoopStateRef],
@@ -63,7 +64,31 @@ pub(in crate::lowering) type PreparedScaledFactorGroupProductView<'a> = (
 
 pub(super) enum PreparedTerminalBranch {
     Return(NirExpr),
-    PrintReturn { print: NirExpr, returned: NirExpr },
+    PrintReturn {
+        print: NirExpr,
+        returned: NirExpr,
+    },
+    HostCallReturn {
+        calls: Vec<PreparedHostCall>,
+        returned: PreparedHostCallReturn,
+    },
+}
+
+#[derive(Clone)]
+pub(super) struct PreparedHostCall {
+    pub(super) result_name: Option<String>,
+    pub(super) abi: String,
+    pub(super) callee: String,
+    pub(super) args: Vec<NirExpr>,
+}
+
+pub(super) enum PreparedHostCallReturn {
+    Expr(NirExpr),
+    WriteFlushExitCode {
+        write_name: String,
+        flush_name: String,
+        offset: i64,
+    },
 }
 
 #[derive(Clone)]

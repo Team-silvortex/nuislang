@@ -116,12 +116,13 @@ First auto-injectable library module:
 * [lib/io_contracts.ns](lib/io_contracts.ns)
   exposes the initial `StdIoContracts` helper surface for normalizing host I/O
   byte counts, flush statuses, report write coverage, and process-style exit
-  codes
+  codes, including terminal readiness validation gates
 * [lib/fs_contracts.ns](lib/fs_contracts.ns)
   exposes the initial `StdFsContracts` helper surface for normalizing
   filesystem metadata, file read/write/copy status, directory mutation, and
   path/report/session probe summaries, including file report output
-  validation gates
+  validation gates, file read/write/chunk-read/roundtrip readiness gates, and
+  directory mutation plus path copy/remove readiness gates
 * [lib/cli_contracts.ns](lib/cli_contracts.ns)
   exposes the initial `StdCliContracts` helper surface for normalizing
   argv/env/process probes, result/error/diagnostic summaries, command
@@ -134,8 +135,8 @@ First auto-injectable library module:
 * [lib/text_contracts.ns](lib/text_contracts.ns)
   exposes the initial `StdTextContracts` helper surface for normalizing text
   handles, measured lengths, line/word statistics, report readiness, formatted
-  report probes, JSON shape lengths, JSON/text consistency gates, and text
-  pipeline summaries
+  report probes, JSON shape lengths, JSON/text consistency gates, text pipeline
+  summaries, and text pipeline readiness gates
 * [lib/time_contracts.ns](lib/time_contracts.ns)
   exposes the initial `StdTimeContracts` helper surface for normalizing wall
   time, monotonic time, sleep, clock-domain, benchmark span probes, and

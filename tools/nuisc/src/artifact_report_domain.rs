@@ -1,4 +1,5 @@
 use super::*;
+use std::fmt::Write as _;
 
 pub(crate) fn domain_build_contract_summary_json(
     summary: &registry::NustarDomainBuildContractSummary,
@@ -100,10 +101,12 @@ pub(crate) fn domain_registry_json(
 ) -> String {
     let mut fields = registry::domain_registration_json(registration);
     fields.pop();
-    fields.push_str(&format!(
+    write!(
+        fields,
         ",\"build_contract\":{}",
         domain_build_contract_summary_json(&registry::domain_build_contract_summary(manifest))
-    ));
+    )
+    .unwrap();
     fields.push('}');
     fields
 }

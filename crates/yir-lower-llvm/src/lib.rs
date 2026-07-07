@@ -4,14 +4,13 @@
     clippy::ptr_arg,
     clippy::too_many_arguments,
     clippy::type_complexity,
-    clippy::useless_format
+    clippy::useless_format,
+    clippy::obfuscated_if_else
 )]
-
 use std::collections::BTreeMap;
-
 use yir_core::{CpuLlvmLoweringClass, EdgeKind, Node, Resource, YirModule};
 use yir_verify::verify_module;
-
+mod guard_host_call;
 #[derive(Clone)]
 enum LlvmValueRef {
     Bool { i1: String, i64: String },
@@ -31,52 +30,43 @@ enum LlvmValueRef {
     TextHandle { ptr: String, handle: String },
     Void,
 }
-
 #[derive(Clone)]
 struct StructLlvmValueRef {
     type_name: String,
     fields: Vec<(String, LlvmValueRef)>,
 }
-
 #[derive(Clone)]
 struct VariantUnionLlvmValueRef {
     parent_type_name: String,
     tag_i64: String,
     variants: BTreeMap<String, StructLlvmValueRef>,
 }
-
 #[derive(Clone)]
 struct NetworkResultLlvmValueRef {
     state: String,
     value: Box<LlvmValueRef>,
 }
-
 #[derive(Clone)]
 struct TaskLlvmValueRef {
     value: Box<LlvmValueRef>,
 }
-
 #[derive(Clone)]
 struct ThreadLlvmValueRef {
     value: Box<LlvmValueRef>,
 }
-
 #[derive(Clone)]
 struct TaskResultLlvmValueRef {
     state: String,
     value: Option<Box<LlvmValueRef>>,
 }
-
 #[derive(Clone)]
 struct MutexLlvmValueRef {
     value: Box<LlvmValueRef>,
 }
-
 #[derive(Clone)]
 struct MutexGuardLlvmValueRef {
     value: Box<LlvmValueRef>,
 }
-
 struct LlvmLoweringState {
     body: Vec<String>,
     globals: Vec<String>,
@@ -88,12 +78,10 @@ struct LlvmLoweringState {
     last_cpu_value: Option<String>,
     ends_with_terminal_return: bool,
 }
-
 struct EmittedCpuFunction {
     globals: Vec<String>,
     body: String,
 }
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum CpuCallScalarKind {
     Bool,
@@ -102,26 +90,22 @@ enum CpuCallScalarKind {
     F32,
     F64,
 }
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum CpuLoopScalarKind {
     I64,
     F32,
     F64,
 }
-
 struct CpuHelperSignature {
     params: Vec<CpuCallScalarKind>,
     ret: CpuCallScalarKind,
 }
-
 #[derive(Clone)]
 enum LoopControlExpr {
     Cond { kind: String, rhs_name: String },
     And(Box<LoopControlExpr>, Box<LoopControlExpr>),
     Or(Box<LoopControlExpr>, Box<LoopControlExpr>),
 }
-
 #[derive(Clone)]
 enum ResolvedLoopControlExpr {
     Cond { kind: String, rhs: String },
@@ -10686,6 +10670,31 @@ fn emit_cpu_function(
                 }
                 body.push(format!("{cont_label}:"));
             }
+            ("cpu", "guard_host_call_return") => {
+                if !guard_host_call::lower_guard_host_call_return(
+                    node,
+                    &registers,
+                    &mut body,
+                    &mut next_reg,
+                    &mut next_block,
+                    function_return_kind,
+                ) {
+                    continue;
+                }
+            }
+            ("cpu", "branch_host_call_return") => {
+                if !guard_host_call::lower_branch_host_call_return(
+                    node,
+                    &registers,
+                    &mut body,
+                    &mut next_reg,
+                    &mut next_block,
+                    function_return_kind,
+                ) {
+                    continue;
+                }
+                state.ends_with_terminal_return = true;
+            }
             ("cpu", "branch_print_return") => {
                 let cond_value = registers.get(&node.op.args[0]).cloned();
                 let then_print_value = registers.get(&node.op.args[1]).cloned();
@@ -10979,46 +10988,20 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         &mut global_counter,
     )?;
     globals.extend(entry_emitted.globals);
-
     let dynamic_extern_decls = render_dynamic_extern_decls(module);
-    let dynamic_extern_block = if dynamic_extern_decls.is_empty() {
-        String::new()
-    } else {
-        format!("{}\n\n", dynamic_extern_decls.join("\n"))
-    };
-
+    let dynamic_extern_block = (!dynamic_extern_decls.is_empty())
+        .then(|| format!("{}\n\n", dynamic_extern_decls.join("\n")))
+        .unwrap_or_default();
     Ok(format!(
         "; yir version: {}\n\
 {}\n\
 %cpu.node = type {{ i64, ptr }}\n\
-declare ptr @malloc(i64)\n\
-declare void @free(ptr)\n\
-declare i32 @puts(ptr)\n\
-declare i64 @nuis_host_text_lift(ptr)\n\
-declare ptr @nuis_host_text_ptr(i64)\n\
-declare void @nuis_debug_print_bool(i32)\n\
-declare void @nuis_debug_print_i32(i32)\n\
-declare void @nuis_debug_print_i64(i64)\n\n\
-declare void @nuis_debug_print_f32(float)\n\
-declare void @nuis_debug_print_f64(double)\n\n\
-declare i64 @host_color_bias(i64)\n\
-declare i64 @host_speed_curve(i64)\n\
-declare i64 @host_radius_curve(i64)\n\
-declare i64 @host_mix_tick(i64, i64)\n\
-declare i64 @host_text_handle(i64)\n\n\
-declare i64 @host_argv_count()\n\
-declare i64 @host_argv_at(i64)\n\
-declare i64 @host_file_open(i64, i64)\n\
-declare i64 @host_file_read(i64, i64, i64)\n\
-declare i64 @host_file_write(i64, i64)\n\
-declare i64 @host_file_close(i64)\n\
-declare i64 @host_serialize_i64_into(i64, i64, i64)\n\
-declare i64 @host_deserialize_text_from(i64, i64, i64)\n\n\
-declare i64 @HostRenderCurves__color_bias(i64)\n\
-declare i64 @HostRenderCurves__speed_curve(i64)\n\
-declare i64 @HostRenderCurves__radius_curve(i64)\n\
-declare i64 @HostRenderCurves__mix_tick(i64, i64)\n\
-declare i64 @HostMath__speed_curve(i64)\n\
+declare ptr @malloc(i64)\ndeclare void @free(ptr)\ndeclare i32 @puts(ptr)\ndeclare i64 @nuis_host_text_lift(ptr)\ndeclare ptr @nuis_host_text_ptr(i64)\n\
+declare void @nuis_debug_print_bool(i32)\ndeclare void @nuis_debug_print_i32(i32)\ndeclare void @nuis_debug_print_i64(i64)\ndeclare void @nuis_debug_print_f32(float)\ndeclare void @nuis_debug_print_f64(double)\n\n\
+declare i64 @host_color_bias(i64)\ndeclare i64 @host_speed_curve(i64)\ndeclare i64 @host_radius_curve(i64)\ndeclare i64 @host_mix_tick(i64, i64)\ndeclare i64 @host_text_handle(i64)\ndeclare i64 @host_text_len(i64)\ndeclare i64 @host_text_line_count(i64)\ndeclare i64 @host_text_word_count(i64)\ndeclare i64 @host_text_concat(i64, i64)\n\
+declare i64 @host_argv_count()\ndeclare i64 @host_argv_at(i64)\ndeclare i64 @host_file_open(i64, i64)\ndeclare i64 @host_file_read(i64, i64, i64)\ndeclare i64 @host_file_write(i64, i64)\ndeclare i64 @host_file_close(i64)\n\
+declare i64 @host_stdout_write(i64)\ndeclare i64 @host_stdout_flush()\ndeclare i64 @host_stderr_write(i64)\ndeclare i64 @host_stderr_flush()\ndeclare i64 @host_serialize_i64_into(i64, i64, i64)\ndeclare i64 @host_serialize_text_into(i64, i64, i64)\ndeclare i64 @host_deserialize_text_from(i64, i64, i64)\ndeclare i64 @host_monotonic_time_ns()\n\
+declare i64 @HostRenderCurves__color_bias(i64)\ndeclare i64 @HostRenderCurves__speed_curve(i64)\ndeclare i64 @HostRenderCurves__radius_curve(i64)\ndeclare i64 @HostRenderCurves__mix_tick(i64, i64)\ndeclare i64 @HostMath__speed_curve(i64)\n\
 {}\n\
 {}\n\
 define i64 @nuis_yir_entry() {{\n{}\n}}\n",
@@ -11609,13 +11592,30 @@ fn is_builtin_host_ffi_symbol(symbol: &str) -> bool {
             | "HostMath__speed_curve"
             | "host_argv_count"
             | "host_argv_at"
+            | "host_env_has"
+            | "host_env_get"
             | "host_file_open"
             | "host_file_read"
             | "host_file_write"
             | "host_file_close"
             | "host_text_handle"
+            | "host_text_len"
+            | "host_text_line_count"
+            | "host_text_word_count"
+            | "host_text_concat"
+            | "host_stdout_write"
+            | "host_stdout_flush"
+            | "host_stderr_write"
+            | "host_stderr_flush"
             | "host_serialize_i64_into"
+            | "host_serialize_text_into"
+            | "host_serialize_bool_into"
+            | "host_serialize_byte_into"
+            | "host_deserialize_i64_from"
+            | "host_deserialize_bool_from"
+            | "host_deserialize_byte_from"
             | "host_deserialize_text_from"
+            | "host_monotonic_time_ns"
     )
 }
 

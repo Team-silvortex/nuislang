@@ -42,19 +42,16 @@ mod cpu Main {
         summary.remove_code,
         summary.exists_after_remove
       );
-    if !StdFsContracts.close_ok(summary.create_code) {
+    let validation_total: i64 = StdFsContracts.directory_remove_validation_total(
+      summary.create_code,
+      summary.exists_before_remove,
+      summary.remove_code,
+      summary.exists_after_remove
+    );
+    if validation_total < 4 {
       return StdFsContracts.fs_error();
     }
-    if !StdFsContracts.close_ok(summary.remove_code) {
-      return StdFsContracts.fs_error();
-    }
-    if !StdFsContracts.metadata_exists(summary.exists_before_remove) {
-      return StdFsContracts.fs_error();
-    }
-    if StdFsContracts.metadata_exists(summary.exists_after_remove) {
-      return StdFsContracts.fs_error();
-    }
-    if total >= 0 {
+    if total + validation_total >= 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

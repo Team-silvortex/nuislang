@@ -77,28 +77,20 @@ mod cpu Main {
       summary.src_exists,
       summary.dst_exists
     );
-    if !StdFsContracts.write_covers_payload(summary.payload_len, summary.write_status) {
+    let validation_total: i64 = StdFsContracts.path_copy_remove_validation_total(
+      summary.payload_len,
+      summary.write_status,
+      summary.copy_status,
+      summary.dst_size,
+      summary.src_remove_status,
+      summary.dst_remove_status,
+      summary.src_exists_after_remove,
+      summary.dst_exists_after_remove
+    );
+    if validation_total < 7 {
       return StdFsContracts.fs_error();
     }
-    if summary.copy_status <= 0 {
-      return StdFsContracts.fs_error();
-    }
-    if summary.dst_size < summary.payload_len {
-      return StdFsContracts.fs_error();
-    }
-    if summary.src_remove_status <= 0 {
-      return StdFsContracts.fs_error();
-    }
-    if summary.dst_remove_status <= 0 {
-      return StdFsContracts.fs_error();
-    }
-    if summary.src_exists_after_remove != 0 {
-      return StdFsContracts.fs_error();
-    }
-    if summary.dst_exists_after_remove != 0 {
-      return StdFsContracts.fs_error();
-    }
-    if total > 0 {
+    if total + validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

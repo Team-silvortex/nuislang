@@ -349,6 +349,28 @@ pub(in crate::lowering) fn substitute_prepared_terminal_branch(
                 returned: substitute_branch_binding(&returned, binding_name, binding_value),
             }
         }
+        PreparedTerminalBranch::HostCallReturn { calls, returned } => {
+            PreparedTerminalBranch::HostCallReturn {
+                calls: calls
+                    .into_iter()
+                    .map(|call| PreparedHostCall {
+                        result_name: call.result_name,
+                        abi: call.abi,
+                        callee: call.callee,
+                        args: call
+                            .args
+                            .iter()
+                            .map(|arg| substitute_branch_binding(arg, binding_name, binding_value))
+                            .collect(),
+                    })
+                    .collect(),
+                returned: substitute_prepared_host_call_return(
+                    returned,
+                    binding_name,
+                    binding_value,
+                ),
+            }
+        }
     }
 }
 
@@ -456,13 +478,56 @@ pub(in crate::lowering) fn prepare_terminal_branch(
 ) -> Option<PreparedTerminalBranch> {
     match stmts {
         [NirStmt::Return(Some(value))] | [NirStmt::Expr(value)] => {
+            if !is_terminal_branch_pure_expr(value, pure_helpers) {
+                return None;
+            }
             Some(PreparedTerminalBranch::Return(value.clone()))
         }
         [NirStmt::Print(print), NirStmt::Return(Some(returned))]
         | [NirStmt::Print(print), NirStmt::Expr(returned)] => {
+            if !is_terminal_branch_pure_expr(print, pure_helpers)
+                || !is_terminal_branch_pure_expr(returned, pure_helpers)
+            {
+                return None;
+            }
             Some(PreparedTerminalBranch::PrintReturn {
                 print: print.clone(),
                 returned: returned.clone(),
+            })
+        }
+        [calls @ .., NirStmt::Return(Some(returned)) | NirStmt::Expr(returned)]
+            if !calls.is_empty() && calls.len() <= 4 =>
+        {
+            if !is_terminal_branch_pure_expr(returned, pure_helpers) {
+                return None;
+            }
+            let prepared_calls = calls
+                .iter()
+                .map(prepare_guard_host_call_stmt)
+                .collect::<Option<Vec<_>>>()?;
+            let effect_bindings = prepared_calls
+                .iter()
+                .filter_map(|(name, _)| name.as_deref())
+                .collect::<BTreeSet<_>>();
+            let returned = if expr_references_names(returned, &effect_bindings) {
+                prepare_host_call_computed_return(returned, &effect_bindings)?
+            } else {
+                PreparedHostCallReturn::Expr(returned.clone())
+            };
+            if matches!(returned, PreparedHostCallReturn::Expr(_))
+                && expr_references_names(
+                    match &returned {
+                        PreparedHostCallReturn::Expr(expr) => expr,
+                        PreparedHostCallReturn::WriteFlushExitCode { .. } => unreachable!(),
+                    },
+                    &effect_bindings,
+                )
+            {
+                return None;
+            }
+            Some(PreparedTerminalBranch::HostCallReturn {
+                calls: prepared_calls.into_iter().map(|(_, call)| call).collect(),
+                returned,
             })
         }
         [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {
@@ -471,5 +536,26 @@ pub(in crate::lowering) fn prepare_terminal_branch(
             Some(substitute_prepared_terminal_branch(prepared, &name, &value))
         }
         _ => None,
+    }
+}
+
+fn substitute_prepared_host_call_return(
+    returned: PreparedHostCallReturn,
+    binding_name: &str,
+    binding_value: &NirExpr,
+) -> PreparedHostCallReturn {
+    match returned {
+        PreparedHostCallReturn::Expr(expr) => PreparedHostCallReturn::Expr(
+            substitute_branch_binding(&expr, binding_name, binding_value),
+        ),
+        PreparedHostCallReturn::WriteFlushExitCode {
+            write_name,
+            flush_name,
+            offset,
+        } => PreparedHostCallReturn::WriteFlushExitCode {
+            write_name,
+            flush_name,
+            offset,
+        },
     }
 }

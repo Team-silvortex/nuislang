@@ -89,8 +89,9 @@ use edge_helpers::{
     ensure_shader_resource, push_dep_edges, push_lifetime_edge, push_xfer_edge,
 };
 use guard_ops::{
-    lower_branch_print_return, lower_guard_print, lower_guard_print_return, lower_guard_return,
-    lower_select,
+    lower_branch_host_call_return, lower_branch_print_return, lower_guard_host_call_return,
+    lower_guard_print, lower_guard_print_return, lower_guard_return, lower_select,
+    PreparedHostCallReturnSpec,
 };
 use if_lowering::lower_if_pair;
 use kernel_exprs::lower_kernel_expr;
@@ -417,6 +418,9 @@ mod tests_async_runtime;
 #[cfg(test)]
 #[path = "lowering/tests_branch_helpers.rs"]
 mod tests_branch_helpers;
+#[cfg(test)]
+#[path = "lowering/tests_branch_host_calls.rs"]
+mod tests_branch_host_calls;
 #[cfg(test)]
 #[path = "lowering/tests_branch_summaries.rs"]
 mod tests_branch_summaries;
