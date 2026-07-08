@@ -19,7 +19,7 @@ pub fn host_cpu_build_target() -> CpuBuildTarget {
     let object_format = host_object_format().to_owned();
     let calling_abi = host_calling_abi().to_owned();
     CpuBuildTarget {
-        abi: format!("cpu.{machine_arch}.{calling_abi}"),
+        abi: canonical_cpu_abi(&machine_arch, &machine_os, &calling_abi).to_owned(),
         machine_arch: machine_arch.clone(),
         machine_os: machine_os.clone(),
         object_format,
@@ -28,6 +28,21 @@ pub fn host_cpu_build_target() -> CpuBuildTarget {
         isa_family: cpu_isa_family(&machine_arch).to_owned(),
         isa_features: default_cpu_isa_features(&machine_arch, &machine_os),
         cross_compile: false,
+    }
+}
+
+fn canonical_cpu_abi(machine_arch: &str, machine_os: &str, calling_abi: &str) -> &'static str {
+    match (
+        canonical_machine_arch(machine_arch),
+        machine_os,
+        calling_abi,
+    ) {
+        ("arm64", "darwin", "aapcs64-darwin") => "cpu.arm64.apple_aapcs64",
+        ("arm64", "linux", "aapcs64") => "cpu.arm64.linux.aapcs64",
+        ("x86_64", "darwin", "sysv64") => "cpu.x86_64.apple_sysv64",
+        ("x86_64", "linux", "sysv64") => "cpu.x86_64.sysv64",
+        ("x86_64", "windows", "win64") => "cpu.x86_64.win64",
+        _ => "cpu.host.unknown",
     }
 }
 
@@ -218,5 +233,30 @@ fn clang_target_triple(machine_arch: &str, machine_os: &str) -> String {
         ("x86_64", "linux") => "x86_64-unknown-linux-gnu".to_owned(),
         ("x86_64", "windows") => "x86_64-pc-windows-msvc".to_owned(),
         _ => format!("{machine_arch}-unknown-{machine_os}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::canonical_cpu_abi;
+
+    #[test]
+    fn canonical_cpu_abi_uses_registered_profile_names() {
+        assert_eq!(
+            canonical_cpu_abi("arm64", "darwin", "aapcs64-darwin"),
+            "cpu.arm64.apple_aapcs64"
+        );
+        assert_eq!(
+            canonical_cpu_abi("arm64", "linux", "aapcs64"),
+            "cpu.arm64.linux.aapcs64"
+        );
+        assert_eq!(
+            canonical_cpu_abi("x86_64", "darwin", "sysv64"),
+            "cpu.x86_64.apple_sysv64"
+        );
+        assert_eq!(
+            canonical_cpu_abi("x86_64", "windows", "win64"),
+            "cpu.x86_64.win64"
+        );
     }
 }

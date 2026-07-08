@@ -149,7 +149,19 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
         });
     } else {
         let mut bindings = BTreeMap::<String, String>::new();
-        lower_function_body(main, &mut state, &mut bindings, true)?;
+        let returned = lower_function_body(main, &mut state, &mut bindings, true)?;
+        if returned.is_none() && main.return_type.is_none() {
+            let name = next_name(&mut state, "implicit_main_return");
+            state.yir.nodes.push(Node {
+                name,
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "const_i64".to_owned(),
+                    args: vec!["0".to_owned()],
+                },
+            });
+        }
     }
     materialize_doc_contract_nodes(&mut yir, module);
     assign_default_lanes(&mut yir);

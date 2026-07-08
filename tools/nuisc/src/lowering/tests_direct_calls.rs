@@ -2,6 +2,38 @@ use super::lower_nir_to_yir_builtin_cpu;
 use crate::frontend::parse_nuis_module;
 
 #[test]
+fn lowers_void_main_print_into_explicit_zero_entry_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            print(42);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let has_print = yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "print");
+    let has_implicit_zero = yir.nodes.iter().any(|node| {
+        node.op.module == "cpu"
+            && node.op.instruction == "const_i64"
+            && node.op.args == ["0".to_owned()]
+            && node.name.starts_with("implicit_main_return_")
+    });
+
+    assert!(
+        has_print,
+        "expected void main to preserve print side effect"
+    );
+    assert!(has_implicit_zero, "expected void main to exit with zero");
+}
+
+#[test]
 fn lowers_ordinary_self_recursive_function_into_helper_lane_and_call_i64() {
     let module = parse_nuis_module(
         r#"

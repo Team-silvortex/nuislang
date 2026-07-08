@@ -30,11 +30,6 @@ mod cpu Main {
     completed: i64,
     timed_out: i64,
     selected_value: i64,
-    diag_code: i64,
-    stdout_code: i64,
-    stderr_code: i64,
-    stdout_flushed: i64,
-    stderr_flushed: i64,
     tick_ns: i64
   }
 
@@ -82,16 +77,6 @@ mod cpu Main {
         completed: 1,
         timed_out: 0,
         selected_value: task_value(result),
-        diag_code: emit_diag(
-          seed.ok_text_handle,
-          0,
-          line_len,
-          seed.ok_severity
-        ),
-        stdout_code: host_stdout_write(seed.ok_text_handle),
-        stderr_code: 0,
-        stdout_flushed: host_stdout_flush(),
-        stderr_flushed: 0,
         tick_ns: tick_ns
       };
     }
@@ -103,16 +88,6 @@ mod cpu Main {
       completed: 0,
       timed_out: 1,
       selected_value: 0,
-      diag_code: emit_diag(
-        seed.err_text_handle,
-        0,
-        line_len,
-        seed.err_severity
-      ),
-      stdout_code: 0,
-      stderr_code: host_stderr_write(seed.err_text_handle),
-      stdout_flushed: 0,
-      stderr_flushed: host_stderr_flush(),
       tick_ns: tick_ns
     };
   }
@@ -142,13 +117,16 @@ mod cpu Main {
       summary.completed == 1,
       summary.timed_out == 1
     ) + summary.selected_value
-      + summary.diag_code
-      + StdIoContracts.console_status_total(
-        summary.stdout_code,
-        summary.stderr_code,
-        summary.stdout_flushed,
-        summary.stderr_flushed
-      );
+      + emit_diag(err_text_handle, 0, summary.line_len, err_severity);
+    if summary.completed == 1 {
+      let wrote: i64 = host_stdout_write(ok_text_handle);
+      let flushed: i64 = host_stdout_flush();
+      return StdIoContracts.write_flush_exit_code(wrote, flushed);
+    } else {
+      let wrote: i64 = host_stderr_write(err_text_handle);
+      let flushed: i64 = host_stderr_flush();
+      return StdIoContracts.write_flush_exit_code(wrote, flushed);
+    }
   }
 
   fn main() {

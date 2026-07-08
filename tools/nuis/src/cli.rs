@@ -1,4 +1,15 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+
+mod galaxy;
+mod support;
+
+use galaxy::parse_galaxy_args;
+pub use galaxy::GalaxyCommand;
+use support::{
+    parse_bench_args, parse_build_args, parse_cache_status_args, parse_clean_cache_args,
+    parse_optional_json_input, parse_prune_cache_args, parse_release_check_args,
+    parse_required_json_input, parse_required_json_input_output, parse_test_args,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandKind {
@@ -143,61 +154,6 @@ pub enum CommandKind {
     Galaxy(GalaxyCommand),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GalaxyCommand {
-    Init {
-        input: PathBuf,
-        framework: Option<String>,
-    },
-    Check {
-        input: PathBuf,
-    },
-    Pack {
-        input: PathBuf,
-        output: PathBuf,
-    },
-    Inspect {
-        input: PathBuf,
-    },
-    PublishLocal {
-        input: PathBuf,
-        output: Option<PathBuf>,
-    },
-    List,
-    InstallLocal {
-        name: String,
-        version: Option<String>,
-        output: PathBuf,
-    },
-    InstallDeps {
-        input: PathBuf,
-    },
-    Doctor {
-        input: PathBuf,
-    },
-    SyncDeps {
-        input: PathBuf,
-    },
-    LockDeps {
-        input: PathBuf,
-    },
-    VerifyLock {
-        input: PathBuf,
-    },
-    InspectLocal {
-        name: String,
-        version: Option<String>,
-    },
-    VerifyLocal {
-        name: String,
-        version: Option<String>,
-    },
-    RemoveLocal {
-        name: String,
-        version: Option<String>,
-    },
-}
-
 pub fn parse_args<I>(mut args: I) -> Result<CommandKind, String>
 where
     I: Iterator<Item = String>,
@@ -248,156 +204,54 @@ where
                 .ok_or_else(|| "usage: nuis loader-contract <package-id>".to_owned())?,
         }),
         "inspect-artifact" => {
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis inspect-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
-                            .to_owned(),
-                    );
-                }
-            }
-            Ok(CommandKind::InspectArtifact {
-                input: input.ok_or_else(|| {
-                    "usage: nuis inspect-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>"
-                        .to_owned()
-                })?,
-                json,
-            })
+            let (input, json) = parse_required_json_input(
+                &mut args,
+                "usage: nuis inspect-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml>",
+            )?;
+            Ok(CommandKind::InspectArtifact { input, json })
         }
         "verify-artifact" => {
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis verify-artifact [--json] <output-dir|nuis.compiled.artifact>"
-                            .to_owned(),
-                    );
-                }
-            }
-            Ok(CommandKind::VerifyArtifact {
-                input: input.ok_or_else(|| {
-                    "usage: nuis verify-artifact [--json] <output-dir|nuis.compiled.artifact>"
-                        .to_owned()
-                })?,
-                json,
-            })
+            let (input, json) = parse_required_json_input(
+                &mut args,
+                "usage: nuis verify-artifact [--json] <output-dir|nuis.compiled.artifact>",
+            )?;
+            Ok(CommandKind::VerifyArtifact { input, json })
         }
         "unpack-artifact-support" => {
-            let mut json = false;
-            let mut input = None;
-            let mut output_dir = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else if output_dir.is_none() {
-                    output_dir = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis unpack-artifact-support [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
-                            .to_owned(),
-                    );
-                }
-            }
+            let (input, output_dir, json) = parse_required_json_input_output(
+                &mut args,
+                "usage: nuis unpack-artifact-support [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>",
+            )?;
             Ok(CommandKind::UnpackArtifactSupport {
-                input: input.ok_or_else(|| {
-                    "usage: nuis unpack-artifact-support [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
-                        .to_owned()
-                })?,
-                output_dir: output_dir.ok_or_else(|| {
-                    "usage: nuis unpack-artifact-support [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
-                        .to_owned()
-                })?,
+                input,
+                output_dir,
                 json,
             })
         }
         "materialize-artifact" => {
-            let mut json = false;
-            let mut input = None;
-            let mut output_dir = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else if output_dir.is_none() {
-                    output_dir = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis materialize-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
-                            .to_owned(),
-                    );
-                }
-            }
+            let (input, output_dir, json) = parse_required_json_input_output(
+                &mut args,
+                "usage: nuis materialize-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>",
+            )?;
             Ok(CommandKind::MaterializeArtifact {
-                input: input.ok_or_else(|| {
-                    "usage: nuis materialize-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
-                        .to_owned()
-                })?,
-                output_dir: output_dir.ok_or_else(|| {
-                    "usage: nuis materialize-artifact [--json] <output-dir|nuis.compiled.artifact|nuis.build.manifest.toml> <output-dir>"
-                        .to_owned()
-                })?,
+                input,
+                output_dir,
                 json,
             })
         }
         "artifact-doctor" => {
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis artifact-doctor [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
-                            .to_owned(),
-                    );
-                }
-            }
-            Ok(CommandKind::ArtifactDoctor {
-                input: input.ok_or_else(|| {
-                    "usage: nuis artifact-doctor [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
-                        .to_owned()
-                })?,
-                json,
-            })
+            let (input, json) = parse_required_json_input(
+                &mut args,
+                "usage: nuis artifact-doctor [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>",
+            )?;
+            Ok(CommandKind::ArtifactDoctor { input, json })
         }
         "build-report" => {
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis build-report [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
-                            .to_owned(),
-                    );
-                }
-            }
-            Ok(CommandKind::BuildReport {
-                input: input.ok_or_else(|| {
-                    "usage: nuis build-report [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
-                        .to_owned()
-                })?,
-                json,
-            })
+            let (input, json) = parse_required_json_input(
+                &mut args,
+                "usage: nuis build-report [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>",
+            )?;
+            Ok(CommandKind::BuildReport { input, json })
         }
         "verify-build-manifest" => Ok(CommandKind::VerifyBuildManifest {
             manifest: PathBuf::from(args.next().ok_or_else(|| {
@@ -406,285 +260,80 @@ where
             })?),
         }),
         "cache-status" => {
-            let mut verbose_cache = false;
-            let mut all = false;
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--verbose-cache" {
-                    verbose_cache = true;
-                } else if arg == "--all" {
-                    all = true;
-                } else if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]"
-                            .to_owned(),
-                    );
-                }
-            }
+            let parsed = parse_cache_status_args(&mut args)?;
             Ok(CommandKind::CacheStatus {
-                input: if all {
-                    input
-                } else {
-                    Some(input.unwrap_or_else(|| PathBuf::from(".")))
-                },
-                all,
-                verbose_cache,
-                json,
+                input: parsed.input,
+                all: parsed.all,
+                verbose_cache: parsed.verbose_cache,
+                json: parsed.json,
             })
         }
         "clean-cache" => {
-            let mut all = false;
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--all" {
-                    all = true;
-                } else if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis clean-cache [--all] [--json] [input.ns|project-dir|nuis.toml]"
-                            .to_owned(),
-                    );
-                }
-            }
+            let parsed = parse_clean_cache_args(&mut args)?;
             Ok(CommandKind::CleanCache {
-                input: if all {
-                    input
-                } else {
-                    Some(input.unwrap_or_else(|| PathBuf::from(".")))
-                },
-                all,
-                json,
+                input: parsed.input,
+                all: parsed.all,
+                json: parsed.json,
             })
         }
         "cache-prune" => {
-            let mut all = false;
-            let mut input = None;
-            let mut keep = 4usize;
-            let mut json = false;
-            let iter = args.by_ref();
-            while let Some(arg) = iter.next() {
-                if arg == "--all" {
-                    all = true;
-                } else if arg == "--json" {
-                    json = true;
-                } else if arg == "--keep" {
-                    let raw = iter.next().ok_or_else(|| {
-                        "usage: nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]"
-                            .to_owned()
-                    })?;
-                    keep = raw.parse::<usize>().map_err(|_| {
-                        format!("invalid value for `--keep`: `{raw}`; expected non-negative integer")
-                    })?;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]"
-                            .to_owned(),
-                    );
-                }
-            }
+            let parsed = parse_prune_cache_args(&mut args)?;
             Ok(CommandKind::PruneCache {
-                input: if all {
-                    input
-                } else {
-                    Some(input.unwrap_or_else(|| PathBuf::from(".")))
-                },
-                all,
-                keep,
-                json,
+                input: parsed.input,
+                all: parsed.all,
+                keep: parsed.keep,
+                json: parsed.json,
             })
         }
         "release-check" => {
-            let mut cpu_abi = None;
-            let mut target = None;
-            let mut positional = Vec::new();
-            let iter = args.by_ref();
-            while let Some(arg) = iter.next() {
-                if arg == "--cpu-abi" {
-                    cpu_abi = Some(iter.next().ok_or_else(|| {
-                        "usage: nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
-                            .to_owned()
-                    })?);
-                } else if arg == "--target" {
-                    target = Some(iter.next().ok_or_else(|| {
-                        "usage: nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
-                            .to_owned()
-                    })?);
-                } else {
-                    positional.push(arg);
-                }
-            }
-            let input = PathBuf::from(positional.first().cloned().unwrap_or_else(|| ".".to_owned()));
-            let output_dir = PathBuf::from(positional.get(1).cloned().unwrap_or_else(|| {
-                format!(
-                    "target/nuis-release-check/{}",
-                    sanitize_path_label(
-                        input
-                            .file_stem()
-                            .or_else(|| input.file_name())
-                            .and_then(|item| item.to_str())
-                            .unwrap_or("input")
-                    )
-                )
-            }));
-            if positional.len() > 2 {
-                return Err(
-                    "usage: nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
-                        .to_owned(),
-                );
-            }
+            let parsed = parse_release_check_args(&mut args)?;
             Ok(CommandKind::ReleaseCheck {
-                input,
-                output_dir,
-                cpu_abi,
-                target,
+                input: parsed.input,
+                output_dir: parsed.output_dir,
+                cpu_abi: parsed.cpu_abi,
+                target: parsed.target,
             })
         }
         "check" => Ok(CommandKind::Check {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
         "test" => {
-            let mut list = false;
-            let mut ignored_only = false;
-            let mut include_ignored = false;
-            let mut exact = false;
-            let mut positional = Vec::new();
-            for arg in args.by_ref() {
-                if arg == "--list" {
-                    list = true;
-                } else if arg == "--ignored" {
-                    ignored_only = true;
-                } else if arg == "--include-ignored" {
-                    include_ignored = true;
-                } else if arg == "--exact" {
-                    exact = true;
-                } else {
-                    positional.push(arg);
-                }
-            }
-            if ignored_only && include_ignored {
-                return Err(
-                    "usage: nuis test [--list] [--ignored|--include-ignored] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
-                        .to_owned(),
-                );
-            }
-            if positional.len() > 2 {
-                return Err(
-                    "usage: nuis test [--list] [--ignored|--include-ignored] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
-                        .to_owned(),
-                );
-            }
+            let parsed = parse_test_args(&mut args)?;
             Ok(CommandKind::Test {
-                input: PathBuf::from(positional.first().cloned().unwrap_or_else(|| ".".to_owned())),
-                list,
-                ignored_only,
-                include_ignored,
-                exact,
-                filter: positional.get(1).cloned(),
+                input: parsed.input,
+                list: parsed.list,
+                ignored_only: parsed.ignored_only,
+                include_ignored: parsed.include_ignored,
+                exact: parsed.exact,
+                filter: parsed.filter,
             })
         }
         "bench" => {
-            let mut list = false;
-            let mut json = false;
-            let mut exact = false;
-            let mut positional = Vec::new();
-            for arg in args.by_ref() {
-                if arg == "--list" {
-                    list = true;
-                } else if arg == "--json" {
-                    json = true;
-                } else if arg == "--exact" {
-                    exact = true;
-                } else {
-                    positional.push(arg);
-                }
-            }
-            if positional.len() > 2 {
-                return Err(
-                    "usage: nuis bench [--list] [--json] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
-                        .to_owned(),
-                );
-            }
+            let parsed = parse_bench_args(&mut args)?;
             Ok(CommandKind::Bench {
-                input: PathBuf::from(positional.first().cloned().unwrap_or_else(|| ".".to_owned())),
-                list,
-                json,
-                exact,
-                filter: positional.get(1).cloned(),
+                input: parsed.input,
+                list: parsed.list,
+                json: parsed.json,
+                exact: parsed.exact,
+                filter: parsed.filter,
             })
         }
         "build" => {
-            let mut verbose_cache = false;
-            let mut cpu_abi = None;
-            let mut target = None;
-            let mut positional = Vec::new();
-            while let Some(arg) = args.next() {
-                if arg == "--verbose-cache" {
-                    verbose_cache = true;
-                } else if arg == "--cpu-abi" {
-                    cpu_abi = Some(args.next().ok_or_else(|| {
-                        "usage: nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
-                            .to_owned()
-                    })?);
-                } else if arg == "--target" {
-                    target = Some(args.next().ok_or_else(|| {
-                        "usage: nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
-                            .to_owned()
-                    })?);
-                } else {
-                    positional.push(arg);
-                }
-            }
-            let (input, output_dir) = match positional.len() {
-                1 => (PathBuf::from("."), PathBuf::from(&positional[0])),
-                2 => (PathBuf::from(&positional[0]), PathBuf::from(&positional[1])),
-                _ => {
-                    return Err(
-                        "usage: nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
-                            .to_owned(),
-                    )
-                }
-            };
+            let parsed = parse_build_args(&mut args)?;
             Ok(CommandKind::Build {
-                input,
-                output_dir,
-                verbose_cache,
-                cpu_abi,
-                target,
+                input: parsed.input,
+                output_dir: parsed.output_dir,
+                verbose_cache: parsed.verbose_cache,
+                cpu_abi: parsed.cpu_abi,
+                target: parsed.target,
             })
         }
         "run-artifact" => {
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
-                            .to_owned(),
-                    );
-                }
-            }
-            Ok(CommandKind::RunArtifact {
-                input: input.ok_or_else(|| {
-                    "usage: nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
-                        .to_owned()
-                })?,
-                json,
-            })
+            let (input, json) = parse_required_json_input(
+                &mut args,
+                "usage: nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>",
+            )?;
+            Ok(CommandKind::RunArtifact { input, json })
         }
         "dump-ast" => Ok(CommandKind::DumpAst {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
@@ -696,87 +345,23 @@ where
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
         "workflow" => {
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis workflow [--json] [input.ns|project-dir|nuis.toml]"
-                            .to_owned(),
-                    );
-                }
-            }
-            Ok(CommandKind::Workflow {
-                input: input.unwrap_or_else(|| PathBuf::from(".")),
-                json,
-            })
+            let (input, json) = parse_optional_json_input(&mut args, "usage: nuis workflow [--json] [input.ns|project-dir|nuis.toml]")?;
+            Ok(CommandKind::Workflow { input, json })
         }
         "scheduler-view" => {
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis scheduler-view [--json] [input.ns|project-dir|nuis.toml]"
-                            .to_owned(),
-                    );
-                }
-            }
-            Ok(CommandKind::SchedulerView {
-                input: input.unwrap_or_else(|| PathBuf::from(".")),
-                json,
-            })
+            let (input, json) = parse_optional_json_input(&mut args, "usage: nuis scheduler-view [--json] [input.ns|project-dir|nuis.toml]")?;
+            Ok(CommandKind::SchedulerView { input, json })
         }
         "rc" => Ok(CommandKind::Rc {
             args: args.collect::<Vec<_>>(),
         }),
         "project-status" => {
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis project-status [--json] [project-dir|nuis.toml]"
-                            .to_owned(),
-                    );
-                }
-            }
-            Ok(CommandKind::ProjectStatus {
-                input: input.unwrap_or_else(|| PathBuf::from(".")),
-                json,
-            })
+            let (input, json) = parse_optional_json_input(&mut args, "usage: nuis project-status [--json] [project-dir|nuis.toml]")?;
+            Ok(CommandKind::ProjectStatus { input, json })
         }
         "project-doctor" => {
-            let mut json = false;
-            let mut input = None;
-            for arg in args.by_ref() {
-                if arg == "--json" {
-                    json = true;
-                } else if input.is_none() {
-                    input = Some(PathBuf::from(arg));
-                } else {
-                    return Err(
-                        "usage: nuis project-doctor [--json] [project-dir|nuis.toml]"
-                            .to_owned(),
-                    );
-                }
-            }
-            Ok(CommandKind::ProjectDoctor {
-                input: input.unwrap_or_else(|| PathBuf::from(".")),
-                json,
-            })
+            let (input, json) = parse_optional_json_input(&mut args, "usage: nuis project-doctor [--json] [project-dir|nuis.toml]")?;
+            Ok(CommandKind::ProjectDoctor { input, json })
         }
         "project-imports" => {
             let mut json = false;
@@ -812,105 +397,6 @@ where
     }
 }
 
-fn parse_galaxy_args<I>(mut args: I) -> Result<CommandKind, String>
-where
-    I: Iterator<Item = String>,
-{
-    let subcommand = args.next().unwrap_or_else(|| "check".to_owned());
-    match subcommand.as_str() {
-        "init" => {
-            let mut input = PathBuf::from(".".to_owned());
-            let mut framework = None;
-            while let Some(arg) = args.next() {
-                if arg == "--framework" {
-                    framework = Some(args.next().ok_or_else(|| {
-                        "usage: nuis galaxy init [project-dir] [--framework <name>]".to_owned()
-                    })?);
-                } else if input == Path::new(".") {
-                    input = PathBuf::from(arg);
-                } else {
-                    return Err(format!(
-                        "unknown nuis galaxy init argument `{arg}`; expected `[project-dir] [--framework <name>]`"
-                    ));
-                }
-            }
-            Ok(CommandKind::Galaxy(GalaxyCommand::Init { input, framework }))
-        }
-        "check" => Ok(CommandKind::Galaxy(GalaxyCommand::Check {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        })),
-        "pack" => {
-            let input = PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned()));
-            let output = PathBuf::from(args.next().unwrap_or_else(|| {
-                format!(
-                    "target/galaxy/{}.galaxy",
-                    sanitize_path_label(
-                        input
-                            .file_stem()
-                            .or_else(|| input.file_name())
-                            .and_then(|item| item.to_str())
-                            .unwrap_or("package")
-                    )
-                )
-            }));
-            Ok(CommandKind::Galaxy(GalaxyCommand::Pack { input, output }))
-        }
-        "inspect" => Ok(CommandKind::Galaxy(GalaxyCommand::Inspect {
-            input: PathBuf::from(args.next().ok_or_else(|| {
-                "usage: nuis galaxy inspect <input.galaxy>".to_owned()
-            })?),
-        })),
-        "publish-local" => Ok(CommandKind::Galaxy(GalaxyCommand::PublishLocal {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-            output: args.next().map(PathBuf::from),
-        })),
-        "list" => Ok(CommandKind::Galaxy(GalaxyCommand::List)),
-        "install-local" => Ok(CommandKind::Galaxy(GalaxyCommand::InstallLocal {
-            name: args.next().ok_or_else(|| {
-                "usage: nuis galaxy install-local <name> [version] [output-dir]".to_owned()
-            })?,
-            version: args.next(),
-            output: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        })),
-        "install-deps" => Ok(CommandKind::Galaxy(GalaxyCommand::InstallDeps {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        })),
-        "doctor" => Ok(CommandKind::Galaxy(GalaxyCommand::Doctor {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        })),
-        "sync-deps" => Ok(CommandKind::Galaxy(GalaxyCommand::SyncDeps {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        })),
-        "lock-deps" => Ok(CommandKind::Galaxy(GalaxyCommand::LockDeps {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        })),
-        "verify-lock" => Ok(CommandKind::Galaxy(GalaxyCommand::VerifyLock {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        })),
-        "inspect-local" => Ok(CommandKind::Galaxy(GalaxyCommand::InspectLocal {
-            name: args.next().ok_or_else(|| {
-                "usage: nuis galaxy inspect-local <name> [version]".to_owned()
-            })?,
-            version: args.next(),
-        })),
-        "verify-local" => Ok(CommandKind::Galaxy(GalaxyCommand::VerifyLocal {
-            name: args.next().ok_or_else(|| {
-                "usage: nuis galaxy verify-local <name> [version]".to_owned()
-            })?,
-            version: args.next(),
-        })),
-        "remove-local" => Ok(CommandKind::Galaxy(GalaxyCommand::RemoveLocal {
-            name: args.next().ok_or_else(|| {
-                "usage: nuis galaxy remove-local <name> [version]".to_owned()
-            })?,
-            version: args.next(),
-        })),
-        other => Err(format!(
-            "unknown nuis galaxy command `{other}`; expected `init`, `check`, `pack`, `inspect`, `publish-local`, `list`, `install-local`, `install-deps`, `doctor`, `sync-deps`, `lock-deps`, `verify-lock`, `inspect-local`, `verify-local`, or `remove-local`"
-        )),
-    }
-}
-
 fn sanitize_path_label(raw: &str) -> String {
     let mut out = String::new();
     for ch in raw.chars() {
@@ -928,275 +414,5 @@ fn sanitize_path_label(raw: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{parse_args, CommandKind};
-    use std::path::PathBuf;
-
-    #[test]
-    fn parses_workflow_with_default_input() {
-        let command = parse_args(["workflow".to_owned()].into_iter()).expect("workflow parses");
-        assert_eq!(
-            command,
-            CommandKind::Workflow {
-                input: PathBuf::from("."),
-                json: false,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_workflow_json_with_explicit_input() {
-        let command = parse_args(
-            [
-                "workflow".to_owned(),
-                "--json".to_owned(),
-                "examples/demo.ns".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("workflow json parses");
-        assert_eq!(
-            command,
-            CommandKind::Workflow {
-                input: PathBuf::from("examples/demo.ns"),
-                json: true,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_project_imports_json_with_explicit_input() {
-        let command = parse_args(
-            [
-                "project-imports".to_owned(),
-                "--json".to_owned(),
-                "examples/demo".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("project-imports parses");
-        assert_eq!(
-            command,
-            CommandKind::ProjectImports {
-                input: PathBuf::from("examples/demo"),
-                json: true,
-                apply_suggested: false,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_project_imports_apply_suggested_with_default_input() {
-        let command =
-            parse_args(["project-imports".to_owned(), "--apply-suggested".to_owned()].into_iter())
-                .expect("project-imports apply parses");
-        assert_eq!(
-            command,
-            CommandKind::ProjectImports {
-                input: PathBuf::from("."),
-                json: false,
-                apply_suggested: true,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_inspect_artifact_json_with_manifest_input() {
-        let command = parse_args(
-            [
-                "inspect-artifact".to_owned(),
-                "--json".to_owned(),
-                "target/demo/nuis.build.manifest.toml".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("inspect-artifact parses");
-        assert_eq!(
-            command,
-            CommandKind::InspectArtifact {
-                input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
-                json: true,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_verify_artifact_with_compiled_artifact_input() {
-        let command = parse_args(
-            [
-                "verify-artifact".to_owned(),
-                "target/demo/nuis.compiled.artifact".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("verify-artifact parses");
-        assert_eq!(
-            command,
-            CommandKind::VerifyArtifact {
-                input: PathBuf::from("target/demo/nuis.compiled.artifact"),
-                json: false,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_run_artifact_with_manifest_input() {
-        let command = parse_args(
-            [
-                "run-artifact".to_owned(),
-                "target/demo/nuis.build.manifest.toml".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("run-artifact parses");
-        assert_eq!(
-            command,
-            CommandKind::RunArtifact {
-                input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
-                json: false,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_run_artifact_json_with_manifest_input() {
-        let command = parse_args(
-            [
-                "run-artifact".to_owned(),
-                "--json".to_owned(),
-                "target/demo/nuis.build.manifest.toml".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("run-artifact json parses");
-        assert_eq!(
-            command,
-            CommandKind::RunArtifact {
-                input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
-                json: true,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_artifact_doctor_json_with_output_dir() {
-        let command = parse_args(
-            [
-                "artifact-doctor".to_owned(),
-                "--json".to_owned(),
-                "target/demo".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("artifact-doctor parses");
-        assert_eq!(
-            command,
-            CommandKind::ArtifactDoctor {
-                input: PathBuf::from("target/demo"),
-                json: true,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_build_report_json_with_output_dir() {
-        let command = parse_args(
-            [
-                "build-report".to_owned(),
-                "--json".to_owned(),
-                "target/demo".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("build-report parses");
-        assert_eq!(
-            command,
-            CommandKind::BuildReport {
-                input: PathBuf::from("target/demo"),
-                json: true,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_unpack_artifact_support_json_with_output_dir() {
-        let command = parse_args(
-            [
-                "unpack-artifact-support".to_owned(),
-                "--json".to_owned(),
-                "target/demo/nuis.compiled.artifact".to_owned(),
-                "target/unpacked".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("unpack-artifact-support parses");
-        assert_eq!(
-            command,
-            CommandKind::UnpackArtifactSupport {
-                input: PathBuf::from("target/demo/nuis.compiled.artifact"),
-                output_dir: PathBuf::from("target/unpacked"),
-                json: true,
-            }
-        );
-    }
-    #[test]
-    fn parses_materialize_artifact_with_output_dir() {
-        let command = parse_args(
-            [
-                "materialize-artifact".to_owned(),
-                "target/demo/nuis.build.manifest.toml".to_owned(),
-                "target/materialized".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("materialize-artifact parses");
-        assert_eq!(
-            command,
-            CommandKind::MaterializeArtifact {
-                input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
-                output_dir: PathBuf::from("target/materialized"),
-                json: false,
-            }
-        );
-    }
-    #[test]
-    fn parses_bench_with_default_input() {
-        let command = parse_args(["bench".to_owned()].into_iter()).expect("bench parses");
-        assert_eq!(
-            command,
-            CommandKind::Bench {
-                input: PathBuf::from("."),
-                list: false,
-                json: false,
-                exact: false,
-                filter: None,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_bench_with_list_exact_and_filter() {
-        let command = parse_args(
-            [
-                "bench".to_owned(),
-                "--list".to_owned(),
-                "--json".to_owned(),
-                "--exact".to_owned(),
-                "examples/demo.ns".to_owned(),
-                "sum_loop".to_owned(),
-            ]
-            .into_iter(),
-        )
-        .expect("bench with filter parses");
-        assert_eq!(
-            command,
-            CommandKind::Bench {
-                input: PathBuf::from("examples/demo.ns"),
-                list: true,
-                json: true,
-                exact: true,
-                filter: Some("sum_loop".to_owned()),
-            }
-        );
-    }
-}
+#[path = "cli_tests.rs"]
+mod tests;

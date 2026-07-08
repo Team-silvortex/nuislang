@@ -1230,6 +1230,9 @@ fn emit_cpu_function(
             .get(&node.resource)
             .copied()
             .ok_or_else(|| format!("unknown resource `{}`", node.resource))?;
+        if state.ends_with_terminal_return {
+            continue;
+        }
 
         if resource.kind.is_family("network") && lower_network_observer_node(node, &mut state) {
             continue;
@@ -1276,7 +1279,6 @@ fn emit_cpu_function(
         let mut next_block = &mut state.next_block;
         let _next_global = &mut state.next_global;
         let last_cpu_value = &mut state.last_cpu_value;
-        state.ends_with_terminal_return = false;
 
         match (node.op.module.as_str(), node.op.instruction.as_str()) {
             ("cpu", "text")
@@ -11845,14 +11847,12 @@ fn get_ptr<'a>(registers: &'a BTreeMap<String, LlvmValueRef>, name: &str) -> Opt
         _ => None,
     }
 }
-
 fn get_cstr<'a>(registers: &'a BTreeMap<String, LlvmValueRef>, name: &str) -> Option<&'a str> {
     match registers.get(name) {
         Some(LlvmValueRef::TextHandle { ptr, .. }) => Some(ptr.as_str()),
         _ => None,
     }
 }
-
 fn fresh_reg(next: &mut usize) -> String {
     *next += 1;
     let reg = format!("%{}", *next);

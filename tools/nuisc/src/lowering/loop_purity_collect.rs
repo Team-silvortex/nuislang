@@ -8,7 +8,7 @@ pub(in crate::lowering) fn collect_pure_helper_functions(module: &NirModule) -> 
         .collect::<BTreeMap<_, _>>();
     let mut memo = BTreeMap::<String, bool>::new();
     let mut visiting = BTreeSet::<String>::new();
-    module
+    let mut helpers = module
         .functions
         .iter()
         .filter(|function| function.name != "main")
@@ -16,7 +16,18 @@ pub(in crate::lowering) fn collect_pure_helper_functions(module: &NirModule) -> 
             is_pure_helper_function(function, &function_map, &mut memo, &mut visiting)
         })
         .map(|function| function.name.clone())
-        .collect()
+        .collect::<BTreeSet<_>>();
+    helpers.extend(enum_variant_constructor_names(module));
+    helpers
+}
+
+fn enum_variant_constructor_names(module: &NirModule) -> impl Iterator<Item = String> + '_ {
+    module.enums.iter().flat_map(|definition| {
+        definition
+            .variants
+            .iter()
+            .map(|variant| format!("{}.{}", definition.name, variant.name))
+    })
 }
 
 pub(in crate::lowering) fn collect_inlineable_pure_helper_exprs(
@@ -318,6 +329,9 @@ fn is_pure_helper_expr(
             .iter()
             .all(|(_, value)| is_pure_helper_expr(value, function_map, memo, visiting)),
         NirExpr::FieldAccess { base, .. } => {
+            is_pure_helper_expr(base, function_map, memo, visiting)
+        }
+        NirExpr::VariantIs { base, .. } | NirExpr::VariantFieldAccess { base, .. } => {
             is_pure_helper_expr(base, function_map, memo, visiting)
         }
         NirExpr::Binary { lhs, rhs, .. } => {

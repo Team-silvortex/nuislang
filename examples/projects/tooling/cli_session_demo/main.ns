@@ -18,10 +18,6 @@ mod cpu Main {
     completed: i64,
     timed_out: i64,
     selected_value: i64,
-    stdout_code: i64,
-    stderr_code: i64,
-    stdout_flushed: i64,
-    stderr_flushed: i64,
     tick_ns: i64
   }
 
@@ -48,10 +44,6 @@ mod cpu Main {
         completed: 1,
         timed_out: 0,
         selected_value: task_value(result),
-        stdout_code: host_stdout_write(1901),
-        stderr_code: 0,
-        stdout_flushed: host_stdout_flush(),
-        stderr_flushed: 0,
         tick_ns: tick_ns
       };
     }
@@ -63,10 +55,6 @@ mod cpu Main {
       completed: 0,
       timed_out: 1,
       selected_value: 0,
-      stdout_code: 0,
-      stderr_code: host_stderr_write(1903),
-      stdout_flushed: 0,
-      stderr_flushed: host_stderr_flush(),
       tick_ns: tick_ns
     };
   }
@@ -81,15 +69,14 @@ mod cpu Main {
       summary.completed == 1,
       summary.timed_out == 1
     );
-    let io_total: i64 = StdIoContracts.console_status_total(
-      summary.stdout_code,
-      summary.stderr_code,
-      summary.stdout_flushed,
-      summary.stderr_flushed
-    );
-    if session_total > 0 && io_total > 0 {
-      return StdCliContracts.cli_ok();
+    if session_total > 0 && summary.completed == 1 {
+      let wrote: i64 = host_stdout_write(1901);
+      let flushed: i64 = host_stdout_flush();
+      return StdIoContracts.write_flush_exit_code(wrote, flushed);
+    } else {
+      let wrote: i64 = host_stderr_write(1903);
+      let flushed: i64 = host_stderr_flush();
+      return StdIoContracts.write_flush_exit_code(wrote, flushed) + 1;
     }
-    return StdCliContracts.cli_error();
   }
 }

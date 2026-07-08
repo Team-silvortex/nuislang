@@ -124,6 +124,19 @@ pub(in crate::lowering) fn substitute_branch_binding(
             base: Box::new(substitute_branch_binding(base, binding_name, binding_value)),
             field: field.clone(),
         },
+        NirExpr::VariantIs { base, variant } => NirExpr::VariantIs {
+            base: Box::new(substitute_branch_binding(base, binding_name, binding_value)),
+            variant: variant.clone(),
+        },
+        NirExpr::VariantFieldAccess {
+            base,
+            variant,
+            field,
+        } => NirExpr::VariantFieldAccess {
+            base: Box::new(substitute_branch_binding(base, binding_name, binding_value)),
+            variant: variant.clone(),
+            field: field.clone(),
+        },
         NirExpr::Binary { op, lhs, rhs } => NirExpr::Binary {
             op: *op,
             lhs: Box::new(substitute_branch_binding(lhs, binding_name, binding_value)),
@@ -476,6 +489,13 @@ pub(in crate::lowering) fn prepare_terminal_branch(
     stmts: &[NirStmt],
     pure_helpers: &BTreeSet<String>,
 ) -> Option<PreparedTerminalBranch> {
+    if let [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] = stmts {
+        if let Some((name, value)) = extract_pure_branch_binding(binding, pure_helpers) {
+            let prepared = prepare_terminal_branch(tail, pure_helpers)?;
+            return Some(substitute_prepared_terminal_branch(prepared, &name, &value));
+        }
+    }
+
     match stmts {
         [NirStmt::Return(Some(value))] | [NirStmt::Expr(value)] => {
             if !is_terminal_branch_pure_expr(value, pure_helpers) {
@@ -529,11 +549,6 @@ pub(in crate::lowering) fn prepare_terminal_branch(
                 calls: prepared_calls.into_iter().map(|(_, call)| call).collect(),
                 returned,
             })
-        }
-        [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {
-            let (name, value) = extract_pure_branch_binding(binding, pure_helpers)?;
-            let prepared = prepare_terminal_branch(tail, pure_helpers)?;
-            Some(substitute_prepared_terminal_branch(prepared, &name, &value))
         }
         _ => None,
     }

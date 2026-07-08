@@ -51,6 +51,9 @@ pub(in crate::lowering) fn is_terminal_branch_pure_expr(
             .iter()
             .all(|(_, value)| is_terminal_branch_pure_expr(value, pure_helpers)),
         NirExpr::FieldAccess { base, .. } => is_terminal_branch_pure_expr(base, pure_helpers),
+        NirExpr::VariantIs { base, .. } | NirExpr::VariantFieldAccess { base, .. } => {
+            is_terminal_branch_pure_expr(base, pure_helpers)
+        }
         NirExpr::Binary { lhs, rhs, .. } => {
             is_terminal_branch_pure_expr(lhs, pure_helpers)
                 && is_terminal_branch_pure_expr(rhs, pure_helpers)
