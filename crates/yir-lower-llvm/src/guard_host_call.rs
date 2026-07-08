@@ -1,10 +1,16 @@
 use std::collections::BTreeMap;
 
 use super::{
-    can_emit_typed_return_from_value, coerce_to_i64, cpu_scalar_kind_llvm_type,
-    emit_typed_return_from_value, fresh_block, fresh_reg, is_builtin_host_ffi_symbol,
-    lower_dynamic_extern_arg, lower_i64_extern_arg, render_extern_call, CpuCallScalarKind,
-    LlvmValueRef,
+    call_return::{
+        can_emit_typed_return_from_value, cpu_scalar_kind_llvm_type, emit_typed_return_from_value,
+    },
+    extern_abi::{
+        is_builtin_host_ffi_symbol, lower_dynamic_extern_arg, lower_i64_extern_arg,
+        render_extern_call,
+    },
+    fresh_block, fresh_reg,
+    value_ref::coerce_to_i64,
+    CpuCallScalarKind, LlvmValueRef,
 };
 use yir_core::Node;
 

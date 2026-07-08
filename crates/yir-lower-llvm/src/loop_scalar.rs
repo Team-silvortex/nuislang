@@ -1,4 +1,4 @@
-use super::{coerce_to_i64, fresh_reg, CpuLoopScalarKind, LlvmValueRef};
+use super::{fresh_reg, value_ref::coerce_to_i64, CpuLoopScalarKind, LlvmValueRef};
 
 pub(crate) fn infer_loop_scalar_kind<'a, I>(values: I) -> Option<CpuLoopScalarKind>
 where

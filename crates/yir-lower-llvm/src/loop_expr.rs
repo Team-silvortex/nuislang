@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::{coerce_to_i64, LlvmValueRef};
+use super::{value_ref::coerce_to_i64, LlvmValueRef};
 
 #[derive(Clone)]
 pub(crate) enum LoopControlExpr {

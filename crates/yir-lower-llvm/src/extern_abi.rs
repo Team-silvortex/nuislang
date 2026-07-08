@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 
 use yir_core::{Node, YirModule};
 
-use super::{coerce_to_i32, coerce_to_i64, LlvmValueRef};
+use super::{
+    value_ref::{coerce_to_i32, coerce_to_i64},
+    LlvmValueRef,
+};
 
 pub(crate) fn render_dynamic_extern_decls(module: &YirModule) -> Vec<String> {
     let producer_types = module
