@@ -11,13 +11,12 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("crates/nuis-runtime/src/loader.rs", 775),
         ("crates/nuis-semantics/src/model.rs", 2720),
         ("crates/yir-core/src/lib.rs", 3450),
-        ("crates/yir-domain-cpu/src/lib.rs", 4814),
+        ("crates/yir-domain-cpu/src/lib.rs", 3217),
         ("crates/yir-domain-kernel/src/lib.rs", 1581),
-        ("crates/yir-domain-shader/src/lib.rs", 7269),
+        ("crates/yir-domain-shader/src/lib.rs", 6445),
         ("crates/yir-lower-contract/src/lib.rs", 2530),
-        ("crates/yir-lower-llvm/src/lib.rs", 12032),
+        ("crates/yir-lower-llvm/src/lib.rs", 10922),
         ("crates/yir-lower-llvm/src/tests.rs", 2132),
-        ("crates/yir-verify/src/lib.rs", 6533),
         ("docs/grammar/nuis-ir.md", 678),
         ("docs/historical/nuislang-whitepaper-v0.44b.md", 639),
         ("docs/reference/nsld-linker-frontdoor.md", 1388),
@@ -62,21 +61,10 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("tools/nsld/src/object_writer_input.rs", 682),
         ("tools/nsld/src/reports.rs", 1109),
         ("tools/nuis/src/main.rs", 3244),
-        ("tools/nuisc/src/frontend/tests_control_flow.rs", 1682),
-        ("tools/nuisc/src/frontend/tests_enums.rs", 1604),
-        (
-            "tools/nuisc/src/frontend/tests_generic_constraints.rs",
-            2623,
-        ),
-        (
-            "tools/nuisc/src/frontend/tests_generic_method_bounds.rs",
-            2253,
-        ),
         (
             "tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs",
             815,
         ),
-        ("tools/nuisc/src/frontend/tests_generic_structs.rs", 2214),
         ("tools/nuisc/src/frontend/tests_lambda_higher_order.rs", 946),
         (
             "tools/nuisc/src/frontend/tests_match_struct_bindings.rs",
@@ -111,7 +99,6 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("tools/nuisc/tests/glm_verify.rs", 1400),
         ("tools/nuisc/tests/memory_compile.rs", 1786),
         ("tools/nuisc/tests/network_compile.rs", 1446),
-        ("tools/nuisc/tests/state_compile.rs", 2638),
         ("tools/yir-pack-aot/src/main.rs", 4329),
     ])
 }
