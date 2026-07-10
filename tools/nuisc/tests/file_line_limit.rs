@@ -15,7 +15,7 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("crates/yir-domain-kernel/src/lib.rs", 1581),
         ("crates/yir-domain-shader/src/lib.rs", 6445),
         ("crates/yir-lower-contract/src/lib.rs", 2530),
-        ("crates/yir-lower-llvm/src/lib.rs", 9344),
+        ("crates/yir-lower-llvm/src/lib.rs", 7509),
         ("crates/yir-lower-llvm/src/tests.rs", 2132),
         ("docs/grammar/nuis-ir.md", 678),
         ("docs/historical/nuislang-whitepaper-v0.44b.md", 639),
