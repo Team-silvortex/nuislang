@@ -180,6 +180,68 @@ mod cpu StdCliContracts {
     return first_failure_handle != 0;
   }
 
+  /// Returns true when a fail-fast step should stop the rest of a workflow.
+  pub fn workflow_should_stop(fail_fast: bool, executed: bool, succeeded: bool) -> bool {
+    if !executed {
+      return false;
+    }
+    return fail_fast && succeeded == false;
+  }
+
+  /// Encodes one workflow step as an executed-step count contribution.
+  pub fn workflow_step_executed_count(executed: bool) -> i64 {
+    if executed {
+      return 1;
+    }
+    return 0;
+  }
+
+  /// Returns true when a skipped workflow step carries blocked/failure metadata.
+  pub fn workflow_skipped_step_ok(
+    executed: bool,
+    blocked_by_failure: bool,
+    succeeded: bool
+  ) -> bool {
+    if executed {
+      return true;
+    }
+    return blocked_by_failure && succeeded == false;
+  }
+
+  /// Chooses the success or failure summary handle for a workflow result.
+  pub fn workflow_selected_summary_handle(
+    overall_success: bool,
+    success_handle: i64,
+    failure_handle: i64
+  ) -> i64 {
+    if overall_success {
+      return success_handle;
+    }
+    return failure_handle;
+  }
+
+  /// Encodes the first failed stage in a fixed four-step workflow.
+  pub fn workflow_failure_stage(
+    first_failed: bool,
+    second_failed: bool,
+    third_failed: bool,
+    fourth_failed: bool
+  ) -> i64 {
+    if first_failed {
+      return 1;
+    }
+    if second_failed {
+      return 2;
+    }
+    if third_failed {
+      return 3;
+    }
+    if fourth_failed {
+      return 4;
+    }
+    return 0;
+  }
+
   /// Scores workflow execution, failure marker, and final success gates.
   pub fn workflow_validation_total(
     executed_steps: i64,

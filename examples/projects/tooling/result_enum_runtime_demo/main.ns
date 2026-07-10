@@ -167,10 +167,12 @@ mod cpu Main {
   }
 
   fn lift_host_result(tag_handle: i64) -> Result<i64, ErrorEnvelope> {
+    let ok: Result<i64, ErrorEnvelope> = Result.Ok(host_result_value(tag_handle));
+    let err: Result<i64, ErrorEnvelope> = lift_error_kind(host_result_error(tag_handle));
     if host_result_is_ok(tag_handle) == 1 {
-      return Result.Ok(host_result_value(tag_handle));
+      return ok;
     }
-    return lift_error_kind(host_result_error(tag_handle));
+    return err;
   }
 
   fn result_is_ok<T, E>(result: Result<T, E>) -> bool {
@@ -258,8 +260,7 @@ mod cpu Main {
 
   fn capture_result_enum_project() -> ResultEnumProjectSummary {
     let success: Result<i64, ErrorEnvelope> = result_map(lift_host_result(21), raise_value);
-    let fallback: Result<i64, ErrorEnvelope> =
-      result_map_err(lift_host_result(1207), soften_error);
+    let fallback: Result<i64, ErrorEnvelope> = lift_host_result(1207);
     return ResultEnumProjectSummary {
       success_score: result_score(success)
         + result_unwrap_or(success, -10)

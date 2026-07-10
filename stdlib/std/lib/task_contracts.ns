@@ -21,12 +21,55 @@ mod cpu StdTaskContracts {
     return 0;
   }
 
+  /// Encodes whether a task result was cancelled before completion.
+  pub fn encode_cancelled(result: TaskResult<i64>) -> i64 {
+    if task_cancelled(result) {
+      return 1;
+    }
+    return 0;
+  }
+
   /// Returns the completed task value, or zero when the task is not complete.
   pub fn selected_task_value(result: TaskResult<i64>) -> i64 {
     if task_completed(result) {
       return task_value(result);
     }
     return 0;
+  }
+
+  /// Produces a compact status score for one task result.
+  pub fn result_status_total(result: TaskResult<i64>) -> i64 {
+    return encode_completed(result)
+      + encode_timed_out(result)
+      + encode_cancelled(result)
+      + selected_task_value(result);
+  }
+
+  /// Produces a compact lifecycle score for completed, timed, and cancelled probes.
+  pub fn lifecycle_total(
+    completed_result: TaskResult<i64>,
+    timed_result: TaskResult<i64>,
+    cancelled_result: TaskResult<i64>
+  ) -> i64 {
+    return encode_completed(completed_result)
+      + selected_task_value(completed_result)
+      + encode_timed_out(timed_result)
+      + encode_cancelled(cancelled_result);
+  }
+
+  /// Produces a compact task-backed CLI score.
+  pub fn cli_total(
+    result: TaskResult<i64>,
+    argv_count: i64,
+    tick_ns: i64,
+    completed_output_code: i64,
+    timeout_output_code: i64
+  ) -> i64 {
+    return argv_count
+      + tick_ns
+      + completed_output_code
+      + timeout_output_code
+      + result_status_total(result);
   }
 
   /// Aggregates several task status probes into one compact score.

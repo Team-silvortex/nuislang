@@ -43,7 +43,21 @@ mod cpu Main {
       summary.secondary_stdout_flushed,
       summary.secondary_stderr_flushed
     );
-    if total > 0 {
+    let validation_total: i64 = StdIoContracts.console_validation_total(
+      summary.primary_stdout_written,
+      summary.primary_stderr_written,
+      summary.primary_stdout_flushed,
+      summary.primary_stderr_flushed
+    ) + StdIoContracts.console_validation_total(
+      summary.secondary_stdout_written,
+      summary.secondary_stderr_written,
+      summary.secondary_stdout_flushed,
+      summary.secondary_stderr_flushed
+    );
+    if validation_total < 4 {
+      return StdIoContracts.io_error();
+    }
+    if total + validation_total > 0 {
       return StdIoContracts.io_ok();
     }
     return StdIoContracts.io_error();

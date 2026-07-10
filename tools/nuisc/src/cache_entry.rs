@@ -39,9 +39,15 @@ pub fn store_compile_cache(
             })?;
         }
     }
-    let temp_dir = key
-        .root
-        .join(format!("{}.tmp-{}", key.key, std::process::id()));
+    let temp_dir = key.root.join(format!(
+        "{}.tmp-{}-{}",
+        key.key,
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
     if temp_dir.exists() {
         fs::remove_dir_all(&temp_dir)
             .map_err(|error| format!("failed to reset `{}`: {error}", temp_dir.display()))?;

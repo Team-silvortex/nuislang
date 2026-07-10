@@ -43,6 +43,40 @@ mod cpu StdFsContracts {
       + host_fs_value_or_zero(size);
   }
 
+  /// Combines two metadata probes into a compact smoke-test score.
+  pub fn metadata_pair_status_total(
+    primary_exists: i64,
+    primary_kind: i64,
+    primary_size: i64,
+    secondary_exists: i64,
+    secondary_kind: i64,
+    secondary_size: i64
+  ) -> i64 {
+    return metadata_status_total(primary_exists, primary_kind, primary_size)
+      + metadata_status_total(secondary_exists, secondary_kind, secondary_size);
+  }
+
+  /// Scores whether one metadata probe describes an existing filesystem item.
+  pub fn metadata_validation_total(exists: i64, kind: i64, size: i64) -> i64 {
+    return encode_fs_gate(metadata_exists(exists))
+      + encode_fs_gate(kind > 0)
+      + encode_fs_gate(size >= 0);
+  }
+
+  /// Combines mode and timestamp stat probes into a compact score.
+  pub fn stat_status_total(mode: i64, mtime_ns: i64, ctime_ns: i64) -> i64 {
+    return host_fs_value_or_zero(mode)
+      + host_fs_value_or_zero(mtime_ns)
+      + host_fs_value_or_zero(ctime_ns);
+  }
+
+  /// Scores whether stat probes returned a plausible mode and timestamps.
+  pub fn stat_validation_total(mode: i64, mtime_ns: i64, ctime_ns: i64) -> i64 {
+    return encode_fs_gate(mode > 0)
+      + encode_fs_gate(mtime_ns >= 0)
+      + encode_fs_gate(ctime_ns >= 0);
+  }
+
   /// Encodes whether a file read made valid progress for the requested length.
   pub fn read_exit_code(requested_len: i64, read_len: i64) -> i64 {
     if requested_len < 0 {
@@ -264,11 +298,97 @@ mod cpu StdFsContracts {
       + encode_fs_gate(!metadata_exists(dst_exists_after_remove));
   }
 
+  /// Combines path rename handles, status, and post-rename existence probes.
+  pub fn path_rename_status_total(
+    src_path_handle: i64,
+    dst_path_handle: i64,
+    rename_status: i64,
+    src_exists_after_rename: i64,
+    dst_exists_after_rename: i64
+  ) -> i64 {
+    return host_fs_value_or_zero(src_path_handle)
+      + host_fs_value_or_zero(dst_path_handle)
+      + host_fs_value_exit_code(rename_status)
+      + host_fs_value_or_zero(src_exists_after_rename)
+      + host_fs_value_or_zero(dst_exists_after_rename);
+  }
+
+  /// Scores whether a rename moved the source path to the destination path.
+  pub fn path_rename_validation_total(
+    rename_status: i64,
+    src_exists_after_rename: i64,
+    dst_exists_after_rename: i64
+  ) -> i64 {
+    return encode_fs_gate(rename_status > 0)
+      + encode_fs_gate(!metadata_exists(src_exists_after_rename))
+      + encode_fs_gate(metadata_exists(dst_exists_after_rename));
+  }
+
+  /// Combines path remove handle, status, and before/after existence probes.
+  pub fn path_remove_status_total(
+    path_handle: i64,
+    exists_before_remove: i64,
+    remove_status: i64,
+    exists_after_remove: i64
+  ) -> i64 {
+    return host_fs_value_or_zero(path_handle)
+      + host_fs_value_or_zero(exists_before_remove)
+      + host_fs_value_exit_code(remove_status)
+      + host_fs_value_or_zero(exists_after_remove);
+  }
+
+  /// Scores whether a remove operation deleted an existing path.
+  pub fn path_remove_validation_total(
+    exists_before_remove: i64,
+    remove_status: i64,
+    exists_after_remove: i64
+  ) -> i64 {
+    return encode_fs_gate(metadata_exists(exists_before_remove))
+      + encode_fs_gate(remove_status > 0)
+      + encode_fs_gate(!metadata_exists(exists_after_remove));
+  }
+
   /// Combines directory open/count/close outcomes into a compact directory score.
   pub fn directory_status_total(dir_handle: i64, entry_count: i64, close_status: i64) -> i64 {
     return host_fs_value_or_zero(dir_handle)
       + host_fs_value_or_zero(entry_count)
       + host_fs_value_exit_code(close_status);
+  }
+
+  /// Combines directory listing, metadata, and stat probes for directory stat demos.
+  pub fn directory_stat_status_total(
+    dir_handle: i64,
+    entry_count: i64,
+    close_status: i64,
+    exists: i64,
+    kind: i64,
+    size: i64,
+    mode: i64,
+    mtime_ns: i64,
+    ctime_ns: i64
+  ) -> i64 {
+    return directory_status_total(dir_handle, entry_count, close_status)
+      + metadata_status_total(exists, kind, size)
+      + stat_status_total(mode, mtime_ns, ctime_ns);
+  }
+
+  /// Scores whether directory listing, metadata, and stat probes look coherent.
+  pub fn directory_stat_validation_total(
+    dir_handle: i64,
+    entry_count: i64,
+    close_status: i64,
+    exists: i64,
+    kind: i64,
+    size: i64,
+    mode: i64,
+    mtime_ns: i64,
+    ctime_ns: i64
+  ) -> i64 {
+    return encode_fs_gate(file_handle_ok(dir_handle))
+      + encode_fs_gate(entry_count >= 0)
+      + encode_fs_gate(close_ok(close_status))
+      + metadata_validation_total(exists, kind, size)
+      + stat_validation_total(mode, mtime_ns, ctime_ns);
   }
 
   /// Combines create/remove host statuses into a compact mutation score.

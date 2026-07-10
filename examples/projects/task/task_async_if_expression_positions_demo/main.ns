@@ -59,17 +59,19 @@ mod cpu Main {
   }
 
   async fn packetize(seed: bool) -> Packet {
+    let value: i64 = await if seed {
+      one()
+    } else {
+      two()
+    };
+    let tag: i64 = if seed {
+      1
+    } else {
+      0
+    };
     let packet: Packet = Packet {
-      value: await if seed {
-        one()
-      } else {
-        two()
-      },
-      tag: if seed {
-        1
-      } else {
-        0
-      },
+      value: value,
+      tag: tag,
     };
     return packet;
   }

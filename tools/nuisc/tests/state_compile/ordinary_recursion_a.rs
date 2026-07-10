@@ -211,19 +211,19 @@ fn lowers_ordinary_recursive_bool_state_project_with_bool_helper_shape() {
         .iter()
         .filter(|node| node.op.module == "cpu" && node.op.instruction == "return_bool")
         .count();
-    let selects = artifacts
+    let bool_params = artifacts
         .yir
         .nodes
         .iter()
-        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "param_bool")
         .count();
     assert!(
         bool_returns >= 3,
         "expected bool recursive project to emit bool helper returns"
     );
     assert!(
-        selects >= 3,
-        "expected bool recursive project to lower bool branches through select nodes"
+        bool_params >= 3,
+        "expected bool recursive project to emit bool helper parameters"
     );
 }
 

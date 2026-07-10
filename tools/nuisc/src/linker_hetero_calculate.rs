@@ -65,21 +65,29 @@ pub(crate) fn derive_hetero_calculate_plan(
     let data_segments = hetero_units
         .iter()
         .enumerate()
-        .map(|(index, unit)| LinkPlanDataSegment {
-            index,
-            segment_id: format!("seg{:04}.{}", index + 1, unit.domain_family),
-            domain_family: unit.domain_family.clone(),
-            owner_package: unit.package_id.clone(),
-            order_key: format!("data:{:04}:{}", index + 1, unit.domain_family),
-            access_phase: if unit.domain_family == "network" {
-                "recv-finalize".to_owned()
-            } else {
-                "bind-submit-wait-finalize".to_owned()
-            },
-            source_path: unit
-                .artifact_payload_blob_path
-                .clone()
-                .or_else(|| unit.artifact_payload_path.clone()),
+        .map(|(index, unit)| {
+            let node_timestamp = nodes
+                .get(index)
+                .map(|node| node.timestamp.clone())
+                .unwrap_or_else(|| format!("t{:04}.{}", index + 1, unit.domain_family));
+            LinkPlanDataSegment {
+                index,
+                segment_id: format!("seg{:04}.{}", index + 1, unit.domain_family),
+                domain_family: unit.domain_family.clone(),
+                owner_package: unit.package_id.clone(),
+                order_key: format!("data:{:04}:{}", index + 1, unit.domain_family),
+                access_phase: if unit.domain_family == "network" {
+                    "recv-finalize".to_owned()
+                } else {
+                    "bind-submit-wait-finalize".to_owned()
+                },
+                wait_event: format!("{node_timestamp}.complete"),
+                commit_event: format!("{node_timestamp}.data_commit"),
+                source_path: unit
+                    .artifact_payload_blob_path
+                    .clone()
+                    .or_else(|| unit.artifact_payload_path.clone()),
+            }
         })
         .collect::<Vec<_>>();
 
@@ -231,6 +239,31 @@ pub(crate) fn validate_hetero_calculate_plan(
                     segment.segment_id, node.timestamp
                 ));
             }
+            let expected_wait_event = format!("{}.complete", node.timestamp);
+            checked += 1;
+            if segment.wait_event != expected_wait_event {
+                issues.push(format!(
+                    "segment `{}` wait_event mismatch: expected `{}`, found `{}`",
+                    segment.segment_id, expected_wait_event, segment.wait_event
+                ));
+            }
+            let expected_commit_event = format!("{}.data_commit", node.timestamp);
+            checked += 1;
+            if segment.commit_event != expected_commit_event {
+                issues.push(format!(
+                    "segment `{}` commit_event mismatch: expected `{}`, found `{}`",
+                    segment.segment_id, expected_commit_event, segment.commit_event
+                ));
+            }
+            checked += 1;
+            if !node.emits.contains(&segment.wait_event)
+                || !node.emits.contains(&segment.commit_event)
+            {
+                issues.push(format!(
+                    "segment `{}` events are not emitted by node `{}`",
+                    segment.segment_id, node.timestamp
+                ));
+            }
         }
     }
 
@@ -321,6 +354,14 @@ pub fn render_hetero_calculate_plan_toml(plan: &LinkPlanHeteroCalculate) -> Stri
         out.push_str(&format!(
             "access_phase = \"{}\"\n",
             escape_toml_string(&segment.access_phase)
+        ));
+        out.push_str(&format!(
+            "wait_event = \"{}\"\n",
+            escape_toml_string(&segment.wait_event)
+        ));
+        out.push_str(&format!(
+            "commit_event = \"{}\"\n",
+            escape_toml_string(&segment.commit_event)
         ));
         if let Some(source_path) = &segment.source_path {
             out.push_str(&format!(

@@ -64,55 +64,8 @@ mod cpu Main {
     return host_text_concat(with_line, newline_handle);
   }
 
-  fn clamp_sample_count(sample_count: i64) -> i64 {
-    if sample_count < 1 {
-      return 1;
-    }
-    if sample_count > 4 {
-      return 4;
-    }
-    return sample_count;
-  }
-
-  fn min2(lhs: i64, rhs: i64) -> i64 {
-    if lhs < rhs {
-      return lhs;
-    }
-    return rhs;
-  }
-
-  fn max2(lhs: i64, rhs: i64) -> i64 {
-    if lhs > rhs {
-      return lhs;
-    }
-    return rhs;
-  }
-
-  fn min3(first: i64, second: i64, third: i64) -> i64 {
-    return min2(min2(first, second), third);
-  }
-
-  fn max3(first: i64, second: i64, third: i64) -> i64 {
-    return max2(max2(first, second), third);
-  }
-
-  fn min4(first: i64, second: i64, third: i64, fourth: i64) -> i64 {
-    return min2(min3(first, second, third), fourth);
-  }
-
-  fn max4(first: i64, second: i64, third: i64, fourth: i64) -> i64 {
-    return max2(max3(first, second, third), fourth);
-  }
-
-  fn active_or_zero(value: i64, enabled: bool) -> i64 {
-    if enabled {
-      return value;
-    }
-    return 0;
-  }
-
   fn capture_benchmark_report_count_project() -> BenchmarkReportCountProjectSummary {
-    let effective_sample_count: i64 = clamp_sample_count(4);
+    let effective_sample_count: i64 = StdTimeContracts.clamp_benchmark_sample_count(4);
 
     let first_start_ns: i64 = host_monotonic_time_ns();
     let first_sleep_ns_raw: i64 = host_sleep_ns(1000);
@@ -133,14 +86,20 @@ mod cpu Main {
     let fourth_span_ns_raw: i64 = fourth_end_ns - fourth_start_ns;
 
     let first_span_ns: i64 = first_span_ns_raw;
-    let second_span_ns: i64 = active_or_zero(second_span_ns_raw, effective_sample_count > 1);
-    let third_span_ns: i64 = active_or_zero(third_span_ns_raw, effective_sample_count > 2);
-    let fourth_span_ns: i64 = active_or_zero(fourth_span_ns_raw, effective_sample_count > 3);
+    let second_span_ns: i64 =
+      StdTimeContracts.active_time_or_zero(second_span_ns_raw, effective_sample_count > 1);
+    let third_span_ns: i64 =
+      StdTimeContracts.active_time_or_zero(third_span_ns_raw, effective_sample_count > 2);
+    let fourth_span_ns: i64 =
+      StdTimeContracts.active_time_or_zero(fourth_span_ns_raw, effective_sample_count > 3);
 
     let first_sleep_ns: i64 = first_sleep_ns_raw;
-    let second_sleep_ns: i64 = active_or_zero(second_sleep_ns_raw, effective_sample_count > 1);
-    let third_sleep_ns: i64 = active_or_zero(third_sleep_ns_raw, effective_sample_count > 2);
-    let fourth_sleep_ns: i64 = active_or_zero(fourth_sleep_ns_raw, effective_sample_count > 3);
+    let second_sleep_ns: i64 =
+      StdTimeContracts.active_time_or_zero(second_sleep_ns_raw, effective_sample_count > 1);
+    let third_sleep_ns: i64 =
+      StdTimeContracts.active_time_or_zero(third_sleep_ns_raw, effective_sample_count > 2);
+    let fourth_sleep_ns: i64 =
+      StdTimeContracts.active_time_or_zero(fourth_sleep_ns_raw, effective_sample_count > 3);
 
     let total_span_ns: i64 =
       first_span_ns + second_span_ns + third_span_ns + fourth_span_ns;
@@ -152,12 +111,12 @@ mod cpu Main {
         first_span_ns
       } else {
         if effective_sample_count == 2 {
-          min2(first_span_ns, second_span_ns)
+          StdTimeContracts.benchmark_min2(first_span_ns, second_span_ns)
         } else {
           if effective_sample_count == 3 {
-            min3(first_span_ns, second_span_ns, third_span_ns)
+            StdTimeContracts.benchmark_min3(first_span_ns, second_span_ns, third_span_ns)
           } else {
-            min4(first_span_ns, second_span_ns, third_span_ns, fourth_span_ns)
+            StdTimeContracts.benchmark_min4(first_span_ns, second_span_ns, third_span_ns, fourth_span_ns)
           }
         }
       };
@@ -167,12 +126,12 @@ mod cpu Main {
         first_span_ns
       } else {
         if effective_sample_count == 2 {
-          max2(first_span_ns, second_span_ns)
+          StdTimeContracts.benchmark_max2(first_span_ns, second_span_ns)
         } else {
           if effective_sample_count == 3 {
-            max3(first_span_ns, second_span_ns, third_span_ns)
+            StdTimeContracts.benchmark_max3(first_span_ns, second_span_ns, third_span_ns)
           } else {
-            max4(first_span_ns, second_span_ns, third_span_ns, fourth_span_ns)
+            StdTimeContracts.benchmark_max4(first_span_ns, second_span_ns, third_span_ns, fourth_span_ns)
           }
         }
       };
@@ -192,7 +151,7 @@ mod cpu Main {
       fourth_span_ns: fourth_span_ns,
       min_span_ns: min_span_ns,
       max_span_ns: max_span_ns,
-      avg_span_ns: total_span_ns / effective_sample_count,
+      avg_span_ns: StdTimeContracts.benchmark_avg_span(total_span_ns, effective_sample_count),
       first_sleep_ns: first_sleep_ns,
       second_sleep_ns: second_sleep_ns,
       third_sleep_ns: third_sleep_ns,
@@ -221,12 +180,13 @@ mod cpu Main {
       summary.first_span_ns,
       summary.second_span_ns,
       summary.third_span_ns,
-      min3(summary.first_span_ns, summary.second_span_ns, summary.third_span_ns),
-      max3(summary.first_span_ns, summary.second_span_ns, summary.third_span_ns),
-      summary.first_span_ns + summary.second_span_ns + summary.third_span_ns
-        - min3(summary.first_span_ns, summary.second_span_ns, summary.third_span_ns)
-        - max3(summary.first_span_ns, summary.second_span_ns, summary.third_span_ns),
-      (summary.first_span_ns + summary.second_span_ns + summary.third_span_ns) / 3,
+      StdTimeContracts.benchmark_min3(summary.first_span_ns, summary.second_span_ns, summary.third_span_ns),
+      StdTimeContracts.benchmark_max3(summary.first_span_ns, summary.second_span_ns, summary.third_span_ns),
+      StdTimeContracts.benchmark_mid3(summary.first_span_ns, summary.second_span_ns, summary.third_span_ns),
+      StdTimeContracts.benchmark_avg_span(
+        summary.first_span_ns + summary.second_span_ns + summary.third_span_ns,
+        3
+      ),
       summary.first_span_ns + summary.second_span_ns + summary.third_span_ns,
       summary.first_sleep_ns + summary.second_sleep_ns + summary.third_sleep_ns
     );

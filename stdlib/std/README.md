@@ -112,35 +112,44 @@ First auto-injectable library module:
 
 * [lib/task_contracts.ns](lib/task_contracts.ns)
   exposes the initial `StdTaskContracts` helper surface for project-level
-  stdlib galaxy injection
+  stdlib galaxy injection, including completed/timed-out/cancelled status
+  encoding, selected completed values, lifecycle totals, policy totals, and
+  task-backed CLI summary totals
 * [lib/io_contracts.ns](lib/io_contracts.ns)
   exposes the initial `StdIoContracts` helper surface for normalizing host I/O
   byte counts, flush statuses, report write coverage, and process-style exit
-  codes, including terminal readiness validation gates
+  codes, including console write/flush validation, single-output report
+  validation, and terminal readiness gates
 * [lib/fs_contracts.ns](lib/fs_contracts.ns)
   exposes the initial `StdFsContracts` helper surface for normalizing
-  filesystem metadata, file read/write/copy status, directory mutation, and
-  path/report/session probe summaries, including file report output
-  validation gates, file read/write/chunk-read/roundtrip readiness gates, and
-  directory mutation plus path copy/remove readiness gates
+  filesystem metadata/stat probes, file read/write/copy status, directory
+  mutation/stat summaries, and path/report/session probe summaries, including
+  file report output validation gates, file read/write/chunk-read/roundtrip
+  readiness gates, and directory mutation plus path copy/rename/remove
+  readiness gates
 * [lib/cli_contracts.ns](lib/cli_contracts.ns)
   exposes the initial `StdCliContracts` helper surface for normalizing
   argv/env/process probes, result/error/diagnostic summaries, command
   requests/results, workflow gates, CLI sessions, and project frontdoor
-  recommendations, including command/workflow validation gates
+  recommendations, including command/workflow validation gates plus reusable
+  fail-fast, skipped-step, executed-count, failure-stage, and selected-summary
+  workflow helpers
 * [lib/net_contracts.ns](lib/net_contracts.ns)
   exposes the initial `StdNetContracts` helper surface for normalizing
   network ready states, endpoint/window summaries, HTTP byte estimates,
-  owned-transport lifecycle values, and session/task bridge totals
+  owned-transport lifecycle values, HTTP client lane totals, network result
+  ready/value probes, and session/task bridge totals
 * [lib/text_contracts.ns](lib/text_contracts.ns)
   exposes the initial `StdTextContracts` helper surface for normalizing text
   handles, measured lengths, line/word statistics, report readiness, formatted
-  report probes, JSON shape lengths, JSON/text consistency gates, text pipeline
-  summaries, and text pipeline readiness gates
+  report probes, report-builder line summaries, JSON shape lengths, JSON/text
+  consistency gates, text pipeline summaries, and text pipeline readiness gates
 * [lib/time_contracts.ns](lib/time_contracts.ns)
   exposes the initial `StdTimeContracts` helper surface for normalizing wall
   time, monotonic time, sleep, clock-domain, benchmark span probes, and
-  benchmark validation gates
+  benchmark validation gates, including four-sample count clamping,
+  active-probe filtering, min/max/mid/average helpers, and benchmark triplet
+  totals
 * [lib/hetero_contracts.ns](lib/hetero_contracts.ns)
   exposes the initial `StdHeteroContracts` helper surface for normalizing
   heterogeneous backend ids, C FFI proxy whitelist checks, accepted/rejected

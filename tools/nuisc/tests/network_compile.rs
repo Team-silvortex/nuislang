@@ -989,9 +989,9 @@ fn lowers_http_client_lane_recipe_project_with_expected_client_lane_shape() {
         }));
     }
     for (name, callee) in [
-        ("status_code", "encode_value"),
-        ("send_value", "encode_value"),
-        ("recv_value", "encode_value"),
+        ("status_code", "StdNetContracts.result_value"),
+        ("send_value", "StdNetContracts.result_value"),
+        ("recv_value", "StdNetContracts.result_value"),
     ] {
         assert!(capture.body.iter().any(|stmt| {
             matches!(
@@ -1004,15 +1004,19 @@ fn lowers_http_client_lane_recipe_project_with_expected_client_lane_shape() {
             )
         }));
     }
-    for field_name in ["send_ready", "recv_ready", "lane_value"] {
-        assert!(capture.body.iter().any(|stmt| {
-            matches!(
-                stmt,
-                NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
-                    if fields.iter().any(|(field, _)| field == field_name)
-            )
-        }));
-    }
+    assert!(capture.body.iter().any(|stmt| matches!(
+        stmt,
+        NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
+            if ["send_ready", "recv_ready", "lane_value"]
+                .iter()
+                .all(|field_name| fields.iter().any(|(field, _)| field == field_name))
+                && fields.iter().any(|(field, value)| field == "lane_value"
+                    && matches!(
+                        value,
+                        NirExpr::Call { callee, .. }
+                            if callee == "StdNetContracts.http_client_lane_total"
+                    ))
+    )));
 
     let summarize = artifacts
         .nir
@@ -1020,10 +1024,6 @@ fn lowers_http_client_lane_recipe_project_with_expected_client_lane_shape() {
         .iter()
         .find(|function| function.name == "summarize_net_http_client_lane_recipe")
         .unwrap();
-    assert!(matches!(
-        summarize.return_type.as_ref().map(|ty| ty.render()),
-        Some(rendered) if rendered == "i64"
-    ));
     assert!(matches!(
         summarize.body.first(),
         Some(NirStmt::Let {

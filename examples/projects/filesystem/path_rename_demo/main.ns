@@ -1,3 +1,5 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
   extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
   extern "c" fn host_path_rename(src_handle: i64, dst_handle: i64) -> i64;
@@ -26,10 +28,24 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: PathRenameProjectSummary = capture_path_rename_project();
-    return summary.src_path_handle
-      + summary.dst_path_handle
-      + summary.rename_code
-      + summary.src_exists_code
-      + summary.dst_exists_code;
+    let total: i64 = StdFsContracts.path_rename_status_total(
+      summary.src_path_handle,
+      summary.dst_path_handle,
+      summary.rename_code,
+      summary.src_exists_code,
+      summary.dst_exists_code
+    );
+    let validation_total: i64 = StdFsContracts.path_rename_validation_total(
+      summary.rename_code,
+      summary.src_exists_code,
+      summary.dst_exists_code
+    );
+    if validation_total < 3 {
+      return StdFsContracts.fs_error();
+    }
+    if total + validation_total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

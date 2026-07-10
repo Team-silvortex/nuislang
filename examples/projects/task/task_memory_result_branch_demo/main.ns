@@ -13,8 +13,9 @@ mod cpu Main {
   }
 
   fn encode_completed(seed: i64, result: TaskResult<i64>) -> i64 {
+    let observed: i64 = encode_observed(seed, task_value(result));
     if task_completed(result) {
-      return encode_observed(seed, task_value(result));
+      return observed;
     }
     return 0;
   }

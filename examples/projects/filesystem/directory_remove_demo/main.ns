@@ -36,7 +36,16 @@ mod cpu Main {
       summary.remove_code,
       summary.exists_after_remove
     ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle);
-    if total > 0 {
+    let validation_total: i64 = StdFsContracts.directory_remove_validation_total(
+      summary.create_code,
+      summary.exists_before_remove,
+      summary.remove_code,
+      summary.exists_after_remove
+    );
+    if validation_total < 4 {
+      return StdFsContracts.fs_error();
+    }
+    if total + validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

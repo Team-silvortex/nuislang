@@ -197,11 +197,13 @@ mod cpu Main {
     send_result: NetworkResult<i64>,
     retry_budget: i64
   ) -> i64 {
+    let recv_value: i64 = encode_value(recv_result);
+    let send_value: i64 = encode_value(send_result);
     if network_recv_ready(recv_result) {
-      return encode_value(recv_result);
+      return recv_value;
     }
     if network_send_ready(send_result) {
-      return encode_value(send_result) + retry_budget;
+      return send_value + retry_budget;
     }
     return retry_budget;
   }

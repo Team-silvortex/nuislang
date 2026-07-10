@@ -1,3 +1,5 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
   extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
   extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
@@ -9,6 +11,7 @@ mod cpu Main {
   struct PathCopyProjectSummary {
     src_path_handle: i64,
     dst_path_handle: i64,
+    src_file_handle: i64,
     write_code: i64,
     close_code: i64,
     copy_code: i64,
@@ -26,6 +29,7 @@ mod cpu Main {
     return PathCopyProjectSummary {
       src_path_handle: src_path_handle,
       dst_path_handle: dst_path_handle,
+      src_file_handle: src_file_handle,
       write_code: write_code,
       close_code: close_code,
       copy_code: copy_code,
@@ -36,12 +40,29 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: PathCopyProjectSummary = capture_path_copy_project();
-    return summary.src_path_handle
-      + summary.dst_path_handle
-      + summary.write_code
-      + summary.close_code
-      + summary.copy_code
-      + summary.src_exists_code
-      + summary.dst_exists_code;
+    let total: i64 = StdFsContracts.path_copy_status_total(
+      summary.src_path_handle,
+      summary.dst_path_handle,
+      summary.src_file_handle,
+      summary.write_code,
+      summary.close_code,
+      summary.copy_code,
+      summary.src_exists_code,
+      summary.dst_exists_code
+    );
+    let validation_total: i64 = StdFsContracts.path_copy_validation_total(
+      summary.src_file_handle,
+      summary.close_code,
+      summary.copy_code,
+      summary.src_exists_code,
+      summary.dst_exists_code
+    );
+    if validation_total < 5 {
+      return StdFsContracts.fs_error();
+    }
+    if total + validation_total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

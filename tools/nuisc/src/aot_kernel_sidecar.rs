@@ -3,7 +3,7 @@ use nuis_artifact::BuildManifestDomainBuildUnit;
 use crate::aot_domain_profile::{
     derived_lowering_profile_for_unit, kernel_registered_feature_surfaces_for_profile,
     kernel_registered_lane_groups_for_profile, kernel_supported_dispatch_kinds_for_profile,
-    render_target_specific_backend_fields,
+    render_schedule_contract_fields, render_target_specific_backend_fields,
 };
 use crate::aot_toml::{escape_toml_string, render_string_array};
 
@@ -88,6 +88,7 @@ pub(crate) fn render_domain_build_unit_kernel_ir_sidecar(
         ));
     }
     out.push_str(&render_target_specific_backend_fields(unit, &profile));
+    out.push_str(&render_schedule_contract_fields(&profile));
     out.push_str("[lowering_capabilities]\n");
     out.push_str("binary_role = \"linker-input-sidecar\"\n");
     out.push_str("capability_owner = \"kernel-nustar\"\n");

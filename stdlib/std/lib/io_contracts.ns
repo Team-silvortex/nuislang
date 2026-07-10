@@ -88,6 +88,16 @@ mod cpu StdIoContracts {
       + encode_io_gate(write_flush_ok(stderr_written, stderr_flushed));
   }
 
+  /// Scores whether one output write covered a report and flushed successfully.
+  pub fn output_report_validation_total(
+    report_len: i64,
+    written: i64,
+    flushed: i64
+  ) -> i64 {
+    return encode_io_gate(write_covers_payload(written, report_len))
+      + encode_io_gate(write_flush_ok(written, flushed));
+  }
+
   /// Produces a compact score for stdout/stderr write and flush probes.
   pub fn console_status_total(
     stdout_written: i64,
@@ -99,6 +109,17 @@ mod cpu StdIoContracts {
       + byte_count_or_zero(stderr_written)
       + flush_exit_code(stdout_flushed)
       + flush_exit_code(stderr_flushed);
+  }
+
+  /// Scores whether stdout/stderr writes and flushes both succeeded.
+  pub fn console_validation_total(
+    stdout_written: i64,
+    stderr_written: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64
+  ) -> i64 {
+    return encode_io_gate(write_flush_ok(stdout_written, stdout_flushed))
+      + encode_io_gate(write_flush_ok(stderr_written, stderr_flushed));
   }
 
   /// Normalizes a read result against its requested byte length.

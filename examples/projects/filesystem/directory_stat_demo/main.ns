@@ -1,3 +1,5 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
   extern "c" fn host_dir_open(path_handle: i64) -> i64;
   extern "c" fn host_dir_entry_count(dir_handle: i64) -> i64;
@@ -38,14 +40,34 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: DirectoryStatProjectSummary = capture_directory_stat_project();
-    return summary.dir_handle
-      + summary.dir_entry_count
-      + summary.dir_close_code
-      + summary.exists
-      + summary.kind
-      + summary.size
-      + summary.mode
-      + summary.mtime_ns
-      + summary.ctime_ns;
+    let total: i64 = StdFsContracts.directory_stat_status_total(
+      summary.dir_handle,
+      summary.dir_entry_count,
+      summary.dir_close_code,
+      summary.exists,
+      summary.kind,
+      summary.size,
+      summary.mode,
+      summary.mtime_ns,
+      summary.ctime_ns
+    );
+    let validation_total: i64 = StdFsContracts.directory_stat_validation_total(
+      summary.dir_handle,
+      summary.dir_entry_count,
+      summary.dir_close_code,
+      summary.exists,
+      summary.kind,
+      summary.size,
+      summary.mode,
+      summary.mtime_ns,
+      summary.ctime_ns
+    );
+    if validation_total < 9 {
+      return StdFsContracts.fs_error();
+    }
+    if total + validation_total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

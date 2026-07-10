@@ -85,33 +85,43 @@ fn lowers_task_clock_observe_project_with_clock_host_observer_shapes() {
                 && matches!(task.as_ref(), NirExpr::CpuSpawn { callee, .. } if callee == "ping")
         )
     }));
+    for (name, callee) in [
+        ("global_epoch_ns", "host_clock_epoch_ns"),
+        ("monotonic_ns", "host_monotonic_time_ns"),
+        ("global_scale_ppm", "host_clock_scale_ppm"),
+    ] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: binding_name,
+                    ty: Some(ty),
+                    value: NirExpr::CpuExternCall { callee: call, .. },
+                } if binding_name == name && ty.render() == "i64" && call == callee
+            )
+        }));
+    }
     assert!(capture.body.iter().any(|stmt| {
         matches!(
             stmt,
-            NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
-                if fields.iter().any(|(field, value)| {
-                    field == "global_domain_id" && matches!(value, NirExpr::Binary { .. })
-                }) && fields.iter().any(|(field, value)| {
-                    field == "global_epoch_ns"
-                        && matches!(
-                            value,
-                            NirExpr::CpuExternCall { callee, .. } if callee == "host_clock_epoch_ns"
-                        )
-                }) && fields.iter().any(|(field, value)| {
-                    field == "monotonic_ns"
-                        && matches!(
-                            value,
-                            NirExpr::CpuExternCall { callee, .. } if callee == "host_monotonic_time_ns"
-                        )
-                }) && fields.iter().any(|(field, value)| {
-                    field == "global_tick" && matches!(value, NirExpr::CpuTickI64 { .. })
-                }) && fields.iter().any(|(field, value)| {
-                    field == "global_scale_ppm"
-                        && matches!(
-                            value,
-                            NirExpr::CpuExternCall { callee, .. } if callee == "host_clock_scale_ppm"
-                        )
-                })
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuTickI64 { .. },
+            } if name == "global_tick" && ty.render() == "i64"
+        )
+    }));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                condition: NirExpr::CpuTaskCompleted(_),
+                then_body,
+                ..
+            } if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Var(name)))] if name == "completed_summary"
+            )
         )
     }));
 }

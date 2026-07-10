@@ -325,6 +325,11 @@ fn is_pure_helper_expr(
         NirExpr::CastI64ToF64(inner) | NirExpr::CastF64ToI64(inner) => {
             is_pure_helper_expr(inner, function_map, memo, visiting)
         }
+        NirExpr::CpuTaskCompleted(inner)
+        | NirExpr::CpuTaskTimedOut(inner)
+        | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskValue(inner)
+        | NirExpr::CpuMutexValue(inner) => is_pure_helper_expr(inner, function_map, memo, visiting),
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .all(|(_, value)| is_pure_helper_expr(value, function_map, memo, visiting)),
@@ -338,6 +343,12 @@ fn is_pure_helper_expr(
             is_pure_helper_expr(lhs, function_map, memo, visiting)
                 && is_pure_helper_expr(rhs, function_map, memo, visiting)
         }
-        _ => nir_expr_effect_class(expr) == NirExprEffectClass::Pure,
+        _ => matches!(
+            nir_expr_effect_class(expr),
+            NirExprEffectClass::Pure
+                | NirExprEffectClass::LocalReadOnly
+                | NirExprEffectClass::HostReadOnly
+                | NirExprEffectClass::DomainReadOnly
+        ),
     }
 }

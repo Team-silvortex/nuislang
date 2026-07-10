@@ -2,6 +2,7 @@ name = "net_http_client_lane_recipe_demo"
 version = "0.1.0"
 entry = "main.ns"
 modules = ["main.ns", "network_unit.ns"]
+galaxy = ["std=workspace"]
 
 abi = [
   "cpu=cpu.arm64.apple_aapcs64",

@@ -172,13 +172,15 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
     }
     for segment in &plan.hetero_calculate.data_segments {
         lines.push(format!(
-            "data_segment: index={} id={} domain={} owner={} order={} phase={} source={}",
+            "data_segment: index={} id={} domain={} owner={} order={} phase={} wait={} commit={} source={}",
             segment.index,
             segment.segment_id,
             segment.domain_family,
             segment.owner_package,
             segment.order_key,
             segment.access_phase,
+            segment.wait_event,
+            segment.commit_event,
             segment.source_path.as_deref().unwrap_or("none")
         ));
     }

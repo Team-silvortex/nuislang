@@ -113,6 +113,29 @@ mod cpu StdTextContracts {
     return text_value_or_zero(report_handle) + text_value_or_zero(report_len);
   }
 
+  /// Combines common report-builder line handles and report statistics.
+  pub fn report_lines_status_total(
+    title_line_handle: i64,
+    title_line_len: i64,
+    kv_line_handle: i64,
+    kv_line_len: i64,
+    status_line_handle: i64,
+    status_line_len: i64,
+    report_handle: i64,
+    report_len: i64,
+    report_lines: i64,
+    report_words: i64
+  ) -> i64 {
+    return text_value_or_zero(title_line_handle)
+      + text_value_or_zero(title_line_len)
+      + text_value_or_zero(kv_line_handle)
+      + text_value_or_zero(kv_line_len)
+      + text_value_or_zero(status_line_handle)
+      + text_value_or_zero(status_line_len)
+      + report_status_total(report_handle, report_len)
+      + text_stats_total(report_len, report_lines, report_words);
+  }
+
   /// Returns true when a report handle and measured length are both usable.
   pub fn report_ready(report_handle: i64, report_len: i64) -> bool {
     if report_handle < 0 {

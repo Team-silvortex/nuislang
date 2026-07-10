@@ -101,6 +101,8 @@ pub(crate) fn link_plan_data_segment_json(segment: &linker::LinkPlanDataSegment)
         json_string_field("owner_package", &segment.owner_package),
         json_string_field("order_key", &segment.order_key),
         json_string_field("access_phase", &segment.access_phase),
+        json_string_field("wait_event", &segment.wait_event),
+        json_string_field("commit_event", &segment.commit_event),
         json_optional_string_field("source_path", segment.source_path.as_deref()),
     ];
     format!("{{{}}}", fields.join(","))

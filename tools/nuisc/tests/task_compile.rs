@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use nuis_semantics::model::{NirExpr, NirStmt};
+use nuis_semantics::model::{NirBinaryOp, NirExpr, NirStmt};
 
 fn compiled_project(path: &str) -> nuisc::pipeline::PipelineArtifacts {
     nuisc::pipeline::compile_project(Path::new(path))

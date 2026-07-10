@@ -145,8 +145,9 @@ mod cpu Main {
     headers: HeaderBlocks,
     recv_result: NetworkResult<i64>
   ) -> i64 {
+    let recv_value: i64 = encode_value(recv_result);
     if network_recv_ready(recv_result) {
-      return encode_value(recv_result) + headers.auth_code + plan.path_code;
+      return recv_value + headers.auth_code + plan.path_code;
     }
     return plan.retry_budget + headers.accept_code;
   }
@@ -183,11 +184,13 @@ mod cpu Main {
     recv_result: NetworkResult<i64>,
     send_result: NetworkResult<i64>
   ) -> i64 {
+    let recv_value: i64 = encode_value(recv_result);
+    let send_value: i64 = encode_value(send_result);
     if network_recv_ready(recv_result) {
-      return encode_value(recv_result) + headers.accept_code;
+      return recv_value + headers.accept_code;
     }
     if network_send_ready(send_result) {
-      return encode_value(send_result) + plan.route_code;
+      return send_value + plan.route_code;
     }
     return plan.retry_budget;
   }

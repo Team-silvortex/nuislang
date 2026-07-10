@@ -5,10 +5,12 @@ mod cpu Main {
   extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
   extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
   extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
 
   struct FileWriteProjectSummary {
     path_handle: i64,
     file_handle: i64,
+    payload_len: i64,
     write_code: i64,
     close_code: i64
   }
@@ -19,6 +21,7 @@ mod cpu Main {
     return FileWriteProjectSummary {
       path_handle: path_handle,
       file_handle: file_handle,
+      payload_len: host_text_len(777),
       write_code: host_file_write(file_handle, 777),
       close_code: host_file_close(file_handle)
     };
@@ -31,7 +34,16 @@ mod cpu Main {
       summary.write_code,
       summary.close_code
     ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle);
-    if total > 0 {
+    let validation_total: i64 = StdFsContracts.file_write_validation_total(
+      summary.file_handle,
+      summary.payload_len,
+      summary.write_code,
+      summary.close_code
+    );
+    if validation_total < 3 {
+      return StdFsContracts.fs_error();
+    }
+    if total + validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

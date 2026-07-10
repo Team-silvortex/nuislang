@@ -242,6 +242,24 @@ pub(crate) fn render_target_specific_lowering_fields(
     out
 }
 
+pub(crate) fn render_schedule_contract_fields(profile: &DerivedLoweringProfile<'_>) -> String {
+    let mut out = String::new();
+    out.push_str("[schedule_contract]\n");
+    out.push_str(&format!(
+        "execution_route = \"{}\"\n",
+        profile.execution_route
+    ));
+    out.push_str(&format!(
+        "submission_adapter = \"{}\"\n",
+        profile.submission_adapter
+    ));
+    out.push_str(&format!("wake_adapter = \"{}\"\n", profile.wake_adapter));
+    out.push_str("clock_contract = \"global-time-partial-order\"\n");
+    out.push_str("completion_contract = \"lifecycle-hook-fence\"\n");
+    out.push_str("data_order_contract = \"deterministic-segment-order\"\n");
+    out
+}
+
 pub(crate) fn shader_supported_stages_for_profile(
     unit: &BuildManifestDomainBuildUnit,
     profile: &DerivedLoweringProfile<'_>,
@@ -413,5 +431,18 @@ mod tests {
             shader_supported_stages_for_profile(&unit, &profile),
             Some(&["vertex", "fragment", "compute"][..])
         );
+    }
+
+    #[test]
+    fn schedule_contract_renders_profile_owned_adapters() {
+        let unit = domain_unit("kernel", "vulkan.discrete-or-integrated-gpu");
+        let profile = derived_lowering_profile_for_unit(&unit);
+        let rendered = render_schedule_contract_fields(&profile);
+
+        assert!(rendered.contains("[schedule_contract]"));
+        assert!(rendered.contains("execution_route = \"spirv-compute-queue\""));
+        assert!(rendered.contains("submission_adapter = \"vulkan-compute-submit\""));
+        assert!(rendered.contains("wake_adapter = \"vulkan-timeline-semaphore\""));
+        assert!(rendered.contains("clock_contract = \"global-time-partial-order\""));
     }
 }

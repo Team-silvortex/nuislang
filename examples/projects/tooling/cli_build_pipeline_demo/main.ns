@@ -167,6 +167,7 @@ mod cpu Main {
     let line_len: i64 = host_line_len(line_handle);
     let result: TaskResult<i64> =
       join_result(timeout(spawn(ping(argv_count + line_len)), seed.timeout_limit));
+    let tick_ns: i64 = host_monotonic_time_ns();
 
     if task_completed(result) {
       return PipelineCliSummary {
@@ -176,7 +177,7 @@ mod cpu Main {
         completed: true,
         timed_out: false,
         selected_target_handle: task_value(result),
-        tick_ns: host_monotonic_time_ns()
+        tick_ns: tick_ns
       };
     }
 
@@ -187,7 +188,7 @@ mod cpu Main {
       completed: false,
       timed_out: true,
       selected_target_handle: 0,
-      tick_ns: host_monotonic_time_ns()
+      tick_ns: tick_ns
     };
   }
 
@@ -566,12 +567,10 @@ mod cpu Main {
       capture_pipeline_automation(seed.automation, cli.selected_target_handle);
     let plan: BuildPlan = build_plan(cli, automation);
     let pipeline: BuildPipelineReport = capture_pipeline(plan, cli);
-
-    if pipeline.overall_success {
-      return build_success_summary(seed, cli, automation, plan, pipeline);
-    }
-
-    return build_failure_summary(seed, cli, automation, plan, pipeline);
+    let success_summary: BuildPipelineSummary = build_success_summary(seed, cli, automation, plan, pipeline);
+    let failure_summary: BuildPipelineSummary = build_failure_summary(seed, cli, automation, plan, pipeline);
+    if pipeline.overall_success { return success_summary; }
+    return failure_summary;
   }
 
   fn main() -> i64 {

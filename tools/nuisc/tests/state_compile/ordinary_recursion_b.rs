@@ -426,19 +426,19 @@ fn lowers_ordinary_recursive_mixed_state_project_with_bool_recursive_helper_shap
         .iter()
         .filter(|node| node.op.module == "cpu" && node.op.instruction == "return_bool")
         .count();
-    let selects = artifacts
+    let scalar_params = artifacts
         .yir
         .nodes
         .iter()
-        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "param_i32")
         .count();
     assert!(
         bool_returns >= 3,
         "expected mixed recursive project to emit bool helper returns"
     );
     assert!(
-        selects >= 3,
-        "expected mixed recursive project to lower bool branches through select nodes"
+        scalar_params >= 3,
+        "expected mixed recursive project to emit scalar helper parameters"
     );
 }
 

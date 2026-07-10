@@ -1,3 +1,5 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
   extern "c" fn host_fs_exists(path_handle: i64) -> i64;
   extern "c" fn host_fs_kind(path_handle: i64) -> i64;
@@ -25,11 +27,17 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: FsMetadataProjectSummary = capture_fs_metadata_project();
-    return summary.primary_exists
-      + summary.primary_kind
-      + summary.primary_size
-      + summary.secondary_exists
-      + summary.secondary_kind
-      + summary.secondary_size;
+    let total: i64 = StdFsContracts.metadata_pair_status_total(
+      summary.primary_exists,
+      summary.primary_kind,
+      summary.primary_size,
+      summary.secondary_exists,
+      summary.secondary_kind,
+      summary.secondary_size
+    );
+    if total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

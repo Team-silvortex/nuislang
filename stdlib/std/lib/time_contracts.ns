@@ -113,6 +113,75 @@ mod cpu StdTimeContracts {
     return 0;
   }
 
+  /// Clamps benchmark sample count into the current four-sample recipe range.
+  pub fn clamp_benchmark_sample_count(sample_count: i64) -> i64 {
+    if sample_count < 1 {
+      return 1;
+    }
+    if sample_count > 4 {
+      return 4;
+    }
+    return sample_count;
+  }
+
+  /// Keeps an active benchmark probe or drops it to zero when disabled.
+  pub fn active_time_or_zero(value: i64, enabled: bool) -> i64 {
+    if enabled {
+      return value;
+    }
+    return 0;
+  }
+
+  /// Returns the smaller of two benchmark spans.
+  pub fn benchmark_min2(lhs: i64, rhs: i64) -> i64 {
+    if lhs < rhs {
+      return lhs;
+    }
+    return rhs;
+  }
+
+  /// Returns the larger of two benchmark spans.
+  pub fn benchmark_max2(lhs: i64, rhs: i64) -> i64 {
+    if lhs > rhs {
+      return lhs;
+    }
+    return rhs;
+  }
+
+  /// Returns the smaller of three benchmark spans.
+  pub fn benchmark_min3(first: i64, second: i64, third: i64) -> i64 {
+    return benchmark_min2(benchmark_min2(first, second), third);
+  }
+
+  /// Returns the larger of three benchmark spans.
+  pub fn benchmark_max3(first: i64, second: i64, third: i64) -> i64 {
+    return benchmark_max2(benchmark_max2(first, second), third);
+  }
+
+  /// Returns the smaller of four benchmark spans.
+  pub fn benchmark_min4(first: i64, second: i64, third: i64, fourth: i64) -> i64 {
+    return benchmark_min2(benchmark_min3(first, second, third), fourth);
+  }
+
+  /// Returns the larger of four benchmark spans.
+  pub fn benchmark_max4(first: i64, second: i64, third: i64, fourth: i64) -> i64 {
+    return benchmark_max2(benchmark_max3(first, second, third), fourth);
+  }
+
+  /// Returns the middle span of a three-sample benchmark triplet.
+  pub fn benchmark_mid3(first: i64, second: i64, third: i64) -> i64 {
+    return first
+      + second
+      + third
+      - benchmark_min3(first, second, third)
+      - benchmark_max3(first, second, third);
+  }
+
+  /// Averages a total span with a guarded benchmark sample count.
+  pub fn benchmark_avg_span(total_span_ns: i64, sample_count: i64) -> i64 {
+    return total_span_ns / clamp_benchmark_sample_count(sample_count);
+  }
+
   /// Combines three benchmark span and sleep probes into a compact score.
   pub fn benchmark_triplet_total(
     first_span_ns: i64,

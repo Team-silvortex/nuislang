@@ -39,11 +39,13 @@ mod cpu NetHttpishPacketShapes {
     primary_result: TaskResult<i64>,
     fallback_result: TaskResult<i64>
   ) -> i64 {
+    let primary_value: i64 = selected_task_value(primary_result);
+    let fallback_value: i64 = selected_task_value(fallback_result);
     if task_completed(primary_result) {
-      return selected_task_value(primary_result);
+      return primary_value;
     }
     if task_completed(fallback_result) {
-      return selected_task_value(fallback_result);
+      return fallback_value;
     }
     return 1;
   }
@@ -65,11 +67,13 @@ mod cpu NetHttpishPacketShapes {
     primary_result: TaskResult<i64>,
     fallback_result: TaskResult<i64>
   ) -> i64 {
+    let primary_value: i64 = selected_task_value(primary_result);
+    let fallback_value: i64 = selected_task_value(fallback_result);
     if task_completed(primary_result) {
-      return selected_task_value(primary_result);
+      return primary_value;
     }
     if task_completed(fallback_result) {
-      return selected_task_value(fallback_result);
+      return fallback_value;
     }
     return 1;
   }

@@ -1,3 +1,5 @@
+use cpu StdFsContracts;
+
 mod cpu Main {
   extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
   extern "c" fn host_path_remove(path_handle: i64) -> i64;
@@ -24,9 +26,23 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: PathRemoveProjectSummary = capture_path_remove_project();
-    return summary.path_handle
-      + summary.exists_before
-      + summary.remove_code
-      + summary.exists_after;
+    let total: i64 = StdFsContracts.path_remove_status_total(
+      summary.path_handle,
+      summary.exists_before,
+      summary.remove_code,
+      summary.exists_after
+    );
+    let validation_total: i64 = StdFsContracts.path_remove_validation_total(
+      summary.exists_before,
+      summary.remove_code,
+      summary.exists_after
+    );
+    if validation_total < 3 {
+      return StdFsContracts.fs_error();
+    }
+    if total + validation_total > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
   }
 }

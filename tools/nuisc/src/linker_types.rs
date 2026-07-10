@@ -246,6 +246,8 @@ pub struct LinkPlanDataSegment {
     pub owner_package: String,
     pub order_key: String,
     pub access_phase: String,
+    pub wait_event: String,
+    pub commit_event: String,
     pub source_path: Option<String>,
 }
 

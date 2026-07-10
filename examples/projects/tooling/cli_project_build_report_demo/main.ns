@@ -167,6 +167,7 @@ mod cpu Main {
     let line_len: i64 = host_line_len(line_handle);
     let result: TaskResult<i64> =
       join_result(timeout(spawn(ping(argv_count + line_len)), seed.timeout_limit));
+    let tick_ns: i64 = host_monotonic_time_ns();
 
     if task_completed(result) {
       return ProjectSessionSummary {
@@ -176,7 +177,7 @@ mod cpu Main {
         completed: true,
         timed_out: false,
         target_handle: task_value(result),
-        tick_ns: host_monotonic_time_ns()
+        tick_ns: tick_ns
       };
     }
 
@@ -187,7 +188,7 @@ mod cpu Main {
       completed: false,
       timed_out: true,
       target_handle: 0,
-      tick_ns: host_monotonic_time_ns()
+      tick_ns: tick_ns
     };
   }
 
@@ -585,12 +586,10 @@ mod cpu Main {
     let artifact: ProjectArtifactSummary = capture_project_artifact(seed.build, session.target_handle);
     let manifest: BuildManifest = build_manifest(session, artifact);
     let build_report: ProjectBuildReport = capture_build_report(manifest, session);
-
-    if build_report.overall_success {
-      return build_success_summary(seed, session, artifact, manifest, build_report);
-    }
-
-    return build_failure_summary(seed, session, artifact, manifest, build_report);
+    let success_summary: ProjectBuildSummary = build_success_summary(seed, session, artifact, manifest, build_report);
+    let failure_summary: ProjectBuildSummary = build_failure_summary(seed, session, artifact, manifest, build_report);
+    if build_report.overall_success { return success_summary; }
+    return failure_summary;
   }
 
   fn main() -> i64 {

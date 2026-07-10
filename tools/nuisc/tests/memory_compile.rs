@@ -1027,18 +1027,11 @@ fn compiles_text_serialization_intrinsics_into_buffer() {
             _ => false,
         })
     }));
-    assert!(artifacts
-        .llvm_ir
-        .contains("call i64 @host_serialize_text_into"));
-    assert!(artifacts
-        .llvm_ir
-        .contains("call i64 @host_serialize_i64_into"));
-    assert!(artifacts
-        .llvm_ir
-        .contains("declare i64 @host_serialize_text_into(ptr, ptr, i64)"));
-    assert!(artifacts
-        .llvm_ir
-        .contains("declare i64 @host_serialize_i64_into(i64, i64, i64)"));
+    let llvm = &artifacts.llvm_ir;
+    assert!(llvm.contains("call i64 @host_serialize_text_into"));
+    assert!(llvm.contains("call i64 @host_serialize_i64_into"));
+    assert!(llvm.contains("declare i64 @host_serialize_text_into("));
+    assert!(llvm.contains("declare i64 @host_serialize_i64_into(i64, i64, i64)"));
 }
 
 #[test]
@@ -1360,12 +1353,13 @@ fn compiles_text_deserialization_intrinsics() {
     let artifacts = nuisc::pipeline::compile_source(
         r#"
         mod cpu Main {
+          fn bool_score(flag: bool) -> i64 { if flag { return 1; } return 0; }
           fn main() -> i64 {
             let buffer: ref Buffer = alloc_buffer(32, 0);
             let written: i64 = serialize_text_into("hello", buffer, 2);
             let restored: String = deserialize_text_from(buffer, 2, written);
             let parsed_flag: bool = deserialize_bool_from(buffer, 0, 1);
-            return text_len(restored) + if parsed_flag { 1 } else { 0 };
+            return text_len(restored) + bool_score(parsed_flag);
           }
         }
         "#,

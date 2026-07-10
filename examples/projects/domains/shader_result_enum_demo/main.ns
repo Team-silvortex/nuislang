@@ -210,17 +210,24 @@ mod cpu Main {
   }
 
   fn lift_pass_result(result: ShaderResult<Pass>) -> Result<Pass, ErrorEnvelope> {
-    if shader_pass_ready(result) {
-      return Result.Ok(shader_value(result));
+    let ready: bool = shader_pass_ready(result);
+    let pass: Pass = shader_value(result);
+    let missing: Result<Pass, ErrorEnvelope> =
+      Result.Err(build_error_envelope(kind_result_missing()));
+    if ready {
+      return Result.Ok(pass);
     }
-    return Result.Err(build_error_envelope(kind_result_missing()));
+    return missing;
   }
 
   fn lift_frame_result(result: ShaderResult<Frame>, bias: i64) -> Result<i64, ErrorEnvelope> {
-    if shader_frame_ready(result) {
-      return Result.Ok(bias);
+    let ready: bool = shader_frame_ready(result);
+    let ok: Result<i64, ErrorEnvelope> = Result.Ok(bias);
+    let diagnostic: Result<i64, ErrorEnvelope> = lift_error_kind(kind_diagnostic_message());
+    if ready {
+      return ok;
     }
-    return lift_error_kind(kind_diagnostic_message());
+    return diagnostic;
   }
 
   fn raise_metric(value: i64) -> i64 {

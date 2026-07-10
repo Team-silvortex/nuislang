@@ -65,8 +65,11 @@ fn lowers_thread_and_mutex_primitives_into_cpu_nodes() {
             let guard: MutexGuard<i64> = mutex_lock(lock);
             let value: i64 = mutex_value(guard);
             let unlocked: Mutex<i64> = mutex_unlock(guard);
+            let joined_value: i64 = thread_join(worker);
+            let relocked: MutexGuard<i64> = mutex_lock(unlocked);
+            let unlocked_value: i64 = mutex_value(relocked);
             if task_completed(joined) {
-              return value + thread_join(worker) + mutex_value(mutex_lock(unlocked));
+              return value + joined_value + unlocked_value;
             }
             return 0;
           }

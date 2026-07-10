@@ -117,10 +117,10 @@ mod cpu Main {
     let validation_total: i64 = StdTextContracts.report_validation_total(
       report_handle,
       report_len
-    ) + StdIoContracts.encode_io_gate(
-      StdIoContracts.write_covers_payload(stdout_written, report_len)
-    ) + StdIoContracts.encode_io_gate(
-      StdIoContracts.write_flush_ok(stdout_written, stdout_flushed)
+    ) + StdIoContracts.output_report_validation_total(
+      report_len,
+      stdout_written,
+      stdout_flushed
     );
     return TimeReportSummary {
       wall_ns: wall_ns,

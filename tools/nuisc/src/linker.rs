@@ -470,6 +470,14 @@ mod tests {
             "data:0001:shader"
         );
         assert_eq!(
+            plan.hetero_calculate.data_segments[0].wait_event,
+            "t0001.shader.complete"
+        );
+        assert_eq!(
+            plan.hetero_calculate.data_segments[0].commit_event,
+            "t0001.shader.data_commit"
+        );
+        assert_eq!(
             plan.domain_units[1].artifact_payload_blob_path.as_deref(),
             Some("out/shader.ndpb")
         );
@@ -509,6 +517,8 @@ mod tests {
         assert!(hetero_toml.contains("wait_on = [\"t0000.nustar.bootstrap.v1\"]"));
         assert!(hetero_toml.contains("[[data_segment]]"));
         assert!(hetero_toml.contains("order_key = \"data:0001:shader\""));
+        assert!(hetero_toml.contains("wait_event = \"t0001.shader.complete\""));
+        assert!(hetero_toml.contains("commit_event = \"t0001.shader.data_commit\""));
         let out_path = std::env::temp_dir().join("nuis-linker-hetero-calculate-test.toml");
         write_hetero_calculate_plan(&plan, &out_path).unwrap();
         let written = std::fs::read_to_string(&out_path).unwrap();

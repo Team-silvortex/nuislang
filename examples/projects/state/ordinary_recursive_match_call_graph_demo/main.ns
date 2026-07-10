@@ -1,24 +1,16 @@
 mod cpu Main {
   fn odd(value: i64) -> i64 {
-    match value {
-      0 => {
-        return 0;
-      },
-      _ => {
-        return even(value - 1);
-      }
+    if value == 0 {
+      return 0;
     }
+    return even(value - 1);
   }
 
   fn even(value: i64) -> i64 {
-    match value {
-      0 => {
-        return 1;
-      },
-      _ => {
-        return odd(value - 1);
-      }
+    if value == 0 {
+      return 1;
     }
+    return odd(value - 1);
   }
 
   fn main() -> i64 {

@@ -65,19 +65,18 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: TextReportBuilderProjectSummary = capture_text_report_builder_project();
-    let total: i64 = StdTextContracts.text_value_or_zero(summary.title_line_handle)
-      + StdTextContracts.text_value_or_zero(summary.title_line_len)
-      + StdTextContracts.text_value_or_zero(summary.kv_line_handle)
-      + StdTextContracts.text_value_or_zero(summary.kv_line_len)
-      + StdTextContracts.text_value_or_zero(summary.status_line_handle)
-      + StdTextContracts.text_value_or_zero(summary.status_line_len)
-      + StdTextContracts.report_status_total(summary.report_handle, summary.report_len)
-      + StdTextContracts.text_stats_total(
-        summary.report_len,
-        summary.report_lines,
-        summary.report_words
-      )
-      + summary.validation_total;
+    let total: i64 = StdTextContracts.report_lines_status_total(
+      summary.title_line_handle,
+      summary.title_line_len,
+      summary.kv_line_handle,
+      summary.kv_line_len,
+      summary.status_line_handle,
+      summary.status_line_len,
+      summary.report_handle,
+      summary.report_len,
+      summary.report_lines,
+      summary.report_words
+    ) + summary.validation_total;
     if !StdTextContracts.text_stats_ready(
       summary.report_len,
       summary.report_lines,

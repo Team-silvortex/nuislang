@@ -269,6 +269,11 @@ fn kernel_coreml_sidecar_emits_dispatch_templates() {
     assert!(sidecar.contains("tensor_lowering = \"ranked-tensor-graph\""));
     assert!(sidecar.contains("dispatch_lowering = \"ane-graph-submit\""));
     assert!(sidecar.contains("kernel.shape-contract"));
+    assert!(sidecar.contains("[schedule_contract]"));
+    assert!(sidecar.contains("execution_route = \"ane-graph-execution\""));
+    assert!(sidecar.contains("submission_adapter = \"coreml-graph-submit\""));
+    assert!(sidecar.contains("wake_adapter = \"coreml-completion-callback\""));
+    assert!(sidecar.contains("completion_contract = \"lifecycle-hook-fence\""));
     assert!(sidecar.contains("[dispatch_shapes]"));
     assert!(sidecar.contains("primary = \"graph\""));
     assert!(sidecar.contains("[entry_points]"));
@@ -295,6 +300,9 @@ fn kernel_vulkan_sidecar_emits_grid_and_indirect_dispatch_templates() {
     assert!(sidecar.contains("tensor_lowering = \"storage-buffer-tensor-view\""));
     assert!(sidecar.contains("dispatch_lowering = \"compute-grid-or-indirect\""));
     assert!(sidecar.contains("spirv.compute-layout"));
+    assert!(sidecar.contains("execution_route = \"spirv-compute-queue\""));
+    assert!(sidecar.contains("submission_adapter = \"vulkan-compute-submit\""));
+    assert!(sidecar.contains("wake_adapter = \"vulkan-timeline-semaphore\""));
     assert!(sidecar.contains("primary = \"grid\""));
     assert!(sidecar.contains("fallback = \"indirect\""));
     assert!(sidecar.contains("binding_table = \"set0.buffer0, set0.buffer1\""));
@@ -321,6 +329,9 @@ fn kernel_cpu_fallback_sidecar_emits_range_and_tile_dispatch_templates() {
     assert!(sidecar.contains("tensor_lowering = \"slice-backed-tensor-view\""));
     assert!(sidecar.contains("dispatch_lowering = \"threadpool-range-or-tile\""));
     assert!(sidecar.contains("host.slice-bounds"));
+    assert!(sidecar.contains("execution_route = \"host-kernel-fallback\""));
+    assert!(sidecar.contains("submission_adapter = \"cpu-threadpool-dispatch\""));
+    assert!(sidecar.contains("wake_adapter = \"host-join-wake\""));
     assert!(sidecar.contains("primary = \"range\""));
     assert!(sidecar.contains("fallback = \"tile\""));
     assert!(sidecar.contains("binding_table = \"slice.input, slice.output\""));

@@ -84,6 +84,95 @@ mod cpu StdNetContracts {
     return timeout_budget + retry_budget + connect_timeout_ms;
   }
 
+  /// Encodes whether a network send result is ready.
+  pub fn send_ready_code(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  /// Encodes whether a network receive result is ready.
+  pub fn recv_ready_code(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  /// Returns the value carried by a network result.
+  pub fn result_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  /// Builds a compact method code for HTTP-ish recipes.
+  pub fn http_method_code(protocol_kind: i64, protocol_version: i64) -> i64 {
+    return 64 + protocol_kind + protocol_version;
+  }
+
+  /// Estimates authority bytes for an HTTP-ish request.
+  pub fn http_authority_bytes(protocol_header_bytes: i64, transport_family: i64) -> i64 {
+    return protocol_header_bytes + 8 + transport_family;
+  }
+
+  /// Estimates path bytes for an HTTP-ish request.
+  pub fn http_path_bytes(protocol_version: i64, send_window: i64) -> i64 {
+    return protocol_version + send_window + 12;
+  }
+
+  /// Estimates request header bytes for an HTTP-ish request.
+  pub fn http_request_header_bytes(
+    protocol_header_bytes: i64,
+    send_window: i64,
+    retry_budget: i64
+  ) -> i64 {
+    return protocol_header_bytes + send_window + retry_budget;
+  }
+
+  /// Estimates request body bytes for an HTTP-ish request.
+  pub fn http_request_body_bytes(
+    stream_window: i64,
+    protocol_version: i64,
+    timeout_budget: i64
+  ) -> i64 {
+    return stream_window + protocol_version + timeout_budget;
+  }
+
+  /// Estimates response header bytes for an HTTP-ish response.
+  pub fn http_response_header_bytes(protocol_header_bytes: i64) -> i64 {
+    return protocol_header_bytes + 12;
+  }
+
+  /// Estimates response body bytes for an HTTP-ish response.
+  pub fn http_response_body_bytes(protocol_header_bytes: i64, recv_window: i64) -> i64 {
+    return protocol_header_bytes + recv_window;
+  }
+
+  /// Produces a compact score for an HTTP client lane.
+  pub fn http_client_lane_total(
+    transport_family: i64,
+    retry_budget: i64,
+    method_code: i64,
+    request_bytes: i64,
+    response_bytes: i64,
+    status_code: i64,
+    open_handle: i64,
+    send_value: i64,
+    recv_value: i64,
+    close_value: i64
+  ) -> i64 {
+    return transport_family
+      + retry_budget
+      + method_code
+      + request_bytes
+      + response_bytes
+      + status_code
+      + open_handle
+      + send_value
+      + recv_value
+      + close_value;
+  }
+
   /// Produces a compact score for a full client-side network session.
   pub fn client_session_total(
     argv_count: i64,

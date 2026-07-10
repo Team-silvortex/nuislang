@@ -101,6 +101,47 @@ fn lower_prepared_host_call_return(
     Ok((calls, returned))
 }
 
+fn extract_single_return_call(stmts: &[NirStmt]) -> Option<(&str, &[NirExpr])> {
+    let ([NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+    | [NirStmt::Expr(NirExpr::Call { callee, args })]) = stmts
+    else {
+        return None;
+    };
+    Some((callee.as_str(), args.as_slice()))
+}
+
+fn lower_matching_call_return(
+    condition_name: &str,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<LoweredIfOutcome>, String> {
+    let Some((then_callee, then_args)) = extract_single_return_call(then_body) else {
+        return Ok(None);
+    };
+    let Some((else_callee, else_args)) = extract_single_return_call(else_body) else {
+        return Ok(None);
+    };
+    if then_callee != else_callee || then_args.len() != else_args.len() {
+        return Ok(None);
+    }
+
+    let mut selected_bindings = bindings.clone();
+    let mut selected_args = Vec::with_capacity(then_args.len());
+    for (index, (then_arg, else_arg)) in then_args.iter().zip(else_args.iter()).enumerate() {
+        let then_name = lower_expr(then_arg, state, bindings)?;
+        let else_name = lower_expr(else_arg, state, bindings)?;
+        let selected_name = lower_select(condition_name.to_owned(), then_name, else_name, state)?;
+        let temp_name = format!("__nuis_selected_call_arg_{index}");
+        selected_bindings.insert(temp_name.clone(), selected_name);
+        selected_args.push(NirExpr::Var(temp_name));
+    }
+
+    let returned = lower_call_expr(then_callee, &selected_args, state, &selected_bindings)?;
+    Ok(Some(LoweredIfOutcome::Returned(returned)))
+}
+
 pub(super) fn lower_if_pair(
     condition_name: String,
     then_body: &[NirStmt],
@@ -119,6 +160,12 @@ pub(super) fn lower_if_pair(
         state,
         bindings,
     )? {
+        return Ok(lowered);
+    }
+
+    if let Some(lowered) =
+        lower_matching_call_return(&condition_name, then_body, else_body, state, bindings)?
+    {
         return Ok(lowered);
     }
 

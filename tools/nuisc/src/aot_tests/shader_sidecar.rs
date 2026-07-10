@@ -106,6 +106,11 @@ fn build_manifest_emits_shader_ir_sidecar() {
         shader_sidecar_text.contains("supported_stages = [\"vertex\", \"fragment\", \"compute\"]")
     );
     assert!(shader_sidecar_text.contains("ir_container = \"text.msl\""));
+    assert!(shader_sidecar_text.contains("[schedule_contract]"));
+    assert!(shader_sidecar_text.contains("execution_route = \"unified-render-graph\""));
+    assert!(shader_sidecar_text.contains("submission_adapter = \"metal-command-encoder\""));
+    assert!(shader_sidecar_text.contains("wake_adapter = \"metal-shared-event\""));
+    assert!(shader_sidecar_text.contains("clock_contract = \"global-time-partial-order\""));
     assert!(shader_sidecar_text.contains("[lowering_capabilities]"));
     assert!(shader_sidecar_text.contains("capability_owner = \"shader-nustar\""));
     assert!(shader_sidecar_text.contains("pipeline_lowering = \"metal-render-pipeline-state\""));

@@ -52,18 +52,24 @@ mod cpu Main {
     let observed: TaskResult<i64> = join_result(timeout(task, seed.timeout_ns));
     let finished_ns: i64 = host_monotonic_time_ns();
     let timed_out: i64 = encode_timed_out(observed);
+    let completed_flag: bool = task_completed(observed);
+    let payload_value: i64 = task_value(observed);
+    let stdout_code_value: i64 = host_stdout_write(seed.stdout_handle);
+    let stderr_code_value: i64 = host_stderr_write(seed.stderr_handle);
+    let completed_diag_code: i64 = emit_diag(seed.diag_message_handle, payload_value);
+    let timed_out_diag_code: i64 = emit_diag(seed.diag_message_handle, timed_out);
 
-    if task_completed(observed) {
+    if completed_flag {
       return TaskCliSummary {
         argv_count: argv_count,
         started_ns: started_ns,
         finished_ns: finished_ns,
         timed_out: timed_out,
         completed: 1,
-        payload: task_value(observed),
-        stdout_code: host_stdout_write(seed.stdout_handle),
+        payload: payload_value,
+        stdout_code: stdout_code_value,
         stderr_code: 0,
-        diag_emit_code: emit_diag(seed.diag_message_handle, task_value(observed))
+        diag_emit_code: completed_diag_code
       };
     }
 
@@ -75,8 +81,8 @@ mod cpu Main {
       completed: 0,
       payload: 0,
       stdout_code: 0,
-      stderr_code: host_stderr_write(seed.stderr_handle),
-      diag_emit_code: emit_diag(seed.diag_message_handle, timed_out)
+      stderr_code: stderr_code_value,
+      diag_emit_code: timed_out_diag_code
     };
   }
 

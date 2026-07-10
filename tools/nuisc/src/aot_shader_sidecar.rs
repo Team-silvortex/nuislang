@@ -1,9 +1,9 @@
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
 use crate::aot_domain_profile::{
-    derived_lowering_profile_for_unit, render_target_specific_lowering_fields,
-    shader_registered_feature_surfaces_for_profile, shader_registered_lane_groups_for_profile,
-    shader_supported_stages_for_profile,
+    derived_lowering_profile_for_unit, render_schedule_contract_fields,
+    render_target_specific_lowering_fields, shader_registered_feature_surfaces_for_profile,
+    shader_registered_lane_groups_for_profile, shader_supported_stages_for_profile,
 };
 use crate::aot_toml::{escape_toml_string, render_string_array};
 
@@ -89,6 +89,7 @@ pub(crate) fn render_domain_build_unit_shader_ir_sidecar(
         ));
     }
     out.push_str(&render_target_specific_lowering_fields(unit, &profile));
+    out.push_str(&render_schedule_contract_fields(&profile));
     out.push_str("[lowering_capabilities]\n");
     out.push_str("binary_role = \"linker-input-sidecar\"\n");
     out.push_str("capability_owner = \"shader-nustar\"\n");

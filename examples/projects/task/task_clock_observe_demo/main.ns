@@ -36,29 +36,35 @@ mod cpu Main {
     let task: Task<i64> = timeout(spawn(ping(seed.payload)), seed.timeout_limit);
     let result: TaskResult<i64> = join_result(task);
     let timed_out: i64 = encode_timed_out(result);
+    let global_domain_id: i64 = host_clock_domain_id() + seed.bias;
+    let global_epoch_ns: i64 = host_clock_epoch_ns();
+    let monotonic_ns: i64 = host_monotonic_time_ns();
+    let global_tick: i64 = cpu_tick_i64(0, 1);
+    let global_scale_ppm: i64 = host_clock_scale_ppm();
+    let completed_summary: TaskClockProjectSummary = TaskClockProjectSummary {
+      completed: 1,
+      timed_out: 0,
+      value: task_value(result),
+      global_domain_id: global_domain_id,
+      global_epoch_ns: global_epoch_ns,
+      monotonic_ns: monotonic_ns,
+      global_tick: global_tick,
+      global_scale_ppm: global_scale_ppm
+    };
 
     if task_completed(result) {
-      return TaskClockProjectSummary {
-        completed: 1,
-        timed_out: 0,
-        value: task_value(result),
-        global_domain_id: host_clock_domain_id() + seed.bias,
-        global_epoch_ns: host_clock_epoch_ns(),
-        monotonic_ns: host_monotonic_time_ns(),
-        global_tick: cpu_tick_i64(0, 1),
-        global_scale_ppm: host_clock_scale_ppm()
-      };
+      return completed_summary;
     }
 
     return TaskClockProjectSummary {
       completed: 0,
       timed_out: timed_out,
       value: 0,
-      global_domain_id: host_clock_domain_id() + seed.bias,
-      global_epoch_ns: host_clock_epoch_ns(),
-      monotonic_ns: host_monotonic_time_ns(),
-      global_tick: cpu_tick_i64(0, 1),
-      global_scale_ppm: host_clock_scale_ppm()
+      global_domain_id: global_domain_id,
+      global_epoch_ns: global_epoch_ns,
+      monotonic_ns: monotonic_ns,
+      global_tick: global_tick,
+      global_scale_ppm: global_scale_ppm
     };
   }
 

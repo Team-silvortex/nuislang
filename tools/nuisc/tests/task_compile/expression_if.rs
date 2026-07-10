@@ -90,8 +90,40 @@ fn lowers_task_async_if_expression_positions_project_with_async_if_expression_fa
         matches!(
             stmt,
             NirStmt::If { then_body, else_body, .. }
-                if matches!(then_body.as_slice(), [NirStmt::If { .. }])
-                    && matches!(else_body.as_slice(), [NirStmt::If { .. }])
+                if matches!(
+                    then_body.as_slice(),
+                    [NirStmt::Let {
+                        name,
+                        value: NirExpr::Await(inner),
+                        ..
+                    }] if name == "value"
+                        && matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "one")
+                ) && matches!(
+                    else_body.as_slice(),
+                    [NirStmt::Let {
+                        name,
+                        value: NirExpr::Await(inner),
+                        ..
+                    }] if name == "value"
+                        && matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "two")
+                )
+        )
+    }));
+    assert!(packetize.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { fields, .. },
+            } if name == "packet"
+                && ty.render() == "Packet"
+                && fields.iter().any(|(field, value)| {
+                    field == "value" && matches!(value, NirExpr::Var(name) if name == "value")
+                })
+                && fields.iter().any(|(field, value)| {
+                    field == "tag" && matches!(value, NirExpr::Var(name) if name == "tag")
+                })
         )
     }));
     assert!(matches!(

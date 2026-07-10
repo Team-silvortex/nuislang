@@ -49,21 +49,65 @@ fn lowers_task_cli_tooling_project_with_timeout_and_host_io_shape() {
     assert!(main.body.iter().any(|stmt| {
         matches!(
             stmt,
+            NirStmt::Let {
+                name,
+                value: NirExpr::Call { callee, .. },
+                ..
+            } if name == "completed_cli" && callee == "emit_completed_cli"
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                value: NirExpr::Call { callee, .. },
+                ..
+            } if name == "timeout_cli" && callee == "emit_timeout_cli"
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                value: NirExpr::Call { callee, .. },
+                ..
+            } if name == "task_cli_total" && callee == "StdTaskContracts.cli_total"
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                value: NirExpr::Call { callee, .. },
+                ..
+            } if name == "completed_gate" && callee == "StdTaskContracts.encode_completed"
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
             NirStmt::If {
-                condition: NirExpr::CpuTaskCompleted(_),
+                condition: NirExpr::Binary {
+                    op: NirBinaryOp::Eq,
+                    lhs,
+                    rhs,
+                },
                 then_body,
                 ..
-            } if matches!(
+            } if matches!(lhs.as_ref(), NirExpr::Var(name) if name == "completed_gate")
+                && matches!(rhs.as_ref(), NirExpr::Int(1))
+                && matches!(
                 then_body.as_slice(),
-                [NirStmt::Return(Some(NirExpr::Call { callee, .. }))]
-                    if callee == "emit_completed_cli"
+                [NirStmt::Return(Some(NirExpr::Var(name)))] if name == "completed_cli"
             )
         )
     }));
     assert!(matches!(
         main.body.last(),
-        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
-            if callee == "emit_timeout_cli"
+        Some(NirStmt::Return(Some(NirExpr::Binary { .. })))
     ));
 
     let emit_completed = artifacts
@@ -82,6 +126,16 @@ fn lowers_task_cli_tooling_project_with_timeout_and_host_io_shape() {
             } if name == "stdout_code"
                 && ty.render() == "i64"
                 && callee == "host_stdout_write"
+        )
+    }));
+    assert!(emit_completed.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                value: NirExpr::Call { callee, .. },
+                ..
+            } if name == "payload" && callee == "StdTaskContracts.selected_task_value"
         )
     }));
 

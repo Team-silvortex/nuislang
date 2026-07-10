@@ -1,3 +1,5 @@
+use cpu StdTaskContracts;
+
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
@@ -46,7 +48,7 @@ mod cpu Main {
 
   fn emit_completed_cli(result: TaskResult<i64>, argv_count: i64, tick_ns: i64) -> i64 {
     let summary: TaskCliSummary = completed_summary(argv_count);
-    let payload: i64 = task_value(result);
+    let payload: i64 = StdTaskContracts.selected_task_value(result);
     let stdout_code: i64 = host_stdout_write(summary.message_handle);
     return summary.code + payload + stdout_code + tick_ns;
   }
@@ -62,9 +64,19 @@ mod cpu Main {
     let tick_ns: i64 = host_monotonic_time_ns();
     let task: Task<i64> = timeout(spawn(ping(argv_count)), 0);
     let result: TaskResult<i64> = join_result(task);
-    if task_completed(result) {
-      return emit_completed_cli(result, argv_count, tick_ns);
+    let completed_cli: i64 = emit_completed_cli(result, argv_count, tick_ns);
+    let timeout_cli: i64 = emit_timeout_cli(argv_count, tick_ns);
+    let task_cli_total: i64 = StdTaskContracts.cli_total(
+      result,
+      argv_count,
+      tick_ns,
+      completed_cli,
+      timeout_cli
+    );
+    let completed_gate: i64 = StdTaskContracts.encode_completed(result);
+    if completed_gate == 1 {
+      return completed_cli;
     }
-    return emit_timeout_cli(argv_count, tick_ns);
+    return timeout_cli + task_cli_total;
   }
 }

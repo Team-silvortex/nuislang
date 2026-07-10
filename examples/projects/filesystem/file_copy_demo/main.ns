@@ -50,7 +50,17 @@ mod cpu Main {
       summary.src_exists_code,
       summary.dst_exists_code
     );
-    if total > 0 {
+    let validation_total: i64 = StdFsContracts.path_copy_validation_total(
+      summary.src_file_handle,
+      summary.close_code,
+      summary.copy_code,
+      summary.src_exists_code,
+      summary.dst_exists_code
+    );
+    if validation_total < 5 {
+      return StdFsContracts.fs_error();
+    }
+    if total + validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

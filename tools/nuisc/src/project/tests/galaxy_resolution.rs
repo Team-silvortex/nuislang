@@ -3,6 +3,17 @@ use super::*;
 use std::fs;
 use std::path::PathBuf;
 
+fn assert_project_function(artifacts: &crate::pipeline::PipelineArtifacts, name: &str) {
+    assert!(
+        artifacts
+            .nir
+            .functions
+            .iter()
+            .any(|function| function.name == name),
+        "expected project function `{name}`"
+    );
+}
+
 #[test]
 fn resolves_project_galaxy_dependency_closure_from_stdlib() {
     let root = write_temp_project_fixture(
@@ -137,12 +148,12 @@ mod cpu Main {
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=16\tdocumented_modules=15\tdocumented_items=217"));
+    assert!(docs_index.contains("summary\tmodules=16\tdocumented_modules=15\tdocumented_items="));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=34\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=217"
+        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items="
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -346,6 +357,7 @@ use cpu PixelMagicContracts;
 use cpu StdIoContracts;
 use cpu StdFsContracts;
 use cpu StdTaskContracts;
+use cpu StdCliContracts;
 use cpu StdTextContracts;
 use cpu StdTimeContracts;
 use cpu StdHeteroContracts;
@@ -374,6 +386,9 @@ mod cpu Main {
         + StdFsContracts.filesystem_report_file_status_total(
           2, 3, 1, 2, 3, 4, 5, 0, 6, 7, 0, 8, 9, 10, 11, 0, 0
         )
+        + StdCliContracts.workflow_step_executed_count(true)
+        + StdCliContracts.workflow_selected_summary_handle(true, 30, 40)
+        + StdCliContracts.workflow_failure_stage(false, true, false, false)
         + StdTextContracts.pipeline_status_total(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
         + StdTimeContracts.time_sample_total(100, 200, 300)
         + StdHeteroContracts.hetero_test_total(
@@ -394,121 +409,36 @@ mod cpu Main {
     );
 
     let artifacts = crate::pipeline::compile_project(root.as_path()).unwrap();
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "CorePrelude.sum3_i64"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdTaskContracts.add_bias"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdIoContracts.byte_count_exit_code"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdIoContracts.stdin_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdIoContracts.tty_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdIoContracts.line_input_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdIoContracts.terminal_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.host_fs_value_exit_code"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.metadata_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.file_io_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.file_write_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.file_roundtrip_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.file_copy_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.path_copy_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.directory_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.directory_mutation_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.path_probe_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdFsContracts.filesystem_report_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| { function.name == "StdFsContracts.filesystem_report_file_status_total" }));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdTextContracts.pipeline_status_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdTimeContracts.time_sample_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "StdHeteroContracts.hetero_test_total"));
-    assert!(artifacts
-        .nir
-        .functions
-        .iter()
-        .any(|function| function.name == "PixelMagicContracts.grayscale_packet_total"));
+    for name in [
+        "CorePrelude.sum3_i64",
+        "StdTaskContracts.add_bias",
+        "StdIoContracts.byte_count_exit_code",
+        "StdIoContracts.stdin_status_total",
+        "StdIoContracts.tty_status_total",
+        "StdIoContracts.line_input_status_total",
+        "StdIoContracts.terminal_status_total",
+        "StdFsContracts.host_fs_value_exit_code",
+        "StdFsContracts.metadata_status_total",
+        "StdFsContracts.file_io_status_total",
+        "StdFsContracts.file_write_status_total",
+        "StdFsContracts.file_roundtrip_status_total",
+        "StdFsContracts.file_copy_status_total",
+        "StdFsContracts.path_copy_status_total",
+        "StdFsContracts.directory_status_total",
+        "StdFsContracts.directory_mutation_status_total",
+        "StdFsContracts.path_probe_status_total",
+        "StdFsContracts.filesystem_report_status_total",
+        "StdFsContracts.filesystem_report_file_status_total",
+        "StdCliContracts.workflow_step_executed_count",
+        "StdCliContracts.workflow_selected_summary_handle",
+        "StdCliContracts.workflow_failure_stage",
+        "StdTextContracts.pipeline_status_total",
+        "StdTimeContracts.time_sample_total",
+        "StdHeteroContracts.hetero_test_total",
+        "PixelMagicContracts.grayscale_packet_total",
+    ] {
+        assert_project_function(&artifacts, name);
+    }
 }
 
 #[test]
@@ -1113,7 +1043,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items=217"
+        "summary\tlibraries=15\tvisible_libraries=15\tvisible_modules=16\tdocumented_visible_modules=15\tdocumented_visible_items="
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

@@ -168,6 +168,7 @@ mod cpu Main {
     let line_len: i64 = host_line_len(line_handle);
     let result: TaskResult<i64> =
       join_result(timeout(spawn(ping(argv_count + line_len)), seed.timeout_limit));
+    let tick_ns: i64 = host_monotonic_time_ns();
 
     if task_completed(result) {
       return WorkflowCliSummary {
@@ -177,7 +178,7 @@ mod cpu Main {
         completed: true,
         timed_out: false,
         selected_value: task_value(result),
-        tick_ns: host_monotonic_time_ns()
+        tick_ns: tick_ns
       };
     }
 
@@ -188,7 +189,7 @@ mod cpu Main {
       completed: false,
       timed_out: true,
       selected_value: 0,
-      tick_ns: host_monotonic_time_ns()
+      tick_ns: tick_ns
     };
   }
 
@@ -603,14 +604,11 @@ mod cpu Main {
     let automation: WorkflowAutomationSummary = capture_automation(seed.automation, cli.selected_value);
     let workflow: WorkflowQuadReport = capture_workflow(cli, automation);
     let frontdoor: WorkflowFrontdoorSurface = build_frontdoor_surface(cli, workflow);
-
-    if cli.completed == false {
-      return build_failure_summary(seed, cli, automation, workflow, frontdoor);
-    }
-    if workflow.overall_success {
-      return build_success_summary(seed, cli, automation, workflow, frontdoor);
-    }
-    return build_failure_summary(seed, cli, automation, workflow, frontdoor);
+    let success_summary: WorkflowSummary = build_success_summary(seed, cli, automation, workflow, frontdoor);
+    let failure_summary: WorkflowSummary = build_failure_summary(seed, cli, automation, workflow, frontdoor);
+    if cli.completed == false { return failure_summary; }
+    if workflow.overall_success { return success_summary; }
+    return failure_summary;
   }
 
   fn main() -> i64 {

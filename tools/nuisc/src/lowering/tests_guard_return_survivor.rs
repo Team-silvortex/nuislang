@@ -20,8 +20,9 @@ fn lowers_guard_return_with_async_survivor_binding_once() {
           }
 
           fn fetch(seed: i64) -> Result<Task<i64>, Error> {
+            let task: Task<i64> = spawn(work(seed));
             if seed > 0 {
-              return Result.Ok(spawn(work(seed)));
+              return Result.Ok(task);
             }
             return Result.Err(Error.InvalidInput);
           }

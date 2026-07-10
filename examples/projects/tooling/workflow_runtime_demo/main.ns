@@ -94,6 +94,19 @@ mod cpu Main {
     };
   }
 
+  fn workflow_should_stop(step: WorkflowStep, report: WorkflowStepReport) -> bool {
+    return StdCliContracts.workflow_should_stop(
+      step.fail_fast,
+      report.executed,
+      report.result.succeeded
+    );
+  }
+
+  fn workflow_executed_steps(first: WorkflowStepReport, second: WorkflowStepReport) -> i64 {
+    return StdCliContracts.workflow_step_executed_count(first.executed)
+      + StdCliContracts.workflow_step_executed_count(second.executed);
+  }
+
   fn build_workflow_report(
     first: WorkflowStepReport,
     second: WorkflowStepReport
@@ -118,12 +131,11 @@ mod cpu Main {
       0,
       0,
       0,
-      StdCliContracts.encode_success(first.executed) + StdCliContracts.encode_success(second.executed),
+      workflow_executed_steps(first, second),
       first.result.succeeded && second.result.succeeded
     );
     if first.result.succeeded == false {
-      let executed_steps: i64 =
-        StdCliContracts.encode_success(first.executed) + StdCliContracts.encode_success(second.executed);
+      let executed_steps: i64 = workflow_executed_steps(first, second);
       return WorkflowReport {
         first: first,
         second: second,
@@ -139,8 +151,7 @@ mod cpu Main {
       };
     }
     if second.result.succeeded == false {
-      let executed_steps: i64 =
-        StdCliContracts.encode_success(first.executed) + StdCliContracts.encode_success(second.executed);
+      let executed_steps: i64 = workflow_executed_steps(first, second);
       return WorkflowReport {
         first: first,
         second: second,
@@ -155,8 +166,7 @@ mod cpu Main {
         )
       };
     }
-    let executed_steps: i64 =
-      StdCliContracts.encode_success(first.executed) + StdCliContracts.encode_success(second.executed);
+    let executed_steps: i64 = workflow_executed_steps(first, second);
     let overall_success: bool =
       StdCliContracts.success_exit_code(gate_total > 0) == StdCliContracts.cli_ok();
     return WorkflowReport {
@@ -182,7 +192,7 @@ mod cpu Main {
       build_workflow_step(text_handle("second"), text_handle("/usr/bin/true"), empty_args, false);
     let first_report: WorkflowStepReport = run_workflow_step(first_step);
 
-    if first_step.fail_fast && first_report.result.succeeded == false {
+    if workflow_should_stop(first_step, first_report) {
       return build_workflow_report(
         first_report,
         skipped_workflow_step(second_step)

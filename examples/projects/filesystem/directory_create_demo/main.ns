@@ -28,7 +28,14 @@ mod cpu Main {
       StdFsContracts.fs_ok(),
       0
     ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle);
-    if total > 0 {
+    let validation_total: i64 = StdFsContracts.directory_create_validation_total(
+      summary.create_code,
+      summary.exists_code
+    );
+    if validation_total < 2 {
+      return StdFsContracts.fs_error();
+    }
+    if total + validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();

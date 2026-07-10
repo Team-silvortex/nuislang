@@ -6,13 +6,16 @@ mod cpu Main {
   extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
   extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
   extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
 
   struct FileReadProjectSummary {
     path_handle: i64,
     setup_file_handle: i64,
+    payload_len: i64,
     setup_write_code: i64,
     setup_close_code: i64,
     file_handle: i64,
+    requested_len: i64,
     read_bytes: i64,
     close_code: i64
   }
@@ -27,9 +30,11 @@ mod cpu Main {
     return FileReadProjectSummary {
       path_handle: path_handle,
       setup_file_handle: setup_file_handle,
+      payload_len: host_text_len(777),
       setup_write_code: setup_write_code,
       setup_close_code: setup_close_code,
       file_handle: file_handle,
+      requested_len: 8,
       read_bytes: host_file_read(file_handle, host_buffer_handle(backing), 8),
       close_code: host_file_close(file_handle)
     };
@@ -46,7 +51,18 @@ mod cpu Main {
       summary.setup_write_code,
       summary.setup_close_code
     ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle);
-    if total > 0 {
+    let validation_total: i64 = StdFsContracts.file_read_validation_total(
+      summary.payload_len,
+      summary.setup_write_code,
+      summary.file_handle,
+      summary.requested_len,
+      summary.read_bytes,
+      summary.close_code
+    );
+    if validation_total < 4 {
+      return StdFsContracts.fs_error();
+    }
+    if total + validation_total > 0 {
       return StdFsContracts.fs_ok();
     }
     return StdFsContracts.fs_error();
