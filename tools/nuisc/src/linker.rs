@@ -454,6 +454,11 @@ mod tests {
             .edges
             .iter()
             .any(|edge| edge.to == "t0001.shader" && edge.relation == "happens-before"));
+        assert!(plan.clock_protocol.edges.iter().any(|edge| {
+            edge.from == "t0001.shader.complete"
+                && edge.to == "t0001.shader.data_commit"
+                && edge.relation == "data-segment-commit"
+        }));
         assert_eq!(plan.hetero_calculate.nodes[0].timestamp, "t0001.shader");
         assert_eq!(
             plan.hetero_calculate.nodes[0].lifecycle_hook,
@@ -506,6 +511,11 @@ mod tests {
         assert!(lines
             .iter()
             .any(|line| line.contains("clock_edge: index=2 from=t0000.nustar.bootstrap.v1")));
+        assert!(lines.iter().any(|line| {
+            line.contains("clock_edge:")
+                && line.contains("from=t0001.shader.complete")
+                && line.contains("relation=data-segment-commit")
+        }));
         let hetero_toml = render_hetero_calculate_plan_toml(&plan.hetero_calculate);
         assert!(hetero_toml.contains("schema = \"nuis-hetero-calculate-link-plan-v1\""));
         assert!(hetero_toml.contains("static_link = true"));

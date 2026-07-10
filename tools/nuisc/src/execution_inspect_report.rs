@@ -233,12 +233,13 @@ pub(crate) fn render_execution_report(input: &Path) -> Result<String, String> {
     ];
     if let Some(summary) = clock_summary {
         lines.push(format!(
-            "  clock_protocol: schema={} mode={} domains={} edges={} happens_before={} valid={}",
+            "  clock_protocol: schema={} mode={} domains={} edges={} happens_before={} data_segment_commits={} valid={}",
             summary.schema,
             summary.mode,
             summary.domains,
             summary.edges,
             summary.happens_before_edges,
+            summary.data_segment_commit_edges,
             summary.validation_valid
         ));
     } else {
@@ -561,6 +562,10 @@ fn clock_protocol_summary_json(summary: Option<&ClockProtocolRuntimeSummary>) ->
         json_usize_field("domains", summary.domains),
         json_usize_field("edges", summary.edges),
         json_usize_field("happens_before_edges", summary.happens_before_edges),
+        json_usize_field(
+            "data_segment_commit_edges",
+            summary.data_segment_commit_edges,
+        ),
         json_bool_field("validation_valid", summary.validation_valid),
     ];
     format!("\"clock_protocol\":{{{}}}", fields.join(","))

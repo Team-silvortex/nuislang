@@ -76,9 +76,11 @@ impl BridgeExecutor {
             .as_ref()
             .map(|protocol| {
                 protocol
-                    .happens_before_edges()
+                    .edges
+                    .iter()
                     .filter(|edge| {
-                        edge.to.ends_with(&format!(".{domain_family}"))
+                        edge.to.contains(&format!(".{domain_family}"))
+                            || edge.from.contains(&format!(".{domain_family}"))
                             || edge.source.contains(domain_family)
                     })
                     .collect::<Vec<_>>()

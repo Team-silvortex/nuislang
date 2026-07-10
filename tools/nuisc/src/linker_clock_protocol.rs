@@ -54,6 +54,15 @@ pub(crate) fn derive_clock_protocol(
             source: format!("hetero.node.{}", node.index),
         });
     }
+    for segment in &hetero_calculate.data_segments {
+        edges.push(LinkPlanClockEdge {
+            index: edges.len(),
+            from: segment.wait_event.clone(),
+            to: segment.commit_event.clone(),
+            relation: "data-segment-commit".to_owned(),
+            source: format!("hetero.data_segment.{}", segment.index),
+        });
+    }
 
     let mut plan = LinkPlanClockProtocol {
         schema: "nuis-clock-protocol-v1".to_owned(),
@@ -145,6 +154,15 @@ pub(crate) fn validate_clock_protocol(
         if edge.from.is_empty() || edge.to.is_empty() || edge.relation.is_empty() {
             issues.push(format!(
                 "clock edge `{}` -> `{}` has incomplete relation",
+                edge.from, edge.to
+            ));
+        }
+        checked += 1;
+        if edge.relation == "data-segment-commit"
+            && (!edge.from.ends_with(".complete") || !edge.to.ends_with(".data_commit"))
+        {
+            issues.push(format!(
+                "clock data segment edge `{}` -> `{}` must connect complete to data_commit",
                 edge.from, edge.to
             ));
         }

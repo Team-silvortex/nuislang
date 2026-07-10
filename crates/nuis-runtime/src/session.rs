@@ -28,6 +28,7 @@ pub struct ClockProtocolRuntimeSummary {
     pub domains: usize,
     pub edges: usize,
     pub happens_before_edges: usize,
+    pub data_segment_commit_edges: usize,
     pub validation_valid: bool,
 }
 
@@ -103,6 +104,7 @@ impl LoadedExecutable {
             domains: protocol.domains.len(),
             edges: protocol.edges.len(),
             happens_before_edges: protocol.happens_before_edges().count(),
+            data_segment_commit_edges: protocol.data_segment_commit_edges().count(),
             validation_valid: protocol.validation_valid,
         })
     }

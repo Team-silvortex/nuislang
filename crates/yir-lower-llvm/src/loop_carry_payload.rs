@@ -189,3 +189,25 @@ pub(crate) fn loop_carry_payload_len(kind: &str) -> usize {
         0
     }
 }
+
+pub(crate) fn loop_async_chain_carry_payload_len(kind: &str) -> usize {
+    if kind.contains("_plus_factor_invariant_") && kind.starts_with("mul_scaled_by_") {
+        1 + usize::from(kind.ends_with("_plus_invariant"))
+    } else if kind.starts_with("mul_scaled_by_") {
+        usize::from(kind.ends_with("_plus_invariant"))
+    } else if kind.starts_with("mul_scaled_") {
+        1 + usize::from(kind.ends_with("_plus_invariant"))
+    } else if kind.starts_with("mul_") && kind.contains("_plus_") {
+        usize::from(kind.ends_with("_plus_invariant"))
+    } else if matches!(
+        kind,
+        "mul_current_plus_invariant"
+            | "mul_prev_current_plus_invariant"
+            | "mul_invariant"
+            | "mul_source_plus_invariant"
+    ) {
+        1
+    } else {
+        0
+    }
+}

@@ -55,6 +55,12 @@ impl ClockProtocol {
             .iter()
             .filter(|edge| edge.relation == "happens-before")
     }
+
+    pub fn data_segment_commit_edges(&self) -> impl Iterator<Item = &ClockEdge> {
+        self.edges
+            .iter()
+            .filter(|edge| edge.relation == "data-segment-commit")
+    }
 }
 
 pub fn parse_clock_protocol(path: &Path) -> Result<ClockProtocol, ArtifactError> {
@@ -274,6 +280,12 @@ from = "t0000.nuis.bootstrap.lifecycle.v1"
 to = "t0001.shader"
 relation = "happens-before"
 source = "hetero.node.0"
+[[clock_edge]]
+index = 2
+from = "t0001.shader.complete"
+to = "t0001.shader.data_commit"
+relation = "data-segment-commit"
+source = "hetero.data_segment.0"
 "#;
         let protocol =
             parse_clock_protocol_from_source(source, Path::new("<test-clock-protocol>")).unwrap();
@@ -281,11 +293,12 @@ source = "hetero.node.0"
         assert_eq!(protocol.schema, "nuis-clock-protocol-v1");
         assert!(protocol.validation_valid);
         assert_eq!(protocol.domains.len(), 1);
-        assert_eq!(protocol.edges.len(), 2);
+        assert_eq!(protocol.edges.len(), 3);
         assert_eq!(
             protocol.find_domain("cpu").unwrap().clock_domain_id,
             "cpu.clock.host.v1"
         );
         assert_eq!(protocol.happens_before_edges().count(), 1);
+        assert_eq!(protocol.data_segment_commit_edges().count(), 1);
     }
 }

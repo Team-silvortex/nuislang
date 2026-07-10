@@ -182,6 +182,18 @@ pub(super) fn verify_clock_protocol(
         "clock protocol",
         &protocol_label,
     )?;
+    let heterogeneous_domain_count = domain_build_units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .count();
+    let expected_clock_edge_count = clock_protocol_domains + heterogeneous_domain_count * 2;
+    verify_block_count(
+        &protocol_source,
+        "[[clock_edge]]",
+        expected_clock_edge_count,
+        "clock protocol",
+        &protocol_label,
+    )?;
     let mut unique_domains = domain_build_units
         .iter()
         .map(|unit| unit.domain_family.as_str())
@@ -225,7 +237,23 @@ pub(super) fn verify_clock_protocol(
                 protocol_label, unit.package_id
             ));
         }
+        if unit.domain_family != "cpu" {
+            if !protocol_source.contains(&format!(".{}.data_commit", unit.domain_family))
+                || !protocol_source.contains("relation = \"data-segment-commit\"")
+            {
+                return Err(format!(
+                    "clock protocol `{}` is missing data segment commit edge for `{}`",
+                    protocol_label, unit.domain_family
+                ));
+            }
+            if !protocol_source.contains(&format!("source = \"hetero.data_segment.")) {
+                return Err(format!(
+                    "clock protocol `{}` is missing hetero data segment edge source",
+                    protocol_label
+                ));
+            }
+        }
         entries_checked += 1;
     }
-    Ok((1, entries_checked))
+    Ok((1, entries_checked + expected_clock_edge_count))
 }
