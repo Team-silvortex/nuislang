@@ -10,6 +10,7 @@ workflow/history checkpoints, and policy notes.
 If you want the current line instead of historical backfill, start with:
 
 * [nuis-alpha-0.8-mainline-entry.md](nuis-alpha-0.8-mainline-entry.md)
+* [nuis-alpha-0.8-doc-sync-inventory.md](nuis-alpha-0.8-doc-sync-inventory.md)
 * [nuis-alpha-0.7-mainline-entry.md](nuis-alpha-0.7-mainline-entry.md)
 * [nuis-alpha-0.6-mainline-entry.md](nuis-alpha-0.6-mainline-entry.md)
 * [nuis-alpha-0.4-system-inventory.md](nuis-alpha-0.4-system-inventory.md)
@@ -27,6 +28,7 @@ Use this first when the question is:
 * what the current mainline should optimize before `alpha-0.10.0`
 * which documentation routes and wording are current after the alpha-0.8
   entry refresh
+* which broad README surfaces were refreshed for alpha-0.8
 * what the `alpha-0.1.*` mainline established before this hardening pass
 * what should count as present-tense repo truth
 * which older files should now be treated as predecessor anchors

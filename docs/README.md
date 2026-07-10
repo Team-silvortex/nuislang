@@ -23,6 +23,7 @@ If you want to understand the repository as it exists today, start here:
 
 * [current-mainline-map.md](current-mainline-map.md)
 * [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
+* [versioning/nuis-alpha-0.8-doc-sync-inventory.md](versioning/nuis-alpha-0.8-doc-sync-inventory.md)
 * [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
 * [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
 * [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
@@ -41,8 +42,9 @@ binary assembly references before drilling into deeper reference material.
 
 If your immediate question is “which docs are current, which are predecessor
 anchors, and what wording is safe?”, read the `alpha-0.8.*` mainline entry
-first, then the `alpha-0.4.*` documentation sync baseline before editing broad
-docs.
+first, then the `alpha-0.8.*` documentation sync inventory. Use the
+`alpha-0.4.*` documentation sync baseline only when you need the older
+hardening baseline.
 
 If your immediate question is “what is the current minor-line history anchor?”,
 start with the `alpha-0.8.*` mainline entry, then use the `alpha-0.4.*`

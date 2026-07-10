@@ -1,158 +1,99 @@
 # nuislang
 
-> AOT-first heterogeneous systems language and toolchain built around `nuis -> NIR -> YIR -> LLVM/AOT`, with `nustar` packages providing per-domain parsing, lowering, ABI contracts, and verification surfaces.
+> AOT-first heterogeneous systems language and toolchain built around
+> `nuis -> NIR -> YIR -> LLVM/AOT`, with `nustar` packages registering
+> per-domain parsing, lowering, ABI contracts, artifacts, and verification
+> surfaces.
 
 ## Current Status
 
-The repository is currently on the `alpha-0.8.*` line. It is still in an active
-architecture-building stage, but the mainline is now expected to describe one
-connected toolchain rather than a pile of promising surfaces.
+The repository is on the `alpha-0.8.*` line. This is still an architecture
+building line, not a beta-stability line, but the project now has one connected
+compiler/toolchain spine instead of separate experimental islands.
 
-The most stable current spine is:
+Current spine:
 
 ```text
-nuis source / project
+nuis source / nuis.toml project
+  -> nuis frontdoor
   -> nuisc
   -> NIR
   -> YIR
-  -> LLVM / AOT packaging
+  -> LLVM / AOT artifacts
+  -> nsld binary-linking convergence
 ```
 
-The key thing that is already real today is not “all language features are done”, but that the project now has one increasingly consistent execution model across:
-
-* `cpu`
-* `data`
-* `shader`
-* `kernel`
-* `network`
-
-That model is increasingly enforced through `YIR` contracts, project validation, per-domain `nustar` manifests, and verifier checks rather than only ad hoc frontend rules.
-
-The newest `alpha-0.8.*` emphasis is:
-
-* binary-linking convergence through `nsld`, with the explicit target of a
-  minimal runnable binary route before `alpha-0.10.0`
-* artifact-chain, closure, final-stage, and final-executable diagnostics kept
-  deterministic enough for linker/cache/debugger reuse
-* std-backed tooling demos from `alpha-0.7.*` kept as the main smoke pressure
-  for real build inputs
-
-Current versioning entrypoints:
-
-* current `alpha-0.8.*` mainline entry:
-  [docs/versioning/nuis-alpha-0.8-mainline-entry.md](docs/versioning/nuis-alpha-0.8-mainline-entry.md)
-* predecessor `alpha-0.7.*` std/tooling smoke entry:
-  [docs/versioning/nuis-alpha-0.7-mainline-entry.md](docs/versioning/nuis-alpha-0.7-mainline-entry.md)
-* predecessor `alpha-0.6.*` linker/std smoke entry:
-  [docs/versioning/nuis-alpha-0.6-mainline-entry.md](docs/versioning/nuis-alpha-0.6-mainline-entry.md)
-* current mainline router:
-  [docs/current-mainline-map.md](docs/current-mainline-map.md)
-* `alpha-0.4.*` hardening baseline system inventory:
-  [docs/versioning/nuis-alpha-0.4-system-inventory.md](docs/versioning/nuis-alpha-0.4-system-inventory.md)
-* `alpha-0.4.*` hardening baseline plan:
-  [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-* `alpha-0.4.*` documentation sync baseline:
-  [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-* long-range heterogeneous OS roadmap:
-  [docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md](docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md)
-* CFFI / classic von-Neumann domain contract:
-  [docs/reference/cffi-von-neumann-domain-contract.md](docs/reference/cffi-von-neumann-domain-contract.md)
-* predecessor `alpha-0.1.*` status anchor:
-  [docs/versioning/nuis-alpha-0.1-mainline-status.md](docs/versioning/nuis-alpha-0.1-mainline-status.md)
-* predecessor alpha closeout board:
-  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
-* predecessor alpha closeout checklist:
-  [docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md](docs/versioning/nuis-alpha-0.0.1-closeout-checklist.md)
-* previous pre-alpha snapshot anchor:
-  [docs/versioning/nuis-0.19.0-snapshot.md](docs/versioning/nuis-0.19.0-snapshot.md)
-* previous pre-alpha workflow anchor:
-  [docs/versioning/nuis-0.19.0-compile-workflow.md](docs/versioning/nuis-0.19.0-compile-workflow.md)
-* predecessor ABI compile vocabulary bridge into `0.20.*`:
-  [docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md](docs/versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-* previous pre-alpha regression gate:
-  [docs/versioning/nuis-0.19.0-mainline-regression-matrix.md](docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
-* previous pre-alpha address/pointer anchor:
-  [docs/versioning/nuis-0.19.0-address-pointer-mainline.md](docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
-* previous minor-line snapshot:
-  [docs/versioning/nuis-0.18.0-snapshot.md](docs/versioning/nuis-0.18.0-snapshot.md)
-* historical index:
-  [docs/versioning/README.md](docs/versioning/README.md)
-
-If you want the current line first, start with
-[docs/versioning/nuis-alpha-0.8-mainline-entry.md](docs/versioning/nuis-alpha-0.8-mainline-entry.md),
-then use [docs/current-mainline-map.md](docs/current-mainline-map.md)
-and
-[docs/reference/nsld-linker-frontdoor.md](docs/reference/nsld-linker-frontdoor.md).
-For the hardening baseline behind that current line, use
-[docs/versioning/nuis-alpha-0.4-system-inventory.md](docs/versioning/nuis-alpha-0.4-system-inventory.md),
-[docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-and
-[docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md).
-
-If you want the older pre-alpha history anchor after that, start with
-[`0.19.0` snapshot](docs/versioning/nuis-0.19.0-snapshot.md), then use
-[docs/versioning/README.md](docs/versioning/README.md) only when you intentionally need older lines.
-
-Current source-style note:
-
-* ordinary `.ns` examples and `std` modules now prefer address surface syntax
-  such as `ptr.value`, `ptr.next`, `buffer.len`, and `buffer[index]`
-* builtin names like `load_value(...)` and `store_at(...)` remain the lowered
-  implementation truth in NIR/YIR-facing docs
-* source-facing contract:
-  [docs/reference/address-surface-contract.md](docs/reference/address-surface-contract.md)
-
-## Toolchain
-
-The visible workspace toolchain now includes:
-
-* `nuis`: front-door workflow command
-* `nuisc`: compiler core and AOT artifact producer
-* `nsld`: alpha-0.6.0 linker frontdoor for link-plan, clock protocol, and
-  heterogeneous calculate contract inspection
-* `nsdb`: YIR-layer debugger metadata frontdoor; native debuggers can still
-  attach to the host shell, but Nsdb owns Nuis semantic debug visibility
-* `nsbdr`: OS bundle/distribution frontdoor; consumes `nsld` final outputs and
-  owns platform package plans such as `.app` and `.dmg`
-* `nuis-rc`: local resident control prototype
-* `yir-*`: lower-level YIR inspection, packing, running, and export tools
-
-`nsld` is currently a separate tool boundary over `nuisc::linker`, not the
-finished self-owned object linker. The point of the split is to make linker
-ownership explicit before the implementation is fully extracted.
-Longer-term, `nsld`, `nsdb`, and `nsbdr` should be CLI adapters over reusable
-galaxy-style core toolchain capabilities, not CLI-only command surfaces.
-
-Reference:
-[docs/reference/nsld-linker-frontdoor.md](docs/reference/nsld-linker-frontdoor.md),
-[docs/reference/nsdb-yir-debugger-frontdoor.md](docs/reference/nsdb-yir-debugger-frontdoor.md),
-[docs/reference/nsbdr-bundler-frontdoor.md](docs/reference/nsbdr-bundler-frontdoor.md),
-[docs/reference/toolchain-galaxy-core-boundary.md](docs/reference/toolchain-galaxy-core-boundary.md)
+The current goal before `alpha-0.10.0` is an honest minimal binary-linking loop:
 
 ```text
-nuis     -> front-door workflow tool
-nuis-rc  -> resident control tool (later-stage, still intentionally thin)
-nuisc    -> compiler/scheduler core
-nsbdr    -> OS bundle/distribution adapter for nsld final outputs
-yalivia  -> hosted future JIT/runtime subproject under `subprojects/yalivia`
-vulpoya  -> hosted future analyzer/verifier subproject under `subprojects/vulpoya`
+project
+  -> compiled artifact
+  -> object image / compatibility object
+  -> container + payload
+  -> closure snapshot
+  -> final-stage plan
+  -> runnable binary route or explicit blocked executable artifact
 ```
 
-Current responsibility split:
+This does not yet mean final self-hosting, final std API stability, or a fully
+self-owned linker. Safe current wording is `binary-linking convergence`,
+`minimal runnable route`, and `host-assisted finalization` where applicable.
 
-* `nuis` is the main workflow surface for `check`, `build`, caches, projects, and package inspection.
-* `nuisc` is the compiler/scheduler core that consumes `.ns` or project inputs and emits `NIR`, `YIR`, LLVM IR, and AOT outputs.
-* `nustar` packages are where per-domain ABI support, default lanes, frontend/lowering entrypoints, and package contracts are registered.
-* `nustar` packages are also starting to declare per-domain clock contracts such as `clock_domain_id`, `clock_kind`, `clock_epoch_kind`, `clock_resolution`, and `clock_bridge_default`.
-* the C ABI / libc / classic host stack should enter through a CFFI or
-  host-compat domain contract rather than acting as the implicit machine model.
-* `subprojects/yalivia` and `subprojects/vulpoya` are now hosted inside this repository tree as sibling ecosystem projects while their boundaries are still evolving.
+Start here for the current line:
+
+* [docs/current-mainline-map.md](docs/current-mainline-map.md)
+* [docs/versioning/nuis-alpha-0.8-mainline-entry.md](docs/versioning/nuis-alpha-0.8-mainline-entry.md)
+* [docs/versioning/nuis-alpha-0.8-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.8-doc-sync-inventory.md)
+* [docs/reference/nsld-linker-frontdoor.md](docs/reference/nsld-linker-frontdoor.md)
+* [docs/reference/nsld-binary-assembly-gap-map.md](docs/reference/nsld-binary-assembly-gap-map.md)
+* [docs/reference/nuis-native-artifact-workflow.md](docs/reference/nuis-native-artifact-workflow.md)
+* [docs/reference/nustar-multi-backend-artifact-contract.md](docs/reference/nustar-multi-backend-artifact-contract.md)
+* [docs/reference/toolchain-galaxy-core-boundary.md](docs/reference/toolchain-galaxy-core-boundary.md)
+
+Older alpha and pre-alpha files are still useful, but they are predecessor or
+baseline context. Use [docs/versioning/README.md](docs/versioning/README.md)
+when you intentionally need history.
+
+## What Exists Now
+
+Implemented or actively usable surfaces:
+
+* `nuis` project workflow commands for `workflow`, `project-doctor`, `check`,
+  `test`, `build`, artifact inspection, and release checks.
+* `nuisc` compiler core with parser/frontend, NIR/YIR generation, verifier
+  checks, LLVM lowering, AOT artifact emission, and project metadata.
+* `nustar` registration for the main domain set: `cpu`, `data`, `shader`,
+  `kernel`, `network`, plus CFFI/host-compatibility boundaries.
+* `YIR` as the central semantic execution boundary, with result-family,
+  artifact, clock, ABI, and domain validation surfaces.
+* `nsld` as the linker frontdoor over the current linker core, with object,
+  container, closure, final-stage, and readiness diagnostics.
+* `nsdb` as the YIR-level debugger metadata frontdoor.
+* `nsbdr` as the future OS bundle/distribution frontdoor over final `nsld`
+  outputs.
+* Standard-library source assets under `stdlib/core`, `stdlib/std`,
+  `stdlib/pixelmagic`, `stdlib/witsage`, and `stdlib/ns-nova`.
+* Project examples covering control flow, task/thread/lock surfaces,
+  filesystem/IO/text/tooling, PixelMagic image lanes, WitSage classical ML
+  contracts, network profiles, shader/kernel domain artifacts, and native
+  artifact closure.
+
+Still incomplete or intentionally soft:
+
+* final self-owned executable linking
+* stable std import/autoinjection semantics
+* complete unsafe/raw-pointer policy
+* final GPU/NPU backend maturity
+* beta-level public API stability
+* self-hosting
 
 ## Quick Start
 
-Recommended default compile workflow:
+Use `nuis workflow` first when you are not sure which command should own the
+next step:
 
 ```bash
+cargo run -p nuis -- workflow examples/projects/window_controls_demo
 cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
 cargo run -p nuis -- check examples/projects/window_controls_demo
 cargo run -p nuis -- test examples/projects/window_controls_demo
@@ -160,91 +101,10 @@ cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/
 cargo run -p nuis -- release-check examples/projects/window_controls_demo examples/bins/window_controls_demo_project_release
 ```
 
-If you want the CLI to restate the shortest route for the current input first:
-
-```bash
-cargo run -p nuis -- workflow examples/projects/window_controls_demo
-cargo run -p nuis -- workflow stdlib/std/net_session_recipe.ns --json
-```
-
-Useful follow-up variants:
-
-```bash
-cargo run -p nuis -- test --list examples/projects/window_controls_demo
-cargo run -p nuis -- test --ignored examples/projects/window_controls_demo
-cargo run -p nuis -- test --include-ignored examples/projects/window_controls_demo
-cargo run -p nuis -- test --exact examples/projects/window_controls_demo smoke_add
-cargo run -p nuis -- test --ignored --exact examples/projects/window_controls_demo smoke_skip
-cargo run -p nuis -- project-status examples/projects/window_controls_demo
-cargo run -p nuis -- project-lock-abi examples/projects/window_controls_demo
-```
-
-If you want the current native artifact closure route specifically, use:
+Native artifact closure route:
 
 ```bash
 cargo run -p nuis -- workflow examples/projects/tooling/native_artifact_closure_demo
-cargo run -p nuis -- project-status examples/projects/tooling/native_artifact_closure_demo
-cargo run -p nuis -- build examples/projects/tooling/native_artifact_closure_demo examples/bins/native_artifact_closure_demo_project
-cargo run -p nuis -- artifact-doctor examples/bins/native_artifact_closure_demo_project
-cargo run -p nuis -- run-artifact examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
-```
-
-Current native artifact closure reference:
-[docs/reference/nuis-native-artifact-workflow.md](docs/reference/nuis-native-artifact-workflow.md)
-
-The current rule of thumb should be:
-
-* `project-doctor` before deep work on a project
-* `check` for compile/validation truth
-* `test` for language-level behavior
-* `build` for artifact emission
-* `release-check` before calling the result release-ready
-
-Current language-level test declarations use:
-
-```ns
-test("smoke_add") fn smoke_add() -> i64 { return 1; }
-test(ignored=true) fn skipped_case() -> i64 { return 1; }
-test(should_fail=true) fn expected_failure() -> i64 { return 0; }
-test("expected_failure", should_fail=true, reason="must reject zero") fn expected_failure() -> i64 { return 0; }
-test("slow_async", timeout_ms=25, clock_domain="global", clock_policy="bridge") async fn slow_async() -> i64 { return 1; }
-```
-
-Timed tests already support `timeout_ms`, `clock_domain`, and
-`clock_policy="bridge"`. `nuis test` reports both declared and resolved clock
-metadata at run time. For the current contract and bridge semantics, read
-[docs/reference/cpu-task-scheduler-clock.md](docs/reference/cpu-task-scheduler-clock.md).
-
-Current workflow reading rule:
-
-* use `nuis workflow` when you want the CLI to restate the shortest route for
-  a specific input
-* use [docs/current-mainline-map.md](docs/current-mainline-map.md)
-  when you want the repo-wide current route
-* use
-  [docs/versioning/nuis-alpha-0.8-mainline-entry.md](docs/versioning/nuis-alpha-0.8-mainline-entry.md)
-  when the question is whether a lane is already current, still active, or only
-  an intentional alpha boundary
-* use
-  [docs/versioning/nuis-alpha-0.0.1-closeout-board.md](docs/versioning/nuis-alpha-0.0.1-closeout-board.md)
-  only when you intentionally need the first alpha closeout history
-
-Useful inspection commands:
-
-```bash
-cargo run -p nuis -- dump-ast examples/projects/window_controls_demo
-cargo run -p nuis -- dump-nir examples/projects/window_controls_demo
-cargo run -p nuis -- dump-yir examples/projects/window_controls_demo
-cargo run -p nuis -- inspect-artifact examples/bins/window_controls_demo_project/nuis.build.manifest.toml
-cargo run -p nuis -- verify-artifact examples/bins/window_controls_demo_project/nuis.compiled.artifact
-cargo run -p nuis -- artifact-doctor examples/bins/window_controls_demo_project
-cargo run -p nuis -- verify-build-manifest examples/bins/window_controls_demo_project/nuis.build.manifest.toml
-cargo run -p nuis -- run-artifact examples/bins/window_controls_demo_project/nuis.build.manifest.toml
-```
-
-If you want the shortest current native artifact closure route specifically:
-
-```bash
 cargo run -p nuis -- build \
   examples/projects/tooling/native_artifact_closure_demo \
   examples/bins/native_artifact_closure_demo_project
@@ -254,13 +114,11 @@ cargo run -p nuis -- verify-artifact \
   examples/bins/native_artifact_closure_demo_project/nuis.compiled.artifact
 cargo run -p nuis -- artifact-doctor \
   examples/bins/native_artifact_closure_demo_project
-cargo run -p nuis -- verify-build-manifest \
-  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
 cargo run -p nuis -- run-artifact \
   examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
 ```
 
-CPU target override is now explicit:
+Explicit CPU target examples:
 
 ```bash
 cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
@@ -272,114 +130,134 @@ cargo run -p nuis -- build --target aarch64-apple-darwin \
   examples/bins/kernel_tensor_demo_project
 ```
 
-## What Is Working Well Right Now
+Useful inspection commands:
 
-High-signal implemented surfaces:
+```bash
+cargo run -p nuis -- dump-ast examples/projects/window_controls_demo
+cargo run -p nuis -- dump-nir examples/projects/window_controls_demo
+cargo run -p nuis -- dump-yir examples/projects/window_controls_demo
+cargo run -p nuis -- project-status examples/projects/window_controls_demo
+cargo run -p nuis -- artifact-doctor examples/bins/window_controls_demo_project
+cargo run -p nuis -- verify-build-manifest examples/bins/window_controls_demo_project/nuis.build.manifest.toml
+```
 
-* multi-file `nuis.toml` projects with project-level `links`
-* lazy `nustar` loading and per-domain ABI resolution
-* ABI auto-selection from registered `abi_targets`
-* explicit `--cpu-abi` and `--target` overrides for CPU builds
-* compile-cache inspection and pruning through `nuis`
-* AOT bundle generation for current CPU-only and macOS window-hosted demo paths
-* runtime-side artifact loading and host-consumable summary reporting through
-  `nuis-runtime`
-* host-YIR execution probes that read artifact YIR sidecars and execute
-  registered YIR domain mods, including real kernel tensor result summaries
-* repository source hygiene with non-test `tools/nuisc/src` implementation
-  files kept below the current 600-line policy threshold
-* source visibility boundaries through minimal `pub/private`
-* `project-status` / `project-doctor` public-surface reporting
-* intrinsic frontend annotations for `@test`, `@export`, `@inline`,
-  `@noinline`, and `@host_symbol`
-* first constrained trait/generic monomorphization slices
-* packet schema/contract metadata through `@packet`,
-  `@packet_field`, and `@packet_control_field`
-* executable `while` subsets for counted/carry/flow-style loops, including
-  representative native compile/launch smoke
-* `std net` low-level syscall/socket/flow layering
-* project-level host FFI contract indexing
-* `ns-nova` framework manifests with family/render/selection assembly metadata for `core / ui / future scene` layering
-* `cpu/data/shader/kernel` result-family validation in `YIR`
-* task-style async primitives with `spawn / join / cancel / timeout / join_result`
-* core-level async/result metadata beginning to move into `yir-core`
+## Toolchain Boundaries
 
-## Mainline Vs Experimental
+```text
+nuis   -> workflow/project frontdoor
+nuisc  -> compiler core and AOT artifact producer
+nsld   -> linker frontdoor and binary assembly convergence surface
+nsdb   -> YIR semantic debugger frontdoor
+nsbdr  -> OS bundle/distribution adapter for final nsld outputs
+yir-*  -> lower-level YIR inspection, packing, running, and export tools
+```
 
-Current mainline, meaning “good default places to stand on today”:
+`nsld`, `nsdb`, and `nsbdr` should remain command adapters over reusable
+toolchain capabilities. They should not become isolated CLI-only logic piles.
+See [docs/reference/toolchain-galaxy-core-boundary.md](docs/reference/toolchain-galaxy-core-boundary.md).
 
-* `nuis -> NIR -> YIR -> LLVM/AOT` build path
-* multi-file `nuis.toml` projects
-* `nustar`-driven ABI and lane policy registration
-* artifact-to-runtime inspection through `nuis-runtime`, including host-YIR
-  reference execution for payload-backed YIR sidecars
-* `examples/projects` as the primary runnable/compile-contract example layer
-* `docs/reference` as the primary implementation-truth documentation layer
-* `stdlib/std`, `stdlib/pixelmagic`, and `stdlib/witsage` as the current
-  source-asset/library proving path
-* `stdlib/ns-nova` as an official future GUI/render galaxy that should remain
-  behind AOT/std/PixelMagic/WitSage hardening for now
+The C world is treated as a compatibility domain, not as the hidden default
+machine model. Current CFFI direction is documented in
+[docs/reference/cffi-von-neumann-domain-contract.md](docs/reference/cffi-von-neumann-domain-contract.md)
+and [docs/reference/ffi-pointer-safety-boundary.md](docs/reference/ffi-pointer-safety-boundary.md).
 
-Current experimental or intentionally still soft-edged tracks:
+## Nustar And Heterogeneous Domains
 
-* `Task<T>` / `TaskResult<T>` ownership and future `GLM` elevation
-* external-handle bridge-object direction for resource-bearing task payloads
-* hot-sync contraction of local async regions
-* `YIR`-level global clock negotiation and multi-`nustar` time conversion
-* native CPU task execution beyond the current compile/contract staging path
+`nustar` packages are the registration boundary for domain-specific knowledge.
+The compiler may know the shape of `nustar` contracts, but it should avoid
+hardcoding every domain's internal logic.
 
-Reading rule that matches this split:
+Current core domain set:
 
-* when current examples/docs and future sketches differ, prefer the current
-  project/examples/reference path first
-* treat sketches, probes, and future notes as design direction, not as already
-  promised repository behavior
+* `cpu`: scalar/control-flow/task/thread/lock/host-compatible execution spine
+* `data`: fabric, handles, markers, movement, windows, pipes, observers
+* `shader`: shader artifact and graphics/image-processing pressure surface
+* `kernel`: compute-kernel and future ML/NPU pressure surface
+* `network`: profile/session/flow and host-backed networking contracts
+* `cffi`: compatibility boundary for libc/C ABI/classic host object support
 
-## Fast Orientation
+Important references:
 
-If you want the shortest path by goal:
+* [docs/reference/nustar-capability-split-boundary.md](docs/reference/nustar-capability-split-boundary.md)
+* [docs/reference/nustar-multi-backend-artifact-contract.md](docs/reference/nustar-multi-backend-artifact-contract.md)
+* [docs/reference/std-shader-kernel-project-contract.md](docs/reference/std-shader-kernel-project-contract.md)
+* [docs/reference/network-domain-contract.md](docs/reference/network-domain-contract.md)
 
-* consolidated current mainline map
-  - [docs/current-mainline-map.md](docs/current-mainline-map.md)
-* current alpha line and hardening baseline
-  - [docs/versioning/nuis-alpha-0.8-mainline-entry.md](docs/versioning/nuis-alpha-0.8-mainline-entry.md)
-  - [docs/versioning/nuis-alpha-0.7-mainline-entry.md](docs/versioning/nuis-alpha-0.7-mainline-entry.md)
-  - [docs/versioning/nuis-alpha-0.6-mainline-entry.md](docs/versioning/nuis-alpha-0.6-mainline-entry.md)
-  - [docs/versioning/nuis-alpha-0.4-system-inventory.md](docs/versioning/nuis-alpha-0.4-system-inventory.md)
-  - [docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md](docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-  - [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-* current user-facing project path
-  - [examples/projects/README.md](examples/projects/README.md)
-  - [docs/examples-freshness-audit.md](docs/examples-freshness-audit.md)
-  - [docs/reference/yir-tools-reference.md](docs/reference/yir-tools-reference.md)
-* current source-level language and host examples
-  - [examples/ns/README.md](examples/ns/README.md)
-  - [examples/ns/ffi/README.md](examples/ns/ffi/README.md)
-  - [examples/ns/memory/README.md](examples/ns/memory/README.md)
-* current implementation-facing semantic contracts
-  - [docs/reference/README.md](docs/reference/README.md)
-* current `std` and framework source assets
-  - [stdlib/README.md](stdlib/README.md)
-  - [stdlib/std/README.md](stdlib/std/README.md)
-  - [stdlib/pixelmagic/README.md](stdlib/pixelmagic/README.md)
-  - [stdlib/witsage/README.md](stdlib/witsage/README.md)
-  - [stdlib/ns-nova/README.md](stdlib/ns-nova/README.md)
-* quick repo map
-  - [docs/repo-layout.md](docs/repo-layout.md)
+## Standard Library And Official Galaxies
 
-## Key Architectural Notes
+The standard library is not a final crate-like automatic import tree yet, but it
+is no longer empty scaffolding.
 
-Current high-signal architectural facts:
+Current layers:
 
-* `YIR` is the main semantic execution boundary in this repository.
-* `nuisc` is intentionally becoming more mod-agnostic; per-domain support should come from registered `nustar` contracts.
-* `abi_targets` now live in `nustar` manifests and drive auto ABI selection, CLI overrides, packaging metadata, and loader contracts.
-* default lane policy also belongs to `nustar` manifests; `nuisc` should only apply that policy plus narrow fallbacks.
-* `data.handle_table` remains an indirection/resource-binding surface, not a place to own large payload blobs directly.
-* `data.fabric` is being kept on a strict seven-family primitive model: `bind`, `handle`, `marker`, `move`, `window`, `pipe`, and `observe`. Higher-level helpers must lower into those families rather than invent new primitive classes.
-* current Fabric host integration is intentionally thin and AOT-first, with static typed action tables rather than a heavy runtime metadata graph.
-* async/result semantics are being normalized into `yir-core`, even though the concrete entry ops are still currently surfaced through `cpu.*`.
+```text
+core -> std -> pixelmagic
+core -> std -> witsage
+core -> std -> ns-nova
+```
 
-Historical architecture material lives under:
+* `core`: smallest semantic/source-contract base
+* `std`: systems helpers for task, host, IO, filesystem, text, networking,
+  tooling, persistence, result/error, and benchmark/report lanes
+* `pixelmagic`: official image/resource Galaxy and shader-facing image pipeline
+  pressure surface
+* `witsage`: official classical ML Galaxy and kernel-facing model/statistics
+  pressure surface
+* `ns-nova`: future GUI/render/application framework Galaxy, intentionally
+  later than AOT/std/PixelMagic/WitSage hardening
 
+Read [stdlib/README.md](stdlib/README.md) first, then
+[stdlib/std/README.md](stdlib/std/README.md),
+[stdlib/pixelmagic/README.md](stdlib/pixelmagic/README.md),
+[stdlib/witsage/README.md](stdlib/witsage/README.md), and
+[stdlib/ns-nova/README.md](stdlib/ns-nova/README.md).
+
+## Examples
+
+Use [examples/README.md](examples/README.md) as the router. The current default
+example layer is `examples/projects`, not every older source snippet.
+
+High-signal routes:
+
+* control-flow: `examples/projects/state/*`
+* task/thread/lock: `examples/projects/task/*`
+* tooling/std: `examples/projects/tooling/*`
+* domain demos: `examples/projects/domains/*`
+* source-level companions: `examples/ns/*`
+* handwritten YIR anchors: `examples/yir/*`
+* invalid/verifier cases: `examples/invalid/*`
+
+## Development Checks
+
+Common checks for this workspace:
+
+```bash
+cargo test -q -p nuisc --lib --no-run
+cargo test -q -p nuisc --test file_line_limit --no-fail-fast
+cargo test -q -p yir-lower-llvm --lib --no-run
+cargo clippy -q -p yir-lower-llvm --lib --tests -- -D warnings
+cargo fmt --check
+git diff --check
+```
+
+The repository has an active file-size hygiene policy. Current large-file work
+is reducing `crates/yir-lower-llvm/src/lib.rs` by extracting focused lowering
+modules such as scalar arithmetic, scalar comparisons, guard returns, simple
+loops, carry payload parsing, value types, bitwise lowering, params, and select.
+See [docs/repo-file-line-policy.md](docs/repo-file-line-policy.md).
+
+## Long-Range Direction
+
+Nuis is intentionally not designed as a classic C-shaped systems language with a
+thin new syntax layer. The long-range direction is a Nuis-owned heterogeneous
+computing stack: AOT-first today, linker/debugger/bundler convergence next,
+eventually self-hosting before beta, and later Nuis OS / XR heterogeneous
+workstation ideas without binding the architecture too tightly to libc or a
+single von-Neumann host model.
+
+Long-range design notes:
+
+* [docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md](docs/versioning/nuis-long-range-heterogeneous-os-roadmap.md)
+* [docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md](docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md)
+* [docs/glm-spec/vulpoya-yir-secondary-review-positioning.md](docs/glm-spec/vulpoya-yir-secondary-review-positioning.md)
 * [docs/historical/README.md](docs/historical/README.md)

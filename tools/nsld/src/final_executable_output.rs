@@ -16,6 +16,12 @@ pub(crate) fn nsld_final_executable_output_report(
     let present = output_bytes.is_ok();
     let size_bytes = output_bytes.as_ref().ok().map(Vec::len);
     let output_hash = output_bytes.as_ref().ok().map(|bytes| fnv1a64_hex(bytes));
+    let expected_image_size_bytes = final_emit.actual_image_dry_run_size_bytes;
+    let expected_image_hash = final_emit.actual_image_dry_run_hash.clone();
+    let matches_expected_image = present
+        && size_bytes == expected_image_size_bytes
+        && output_hash == expected_image_hash
+        && expected_image_hash.is_some();
     let mut blockers = Vec::new();
     let mut issues = Vec::new();
 
@@ -46,9 +52,38 @@ pub(crate) fn nsld_final_executable_output_report(
             "missing_or_unreadable_final_executable_output `{output_path}`: {error}"
         ));
     }
+    if final_emit.valid && expected_image_hash.is_none() {
+        blockers.push("final-executable-output:expected-image-hash-missing".to_owned());
+        issues.push("final executable output cannot be compared because verified image dry-run hash is missing".to_owned());
+    }
+    if present && expected_image_size_bytes.is_some() && size_bytes != expected_image_size_bytes {
+        blockers.push("final-executable-output:size-mismatch".to_owned());
+        issues.push(format!(
+            "final executable output size mismatch: expected {}, found {}",
+            expected_image_size_bytes
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "missing".to_owned()),
+            size_bytes
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "missing".to_owned())
+        ));
+    }
+    if present && expected_image_hash.is_some() && output_hash != expected_image_hash {
+        blockers.push("final-executable-output:hash-mismatch".to_owned());
+        issues.push(format!(
+            "final executable output hash mismatch: expected {}, found {}",
+            expected_image_hash
+                .clone()
+                .unwrap_or_else(|| "missing".to_owned()),
+            output_hash.clone().unwrap_or_else(|| "missing".to_owned())
+        ));
+    }
 
-    let runnable_candidate =
-        present && final_stage.valid && final_emit.valid && final_emit.actual_emitted == Some(true);
+    let runnable_candidate = present
+        && final_stage.valid
+        && final_emit.valid
+        && final_emit.actual_emitted == Some(true)
+        && matches_expected_image;
 
     NsldFinalExecutableOutputReport {
         manifest: manifest.display().to_string(),
@@ -56,6 +91,9 @@ pub(crate) fn nsld_final_executable_output_report(
         present,
         size_bytes,
         output_hash,
+        expected_image_size_bytes,
+        expected_image_hash,
+        matches_expected_image,
         final_stage_plan_valid: final_stage.valid,
         final_stage_plan_hash: final_stage.actual_plan_hash,
         final_executable_emit_valid: final_emit.valid,

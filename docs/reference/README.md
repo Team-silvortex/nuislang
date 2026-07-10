@@ -14,6 +14,7 @@ task/pointer rules?", read:
 If you want a short current phase summary before drilling into individual
 contracts, start with:
 
+* [../versioning/nuis-alpha-0.8-mainline-entry.md](../../docs/versioning/nuis-alpha-0.8-mainline-entry.md)
 * [../versioning/nuis-alpha-0.7-mainline-entry.md](../../docs/versioning/nuis-alpha-0.7-mainline-entry.md)
 * [../versioning/nuis-alpha-0.6-mainline-entry.md](../../docs/versioning/nuis-alpha-0.6-mainline-entry.md)
 * [../versioning/nuis-alpha-0.4-system-inventory.md](../../docs/versioning/nuis-alpha-0.4-system-inventory.md)
@@ -33,6 +34,7 @@ Start in this order:
   - [nustar-multi-backend-artifact-contract.md](nustar-multi-backend-artifact-contract.md)
   - [nsld-linker-frontdoor.md](nsld-linker-frontdoor.md)
   - [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md)
+  - [nuis-packaging-lifecycle-responsibility-map.md](nuis-packaging-lifecycle-responsibility-map.md)
   - [cffi-von-neumann-domain-contract.md](cffi-von-neumann-domain-contract.md)
   - [nsdb-yir-debugger-frontdoor.md](nsdb-yir-debugger-frontdoor.md)
   - [nsbdr-bundler-frontdoor.md](nsbdr-bundler-frontdoor.md)
@@ -86,6 +88,10 @@ frontdoor?”, start with
 If your question is specifically “what remains between the current Nsld
 container and a runnable Nuis-owned heterogeneous executable?”, start with
 [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md).
+
+If your question is specifically “what is the current alpha-0.8 binary-linking
+target and what wording is safe?”, start with
+[../versioning/nuis-alpha-0.8-mainline-entry.md](../../docs/versioning/nuis-alpha-0.8-mainline-entry.md).
 
 If your question is specifically “how should Nuis treat the C world and the
 classic von-Neumann host stack?”, start with

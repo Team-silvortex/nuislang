@@ -1,10 +1,15 @@
 mod artifact_chain;
 mod assembly;
 mod check;
+mod check_container;
+mod check_core;
+mod check_final;
 mod cli;
 mod closure;
+mod closure_snapshot_helpers;
 mod commands;
 mod container;
+mod container_hashes;
 mod container_model;
 mod container_pipeline;
 mod container_pipeline_actual;
@@ -18,11 +23,18 @@ mod display;
 mod display_check;
 mod display_container;
 mod display_container_verify;
+mod display_final_host;
+mod display_final_image;
+mod display_final_stage;
 mod display_link_tables;
+mod display_linker;
 mod display_object;
 mod display_object_emit;
 mod display_object_image;
+mod display_prepare;
+mod display_text;
 mod final_executable_emit;
+mod final_executable_emit_shape;
 mod final_executable_host;
 mod final_executable_image;
 mod final_executable_image_stage;
@@ -38,40 +50,83 @@ mod final_executable_writer_input;
 mod final_stage;
 mod final_stage_plan;
 mod json;
+mod json_artifacts;
+mod json_check;
+mod json_check_sections;
+mod json_closure;
 mod json_container;
+mod json_container_fragments;
 mod json_fields;
+mod json_final_fragments;
+mod json_final_host;
+mod json_final_layout;
+mod json_final_stage;
 mod json_fragments;
 mod json_object;
 mod json_object_emit;
 mod json_object_image;
+mod json_prepare;
 mod link_bundle_pipeline;
 mod link_inputs_pipeline;
 mod link_units;
+#[cfg(test)]
+mod main_check_core_tests;
+#[cfg(test)]
+mod main_check_final_executable_tests;
+#[cfg(test)]
+mod main_cli_final_executable_tests;
 #[cfg(test)]
 mod main_cli_object_tests;
 #[cfg(test)]
 mod main_cli_tests;
 #[cfg(test)]
+mod main_closure_tests;
+#[cfg(test)]
 mod main_container_tests;
+#[cfg(test)]
+mod main_container_verify_assertions;
 #[cfg(test)]
 mod main_container_verify_tamper;
 #[cfg(test)]
 mod main_container_verify_tests;
+mod main_final_executable_commands;
+#[cfg(test)]
+mod main_final_executable_emit_blocked_tests;
+#[cfg(test)]
+mod main_final_executable_emit_drift_tests;
+#[cfg(test)]
+mod main_final_executable_emit_tests;
+#[cfg(test)]
+mod main_final_executable_frontdoor_tests;
+#[cfg(test)]
+mod main_final_executable_image_tests;
+#[cfg(test)]
+mod main_final_executable_layout_tests;
+#[cfg(test)]
+mod main_final_executable_output_tests;
+#[cfg(test)]
+mod main_final_stage_tests;
 #[cfg(test)]
 mod main_link_pipeline_tests;
 #[cfg(test)]
 mod main_link_table_tests;
 mod main_object_commands;
 #[cfg(test)]
+mod main_sidecar_tests;
+#[cfg(test)]
 mod main_test_support;
 #[cfg(test)]
 mod main_tests;
+#[cfg(test)]
+mod main_toml_tests;
 mod object_byte_layout;
 mod object_emit;
 mod object_emit_render;
 mod object_file_layout;
 mod object_image_backend;
 mod object_image_dry_run;
+mod object_image_dry_run_paths;
+mod object_image_dry_run_verify;
 mod object_image_render;
 mod object_layout;
 mod object_macho_header;
@@ -85,9 +140,12 @@ mod object_plan_verify;
 mod object_render;
 mod object_writer_backend;
 mod object_writer_input;
+mod object_writer_input_verify;
 mod prepare;
 mod protocol;
 mod reports;
+mod reports_final;
+mod reports_link_inputs;
 mod reports_object;
 mod toml;
 mod toml_read;
@@ -120,6 +178,9 @@ fn run() -> Result<(), String> {
     let command = parse_args(env::args().skip(1))?;
     if let Some(result) = run_object_command(&command) {
         return result;
+    }
+    if main_final_executable_commands::run_final_executable_command(&command)? {
+        return Ok(());
     }
 
     match command {
@@ -208,210 +269,6 @@ fn run() -> Result<(), String> {
             }
             if !report.valid {
                 return Err("nsld final-stage plan verification failed".to_owned());
-            }
-        }
-        Command::FinalExecutableReadiness { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_final_executable_readiness_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!("{}", nsld_final_executable_readiness_report_json(&report));
-            } else {
-                print_nsld_final_executable_readiness_report(&report);
-            }
-        }
-        Command::FinalExecutableWriterPlan { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_final_executable_writer_plan_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!("{}", nsld_final_executable_writer_plan_report_json(&report));
-            } else {
-                print_nsld_final_executable_writer_plan_report(&report);
-            }
-        }
-        Command::EmitFinalExecutableWriterInput { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_emit_final_executable_writer_input_report(&ctx.manifest, &ctx.plan)?;
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_writer_input_emit_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_writer_input_emit_report(&report);
-            }
-        }
-        Command::VerifyFinalExecutableWriterInput { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_verify_final_executable_writer_input_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_writer_input_verify_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_writer_input_verify_report(&report);
-            }
-            if !report.valid {
-                return Err("nsld final executable writer input verification failed".to_owned());
-            }
-        }
-        Command::FinalExecutableHostDryRun { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_final_executable_host_dry_run_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_host_dry_run_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_host_dry_run_report(&report);
-            }
-        }
-        Command::FinalExecutableHostInvokePlan { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_final_executable_host_invoke_plan_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_host_invoke_plan_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_host_invoke_plan_report(&report);
-            }
-        }
-        Command::EmitFinalExecutableHostInvokePlan { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report =
-                nsld_emit_final_executable_host_invoke_plan_report(&ctx.manifest, &ctx.plan)?;
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_host_invoke_plan_emit_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_host_invoke_plan_emit_report(&report);
-            }
-        }
-        Command::VerifyFinalExecutableHostInvokePlan { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report =
-                nsld_verify_final_executable_host_invoke_plan_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_host_invoke_plan_verify_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_host_invoke_plan_verify_report(&report);
-            }
-            if !report.valid {
-                return Err("nsld final executable host invoke plan verification failed".to_owned());
-            }
-        }
-        Command::FinalExecutableLayout { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_final_executable_layout_plan_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!("{}", nsld_final_executable_layout_plan_report_json(&report));
-            } else {
-                print_nsld_final_executable_layout_plan_report(&report);
-            }
-        }
-        Command::EmitFinalExecutableLayout { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_emit_final_executable_layout_plan_report(&ctx.manifest, &ctx.plan)?;
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_layout_plan_emit_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_layout_plan_emit_report(&report);
-            }
-        }
-        Command::VerifyFinalExecutableLayout { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_verify_final_executable_layout_plan_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_layout_plan_verify_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_layout_plan_verify_report(&report);
-            }
-            if !report.valid {
-                return Err("nsld final executable layout verification failed".to_owned());
-            }
-        }
-        Command::FinalExecutableImageDryRun { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_final_executable_image_dry_run_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_image_dry_run_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_image_dry_run_report(&report);
-            }
-        }
-        Command::EmitFinalExecutableImageDryRun { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_emit_final_executable_image_dry_run_report(&ctx.manifest, &ctx.plan)?;
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_image_dry_run_emit_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_image_dry_run_emit_report(&report);
-            }
-        }
-        Command::VerifyFinalExecutableImageDryRun { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report =
-                nsld_verify_final_executable_image_dry_run_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!(
-                    "{}",
-                    nsld_final_executable_image_dry_run_verify_report_json(&report)
-                );
-            } else {
-                print_nsld_final_executable_image_dry_run_verify_report(&report);
-            }
-            if !report.valid {
-                return Err("nsld final executable image dry-run verification failed".to_owned());
-            }
-        }
-        Command::EmitFinalExecutable { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_emit_final_executable_report(&ctx.manifest, &ctx.plan)?;
-            if json {
-                println!("{}", nsld_final_executable_emit_report_json(&report));
-            } else {
-                print_nsld_final_executable_emit_report(&report);
-            }
-        }
-        Command::VerifyFinalExecutableEmit { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_verify_final_executable_emit_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!("{}", nsld_final_executable_emit_verify_report_json(&report));
-            } else {
-                print_nsld_final_executable_emit_verify_report(&report);
-            }
-            if !report.valid {
-                return Err("nsld final executable emit verification failed".to_owned());
-            }
-        }
-        Command::FinalExecutableOutput { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_final_executable_output_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!("{}", nsld_final_executable_output_report_json(&report));
-            } else {
-                print_nsld_final_executable_output_report(&report);
             }
         }
         Command::Prepare { input, json } => {

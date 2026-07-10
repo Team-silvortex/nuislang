@@ -23,7 +23,7 @@ If the example tree feels noisy, that is real. The current rule is:
 If you want the fastest route into the current repository spine:
 
 * [docs/current-mainline-map.md](../docs/current-mainline-map.md)
-* [docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md](../docs/versioning/nuis-alpha-0.4-doc-sync-inventory.md)
+* [docs/versioning/nuis-alpha-0.8-mainline-entry.md](../docs/versioning/nuis-alpha-0.8-mainline-entry.md)
 * [docs/examples-freshness-audit.md](../docs/examples-freshness-audit.md)
 * [examples/projects/README.md](projects/README.md)
 * [examples/ns/README.md](ns/README.md)
@@ -40,6 +40,7 @@ If you want the fastest route into the current repository spine:
   [examples/projects](projects)
   Start with:
   [window_controls_demo](projects/window_controls_demo),
+  [tooling/native_artifact_closure_demo](projects/tooling/native_artifact_closure_demo),
   [kernel_tensor_demo](projects/kernel_tensor_demo)
 * handwritten `YIR` anchors:
   [examples/yir](yir)
@@ -73,6 +74,13 @@ That means:
   exist
 * probe routes can stay in-tree when they still support active design or host
   validation docs, even if they are not current onboarding material
+
+Current alpha-0.8 reading rule:
+
+* use project examples first when testing the toolchain path
+* use source-level `.ns` examples when checking one language feature
+* use handwritten `YIR` examples when checking verifier/runtime/domain behavior
+* use build artifacts only as inspection fixtures, not as the source of truth
 
 ## Local Guides
 

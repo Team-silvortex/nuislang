@@ -8,22 +8,10 @@ use super::{
         nsld_verify_assemble_plan_report, nsld_verify_link_bundle_report,
         nsld_verify_section_manifest_report,
     },
-    closure::nsld_verify_closure_report,
-    container_pipeline::{
-        nsld_container_report, nsld_verify_container_plan_report, nsld_verify_container_report,
-    },
-    final_stage::{
-        nsld_final_executable_output_report, nsld_final_stage_plan_report,
-        nsld_verify_final_executable_emit_report,
-        nsld_verify_final_executable_host_invoke_plan_report,
-        nsld_verify_final_executable_image_dry_run_report,
-        nsld_verify_final_executable_layout_plan_report,
-        nsld_verify_final_executable_writer_input_report, nsld_verify_final_stage_plan_report,
-    },
-    link_units::{
-        nsld_domain_diagnostics, nsld_sidecar_capability_diagnostics,
-        nsld_verify_link_inputs_report, nsld_verify_link_units_report,
-    },
+    check_container::{nsld_check_container_snapshot, push_container_snapshot_issues},
+    check_core::{nsld_check_core_snapshot, push_optional_check_failure},
+    check_final::{nsld_check_final_snapshot, push_final_snapshot_issues},
+    link_units::{nsld_verify_link_inputs_report, nsld_verify_link_units_report},
     object_byte_layout::nsld_verify_object_byte_layout_report,
     object_emit::nsld_verify_object_emit_report,
     object_file_layout::nsld_verify_object_file_layout_report,
@@ -33,39 +21,14 @@ use super::{
     object_writer_input::{
         nsld_verify_object_writer_dry_run_report, nsld_verify_object_writer_input_report,
     },
-    reports::{NsldCheckReport, NsldClockEdgeDiagnostic, NsldDataSegmentDiagnostic},
+    reports::NsldCheckReport,
 };
 use std::path::Path;
 pub(crate) fn nsld_check_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldCheckReport {
-    let artifact_lowering_alignment_consistent = plan.artifact_lowering_alignment.consistent;
-    let artifact_lowering_alignment_mismatches = plan.artifact_lowering_alignment.mismatches;
-    let clock_protocol_valid = plan.clock_protocol.validation.valid;
-    let clock_protocol_issues = plan.clock_protocol.validation.issues.clone();
-    let hetero_calculate_valid = plan.hetero_calculate.validation.valid;
-    let hetero_calculate_issues = plan.hetero_calculate.validation.issues.clone();
-    let static_link = plan.hetero_calculate.static_link;
-    let lifecycle_driven = plan.hetero_calculate.lifecycle_driven;
-    let domains = nsld_domain_diagnostics(plan);
-    let sidecar_capabilities = nsld_sidecar_capability_diagnostics(plan);
-    let sidecar_capability_issues = sidecar_capabilities
-        .iter()
-        .flat_map(|capability| {
-            capability
-                .issues
-                .iter()
-                .map(|issue| {
-                    format!(
-                        "{}:{}: {}",
-                        capability.package_id, capability.domain_family, issue
-                    )
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect::<Vec<_>>();
-    let sidecar_capability_valid = sidecar_capability_issues.is_empty();
+    let core_snapshot = nsld_check_core_snapshot(plan);
     let link_input_table_path =
         nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::LinkInputs);
     let link_input_table_present = link_input_table_path.exists();
@@ -260,354 +223,16 @@ pub(crate) fn nsld_check_report(
         .as_ref()
         .map(|report| report.issues.clone())
         .unwrap_or_default();
-    let container_plan_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ContainerPlan);
-    let container_plan_present = container_plan_path.exists();
-    let container_plan_verify_report =
-        container_plan_present.then(|| nsld_verify_container_plan_report(manifest, plan));
-    let container_plan_valid = container_plan_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let container_plan_issues = container_plan_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let container_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::Container);
-    let container_present = container_path.exists();
-    let container_verify_report =
-        container_present.then(|| nsld_verify_container_report(manifest, plan));
-    let container_valid = container_verify_report.as_ref().map(|report| report.valid);
-    let container_issues = container_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let container_section_issues = container_verify_report
-        .as_ref()
-        .map(|report| report.container_section_issues.clone())
-        .unwrap_or_default();
-    let container_loader_symbol_issues = container_verify_report
-        .as_ref()
-        .map(|report| report.loader_symbol_issues.clone())
-        .unwrap_or_default();
-    let container_relocation_issues = container_verify_report
-        .as_ref()
-        .map(|report| report.relocation_issues.clone())
-        .unwrap_or_default();
-    let container_compatibility_domain_issues = container_verify_report
-        .as_ref()
-        .map(|report| report.compatibility_domain_issues.clone())
-        .unwrap_or_default();
-    let container_external_import_issues = container_verify_report
-        .as_ref()
-        .map(|report| report.external_import_issues.clone())
-        .unwrap_or_default();
-    let container_compatibility_domain_count = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_compatibility_domain_count);
-    let container_compatibility_domain_table_hash = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_compatibility_domain_table_hash.clone());
-    let container_compatibility_domain_id = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_compatibility_domain_id.clone());
-    let container_compatibility_domain_kind = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_compatibility_domain_kind.clone());
-    let container_compatibility_domain_paradigm = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_compatibility_domain_paradigm.clone());
-    let container_compatibility_domain_lifecycle_hook = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_compatibility_domain_lifecycle_hook.clone());
-    let container_compatibility_domain_abi_family = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_compatibility_domain_abi_family.clone());
-    let container_compatibility_domain_wrapper_policy = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_compatibility_domain_wrapper_policy.clone());
-    let container_compatibility_domain_required = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_compatibility_domain_required);
-    let container_native_object_section_present = container_verify_report
-        .as_ref()
-        .is_some_and(|report| report.actual_native_object_section_present);
-    let container_native_object_section_id = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_native_object_section_id.clone());
-    let container_native_object_loader_symbol_present = container_verify_report
-        .as_ref()
-        .is_some_and(|report| report.actual_native_object_loader_symbol_present);
-    let container_native_object_loader_symbol_id = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_native_object_loader_symbol_id.clone());
-    let container_native_object_relocation_present = container_verify_report
-        .as_ref()
-        .is_some_and(|report| report.actual_native_object_relocation_present);
-    let container_native_object_relocation_id = container_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_native_object_relocation_id.clone());
-    let expected_container_report =
-        container_present.then(|| nsld_container_report(manifest, plan));
-    let container_loader_readiness = expected_container_report
-        .as_ref()
-        .map(|report| report.loader_readiness.clone());
-    let container_loader_blockers = expected_container_report
-        .as_ref()
-        .map(|report| report.loader_blockers.clone())
-        .unwrap_or_default();
-    let container_metadata_table_hash = expected_container_report
-        .as_ref()
-        .map(|report| report.metadata_table_hash.clone());
-    let container_external_import_count = expected_container_report
-        .as_ref()
-        .map(|report| report.external_imports.len());
-    let container_payload_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ContainerPayload);
-    let container_payload_present = container_payload_path.exists();
-    let mut container_payload_issues = Vec::new();
-    if container_payload_present && !container_present {
-        container_payload_issues.push("container payload is present without container".to_owned());
-    }
-    if container_present && !container_payload_present {
-        container_payload_issues
-            .push("container payload is missing for present container".to_owned());
-    }
-    let closure_snapshot_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ClosureSnapshot);
-    let closure_snapshot_present = closure_snapshot_path.exists();
-    let closure_snapshot_verify_report =
-        closure_snapshot_present.then(|| nsld_verify_closure_report(manifest, plan));
-    let closure_snapshot_valid = closure_snapshot_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let closure_snapshot_issues = closure_snapshot_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let closure_snapshot_linker_contract_hash = closure_snapshot_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_linker_contract_hash.clone());
-    let closure_snapshot_container_hash = closure_snapshot_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_container_hash.clone());
-    let closure_snapshot_payload_size_bytes = closure_snapshot_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_payload_size_bytes);
-    let closure_snapshot_payload_hash = closure_snapshot_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_payload_hash.clone());
-    let final_stage_plan_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::FinalStagePlan);
-    let final_stage_plan_present = final_stage_plan_path.exists();
-    let final_stage_plan_verify_report =
-        final_stage_plan_present.then(|| nsld_verify_final_stage_plan_report(manifest, plan));
-    let final_stage_plan_valid = final_stage_plan_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let final_stage_plan_issues = final_stage_plan_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let expected_final_stage_plan_report =
-        final_stage_plan_present.then(|| nsld_final_stage_plan_report(manifest, plan));
-    let final_stage_plan_ready = expected_final_stage_plan_report
-        .as_ref()
-        .map(|report| report.ready);
-    let final_stage_plan_hash = expected_final_stage_plan_report
-        .as_ref()
-        .map(|report| report.plan_hash.clone());
-    let final_stage_plan_blocker_count = expected_final_stage_plan_report
-        .as_ref()
-        .map(|report| report.blockers.len());
-    let final_executable_writer_input_path = nsld_artifact_stage_kind_path(
-        &plan.output_dir,
-        NsldArtifactStageKind::FinalExecutableWriterInput,
-    );
-    let final_executable_writer_input_present = final_executable_writer_input_path.exists();
-    let final_executable_writer_input_verify_report = final_executable_writer_input_present
-        .then(|| nsld_verify_final_executable_writer_input_report(manifest, plan));
-    let final_executable_writer_input_valid = final_executable_writer_input_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let final_executable_writer_input_hash = final_executable_writer_input_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_writer_input_hash.clone());
-    let final_executable_writer_input_command_arg_count =
-        final_executable_writer_input_verify_report
-            .as_ref()
-            .and_then(|report| report.actual_command_arg_count);
-    let final_executable_writer_input_issues = final_executable_writer_input_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let final_executable_host_invoke_plan_path = nsld_artifact_stage_kind_path(
-        &plan.output_dir,
-        NsldArtifactStageKind::FinalExecutableHostInvokePlan,
-    );
-    let final_executable_host_invoke_plan_present = final_executable_host_invoke_plan_path.exists();
-    let final_executable_host_invoke_plan_verify_report = final_executable_host_invoke_plan_present
-        .then(|| nsld_verify_final_executable_host_invoke_plan_report(manifest, plan));
-    let final_executable_host_invoke_plan_valid = final_executable_host_invoke_plan_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let final_executable_host_invoke_plan_hash = final_executable_host_invoke_plan_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_invoke_plan_hash.clone());
-    let final_executable_host_invoke_plan_invocation_policy =
-        final_executable_host_invoke_plan_verify_report
-            .as_ref()
-            .and_then(|report| report.actual_invocation_policy.clone());
-    let final_executable_host_invoke_plan_requires_explicit_allow =
-        final_executable_host_invoke_plan_verify_report
-            .as_ref()
-            .and_then(|report| report.actual_requires_explicit_allow);
-    let final_executable_host_invoke_plan_explicit_allow_present =
-        final_executable_host_invoke_plan_verify_report
-            .as_ref()
-            .and_then(|report| report.actual_explicit_allow_present);
-    let final_executable_host_invoke_plan_would_invoke =
-        final_executable_host_invoke_plan_verify_report
-            .as_ref()
-            .and_then(|report| report.actual_would_invoke);
-    let final_executable_host_invoke_plan_blocker_count =
-        final_executable_host_invoke_plan_verify_report
-            .as_ref()
-            .and_then(|report| report.actual_blocker_count);
-    let final_executable_host_invoke_plan_issues = final_executable_host_invoke_plan_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let final_executable_layout_plan_path = nsld_artifact_stage_kind_path(
-        &plan.output_dir,
-        NsldArtifactStageKind::FinalExecutableLayoutPlan,
-    );
-    let final_executable_layout_plan_present = final_executable_layout_plan_path.exists();
-    let final_executable_layout_plan_verify_report = final_executable_layout_plan_present
-        .then(|| nsld_verify_final_executable_layout_plan_report(manifest, plan));
-    let final_executable_layout_plan_valid = final_executable_layout_plan_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let final_executable_layout_plan_hash = final_executable_layout_plan_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_layout_hash.clone());
-    let final_executable_layout_plan_payload_count = final_executable_layout_plan_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_payload_count);
-    let final_executable_layout_plan_issues = final_executable_layout_plan_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let final_executable_image_dry_run_path = nsld_artifact_stage_kind_path(
-        &plan.output_dir,
-        NsldArtifactStageKind::FinalExecutableImageDryRun,
-    );
-    let final_executable_image_dry_run_present = final_executable_image_dry_run_path.exists();
-    let final_executable_image_dry_run_verify_report = final_executable_image_dry_run_present
-        .then(|| nsld_verify_final_executable_image_dry_run_report(manifest, plan));
-    let final_executable_image_dry_run_valid = final_executable_image_dry_run_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let final_executable_image_dry_run_hash = final_executable_image_dry_run_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_image_hash.clone());
-    let final_executable_image_dry_run_size_bytes = final_executable_image_dry_run_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_image_size_bytes);
-    let final_executable_image_dry_run_issues = final_executable_image_dry_run_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let final_executable_blocked_path = nsld_artifact_stage_kind_path(
-        &plan.output_dir,
-        NsldArtifactStageKind::FinalExecutableBlocked,
-    );
-    let final_executable_blocked_present = final_executable_blocked_path.exists();
-    let final_executable_blocked_verify_report = final_executable_blocked_present
-        .then(|| nsld_verify_final_executable_emit_report(manifest, plan));
-    let final_executable_blocked_valid = final_executable_blocked_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let final_executable_blocked_emitted = final_executable_blocked_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_emitted);
-    let final_executable_blocked_plan_hash = final_executable_blocked_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_final_stage_plan_hash.clone());
-    let final_executable_blocked_blocker_count = final_executable_blocked_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_blocker_count);
-    let final_executable_blocked_issues = final_executable_blocked_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let final_executable_output_present = Path::new(&plan.final_stage.output_path).exists();
-    let final_executable_output_report = final_executable_output_present
-        .then(|| nsld_final_executable_output_report(manifest, plan));
-    let final_executable_output_size_bytes = final_executable_output_report
-        .as_ref()
-        .and_then(|report| report.size_bytes);
-    let final_executable_output_hash = final_executable_output_report
-        .as_ref()
-        .and_then(|report| report.output_hash.clone());
-    let final_executable_output_runnable_candidate = final_executable_output_report
-        .as_ref()
-        .map(|report| report.runnable_candidate);
-    let final_executable_output_blocker_count = final_executable_output_report
-        .as_ref()
-        .map(|report| report.blockers.len());
-    let final_executable_output_issues = final_executable_output_report
-        .as_ref()
-        .map(|report| {
-            let mut issues = report.issues.clone();
-            if !report.runnable_candidate {
-                issues.extend(
-                    report
-                        .blockers
-                        .iter()
-                        .map(|blocker| format!("final-executable-output:{blocker}")),
-                );
-            }
-            issues
-        })
-        .unwrap_or_default();
+    let container_snapshot = nsld_check_container_snapshot(manifest, plan);
+    let final_snapshot = nsld_check_final_snapshot(manifest, plan);
     let artifact_chain_issues = nsld_artifact_chain_issues(&nsld_artifact_stages_for_plan(plan));
     let artifact_chain_valid = artifact_chain_issues.is_empty();
-    let clock_edges = plan
-        .clock_protocol
-        .edges
-        .iter()
-        .map(|edge| NsldClockEdgeDiagnostic {
-            index: edge.index,
-            from: edge.from.clone(),
-            to: edge.to.clone(),
-            relation: edge.relation.clone(),
-            source: edge.source.clone(),
-        })
-        .collect::<Vec<_>>();
-    let data_segments = plan
-        .hetero_calculate
-        .data_segments
-        .iter()
-        .map(|segment| NsldDataSegmentDiagnostic {
-            index: segment.index,
-            segment_id: segment.segment_id.clone(),
-            domain_family: segment.domain_family.clone(),
-            owner_package: segment.owner_package.clone(),
-            order_key: segment.order_key.clone(),
-            access_phase: segment.access_phase.clone(),
-            source_path: segment
-                .source_path
-                .clone()
-                .unwrap_or_else(|| "none".to_owned()),
-        })
-        .collect::<Vec<_>>();
     let mut issues = Vec::new();
 
-    if !artifact_lowering_alignment_consistent {
+    if !core_snapshot.artifact_lowering_alignment_consistent {
         issues.push(format!(
             "artifact lowering alignment has {} mismatch(es)",
-            artifact_lowering_alignment_mismatches
+            core_snapshot.artifact_lowering_alignment_mismatches
         ));
         for check in &plan.artifact_lowering_alignment.checks {
             for issue in &check.issues {
@@ -618,124 +243,96 @@ pub(crate) fn nsld_check_report(
             }
         }
     }
-    if !clock_protocol_valid {
+    if !core_snapshot.clock_protocol_valid {
         issues.push("clock protocol validation failed".to_owned());
-        issues.extend(clock_protocol_issues.iter().cloned());
+        issues.extend(core_snapshot.clock_protocol_issues.iter().cloned());
     }
-    if !hetero_calculate_valid {
+    if !core_snapshot.hetero_calculate_valid {
         issues.push("hetero calculate validation failed".to_owned());
-        issues.extend(hetero_calculate_issues.iter().cloned());
+        issues.extend(core_snapshot.hetero_calculate_issues.iter().cloned());
     }
-    if !static_link {
+    if !core_snapshot.static_link {
         issues.push("hetero calculate plan is not static-link".to_owned());
     }
-    if !lifecycle_driven {
+    if !core_snapshot.lifecycle_driven {
         issues.push("hetero calculate plan is not lifecycle-driven".to_owned());
     }
-    if !sidecar_capability_valid {
+    if !core_snapshot.sidecar_capability_valid {
         issues.push("sidecar capability validation failed".to_owned());
-        issues.extend(sidecar_capability_issues.iter().cloned());
+        issues.extend(core_snapshot.sidecar_capability_issues.iter().cloned());
     }
-    if link_input_table_valid == Some(false) {
-        issues.push("link input table verification failed".to_owned());
-        issues.extend(link_input_table_issues.iter().cloned());
+    macro_rules! push_failure {
+        ($valid:expr, $headline:literal, $details:expr) => {
+            push_optional_check_failure(&mut issues, $valid, $headline, $details);
+        };
     }
-    if link_unit_table_valid == Some(false) {
-        issues.push("link unit table verification failed".to_owned());
-        issues.extend(link_unit_table_issues.iter().cloned());
-    }
-    if link_bundle_valid == Some(false) {
-        issues.push("link bundle verification failed".to_owned());
-        issues.extend(link_bundle_issues.iter().cloned());
-    }
-    if assemble_plan_valid == Some(false) {
-        issues.push("assemble plan verification failed".to_owned());
-        issues.extend(assemble_plan_issues.iter().cloned());
-    }
-    if section_manifest_valid == Some(false) {
-        issues.push("section manifest verification failed".to_owned());
-        issues.extend(section_manifest_issues.iter().cloned());
-    }
-    if object_plan_valid == Some(false) {
-        issues.push("object plan verification failed".to_owned());
-        issues.extend(object_plan_issues.iter().cloned());
-    }
-    if object_writer_input_valid == Some(false) {
-        issues.push("object writer input verification failed".to_owned());
-        issues.extend(object_writer_input_issues.iter().cloned());
-    }
-    if object_byte_layout_valid == Some(false) {
-        issues.push("object byte layout verification failed".to_owned());
-        issues.extend(object_byte_layout_issues.iter().cloned());
-    }
-    if object_file_layout_valid == Some(false) {
-        issues.push("object file layout verification failed".to_owned());
-        issues.extend(object_file_layout_issues.iter().cloned());
-    }
-    if object_image_dry_run_valid == Some(false) {
-        issues.push("object image dry-run verification failed".to_owned());
-        issues.extend(object_image_dry_run_issues.iter().cloned());
-    }
-    if object_emit_blocked_valid == Some(false) {
-        issues.push("object emit blocked report verification failed".to_owned());
-        issues.extend(object_emit_blocked_issues.iter().cloned());
-    }
-    if object_output_valid == Some(false) {
-        issues.push("object output verification failed".to_owned());
-        issues.extend(object_output_issues.iter().cloned());
-    }
-    if object_writer_dry_run_valid == Some(false) {
-        issues.push("object writer dry-run verification failed".to_owned());
-        issues.extend(object_writer_dry_run_issues.iter().cloned());
-    }
-    if container_plan_valid == Some(false) {
-        issues.push("container plan verification failed".to_owned());
-        issues.extend(container_plan_issues.iter().cloned());
-    }
-    if container_valid == Some(false) {
-        issues.push("container verification failed".to_owned());
-        issues.extend(container_issues.iter().cloned());
-    }
-    if container_loader_readiness.as_deref() == Some("blocked") {
-        issues.push("container loader readiness is blocked".to_owned());
-        issues.extend(container_loader_blockers.iter().cloned());
-    }
-    if !container_payload_issues.is_empty() {
-        issues.push("container payload state is inconsistent".to_owned());
-        issues.extend(container_payload_issues.iter().cloned());
-    }
-    if closure_snapshot_valid == Some(false) {
-        issues.push("closure snapshot verification failed".to_owned());
-        issues.extend(closure_snapshot_issues.iter().cloned());
-    }
-    if final_stage_plan_valid == Some(false) {
-        issues.push("final-stage plan verification failed".to_owned());
-        issues.extend(final_stage_plan_issues.iter().cloned());
-    }
-    if final_executable_writer_input_valid == Some(false) {
-        issues.push("final executable writer input verification failed".to_owned());
-        issues.extend(final_executable_writer_input_issues.iter().cloned());
-    }
-    if final_executable_host_invoke_plan_valid == Some(false) {
-        issues.push("final executable host invoke plan verification failed".to_owned());
-        issues.extend(final_executable_host_invoke_plan_issues.iter().cloned());
-    }
-    if final_executable_layout_plan_valid == Some(false) {
-        issues.push("final executable layout plan verification failed".to_owned());
-        issues.extend(final_executable_layout_plan_issues.iter().cloned());
-    }
-    if final_executable_image_dry_run_valid == Some(false) {
-        issues.push("final executable image dry-run verification failed".to_owned());
-        issues.extend(final_executable_image_dry_run_issues.iter().cloned());
-    }
-    if final_executable_blocked_valid == Some(false) {
-        issues.push("final executable blocked report verification failed".to_owned());
-        issues.extend(final_executable_blocked_issues.iter().cloned());
-    }
-    if final_executable_output_runnable_candidate == Some(false) {
-        issues.push("final executable output verification failed".to_owned());
-        issues.extend(final_executable_output_issues.iter().cloned());
-    }
+    push_failure!(
+        link_input_table_valid,
+        "link input table verification failed",
+        &link_input_table_issues
+    );
+    push_failure!(
+        link_unit_table_valid,
+        "link unit table verification failed",
+        &link_unit_table_issues
+    );
+    push_failure!(
+        link_bundle_valid,
+        "link bundle verification failed",
+        &link_bundle_issues
+    );
+    push_failure!(
+        assemble_plan_valid,
+        "assemble plan verification failed",
+        &assemble_plan_issues
+    );
+    push_failure!(
+        section_manifest_valid,
+        "section manifest verification failed",
+        &section_manifest_issues
+    );
+    push_failure!(
+        object_plan_valid,
+        "object plan verification failed",
+        &object_plan_issues
+    );
+    push_failure!(
+        object_writer_input_valid,
+        "object writer input verification failed",
+        &object_writer_input_issues
+    );
+    push_failure!(
+        object_byte_layout_valid,
+        "object byte layout verification failed",
+        &object_byte_layout_issues
+    );
+    push_failure!(
+        object_file_layout_valid,
+        "object file layout verification failed",
+        &object_file_layout_issues
+    );
+    push_failure!(
+        object_image_dry_run_valid,
+        "object image dry-run verification failed",
+        &object_image_dry_run_issues
+    );
+    push_failure!(
+        object_emit_blocked_valid,
+        "object emit blocked report verification failed",
+        &object_emit_blocked_issues
+    );
+    push_failure!(
+        object_output_valid,
+        "object output verification failed",
+        &object_output_issues
+    );
+    push_failure!(
+        object_writer_dry_run_valid,
+        "object writer dry-run verification failed",
+        &object_writer_dry_run_issues
+    );
+    push_container_snapshot_issues(&mut issues, &container_snapshot);
+    push_final_snapshot_issues(&mut issues, &final_snapshot);
     if !artifact_chain_valid {
         issues.push("nsld artifact chain is incomplete".to_owned());
         issues.extend(artifact_chain_issues.iter().cloned());
@@ -754,33 +351,38 @@ pub(crate) fn nsld_check_report(
     let checks = checks + usize::from(object_emit_blocked_present);
     let checks = checks + usize::from(object_output_present);
     let checks = checks + usize::from(object_writer_dry_run_present);
-    let checks = checks + usize::from(container_plan_present);
-    let checks = checks + usize::from(container_present);
-    let checks = checks + usize::from(container_present || container_payload_present);
-    let checks = checks + usize::from(closure_snapshot_present);
-    let checks = checks + usize::from(final_stage_plan_present);
-    let checks = checks + usize::from(final_executable_writer_input_present);
-    let checks = checks + usize::from(final_executable_host_invoke_plan_present);
-    let checks = checks + usize::from(final_executable_layout_plan_present);
-    let checks = checks + usize::from(final_executable_image_dry_run_present);
-    let checks = checks + usize::from(final_executable_blocked_present);
-    let checks = checks + usize::from(final_executable_output_present);
+    let checks = checks + usize::from(container_snapshot.container_plan_present);
+    let checks = checks + usize::from(container_snapshot.container_present);
+    let checks = checks
+        + usize::from(
+            container_snapshot.container_present || container_snapshot.container_payload_present,
+        );
+    let checks = checks + usize::from(container_snapshot.closure_snapshot_present);
+    let checks = checks + usize::from(final_snapshot.final_stage_plan_present);
+    let checks = checks + usize::from(final_snapshot.final_executable_writer_input_present);
+    let checks = checks + usize::from(final_snapshot.final_executable_host_invoke_plan_present);
+    let checks = checks + usize::from(final_snapshot.final_executable_layout_plan_present);
+    let checks = checks + usize::from(final_snapshot.final_executable_image_dry_run_present);
+    let checks = checks + usize::from(final_snapshot.final_executable_blocked_present);
+    let checks = checks + usize::from(final_snapshot.final_executable_output_present);
     let failures = issues.len();
     NsldCheckReport {
         manifest: manifest.display().to_string(),
         valid: failures == 0,
         checks,
         failures,
-        artifact_lowering_alignment_consistent,
-        artifact_lowering_alignment_mismatches,
-        clock_protocol_valid,
-        clock_protocol_issues,
-        hetero_calculate_valid,
-        hetero_calculate_issues,
-        static_link,
-        lifecycle_driven,
-        sidecar_capability_valid,
-        sidecar_capability_issues,
+        artifact_lowering_alignment_consistent: core_snapshot
+            .artifact_lowering_alignment_consistent,
+        artifact_lowering_alignment_mismatches: core_snapshot
+            .artifact_lowering_alignment_mismatches,
+        clock_protocol_valid: core_snapshot.clock_protocol_valid,
+        clock_protocol_issues: core_snapshot.clock_protocol_issues.clone(),
+        hetero_calculate_valid: core_snapshot.hetero_calculate_valid,
+        hetero_calculate_issues: core_snapshot.hetero_calculate_issues.clone(),
+        static_link: core_snapshot.static_link,
+        lifecycle_driven: core_snapshot.lifecycle_driven,
+        sidecar_capability_valid: core_snapshot.sidecar_capability_valid,
+        sidecar_capability_issues: core_snapshot.sidecar_capability_issues.clone(),
         link_input_table_present,
         link_input_table_valid,
         link_input_table_issues,
@@ -832,94 +434,123 @@ pub(crate) fn nsld_check_report(
         object_writer_dry_run_present,
         object_writer_dry_run_valid,
         object_writer_dry_run_issues,
-        container_plan_present,
-        container_plan_valid,
-        container_plan_issues,
-        container_present,
-        container_valid,
-        container_issues,
-        container_section_issues,
-        container_loader_symbol_issues,
-        container_relocation_issues,
-        container_compatibility_domain_issues,
-        container_external_import_issues,
-        container_payload_present,
-        container_payload_issues,
-        closure_snapshot_present,
-        closure_snapshot_valid,
-        closure_snapshot_issues,
-        closure_snapshot_linker_contract_hash,
-        closure_snapshot_container_hash,
-        closure_snapshot_payload_size_bytes,
-        closure_snapshot_payload_hash,
-        final_stage_plan_present,
-        final_stage_plan_valid,
-        final_stage_plan_ready,
-        final_stage_plan_hash,
-        final_stage_plan_blocker_count,
-        final_stage_plan_issues,
-        final_executable_writer_input_present,
-        final_executable_writer_input_valid,
-        final_executable_writer_input_hash,
-        final_executable_writer_input_command_arg_count,
-        final_executable_writer_input_issues,
-        final_executable_host_invoke_plan_present,
-        final_executable_host_invoke_plan_valid,
-        final_executable_host_invoke_plan_hash,
-        final_executable_host_invoke_plan_invocation_policy,
-        final_executable_host_invoke_plan_requires_explicit_allow,
-        final_executable_host_invoke_plan_explicit_allow_present,
-        final_executable_host_invoke_plan_would_invoke,
-        final_executable_host_invoke_plan_blocker_count,
-        final_executable_host_invoke_plan_issues,
-        final_executable_layout_plan_present,
-        final_executable_layout_plan_valid,
-        final_executable_layout_plan_hash,
-        final_executable_layout_plan_payload_count,
-        final_executable_layout_plan_issues,
-        final_executable_image_dry_run_present,
-        final_executable_image_dry_run_valid,
-        final_executable_image_dry_run_hash,
-        final_executable_image_dry_run_size_bytes,
-        final_executable_image_dry_run_issues,
-        final_executable_blocked_present,
-        final_executable_blocked_valid,
-        final_executable_blocked_emitted,
-        final_executable_blocked_plan_hash,
-        final_executable_blocked_blocker_count,
-        final_executable_blocked_issues,
-        final_executable_output_present,
-        final_executable_output_size_bytes,
-        final_executable_output_hash,
-        final_executable_output_runnable_candidate,
-        final_executable_output_blocker_count,
-        final_executable_output_issues,
-        container_loader_readiness,
-        container_loader_blockers,
-        container_metadata_table_hash,
-        container_compatibility_domain_count,
-        container_compatibility_domain_table_hash,
-        container_compatibility_domain_id,
-        container_compatibility_domain_kind,
-        container_compatibility_domain_paradigm,
-        container_compatibility_domain_lifecycle_hook,
-        container_compatibility_domain_abi_family,
-        container_compatibility_domain_wrapper_policy,
-        container_compatibility_domain_required,
-        container_external_import_count,
-        container_native_object_section_present,
-        container_native_object_section_id,
-        container_native_object_loader_symbol_present,
-        container_native_object_loader_symbol_id,
-        container_native_object_relocation_present,
-        container_native_object_relocation_id,
+        container_plan_present: container_snapshot.container_plan_present,
+        container_plan_valid: container_snapshot.container_plan_valid,
+        container_plan_issues: container_snapshot.container_plan_issues,
+        container_present: container_snapshot.container_present,
+        container_valid: container_snapshot.container_valid,
+        container_issues: container_snapshot.container_issues,
+        container_section_issues: container_snapshot.container_section_issues,
+        container_loader_symbol_issues: container_snapshot.container_loader_symbol_issues,
+        container_relocation_issues: container_snapshot.container_relocation_issues,
+        container_compatibility_domain_issues: container_snapshot
+            .container_compatibility_domain_issues,
+        container_external_import_issues: container_snapshot.container_external_import_issues,
+        container_payload_present: container_snapshot.container_payload_present,
+        container_payload_issues: container_snapshot.container_payload_issues,
+        closure_snapshot_present: container_snapshot.closure_snapshot_present,
+        closure_snapshot_valid: container_snapshot.closure_snapshot_valid,
+        closure_snapshot_issues: container_snapshot.closure_snapshot_issues,
+        closure_snapshot_linker_contract_hash: container_snapshot
+            .closure_snapshot_linker_contract_hash,
+        closure_snapshot_container_hash: container_snapshot.closure_snapshot_container_hash,
+        closure_snapshot_payload_size_bytes: container_snapshot.closure_snapshot_payload_size_bytes,
+        closure_snapshot_payload_hash: container_snapshot.closure_snapshot_payload_hash,
+        final_stage_plan_present: final_snapshot.final_stage_plan_present,
+        final_stage_plan_valid: final_snapshot.final_stage_plan_valid,
+        final_stage_plan_ready: final_snapshot.final_stage_plan_ready,
+        final_stage_plan_hash: final_snapshot.final_stage_plan_hash,
+        final_stage_plan_blocker_count: final_snapshot.final_stage_plan_blocker_count,
+        final_stage_plan_issues: final_snapshot.final_stage_plan_issues,
+        final_executable_writer_input_present: final_snapshot.final_executable_writer_input_present,
+        final_executable_writer_input_valid: final_snapshot.final_executable_writer_input_valid,
+        final_executable_writer_input_hash: final_snapshot.final_executable_writer_input_hash,
+        final_executable_writer_input_command_arg_count: final_snapshot
+            .final_executable_writer_input_command_arg_count,
+        final_executable_writer_input_issues: final_snapshot.final_executable_writer_input_issues,
+        final_executable_host_invoke_plan_present: final_snapshot
+            .final_executable_host_invoke_plan_present,
+        final_executable_host_invoke_plan_valid: final_snapshot
+            .final_executable_host_invoke_plan_valid,
+        final_executable_host_invoke_plan_hash: final_snapshot
+            .final_executable_host_invoke_plan_hash,
+        final_executable_host_invoke_plan_invocation_policy: final_snapshot
+            .final_executable_host_invoke_plan_invocation_policy,
+        final_executable_host_invoke_plan_requires_explicit_allow: final_snapshot
+            .final_executable_host_invoke_plan_requires_explicit_allow,
+        final_executable_host_invoke_plan_explicit_allow_present: final_snapshot
+            .final_executable_host_invoke_plan_explicit_allow_present,
+        final_executable_host_invoke_plan_would_invoke: final_snapshot
+            .final_executable_host_invoke_plan_would_invoke,
+        final_executable_host_invoke_plan_blocker_count: final_snapshot
+            .final_executable_host_invoke_plan_blocker_count,
+        final_executable_host_invoke_plan_issues: final_snapshot
+            .final_executable_host_invoke_plan_issues,
+        final_executable_layout_plan_present: final_snapshot.final_executable_layout_plan_present,
+        final_executable_layout_plan_valid: final_snapshot.final_executable_layout_plan_valid,
+        final_executable_layout_plan_hash: final_snapshot.final_executable_layout_plan_hash,
+        final_executable_layout_plan_payload_count: final_snapshot
+            .final_executable_layout_plan_payload_count,
+        final_executable_layout_plan_issues: final_snapshot.final_executable_layout_plan_issues,
+        final_executable_image_dry_run_present: final_snapshot
+            .final_executable_image_dry_run_present,
+        final_executable_image_dry_run_valid: final_snapshot.final_executable_image_dry_run_valid,
+        final_executable_image_dry_run_hash: final_snapshot.final_executable_image_dry_run_hash,
+        final_executable_image_dry_run_size_bytes: final_snapshot
+            .final_executable_image_dry_run_size_bytes,
+        final_executable_image_dry_run_issues: final_snapshot.final_executable_image_dry_run_issues,
+        final_executable_blocked_present: final_snapshot.final_executable_blocked_present,
+        final_executable_blocked_valid: final_snapshot.final_executable_blocked_valid,
+        final_executable_blocked_emitted: final_snapshot.final_executable_blocked_emitted,
+        final_executable_blocked_plan_hash: final_snapshot.final_executable_blocked_plan_hash,
+        final_executable_blocked_blocker_count: final_snapshot
+            .final_executable_blocked_blocker_count,
+        final_executable_blocked_issues: final_snapshot.final_executable_blocked_issues,
+        final_executable_output_present: final_snapshot.final_executable_output_present,
+        final_executable_output_size_bytes: final_snapshot.final_executable_output_size_bytes,
+        final_executable_output_hash: final_snapshot.final_executable_output_hash,
+        final_executable_output_runnable_candidate: final_snapshot
+            .final_executable_output_runnable_candidate,
+        final_executable_output_blocker_count: final_snapshot.final_executable_output_blocker_count,
+        final_executable_output_issues: final_snapshot.final_executable_output_issues,
+        container_loader_readiness: container_snapshot.container_loader_readiness,
+        container_loader_blockers: container_snapshot.container_loader_blockers,
+        container_metadata_table_hash: container_snapshot.container_metadata_table_hash,
+        container_compatibility_domain_count: container_snapshot
+            .container_compatibility_domain_count,
+        container_compatibility_domain_table_hash: container_snapshot
+            .container_compatibility_domain_table_hash,
+        container_compatibility_domain_id: container_snapshot.container_compatibility_domain_id,
+        container_compatibility_domain_kind: container_snapshot.container_compatibility_domain_kind,
+        container_compatibility_domain_paradigm: container_snapshot
+            .container_compatibility_domain_paradigm,
+        container_compatibility_domain_lifecycle_hook: container_snapshot
+            .container_compatibility_domain_lifecycle_hook,
+        container_compatibility_domain_abi_family: container_snapshot
+            .container_compatibility_domain_abi_family,
+        container_compatibility_domain_wrapper_policy: container_snapshot
+            .container_compatibility_domain_wrapper_policy,
+        container_compatibility_domain_required: container_snapshot
+            .container_compatibility_domain_required,
+        container_external_import_count: container_snapshot.container_external_import_count,
+        container_native_object_section_present: container_snapshot
+            .container_native_object_section_present,
+        container_native_object_section_id: container_snapshot.container_native_object_section_id,
+        container_native_object_loader_symbol_present: container_snapshot
+            .container_native_object_loader_symbol_present,
+        container_native_object_loader_symbol_id: container_snapshot
+            .container_native_object_loader_symbol_id,
+        container_native_object_relocation_present: container_snapshot
+            .container_native_object_relocation_present,
+        container_native_object_relocation_id: container_snapshot
+            .container_native_object_relocation_id,
         artifact_chain_valid,
         artifact_chain_issues,
         final_stage_link_mode: plan.final_stage.link_mode.clone(),
-        domains,
-        sidecar_capabilities,
-        clock_edges,
-        data_segments,
+        domains: core_snapshot.domains,
+        sidecar_capabilities: core_snapshot.sidecar_capabilities,
+        clock_edges: core_snapshot.clock_edges,
+        data_segments: core_snapshot.data_segments,
         issues,
     }
 }

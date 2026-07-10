@@ -72,8 +72,12 @@ At the current repo stage:
   module set yet, because many current stdlib recipe assets still collide on
   repeated bindings such as `mod cpu Main`
 * the live implementation focus is still on `nuis / nuisc / YIR / nustar`
-* but `stdlib` is no longer empty scaffolding; all four layers now carry real
+* but `stdlib` is no longer empty scaffolding; all five layers now carry real
   checked-in `.ns` assets
+* for the `alpha-0.8.*` line, `std`, PixelMagic, and WitSage are the practical
+  proving surfaces for buildable CLI/tooling, image/resource, and kernel-facing
+  classical ML contracts before `ns-nova` grows into a larger GUI/framework
+  layer
 
 Asset view by layer:
 
@@ -142,6 +146,16 @@ Current boundaries:
   shader/kernel cooperation
 * `ns-nova` remains deliberately later-stage because it depends on the lower
   AOT, library, shader, kernel, and future runtime layers
+
+Current alpha-0.8 priority order:
+
+1. keep `core` and `std` contracts buildable and boring
+2. keep filesystem, IO, text, result/error, benchmark, network, and host helpers
+   useful for real CLI examples
+3. use PixelMagic to pressure shader/resource/image handoff contracts
+4. use WitSage to pressure kernel/classical-ML artifact contracts
+5. let `ns-nova` stay mostly contract/source-asset oriented until the lower
+   AOT and official Galaxy layers are less soft
 
 ## Read In This Order
 
