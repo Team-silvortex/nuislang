@@ -47,6 +47,31 @@ pub(crate) fn nsld_artifact_chain_report_json(report: &NsldArtifactChainReport) 
             "next_optional_command_reason",
             report.next_optional_command_reason.as_deref(),
         ),
+        json_optional_string_field("advisory_command_id", report.advisory_command_id.as_deref()),
+        json_optional_string_field("advisory_command", report.advisory_command.as_deref()),
+        json_optional_string_field(
+            "advisory_command_resolved",
+            report.advisory_command_resolved.as_deref(),
+        ),
+        json_optional_string_field(
+            "advisory_command_reason",
+            report.advisory_command_reason.as_deref(),
+        ),
+        json_optional_string_field(
+            "next_action_command_id",
+            report.next_action_command_id.as_deref(),
+        ),
+        json_optional_string_field("next_action_command", report.next_action_command.as_deref()),
+        json_optional_string_field(
+            "next_action_command_resolved",
+            report.next_action_command_resolved.as_deref(),
+        ),
+        json_optional_string_field(
+            "next_action_command_reason",
+            report.next_action_command_reason.as_deref(),
+        ),
+        json_optional_string_field("next_action_source", report.next_action_source.as_deref()),
+        json_bool_field("next_action_available", report.next_action_available),
         format!(
             "\"stages\":[{}]",
             artifact_chain_stage_diagnostics_json(&report.stages)

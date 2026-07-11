@@ -1,6 +1,12 @@
-use super::reports::{NsldArtifactChainReport, NsldArtifactStageDiagnostic};
+use super::{
+    artifact_chain_actions::nsld_artifact_chain_action_plan,
+    reports::{NsldArtifactChainReport, NsldArtifactStageDiagnostic},
+};
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+#[path = "main_artifact_chain_next_action_tests.rs"]
+mod next_action_tests;
 #[cfg(test)]
 #[path = "main_artifact_chain_tests.rs"]
 mod tests;
@@ -275,51 +281,6 @@ pub(crate) fn nsld_artifact_stage_id(kind: NsldArtifactStageKind) -> &'static st
     }
 }
 
-pub(crate) fn nsld_artifact_stage_suggested_command(kind: NsldArtifactStageKind) -> &'static str {
-    match kind {
-        NsldArtifactStageKind::LinkInputs => "emit-inputs",
-        NsldArtifactStageKind::LinkUnits => "emit-units",
-        NsldArtifactStageKind::LinkBundle => "emit-bundle",
-        NsldArtifactStageKind::AssemblePlan => "emit-assemble-plan",
-        NsldArtifactStageKind::SectionManifest => "emit-section-manifest",
-        NsldArtifactStageKind::ObjectPlan => "emit-object-plan",
-        NsldArtifactStageKind::ObjectWriterInput
-        | NsldArtifactStageKind::ObjectImageDryRunBytes
-        | NsldArtifactStageKind::ContainerPayload => "prepare",
-        NsldArtifactStageKind::ObjectByteLayout => "emit-object-byte-layout",
-        NsldArtifactStageKind::ObjectFileLayout => "emit-object-file-layout",
-        NsldArtifactStageKind::ObjectImageDryRun => "emit-object-image-dry-run",
-        NsldArtifactStageKind::ObjectEmitBlocked => "emit-object",
-        NsldArtifactStageKind::ObjectOutput => "emit-object",
-        NsldArtifactStageKind::ObjectWriterDryRun => "emit-object-writer-dry-run",
-        NsldArtifactStageKind::ContainerPlan => "emit-container-plan",
-        NsldArtifactStageKind::Container => "emit-container",
-        NsldArtifactStageKind::ClosureSnapshot => "emit-closure",
-        NsldArtifactStageKind::FinalStagePlan
-        | NsldArtifactStageKind::FinalExecutableWriterInput
-        | NsldArtifactStageKind::FinalExecutableHostInvokePlan
-        | NsldArtifactStageKind::FinalExecutableLayoutPlan
-        | NsldArtifactStageKind::FinalExecutableBlocked
-        | NsldArtifactStageKind::FinalExecutableOutput
-        | NsldArtifactStageKind::FinalExecutableLauncherManifest
-        | NsldArtifactStageKind::FinalExecutableLauncherDryRun
-        | NsldArtifactStageKind::FinalExecutablePipeline => "emit-final-executable-pipeline",
-        NsldArtifactStageKind::FinalExecutableImageDryRun
-        | NsldArtifactStageKind::FinalExecutableImageDryRunBytes => {
-            "emit-final-executable-pipeline"
-        }
-    }
-}
-
-pub(crate) fn nsld_artifact_stage_suggested_command_template(
-    kind: NsldArtifactStageKind,
-) -> String {
-    format!(
-        "nsld {} <input>",
-        nsld_artifact_stage_suggested_command(kind)
-    )
-}
-
 pub(crate) fn nsld_artifact_stage_kind_path(
     output_dir: impl AsRef<Path>,
     kind: NsldArtifactStageKind,
@@ -479,37 +440,12 @@ pub(crate) fn nsld_artifact_chain_report(
     let first_missing_required = stages.iter().find(|stage| stage.required && !stage.present);
     let first_missing_required_stage =
         first_missing_required.map(|stage| nsld_artifact_stage_id(stage.kind).to_owned());
-    let next_required_stage = first_missing_required_stage.clone();
-    let suggested_command_id = first_missing_required
-        .map(|stage| nsld_artifact_stage_suggested_command(stage.kind).to_owned());
-    let suggested_command = first_missing_required
-        .map(|stage| nsld_artifact_stage_suggested_command_template(stage.kind));
-    let suggested_command_resolved = suggested_command
-        .as_ref()
-        .map(|command| command.replace("<input>", &manifest.display().to_string()));
-    let suggested_command_reason = first_missing_required_stage
-        .as_ref()
-        .map(|stage_id| format!("first missing required artifact stage `{stage_id}`"));
-    let first_missing_optional = first_missing_required
-        .is_none()
-        .then(|| {
-            stages
-                .iter()
-                .find(|stage| !stage.required && !stage.present)
-        })
-        .flatten();
-    let next_optional_stage =
-        first_missing_optional.map(|stage| nsld_artifact_stage_id(stage.kind).to_owned());
-    let next_optional_command_id = first_missing_optional
-        .map(|stage| nsld_artifact_stage_suggested_command(stage.kind).to_owned());
-    let next_optional_command = first_missing_optional
-        .map(|stage| nsld_artifact_stage_suggested_command_template(stage.kind));
-    let next_optional_command_resolved = next_optional_command
-        .as_ref()
-        .map(|command| command.replace("<input>", &manifest.display().to_string()));
-    let next_optional_command_reason = next_optional_stage
-        .as_ref()
-        .map(|stage_id| format!("first missing optional artifact stage `{stage_id}`"));
+    let action_plan = nsld_artifact_chain_action_plan(
+        manifest,
+        &stages,
+        first_missing_required_stage.clone(),
+        &advisories,
+    );
 
     NsldArtifactChainReport {
         manifest: manifest.display().to_string(),
@@ -521,16 +457,26 @@ pub(crate) fn nsld_artifact_chain_report(
         missing_required_count,
         optional_present_count,
         first_missing_required_stage,
-        next_required_stage,
-        suggested_command_id,
-        suggested_command,
-        suggested_command_resolved,
-        suggested_command_reason,
-        next_optional_stage,
-        next_optional_command_id,
-        next_optional_command,
-        next_optional_command_resolved,
-        next_optional_command_reason,
+        next_required_stage: action_plan.next_required_stage,
+        suggested_command_id: action_plan.suggested_command_id,
+        suggested_command: action_plan.suggested_command,
+        suggested_command_resolved: action_plan.suggested_command_resolved,
+        suggested_command_reason: action_plan.suggested_command_reason,
+        next_optional_stage: action_plan.next_optional_stage,
+        next_optional_command_id: action_plan.next_optional_command_id,
+        next_optional_command: action_plan.next_optional_command,
+        next_optional_command_resolved: action_plan.next_optional_command_resolved,
+        next_optional_command_reason: action_plan.next_optional_command_reason,
+        advisory_command_id: action_plan.advisory_command_id,
+        advisory_command: action_plan.advisory_command,
+        advisory_command_resolved: action_plan.advisory_command_resolved,
+        advisory_command_reason: action_plan.advisory_command_reason,
+        next_action_command_id: action_plan.next_action_command_id,
+        next_action_command: action_plan.next_action_command,
+        next_action_command_resolved: action_plan.next_action_command_resolved,
+        next_action_command_reason: action_plan.next_action_command_reason,
+        next_action_source: action_plan.next_action_source,
+        next_action_available: action_plan.next_action_available,
         stages: diagnostics,
         advisories,
         issues,

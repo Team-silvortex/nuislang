@@ -15,6 +15,22 @@ pub(crate) fn check_report_json(report: &NsldCheckReport) -> String {
         json_bool_field("valid", report.valid),
         json_usize_field("checks", report.checks),
         json_usize_field("failures", report.failures),
+        json_usize_field("advisory_count", report.advisory_count),
+        json_optional_string_field(
+            "next_action_command_id",
+            report.next_action_command_id.as_deref(),
+        ),
+        json_optional_string_field("next_action_command", report.next_action_command.as_deref()),
+        json_optional_string_field(
+            "next_action_command_resolved",
+            report.next_action_command_resolved.as_deref(),
+        ),
+        json_optional_string_field(
+            "next_action_command_reason",
+            report.next_action_command_reason.as_deref(),
+        ),
+        json_optional_string_field("next_action_source", report.next_action_source.as_deref()),
+        json_bool_field("next_action_available", report.next_action_available),
         json_bool_field(
             "artifact_lowering_alignment_consistent",
             report.artifact_lowering_alignment_consistent,

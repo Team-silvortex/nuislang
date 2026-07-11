@@ -1,7 +1,6 @@
 use super::{
     artifact_chain::{
-        nsld_artifact_chain_issues, nsld_artifact_stage_kind_path, nsld_artifact_stages_for_plan,
-        NsldArtifactStageKind,
+        nsld_artifact_chain_report, nsld_artifact_stage_kind_path, NsldArtifactStageKind,
     },
     assembly::{
         nsld_verify_assemble_plan_report, nsld_verify_link_bundle_report,
@@ -79,8 +78,31 @@ pub(crate) fn nsld_check_report(
     let object_snapshot = nsld_check_object_snapshot(manifest, plan);
     let container_snapshot = nsld_check_container_snapshot(manifest, plan);
     let final_snapshot = nsld_check_final_snapshot(manifest, plan);
-    let artifact_chain_issues = nsld_artifact_chain_issues(&nsld_artifact_stages_for_plan(plan));
-    let artifact_chain_valid = artifact_chain_issues.is_empty();
+    let artifact_chain_report = nsld_artifact_chain_report(manifest, plan);
+    let artifact_chain_valid = artifact_chain_report.valid;
+    let artifact_chain_advisories = artifact_chain_report.advisories.clone();
+    let artifact_chain_advisory_command_id = artifact_chain_report.advisory_command_id.clone();
+    let artifact_chain_advisory_command = artifact_chain_report.advisory_command.clone();
+    let artifact_chain_advisory_command_resolved =
+        artifact_chain_report.advisory_command_resolved.clone();
+    let artifact_chain_advisory_command_reason =
+        artifact_chain_report.advisory_command_reason.clone();
+    let artifact_chain_next_action_command_id =
+        artifact_chain_report.next_action_command_id.clone();
+    let artifact_chain_next_action_command = artifact_chain_report.next_action_command.clone();
+    let artifact_chain_next_action_command_resolved =
+        artifact_chain_report.next_action_command_resolved.clone();
+    let artifact_chain_next_action_command_reason =
+        artifact_chain_report.next_action_command_reason.clone();
+    let artifact_chain_next_action_source = artifact_chain_report.next_action_source.clone();
+    let artifact_chain_next_action_available = artifact_chain_report.next_action_available;
+    let next_action_command_id = artifact_chain_next_action_command_id.clone();
+    let next_action_command = artifact_chain_next_action_command.clone();
+    let next_action_command_resolved = artifact_chain_next_action_command_resolved.clone();
+    let next_action_command_reason = artifact_chain_next_action_command_reason.clone();
+    let next_action_source = artifact_chain_next_action_source.clone();
+    let next_action_available = artifact_chain_next_action_available;
+    let artifact_chain_issues = artifact_chain_report.issues.clone();
     let mut issues = Vec::new();
 
     if !core_snapshot.artifact_lowering_alignment_consistent {
@@ -194,11 +216,19 @@ pub(crate) fn nsld_check_report(
         );
     let checks = checks + usize::from(final_snapshot.tail.final_executable_pipeline_present);
     let failures = issues.len();
+    let advisory_count = artifact_chain_advisories.len();
     NsldCheckReport {
         manifest: manifest.display().to_string(),
         valid: failures == 0,
         checks,
         failures,
+        advisory_count,
+        next_action_command_id,
+        next_action_command,
+        next_action_command_resolved,
+        next_action_command_reason,
+        next_action_source,
+        next_action_available,
         artifact_lowering_alignment_consistent: core_snapshot
             .artifact_lowering_alignment_consistent,
         artifact_lowering_alignment_mismatches: core_snapshot
@@ -443,6 +473,17 @@ pub(crate) fn nsld_check_report(
         container_native_object_relocation_id: container_snapshot
             .container_native_object_relocation_id,
         artifact_chain_valid,
+        artifact_chain_advisories,
+        artifact_chain_advisory_command_id,
+        artifact_chain_advisory_command,
+        artifact_chain_advisory_command_resolved,
+        artifact_chain_advisory_command_reason,
+        artifact_chain_next_action_command_id,
+        artifact_chain_next_action_command,
+        artifact_chain_next_action_command_resolved,
+        artifact_chain_next_action_command_reason,
+        artifact_chain_next_action_source,
+        artifact_chain_next_action_available,
         artifact_chain_issues,
         final_stage_link_mode: plan.final_stage.link_mode.clone(),
         domains: core_snapshot.domains,

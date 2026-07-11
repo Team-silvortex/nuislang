@@ -1,4 +1,5 @@
 mod artifact_chain;
+mod artifact_chain_actions;
 mod assembly;
 mod check;
 mod check_container;
@@ -181,7 +182,7 @@ use assembly::*;
 use check::*;
 use cli::{parse_args, Command};
 use closure::*;
-use commands::{run_plan_command, run_status_command};
+use commands::{run_check_command, run_plan_command, run_status_command};
 use container_pipeline::*;
 use context::load_link_input_context;
 use display::*;
@@ -215,16 +216,7 @@ fn run() -> Result<(), String> {
             run_plan_command(&input, json)?;
         }
         Command::Check { input, json } => {
-            let ctx = load_link_input_context(&input)?;
-            let report = nsld_check_report(&ctx.manifest, &ctx.plan);
-            if json {
-                println!("{}", json::check_report_json(&report));
-            } else {
-                display::print_check_report(&report);
-            }
-            if !report.valid {
-                return Err("nsld check failed".to_owned());
-            }
+            run_check_command(&input, json)?;
         }
         Command::ArtifactChain { input, json } => {
             let ctx = load_link_input_context(&input)?;

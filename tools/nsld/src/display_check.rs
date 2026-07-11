@@ -9,6 +9,24 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     println!("  valid: {}", report.valid);
     println!("  checks: {}", report.checks);
     println!("  failures: {}", report.failures);
+    println!("  advisories: {}", report.advisory_count);
+    println!(
+        "  next_action_command_id: {}",
+        optional_string_text(report.next_action_command_id.as_deref())
+    );
+    println!(
+        "  next_action_command: {}",
+        optional_string_text(report.next_action_command.as_deref())
+    );
+    println!(
+        "  next_action_command_resolved: {}",
+        optional_string_text(report.next_action_command_resolved.as_deref())
+    );
+    println!(
+        "  next_action_source: {}",
+        optional_string_text(report.next_action_source.as_deref())
+    );
+    println!("  next_action_available: {}", report.next_action_available);
     println!(
         "  artifact_lowering_alignment: consistent={} mismatches={}",
         report.artifact_lowering_alignment_consistent,
@@ -314,9 +332,42 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         optional_string_text(report.container_native_object_relocation_id.as_deref())
     );
     println!(
-        "  artifact_chain: valid={} issues={}",
+        "  artifact_chain: valid={} advisories={} issues={}",
         report.artifact_chain_valid,
+        report.advisory_count,
         report.artifact_chain_issues.len()
+    );
+    println!(
+        "  artifact_chain_advisory_command_id: {}",
+        optional_string_text(report.artifact_chain_advisory_command_id.as_deref())
+    );
+    println!(
+        "  artifact_chain_advisory_command_resolved: {}",
+        optional_string_text(report.artifact_chain_advisory_command_resolved.as_deref())
+    );
+    println!(
+        "  artifact_chain_next_action_command_id: {}",
+        optional_string_text(report.artifact_chain_next_action_command_id.as_deref())
+    );
+    println!(
+        "  artifact_chain_next_action_command: {}",
+        optional_string_text(report.artifact_chain_next_action_command.as_deref())
+    );
+    println!(
+        "  artifact_chain_next_action_command_resolved: {}",
+        optional_string_text(
+            report
+                .artifact_chain_next_action_command_resolved
+                .as_deref()
+        )
+    );
+    println!(
+        "  artifact_chain_next_action_source: {}",
+        optional_string_text(report.artifact_chain_next_action_source.as_deref())
+    );
+    println!(
+        "  artifact_chain_next_action_available: {}",
+        report.artifact_chain_next_action_available
     );
     println!("  final_stage_link_mode: {}", report.final_stage_link_mode);
     println!("  domains: {}", report.domains.len());
@@ -481,6 +532,18 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     }
     for blocker in &report.container_loader_blockers {
         println!("  container_loader_blocker: {blocker}");
+    }
+    for advisory in &report.artifact_chain_advisories {
+        println!("  artifact_chain_advisory: {advisory}");
+    }
+    if let Some(reason) = report.artifact_chain_advisory_command_reason.as_deref() {
+        println!("  artifact_chain_advisory_command_reason: {reason}");
+    }
+    if let Some(reason) = report.artifact_chain_next_action_command_reason.as_deref() {
+        println!("  artifact_chain_next_action_command_reason: {reason}");
+    }
+    if let Some(reason) = report.next_action_command_reason.as_deref() {
+        println!("  next_action_command_reason: {reason}");
     }
     for issue in &report.artifact_chain_issues {
         println!("  artifact_chain_issue: {issue}");

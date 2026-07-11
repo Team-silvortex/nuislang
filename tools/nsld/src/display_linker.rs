@@ -60,6 +60,43 @@ pub(crate) fn print_nsld_artifact_chain_report(report: &NsldArtifactChainReport)
         "  next_optional_command_reason: {}",
         optional_string_text(report.next_optional_command_reason.as_deref())
     );
+    println!(
+        "  advisory_command_id: {}",
+        optional_string_text(report.advisory_command_id.as_deref())
+    );
+    println!(
+        "  advisory_command: {}",
+        optional_string_text(report.advisory_command.as_deref())
+    );
+    println!(
+        "  advisory_command_resolved: {}",
+        optional_string_text(report.advisory_command_resolved.as_deref())
+    );
+    println!(
+        "  advisory_command_reason: {}",
+        optional_string_text(report.advisory_command_reason.as_deref())
+    );
+    println!(
+        "  next_action_command_id: {}",
+        optional_string_text(report.next_action_command_id.as_deref())
+    );
+    println!(
+        "  next_action_command: {}",
+        optional_string_text(report.next_action_command.as_deref())
+    );
+    println!(
+        "  next_action_command_resolved: {}",
+        optional_string_text(report.next_action_command_resolved.as_deref())
+    );
+    println!(
+        "  next_action_command_reason: {}",
+        optional_string_text(report.next_action_command_reason.as_deref())
+    );
+    println!(
+        "  next_action_source: {}",
+        optional_string_text(report.next_action_source.as_deref())
+    );
+    println!("  next_action_available: {}", report.next_action_available);
     for stage in &report.stages {
         println!(
             "  stage: order={} id={} required={} present={} file={} path={}",
