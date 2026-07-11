@@ -110,6 +110,18 @@ fn nsld_final_executable_report_json_with_kind(
         json_optional_string_field("image_dry_run_hash", report.image_dry_run_hash.as_deref()),
         json_optional_usize_field("image_dry_run_size_bytes", report.image_dry_run_size_bytes),
         json_string_array_field("image_dry_run_issues", &report.image_dry_run_issues),
+        json_bool_field("final_output_checked", report.final_output_checked),
+        json_bool_field("final_output_present", report.final_output_present),
+        json_optional_usize_field("final_output_size_bytes", report.final_output_size_bytes),
+        json_optional_string_field("final_output_hash", report.final_output_hash.as_deref()),
+        json_optional_bool_field(
+            "final_output_image_header_valid",
+            report.final_output_image_header_valid,
+        ),
+        json_optional_bool_field(
+            "final_output_runnable_candidate",
+            report.final_output_runnable_candidate,
+        ),
         json_usize_field("input_count", report.input_count),
         json_usize_field("blocker_count", report.blockers.len()),
         json_string_array_field("blockers", &report.blockers),
@@ -363,6 +375,54 @@ pub(crate) fn nsld_final_executable_emit_verify_report_json(
         json_string_array_field(
             "actual_image_dry_run_issues",
             &report.actual_image_dry_run_issues,
+        ),
+        json_bool_field(
+            "expected_final_output_checked",
+            report.expected_final_output_checked,
+        ),
+        json_optional_bool_field(
+            "actual_final_output_checked",
+            report.actual_final_output_checked,
+        ),
+        json_bool_field(
+            "expected_final_output_present",
+            report.expected_final_output_present,
+        ),
+        json_optional_bool_field(
+            "actual_final_output_present",
+            report.actual_final_output_present,
+        ),
+        json_optional_usize_field(
+            "expected_final_output_size_bytes",
+            report.expected_final_output_size_bytes,
+        ),
+        json_optional_usize_field(
+            "actual_final_output_size_bytes",
+            report.actual_final_output_size_bytes,
+        ),
+        json_optional_string_field(
+            "expected_final_output_hash",
+            report.expected_final_output_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_final_output_hash",
+            report.actual_final_output_hash.as_deref(),
+        ),
+        json_optional_bool_field(
+            "expected_final_output_image_header_valid",
+            report.expected_final_output_image_header_valid,
+        ),
+        json_optional_bool_field(
+            "actual_final_output_image_header_valid",
+            report.actual_final_output_image_header_valid,
+        ),
+        json_optional_bool_field(
+            "expected_final_output_runnable_candidate",
+            report.expected_final_output_runnable_candidate,
+        ),
+        json_optional_bool_field(
+            "actual_final_output_runnable_candidate",
+            report.actual_final_output_runnable_candidate,
         ),
         json_usize_field("expected_blocker_count", report.expected_blocker_count),
         json_optional_usize_field("actual_blocker_count", report.actual_blocker_count),

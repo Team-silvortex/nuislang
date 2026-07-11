@@ -50,3 +50,12 @@ pub(crate) fn nsld_final_executable_image_dry_run_bytes_path(
         NsldArtifactStageKind::FinalExecutableImageDryRunBytes,
     )
 }
+
+pub(crate) fn nsld_final_executable_launcher_manifest_path(
+    plan: &nuisc::linker::LinkPlan,
+) -> PathBuf {
+    nsld_artifact_stage_kind_path(
+        &plan.output_dir,
+        NsldArtifactStageKind::FinalExecutableLauncherManifest,
+    )
+}

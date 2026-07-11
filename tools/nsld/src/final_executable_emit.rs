@@ -1,5 +1,7 @@
 use super::{
+    final_executable_emit_output_verify::push_final_output_emit_verify_mismatches,
     final_executable_emit_shape::nsld_final_executable_emit_report_shape,
+    final_executable_output_summary::populate_final_output_emit_summary,
     final_executable_paths::nsld_final_executable_blocked_path,
     final_executable_render::{
         optional_bool_toml, optional_usize_toml, render_final_executable_blocked,
@@ -31,6 +33,7 @@ pub(crate) fn nsld_emit_final_executable_report(
             )
         })?;
         report.emitted = true;
+        populate_final_output_emit_summary(&mut report);
     }
     let blocked_report_path = nsld_final_executable_blocked_path(plan);
     fs::write(
@@ -50,7 +53,10 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldFinalExecutableEmitVerifyReport {
-    let expected = nsld_final_executable_emit_report_shape(manifest, plan);
+    let mut expected = nsld_final_executable_emit_report_shape(manifest, plan);
+    if expected.can_emit_final_executable {
+        populate_final_output_emit_summary(&mut expected);
+    }
     let input_path = nsld_final_executable_blocked_path(plan);
     let mut issues = Vec::new();
     let actual = fs::read_to_string(&input_path).map_err(|error| {
@@ -90,6 +96,12 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         actual_image_dry_run_hash,
         actual_image_dry_run_size_bytes,
         actual_image_dry_run_issues,
+        actual_final_output_checked,
+        actual_final_output_present,
+        actual_final_output_size_bytes,
+        actual_final_output_hash,
+        actual_final_output_image_header_valid,
+        actual_final_output_runnable_candidate,
         actual_blocker_count,
         actual_blockers,
     ) = match actual.as_ref() {
@@ -124,6 +136,12 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
             non_empty_toml_string(source, "image_dry_run_hash"),
             optional_usize_value(source, "image_dry_run_size_bytes"),
             toml::string_array_value(source, "image_dry_run_issues"),
+            toml::bool_value(source, "final_output_checked"),
+            toml::bool_value(source, "final_output_present"),
+            optional_usize_value(source, "final_output_size_bytes"),
+            non_empty_toml_string(source, "final_output_hash"),
+            toml::bool_value(source, "final_output_image_header_valid"),
+            toml::bool_value(source, "final_output_runnable_candidate"),
             toml::usize_value(source, "blocker_count"),
             toml::string_array_value(source, "blockers"),
         ),
@@ -160,6 +178,12 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
                 None,       // image_dry_run_hash
                 None,       // image_dry_run_size_bytes
                 Vec::new(), // image_dry_run_issues
+                None,       // final_output_checked
+                None,       // final_output_present
+                None,       // final_output_size_bytes
+                None,       // final_output_hash
+                None,       // final_output_image_header_valid
+                None,       // final_output_runnable_candidate
                 None,       // blocker_count
                 Vec::new(), // blockers
             )
@@ -448,6 +472,16 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
                 actual_image_dry_run_issues.join(", ")
             ));
         }
+        push_final_output_emit_verify_mismatches(
+            &mut issues,
+            &expected,
+            actual_final_output_checked,
+            actual_final_output_present,
+            actual_final_output_size_bytes,
+            actual_final_output_hash.clone(),
+            actual_final_output_image_header_valid,
+            actual_final_output_runnable_candidate,
+        );
         if actual_blocker_count != Some(expected.blockers.len()) {
             issues.push(format!(
                 "blocker_count mismatch: expected {}, found {}",
@@ -533,6 +567,18 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         actual_image_dry_run_size_bytes,
         expected_image_dry_run_issues: expected.image_dry_run_issues,
         actual_image_dry_run_issues,
+        expected_final_output_checked: expected.final_output_checked,
+        actual_final_output_checked,
+        expected_final_output_present: expected.final_output_present,
+        actual_final_output_present,
+        expected_final_output_size_bytes: expected.final_output_size_bytes,
+        actual_final_output_size_bytes,
+        expected_final_output_hash: expected.final_output_hash,
+        actual_final_output_hash,
+        expected_final_output_image_header_valid: expected.final_output_image_header_valid,
+        actual_final_output_image_header_valid,
+        expected_final_output_runnable_candidate: expected.final_output_runnable_candidate,
+        actual_final_output_runnable_candidate,
         expected_blocker_count: expected.blockers.len(),
         actual_blocker_count,
         expected_blockers: expected.blockers,

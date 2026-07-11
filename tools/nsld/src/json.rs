@@ -5,6 +5,7 @@ pub(crate) use super::json_container::*;
 pub(crate) use super::json_final_executable::*;
 pub(crate) use super::json_final_host::*;
 pub(crate) use super::json_final_image::*;
+pub(crate) use super::json_final_launcher::*;
 pub(crate) use super::json_final_layout::*;
 pub(crate) use super::json_final_stage::*;
 pub(crate) use super::json_object::*;

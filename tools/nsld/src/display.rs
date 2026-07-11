@@ -3,6 +3,8 @@ pub(crate) use super::display_container::*;
 pub(crate) use super::display_final_executable::*;
 pub(crate) use super::display_final_host::*;
 pub(crate) use super::display_final_image::*;
+pub(crate) use super::display_final_launcher::*;
+pub(crate) use super::display_final_output::*;
 pub(crate) use super::display_final_stage::*;
 pub(crate) use super::display_link_tables::*;
 pub(crate) use super::display_linker::*;

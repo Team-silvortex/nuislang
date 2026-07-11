@@ -110,6 +110,10 @@ fn artifact_stage_kind_paths_are_canonical() {
         nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableOutput),
         "final-executable-output"
     );
+    assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableLauncherManifest),
+        "nuis.nsld.final-executable-launcher.toml"
+    );
     assert_eq!(nsld_object_output_file_name("pe/coff"), "nuis.nsld.pe-coff");
 }
 
@@ -130,7 +134,7 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(report.valid, "{:?}", report.issues);
-    assert_eq!(report.stage_count, 26);
+    assert_eq!(report.stage_count, 27);
     assert!(report.present_count >= report.required_count);
     assert_eq!(report.missing_required_count, 0);
     assert!(report.optional_present_count >= 3);
@@ -318,8 +322,14 @@ fn artifact_chain_marks_self_contained_final_executable_output_as_chain_tail() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(report.valid, "{:?}", report.issues);
-    assert_eq!(report.next_optional_stage, None);
-    assert_eq!(report.next_optional_command_id, None);
+    assert_eq!(
+        report.next_optional_stage.as_deref(),
+        Some("final-executable-launcher")
+    );
+    assert_eq!(
+        report.next_optional_command_id.as_deref(),
+        Some("emit-final-executable-launcher-manifest")
+    );
     assert!(report.stages.iter().any(|stage| {
         stage.stage_id == "final-executable-output"
             && stage.file_name == output_path

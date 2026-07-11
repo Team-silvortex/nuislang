@@ -1,7 +1,6 @@
 use super::{
     artifact_chain::{
-        nsld_artifact_chain_issues, nsld_artifact_stage_kind_path,
-        nsld_artifact_stage_kind_path_for_plan, nsld_artifact_stages_for_plan,
+        nsld_artifact_chain_issues, nsld_artifact_stage_kind_path, nsld_artifact_stages_for_plan,
         NsldArtifactStageKind,
     },
     assembly::{
@@ -11,16 +10,8 @@ use super::{
     check_container::{nsld_check_container_snapshot, push_container_snapshot_issues},
     check_core::{nsld_check_core_snapshot, push_optional_check_failure},
     check_final::{nsld_check_final_snapshot, push_final_snapshot_issues},
+    check_object::{nsld_check_object_snapshot, push_object_snapshot_issues},
     link_units::{nsld_verify_link_inputs_report, nsld_verify_link_units_report},
-    object_byte_layout::nsld_verify_object_byte_layout_report,
-    object_emit::nsld_verify_object_emit_report,
-    object_file_layout::nsld_verify_object_file_layout_report,
-    object_image_dry_run::nsld_verify_object_image_dry_run_report,
-    object_output::nsld_verify_object_output_report,
-    object_plan::nsld_verify_object_plan_report,
-    object_writer_input::{
-        nsld_verify_object_writer_dry_run_report, nsld_verify_object_writer_input_report,
-    },
     reports::NsldCheckReport,
 };
 use std::path::Path;
@@ -85,144 +76,7 @@ pub(crate) fn nsld_check_report(
         .as_ref()
         .map(|report| report.issues.clone())
         .unwrap_or_default();
-    let object_plan_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectPlan);
-    let object_plan_present = object_plan_path.exists();
-    let object_plan_verify_report =
-        object_plan_present.then(|| nsld_verify_object_plan_report(manifest, plan));
-    let object_plan_valid = object_plan_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let object_plan_issues = object_plan_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let object_writer_input_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectWriterInput);
-    let object_writer_input_present = object_writer_input_path.exists();
-    let object_writer_input_verify_report =
-        object_writer_input_present.then(|| nsld_verify_object_writer_input_report(manifest, plan));
-    let object_writer_input_valid = object_writer_input_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let object_writer_input_issues = object_writer_input_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let object_byte_layout_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectByteLayout);
-    let object_byte_layout_present = object_byte_layout_path.exists();
-    let object_byte_layout_verify_report =
-        object_byte_layout_present.then(|| nsld_verify_object_byte_layout_report(manifest, plan));
-    let object_byte_layout_valid = object_byte_layout_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let object_byte_layout_issues = object_byte_layout_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let object_file_layout_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectFileLayout);
-    let object_file_layout_present = object_file_layout_path.exists();
-    let object_file_layout_verify_report =
-        object_file_layout_present.then(|| nsld_verify_object_file_layout_report(manifest, plan));
-    let object_file_layout_valid = object_file_layout_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let object_file_layout_issues = object_file_layout_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let object_image_dry_run_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectImageDryRun);
-    let object_image_dry_run_present = object_image_dry_run_path.exists();
-    let object_image_dry_run_verify_report = object_image_dry_run_present
-        .then(|| nsld_verify_object_image_dry_run_report(manifest, plan));
-    let object_image_dry_run_valid = object_image_dry_run_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let object_image_dry_run_issues = object_image_dry_run_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let object_image_relocation_lowering_valid = object_image_dry_run_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_relocation_lowering_valid);
-    let object_image_relocation_lowering_rule_count = object_image_dry_run_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_relocation_lowering_rule_count);
-    let object_image_relocation_lowering_rules = object_image_dry_run_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_relocation_lowering_rules.clone())
-        .unwrap_or_default();
-    let object_image_relocation_lowering_issues = object_image_dry_run_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_relocation_lowering_issues.clone())
-        .unwrap_or_default();
-    let object_image_relocation_record_count = object_image_dry_run_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_relocation_record_count);
-    let object_image_relocation_record_table_hash = object_image_dry_run_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_relocation_record_table_hash.clone());
-    let object_image_relocation_records = object_image_dry_run_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_relocation_records.clone())
-        .unwrap_or_default();
-    let object_image_dry_run_bytes_present = nsld_artifact_stage_kind_path(
-        &plan.output_dir,
-        NsldArtifactStageKind::ObjectImageDryRunBytes,
-    )
-    .exists();
-    let object_emit_blocked_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectEmitBlocked);
-    let object_emit_blocked_present = object_emit_blocked_path.exists();
-    let object_emit_blocked_verify_report =
-        object_emit_blocked_present.then(|| nsld_verify_object_emit_report(manifest, plan));
-    let object_emit_blocked_valid = object_emit_blocked_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let object_emit_blocked_issues = object_emit_blocked_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
-    let object_output_path =
-        nsld_artifact_stage_kind_path_for_plan(plan, NsldArtifactStageKind::ObjectOutput);
-    let object_output_present = object_output_path.exists();
-    let object_output_verify_report =
-        object_output_present.then(|| nsld_verify_object_output_report(manifest, plan));
-    let object_output_valid = object_output_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let object_output_expected_size_bytes = object_output_verify_report
-        .as_ref()
-        .and_then(|report| report.expected_size_bytes);
-    let object_output_actual_size_bytes = object_output_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_size_bytes);
-    let object_output_expected_hash = object_output_verify_report
-        .as_ref()
-        .and_then(|report| report.expected_hash.clone());
-    let object_output_actual_hash = object_output_verify_report
-        .as_ref()
-        .and_then(|report| report.actual_hash.clone());
-    let object_output_issues = if let Some(report) = object_output_verify_report.as_ref() {
-        report.issues.clone()
-    } else {
-        Vec::new()
-    };
-    let object_writer_dry_run_path =
-        nsld_artifact_stage_kind_path(&plan.output_dir, NsldArtifactStageKind::ObjectWriterDryRun);
-    let object_writer_dry_run_present = object_writer_dry_run_path.exists();
-    let object_writer_dry_run_verify_report = object_writer_dry_run_present
-        .then(|| nsld_verify_object_writer_dry_run_report(manifest, plan));
-    let object_writer_dry_run_valid = object_writer_dry_run_verify_report
-        .as_ref()
-        .map(|report| report.valid);
-    let object_writer_dry_run_issues = object_writer_dry_run_verify_report
-        .as_ref()
-        .map(|report| report.issues.clone())
-        .unwrap_or_default();
+    let object_snapshot = nsld_check_object_snapshot(manifest, plan);
     let container_snapshot = nsld_check_container_snapshot(manifest, plan);
     let final_snapshot = nsld_check_final_snapshot(manifest, plan);
     let artifact_chain_issues = nsld_artifact_chain_issues(&nsld_artifact_stages_for_plan(plan));
@@ -291,46 +145,7 @@ pub(crate) fn nsld_check_report(
         "section manifest verification failed",
         &section_manifest_issues
     );
-    push_failure!(
-        object_plan_valid,
-        "object plan verification failed",
-        &object_plan_issues
-    );
-    push_failure!(
-        object_writer_input_valid,
-        "object writer input verification failed",
-        &object_writer_input_issues
-    );
-    push_failure!(
-        object_byte_layout_valid,
-        "object byte layout verification failed",
-        &object_byte_layout_issues
-    );
-    push_failure!(
-        object_file_layout_valid,
-        "object file layout verification failed",
-        &object_file_layout_issues
-    );
-    push_failure!(
-        object_image_dry_run_valid,
-        "object image dry-run verification failed",
-        &object_image_dry_run_issues
-    );
-    push_failure!(
-        object_emit_blocked_valid,
-        "object emit blocked report verification failed",
-        &object_emit_blocked_issues
-    );
-    push_failure!(
-        object_output_valid,
-        "object output verification failed",
-        &object_output_issues
-    );
-    push_failure!(
-        object_writer_dry_run_valid,
-        "object writer dry-run verification failed",
-        &object_writer_dry_run_issues
-    );
+    push_object_snapshot_issues(&mut issues, &object_snapshot);
     push_container_snapshot_issues(&mut issues, &container_snapshot);
     push_final_snapshot_issues(&mut issues, &final_snapshot);
     if !artifact_chain_valid {
@@ -342,15 +157,15 @@ pub(crate) fn nsld_check_report(
     let checks = checks + usize::from(link_bundle_present);
     let checks = checks + usize::from(assemble_plan_present);
     let checks = checks + usize::from(section_manifest_present);
-    let checks = checks + usize::from(object_plan_present);
-    let checks = checks + usize::from(object_writer_input_present);
-    let checks = checks + usize::from(object_byte_layout_present);
-    let checks = checks + usize::from(object_file_layout_present);
-    let checks = checks + usize::from(object_image_dry_run_present);
-    let checks = checks + usize::from(object_image_dry_run_bytes_present);
-    let checks = checks + usize::from(object_emit_blocked_present);
-    let checks = checks + usize::from(object_output_present);
-    let checks = checks + usize::from(object_writer_dry_run_present);
+    let checks = checks + usize::from(object_snapshot.object_plan_present);
+    let checks = checks + usize::from(object_snapshot.object_writer_input_present);
+    let checks = checks + usize::from(object_snapshot.object_byte_layout_present);
+    let checks = checks + usize::from(object_snapshot.object_file_layout_present);
+    let checks = checks + usize::from(object_snapshot.object_image_dry_run_present);
+    let checks = checks + usize::from(object_snapshot.object_image_dry_run_bytes_present);
+    let checks = checks + usize::from(object_snapshot.object_emit_blocked_present);
+    let checks = checks + usize::from(object_snapshot.object_output_present);
+    let checks = checks + usize::from(object_snapshot.object_writer_dry_run_present);
     let checks = checks + usize::from(container_snapshot.container_plan_present);
     let checks = checks + usize::from(container_snapshot.container_present);
     let checks = checks
@@ -398,42 +213,47 @@ pub(crate) fn nsld_check_report(
         section_manifest_present,
         section_manifest_valid,
         section_manifest_issues,
-        object_plan_present,
-        object_plan_valid,
-        object_plan_issues,
-        object_writer_input_present,
-        object_writer_input_valid,
-        object_writer_input_issues,
-        object_byte_layout_present,
-        object_byte_layout_valid,
-        object_byte_layout_issues,
-        object_file_layout_present,
-        object_file_layout_valid,
-        object_file_layout_issues,
-        object_image_dry_run_present,
-        object_image_dry_run_valid,
-        object_image_dry_run_issues,
-        object_image_relocation_lowering_valid,
-        object_image_relocation_lowering_rule_count,
-        object_image_relocation_lowering_rules,
-        object_image_relocation_lowering_issues,
-        object_image_relocation_record_count,
-        object_image_relocation_record_table_hash,
-        object_image_relocation_records,
-        object_image_dry_run_bytes_present,
-        object_emit_blocked_present,
-        object_emit_blocked_valid,
-        object_emit_blocked_issues,
-        object_output_present,
-        object_output_valid,
-        object_output_expected_size_bytes,
-        object_output_actual_size_bytes,
-        object_output_expected_hash,
-        object_output_actual_hash,
-        object_output_issues,
-        object_writer_dry_run_present,
-        object_writer_dry_run_valid,
-        object_writer_dry_run_issues,
+        object_plan_present: object_snapshot.object_plan_present,
+        object_plan_valid: object_snapshot.object_plan_valid,
+        object_plan_issues: object_snapshot.object_plan_issues,
+        object_writer_input_present: object_snapshot.object_writer_input_present,
+        object_writer_input_valid: object_snapshot.object_writer_input_valid,
+        object_writer_input_issues: object_snapshot.object_writer_input_issues,
+        object_byte_layout_present: object_snapshot.object_byte_layout_present,
+        object_byte_layout_valid: object_snapshot.object_byte_layout_valid,
+        object_byte_layout_issues: object_snapshot.object_byte_layout_issues,
+        object_file_layout_present: object_snapshot.object_file_layout_present,
+        object_file_layout_valid: object_snapshot.object_file_layout_valid,
+        object_file_layout_issues: object_snapshot.object_file_layout_issues,
+        object_image_dry_run_present: object_snapshot.object_image_dry_run_present,
+        object_image_dry_run_valid: object_snapshot.object_image_dry_run_valid,
+        object_image_dry_run_issues: object_snapshot.object_image_dry_run_issues,
+        object_image_relocation_lowering_valid: object_snapshot
+            .object_image_relocation_lowering_valid,
+        object_image_relocation_lowering_rule_count: object_snapshot
+            .object_image_relocation_lowering_rule_count,
+        object_image_relocation_lowering_rules: object_snapshot
+            .object_image_relocation_lowering_rules,
+        object_image_relocation_lowering_issues: object_snapshot
+            .object_image_relocation_lowering_issues,
+        object_image_relocation_record_count: object_snapshot.object_image_relocation_record_count,
+        object_image_relocation_record_table_hash: object_snapshot
+            .object_image_relocation_record_table_hash,
+        object_image_relocation_records: object_snapshot.object_image_relocation_records,
+        object_image_dry_run_bytes_present: object_snapshot.object_image_dry_run_bytes_present,
+        object_emit_blocked_present: object_snapshot.object_emit_blocked_present,
+        object_emit_blocked_valid: object_snapshot.object_emit_blocked_valid,
+        object_emit_blocked_issues: object_snapshot.object_emit_blocked_issues,
+        object_output_present: object_snapshot.object_output_present,
+        object_output_valid: object_snapshot.object_output_valid,
+        object_output_expected_size_bytes: object_snapshot.object_output_expected_size_bytes,
+        object_output_actual_size_bytes: object_snapshot.object_output_actual_size_bytes,
+        object_output_expected_hash: object_snapshot.object_output_expected_hash,
+        object_output_actual_hash: object_snapshot.object_output_actual_hash,
+        object_output_issues: object_snapshot.object_output_issues,
+        object_writer_dry_run_present: object_snapshot.object_writer_dry_run_present,
+        object_writer_dry_run_valid: object_snapshot.object_writer_dry_run_valid,
+        object_writer_dry_run_issues: object_snapshot.object_writer_dry_run_issues,
         container_plan_present: container_snapshot.container_plan_present,
         container_plan_valid: container_snapshot.container_plan_valid,
         container_plan_issues: container_snapshot.container_plan_issues,

@@ -12,6 +12,11 @@ pub(crate) use super::final_executable_image_stage::{
     nsld_emit_final_executable_image_dry_run_report, nsld_final_executable_image_dry_run_report,
     nsld_verify_final_executable_image_dry_run_report,
 };
+pub(crate) use super::final_executable_launcher::{
+    nsld_emit_final_executable_launcher_manifest_report,
+    nsld_final_executable_launcher_dry_run_report, nsld_final_executable_launcher_manifest_report,
+    nsld_verify_final_executable_launcher_manifest_report,
+};
 pub(crate) use super::final_executable_layout_stage::{
     nsld_emit_final_executable_layout_plan_report, nsld_final_executable_layout_plan_report,
     nsld_verify_final_executable_layout_plan_report,

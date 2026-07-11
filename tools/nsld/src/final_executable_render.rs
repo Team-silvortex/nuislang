@@ -307,6 +307,30 @@ pub(crate) fn render_final_executable_blocked(report: &NsldFinalExecutableEmitRe
         "image_dry_run_issues = [{}]\n",
         toml::toml_string_array_literal(&report.image_dry_run_issues)
     ));
+    out.push_str(&format!(
+        "final_output_checked = {}\n",
+        report.final_output_checked
+    ));
+    out.push_str(&format!(
+        "final_output_present = {}\n",
+        report.final_output_present
+    ));
+    out.push_str(&format!(
+        "final_output_size_bytes = {}\n",
+        optional_usize_toml(report.final_output_size_bytes)
+    ));
+    out.push_str(&format!(
+        "final_output_hash = \"{}\"\n",
+        toml::escape_toml_string(report.final_output_hash.as_deref().unwrap_or(""))
+    ));
+    out.push_str(&format!(
+        "final_output_image_header_valid = {}\n",
+        optional_bool_toml(report.final_output_image_header_valid)
+    ));
+    out.push_str(&format!(
+        "final_output_runnable_candidate = {}\n",
+        optional_bool_toml(report.final_output_runnable_candidate)
+    ));
     out.push_str(&format!("input_count = {}\n", report.input_count));
     out.push_str(&format!("blocker_count = {}\n", report.blockers.len()));
     out.push_str(&format!(

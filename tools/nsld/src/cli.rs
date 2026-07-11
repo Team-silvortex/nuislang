@@ -29,6 +29,10 @@ pub(crate) enum Command {
     EmitFinalExecutable { input: PathBuf, json: bool },
     VerifyFinalExecutableEmit { input: PathBuf, json: bool },
     FinalExecutableOutput { input: PathBuf, json: bool },
+    FinalExecutableLauncherManifest { input: PathBuf, json: bool },
+    EmitFinalExecutableLauncherManifest { input: PathBuf, json: bool },
+    VerifyFinalExecutableLauncherManifest { input: PathBuf, json: bool },
+    FinalExecutableLauncherDryRun { input: PathBuf, json: bool },
     Prepare { input: PathBuf, json: bool },
     AssemblePlan { input: PathBuf, json: bool },
     EmitAssemblePlan { input: PathBuf, json: bool },
@@ -108,6 +112,10 @@ where
         | "emit-final-executable"
         | "verify-final-executable-emit"
         | "final-executable-output"
+        | "final-executable-launcher-manifest"
+        | "emit-final-executable-launcher-manifest"
+        | "verify-final-executable-launcher-manifest"
+        | "final-executable-launcher-dry-run"
         | "prepare"
         | "assemble-plan"
         | "emit-assemble-plan"
@@ -182,6 +190,14 @@ where
             let is_emit_final_executable = command == "emit-final-executable";
             let is_verify_final_executable_emit = command == "verify-final-executable-emit";
             let is_final_executable_output = command == "final-executable-output";
+            let is_final_executable_launcher_manifest =
+                command == "final-executable-launcher-manifest";
+            let is_emit_final_executable_launcher_manifest =
+                command == "emit-final-executable-launcher-manifest";
+            let is_verify_final_executable_launcher_manifest =
+                command == "verify-final-executable-launcher-manifest";
+            let is_final_executable_launcher_dry_run =
+                command == "final-executable-launcher-dry-run";
             let is_prepare = command == "prepare";
             let is_assemble_plan = command == "assemble-plan";
             let is_emit_assemble_plan = command == "emit-assemble-plan";
@@ -286,6 +302,14 @@ where
                 Ok(Command::VerifyFinalExecutableEmit { input, json })
             } else if is_final_executable_output {
                 Ok(Command::FinalExecutableOutput { input, json })
+            } else if is_final_executable_launcher_manifest {
+                Ok(Command::FinalExecutableLauncherManifest { input, json })
+            } else if is_emit_final_executable_launcher_manifest {
+                Ok(Command::EmitFinalExecutableLauncherManifest { input, json })
+            } else if is_verify_final_executable_launcher_manifest {
+                Ok(Command::VerifyFinalExecutableLauncherManifest { input, json })
+            } else if is_final_executable_launcher_dry_run {
+                Ok(Command::FinalExecutableLauncherDryRun { input, json })
             } else if is_prepare {
                 Ok(Command::Prepare { input, json })
             } else if is_assemble_plan {
@@ -423,6 +447,10 @@ fn usage() -> &'static str {
         "  nsld emit-final-executable <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-final-executable-emit <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld final-executable-output <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-launcher-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld emit-final-executable-launcher-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld verify-final-executable-launcher-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-launcher-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld prepare <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",

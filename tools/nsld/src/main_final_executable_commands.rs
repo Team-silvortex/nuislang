@@ -228,6 +228,64 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
             }
             Ok(true)
         }
+        Command::FinalExecutableLauncherManifest { input, json } => {
+            let ctx = load_link_input_context(input)?;
+            let report = nsld_final_executable_launcher_manifest_report(&ctx.manifest, &ctx.plan);
+            if *json {
+                println!(
+                    "{}",
+                    nsld_final_executable_launcher_manifest_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_launcher_manifest_report(&report);
+            }
+            Ok(true)
+        }
+        Command::EmitFinalExecutableLauncherManifest { input, json } => {
+            let ctx = load_link_input_context(input)?;
+            let report =
+                nsld_emit_final_executable_launcher_manifest_report(&ctx.manifest, &ctx.plan)?;
+            if *json {
+                println!(
+                    "{}",
+                    nsld_final_executable_launcher_manifest_emit_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_launcher_manifest_emit_report(&report);
+            }
+            Ok(true)
+        }
+        Command::VerifyFinalExecutableLauncherManifest { input, json } => {
+            let ctx = load_link_input_context(input)?;
+            let report =
+                nsld_verify_final_executable_launcher_manifest_report(&ctx.manifest, &ctx.plan);
+            if *json {
+                println!(
+                    "{}",
+                    nsld_final_executable_launcher_manifest_verify_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_launcher_manifest_verify_report(&report);
+            }
+            if report.valid {
+                Ok(true)
+            } else {
+                Err("nsld final executable launcher manifest verification failed".to_owned())
+            }
+        }
+        Command::FinalExecutableLauncherDryRun { input, json } => {
+            let ctx = load_link_input_context(input)?;
+            let report = nsld_final_executable_launcher_dry_run_report(&ctx.manifest, &ctx.plan);
+            if *json {
+                println!(
+                    "{}",
+                    nsld_final_executable_launcher_dry_run_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_launcher_dry_run_report(&report);
+            }
+            Ok(true)
+        }
         _ => Ok(false),
     }
 }

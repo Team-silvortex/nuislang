@@ -33,6 +33,7 @@ pub(crate) enum NsldArtifactStageKind {
     FinalExecutableImageDryRunBytes,
     FinalExecutableBlocked,
     FinalExecutableOutput,
+    FinalExecutableLauncherManifest,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -139,6 +140,10 @@ const ARTIFACT_STAGE_DEFINITIONS: &[(NsldArtifactStageKind, &str)] = &[
         "nuis.nsld.final-executable.blocked.toml",
     ),
     (NsldArtifactStageKind::FinalExecutableOutput, ""),
+    (
+        NsldArtifactStageKind::FinalExecutableLauncherManifest,
+        "nuis.nsld.final-executable-launcher.toml",
+    ),
 ];
 
 pub(crate) fn nsld_artifact_stage_path(output_dir: impl AsRef<Path>, file_name: &str) -> PathBuf {
@@ -183,6 +188,9 @@ pub(crate) fn nsld_artifact_stage_file_name(kind: NsldArtifactStageKind) -> &'st
         }
         NsldArtifactStageKind::FinalExecutableBlocked => "nuis.nsld.final-executable.blocked.toml",
         NsldArtifactStageKind::FinalExecutableOutput => "final-executable-output",
+        NsldArtifactStageKind::FinalExecutableLauncherManifest => {
+            "nuis.nsld.final-executable-launcher.toml"
+        }
     }
 }
 
@@ -245,6 +253,7 @@ pub(crate) fn nsld_artifact_stage_id(kind: NsldArtifactStageKind) -> &'static st
         }
         NsldArtifactStageKind::FinalExecutableBlocked => "final-executable-blocked",
         NsldArtifactStageKind::FinalExecutableOutput => "final-executable-output",
+        NsldArtifactStageKind::FinalExecutableLauncherManifest => "final-executable-launcher",
     }
 }
 
@@ -280,6 +289,9 @@ pub(crate) fn nsld_artifact_stage_suggested_command(kind: NsldArtifactStageKind)
         }
         NsldArtifactStageKind::FinalExecutableBlocked
         | NsldArtifactStageKind::FinalExecutableOutput => "emit-final-executable",
+        NsldArtifactStageKind::FinalExecutableLauncherManifest => {
+            "emit-final-executable-launcher-manifest"
+        }
     }
 }
 
@@ -343,6 +355,7 @@ pub(crate) fn nsld_artifact_stage_required(kind: NsldArtifactStageKind) -> bool 
             | NsldArtifactStageKind::FinalExecutableImageDryRunBytes
             | NsldArtifactStageKind::FinalExecutableBlocked
             | NsldArtifactStageKind::FinalExecutableOutput
+            | NsldArtifactStageKind::FinalExecutableLauncherManifest
     )
 }
 
