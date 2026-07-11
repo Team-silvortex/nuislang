@@ -369,6 +369,11 @@ pub(crate) fn nsld_check_report(
         final_executable_blocked_blocker_count: final_snapshot
             .final_executable_blocked_blocker_count,
         final_executable_blocked_issues: final_snapshot.final_executable_blocked_issues,
+        final_executable_output_path_present: final_snapshot.final_executable_output_path_present,
+        final_executable_output_kind: final_snapshot.final_executable_output_kind,
+        final_executable_output_validation_mode: final_snapshot
+            .final_executable_output_validation_mode,
+        final_executable_output_nsld_owned: final_snapshot.final_executable_output_nsld_owned,
         final_executable_output_present: final_snapshot.final_executable_output_present,
         final_executable_output_size_bytes: final_snapshot.final_executable_output_size_bytes,
         final_executable_output_hash: final_snapshot.final_executable_output_hash,

@@ -51,6 +51,10 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_blocked_plan_hash: Option<String>,
     pub(crate) final_executable_blocked_blocker_count: Option<usize>,
     pub(crate) final_executable_blocked_issues: Vec<String>,
+    pub(crate) final_executable_output_path_present: bool,
+    pub(crate) final_executable_output_kind: String,
+    pub(crate) final_executable_output_validation_mode: String,
+    pub(crate) final_executable_output_nsld_owned: bool,
     pub(crate) final_executable_output_present: bool,
     pub(crate) final_executable_output_size_bytes: Option<usize>,
     pub(crate) final_executable_output_hash: Option<String>,
@@ -213,51 +217,38 @@ pub(crate) fn nsld_check_final_snapshot(
         .as_ref()
         .map(|report| report.issues.clone())
         .unwrap_or_default();
-    let final_executable_output_present = Path::new(&plan.final_stage.output_path).exists();
-    let final_executable_output_report = final_executable_output_present
-        .then(|| nsld_final_executable_output_report(manifest, plan));
-    let final_executable_output_size_bytes = final_executable_output_report
-        .as_ref()
-        .and_then(|report| report.size_bytes);
-    let final_executable_output_hash = final_executable_output_report
-        .as_ref()
-        .and_then(|report| report.output_hash.clone());
-    let final_executable_output_image_header_valid = final_executable_output_report
-        .as_ref()
-        .map(|report| report.output_image_header_valid);
-    let final_executable_output_image_magic = final_executable_output_report
-        .as_ref()
-        .and_then(|report| report.output_image_magic.clone());
-    let final_executable_output_image_version = final_executable_output_report
-        .as_ref()
-        .and_then(|report| report.output_image_version);
-    let final_executable_output_image_layout_hash = final_executable_output_report
-        .as_ref()
-        .and_then(|report| report.output_layout_hash.clone());
-    let final_executable_output_image_byte_map_hash = final_executable_output_report
-        .as_ref()
-        .and_then(|report| report.output_byte_map_hash.clone());
-    let final_executable_output_runnable_candidate = final_executable_output_report
-        .as_ref()
-        .map(|report| report.runnable_candidate);
-    let final_executable_output_blocker_count = final_executable_output_report
-        .as_ref()
-        .map(|report| report.blockers.len());
-    let final_executable_output_issues = final_executable_output_report
-        .as_ref()
-        .map(|report| {
-            let mut issues = report.issues.clone();
-            if !report.runnable_candidate {
-                issues.extend(
-                    report
-                        .blockers
-                        .iter()
-                        .map(|blocker| format!("final-executable-output:{blocker}")),
-                );
-            }
-            issues
-        })
-        .unwrap_or_default();
+    let final_executable_output_report = nsld_final_executable_output_report(manifest, plan);
+    let final_executable_output_path_present = final_executable_output_report.path_present;
+    let final_executable_output_kind = final_executable_output_report.output_kind.clone();
+    let final_executable_output_validation_mode = final_executable_output_report
+        .output_validation_mode
+        .clone();
+    let final_executable_output_nsld_owned = final_executable_output_report.nsld_owned_output;
+    let final_executable_output_present = final_executable_output_report.present;
+    let final_executable_output_size_bytes = final_executable_output_report.size_bytes;
+    let final_executable_output_hash = final_executable_output_report.output_hash.clone();
+    let final_executable_output_image_header_valid =
+        Some(final_executable_output_report.output_image_header_valid);
+    let final_executable_output_image_magic =
+        final_executable_output_report.output_image_magic.clone();
+    let final_executable_output_image_version = final_executable_output_report.output_image_version;
+    let final_executable_output_image_layout_hash =
+        final_executable_output_report.output_layout_hash.clone();
+    let final_executable_output_image_byte_map_hash =
+        final_executable_output_report.output_byte_map_hash.clone();
+    let final_executable_output_runnable_candidate =
+        Some(final_executable_output_report.runnable_candidate);
+    let final_executable_output_blocker_count = Some(final_executable_output_report.blockers.len());
+    let mut final_executable_output_issues = final_executable_output_report.issues.clone();
+    if final_executable_output_report.present && !final_executable_output_report.runnable_candidate
+    {
+        final_executable_output_issues.extend(
+            final_executable_output_report
+                .blockers
+                .iter()
+                .map(|blocker| format!("final-executable-output:{blocker}")),
+        );
+    }
     let tail = nsld_check_final_tail_snapshot(manifest, plan);
 
     NsldCheckFinalSnapshot {
@@ -297,6 +288,10 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_blocked_plan_hash,
         final_executable_blocked_blocker_count,
         final_executable_blocked_issues,
+        final_executable_output_path_present,
+        final_executable_output_kind,
+        final_executable_output_validation_mode,
+        final_executable_output_nsld_owned,
         final_executable_output_present,
         final_executable_output_size_bytes,
         final_executable_output_hash,
@@ -355,7 +350,9 @@ pub(crate) fn push_final_snapshot_issues(
         issues.push("final executable blocked report verification failed".to_owned());
         issues.extend(snapshot.final_executable_blocked_issues.iter().cloned());
     }
-    if snapshot.final_executable_output_runnable_candidate == Some(false) {
+    if snapshot.final_executable_output_present
+        && snapshot.final_executable_output_runnable_candidate == Some(false)
+    {
         issues.push("final executable output verification failed".to_owned());
         issues.extend(snapshot.final_executable_output_issues.iter().cloned());
     }

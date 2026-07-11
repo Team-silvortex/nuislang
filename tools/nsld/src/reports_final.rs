@@ -502,6 +502,10 @@ pub(crate) struct NsldFinalExecutableEmitVerifyReport {
 pub(crate) struct NsldFinalExecutableOutputReport {
     pub(crate) manifest: String,
     pub(crate) output_path: String,
+    pub(crate) output_kind: String,
+    pub(crate) output_validation_mode: String,
+    pub(crate) path_present: bool,
+    pub(crate) nsld_owned_output: bool,
     pub(crate) present: bool,
     pub(crate) size_bytes: Option<usize>,
     pub(crate) output_hash: Option<String>,

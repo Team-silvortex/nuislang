@@ -36,6 +36,22 @@ cargo run -p nuis -- run-artifact \
   examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
 ```
 
+To hand the emitted manifest to the current linker frontdoor, use:
+
+```bash
+cargo run -p nsld -- check-next-action \
+  examples/bins/native_artifact_closure_demo_project
+
+cargo run -p nsld -- drive \
+  examples/bins/native_artifact_closure_demo_project \
+  --apply --until-clean --json
+```
+
+`check-next-action` is read-only. `drive --apply --until-clean` walks the
+registered artifact chain with the internal Nsld whitelist until it is clean or
+reaches a structured stop such as `not-applied`, `repeated-next-action`, or
+`max-steps`.
+
 If you want the CLI to classify the route before you build, use:
 
 ```bash
@@ -100,6 +116,11 @@ Today this route proves all of these together:
 * the current output directory can be summarized in one doctor-style view
 * the current frontdoor can restate whether the artifact closure is ready to
   run and what the current final link stage looks like
+* `nsld check-next-action` can expose the next linker artifact action without
+  mutating the build directory
+* `nsld drive --apply --until-clean` can materialize the current whitelisted
+  Nsld artifact chain or return a structured stop report when the chain reaches
+  a blocked host-assisted finalization point
 * the compiled artifact and manifest both survive verifier checks
 * the produced native binary actually launches successfully through the `nuis`
   frontdoor

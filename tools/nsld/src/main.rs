@@ -8,6 +8,7 @@ mod check_final;
 mod check_final_tail;
 mod check_object;
 mod cli;
+mod cli_command_parse;
 mod cli_usage;
 mod closure;
 mod closure_snapshot_helpers;
@@ -40,6 +41,7 @@ mod display_object_emit;
 mod display_object_image;
 mod display_prepare;
 mod display_text;
+mod drive;
 mod final_executable_emit;
 mod final_executable_emit_actual;
 mod final_executable_emit_output_verify;
@@ -94,6 +96,8 @@ mod main_check_final_executable_tests;
 mod main_check_final_host_tests;
 #[cfg(test)]
 mod main_cli_final_executable_tests;
+#[cfg(test)]
+mod main_cli_link_artifact_tests;
 #[cfg(test)]
 mod main_cli_object_tests;
 #[cfg(test)]
@@ -182,10 +186,13 @@ use assembly::*;
 use check::*;
 use cli::{parse_args, Command};
 use closure::*;
-use commands::{run_check_command, run_plan_command, run_status_command};
+use commands::{
+    run_check_command, run_check_next_action_command, run_plan_command, run_status_command,
+};
 use container_pipeline::*;
 use context::load_link_input_context;
 use display::*;
+use drive::run_drive_command;
 use final_stage::*;
 use json::*;
 use link_units::*;
@@ -217,6 +224,17 @@ fn run() -> Result<(), String> {
         }
         Command::Check { input, json } => {
             run_check_command(&input, json)?;
+        }
+        Command::CheckNextAction { input, json } => {
+            run_check_next_action_command(&input, json)?;
+        }
+        Command::Drive {
+            input,
+            json,
+            apply,
+            until_clean,
+        } => {
+            run_drive_command(&input, json, apply, until_clean)?;
         }
         Command::ArtifactChain { input, json } => {
             let ctx = load_link_input_context(&input)?;

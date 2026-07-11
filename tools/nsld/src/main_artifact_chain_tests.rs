@@ -366,6 +366,31 @@ fn artifact_chain_marks_self_contained_final_executable_output_as_chain_tail() {
     }));
 }
 
+#[test]
+fn artifact_chain_does_not_treat_host_binary_as_nsld_final_output() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-artifact-chain-host-output-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.final_stage.output_path = dir.join("demo").display().to_string();
+    fs::write(&plan.final_stage.output_path, b"host-binary").unwrap();
+
+    let report = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    let output_path = plan.final_stage.output_path.clone();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.stages.iter().any(|stage| {
+        stage.stage_id == "final-executable-output"
+            && stage.file_name == output_path
+            && stage.path == output_path
+            && !stage.present
+            && !stage.required
+    }));
+}
+
 fn test_artifact_stage(file_name: &'static str, present: bool) -> NsldArtifactStage {
     NsldArtifactStage {
         kind: NsldArtifactStageKind::LinkInputs,

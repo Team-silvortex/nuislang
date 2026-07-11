@@ -7,14 +7,24 @@ use super::{
 };
 use std::{env, fmt::Write as _, path::Path};
 
+const HOST_FINALIZER_ALLOW_ENV: &str = "NUIS_NSLD_ALLOW_HOST_FINALIZER";
+const HOST_FINALIZER_POLICY_ENV: &str = "NUIS_NSLD_HOST_FINALIZER_POLICY";
+
 pub(crate) fn final_executable_writer_blockers(
     final_stage: &NsldFinalStagePlanReport,
 ) -> Vec<String> {
-    if final_stage.host_wrapper_required {
-        vec!["final-executable-writer:host-assisted:not-implemented".to_owned()]
-    } else {
-        Vec::new()
+    if !final_stage.host_wrapper_required {
+        return Vec::new();
     }
+
+    if host_assisted_writer_execution_enabled() {
+        return Vec::new();
+    }
+    if host_finalizer_policy_allows_invoke() {
+        return vec!["final-executable-writer:host-assisted:explicit-allow-missing".to_owned()];
+    }
+
+    vec!["final-executable-writer:host-assisted:not-implemented".to_owned()]
 }
 
 pub(crate) fn final_executable_writer_steps(final_stage: &NsldFinalStagePlanReport) -> Vec<String> {
@@ -78,6 +88,31 @@ pub(crate) fn resolve_host_driver_path(driver: &str) -> Option<String> {
         let candidate = dir.join(driver);
         candidate.is_file().then(|| candidate.display().to_string())
     })
+}
+
+pub(crate) fn host_assisted_writer_execution_enabled() -> bool {
+    host_finalizer_policy_allows_invoke() && host_finalizer_explicit_allow_present()
+}
+
+fn host_finalizer_policy_allows_invoke() -> bool {
+    env::var(HOST_FINALIZER_POLICY_ENV)
+        .map(|value| {
+            let value = value.trim();
+            value == "allow-host-invoke" || value.eq_ignore_ascii_case("allow")
+        })
+        .unwrap_or(false)
+}
+
+fn host_finalizer_explicit_allow_present() -> bool {
+    env::var(HOST_FINALIZER_ALLOW_ENV)
+        .map(|value| {
+            let value = value.trim();
+            value == "1"
+                || value.eq_ignore_ascii_case("true")
+                || value.eq_ignore_ascii_case("yes")
+                || value.eq_ignore_ascii_case("allow")
+        })
+        .unwrap_or(false)
 }
 
 pub(crate) fn render_final_executable_writer_input(

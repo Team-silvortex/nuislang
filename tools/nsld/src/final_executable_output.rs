@@ -16,13 +16,32 @@ pub(crate) fn nsld_final_executable_output_report(
     let final_stage = nsld_verify_final_stage_plan_report(manifest, plan);
     let final_emit = nsld_verify_final_executable_emit_report(manifest, plan);
     let output_path = plan.final_stage.output_path.clone();
-    let output_bytes = fs::read(&output_path);
-    let present = output_bytes.is_ok();
-    let size_bytes = output_bytes.as_ref().ok().map(Vec::len);
-    let output_hash = output_bytes.as_ref().ok().map(|bytes| fnv1a64_hex(bytes));
+    let host_native_output = plan.final_stage.link_mode == "host-toolchain-finalize";
+    let output_kind = if host_native_output {
+        "host-native-executable"
+    } else {
+        "nuis-image"
+    }
+    .to_owned();
+    let output_validation_mode = if host_native_output {
+        "host-native-presence-and-invoke-plan"
+    } else {
+        "nuis-image-header-size-and-hash"
+    }
+    .to_owned();
+    let emitted = final_emit.actual_emitted == Some(true);
+    let path_present = Path::new(&output_path).exists();
+    let nsld_owned_output = emitted && path_present;
+    let output_bytes = if emitted {
+        fs::read(&output_path).ok()
+    } else {
+        None
+    };
+    let present = nsld_owned_output && output_bytes.is_some();
+    let size_bytes = output_bytes.as_ref().map(Vec::len);
+    let output_hash = output_bytes.as_ref().map(|bytes| fnv1a64_hex(bytes));
     let output_header = output_bytes
         .as_ref()
-        .ok()
         .and_then(|bytes| parse_final_executable_image_header(bytes));
     let output_image_magic = output_header.as_ref().map(|header| header.magic.clone());
     let output_image_version = output_header.as_ref().map(|header| header.version as usize);
@@ -73,13 +92,15 @@ pub(crate) fn nsld_final_executable_output_report(
     if final_emit.actual_emitted != Some(true) {
         blockers.push("final-executable-emit:not-emitted".to_owned());
     }
-    if let Err(error) = &output_bytes {
+    if !present {
         blockers.push("final-executable-output:missing".to_owned());
-        issues.push(format!(
-            "missing_or_unreadable_final_executable_output `{output_path}`: {error}"
-        ));
+        if emitted {
+            issues.push(format!(
+                "missing_or_unreadable_final_executable_output `{output_path}`"
+            ));
+        }
     }
-    if present && !output_image_header_valid {
+    if present && !host_native_output && !output_image_header_valid {
         blockers.push("final-executable-output:image-header-invalid".to_owned());
         issues.push(format!(
             "final executable output image header invalid: magic {} version {} header_size {} payload_offset {} payload_span {}",
@@ -98,11 +119,15 @@ pub(crate) fn nsld_final_executable_output_report(
                 .unwrap_or_else(|| "missing".to_owned())
         ));
     }
-    if final_emit.valid && expected_image_hash.is_none() {
+    if !host_native_output && final_emit.valid && expected_image_hash.is_none() {
         blockers.push("final-executable-output:expected-image-hash-missing".to_owned());
         issues.push("final executable output cannot be compared because verified image dry-run hash is missing".to_owned());
     }
-    if present && expected_image_size_bytes.is_some() && size_bytes != expected_image_size_bytes {
+    if !host_native_output
+        && present
+        && expected_image_size_bytes.is_some()
+        && size_bytes != expected_image_size_bytes
+    {
         blockers.push("final-executable-output:size-mismatch".to_owned());
         issues.push(format!(
             "final executable output size mismatch: expected {}, found {}",
@@ -114,7 +139,11 @@ pub(crate) fn nsld_final_executable_output_report(
                 .unwrap_or_else(|| "missing".to_owned())
         ));
     }
-    if present && expected_image_hash.is_some() && output_hash != expected_image_hash {
+    if !host_native_output
+        && present
+        && expected_image_hash.is_some()
+        && output_hash != expected_image_hash
+    {
         blockers.push("final-executable-output:hash-mismatch".to_owned());
         issues.push(format!(
             "final executable output hash mismatch: expected {}, found {}",
@@ -129,12 +158,19 @@ pub(crate) fn nsld_final_executable_output_report(
         && final_stage.valid
         && final_emit.valid
         && final_emit.actual_emitted == Some(true)
-        && matches_expected_image
-        && output_image_header_valid;
+        && if host_native_output {
+            final_emit.actual_host_invoke_plan_would_invoke == Some(true)
+        } else {
+            matches_expected_image && output_image_header_valid
+        };
 
     NsldFinalExecutableOutputReport {
         manifest: manifest.display().to_string(),
         output_path,
+        output_kind,
+        output_validation_mode,
+        path_present,
+        nsld_owned_output,
         present,
         size_bytes,
         output_hash,

@@ -10,6 +10,8 @@ use std::fs;
 
 pub(crate) fn populate_final_output_emit_summary(report: &mut NsldFinalExecutableEmitReport) {
     report.final_output_checked = true;
+    let host_native_output =
+        report.host_wrapper_required && report.final_stage_link_mode == "host-toolchain-finalize";
     let Ok(bytes) = fs::read(&report.output_path) else {
         report.final_output_present = false;
         report.final_output_size_bytes = None;
@@ -32,10 +34,12 @@ pub(crate) fn populate_final_output_emit_summary(report: &mut NsldFinalExecutabl
     report.final_output_size_bytes = Some(bytes.len());
     report.final_output_hash = Some(output_hash.clone());
     report.final_output_image_header_valid = Some(header_valid);
-    report.final_output_runnable_candidate = Some(
+    report.final_output_runnable_candidate = Some(if host_native_output {
+        report.emitted && report.host_invoke_plan_would_invoke == Some(true) && !bytes.is_empty()
+    } else {
         report.emitted
             && header_valid
             && report.image_dry_run_hash.as_deref() == Some(output_hash.as_str())
-            && report.image_dry_run_size_bytes == Some(bytes.len()),
-    );
+            && report.image_dry_run_size_bytes == Some(bytes.len())
+    });
 }

@@ -42,6 +42,106 @@ fn parses_check_input_and_json_flag() {
 }
 
 #[test]
+fn parses_check_next_action_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "check-next-action".to_owned(),
+            "nuis.build.manifest.toml".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::CheckNextAction {
+            input: PathBuf::from("nuis.build.manifest.toml"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_drive_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "drive".to_owned(),
+            "nuis.build.manifest.toml".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::Drive {
+            input: PathBuf::from("nuis.build.manifest.toml"),
+            json: true,
+            apply: false,
+            until_clean: false
+        })
+    );
+}
+
+#[test]
+fn parses_drive_apply_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "drive".to_owned(),
+            "nuis.build.manifest.toml".to_owned(),
+            "--apply".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::Drive {
+            input: PathBuf::from("nuis.build.manifest.toml"),
+            json: true,
+            apply: true,
+            until_clean: false
+        })
+    );
+}
+
+#[test]
+fn parses_drive_apply_until_clean_flag() {
+    let command = parse_args(
+        vec![
+            "drive".to_owned(),
+            "nuis.build.manifest.toml".to_owned(),
+            "--apply".to_owned(),
+            "--until-clean".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::Drive {
+            input: PathBuf::from("nuis.build.manifest.toml"),
+            json: true,
+            apply: true,
+            until_clean: true
+        })
+    );
+}
+
+#[test]
+fn rejects_drive_until_clean_without_apply() {
+    let error = parse_args(
+        vec![
+            "drive".to_owned(),
+            "nuis.build.manifest.toml".to_owned(),
+            "--until-clean".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .unwrap_err();
+
+    assert!(error.contains("requires `--apply`"));
+}
+
+#[test]
 fn parses_artifact_chain_input_and_json_flag() {
     let command = parse_args(
         vec![
@@ -289,273 +389,6 @@ fn parses_verify_section_manifest_input_and_json_flag() {
     assert_eq!(
         command,
         Ok(Command::VerifySectionManifest {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_container_plan_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "container-plan".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::ContainerPlan {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_emit_container_plan_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "emit-container-plan".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::EmitContainerPlan {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_verify_container_plan_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "verify-container-plan".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::VerifyContainerPlan {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_container_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "container".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::Container {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_emit_container_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "emit-container".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::EmitContainer {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_verify_container_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "verify-container".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::VerifyContainer {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_bundle_input_and_json_flag() {
-    let command =
-        parse_args(vec!["bundle".to_owned(), "out".to_owned(), "--json".to_owned()].into_iter());
-    assert_eq!(
-        command,
-        Ok(Command::Bundle {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_emit_bundle_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "emit-bundle".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::EmitBundle {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_verify_bundle_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "verify-bundle".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::VerifyBundle {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_units_input_and_json_flag() {
-    let command =
-        parse_args(vec!["units".to_owned(), "out".to_owned(), "--json".to_owned()].into_iter());
-    assert_eq!(
-        command,
-        Ok(Command::Units {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_emit_units_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "emit-units".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::EmitUnits {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_verify_units_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "verify-units".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::VerifyUnits {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_inputs_input_and_json_flag() {
-    let command =
-        parse_args(vec!["inputs".to_owned(), "out".to_owned(), "--json".to_owned()].into_iter());
-    assert_eq!(
-        command,
-        Ok(Command::Inputs {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_emit_inputs_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "emit-inputs".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::EmitInputs {
-            input: PathBuf::from("out"),
-            json: true
-        })
-    );
-}
-
-#[test]
-fn parses_verify_inputs_input_and_json_flag() {
-    let command = parse_args(
-        vec![
-            "verify-inputs".to_owned(),
-            "out".to_owned(),
-            "--json".to_owned(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(
-        command,
-        Ok(Command::VerifyInputs {
             input: PathBuf::from("out"),
             json: true
         })

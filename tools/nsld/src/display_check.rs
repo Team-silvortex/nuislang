@@ -249,7 +249,11 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_blocked_issues.len()
     );
     println!(
-        "  final_executable_output: present={} header_valid={} magic={} version={} runnable={} size={} hash={} blockers={} issues={}",
+        "  final_executable_output: path_present={} kind={} validation={} nsld_owned={} present={} header_valid={} magic={} version={} runnable={} size={} hash={} blockers={} issues={}",
+        report.final_executable_output_path_present,
+        report.final_executable_output_kind,
+        report.final_executable_output_validation_mode,
+        report.final_executable_output_nsld_owned,
         report.final_executable_output_present,
         optional_bool_text(report.final_executable_output_image_header_valid),
         optional_string_text(report.final_executable_output_image_magic.as_deref()),

@@ -323,6 +323,13 @@ fn check_reports_valid_final_executable_output_when_present() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(report.valid, "{:?}", report.issues);
+    assert!(report.final_executable_output_path_present);
+    assert_eq!(report.final_executable_output_kind, "nuis-image");
+    assert_eq!(
+        report.final_executable_output_validation_mode,
+        "nuis-image-header-size-and-hash"
+    );
+    assert!(report.final_executable_output_nsld_owned);
     assert!(report.final_executable_output_present);
     assert_eq!(
         report.final_executable_output_size_bytes,
@@ -357,6 +364,12 @@ fn check_reports_valid_final_executable_output_when_present() {
     );
     assert_eq!(report.final_executable_output_blocker_count, Some(0));
     assert!(report.final_executable_output_issues.is_empty());
+    assert!(report_json.contains("\"final_executable_output_path_present\":true"));
+    assert!(report_json.contains("\"final_executable_output_kind\":\"nuis-image\""));
+    assert!(report_json.contains(
+        "\"final_executable_output_validation_mode\":\"nuis-image-header-size-and-hash\""
+    ));
+    assert!(report_json.contains("\"final_executable_output_nsld_owned\":true"));
     assert!(report_json.contains("\"final_executable_output_present\":true"));
     assert!(report_json.contains("\"final_executable_output_image_header_valid\":true"));
     assert!(report_json.contains("\"final_executable_output_image_magic\":\"NUIFIMG\""));

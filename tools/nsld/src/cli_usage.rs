@@ -4,6 +4,8 @@ pub(crate) fn usage() -> &'static str {
         "  nsld status\n",
         "  nsld plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld check <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld check-next-action <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld drive <nuis.build.manifest.toml|artifact-output-dir> [--json] [--apply] [--until-clean]\n",
         "  nsld artifact-chain <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",

@@ -45,6 +45,7 @@ use super::{
     closure::{nsld_closure_report, nsld_verify_closure_report},
     final_executable_paths::nsld_final_stage_plan_path,
     final_executable_render::render_final_stage_plan,
+    final_executable_writer::host_assisted_writer_execution_enabled,
     final_stage_plan::{final_stage_input, final_stage_notes, nsld_final_stage_plan_hash},
     reports::{
         NsldFinalStagePlanEmitReport, NsldFinalStagePlanReport, NsldFinalStagePlanVerifyReport,
@@ -126,7 +127,7 @@ pub(crate) fn nsld_final_stage_plan_report(
     if closure.container_loader_readiness == "blocked" {
         blockers.push("container-loader-blocked".to_owned());
     }
-    if host_wrapper_required {
+    if host_wrapper_required && !host_assisted_writer_execution_enabled() {
         blockers.push("self-owned-final-native-linker".to_owned());
     }
 

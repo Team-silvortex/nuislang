@@ -1,5 +1,6 @@
 use super::{
     artifact_chain_actions::nsld_artifact_chain_action_plan,
+    final_executable_output::nsld_final_executable_output_report,
     reports::{NsldArtifactChainReport, NsldArtifactStageDiagnostic},
 };
 use std::path::{Path, PathBuf};
@@ -306,12 +307,25 @@ fn nsld_artifact_stage_path_for_plan(plan: &nuisc::linker::LinkPlan, file_name: 
 pub(crate) fn nsld_artifact_stages_for_plan(
     plan: &nuisc::linker::LinkPlan,
 ) -> Vec<NsldArtifactStage> {
+    nsld_artifact_stages_for_plan_with_final_output_present(plan, None)
+}
+
+fn nsld_artifact_stages_for_plan_with_final_output_present(
+    plan: &nuisc::linker::LinkPlan,
+    final_output_present: Option<bool>,
+) -> Vec<NsldArtifactStage> {
     let mut stages = Vec::with_capacity(ARTIFACT_STAGE_DEFINITIONS.len());
     for (kind, _) in ARTIFACT_STAGE_DEFINITIONS {
         let file_name = nsld_artifact_stage_file_name_for_plan(*kind, plan);
+        let present = if *kind == NsldArtifactStageKind::FinalExecutableOutput {
+            final_output_present
+                .unwrap_or_else(|| nsld_artifact_stage_path_for_plan(plan, &file_name).exists())
+        } else {
+            nsld_artifact_stage_path_for_plan(plan, &file_name).exists()
+        };
         stages.push(NsldArtifactStage {
             kind: *kind,
-            present: nsld_artifact_stage_path_for_plan(plan, &file_name).exists(),
+            present,
             file_name,
             required: nsld_artifact_stage_required(*kind),
         });
@@ -409,7 +423,9 @@ pub(crate) fn nsld_artifact_chain_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldArtifactChainReport {
-    let stages = nsld_artifact_stages_for_plan(plan);
+    let final_output = nsld_final_executable_output_report(manifest, plan);
+    let stages =
+        nsld_artifact_stages_for_plan_with_final_output_present(plan, Some(final_output.present));
     let issues = nsld_artifact_chain_issues(&stages);
     let advisories = nsld_artifact_chain_advisories(&stages);
     let diagnostics = stages

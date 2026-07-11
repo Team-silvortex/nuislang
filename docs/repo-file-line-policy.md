@@ -2,7 +2,8 @@
 
 The repository now follows a simple file-size rule:
 
-* default maximum: `600` lines per text file
+* default maximum: `600` lines per code/config text file
+* Markdown maximum: `2000` lines per `.md` reference/history document
 * checked categories:
   * `.rs`
   * `.ns`
@@ -28,7 +29,9 @@ The goal is:
 
 ## Historical Exceptions
 
-There are still legacy files above the `600` line default.
+There are still legacy code/config/source files above the `600` line default.
+Markdown files are allowed to be longer because reference material often needs a
+larger narrative envelope, but they should still stay below `2000` lines.
 
 Those files are tracked in an explicit exception budget table inside
 [tools/nuisc/tests/file_line_limit.rs](../tools/nuisc/tests/file_line_limit.rs).
@@ -36,7 +39,8 @@ Those files are tracked in an explicit exception budget table inside
 Important rule:
 
 * an exception is a temporary ceiling, not permission to keep growing
-* if a file is already oversized, it may stay at or below its recorded budget
+* if a non-Markdown file is already oversized, it may stay at or below its
+  recorded budget
 * if a file drops in size, its budget should be lowered with it
 * new files should not be added to the exception list casually
 

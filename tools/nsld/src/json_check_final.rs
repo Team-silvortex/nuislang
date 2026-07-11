@@ -137,6 +137,22 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             &report.final_executable_blocked_issues,
         ),
         json_bool_field(
+            "final_executable_output_path_present",
+            report.final_executable_output_path_present,
+        ),
+        json_string_field(
+            "final_executable_output_kind",
+            &report.final_executable_output_kind,
+        ),
+        json_string_field(
+            "final_executable_output_validation_mode",
+            &report.final_executable_output_validation_mode,
+        ),
+        json_bool_field(
+            "final_executable_output_nsld_owned",
+            report.final_executable_output_nsld_owned,
+        ),
+        json_bool_field(
             "final_executable_output_present",
             report.final_executable_output_present,
         ),

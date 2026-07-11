@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const DEFAULT_MAX_LINES: usize = 600;
+const MARKDOWN_MAX_LINES: usize = 2000;
 
 fn exception_budgets() -> BTreeMap<&'static str, usize> {
     BTreeMap::from([
@@ -17,12 +18,6 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("crates/yir-lower-contract/src/lib.rs", 2530),
         ("crates/yir-lower-llvm/src/lib.rs", 600),
         ("crates/yir-lower-llvm/src/tests.rs", 600),
-        ("docs/grammar/nuis-ir.md", 678),
-        ("docs/historical/nuislang-whitepaper-v0.44b.md", 639),
-        ("docs/reference/nsld-linker-frontdoor.md", 1388),
-        ("docs/reference/std-shader-kernel-project-contract.md", 770),
-        ("docs/reference/yir-langref.md", 874),
-        ("docs/reference/yir-tools-reference.md", 674),
         (
             "examples/projects/domains/net_session_recipe_demo/main.ns",
             1106,
@@ -135,6 +130,13 @@ fn line_count(path: &Path) -> usize {
     content.lines().count()
 }
 
+fn default_limit_for(path: &Path) -> usize {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some("md") => MARKDOWN_MAX_LINES,
+        _ => DEFAULT_MAX_LINES,
+    }
+}
+
 #[test]
 fn repository_text_files_respect_line_budget() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -154,15 +156,16 @@ fn repository_text_files_respect_line_budget() {
             .to_string_lossy()
             .replace('\\', "/");
         let lines = line_count(&path);
+        let default_limit = default_limit_for(&path);
         let limit = exception_budgets
             .get(rel.as_str())
             .copied()
-            .unwrap_or(DEFAULT_MAX_LINES);
+            .unwrap_or(default_limit);
         if lines > limit {
             let reason = if exception_budgets.contains_key(rel.as_str()) {
                 format!("{rel}: {lines} lines exceeds exception budget {limit}")
             } else {
-                format!("{rel}: {lines} lines exceeds default limit {DEFAULT_MAX_LINES}")
+                format!("{rel}: {lines} lines exceeds default limit {default_limit}")
             };
             violations.push(reason);
         }

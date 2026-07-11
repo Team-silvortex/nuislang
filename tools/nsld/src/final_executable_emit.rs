@@ -11,7 +11,7 @@ use super::{
     },
     reports::{NsldFinalExecutableEmitReport, NsldFinalExecutableEmitVerifyReport},
 };
-use std::{fs, path::Path};
+use std::{fs, path::Path, process::Command};
 
 pub(crate) fn nsld_emit_final_executable_report(
     manifest: &Path,
@@ -27,12 +27,16 @@ pub(crate) fn nsld_emit_final_executable_report(
                 )
             })?;
         }
-        fs::copy(&report.image_dry_run_bytes_path, &report.output_path).map_err(|error| {
-            format!(
-                "failed to write nsld final executable output `{}` from `{}`: {error}",
-                report.output_path, report.image_dry_run_bytes_path
-            )
-        })?;
+        if report.host_wrapper_required {
+            emit_host_assisted_final_executable(&report)?;
+        } else {
+            fs::copy(&report.image_dry_run_bytes_path, &report.output_path).map_err(|error| {
+                format!(
+                    "failed to write nsld final executable output `{}` from `{}`: {error}",
+                    report.output_path, report.image_dry_run_bytes_path
+                )
+            })?;
+        }
         report.emitted = true;
         populate_final_output_emit_summary(&mut report);
     }
@@ -48,6 +52,31 @@ pub(crate) fn nsld_emit_final_executable_report(
         )
     })?;
     Ok(report)
+}
+
+fn emit_host_assisted_final_executable(
+    report: &NsldFinalExecutableEmitReport,
+) -> Result<(), String> {
+    let (program, args) = report
+        .host_dry_run_command_args
+        .split_first()
+        .ok_or_else(|| "host finalizer command args are empty".to_owned())?;
+    let status = Command::new(program)
+        .args(args)
+        .status()
+        .map_err(|error| format!("failed to invoke host finalizer driver `{program}`: {error}"))?;
+    if !status.success() {
+        return Err(format!(
+            "host finalizer driver `{program}` exited with status {status}"
+        ));
+    }
+    if !Path::new(&report.output_path).is_file() {
+        return Err(format!(
+            "host finalizer driver `{program}` completed but did not create `{}`",
+            report.output_path
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn nsld_verify_final_executable_emit_report(

@@ -1,3 +1,4 @@
+use crate::json_fields::{json_bool_field, json_optional_string_field, json_string_field};
 use crate::{
     context::load_link_input_context, display, json, nsld_check_report, reports::NsldCheckReport,
 };
@@ -57,6 +58,20 @@ pub(crate) fn run_check_command(input: &Path, json_output: bool) -> Result<(), S
     }
 }
 
+pub(crate) fn run_check_next_action_command(input: &Path, json_output: bool) -> Result<(), String> {
+    let ctx = load_link_input_context(input)?;
+    let report = nsld_check_report(&ctx.manifest, &ctx.plan);
+    let next_action = nsld_check_next_action(&report);
+    if json_output {
+        println!("{}", nsld_check_next_action_json(&next_action));
+    } else if let Some(command) = nsld_check_next_action_dry_run(&report) {
+        println!("{command}");
+    } else {
+        println!("no-next-action");
+    }
+    Ok(())
+}
+
 pub(crate) fn nsld_check_failure_message(report: &NsldCheckReport) -> String {
     let next_action = nsld_check_next_action(report);
     match (
@@ -66,6 +81,20 @@ pub(crate) fn nsld_check_failure_message(report: &NsldCheckReport) -> String {
         (true, Some(command)) => format!("nsld check failed; next action: {command}"),
         _ => "nsld check failed".to_owned(),
     }
+}
+
+pub(crate) fn nsld_check_next_action_json(next_action: &NsldCheckNextAction) -> String {
+    let fields = [
+        json_string_field("tool", "nsld"),
+        json_string_field("kind", "nsld_check_next_action"),
+        json_bool_field("available", next_action.available),
+        json_optional_string_field("source", next_action.source.as_deref()),
+        json_optional_string_field("command_id", next_action.command_id.as_deref()),
+        json_optional_string_field("command", next_action.command.as_deref()),
+        json_optional_string_field("command_resolved", next_action.command_resolved.as_deref()),
+        json_optional_string_field("reason", next_action.reason.as_deref()),
+    ];
+    format!("{{{}}}", fields.join(","))
 }
 
 pub(crate) fn nsld_check_next_action(report: &NsldCheckReport) -> NsldCheckNextAction {
@@ -79,10 +108,19 @@ pub(crate) fn nsld_check_next_action(report: &NsldCheckReport) -> NsldCheckNextA
     }
 }
 
+pub(crate) fn nsld_check_next_action_dry_run(report: &NsldCheckReport) -> Option<String> {
+    let next_action = nsld_check_next_action(report);
+    next_action
+        .available
+        .then(|| next_action.command_resolved)
+        .flatten()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        nsld_check_failure_message, nsld_check_next_action, run_check_command, run_plan_command,
+        nsld_check_failure_message, nsld_check_next_action, nsld_check_next_action_dry_run,
+        nsld_check_next_action_json, run_check_command, run_plan_command,
     };
     use crate::{main_test_support::empty_link_plan, nsld_check_report};
     use std::path::Path;
@@ -151,5 +189,44 @@ mod tests {
         report.next_action_command_resolved = None;
 
         assert_eq!(nsld_check_failure_message(&report), "nsld check failed");
+    }
+
+    #[test]
+    fn check_next_action_dry_run_returns_resolved_command() {
+        let mut report = nsld_check_report(Path::new("manifest.toml"), &empty_link_plan());
+        report.next_action_available = true;
+        report.next_action_command_resolved = Some("nsld emit-inputs manifest.toml".to_owned());
+
+        assert_eq!(
+            nsld_check_next_action_dry_run(&report).as_deref(),
+            Some("nsld emit-inputs manifest.toml")
+        );
+    }
+
+    #[test]
+    fn check_next_action_dry_run_omits_unavailable_action() {
+        let mut report = nsld_check_report(Path::new("manifest.toml"), &empty_link_plan());
+        report.next_action_available = false;
+        report.next_action_command_resolved = Some("nsld emit-inputs manifest.toml".to_owned());
+
+        assert_eq!(nsld_check_next_action_dry_run(&report), None);
+    }
+
+    #[test]
+    fn check_next_action_json_reports_dry_run_shape() {
+        let next_action = super::NsldCheckNextAction {
+            available: true,
+            source: Some("required".to_owned()),
+            command_id: Some("emit-inputs".to_owned()),
+            command: Some("nsld emit-inputs <input>".to_owned()),
+            command_resolved: Some("nsld emit-inputs manifest.toml".to_owned()),
+            reason: Some("first missing required artifact stage `link-inputs`".to_owned()),
+        };
+        let json = nsld_check_next_action_json(&next_action);
+
+        assert!(json.contains("\"kind\":\"nsld_check_next_action\""));
+        assert!(json.contains("\"available\":true"));
+        assert!(json.contains("\"source\":\"required\""));
+        assert!(json.contains("\"command_resolved\":\"nsld emit-inputs manifest.toml\""));
     }
 }

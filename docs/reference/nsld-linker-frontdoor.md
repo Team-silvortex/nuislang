@@ -16,8 +16,8 @@ Longer-term, `Nsld` should be read as a CLI adapter over a future reusable
 linker core / galaxy capability boundary, not as a CLI-only tool. See
 [toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md).
 For the current gap between the deterministic Nsld container and a runnable
-Nuis-owned heterogeneous executable, see
-[nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md).
+Nuis-owned heterogeneous executable, see [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md).
+For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdoor.md).
 
 ## Current Role
 
@@ -1158,16 +1158,21 @@ verifies it and exposes `final_executable_blocked_present`,
 `final_executable_blocked_issues`. The file remains optional so `prepare` can
 stay a deterministic artifact preparation step while final executable emission
 remains an explicit boundary command.
-If the final-stage output file itself is present, `nsld check` runs the same
+If the Nsld-owned final-stage output is present, `nsld check` runs the same
 read-only output boundary exposed by `final-executable-output` and reports
+`final_executable_output_path_present`,
+`final_executable_output_nsld_owned`,
 `final_executable_output_present`,
 `final_executable_output_size_bytes`,
 `final_executable_output_hash`,
 `final_executable_output_runnable_candidate`,
 `final_executable_output_blocker_count`, and
-`final_executable_output_issues`. A missing final output remains non-fatal so
-ordinary preparation workflows can stop before the explicit final emit step,
-but a present output must be consistent with the emitted final-executable
+`final_executable_output_issues`. The standalone `final-executable-output`
+report distinguishes `path_present` from `nsld_owned_output`: a host-native
+binary can exist at the final-stage path without being treated as a Nuis image
+emitted by Nsld. A missing Nsld-owned final output remains non-fatal so ordinary
+preparation workflows can stop before the explicit final emit step, but a
+present Nsld-owned output must be consistent with the emitted final-executable
 boundary.
 
 `nsld prepare` also returns the same compatibility-domain summary after it has

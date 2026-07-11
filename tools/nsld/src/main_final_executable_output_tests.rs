@@ -380,6 +380,8 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
         Some(true)
     );
     assert!(output.present);
+    assert!(output.path_present);
+    assert!(output.nsld_owned_output);
     assert!(output.runnable_candidate, "{:?}", output.blockers);
     assert!(output.matches_expected_image, "{:?}", output.issues);
     assert_eq!(output.size_bytes, Some(output_bytes.len()));
@@ -401,6 +403,8 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert_eq!(output.expected_image_hash, Some(fnv1a64_hex(&image_bytes)));
     assert_eq!(image_bytes, output_bytes);
     assert!(output_json.contains("\"present\":true"));
+    assert!(output_json.contains("\"path_present\":true"));
+    assert!(output_json.contains("\"nsld_owned_output\":true"));
     assert!(output_json.contains("\"output_image_header_valid\":true"));
     assert!(output_json.contains("\"output_image_magic\":\"NUIFIMG\""));
     assert!(output_json.contains("\"output_image_version\":1"));

@@ -4,6 +4,13 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
     println!("Nsld final executable output");
     println!("  manifest: {}", report.manifest);
     println!("  output_path: {}", report.output_path);
+    println!("  output_kind: {}", report.output_kind);
+    println!(
+        "  output_validation_mode: {}",
+        report.output_validation_mode
+    );
+    println!("  path_present: {}", report.path_present);
+    println!("  nsld_owned_output: {}", report.nsld_owned_output);
     println!("  present: {}", report.present);
     println!("  size_bytes: {}", optional_usize_text(report.size_bytes));
     println!(
