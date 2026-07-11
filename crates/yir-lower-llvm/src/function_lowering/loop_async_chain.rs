@@ -238,43 +238,17 @@ macro_rules! lower_loop_async_chain {
                             } else {
                                 (terms_part, false)
                             };
-                        let resolve_term = |term: &str| -> Result<String, String> {
-                            match term {
-                                "current" => Ok(next_current.clone()),
-                                "prev_current" => Ok(current.clone()),
-                                other if other.starts_with("prev_carry") => {
-                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })?;
-                                    current_carries.get(source_index).cloned().ok_or_else(|| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })
-                                }
-                                other if other.starts_with("carry") => {
-                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })?;
-                                    next_carries.get(source_index).cloned().ok_or_else(|| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })
-                                }
-                                _ => Err(format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                    node.name,
-                                )),
-                            }
+                        let resolve_term = |term: &str| {
+                            resolve_loop_carry_term(
+                                term,
+                                carry_kind,
+                                &current,
+                                &next_current,
+                                &current_carries,
+                                &next_carries,
+                                &node.name,
+                                loop_instruction,
+                            )
                         };
                         let factor = resolve_term(factor_term)?;
                         let factor_offset = payloads.first().ok_or_else(|| {
@@ -328,43 +302,17 @@ macro_rules! lower_loop_async_chain {
                             } else {
                                 (terms_part, false)
                             };
-                        let resolve_term = |term: &str| -> Result<String, String> {
-                            match term {
-                                "current" => Ok(next_current.clone()),
-                                "prev_current" => Ok(current.clone()),
-                                other if other.starts_with("prev_carry") => {
-                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })?;
-                                    current_carries.get(source_index).cloned().ok_or_else(|| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })
-                                }
-                                other if other.starts_with("carry") => {
-                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })?;
-                                    next_carries.get(source_index).cloned().ok_or_else(|| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })
-                                }
-                                _ => Err(format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                    node.name,
-                                )),
-                            }
+                        let resolve_term = |term: &str| {
+                            resolve_loop_carry_term(
+                                term,
+                                carry_kind,
+                                &current,
+                                &next_current,
+                                &current_carries,
+                                &next_carries,
+                                &node.name,
+                                loop_instruction,
+                            )
                         };
                         let factor = resolve_term(factor_term)?;
                         let mut terms = terms_part.split("_plus_");
@@ -413,43 +361,17 @@ macro_rules! lower_loop_async_chain {
                                 node.name,
                             )
                         })?;
-                        let resolve_term = |term: &str| -> Result<String, String> {
-                            match term {
-                                "current" => Ok(next_current.clone()),
-                                "prev_current" => Ok(current.clone()),
-                                other if other.starts_with("prev_carry") => {
-                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })?;
-                                    current_carries.get(source_index).cloned().ok_or_else(|| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })
-                                }
-                                other if other.starts_with("carry") => {
-                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })?;
-                                    next_carries.get(source_index).cloned().ok_or_else(|| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })
-                                }
-                                _ => Err(format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                    node.name,
-                                )),
-                            }
+                        let resolve_term = |term: &str| {
+                            resolve_loop_carry_term(
+                                term,
+                                carry_kind,
+                                &current,
+                                &next_current,
+                                &current_carries,
+                                &next_carries,
+                                &node.name,
+                                loop_instruction,
+                            )
                         };
                         let mut terms = terms_part.split("_plus_");
                         let first = terms.next().ok_or_else(|| {
@@ -491,43 +413,17 @@ macro_rules! lower_loop_async_chain {
                         } else {
                             unreachable!()
                         };
-                        let resolve_term = |term: &str| -> Result<String, String> {
-                            match term {
-                                "current" => Ok(next_current.clone()),
-                                "prev_current" => Ok(current.clone()),
-                                other if other.starts_with("prev_carry") => {
-                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })?;
-                                    current_carries.get(source_index).cloned().ok_or_else(|| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })
-                                }
-                                other if other.starts_with("carry") => {
-                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })?;
-                                    next_carries.get(source_index).cloned().ok_or_else(|| {
-                                        format!(
-                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
-                                            node.name,
-                                        )
-                                    })
-                                }
-                                _ => Err(format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
-                                    node.name,
-                                )),
-                            }
+                        let resolve_term = |term: &str| {
+                            resolve_loop_carry_term(
+                                term,
+                                carry_kind,
+                                &current,
+                                &next_current,
+                                &current_carries,
+                                &next_carries,
+                                &node.name,
+                                loop_instruction,
+                            )
                         };
                         let mut terms = terms_part.split("_plus_");
                         let first = terms.next().ok_or_else(|| {

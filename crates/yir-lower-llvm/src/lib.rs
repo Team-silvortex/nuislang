@@ -20,7 +20,12 @@ mod extern_call_lowering;
 mod function_lowering;
 mod guard_host_call;
 mod guard_return_lowering;
+mod loop_async_post_flow_payload;
+mod loop_async_post_flow_source;
 mod loop_carry_payload;
+mod loop_carry_read_source;
+mod loop_carry_scaled_source;
+mod loop_carry_source;
 mod loop_chain_result;
 mod loop_expr;
 mod loop_flow_control_lowering;
@@ -53,7 +58,12 @@ use extern_abi::render_dynamic_extern_decls;
 use extern_call_lowering::lower_cpu_extern_call_node;
 use function_lowering::emit_cpu_function;
 use guard_return_lowering::{lower_cpu_guard_return_node, GuardReturnLoweringOutcome};
+use loop_async_post_flow_payload::async_post_flow_carry_source_payload_len;
+use loop_async_post_flow_source::resolve_source_for_async_post_flow;
 use loop_carry_payload::{loop_async_chain_carry_payload_len, loop_carry_payload_len};
+use loop_carry_read_source::try_resolve_loop_carry_read_source;
+use loop_carry_scaled_source::try_resolve_loop_carry_scaled_source;
+use loop_carry_source::resolve_loop_carry_term;
 use loop_chain_result::{insert_i64_loop_chain_result, insert_scalar_loop_chain_result};
 use loop_expr::{
     canonical_loop_block_prefix, canonical_loop_instruction, collect_resolved_loop_flow_leaves,
