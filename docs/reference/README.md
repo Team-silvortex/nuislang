@@ -89,8 +89,12 @@ If your question is specifically “what remains between the current Nsld
 container and a runnable Nuis-owned heterogeneous executable?”, start with
 [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md).
 
-If your question is specifically “what is the current alpha-0.8 binary-linking
-target and what wording is safe?”, start with
+If your question is specifically “what is the current alpha-0.10 executable
+artifact target and what wording is safe?”, start with
+[../versioning/nuis-alpha-0.10-mainline-entry.md](../../docs/versioning/nuis-alpha-0.10-mainline-entry.md).
+
+If your question is specifically “what did the alpha-0.8 binary-linking
+convergence predecessor establish?”, read
 [../versioning/nuis-alpha-0.8-mainline-entry.md](../../docs/versioning/nuis-alpha-0.8-mainline-entry.md).
 
 If your question is specifically “how should Nuis treat the C world and the

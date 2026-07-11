@@ -7,7 +7,7 @@
 
 ## Current Status
 
-The repository is on the `alpha-0.8.*` line. This is still an architecture
+The repository is on the `alpha-0.10.*` line. This is still an architecture
 building line, not a beta-stability line, but the project now has one connected
 compiler/toolchain spine instead of separate experimental islands.
 
@@ -23,7 +23,7 @@ nuis source / nuis.toml project
   -> nsld binary-linking convergence
 ```
 
-The current goal before `alpha-0.10.0` is an honest minimal binary-linking loop:
+The current `alpha-0.10.*` goal is an honest minimal executable-artifact loop:
 
 ```text
 project
@@ -32,16 +32,19 @@ project
   -> container + payload
   -> closure snapshot
   -> final-stage plan
-  -> runnable binary route or explicit blocked executable artifact
+  -> executable writer input
+  -> runnable host-assisted artifact or explicit blocked executable artifact
 ```
 
 This does not yet mean final self-hosting, final std API stability, or a fully
 self-owned linker. Safe current wording is `binary-linking convergence`,
-`minimal runnable route`, and `host-assisted finalization` where applicable.
+`executable-artifact closure`, `minimal runnable route`, and
+`host-assisted finalization` where applicable.
 
 Start here for the current line:
 
 * [docs/current-mainline-map.md](docs/current-mainline-map.md)
+* [docs/versioning/nuis-alpha-0.10-mainline-entry.md](docs/versioning/nuis-alpha-0.10-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.8-mainline-entry.md](docs/versioning/nuis-alpha-0.8-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.8-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.8-doc-sync-inventory.md)
 * [docs/reference/nsld-linker-frontdoor.md](docs/reference/nsld-linker-frontdoor.md)

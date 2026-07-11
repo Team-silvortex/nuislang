@@ -7,32 +7,33 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `alpha-0.8.*` reading route, use this order:
+If you only need the shortest current `alpha-0.10.*` reading route, use this order:
 
-1. [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
-2. [versioning/nuis-alpha-0.8-doc-sync-inventory.md](versioning/nuis-alpha-0.8-doc-sync-inventory.md)
-3. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-4. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-5. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
-6. [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md)
-7. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-8. [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
-9. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-10. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
-11. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
-12. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-13. [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-14. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-15. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-16. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-17. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-18. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
-19. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
-20. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
-21. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
-22. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-23. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-24. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
+1. [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
+2. [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
+3. [versioning/nuis-alpha-0.8-doc-sync-inventory.md](versioning/nuis-alpha-0.8-doc-sync-inventory.md)
+4. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+5. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+6. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+7. [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md)
+8. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
+9. [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
+10. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
+11. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
+12. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
+13. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+14. [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
+15. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+16. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+17. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+18. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+19. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
+20. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
+21. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
+22. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
+23. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+24. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
+25. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
 
 Short rule:
 
@@ -42,9 +43,11 @@ Short rule:
 
 * repo status and current toolchain spine:
   [README.md](../README.md)
-* current `alpha-0.8.*` entry:
+* current `alpha-0.10.*` entry:
+  [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
+* predecessor `alpha-0.8.*` binary convergence entry:
   [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
-* current `alpha-0.8.*` documentation sync inventory:
+* predecessor `alpha-0.8.*` documentation sync inventory:
   [versioning/nuis-alpha-0.8-doc-sync-inventory.md](versioning/nuis-alpha-0.8-doc-sync-inventory.md)
 * predecessor `alpha-0.7.*` entry:
   [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)

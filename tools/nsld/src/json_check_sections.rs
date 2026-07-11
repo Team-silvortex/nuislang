@@ -326,6 +326,28 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             report.final_executable_output_hash.as_deref(),
         ),
         json_optional_bool_field(
+            "final_executable_output_image_header_valid",
+            report.final_executable_output_image_header_valid,
+        ),
+        json_optional_string_field(
+            "final_executable_output_image_magic",
+            report.final_executable_output_image_magic.as_deref(),
+        ),
+        json_optional_usize_field(
+            "final_executable_output_image_version",
+            report.final_executable_output_image_version,
+        ),
+        json_optional_string_field(
+            "final_executable_output_image_layout_hash",
+            report.final_executable_output_image_layout_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "final_executable_output_image_byte_map_hash",
+            report
+                .final_executable_output_image_byte_map_hash
+                .as_deref(),
+        ),
+        json_optional_bool_field(
             "final_executable_output_runnable_candidate",
             report.final_executable_output_runnable_candidate,
         ),

@@ -8,9 +8,9 @@ contract logic in `nuisc::linker`. It does not yet claim to be the final
 self-owned object linker. Its job is to give linker work a stable tool
 boundary before the implementation is split out further.
 
-For the current `alpha-0.8.*` line, the emphasis is binary-linking
-convergence: keep the existing frontdoor/reporting discipline, but drive it
-toward the smallest runnable binary route before `alpha-0.10.0`.
+For the current `alpha-0.10.*` line, the emphasis is executable-artifact
+closure: keep the frontdoor/reporting discipline, but drive it toward the
+smallest runnable host-assisted route or explicit blocked executable artifact.
 
 Longer-term, `Nsld` should be read as a CLI adapter over a future reusable
 linker core / galaxy capability boundary, not as a CLI-only tool. See
@@ -1374,15 +1374,15 @@ This is the beginning of linker independence, not the end of linker work.
 
 ## Alpha-0.8.* Meaning
 
-For `alpha-0.8.*`, success means:
+For `alpha-0.10.*`, success means:
 
 * Nsld artifact-chain diagnostics can explain missing stages and suggested
   commands
 * object/container/closure/final-stage artifacts remain deterministic and
   checkable
 * final executable readiness describes the exact blocker before real execution
-* the next implementation work is pointed at a minimal runnable binary route
-  before `alpha-0.10.0`
+* the next implementation work is pointed at a minimal runnable host-assisted
+  route or explicit blocked executable artifact
 
 This is the convergence line for binary linking. It should still avoid claiming
 that the self-owned production linker is finished.

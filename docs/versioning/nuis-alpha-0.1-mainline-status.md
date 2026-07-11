@@ -2,7 +2,7 @@
 
 This file is now a predecessor anchor for the `alpha-0.1.*` line.
 
-For present-tense `alpha-0.4.*` work, start with:
+For current hardening-baseline context from the `alpha-0.4.*` line, start with:
 
 * [nuis-alpha-0.4-system-inventory.md](nuis-alpha-0.4-system-inventory.md)
 * [nuis-alpha-0.4-mainline-hardening-plan.md](nuis-alpha-0.4-mainline-hardening-plan.md)

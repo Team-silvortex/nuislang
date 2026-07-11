@@ -51,6 +51,11 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_present: bool,
     pub(crate) final_executable_output_size_bytes: Option<usize>,
     pub(crate) final_executable_output_hash: Option<String>,
+    pub(crate) final_executable_output_image_header_valid: Option<bool>,
+    pub(crate) final_executable_output_image_magic: Option<String>,
+    pub(crate) final_executable_output_image_version: Option<usize>,
+    pub(crate) final_executable_output_image_layout_hash: Option<String>,
+    pub(crate) final_executable_output_image_byte_map_hash: Option<String>,
     pub(crate) final_executable_output_runnable_candidate: Option<bool>,
     pub(crate) final_executable_output_blocker_count: Option<usize>,
     pub(crate) final_executable_output_issues: Vec<String>,
@@ -213,6 +218,21 @@ pub(crate) fn nsld_check_final_snapshot(
     let final_executable_output_hash = final_executable_output_report
         .as_ref()
         .and_then(|report| report.output_hash.clone());
+    let final_executable_output_image_header_valid = final_executable_output_report
+        .as_ref()
+        .map(|report| report.output_image_header_valid);
+    let final_executable_output_image_magic = final_executable_output_report
+        .as_ref()
+        .and_then(|report| report.output_image_magic.clone());
+    let final_executable_output_image_version = final_executable_output_report
+        .as_ref()
+        .and_then(|report| report.output_image_version);
+    let final_executable_output_image_layout_hash = final_executable_output_report
+        .as_ref()
+        .and_then(|report| report.output_layout_hash.clone());
+    let final_executable_output_image_byte_map_hash = final_executable_output_report
+        .as_ref()
+        .and_then(|report| report.output_byte_map_hash.clone());
     let final_executable_output_runnable_candidate = final_executable_output_report
         .as_ref()
         .map(|report| report.runnable_candidate);
@@ -275,6 +295,11 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_present,
         final_executable_output_size_bytes,
         final_executable_output_hash,
+        final_executable_output_image_header_valid,
+        final_executable_output_image_magic,
+        final_executable_output_image_version,
+        final_executable_output_image_layout_hash,
+        final_executable_output_image_byte_map_hash,
         final_executable_output_runnable_candidate,
         final_executable_output_blocker_count,
         final_executable_output_issues,

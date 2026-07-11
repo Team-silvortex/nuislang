@@ -1,10 +1,12 @@
 # `nuis` `alpha-0.8.*` Documentation Sync Inventory
 
 This file records the alpha-0.8 documentation refresh that made the top-level
-entry points match the current binary-linking and standard-library mainline.
+entry points match the binary-linking and standard-library mainline of that
+predecessor line.
 
 It does not replace the current alpha entry:
 
+* [nuis-alpha-0.10-mainline-entry.md](nuis-alpha-0.10-mainline-entry.md)
 * [nuis-alpha-0.8-mainline-entry.md](nuis-alpha-0.8-mainline-entry.md)
 
 Use this file when the question is "which broad README surfaces were refreshed
@@ -12,7 +14,8 @@ for alpha-0.8, and what wording should stay safe?"
 
 ## Updated Entry Points
 
-The broad entry points now route through the current alpha-0.8 line first:
+During the alpha-0.8 refresh, the broad entry points routed through the
+alpha-0.8 line first:
 
 * [../../README.md](../../README.md)
 * [../README.md](../README.md)
@@ -24,13 +27,14 @@ The intended order is:
 
 1. top-level README for the current repo shape
 2. current mainline map for detailed routing
-3. alpha-0.8 mainline entry for current line wording
-4. reference docs for implementation truth
-5. examples and stdlib READMEs for local routes
+3. alpha-0.10 mainline entry for current line wording
+4. alpha-0.8 mainline entry for predecessor binary-convergence wording
+5. reference docs for implementation truth
+6. examples and stdlib READMEs for local routes
 
-## Safe Current Wording
+## Alpha-0.8 Safe Wording
 
-Use these phrases for present-tense work:
+Use these phrases when describing the `alpha-0.8.*` predecessor line:
 
 * `alpha-0.8.*`
 * `binary-linking convergence`
@@ -49,7 +53,7 @@ Avoid claiming these as complete:
 * beta-level public stability
 * self-hosting
 
-## Current Documentation Shape
+## Documentation Shape After The Alpha-0.8 Refresh
 
 The top-level README should stay compact. It should answer:
 
@@ -77,5 +81,5 @@ Future doc sync passes should keep an eye on:
 * keeping `stdlib/ns-nova` later-stage until AOT/std/PixelMagic/WitSage are
   less soft
 * keeping `examples/projects` as the primary runnable/compile-contract route
-* updating this file when alpha-0.9 or alpha-0.10 changes the binary closure
-  truth
+* keeping this file as predecessor context once later alpha lines change the
+  binary closure truth

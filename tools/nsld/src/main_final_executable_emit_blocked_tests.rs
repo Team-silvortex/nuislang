@@ -98,7 +98,7 @@ fn emit_final_executable_writes_blocked_boundary_report() {
     );
     assert!(verify.valid, "{:?}", verify.issues);
     assert!(report_source.contains("schema = \"nuis-nsld-final-executable-blocked-v1\""));
-    assert!(report_source.contains("producer_phase = \"alpha-0.8.0\""));
+    assert!(report_source.contains("producer_phase = \"alpha-0.10.0\""));
     assert!(report_source.contains("writer_kind = \"host-assisted-final-executable\""));
     assert!(report_source.contains("writer_status = \"blocked\""));
     assert!(report_source

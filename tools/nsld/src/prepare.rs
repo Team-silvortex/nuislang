@@ -273,6 +273,7 @@ pub(crate) fn nsld_prepare_report(
         )
         .display()
         .to_string(),
+        final_executable_output_path: plan.final_stage.output_path.clone(),
         link_input_count: input_emit.link_input_count,
         link_input_table_hash: input_emit.link_input_table_hash,
         unit_count: unit_emit.unit_count,

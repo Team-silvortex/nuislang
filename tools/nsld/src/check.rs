@@ -509,6 +509,14 @@ pub(crate) fn nsld_check_report(
         final_executable_output_present: final_snapshot.final_executable_output_present,
         final_executable_output_size_bytes: final_snapshot.final_executable_output_size_bytes,
         final_executable_output_hash: final_snapshot.final_executable_output_hash,
+        final_executable_output_image_header_valid: final_snapshot
+            .final_executable_output_image_header_valid,
+        final_executable_output_image_magic: final_snapshot.final_executable_output_image_magic,
+        final_executable_output_image_version: final_snapshot.final_executable_output_image_version,
+        final_executable_output_image_layout_hash: final_snapshot
+            .final_executable_output_image_layout_hash,
+        final_executable_output_image_byte_map_hash: final_snapshot
+            .final_executable_output_image_byte_map_hash,
         final_executable_output_runnable_candidate: final_snapshot
             .final_executable_output_runnable_candidate,
         final_executable_output_blocker_count: final_snapshot.final_executable_output_blocker_count,

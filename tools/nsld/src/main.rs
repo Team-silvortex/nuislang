@@ -23,6 +23,7 @@ mod display;
 mod display_check;
 mod display_container;
 mod display_container_verify;
+mod display_final_executable;
 mod display_final_host;
 mod display_final_image;
 mod display_final_stage;
@@ -57,8 +58,10 @@ mod json_closure;
 mod json_container;
 mod json_container_fragments;
 mod json_fields;
+mod json_final_executable;
 mod json_final_fragments;
 mod json_final_host;
+mod json_final_image;
 mod json_final_layout;
 mod json_final_stage;
 mod json_fragments;
@@ -73,6 +76,8 @@ mod link_units;
 mod main_check_core_tests;
 #[cfg(test)]
 mod main_check_final_executable_tests;
+#[cfg(test)]
+mod main_check_final_host_tests;
 #[cfg(test)]
 mod main_cli_final_executable_tests;
 #[cfg(test)]

@@ -1,6 +1,6 @@
 # `nuis` `alpha-0.7.*` Mainline Entry
 
-This file is the current short entry point for the `alpha-0.7.*` line.
+This file is the predecessor short entry point for the `alpha-0.7.*` line.
 
 It does not replace the `alpha-0.6.*` Nsld entry or the `alpha-0.4.*`
 hardening baseline. Those remain predecessor context. This file records what
@@ -19,10 +19,10 @@ Read the current line as:
 
 * `alpha-0.4.*` hardening baseline still applies
 * `alpha-0.6.*` introduced the named Nsld linker frontdoor
-* `alpha-0.7.*` makes std contract consumption the default shape for tooling
+* `alpha-0.7.*` made std contract consumption the default shape for tooling
   examples
-* current docs should say `alpha-0.7.*` for present-tense work and link older
-  alpha docs as predecessor/baseline context
+* current docs should say `alpha-0.10.*` for present-tense work and link
+  `alpha-0.7.*` as predecessor std/tooling smoke context
 
 ## Current Front Doors
 

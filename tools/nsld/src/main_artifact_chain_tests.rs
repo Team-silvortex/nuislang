@@ -106,6 +106,10 @@ fn artifact_stage_kind_paths_are_canonical() {
         nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableBlocked),
         "nuis.nsld.final-executable.blocked.toml"
     );
+    assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableOutput),
+        "final-executable-output"
+    );
     assert_eq!(nsld_object_output_file_name("pe/coff"), "nuis.nsld.pe-coff");
 }
 
@@ -126,7 +130,7 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(report.valid, "{:?}", report.issues);
-    assert_eq!(report.stage_count, 25);
+    assert_eq!(report.stage_count, 26);
     assert!(report.present_count >= report.required_count);
     assert_eq!(report.missing_required_count, 0);
     assert!(report.optional_present_count >= 3);
@@ -180,6 +184,9 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
     assert!(report.stages.iter().any(|stage| {
         stage.stage_id == "final-executable-blocked" && stage.present && !stage.required
     }));
+    assert!(report.stages.iter().any(|stage| {
+        stage.stage_id == "final-executable-output" && !stage.present && !stage.required
+    }));
     assert!(report_json.contains("\"kind\":\"nsld_artifact_chain\""));
     assert!(report_json.contains("\"stage_id\":\"final-executable-writer-input\""));
     assert!(report_json.contains("\"stage_id\":\"final-executable-host-invoke-plan\""));
@@ -187,6 +194,7 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
     assert!(report_json.contains("\"stage_id\":\"final-executable-image-dry-run\""));
     assert!(report_json.contains("\"stage_id\":\"final-executable-image-dry-run-bytes\""));
     assert!(report_json.contains("\"stage_id\":\"final-executable-blocked\""));
+    assert!(report_json.contains("\"stage_id\":\"final-executable-output\""));
     assert!(report_json.contains("\"missing_required_count\":0"));
     assert!(report_json.contains("\"first_missing_required_stage\":null"));
     assert!(report_json.contains("\"next_required_stage\":null"));
@@ -272,8 +280,53 @@ fn artifact_chain_next_optional_stage_advances_through_final_executable_tail() {
         after_image_dry_run.next_optional_command_id.as_deref(),
         Some("emit-final-executable")
     );
-    assert_eq!(after_blocked.next_optional_stage, None);
-    assert_eq!(after_blocked.next_optional_command_id, None);
+    assert_eq!(
+        after_blocked.next_optional_stage.as_deref(),
+        Some("final-executable-output")
+    );
+    assert_eq!(
+        after_blocked.next_optional_command_id.as_deref(),
+        Some("emit-final-executable")
+    );
+}
+
+#[test]
+fn artifact_chain_marks_self_contained_final_executable_output_as_chain_tail() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-artifact-chain-self-contained-output-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.final_stage.kind = "nuis-self-contained-image".to_owned();
+    plan.final_stage.driver = "nsld-internal-image-writer".to_owned();
+    plan.final_stage.link_mode = "self-contained".to_owned();
+    plan.final_stage.output_path = dir.join("nuis-app.nsb").display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_host_invoke_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    let output_path = plan.final_stage.output_path.clone();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.valid, "{:?}", report.issues);
+    assert_eq!(report.next_optional_stage, None);
+    assert_eq!(report.next_optional_command_id, None);
+    assert!(report.stages.iter().any(|stage| {
+        stage.stage_id == "final-executable-output"
+            && stage.file_name == output_path
+            && stage.path == output_path
+            && stage.present
+            && !stage.required
+    }));
 }
 
 #[test]

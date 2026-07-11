@@ -32,6 +32,7 @@ pub(crate) enum NsldArtifactStageKind {
     FinalExecutableImageDryRun,
     FinalExecutableImageDryRunBytes,
     FinalExecutableBlocked,
+    FinalExecutableOutput,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,6 +138,7 @@ const ARTIFACT_STAGE_DEFINITIONS: &[(NsldArtifactStageKind, &str)] = &[
         NsldArtifactStageKind::FinalExecutableBlocked,
         "nuis.nsld.final-executable.blocked.toml",
     ),
+    (NsldArtifactStageKind::FinalExecutableOutput, ""),
 ];
 
 pub(crate) fn nsld_artifact_stage_path(output_dir: impl AsRef<Path>, file_name: &str) -> PathBuf {
@@ -180,6 +182,7 @@ pub(crate) fn nsld_artifact_stage_file_name(kind: NsldArtifactStageKind) -> &'st
             "nuis.nsld.final-executable-image-dry-run.bin"
         }
         NsldArtifactStageKind::FinalExecutableBlocked => "nuis.nsld.final-executable.blocked.toml",
+        NsldArtifactStageKind::FinalExecutableOutput => "final-executable-output",
     }
 }
 
@@ -207,6 +210,7 @@ pub(crate) fn nsld_artifact_stage_file_name_for_plan(
         NsldArtifactStageKind::ObjectOutput => {
             nsld_object_output_file_name(&plan.cpu_target.object_format)
         }
+        NsldArtifactStageKind::FinalExecutableOutput => plan.final_stage.output_path.clone(),
         _ => nsld_artifact_stage_file_name(kind).to_owned(),
     }
 }
@@ -240,6 +244,7 @@ pub(crate) fn nsld_artifact_stage_id(kind: NsldArtifactStageKind) -> &'static st
             "final-executable-image-dry-run-bytes"
         }
         NsldArtifactStageKind::FinalExecutableBlocked => "final-executable-blocked",
+        NsldArtifactStageKind::FinalExecutableOutput => "final-executable-output",
     }
 }
 
@@ -273,7 +278,8 @@ pub(crate) fn nsld_artifact_stage_suggested_command(kind: NsldArtifactStageKind)
         | NsldArtifactStageKind::FinalExecutableImageDryRunBytes => {
             "emit-final-executable-image-dry-run"
         }
-        NsldArtifactStageKind::FinalExecutableBlocked => "emit-final-executable",
+        NsldArtifactStageKind::FinalExecutableBlocked
+        | NsldArtifactStageKind::FinalExecutableOutput => "emit-final-executable",
     }
 }
 
@@ -297,10 +303,15 @@ pub(crate) fn nsld_artifact_stage_kind_path_for_plan(
     plan: &nuisc::linker::LinkPlan,
     kind: NsldArtifactStageKind,
 ) -> PathBuf {
-    nsld_artifact_stage_path(
-        &plan.output_dir,
-        &nsld_artifact_stage_file_name_for_plan(kind, plan),
-    )
+    nsld_artifact_stage_path_for_plan(plan, &nsld_artifact_stage_file_name_for_plan(kind, plan))
+}
+
+fn nsld_artifact_stage_path_for_plan(plan: &nuisc::linker::LinkPlan, file_name: &str) -> PathBuf {
+    if file_name == plan.final_stage.output_path {
+        PathBuf::from(file_name)
+    } else {
+        nsld_artifact_stage_path(&plan.output_dir, file_name)
+    }
 }
 
 pub(crate) fn nsld_artifact_stages_for_plan(
@@ -311,7 +322,7 @@ pub(crate) fn nsld_artifact_stages_for_plan(
         let file_name = nsld_artifact_stage_file_name_for_plan(*kind, plan);
         stages.push(NsldArtifactStage {
             kind: *kind,
-            present: nsld_artifact_stage_path(&plan.output_dir, &file_name).exists(),
+            present: nsld_artifact_stage_path_for_plan(plan, &file_name).exists(),
             file_name,
             required: nsld_artifact_stage_required(*kind),
         });
@@ -331,6 +342,7 @@ pub(crate) fn nsld_artifact_stage_required(kind: NsldArtifactStageKind) -> bool 
             | NsldArtifactStageKind::FinalExecutableImageDryRun
             | NsldArtifactStageKind::FinalExecutableImageDryRunBytes
             | NsldArtifactStageKind::FinalExecutableBlocked
+            | NsldArtifactStageKind::FinalExecutableOutput
     )
 }
 
@@ -377,7 +389,7 @@ pub(crate) fn nsld_artifact_chain_report(
             order_index,
             stage_id: nsld_artifact_stage_id(stage.kind).to_owned(),
             file_name: stage.file_name.clone(),
-            path: nsld_artifact_stage_path(&plan.output_dir, &stage.file_name)
+            path: nsld_artifact_stage_path_for_plan(plan, &stage.file_name)
                 .display()
                 .to_string(),
             required: stage.required,

@@ -231,13 +231,25 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_blocked_issues.len()
     );
     println!(
-        "  final_executable_output: present={} runnable={} size={} hash={} blockers={} issues={}",
+        "  final_executable_output: present={} header_valid={} magic={} version={} runnable={} size={} hash={} blockers={} issues={}",
         report.final_executable_output_present,
+        optional_bool_text(report.final_executable_output_image_header_valid),
+        optional_string_text(report.final_executable_output_image_magic.as_deref()),
+        optional_usize_text(report.final_executable_output_image_version),
         optional_bool_text(report.final_executable_output_runnable_candidate),
         optional_usize_text(report.final_executable_output_size_bytes),
         optional_string_text(report.final_executable_output_hash.as_deref()),
         optional_usize_text(report.final_executable_output_blocker_count),
         report.final_executable_output_issues.len()
+    );
+    println!(
+        "  final_executable_output_image_hashes: layout={} byte_map={}",
+        optional_string_text(report.final_executable_output_image_layout_hash.as_deref()),
+        optional_string_text(
+            report
+                .final_executable_output_image_byte_map_hash
+                .as_deref()
+        )
     );
     println!(
         "  container_loader: readiness={} blockers={} metadata_table_hash={} external_imports={}",

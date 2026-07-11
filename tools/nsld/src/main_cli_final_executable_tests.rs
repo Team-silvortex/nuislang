@@ -304,3 +304,22 @@ fn parses_verify_final_executable_emit_input_and_json_flag() {
         })
     );
 }
+
+#[test]
+fn parses_final_executable_output_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "final-executable-output".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::FinalExecutableOutput {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}

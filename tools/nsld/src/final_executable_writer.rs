@@ -89,7 +89,7 @@ pub(crate) fn render_final_executable_writer_input(
     out.push_str("schema = \"nuis-nsld-final-executable-writer-input-v1\"\n");
     out.push_str("schema_version = 1\n");
     out.push_str("producer = \"nsld\"\n");
-    out.push_str("producer_phase = \"alpha-0.8.0\"\n");
+    out.push_str("producer_phase = \"alpha-0.10.0\"\n");
     writeln!(
         out,
         "manifest = \"{}\"",
@@ -198,7 +198,7 @@ pub(crate) fn render_final_executable_host_invoke_plan(
     out.push_str("schema = \"nuis-nsld-final-executable-host-invoke-plan-v1\"\n");
     out.push_str("schema_version = 1\n");
     out.push_str("producer = \"nsld\"\n");
-    out.push_str("producer_phase = \"alpha-0.8.0\"\n");
+    out.push_str("producer_phase = \"alpha-0.10.0\"\n");
     writeln!(
         out,
         "manifest = \"{}\"",

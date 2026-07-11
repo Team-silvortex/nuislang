@@ -29,4 +29,5 @@ fn final_executable_writer_input_command_args_use_pe_coff_native_object_path() {
     assert!(source.contains("nuis.nsld.pe-coff"));
     assert!(!source.contains("nuis.nsld.mach-o"));
     assert!(source.contains("command_args = ["));
+    assert!(source.contains("producer_phase = \"alpha-0.10.0\""));
 }

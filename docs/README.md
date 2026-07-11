@@ -22,6 +22,7 @@ There is also a practical split inside the current tree:
 If you want to understand the repository as it exists today, start here:
 
 * [current-mainline-map.md](current-mainline-map.md)
+* [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
 * [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
 * [versioning/nuis-alpha-0.8-doc-sync-inventory.md](versioning/nuis-alpha-0.8-doc-sync-inventory.md)
 * [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
@@ -37,19 +38,20 @@ If you want to understand the repository as it exists today, start here:
 * [repo-layout.md](repo-layout.md)
 
 If your immediate question is “what is the canonical compile route today?”,
-start with the `alpha-0.8.*` mainline entry, then the Nsld linker/frontdoor and
+start with the `alpha-0.10.*` mainline entry, then the Nsld linker/frontdoor and
 binary assembly references before drilling into deeper reference material.
 
 If your immediate question is “which docs are current, which are predecessor
-anchors, and what wording is safe?”, read the `alpha-0.8.*` mainline entry
-first, then the `alpha-0.8.*` documentation sync inventory. Use the
-`alpha-0.4.*` documentation sync baseline only when you need the older
-hardening baseline.
+anchors, and what wording is safe?”, read the `alpha-0.10.*` mainline entry
+first, then the `alpha-0.8.*` documentation sync inventory for predecessor
+binary-linking convergence context. Use the `alpha-0.4.*` documentation sync
+baseline only when you need the older hardening baseline.
 
 If your immediate question is “what is the current minor-line history anchor?”,
-start with the `alpha-0.8.*` mainline entry, then use the `alpha-0.4.*`
-inventory and hardening plan as baseline context. Use `alpha-0.1.*`, `0.20.*`,
-and `0.19.*` only when you intentionally need predecessor lines.
+start with the `alpha-0.10.*` mainline entry, then use `alpha-0.8.*` for the
+binary convergence predecessor and `alpha-0.4.*` inventory/hardening docs as
+baseline context. Use `alpha-0.1.*`, `0.20.*`, and `0.19.*` only when you
+intentionally need predecessor lines.
 
 If your immediate question is “what long-range hardware/OS shape should current
 architecture avoid foreclosing?”, read the long-range heterogeneous OS roadmap.

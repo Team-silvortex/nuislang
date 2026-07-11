@@ -1,6 +1,6 @@
 # `nuis` `alpha-0.8.*` Mainline Entry
 
-This file is the current short entry point for the `alpha-0.8.*` line.
+This file is the predecessor short entry point for the `alpha-0.8.*` line.
 
 It does not replace the `alpha-0.7.*` std/tooling smoke entry, the
 `alpha-0.6.*` Nsld entry, or the `alpha-0.4.*` hardening baseline. Those remain
@@ -9,8 +9,9 @@ starts treating binary linking as the main convergence target.
 
 Short rule:
 
-`alpha-0.8.*` is where Nsld moves from a linker frontdoor with strong reports
-toward the smallest real binary-linking loop that can run before `alpha-0.10.0`.
+`alpha-0.8.*` is where Nsld moved from a linker frontdoor with strong reports
+toward the smallest real binary-linking loop targeted for the `alpha-0.10.*`
+closure window.
 
 ## Current Line Shape
 
@@ -19,9 +20,9 @@ Read the current line as:
 * `alpha-0.4.*` hardening baseline still applies
 * `alpha-0.6.*` introduced the named Nsld linker frontdoor
 * `alpha-0.7.*` made std-backed tooling examples the default smoke surface
-* `alpha-0.8.*` makes binary linking convergence the default toolchain pressure
-* current docs should say `alpha-0.8.*` for present-tense work and link older
-  alpha docs as predecessor/baseline context
+* `alpha-0.8.*` made binary linking convergence the default toolchain pressure
+* current docs should say `alpha-0.10.*` for present-tense work and link
+  `alpha-0.8.*` as predecessor binary-linking convergence context
 
 ## Current Front Doors
 
@@ -36,7 +37,7 @@ Start here:
 7. [nuis-alpha-0.4-system-inventory.md](nuis-alpha-0.4-system-inventory.md)
 8. [nuis-alpha-0.4-mainline-hardening-plan.md](nuis-alpha-0.4-mainline-hardening-plan.md)
 
-## Main Target Before `alpha-0.10.0`
+## Main Target That Led Into `alpha-0.10.*`
 
 The mainline target is not a complete self-owned production linker yet.
 
@@ -53,10 +54,10 @@ prepare
   -> verify/check
 ```
 
-By `alpha-0.10.0`, the repository should be able to demonstrate one honest
-route where the final stage is more than a report. The acceptable first route
-may still use a host-compatible wrapper or platform object shell, but the route
-must stay Nsld-owned in contract terms:
+During the handoff into `alpha-0.10.*`, the repository should demonstrate one
+honest route where the final stage is more than a report. The acceptable first
+route may still use a host-compatible wrapper or platform object shell, but the
+route must stay Nsld-owned in contract terms:
 
 * no hidden dynamic shortcut
 * no linker special case for one Nustar domain

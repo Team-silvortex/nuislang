@@ -4,7 +4,7 @@ use std::path::Path;
 pub(crate) fn run_status_command() {
     println!("Nsld linker front-door");
     println!("  tool: nsld");
-    println!("  phase: alpha-0.8.0 binary-linking convergence");
+    println!("  phase: alpha-0.10.0 executable-artifact closure");
     println!(
         "  current_role: link-plan inspection, artifact-chain diagnosis, and final executable readiness"
     );
@@ -22,7 +22,7 @@ pub(crate) fn run_plan_command(input: &Path, json: bool) -> Result<(), String> {
         println!("Nsld link plan");
         println!("  input: {}", ctx.input.display());
         println!("  manifest: {}", ctx.manifest.display());
-        println!("  role: alpha-0.8.0 binary-linking convergence front-door");
+        println!("  role: alpha-0.10.0 executable-artifact closure front-door");
         for line in nuisc::linker::render_link_plan_summary(&ctx.plan) {
             println!("  {line}");
         }

@@ -12,7 +12,7 @@ pub(crate) fn render_final_stage_plan(report: &NsldFinalStagePlanReport) -> Stri
     out.push_str("schema_version = 1\n");
     out.push_str("plan_kind = \"deterministic-final-stage-plan\"\n");
     out.push_str("producer = \"nsld\"\n");
-    out.push_str("producer_phase = \"alpha-0.8.0\"\n");
+    out.push_str("producer_phase = \"alpha-0.10.0\"\n");
     out.push_str(&format!(
         "manifest = \"{}\"\n",
         toml::escape_toml_string(&report.manifest)
@@ -105,7 +105,7 @@ pub(crate) fn render_final_executable_blocked(report: &NsldFinalExecutableEmitRe
     out.push_str("schema = \"nuis-nsld-final-executable-blocked-v1\"\n");
     out.push_str("schema_version = 1\n");
     out.push_str("producer = \"nsld\"\n");
-    out.push_str("producer_phase = \"alpha-0.8.0\"\n");
+    out.push_str("producer_phase = \"alpha-0.10.0\"\n");
     out.push_str(&format!(
         "manifest = \"{}\"\n",
         toml::escape_toml_string(&report.manifest)
@@ -327,7 +327,7 @@ pub(crate) fn render_final_executable_layout_plan(
     out.push_str("schema = \"nuis-nsld-final-executable-layout-plan-v1\"\n");
     out.push_str("schema_version = 1\n");
     out.push_str("producer = \"nsld\"\n");
-    out.push_str("producer_phase = \"alpha-0.8.0\"\n");
+    out.push_str("producer_phase = \"alpha-0.10.0\"\n");
     out.push_str(&format!(
         "manifest = \"{}\"\n",
         toml::escape_toml_string(&report.manifest)
@@ -462,7 +462,7 @@ pub(crate) fn render_final_executable_image_dry_run(
     out.push_str("schema = \"nuis-nsld-final-executable-image-dry-run-v1\"\n");
     out.push_str("schema_version = 1\n");
     out.push_str("producer = \"nsld\"\n");
-    out.push_str("producer_phase = \"alpha-0.8.0\"\n");
+    out.push_str("producer_phase = \"alpha-0.10.0\"\n");
     out.push_str(&format!(
         "manifest = \"{}\"\n",
         toml::escape_toml_string(&report.manifest)
