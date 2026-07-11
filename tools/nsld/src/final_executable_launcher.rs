@@ -3,8 +3,8 @@ use super::{
     final_executable_paths::nsld_final_executable_launcher_manifest_path,
     fnv1a64_hex,
     reports::{
-        NsldFinalExecutableLauncherDryRunReport, NsldFinalExecutableLauncherManifestEmitReport,
-        NsldFinalExecutableLauncherManifestReport, NsldFinalExecutableLauncherManifestVerifyReport,
+        NsldFinalExecutableLauncherManifestEmitReport, NsldFinalExecutableLauncherManifestReport,
+        NsldFinalExecutableLauncherManifestVerifyReport,
     },
     toml,
 };
@@ -232,67 +232,6 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
         expected_blockers: expected.blockers,
         actual_blockers,
         issues,
-    }
-}
-
-pub(crate) fn nsld_final_executable_launcher_dry_run_report(
-    manifest: &Path,
-    plan: &nuisc::linker::LinkPlan,
-) -> NsldFinalExecutableLauncherDryRunReport {
-    let verify = nsld_verify_final_executable_launcher_manifest_report(manifest, plan);
-    let nsb_path = verify.actual_nsb_path.clone();
-    let nsb_bytes = nsb_path.as_deref().and_then(|path| fs::read(path).ok());
-    let nsb_hash_actual = nsb_bytes.as_ref().map(|bytes| fnv1a64_hex(bytes));
-    let nsb_hash_expected = verify.actual_nsb_hash.clone();
-    let nsb_hash_matches = nsb_hash_expected.is_some() && nsb_hash_actual == nsb_hash_expected;
-    let mut blockers = Vec::new();
-    if !verify.valid {
-        blockers.push("host-launcher-manifest:invalid".to_owned());
-        blockers.extend(
-            verify
-                .issues
-                .iter()
-                .map(|issue| format!("host-launcher-manifest:{issue}")),
-        );
-    }
-    if nsb_path.is_none() {
-        blockers.push("host-launcher:nsb-path-missing".to_owned());
-    }
-    if nsb_bytes.is_none() {
-        blockers.push("host-launcher:nsb-unreadable".to_owned());
-    }
-    if !nsb_hash_matches {
-        blockers.push("host-launcher:nsb-hash-mismatch".to_owned());
-    }
-    if verify.actual_image_header_valid != Some(true) {
-        blockers.push("host-launcher:image-header-invalid".to_owned());
-    }
-    let launch_steps = if blockers.is_empty() {
-        verify.actual_verification_steps.clone()
-    } else {
-        Vec::new()
-    };
-    let dry_run_ready = blockers.is_empty();
-    NsldFinalExecutableLauncherDryRunReport {
-        manifest: manifest.display().to_string(),
-        launcher_manifest_path: verify.input_path,
-        launcher_manifest_valid: verify.valid,
-        nsb_path,
-        nsb_readable: nsb_bytes.is_some(),
-        nsb_hash_expected,
-        nsb_hash_actual,
-        nsb_hash_matches,
-        image_header_valid: verify.actual_image_header_valid,
-        entry_lifecycle_hook: verify.actual_entry_lifecycle_hook,
-        scheduler_entry: verify.actual_scheduler_entry,
-        dry_run_ready,
-        would_enter_lifecycle_hook: dry_run_ready,
-        launch_steps,
-        blockers,
-        notes: vec![
-            "launcher-dry-run-is-non-executing".to_owned(),
-            "launcher-dry-run-does-not-map-or-jump-into-payload-code".to_owned(),
-        ],
     }
 }
 

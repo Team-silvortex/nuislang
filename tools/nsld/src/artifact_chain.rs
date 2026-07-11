@@ -34,6 +34,8 @@ pub(crate) enum NsldArtifactStageKind {
     FinalExecutableBlocked,
     FinalExecutableOutput,
     FinalExecutableLauncherManifest,
+    FinalExecutableLauncherDryRun,
+    FinalExecutablePipeline,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,6 +146,14 @@ const ARTIFACT_STAGE_DEFINITIONS: &[(NsldArtifactStageKind, &str)] = &[
         NsldArtifactStageKind::FinalExecutableLauncherManifest,
         "nuis.nsld.final-executable-launcher.toml",
     ),
+    (
+        NsldArtifactStageKind::FinalExecutableLauncherDryRun,
+        "nuis.nsld.final-executable-launcher-dry-run.toml",
+    ),
+    (
+        NsldArtifactStageKind::FinalExecutablePipeline,
+        "nuis.nsld.final-executable-pipeline.toml",
+    ),
 ];
 
 pub(crate) fn nsld_artifact_stage_path(output_dir: impl AsRef<Path>, file_name: &str) -> PathBuf {
@@ -190,6 +200,12 @@ pub(crate) fn nsld_artifact_stage_file_name(kind: NsldArtifactStageKind) -> &'st
         NsldArtifactStageKind::FinalExecutableOutput => "final-executable-output",
         NsldArtifactStageKind::FinalExecutableLauncherManifest => {
             "nuis.nsld.final-executable-launcher.toml"
+        }
+        NsldArtifactStageKind::FinalExecutableLauncherDryRun => {
+            "nuis.nsld.final-executable-launcher-dry-run.toml"
+        }
+        NsldArtifactStageKind::FinalExecutablePipeline => {
+            "nuis.nsld.final-executable-pipeline.toml"
         }
     }
 }
@@ -254,6 +270,8 @@ pub(crate) fn nsld_artifact_stage_id(kind: NsldArtifactStageKind) -> &'static st
         NsldArtifactStageKind::FinalExecutableBlocked => "final-executable-blocked",
         NsldArtifactStageKind::FinalExecutableOutput => "final-executable-output",
         NsldArtifactStageKind::FinalExecutableLauncherManifest => "final-executable-launcher",
+        NsldArtifactStageKind::FinalExecutableLauncherDryRun => "final-executable-launcher-dry-run",
+        NsldArtifactStageKind::FinalExecutablePipeline => "final-executable-pipeline",
     }
 }
 
@@ -277,20 +295,18 @@ pub(crate) fn nsld_artifact_stage_suggested_command(kind: NsldArtifactStageKind)
         NsldArtifactStageKind::ContainerPlan => "emit-container-plan",
         NsldArtifactStageKind::Container => "emit-container",
         NsldArtifactStageKind::ClosureSnapshot => "emit-closure",
-        NsldArtifactStageKind::FinalStagePlan => "emit-final-stage-plan",
-        NsldArtifactStageKind::FinalExecutableWriterInput => "emit-final-executable-writer-input",
-        NsldArtifactStageKind::FinalExecutableHostInvokePlan => {
-            "emit-final-executable-host-invoke-plan"
-        }
-        NsldArtifactStageKind::FinalExecutableLayoutPlan => "emit-final-executable-layout",
+        NsldArtifactStageKind::FinalStagePlan
+        | NsldArtifactStageKind::FinalExecutableWriterInput
+        | NsldArtifactStageKind::FinalExecutableHostInvokePlan
+        | NsldArtifactStageKind::FinalExecutableLayoutPlan
+        | NsldArtifactStageKind::FinalExecutableBlocked
+        | NsldArtifactStageKind::FinalExecutableOutput
+        | NsldArtifactStageKind::FinalExecutableLauncherManifest
+        | NsldArtifactStageKind::FinalExecutableLauncherDryRun
+        | NsldArtifactStageKind::FinalExecutablePipeline => "emit-final-executable-pipeline",
         NsldArtifactStageKind::FinalExecutableImageDryRun
         | NsldArtifactStageKind::FinalExecutableImageDryRunBytes => {
-            "emit-final-executable-image-dry-run"
-        }
-        NsldArtifactStageKind::FinalExecutableBlocked
-        | NsldArtifactStageKind::FinalExecutableOutput => "emit-final-executable",
-        NsldArtifactStageKind::FinalExecutableLauncherManifest => {
-            "emit-final-executable-launcher-manifest"
+            "emit-final-executable-pipeline"
         }
     }
 }
@@ -356,6 +372,8 @@ pub(crate) fn nsld_artifact_stage_required(kind: NsldArtifactStageKind) -> bool 
             | NsldArtifactStageKind::FinalExecutableBlocked
             | NsldArtifactStageKind::FinalExecutableOutput
             | NsldArtifactStageKind::FinalExecutableLauncherManifest
+            | NsldArtifactStageKind::FinalExecutableLauncherDryRun
+            | NsldArtifactStageKind::FinalExecutablePipeline
     )
 }
 
@@ -389,12 +407,50 @@ pub(crate) fn nsld_artifact_chain_issues(stages: &[NsldArtifactStage]) -> Vec<St
     issues
 }
 
+pub(crate) fn nsld_artifact_chain_advisories(stages: &[NsldArtifactStage]) -> Vec<String> {
+    final_executable_tail_advisories(stages)
+}
+
+fn final_executable_tail_advisories(stages: &[NsldArtifactStage]) -> Vec<String> {
+    let tail = [
+        NsldArtifactStageKind::FinalExecutableWriterInput,
+        NsldArtifactStageKind::FinalExecutableHostInvokePlan,
+        NsldArtifactStageKind::FinalExecutableLayoutPlan,
+        NsldArtifactStageKind::FinalExecutableImageDryRun,
+        NsldArtifactStageKind::FinalExecutableBlocked,
+        NsldArtifactStageKind::FinalExecutableLauncherManifest,
+        NsldArtifactStageKind::FinalExecutableLauncherDryRun,
+        NsldArtifactStageKind::FinalExecutablePipeline,
+    ];
+    let mut first_missing = None;
+    let mut advisories = Vec::new();
+
+    for kind in tail {
+        let Some(stage) = stages.iter().find(|stage| stage.kind == kind) else {
+            continue;
+        };
+        if stage.present {
+            if let Some(missing) = first_missing.as_ref() {
+                advisories.push(format!(
+                    "optional final executable tail artifact `{}` is present but earlier tail artifact `{missing}` is missing; run `emit-final-executable-pipeline` to rebuild the tail",
+                    nsld_artifact_stage_id(kind)
+                ));
+            }
+        } else if first_missing.is_none() {
+            first_missing = Some(nsld_artifact_stage_id(kind).to_owned());
+        }
+    }
+
+    advisories
+}
+
 pub(crate) fn nsld_artifact_chain_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldArtifactChainReport {
     let stages = nsld_artifact_stages_for_plan(plan);
     let issues = nsld_artifact_chain_issues(&stages);
+    let advisories = nsld_artifact_chain_advisories(&stages);
     let diagnostics = stages
         .iter()
         .enumerate()
@@ -476,6 +532,7 @@ pub(crate) fn nsld_artifact_chain_report(
         next_optional_command_resolved,
         next_optional_command_reason,
         stages: diagnostics,
+        advisories,
         issues,
     }
 }

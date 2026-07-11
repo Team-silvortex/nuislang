@@ -4,8 +4,10 @@ mod check;
 mod check_container;
 mod check_core;
 mod check_final;
+mod check_final_tail;
 mod check_object;
 mod cli;
+mod cli_usage;
 mod closure;
 mod closure_snapshot_helpers;
 mod commands;
@@ -38,17 +40,20 @@ mod display_object_image;
 mod display_prepare;
 mod display_text;
 mod final_executable_emit;
+mod final_executable_emit_actual;
 mod final_executable_emit_output_verify;
 mod final_executable_emit_shape;
 mod final_executable_host;
 mod final_executable_image;
 mod final_executable_image_stage;
 mod final_executable_launcher;
+mod final_executable_launcher_dry_run;
 mod final_executable_layout;
 mod final_executable_layout_stage;
 mod final_executable_output;
 mod final_executable_output_summary;
 mod final_executable_paths;
+mod final_executable_pipeline;
 mod final_executable_render;
 mod final_executable_summary;
 mod final_executable_verify_helpers;
@@ -59,6 +64,7 @@ mod final_stage_plan;
 mod json;
 mod json_artifacts;
 mod json_check;
+mod json_check_final;
 mod json_check_sections;
 mod json_closure;
 mod json_container;
@@ -113,9 +119,13 @@ mod main_final_executable_frontdoor_tests;
 #[cfg(test)]
 mod main_final_executable_image_tests;
 #[cfg(test)]
+mod main_final_executable_launcher_check_tests;
+#[cfg(test)]
 mod main_final_executable_layout_tests;
 #[cfg(test)]
 mod main_final_executable_output_tests;
+#[cfg(test)]
+mod main_final_executable_pipeline_tests;
 #[cfg(test)]
 mod main_final_stage_tests;
 #[cfg(test)]

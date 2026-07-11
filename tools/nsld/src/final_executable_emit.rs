@@ -1,4 +1,7 @@
 use super::{
+    final_executable_emit_actual::{
+        nsld_final_executable_emit_actual_from_source, NsldFinalExecutableEmitActual,
+    },
     final_executable_emit_output_verify::push_final_output_emit_verify_mismatches,
     final_executable_emit_shape::nsld_final_executable_emit_report_shape,
     final_executable_output_summary::populate_final_output_emit_summary,
@@ -6,9 +9,7 @@ use super::{
     final_executable_render::{
         optional_bool_toml, optional_usize_toml, render_final_executable_blocked,
     },
-    final_executable_verify_helpers::{non_empty_toml_string, optional_usize_value},
     reports::{NsldFinalExecutableEmitReport, NsldFinalExecutableEmitVerifyReport},
-    toml,
 };
 use std::{fs, path::Path};
 
@@ -65,128 +66,50 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
             input_path.display()
         )
     });
-    let (
-        actual_plan_hash,
-        actual_emitted,
-        actual_writer_input_valid,
-        actual_writer_input_hash,
-        actual_writer_input_issues,
-        actual_host_environment_ready,
-        actual_host_driver_available,
-        actual_host_can_invoke,
-        actual_host_driver_resolved_path,
-        actual_host_invocation_policy,
-        actual_host_invocation_policy_reason,
-        actual_host_dry_run_command_arg_count,
-        actual_host_dry_run_command_args,
-        actual_host_dry_run_blocker_count,
-        actual_host_dry_run_blockers,
-        actual_host_invoke_plan_valid,
-        actual_host_invoke_plan_would_invoke,
-        actual_host_invoke_plan_hash,
-        actual_host_invoke_plan_invocation_policy,
-        actual_host_invoke_plan_requires_explicit_allow,
-        actual_host_invoke_plan_explicit_allow_present,
-        actual_host_invoke_plan_blocker_count,
-        actual_host_invoke_plan_issues,
-        actual_layout_plan_valid,
-        actual_layout_plan_hash,
-        actual_layout_plan_issues,
-        actual_image_dry_run_valid,
-        actual_image_dry_run_hash,
-        actual_image_dry_run_size_bytes,
-        actual_image_dry_run_issues,
-        actual_final_output_checked,
-        actual_final_output_present,
-        actual_final_output_size_bytes,
-        actual_final_output_hash,
-        actual_final_output_image_header_valid,
-        actual_final_output_runnable_candidate,
-        actual_blocker_count,
-        actual_blockers,
-    ) = match actual.as_ref() {
-        Ok(source) => (
-            toml::string_value(source, "final_stage_plan_hash"),
-            toml::bool_value(source, "emitted"),
-            toml::bool_value(source, "writer_input_valid"),
-            non_empty_toml_string(source, "writer_input_hash"),
-            toml::string_array_value(source, "writer_input_issues"),
-            toml::bool_value(source, "host_dry_run_environment_ready"),
-            toml::bool_value(source, "host_dry_run_driver_available"),
-            toml::bool_value(source, "host_dry_run_can_invoke"),
-            non_empty_toml_string(source, "host_dry_run_driver_resolved_path"),
-            non_empty_toml_string(source, "host_dry_run_invocation_policy"),
-            non_empty_toml_string(source, "host_dry_run_invocation_policy_reason"),
-            toml::usize_value(source, "host_dry_run_command_arg_count"),
-            toml::string_array_value(source, "host_dry_run_command_args"),
-            toml::usize_value(source, "host_dry_run_blocker_count"),
-            toml::string_array_value(source, "host_dry_run_blockers"),
-            toml::bool_value(source, "host_invoke_plan_valid"),
-            toml::bool_value(source, "host_invoke_plan_would_invoke"),
-            non_empty_toml_string(source, "host_invoke_plan_hash"),
-            non_empty_toml_string(source, "host_invoke_plan_invocation_policy"),
-            toml::bool_value(source, "host_invoke_plan_requires_explicit_allow"),
-            toml::bool_value(source, "host_invoke_plan_explicit_allow_present"),
-            toml::usize_value(source, "host_invoke_plan_blocker_count"),
-            toml::string_array_value(source, "host_invoke_plan_issues"),
-            toml::bool_value(source, "layout_plan_valid"),
-            non_empty_toml_string(source, "layout_plan_hash"),
-            toml::string_array_value(source, "layout_plan_issues"),
-            toml::bool_value(source, "image_dry_run_valid"),
-            non_empty_toml_string(source, "image_dry_run_hash"),
-            optional_usize_value(source, "image_dry_run_size_bytes"),
-            toml::string_array_value(source, "image_dry_run_issues"),
-            toml::bool_value(source, "final_output_checked"),
-            toml::bool_value(source, "final_output_present"),
-            optional_usize_value(source, "final_output_size_bytes"),
-            non_empty_toml_string(source, "final_output_hash"),
-            toml::bool_value(source, "final_output_image_header_valid"),
-            toml::bool_value(source, "final_output_runnable_candidate"),
-            toml::usize_value(source, "blocker_count"),
-            toml::string_array_value(source, "blockers"),
-        ),
+    let NsldFinalExecutableEmitActual {
+        final_stage_plan_hash: actual_plan_hash,
+        emitted: actual_emitted,
+        writer_input_valid: actual_writer_input_valid,
+        writer_input_hash: actual_writer_input_hash,
+        writer_input_issues: actual_writer_input_issues,
+        host_dry_run_environment_ready: actual_host_environment_ready,
+        host_dry_run_driver_available: actual_host_driver_available,
+        host_dry_run_can_invoke: actual_host_can_invoke,
+        host_dry_run_driver_resolved_path: actual_host_driver_resolved_path,
+        host_dry_run_invocation_policy: actual_host_invocation_policy,
+        host_dry_run_invocation_policy_reason: actual_host_invocation_policy_reason,
+        host_dry_run_command_arg_count: actual_host_dry_run_command_arg_count,
+        host_dry_run_command_args: actual_host_dry_run_command_args,
+        host_dry_run_blocker_count: actual_host_dry_run_blocker_count,
+        host_dry_run_blockers: actual_host_dry_run_blockers,
+        host_invoke_plan_valid: actual_host_invoke_plan_valid,
+        host_invoke_plan_would_invoke: actual_host_invoke_plan_would_invoke,
+        host_invoke_plan_hash: actual_host_invoke_plan_hash,
+        host_invoke_plan_invocation_policy: actual_host_invoke_plan_invocation_policy,
+        host_invoke_plan_requires_explicit_allow: actual_host_invoke_plan_requires_explicit_allow,
+        host_invoke_plan_explicit_allow_present: actual_host_invoke_plan_explicit_allow_present,
+        host_invoke_plan_blocker_count: actual_host_invoke_plan_blocker_count,
+        host_invoke_plan_issues: actual_host_invoke_plan_issues,
+        layout_plan_valid: actual_layout_plan_valid,
+        layout_plan_hash: actual_layout_plan_hash,
+        layout_plan_issues: actual_layout_plan_issues,
+        image_dry_run_valid: actual_image_dry_run_valid,
+        image_dry_run_hash: actual_image_dry_run_hash,
+        image_dry_run_size_bytes: actual_image_dry_run_size_bytes,
+        image_dry_run_issues: actual_image_dry_run_issues,
+        final_output_checked: actual_final_output_checked,
+        final_output_present: actual_final_output_present,
+        final_output_size_bytes: actual_final_output_size_bytes,
+        final_output_hash: actual_final_output_hash,
+        final_output_image_header_valid: actual_final_output_image_header_valid,
+        final_output_runnable_candidate: actual_final_output_runnable_candidate,
+        blocker_count: actual_blocker_count,
+        blockers: actual_blockers,
+    } = match actual.as_ref() {
+        Ok(source) => nsld_final_executable_emit_actual_from_source(source),
         Err(error) => {
             issues.push(error.clone());
-            (
-                None,       // final_stage_plan_hash
-                None,       // emitted
-                None,       // writer_input_valid
-                None,       // writer_input_hash
-                Vec::new(), // writer_input_issues
-                None,       // host_dry_run_environment_ready
-                None,       // host_dry_run_driver_available
-                None,       // host_dry_run_can_invoke
-                None,       // host_dry_run_driver_resolved_path
-                None,       // host_dry_run_invocation_policy
-                None,       // host_dry_run_invocation_policy_reason
-                None,       // host_dry_run_command_arg_count
-                Vec::new(), // host_dry_run_command_args
-                None,       // host_dry_run_blocker_count
-                Vec::new(), // host_dry_run_blockers
-                None,       // host_invoke_plan_valid
-                None,       // host_invoke_plan_would_invoke
-                None,       // host_invoke_plan_hash
-                None,       // host_invoke_plan_invocation_policy
-                None,       // host_invoke_plan_requires_explicit_allow
-                None,       // host_invoke_plan_explicit_allow_present
-                None,       // host_invoke_plan_blocker_count
-                Vec::new(), // host_invoke_plan_issues
-                None,       // layout_plan_valid
-                None,       // layout_plan_hash
-                Vec::new(), // layout_plan_issues
-                None,       // image_dry_run_valid
-                None,       // image_dry_run_hash
-                None,       // image_dry_run_size_bytes
-                Vec::new(), // image_dry_run_issues
-                None,       // final_output_checked
-                None,       // final_output_present
-                None,       // final_output_size_bytes
-                None,       // final_output_hash
-                None,       // final_output_image_header_valid
-                None,       // final_output_runnable_candidate
-                None,       // blocker_count
-                Vec::new(), // blockers
-            )
+            NsldFinalExecutableEmitActual::default()
         }
     };
     if let Ok(actual) = actual {

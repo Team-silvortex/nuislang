@@ -91,11 +91,25 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     );
     let dry_run =
         super::nsld_final_executable_launcher_dry_run_report(Path::new("manifest.toml"), &plan);
+    let dry_run_emit = super::nsld_emit_final_executable_launcher_dry_run_report(
+        Path::new("manifest.toml"),
+        &plan,
+    )
+    .unwrap();
+    let dry_run_verify = super::nsld_verify_final_executable_launcher_dry_run_report(
+        Path::new("manifest.toml"),
+        &plan,
+    );
     let manifest_json = super::json::nsld_final_executable_launcher_manifest_report_json(&manifest);
     let verify_json =
         super::json::nsld_final_executable_launcher_manifest_verify_report_json(&verify);
     let dry_run_json = super::json::nsld_final_executable_launcher_dry_run_report_json(&dry_run);
+    let dry_run_emit_json =
+        super::json::nsld_final_executable_launcher_dry_run_emit_report_json(&dry_run_emit);
+    let dry_run_verify_json =
+        super::json::nsld_final_executable_launcher_dry_run_verify_report_json(&dry_run_verify);
     let manifest_source = fs::read_to_string(&emit.output_path).unwrap();
+    let dry_run_source = fs::read_to_string(&dry_run_emit.output_path).unwrap();
     let output_bytes = fs::read(&plan.final_stage.output_path).unwrap();
     fs::remove_dir_all(dir).unwrap();
 
@@ -131,7 +145,17 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
         .launch_steps
         .iter()
         .any(|step| step == "enter-lifecycle-hook:on_process_start"));
+    assert!(dry_run_emit.dry_run_ready);
+    assert_eq!(dry_run_emit.blocker_count, 0);
+    assert!(dry_run_verify.valid, "{:?}", dry_run_verify.issues);
+    assert_eq!(dry_run_verify.actual_dry_run_ready, Some(true));
+    assert_eq!(dry_run_verify.actual_would_enter_lifecycle_hook, Some(true));
+    assert_eq!(
+        dry_run_verify.actual_nsb_hash_actual,
+        Some(fnv1a64_hex(&output_bytes))
+    );
     assert!(manifest_source.contains("schema = \"nuis-host-launcher-manifest-v1\""));
+    assert!(dry_run_source.contains("schema = \"nuis-host-launcher-dry-run-v1\""));
     assert!(manifest_source.contains("entry_lifecycle_hook = \"on_process_start\""));
     assert!(manifest_source.contains("scheduler_entry = \"nuis.scheduler.loop.v1\""));
     assert!(manifest_json.contains("\"kind\":\"nsld_final_executable_launcher_manifest\""));
@@ -142,6 +166,12 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert!(dry_run_json.contains("\"kind\":\"nsld_final_executable_launcher_dry_run\""));
     assert!(dry_run_json.contains("\"dry_run_ready\":true"));
     assert!(dry_run_json.contains("\"would_enter_lifecycle_hook\":true"));
+    assert!(dry_run_emit_json.contains("\"kind\":\"nsld_final_executable_launcher_dry_run_emit\""));
+    assert!(dry_run_emit_json.contains("\"dry_run_ready\":true"));
+    assert!(
+        dry_run_verify_json.contains("\"kind\":\"nsld_final_executable_launcher_dry_run_verify\"")
+    );
+    assert!(dry_run_verify_json.contains("\"valid\":true"));
 }
 
 #[test]

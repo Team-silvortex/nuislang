@@ -80,3 +80,89 @@ pub(crate) struct NsldFinalExecutableLauncherDryRunReport {
     pub(crate) blockers: Vec<String>,
     pub(crate) notes: Vec<String>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldFinalExecutableLauncherDryRunEmitReport {
+    pub(crate) manifest: String,
+    pub(crate) output_path: String,
+    pub(crate) dry_run_hash: String,
+    pub(crate) dry_run_ready: bool,
+    pub(crate) blocker_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldFinalExecutableLauncherDryRunVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_dry_run_hash: String,
+    pub(crate) actual_dry_run_hash: Option<String>,
+    pub(crate) expected_dry_run_ready: bool,
+    pub(crate) actual_dry_run_ready: Option<bool>,
+    pub(crate) expected_would_enter_lifecycle_hook: bool,
+    pub(crate) actual_would_enter_lifecycle_hook: Option<bool>,
+    pub(crate) expected_nsb_hash_actual: Option<String>,
+    pub(crate) actual_nsb_hash_actual: Option<String>,
+    pub(crate) expected_launch_steps: Vec<String>,
+    pub(crate) actual_launch_steps: Vec<String>,
+    pub(crate) expected_blocker_count: usize,
+    pub(crate) actual_blocker_count: Option<usize>,
+    pub(crate) expected_blockers: Vec<String>,
+    pub(crate) actual_blockers: Vec<String>,
+    pub(crate) issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldFinalExecutablePipelineEmitReport {
+    pub(crate) manifest: String,
+    pub(crate) valid: bool,
+    pub(crate) final_stage_plan_path: String,
+    pub(crate) final_output_path: String,
+    pub(crate) writer_input_path: String,
+    pub(crate) host_invoke_plan_path: String,
+    pub(crate) layout_plan_path: String,
+    pub(crate) image_dry_run_path: String,
+    pub(crate) final_executable_blocked_path: String,
+    pub(crate) launcher_manifest_path: String,
+    pub(crate) launcher_dry_run_path: String,
+    pub(crate) final_executable_emitted: bool,
+    pub(crate) launcher_manifest_ready: bool,
+    pub(crate) launcher_dry_run_ready: bool,
+    pub(crate) would_enter_lifecycle_hook: bool,
+    pub(crate) required_stage_path_count: usize,
+    pub(crate) required_stage_path_present_count: usize,
+    pub(crate) missing_required_stage_paths: Vec<String>,
+    pub(crate) blocker_count: usize,
+    pub(crate) blockers: Vec<String>,
+    pub(crate) issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldFinalExecutablePipelineVerifyReport {
+    pub(crate) manifest: String,
+    pub(crate) input_path: String,
+    pub(crate) valid: bool,
+    pub(crate) expected_pipeline_hash: String,
+    pub(crate) actual_pipeline_hash: Option<String>,
+    pub(crate) expected_valid: bool,
+    pub(crate) actual_valid: Option<bool>,
+    pub(crate) expected_final_executable_emitted: bool,
+    pub(crate) actual_final_executable_emitted: Option<bool>,
+    pub(crate) expected_launcher_manifest_ready: bool,
+    pub(crate) actual_launcher_manifest_ready: Option<bool>,
+    pub(crate) expected_launcher_dry_run_ready: bool,
+    pub(crate) actual_launcher_dry_run_ready: Option<bool>,
+    pub(crate) expected_would_enter_lifecycle_hook: bool,
+    pub(crate) actual_would_enter_lifecycle_hook: Option<bool>,
+    pub(crate) expected_required_stage_path_count: usize,
+    pub(crate) actual_required_stage_path_count: Option<usize>,
+    pub(crate) expected_required_stage_path_present_count: usize,
+    pub(crate) actual_required_stage_path_present_count: Option<usize>,
+    pub(crate) expected_missing_required_stage_paths: Vec<String>,
+    pub(crate) actual_missing_required_stage_paths: Vec<String>,
+    pub(crate) expected_blocker_count: usize,
+    pub(crate) actual_blocker_count: Option<usize>,
+    pub(crate) expected_blockers: Vec<String>,
+    pub(crate) actual_blockers: Vec<String>,
+    pub(crate) issues: Vec<String>,
+}

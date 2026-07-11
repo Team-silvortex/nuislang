@@ -71,6 +71,9 @@ pub(crate) fn print_nsld_artifact_chain_report(report: &NsldArtifactChainReport)
             stage.path
         );
     }
+    for advisory in &report.advisories {
+        println!("  advisory: {advisory}");
+    }
     for issue in &report.issues {
         println!("  issue: {issue}");
     }

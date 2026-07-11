@@ -268,6 +268,44 @@ fn parses_verify_final_executable_image_dry_run_input_and_json_flag() {
 }
 
 #[test]
+fn parses_emit_final_executable_pipeline_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "emit-final-executable-pipeline".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::EmitFinalExecutablePipeline {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
+fn parses_verify_final_executable_pipeline_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "verify-final-executable-pipeline".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::VerifyFinalExecutablePipeline {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
 fn parses_emit_final_executable_input_and_json_flag() {
     let command = parse_args(
         vec![

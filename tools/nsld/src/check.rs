@@ -180,6 +180,19 @@ pub(crate) fn nsld_check_report(
     let checks = checks + usize::from(final_snapshot.final_executable_image_dry_run_present);
     let checks = checks + usize::from(final_snapshot.final_executable_blocked_present);
     let checks = checks + usize::from(final_snapshot.final_executable_output_present);
+    let checks = checks
+        + usize::from(
+            final_snapshot
+                .tail
+                .final_executable_launcher_manifest_present,
+        );
+    let checks = checks
+        + usize::from(
+            final_snapshot
+                .tail
+                .final_executable_launcher_dry_run_present,
+        );
+    let checks = checks + usize::from(final_snapshot.tail.final_executable_pipeline_present);
     let failures = issues.len();
     NsldCheckReport {
         manifest: manifest.display().to_string(),
@@ -341,6 +354,63 @@ pub(crate) fn nsld_check_report(
             .final_executable_output_runnable_candidate,
         final_executable_output_blocker_count: final_snapshot.final_executable_output_blocker_count,
         final_executable_output_issues: final_snapshot.final_executable_output_issues,
+        final_executable_launcher_manifest_present: final_snapshot
+            .tail
+            .final_executable_launcher_manifest_present,
+        final_executable_launcher_manifest_valid: final_snapshot
+            .tail
+            .final_executable_launcher_manifest_valid,
+        final_executable_launcher_manifest_hash: final_snapshot
+            .tail
+            .final_executable_launcher_manifest_hash,
+        final_executable_launcher_manifest_ready: final_snapshot
+            .tail
+            .final_executable_launcher_manifest_ready,
+        final_executable_launcher_manifest_blocker_count: final_snapshot
+            .tail
+            .final_executable_launcher_manifest_blocker_count,
+        final_executable_launcher_manifest_issues: final_snapshot
+            .tail
+            .final_executable_launcher_manifest_issues,
+        final_executable_launcher_dry_run_present: final_snapshot
+            .tail
+            .final_executable_launcher_dry_run_present,
+        final_executable_launcher_dry_run_valid: final_snapshot
+            .tail
+            .final_executable_launcher_dry_run_valid,
+        final_executable_launcher_dry_run_hash: final_snapshot
+            .tail
+            .final_executable_launcher_dry_run_hash,
+        final_executable_launcher_dry_run_ready: final_snapshot
+            .tail
+            .final_executable_launcher_dry_run_ready,
+        final_executable_launcher_dry_run_would_enter_lifecycle_hook: final_snapshot
+            .tail
+            .final_executable_launcher_dry_run_would_enter_lifecycle_hook,
+        final_executable_launcher_dry_run_blocker_count: final_snapshot
+            .tail
+            .final_executable_launcher_dry_run_blocker_count,
+        final_executable_launcher_dry_run_issues: final_snapshot
+            .tail
+            .final_executable_launcher_dry_run_issues,
+        final_executable_pipeline_present: final_snapshot.tail.final_executable_pipeline_present,
+        final_executable_pipeline_valid: final_snapshot.tail.final_executable_pipeline_valid,
+        final_executable_pipeline_hash: final_snapshot.tail.final_executable_pipeline_hash,
+        final_executable_pipeline_ready: final_snapshot.tail.final_executable_pipeline_ready,
+        final_executable_pipeline_emitted: final_snapshot.tail.final_executable_pipeline_emitted,
+        final_executable_pipeline_required_stage_path_count: final_snapshot
+            .tail
+            .final_executable_pipeline_required_stage_path_count,
+        final_executable_pipeline_required_stage_path_present_count: final_snapshot
+            .tail
+            .final_executable_pipeline_required_stage_path_present_count,
+        final_executable_pipeline_missing_required_stage_paths: final_snapshot
+            .tail
+            .final_executable_pipeline_missing_required_stage_paths,
+        final_executable_pipeline_blocker_count: final_snapshot
+            .tail
+            .final_executable_pipeline_blocker_count,
+        final_executable_pipeline_issues: final_snapshot.tail.final_executable_pipeline_issues,
         container_loader_readiness: container_snapshot.container_loader_readiness,
         container_loader_blockers: container_snapshot.container_loader_blockers,
         container_metadata_table_hash: container_snapshot.container_metadata_table_hash,

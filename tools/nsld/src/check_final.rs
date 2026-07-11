@@ -1,5 +1,8 @@
 use super::{
     artifact_chain::{nsld_artifact_stage_kind_path, NsldArtifactStageKind},
+    check_final_tail::{
+        nsld_check_final_tail_snapshot, push_final_tail_snapshot_issues, NsldCheckFinalTailSnapshot,
+    },
     final_stage::{
         nsld_final_executable_output_report, nsld_final_stage_plan_report,
         nsld_verify_final_executable_emit_report,
@@ -59,6 +62,7 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_runnable_candidate: Option<bool>,
     pub(crate) final_executable_output_blocker_count: Option<usize>,
     pub(crate) final_executable_output_issues: Vec<String>,
+    pub(crate) tail: NsldCheckFinalTailSnapshot,
 }
 
 pub(crate) fn nsld_check_final_snapshot(
@@ -254,6 +258,7 @@ pub(crate) fn nsld_check_final_snapshot(
             issues
         })
         .unwrap_or_default();
+    let tail = nsld_check_final_tail_snapshot(manifest, plan);
 
     NsldCheckFinalSnapshot {
         final_stage_plan_present,
@@ -303,6 +308,7 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_runnable_candidate,
         final_executable_output_blocker_count,
         final_executable_output_issues,
+        tail,
     }
 }
 
@@ -353,4 +359,5 @@ pub(crate) fn push_final_snapshot_issues(
         issues.push("final executable output verification failed".to_owned());
         issues.extend(snapshot.final_executable_output_issues.iter().cloned());
     }
+    push_final_tail_snapshot_issues(issues, &snapshot.tail);
 }

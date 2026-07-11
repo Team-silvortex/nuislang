@@ -194,6 +194,40 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
                 Err("nsld final executable image dry-run verification failed".to_owned())
             }
         }
+        Command::EmitFinalExecutablePipeline { input, json } => {
+            let ctx = load_link_input_context(input)?;
+            let report = nsld_emit_final_executable_pipeline_report(&ctx.manifest, &ctx.plan)?;
+            if *json {
+                println!(
+                    "{}",
+                    nsld_final_executable_pipeline_emit_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_pipeline_emit_report(&report);
+            }
+            if report.valid {
+                Ok(true)
+            } else {
+                Err("nsld final executable pipeline emit completed with blockers".to_owned())
+            }
+        }
+        Command::VerifyFinalExecutablePipeline { input, json } => {
+            let ctx = load_link_input_context(input)?;
+            let report = nsld_verify_final_executable_pipeline_report(&ctx.manifest, &ctx.plan);
+            if *json {
+                println!(
+                    "{}",
+                    nsld_final_executable_pipeline_verify_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_pipeline_verify_report(&report);
+            }
+            if report.valid {
+                Ok(true)
+            } else {
+                Err("nsld final executable pipeline verification failed".to_owned())
+            }
+        }
         Command::EmitFinalExecutable { input, json } => {
             let ctx = load_link_input_context(input)?;
             let report = nsld_emit_final_executable_report(&ctx.manifest, &ctx.plan)?;
@@ -285,6 +319,38 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
                 print_nsld_final_executable_launcher_dry_run_report(&report);
             }
             Ok(true)
+        }
+        Command::EmitFinalExecutableLauncherDryRun { input, json } => {
+            let ctx = load_link_input_context(input)?;
+            let report =
+                nsld_emit_final_executable_launcher_dry_run_report(&ctx.manifest, &ctx.plan)?;
+            if *json {
+                println!(
+                    "{}",
+                    nsld_final_executable_launcher_dry_run_emit_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_launcher_dry_run_emit_report(&report);
+            }
+            Ok(true)
+        }
+        Command::VerifyFinalExecutableLauncherDryRun { input, json } => {
+            let ctx = load_link_input_context(input)?;
+            let report =
+                nsld_verify_final_executable_launcher_dry_run_report(&ctx.manifest, &ctx.plan);
+            if *json {
+                println!(
+                    "{}",
+                    nsld_final_executable_launcher_dry_run_verify_report_json(&report)
+                );
+            } else {
+                print_nsld_final_executable_launcher_dry_run_verify_report(&report);
+            }
+            if report.valid {
+                Ok(true)
+            } else {
+                Err("nsld final executable launcher dry-run verification failed".to_owned())
+            }
         }
         _ => Ok(false),
     }

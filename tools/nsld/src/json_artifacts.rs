@@ -51,6 +51,7 @@ pub(crate) fn nsld_artifact_chain_report_json(report: &NsldArtifactChainReport) 
             "\"stages\":[{}]",
             artifact_chain_stage_diagnostics_json(&report.stages)
         ),
+        json_string_array_field("advisories", &report.advisories),
         json_string_array_field("issues", &report.issues),
     ];
     format!("{{{}}}", fields.join(","))

@@ -1,3 +1,4 @@
+use super::cli_usage::usage;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,6 +27,8 @@ pub(crate) enum Command {
     FinalExecutableImageDryRun { input: PathBuf, json: bool },
     EmitFinalExecutableImageDryRun { input: PathBuf, json: bool },
     VerifyFinalExecutableImageDryRun { input: PathBuf, json: bool },
+    EmitFinalExecutablePipeline { input: PathBuf, json: bool },
+    VerifyFinalExecutablePipeline { input: PathBuf, json: bool },
     EmitFinalExecutable { input: PathBuf, json: bool },
     VerifyFinalExecutableEmit { input: PathBuf, json: bool },
     FinalExecutableOutput { input: PathBuf, json: bool },
@@ -33,6 +36,8 @@ pub(crate) enum Command {
     EmitFinalExecutableLauncherManifest { input: PathBuf, json: bool },
     VerifyFinalExecutableLauncherManifest { input: PathBuf, json: bool },
     FinalExecutableLauncherDryRun { input: PathBuf, json: bool },
+    EmitFinalExecutableLauncherDryRun { input: PathBuf, json: bool },
+    VerifyFinalExecutableLauncherDryRun { input: PathBuf, json: bool },
     Prepare { input: PathBuf, json: bool },
     AssemblePlan { input: PathBuf, json: bool },
     EmitAssemblePlan { input: PathBuf, json: bool },
@@ -109,6 +114,8 @@ where
         | "final-executable-image-dry-run"
         | "emit-final-executable-image-dry-run"
         | "verify-final-executable-image-dry-run"
+        | "emit-final-executable-pipeline"
+        | "verify-final-executable-pipeline"
         | "emit-final-executable"
         | "verify-final-executable-emit"
         | "final-executable-output"
@@ -116,6 +123,8 @@ where
         | "emit-final-executable-launcher-manifest"
         | "verify-final-executable-launcher-manifest"
         | "final-executable-launcher-dry-run"
+        | "emit-final-executable-launcher-dry-run"
+        | "verify-final-executable-launcher-dry-run"
         | "prepare"
         | "assemble-plan"
         | "emit-assemble-plan"
@@ -187,6 +196,8 @@ where
                 command == "emit-final-executable-image-dry-run";
             let is_verify_final_executable_image_dry_run =
                 command == "verify-final-executable-image-dry-run";
+            let is_emit_final_executable_pipeline = command == "emit-final-executable-pipeline";
+            let is_verify_final_executable_pipeline = command == "verify-final-executable-pipeline";
             let is_emit_final_executable = command == "emit-final-executable";
             let is_verify_final_executable_emit = command == "verify-final-executable-emit";
             let is_final_executable_output = command == "final-executable-output";
@@ -198,6 +209,10 @@ where
                 command == "verify-final-executable-launcher-manifest";
             let is_final_executable_launcher_dry_run =
                 command == "final-executable-launcher-dry-run";
+            let is_emit_final_executable_launcher_dry_run =
+                command == "emit-final-executable-launcher-dry-run";
+            let is_verify_final_executable_launcher_dry_run =
+                command == "verify-final-executable-launcher-dry-run";
             let is_prepare = command == "prepare";
             let is_assemble_plan = command == "assemble-plan";
             let is_emit_assemble_plan = command == "emit-assemble-plan";
@@ -296,6 +311,10 @@ where
                 Ok(Command::EmitFinalExecutableImageDryRun { input, json })
             } else if is_verify_final_executable_image_dry_run {
                 Ok(Command::VerifyFinalExecutableImageDryRun { input, json })
+            } else if is_emit_final_executable_pipeline {
+                Ok(Command::EmitFinalExecutablePipeline { input, json })
+            } else if is_verify_final_executable_pipeline {
+                Ok(Command::VerifyFinalExecutablePipeline { input, json })
             } else if is_emit_final_executable {
                 Ok(Command::EmitFinalExecutable { input, json })
             } else if is_verify_final_executable_emit {
@@ -310,6 +329,10 @@ where
                 Ok(Command::VerifyFinalExecutableLauncherManifest { input, json })
             } else if is_final_executable_launcher_dry_run {
                 Ok(Command::FinalExecutableLauncherDryRun { input, json })
+            } else if is_emit_final_executable_launcher_dry_run {
+                Ok(Command::EmitFinalExecutableLauncherDryRun { input, json })
+            } else if is_verify_final_executable_launcher_dry_run {
+                Ok(Command::VerifyFinalExecutableLauncherDryRun { input, json })
             } else if is_prepare {
                 Ok(Command::Prepare { input, json })
             } else if is_assemble_plan {
@@ -415,85 +438,6 @@ pub(crate) fn resolve_manifest_input(input: &Path) -> Result<PathBuf, String> {
         ));
     }
     Ok(input.to_path_buf())
-}
-
-fn usage() -> &'static str {
-    concat!(
-        "usage:\n",
-        "  nsld status\n",
-        "  nsld plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld check <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld artifact-chain <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-closure <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-stage-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-final-stage-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-final-stage-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-executable-readiness <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-executable-writer-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-final-executable-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-final-executable-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-executable-host-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-executable-host-invoke-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-final-executable-host-invoke-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-final-executable-host-invoke-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-executable-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-final-executable-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-final-executable-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-executable-image-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-final-executable-image-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-final-executable-image-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-final-executable <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-final-executable-emit <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-executable-output <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-executable-launcher-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-final-executable-launcher-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-final-executable-launcher-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-executable-launcher-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld prepare <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-assemble-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld section-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-section-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-section-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld object-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-object-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-object-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld object-writer-readiness <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-object <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-object-emit <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-object-output <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-object-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld object-writer-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-object-writer-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-object-writer-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld object-byte-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-object-byte-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-object-byte-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld object-file-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-object-file-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-object-file-layout <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld object-image-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-object-image-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-object-image-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld container-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-container-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-container-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld container <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-container <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-container <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-bundle <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-units <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld emit-inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld verify-inputs <nuis.build.manifest.toml|artifact-output-dir> [--json]"
-    )
 }
 
 #[cfg(test)]

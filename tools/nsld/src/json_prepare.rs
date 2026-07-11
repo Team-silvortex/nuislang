@@ -63,6 +63,14 @@ pub(crate) fn nsld_prepare_report_json(report: &NsldPrepareReport) -> String {
             "final_executable_output_path",
             &report.final_executable_output_path,
         ),
+        json_string_field(
+            "final_executable_launcher_manifest_path",
+            &report.final_executable_launcher_manifest_path,
+        ),
+        json_string_field(
+            "final_executable_launcher_dry_run_path",
+            &report.final_executable_launcher_dry_run_path,
+        ),
         json_usize_field("link_input_count", report.link_input_count),
         json_string_field("link_input_table_hash", &report.link_input_table_hash),
         json_usize_field("unit_count", report.unit_count),

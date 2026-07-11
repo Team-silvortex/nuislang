@@ -274,6 +274,18 @@ pub(crate) fn nsld_prepare_report(
         .display()
         .to_string(),
         final_executable_output_path: plan.final_stage.output_path.clone(),
+        final_executable_launcher_manifest_path: nsld_artifact_stage_kind_path(
+            &plan.output_dir,
+            NsldArtifactStageKind::FinalExecutableLauncherManifest,
+        )
+        .display()
+        .to_string(),
+        final_executable_launcher_dry_run_path: nsld_artifact_stage_kind_path(
+            &plan.output_dir,
+            NsldArtifactStageKind::FinalExecutableLauncherDryRun,
+        )
+        .display()
+        .to_string(),
         link_input_count: input_emit.link_input_count,
         link_input_table_hash: input_emit.link_input_table_hash,
         unit_count: unit_emit.unit_count,

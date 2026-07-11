@@ -26,6 +26,7 @@ pub(crate) struct NsldArtifactChainReport {
     pub(crate) next_optional_command_resolved: Option<String>,
     pub(crate) next_optional_command_reason: Option<String>,
     pub(crate) stages: Vec<NsldArtifactStageDiagnostic>,
+    pub(crate) advisories: Vec<String>,
     pub(crate) issues: Vec<String>,
 }
 
@@ -294,6 +295,8 @@ pub(crate) struct NsldPrepareReport {
     pub(crate) final_executable_image_dry_run_bytes_path: String,
     pub(crate) final_executable_blocked_path: String,
     pub(crate) final_executable_output_path: String,
+    pub(crate) final_executable_launcher_manifest_path: String,
+    pub(crate) final_executable_launcher_dry_run_path: String,
     pub(crate) link_input_count: usize,
     pub(crate) link_input_table_hash: String,
     pub(crate) unit_count: usize,

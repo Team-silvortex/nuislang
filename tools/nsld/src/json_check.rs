@@ -1,7 +1,7 @@
 use super::{
+    json_check_final::check_report_final_fields,
     json_check_sections::{
-        check_report_container_fields, check_report_final_fields, check_report_object_fields,
-        check_report_tail_fields,
+        check_report_container_fields, check_report_object_fields, check_report_tail_fields,
     },
     json_fields::*,
     reports::NsldCheckReport,

@@ -110,10 +110,24 @@ validation_contracts = ["glm.resource-lifetime"]
         report.final_executable_output_path,
         plan.final_stage.output_path
     );
+    assert_eq!(
+        report.final_executable_launcher_manifest_path,
+        dir.join("nuis.nsld.final-executable-launcher.toml")
+            .display()
+            .to_string()
+    );
+    assert_eq!(
+        report.final_executable_launcher_dry_run_path,
+        dir.join("nuis.nsld.final-executable-launcher-dry-run.toml")
+            .display()
+            .to_string()
+    );
     assert!(!Path::new(&report.final_executable_writer_input_path).exists());
     assert!(!Path::new(&report.final_executable_host_invoke_plan_path).exists());
     assert!(!Path::new(&report.final_executable_blocked_path).exists());
     assert!(!Path::new(&report.final_executable_output_path).exists());
+    assert!(!Path::new(&report.final_executable_launcher_manifest_path).exists());
+    assert!(!Path::new(&report.final_executable_launcher_dry_run_path).exists());
     assert!(dir.join("nuis.nsld.object-plan.toml").exists());
     assert!(dir.join("nuis.nsld.object-writer-input.toml").exists());
     assert!(dir.join("nuis.nsld.object.blocked.toml").exists());
@@ -220,6 +234,8 @@ validation_contracts = ["glm.resource-lifetime"]
     assert!(report_json.contains("\"final_executable_host_invoke_plan_path\":"));
     assert!(report_json.contains("\"final_executable_blocked_path\":"));
     assert!(report_json.contains("\"final_executable_output_path\":"));
+    assert!(report_json.contains("\"final_executable_launcher_manifest_path\":"));
+    assert!(report_json.contains("\"final_executable_launcher_dry_run_path\":"));
     assert_ne!(report.container_layout_hash, "missing");
     assert_ne!(report.container_hash, "missing");
     assert!(report.payload_size_bytes > 0);

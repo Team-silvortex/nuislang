@@ -59,3 +59,19 @@ pub(crate) fn nsld_final_executable_launcher_manifest_path(
         NsldArtifactStageKind::FinalExecutableLauncherManifest,
     )
 }
+
+pub(crate) fn nsld_final_executable_launcher_dry_run_path(
+    plan: &nuisc::linker::LinkPlan,
+) -> PathBuf {
+    nsld_artifact_stage_kind_path(
+        &plan.output_dir,
+        NsldArtifactStageKind::FinalExecutableLauncherDryRun,
+    )
+}
+
+pub(crate) fn nsld_final_executable_pipeline_path(plan: &nuisc::linker::LinkPlan) -> PathBuf {
+    nsld_artifact_stage_kind_path(
+        &plan.output_dir,
+        NsldArtifactStageKind::FinalExecutablePipeline,
+    )
+}

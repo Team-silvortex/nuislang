@@ -6,8 +6,8 @@ use super::{
 use crate::{
     json, main_test_support::empty_link_plan, nsld_emit_final_executable_host_invoke_plan_report,
     nsld_emit_final_executable_image_dry_run_report, nsld_emit_final_executable_layout_plan_report,
-    nsld_emit_final_executable_report, nsld_emit_final_executable_writer_input_report,
-    nsld_prepare_report,
+    nsld_emit_final_executable_pipeline_report, nsld_emit_final_executable_report,
+    nsld_emit_final_executable_writer_input_report, nsld_prepare_report,
 };
 use std::{env, fs, path::Path};
 
@@ -114,6 +114,14 @@ fn artifact_stage_kind_paths_are_canonical() {
         nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableLauncherManifest),
         "nuis.nsld.final-executable-launcher.toml"
     );
+    assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutableLauncherDryRun),
+        "nuis.nsld.final-executable-launcher-dry-run.toml"
+    );
+    assert_eq!(
+        nsld_artifact_stage_file_name(NsldArtifactStageKind::FinalExecutablePipeline),
+        "nuis.nsld.final-executable-pipeline.toml"
+    );
     assert_eq!(nsld_object_output_file_name("pe/coff"), "nuis.nsld.pe-coff");
 }
 
@@ -134,7 +142,7 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(report.valid, "{:?}", report.issues);
-    assert_eq!(report.stage_count, 27);
+    assert_eq!(report.stage_count, 29);
     assert!(report.present_count >= report.required_count);
     assert_eq!(report.missing_required_count, 0);
     assert!(report.optional_present_count >= 3);
@@ -150,15 +158,15 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
     );
     assert_eq!(
         report.next_optional_command_id.as_deref(),
-        Some("emit-final-executable-writer-input")
+        Some("emit-final-executable-pipeline")
     );
     assert_eq!(
         report.next_optional_command.as_deref(),
-        Some("nsld emit-final-executable-writer-input <input>")
+        Some("nsld emit-final-executable-pipeline <input>")
     );
     assert_eq!(
         report.next_optional_command_resolved.as_deref(),
-        Some("nsld emit-final-executable-writer-input manifest.toml")
+        Some("nsld emit-final-executable-pipeline manifest.toml")
     );
     assert_eq!(
         report.next_optional_command_reason.as_deref(),
@@ -207,13 +215,11 @@ fn artifact_chain_report_lists_registered_stages_and_optional_tail() {
     assert!(report_json.contains("\"suggested_command_resolved\":null"));
     assert!(report_json.contains("\"suggested_command_reason\":null"));
     assert!(report_json.contains("\"next_optional_stage\":\"final-executable-writer-input\""));
-    assert!(
-        report_json.contains("\"next_optional_command_id\":\"emit-final-executable-writer-input\"")
-    );
+    assert!(report_json.contains("\"next_optional_command_id\":\"emit-final-executable-pipeline\""));
     assert!(report_json
-        .contains("\"next_optional_command\":\"nsld emit-final-executable-writer-input <input>\""));
+        .contains("\"next_optional_command\":\"nsld emit-final-executable-pipeline <input>\""));
     assert!(report_json.contains(
-        "\"next_optional_command_resolved\":\"nsld emit-final-executable-writer-input manifest.toml\""
+        "\"next_optional_command_resolved\":\"nsld emit-final-executable-pipeline manifest.toml\""
     ));
 }
 
@@ -250,7 +256,7 @@ fn artifact_chain_next_optional_stage_advances_through_final_executable_tail() {
     );
     assert_eq!(
         after_prepare.next_optional_command_id.as_deref(),
-        Some("emit-final-executable-writer-input")
+        Some("emit-final-executable-pipeline")
     );
     assert_eq!(
         after_writer_input.next_optional_stage.as_deref(),
@@ -258,7 +264,7 @@ fn artifact_chain_next_optional_stage_advances_through_final_executable_tail() {
     );
     assert_eq!(
         after_writer_input.next_optional_command_id.as_deref(),
-        Some("emit-final-executable-host-invoke-plan")
+        Some("emit-final-executable-pipeline")
     );
     assert_eq!(
         after_invoke_plan.next_optional_stage.as_deref(),
@@ -266,7 +272,7 @@ fn artifact_chain_next_optional_stage_advances_through_final_executable_tail() {
     );
     assert_eq!(
         after_invoke_plan.next_optional_command_id.as_deref(),
-        Some("emit-final-executable-layout")
+        Some("emit-final-executable-pipeline")
     );
     assert_eq!(
         after_layout_plan.next_optional_stage.as_deref(),
@@ -274,7 +280,7 @@ fn artifact_chain_next_optional_stage_advances_through_final_executable_tail() {
     );
     assert_eq!(
         after_layout_plan.next_optional_command_id.as_deref(),
-        Some("emit-final-executable-image-dry-run")
+        Some("emit-final-executable-pipeline")
     );
     assert_eq!(
         after_image_dry_run.next_optional_stage.as_deref(),
@@ -282,7 +288,7 @@ fn artifact_chain_next_optional_stage_advances_through_final_executable_tail() {
     );
     assert_eq!(
         after_image_dry_run.next_optional_command_id.as_deref(),
-        Some("emit-final-executable")
+        Some("emit-final-executable-pipeline")
     );
     assert_eq!(
         after_blocked.next_optional_stage.as_deref(),
@@ -290,7 +296,7 @@ fn artifact_chain_next_optional_stage_advances_through_final_executable_tail() {
     );
     assert_eq!(
         after_blocked.next_optional_command_id.as_deref(),
-        Some("emit-final-executable")
+        Some("emit-final-executable-pipeline")
     );
 }
 
@@ -328,7 +334,7 @@ fn artifact_chain_marks_self_contained_final_executable_output_as_chain_tail() {
     );
     assert_eq!(
         report.next_optional_command_id.as_deref(),
-        Some("emit-final-executable-launcher-manifest")
+        Some("emit-final-executable-pipeline")
     );
     assert!(report.stages.iter().any(|stage| {
         stage.stage_id == "final-executable-output"
@@ -337,6 +343,48 @@ fn artifact_chain_marks_self_contained_final_executable_output_as_chain_tail() {
             && stage.present
             && !stage.required
     }));
+}
+
+#[test]
+fn artifact_chain_reports_advisory_for_broken_final_executable_tail() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-artifact-chain-broken-final-tail-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.final_stage.kind = "nuis-self-contained-image".to_owned();
+    plan.final_stage.driver = "nsld-internal-image-writer".to_owned();
+    plan.final_stage.link_mode = "self-contained".to_owned();
+    plan.final_stage.output_path = dir.join("nuis-app.nsb").display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let pipeline =
+        nsld_emit_final_executable_pipeline_report(Path::new("manifest.toml"), &plan).unwrap();
+    fs::remove_file(&pipeline.launcher_dry_run_path).unwrap();
+    let report = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    let report_json = json::nsld_artifact_chain_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.valid, "{:?}", report.issues);
+    assert!(report.issues.is_empty());
+    assert!(report.advisories.iter().any(|advisory| advisory.contains(
+        "optional final executable tail artifact `final-executable-pipeline` is present"
+    )));
+    assert!(report
+        .advisories
+        .iter()
+        .any(|advisory| advisory.contains("`final-executable-launcher-dry-run` is missing")));
+    assert!(report
+        .advisories
+        .iter()
+        .any(|advisory| advisory.contains("emit-final-executable-pipeline")));
+    assert!(report_json.contains("\"advisories\":["));
+    assert!(report_json.contains("final-executable-launcher-dry-run"));
 }
 
 #[test]

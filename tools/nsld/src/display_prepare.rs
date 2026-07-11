@@ -61,6 +61,14 @@ pub(crate) fn print_nsld_prepare_report(report: &NsldPrepareReport) {
         "  final_executable_output: {}",
         report.final_executable_output_path
     );
+    println!(
+        "  final_executable_launcher_manifest: {}",
+        report.final_executable_launcher_manifest_path
+    );
+    println!(
+        "  final_executable_launcher_dry_run: {}",
+        report.final_executable_launcher_dry_run_path
+    );
     println!("  link_input_count: {}", report.link_input_count);
     println!("  link_input_table_hash: {}", report.link_input_table_hash);
     println!("  unit_count: {}", report.unit_count);

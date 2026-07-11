@@ -252,6 +252,40 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         )
     );
     println!(
+        "  final_executable_launcher_manifest: present={} valid={} ready={} hash={} blockers={} issues={}",
+        report.final_executable_launcher_manifest_present,
+        optional_bool_text(report.final_executable_launcher_manifest_valid),
+        optional_bool_text(report.final_executable_launcher_manifest_ready),
+        optional_string_text(report.final_executable_launcher_manifest_hash.as_deref()),
+        optional_usize_text(report.final_executable_launcher_manifest_blocker_count),
+        report.final_executable_launcher_manifest_issues.len()
+    );
+    println!(
+        "  final_executable_launcher_dry_run: present={} valid={} ready={} enters_hook={} hash={} blockers={} issues={}",
+        report.final_executable_launcher_dry_run_present,
+        optional_bool_text(report.final_executable_launcher_dry_run_valid),
+        optional_bool_text(report.final_executable_launcher_dry_run_ready),
+        optional_bool_text(report.final_executable_launcher_dry_run_would_enter_lifecycle_hook),
+        optional_string_text(report.final_executable_launcher_dry_run_hash.as_deref()),
+        optional_usize_text(report.final_executable_launcher_dry_run_blocker_count),
+        report.final_executable_launcher_dry_run_issues.len()
+    );
+    println!(
+        "  final_executable_pipeline: present={} valid={} ready={} emitted={} hash={} required_paths={} present_paths={} missing_paths={} blockers={} issues={}",
+        report.final_executable_pipeline_present,
+        optional_bool_text(report.final_executable_pipeline_valid),
+        optional_bool_text(report.final_executable_pipeline_ready),
+        optional_bool_text(report.final_executable_pipeline_emitted),
+        optional_string_text(report.final_executable_pipeline_hash.as_deref()),
+        optional_usize_text(report.final_executable_pipeline_required_stage_path_count),
+        optional_usize_text(report.final_executable_pipeline_required_stage_path_present_count),
+        report
+            .final_executable_pipeline_missing_required_stage_paths
+            .len(),
+        optional_usize_text(report.final_executable_pipeline_blocker_count),
+        report.final_executable_pipeline_issues.len()
+    );
+    println!(
         "  container_loader: readiness={} blockers={} metadata_table_hash={} external_imports={}",
         optional_string_text(report.container_loader_readiness.as_deref()),
         report.container_loader_blockers.len(),
@@ -432,6 +466,18 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     }
     for issue in &report.final_executable_output_issues {
         println!("  final_executable_output_issue: {issue}");
+    }
+    for issue in &report.final_executable_launcher_manifest_issues {
+        println!("  final_executable_launcher_manifest_issue: {issue}");
+    }
+    for issue in &report.final_executable_launcher_dry_run_issues {
+        println!("  final_executable_launcher_dry_run_issue: {issue}");
+    }
+    for issue in &report.final_executable_pipeline_issues {
+        println!("  final_executable_pipeline_issue: {issue}");
+    }
+    for path in &report.final_executable_pipeline_missing_required_stage_paths {
+        println!("  final_executable_pipeline_missing_required_stage_path: {path}");
     }
     for blocker in &report.container_loader_blockers {
         println!("  container_loader_blocker: {blocker}");
