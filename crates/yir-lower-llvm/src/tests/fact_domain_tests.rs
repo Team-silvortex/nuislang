@@ -30,6 +30,42 @@ fn folds_known_variant_is_for_lazy_const_select() {
 }
 
 #[test]
+fn folds_known_variant_field_value_for_lazy_const_select() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "ok_payload", "23");
+    push_cpu_node(
+        &mut module,
+        "ok_variant",
+        "cpu.struct",
+        vec!["Result.Ok", "value=ok_payload"],
+    );
+    push_cpu_node(
+        &mut module,
+        "actual",
+        "cpu.variant_field",
+        vec!["ok_variant", "Result.Ok", "value"],
+    );
+    push_cpu_const_i64(&mut module, "expected", "23");
+    push_cpu_node(&mut module, "enabled", "cpu.eq", vec!["actual", "expected"]);
+    push_wrong_variant_payload_select_fixture(&mut module, "enabled", "fallback", "bad_result");
+    push_deps(
+        &mut module,
+        &[
+            ("ok_payload", "ok_variant"),
+            ("ok_variant", "actual"),
+            ("actual", "enabled"),
+            ("expected", "enabled"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("icmp eq i64"));
+    assert!(!llvm_ir.contains("select i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert_wrong_variant_chain_not_deferred(&llvm_ir);
+}
+
+#[test]
 fn folds_known_network_state_for_lazy_const_select() {
     let mut module = module_with_cpu0();
     module.resources.push(Resource {
@@ -125,6 +161,72 @@ fn folds_known_task_result_state_for_lazy_const_select() {
 
     let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
     assert!(llvm_ir.contains("zext i1 true to i64"));
+    assert!(!llvm_ir.contains("select i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert_wrong_variant_chain_not_deferred(&llvm_ir);
+}
+
+#[test]
+fn folds_known_task_value_for_lazy_const_select() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "task_payload", "11");
+    push_cpu_node(
+        &mut module,
+        "task",
+        "cpu.spawn_task",
+        vec!["task_handle", "task_payload"],
+    );
+    push_cpu_node(&mut module, "task_result", "cpu.join_result", vec!["task"]);
+    push_cpu_node(&mut module, "actual", "cpu.task_value", vec!["task_result"]);
+    push_cpu_const_i64(&mut module, "expected", "11");
+    push_cpu_node(&mut module, "enabled", "cpu.eq", vec!["actual", "expected"]);
+    push_wrong_variant_payload_select_fixture(&mut module, "enabled", "fallback", "bad_result");
+    push_deps(
+        &mut module,
+        &[
+            ("task_payload", "task"),
+            ("task", "task_result"),
+            ("task_result", "actual"),
+            ("actual", "enabled"),
+            ("expected", "enabled"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("icmp eq i64"));
+    assert!(!llvm_ir.contains("select i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert_wrong_variant_chain_not_deferred(&llvm_ir);
+}
+
+#[test]
+fn folds_known_mutex_value_for_lazy_const_select() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "shared_payload", "17");
+    push_cpu_node(
+        &mut module,
+        "mutex",
+        "cpu.mutex_new",
+        vec!["shared_payload"],
+    );
+    push_cpu_node(&mut module, "guard", "cpu.mutex_lock", vec!["mutex"]);
+    push_cpu_node(&mut module, "actual", "cpu.mutex_value", vec!["guard"]);
+    push_cpu_const_i64(&mut module, "expected", "17");
+    push_cpu_node(&mut module, "enabled", "cpu.eq", vec!["actual", "expected"]);
+    push_wrong_variant_payload_select_fixture(&mut module, "enabled", "fallback", "bad_result");
+    push_deps(
+        &mut module,
+        &[
+            ("shared_payload", "mutex"),
+            ("mutex", "guard"),
+            ("guard", "actual"),
+            ("actual", "enabled"),
+            ("expected", "enabled"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("icmp eq i64"));
     assert!(!llvm_ir.contains("select i1"));
     assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
     assert_wrong_variant_chain_not_deferred(&llvm_ir);

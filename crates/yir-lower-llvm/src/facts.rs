@@ -31,3 +31,12 @@ impl KnownFacts {
         format!("{struct_name}.{field_name}")
     }
 }
+
+pub(crate) fn propagate_known_facts(from: &str, to: &str, facts: &mut KnownFacts) {
+    if let Some(value) = facts.get_i64(from) {
+        facts.record_i64(to.to_owned(), value);
+    }
+    if let Some(value) = facts.get_bool(from) {
+        facts.record_bool(to.to_owned(), value);
+    }
+}

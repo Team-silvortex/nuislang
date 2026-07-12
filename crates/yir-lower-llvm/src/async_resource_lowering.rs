@@ -1,6 +1,7 @@
 use yir_core::Node;
 
 use super::{
+    facts::propagate_known_facts,
     fresh_reg,
     value_ref::{coerce_to_i64, get_mutex, get_mutex_guard, get_task, get_task_result, get_thread},
     LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef, TaskLlvmValueRef,
@@ -23,6 +24,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     value: Box::new(value_ref),
                 }),
             );
+            propagate_known_facts(&node.op.args[1], &node.name, &mut state.facts);
             true
         }
         "spawn_thread" | "thread_spawn" => {
@@ -39,6 +41,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     value: Box::new(value_ref),
                 }),
             );
+            propagate_known_facts(&node.op.args[1], &node.name, &mut state.facts);
             true
         }
         "join_result" => {
@@ -56,6 +59,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     value: Some(task.value),
                 }),
             );
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         "thread_join_result" => {
@@ -73,6 +77,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     value: Some(thread.value),
                 }),
             );
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         "join" => {
@@ -88,6 +93,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
                 state.last_cpu_value = Some(as_i64);
             }
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         "thread_join" => {
@@ -103,6 +109,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
                 state.last_cpu_value = Some(as_i64);
             }
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         "task_completed" | "task_timed_out" | "task_cancelled" => {
@@ -154,6 +161,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
                 state.last_cpu_value = Some(as_i64);
             }
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         "mutex_new" => {
@@ -170,6 +178,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     value: Box::new(value_ref),
                 }),
             );
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         "mutex_lock" => {
@@ -184,6 +193,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 node.name.clone(),
                 LlvmValueRef::MutexGuard(MutexGuardLlvmValueRef { value: mutex.value }),
             );
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         "mutex_unlock" => {
@@ -198,6 +208,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 node.name.clone(),
                 LlvmValueRef::Mutex(MutexLlvmValueRef { value: guard.value }),
             );
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         "mutex_value" => {
@@ -213,6 +224,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
                 state.last_cpu_value = Some(as_i64);
             }
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         _ => false,

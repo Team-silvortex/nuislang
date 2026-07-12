@@ -1,6 +1,7 @@
 use yir_core::Node;
 
 use super::{
+    facts::propagate_known_facts,
     fresh_global, fresh_reg, llvm_c_string_bytes,
     value_ref::{coerce_to_i64, get_network_result, get_ptr, get_struct},
     variant_select::{emit_variant_is_value, variant_field_value, variant_parent_name},
@@ -51,10 +52,7 @@ pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState)
                     i64: widened.clone(),
                 },
             );
-            state
-                .facts
-                .bool_values
-                .insert(node.name.clone(), value == "true");
+            state.facts.record_bool(node.name.clone(), value == "true");
             state.last_cpu_value = Some(widened);
             true
         }
@@ -226,8 +224,7 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
             if let LlvmValueRef::Struct(struct_value) = &value_ref {
                 state
                     .facts
-                    .bool_values
-                    .insert(node.name.clone(), struct_value.type_name == *variant_name);
+                    .record_bool(node.name.clone(), struct_value.type_name == *variant_name);
             }
             state.registers.insert(node.name.clone(), bool_ref);
             true
@@ -266,6 +263,13 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
             if let Some(as_i64) = coerce_to_i64(&field_value, &mut state.body, &mut state.next_reg)
             {
                 state.last_cpu_value = Some(as_i64);
+            }
+            let field_fact_key = KnownFacts::struct_field_key(&node.op.args[0], field_name);
+            if let Some(value) = state.facts.get_i64(&field_fact_key) {
+                state.facts.record_i64(node.name.clone(), value);
+            }
+            if let Some(value) = state.facts.get_bool(&field_fact_key) {
+                state.facts.record_bool(node.name.clone(), value);
             }
             true
         }
@@ -331,6 +335,7 @@ pub(crate) fn lower_network_observer_node(node: &Node, state: &mut LlvmLoweringS
                     value: Box::new(value_ref),
                 }),
             );
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         "is_config_ready" | "is_send_ready" | "is_recv_ready" | "is_connect_ready"
@@ -367,10 +372,7 @@ pub(crate) fn lower_network_observer_node(node: &Node, state: &mut LlvmLoweringS
                     i64: widened.clone(),
                 },
             );
-            state
-                .facts
-                .bool_values
-                .insert(node.name.clone(), i1 == "true");
+            state.facts.record_bool(node.name.clone(), i1 == "true");
             state.last_cpu_value = Some(widened);
             true
         }
@@ -387,6 +389,7 @@ pub(crate) fn lower_network_observer_node(node: &Node, state: &mut LlvmLoweringS
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
                 state.last_cpu_value = Some(as_i64);
             }
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
         _ => false,
