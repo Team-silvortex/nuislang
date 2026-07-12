@@ -6,7 +6,7 @@ use super::{
         coerce_to_i64, get_mutex, get_mutex_guard, get_network_result, get_ptr, get_struct,
         get_task, get_task_result, get_thread,
     },
-    variant_select::{emit_variant_is_value, variant_field_value},
+    variant_select::{emit_variant_is_value, variant_field_value, variant_parent_name},
     LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
     NetworkResultLlvmValueRef, StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef,
     ThreadLlvmValueRef,
@@ -56,6 +56,9 @@ pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState)
                     i64: widened.clone(),
                 },
             );
+            state
+                .known_bool_values
+                .insert(node.name.clone(), value == "true");
             state.last_cpu_value = Some(widened);
             true
         }
@@ -82,6 +85,9 @@ pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState)
             state
                 .registers
                 .insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+            if let Ok(value) = node.op.args[0].parse::<i64>() {
+                state.known_i64_values.insert(node.name.clone(), value);
+            }
             state.last_cpu_value = Some(reg);
             true
         }
@@ -222,6 +228,16 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
             let field_name = &node.op.args[2];
             let Some(field_value) = variant_field_value(&value_ref, variant_name, field_name)
             else {
+                if is_wrong_concrete_variant_access(&value_ref, variant_name) {
+                    state.delayed_registers.insert(
+                        node.name.clone(),
+                        format!(
+                            "cpu.variant_field `{}` waits for lazy select because `{}` is not active on `{}`",
+                            node.name, variant_name, node.op.args[0]
+                        ),
+                    );
+                    return true;
+                }
                 state.body.push(format!(
                     "  ; deferred lowering for cpu.variant_field `{}` because field `{}` does not exist on variant `{}`",
                     node.name, field_name, variant_name
@@ -239,6 +255,18 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
         }
         _ => false,
     }
+}
+
+fn is_wrong_concrete_variant_access(value_ref: &LlvmValueRef, variant_name: &str) -> bool {
+    let LlvmValueRef::Struct(struct_value) = value_ref else {
+        return false;
+    };
+    if struct_value.type_name == variant_name {
+        return false;
+    }
+    variant_parent_name(&struct_value.type_name)
+        .zip(variant_parent_name(variant_name))
+        .is_some_and(|(actual_parent, expected_parent)| actual_parent == expected_parent)
 }
 
 pub(crate) fn lower_cpu_pointer_node(node: &Node, state: &mut LlvmLoweringState) -> bool {

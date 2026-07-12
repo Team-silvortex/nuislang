@@ -256,28 +256,30 @@ mod cpu Main {
     let line_len: i64 = host_line_len(line_handle);
     let result: TaskResult<i64> =
       join_result(timeout(spawn(ping(argv_count + line_len)), seed.timeout_limit));
-
-    if task_completed(result) {
-      return ProjectSessionSummary {
-        argv_count: argv_count,
-        line_handle: line_handle,
-        line_len: line_len,
-        completed: true,
-        timed_out: false,
-        target_handle: task_value(result),
-        tick_ns: host_monotonic_time_ns()
-      };
-    }
-
-    return ProjectSessionSummary {
+    let target_handle: i64 = task_value(result);
+    let tick_ns: i64 = host_monotonic_time_ns();
+    let completed_summary: ProjectSessionSummary = ProjectSessionSummary {
+      argv_count: argv_count,
+      line_handle: line_handle,
+      line_len: line_len,
+      completed: true,
+      timed_out: false,
+      target_handle: target_handle,
+      tick_ns: tick_ns
+    };
+    let fallback_summary: ProjectSessionSummary = ProjectSessionSummary {
       argv_count: argv_count,
       line_handle: line_handle,
       line_len: line_len,
       completed: false,
       timed_out: true,
       target_handle: 0,
-      tick_ns: host_monotonic_time_ns()
+      tick_ns: tick_ns
     };
+    if task_completed(result) {
+      return completed_summary;
+    }
+    return fallback_summary;
   }
 
   fn capture_project_artifact(
@@ -840,14 +842,70 @@ mod cpu Main {
       manifest,
       build_project_build_workflow_seed()
     );
+    let frontdoor: WorkflowFrontdoorSurface =
+      build_frontdoor_surface(session, build_report);
 
     if session.completed == false {
-      return build_failure_summary(seed, session, artifact, manifest, build_report);
+      let diag_code: i64 = host_diag_emit(
+        seed.cli.failed_text_handle,
+        session.line_len + build_report.build_report.executed_steps,
+        seed.cli.failed_severity
+      );
+      let stderr_code: i64 = host_stderr_write(seed.cli.failed_text_handle);
+      let stderr_flushed: i64 = host_stderr_flush();
+      return CliProjectBuildSummary {
+        session: session,
+        artifact: artifact,
+        manifest: manifest,
+        build_report: build_report,
+        frontdoor: frontdoor,
+        diag_code: 0,
+        stdout_code: 0,
+        stderr_code: 0,
+        stdout_flushed: 0,
+        stderr_flushed: 0
+      };
     }
     if build_report.build_report.overall_success {
-      return build_success_summary(seed, session, artifact, manifest, build_report);
+      let diag_code: i64 = host_diag_emit(
+        seed.cli.ready_text_handle,
+        session.line_len + build_report.build_report.executed_steps,
+        seed.cli.ready_severity
+      );
+      let stdout_code: i64 = host_stdout_write(seed.cli.ready_text_handle);
+      let stdout_flushed: i64 = host_stdout_flush();
+      return CliProjectBuildSummary {
+        session: session,
+        artifact: artifact,
+        manifest: manifest,
+        build_report: build_report,
+        frontdoor: frontdoor,
+        diag_code: 0,
+        stdout_code: 0,
+        stderr_code: 0,
+        stdout_flushed: 0,
+        stderr_flushed: 0
+      };
     }
-    return build_failure_summary(seed, session, artifact, manifest, build_report);
+    let diag_code: i64 = host_diag_emit(
+      seed.cli.failed_text_handle,
+      session.line_len + build_report.build_report.executed_steps,
+      seed.cli.failed_severity
+    );
+    let stderr_code: i64 = host_stderr_write(seed.cli.failed_text_handle);
+    let stderr_flushed: i64 = host_stderr_flush();
+    return CliProjectBuildSummary {
+      session: session,
+      artifact: artifact,
+      manifest: manifest,
+      build_report: build_report,
+      frontdoor: frontdoor,
+      diag_code: 0,
+      stdout_code: 0,
+      stderr_code: 0,
+      stdout_flushed: 0,
+      stderr_flushed: 0
+    };
   }
 
   fn summarize_build_step(report: ProjectBuildStepReport) -> i64 {

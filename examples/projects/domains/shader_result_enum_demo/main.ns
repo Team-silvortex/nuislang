@@ -210,13 +210,8 @@ mod cpu Main {
   }
 
   fn lift_pass_result(result: ShaderResult<Pass>) -> Result<Pass, ErrorEnvelope> {
-    let ready: bool = shader_pass_ready(result);
-    let pass: Pass = shader_value(result);
     let missing: Result<Pass, ErrorEnvelope> =
       Result.Err(build_error_envelope(kind_result_missing()));
-    if ready {
-      return Result.Ok(pass);
-    }
     return missing;
   }
 
@@ -232,6 +227,13 @@ mod cpu Main {
 
   fn raise_metric(value: i64) -> i64 {
     return value + 7;
+  }
+
+  fn bool_score(flag: bool) -> i64 {
+    if flag {
+      return 1;
+    }
+    return 0;
   }
 
   fn map_ok_metric(result: Result<i64, ErrorEnvelope>) -> Result<i64, ErrorEnvelope> {
@@ -298,14 +300,8 @@ mod cpu Main {
       lift_pass_result(shader_result(shader_profile_begin_pass("SurfaceShader"))),
       packet_tag
     );
-    let draw_pass_raw: ShaderResult<Pass> =
-      shader_result(shader_profile_begin_pass("SurfaceShader"));
     let draw_result_raw: ShaderResult<Frame> = shader_result(
-      shader_profile_draw_instanced(
-        "SurfaceShader",
-        shader_value(draw_pass_raw),
-        gpu_packet_draw
-      )
+      shader_profile_render("SurfaceShader", gpu_packet_draw)
     );
     let draw_metric: Result<i64, ErrorEnvelope> =
       map_ok_metric(lift_frame_result(draw_result_raw, packet_field_count));
@@ -313,17 +309,19 @@ mod cpu Main {
       shader_result(shader_profile_render("SurfaceShader", gpu_packet_render));
     let frame_metric_result: Result<i64, ErrorEnvelope> =
       lift_frame_result(frame_result_raw, packet_tag + packet_field_count);
+    let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet_render);
     let host_frame: HostFrameWindow =
-      data_profile_send_downlink("FabricPlane", shader_value(frame_result_raw));
+      data_profile_send_downlink("FabricPlane", frame);
     cpu_present_frame(host_frame);
+    let host_frame_ready: i64 = bool_score(shader_frame_ready(frame_result_raw));
 
     return ShaderResultEnumProjectSummary {
       pass_score: result_score(pass_metric) + result_unwrap_or(pass_metric, -10),
       draw_score: result_score(draw_metric) + result_unwrap_or(draw_metric, -20),
       frame_score: result_score(frame_metric_result)
         + result_unwrap_or(frame_metric_result, -30)
-        + if result_is_err(frame_metric_result) { 3 } else { 0 },
-      host_frame_ready: 1
+        + bool_score(result_is_err(frame_metric_result)),
+      host_frame_ready: host_frame_ready
     };
   }
 

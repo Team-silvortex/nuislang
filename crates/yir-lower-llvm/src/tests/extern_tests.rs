@@ -33,6 +33,45 @@ fn emits_dynamic_declare_for_cpu_extern_calls() {
 }
 
 #[test]
+fn emits_static_declare_for_builtin_env_host_facades() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    module.nodes.push(Node {
+        name: "key".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.const_i64", vec!["1701".to_owned()]).unwrap(),
+    });
+    for (name, symbol) in [
+        ("env_has_call", "host_env_has"),
+        ("env_get_call", "host_env_get"),
+    ] {
+        module.nodes.push(Node {
+            name: name.to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse(
+                "cpu.extern_call_i64",
+                vec!["c".to_owned(), symbol.to_owned(), "key".to_owned()],
+            )
+            .unwrap(),
+        });
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: "key".to_owned(),
+            to: name.to_owned(),
+        });
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("declare i64 @host_env_has(i64)"));
+    assert!(llvm_ir.contains("declare i64 @host_env_get(i64)"));
+    assert!(llvm_ir.contains("call i64 @host_env_has(i64"));
+    assert!(llvm_ir.contains("call i64 @host_env_get(i64"));
+}
+
+#[test]
 fn emits_dynamic_declare_for_i32_cpu_extern_calls() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

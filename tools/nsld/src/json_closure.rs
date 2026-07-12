@@ -6,6 +6,14 @@ pub(crate) fn nsld_closure_report_json(report: &NsldClosureReport) -> String {
         json_string_field("kind", "nsld_linker_closure"),
         json_string_field("manifest", &report.manifest),
         json_bool_field("closed", report.closed),
+        json_string_field(
+            "lowering_plan_index_source",
+            &report.lowering_plan_index_source,
+        ),
+        json_bool_field(
+            "lowering_plan_index_available",
+            report.lowering_plan_index_available,
+        ),
         json_string_array_field("internal_contracts", &report.internal_contracts),
         json_string_field("linker_contract_hash", &report.linker_contract_hash),
         format!(

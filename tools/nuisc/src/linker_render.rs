@@ -51,6 +51,10 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
         lines.push(format!("lowering_plan_index: {path}"));
     }
     lines.push(format!(
+        "lowering_plan_index_source: {}",
+        plan.lowering_plan_index_source
+    ));
+    lines.push(format!(
         "host_ffi: symbols={} policies={} policy={} validation={} index={}",
         plan.host_ffi.symbol_count,
         plan.host_ffi.policy_count,
@@ -221,6 +225,10 @@ pub fn render_link_plan_json(plan: &LinkPlan) -> String {
         json_string_array_field("domain_families", &plan.envelope.domain_families),
         json_usize_field("domain_unit_count", plan.domain_units.len()),
         json_optional_string_field("host_ffi_index_path", plan.host_ffi.index_path.as_deref()),
+        json_string_field(
+            "lowering_plan_index_source",
+            &plan.lowering_plan_index_source,
+        ),
         json_usize_field("host_ffi_symbol_count", plan.host_ffi.symbol_count),
         json_usize_field("host_ffi_policy_count", plan.host_ffi.policy_count),
         json_string_field("host_ffi_policy", &plan.host_ffi.policy),

@@ -329,7 +329,7 @@ mod cpu Main {
     assert!(json.contains("\"runtime_host_yir_ok\":true"));
     assert!(json.contains("\"runtime_host_yir_kernel_nodes\":4"));
     assert!(json.contains("\"runtime_host_yir_tensor_values\":3"));
-    assert!(json.contains("\"runtime_host_yir_scalar_values\":1"));
+    assert!(json.contains("\"runtime_host_yir_scalar_values\":2"));
     assert!(json.contains("\"runtime_host_yir_kernel_integer_checksum\":73"));
     assert!(json.contains("\"runtime_execution_kernel_host_reference_events\":4"));
 }

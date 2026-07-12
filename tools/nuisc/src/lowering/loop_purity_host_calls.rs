@@ -75,8 +75,17 @@ fn is_guard_host_flush_call(callee: &str) -> bool {
     matches!(callee, "host_stdout_flush" | "host_stderr_flush")
 }
 
+fn is_guard_host_diag_call(callee: &str) -> bool {
+    matches!(
+        callee,
+        "host_diag_label" | "host_diag_span" | "host_diag_emit"
+    )
+}
+
 fn is_guard_host_call(callee: &str) -> bool {
-    is_guard_host_output_call(callee) || is_guard_host_flush_call(callee)
+    is_guard_host_output_call(callee)
+        || is_guard_host_flush_call(callee)
+        || is_guard_host_diag_call(callee)
 }
 
 fn prepare_write_flush_exit_code_call(

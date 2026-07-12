@@ -1,5 +1,5 @@
 use super::*;
-use yir_core::{Operation, ResourceKind};
+use yir_core::{Operation, ResourceKind, StructValue};
 
 fn cpu_resource() -> Resource {
     Resource {

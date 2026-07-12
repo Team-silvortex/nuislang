@@ -102,6 +102,8 @@ pub(crate) struct NsldDataSegmentDiagnostic {
 pub(crate) struct NsldClosureReport {
     pub(crate) manifest: String,
     pub(crate) closed: bool,
+    pub(crate) lowering_plan_index_source: String,
+    pub(crate) lowering_plan_index_available: bool,
     pub(crate) internal_contracts: Vec<String>,
     pub(crate) linker_contract_hash: String,
     pub(crate) link_inputs: Vec<NsldLinkInputDiagnostic>,

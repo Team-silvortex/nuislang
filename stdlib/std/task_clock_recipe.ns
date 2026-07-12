@@ -54,23 +54,20 @@ mod cpu Main {
     let task: Task<i64> = timeout(spawn(ping(seed.payload)), seed.timeout_limit);
     let result: TaskResult<i64> = join_result(task);
     let timed_out: i64 = encode_timed_out(result);
-
-    if task_completed(result) {
-      return TaskClockSummary {
-        declared_global_code: capture_declared_global_code(),
-        resolved_global_code: capture_resolved_global_code(),
-        completed: 1,
-        timed_out: 0,
-        value: task_value(result),
-        global_domain_id: host_clock_domain_id() + seed.bias,
-        global_epoch_ns: host_clock_epoch_ns(),
-        monotonic_ns: host_monotonic_time_ns(),
-        global_tick: cpu_tick_i64(0, 1),
-        global_scale_ppm: host_clock_scale_ppm()
-      };
-    }
-
-    return TaskClockSummary {
+    let completed_value: i64 = task_value(result);
+    let completed_summary: TaskClockSummary = TaskClockSummary {
+      declared_global_code: capture_declared_global_code(),
+      resolved_global_code: capture_resolved_global_code(),
+      completed: 1,
+      timed_out: 0,
+      value: completed_value,
+      global_domain_id: host_clock_domain_id() + seed.bias,
+      global_epoch_ns: host_clock_epoch_ns(),
+      monotonic_ns: host_monotonic_time_ns(),
+      global_tick: cpu_tick_i64(0, 1),
+      global_scale_ppm: host_clock_scale_ppm()
+    };
+    let fallback_summary: TaskClockSummary = TaskClockSummary {
       declared_global_code: capture_declared_global_code(),
       resolved_global_code: capture_resolved_global_code(),
       completed: 0,
@@ -82,6 +79,10 @@ mod cpu Main {
       global_tick: cpu_tick_i64(0, 1),
       global_scale_ppm: host_clock_scale_ppm()
     };
+    if task_completed(result) {
+      return completed_summary;
+    }
+    return fallback_summary;
   }
 
   fn summarize_task_clock_recipe(payload: i64, timeout_limit: i64, bias: i64) -> i64 {

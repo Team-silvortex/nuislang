@@ -171,10 +171,14 @@ mod cpu Main {
   }
 
   fn lift_host_result(tag_handle: i64) -> Result<i64, ErrorEnvelope> {
+    let value: i64 = host_result_value(tag_handle);
+    let ok_result: Result<i64, ErrorEnvelope> = Result.Ok(value);
+    let error_result: Result<i64, ErrorEnvelope> =
+      lift_error_kind(host_result_error(tag_handle));
     if host_result_is_ok(tag_handle) == 1 {
-      return Result.Ok(host_result_value(tag_handle));
+      return ok_result;
     }
-    return lift_error_kind(host_result_error(tag_handle));
+    return error_result;
   }
 
   fn result_is_ok<T, E>(result: Result<T, E>) -> bool {
@@ -265,8 +269,10 @@ mod cpu Main {
       combine_results(seed.primary_tag_handle, seed.secondary_tag_handle);
     let primary: Result<i64, ErrorEnvelope> =
       result_map(lift_host_result(seed.primary_tag_handle), raise_value);
+    let softened_fallback: ErrorEnvelope =
+      soften_error(build_error_envelope(host_result_error(seed.fallback_tag_handle)));
     let fallback: Result<i64, ErrorEnvelope> =
-      result_map_err(lift_host_result(seed.fallback_tag_handle), soften_error);
+      Result.Err(softened_fallback);
     return ResultEnumRecipeSummary {
       primary_score: result_score(primary)
         + result_unwrap_or(primary, -10)

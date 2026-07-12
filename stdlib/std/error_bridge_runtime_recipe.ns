@@ -246,8 +246,10 @@ mod cpu Main {
   fn capture_error_bridge(seed: ErrorBridgeSeed) -> ErrorBridgeSummary {
     let primary: Result<i64, ErrorEnvelope> =
       result_map(lift_error_kind(seed.primary_kind_handle), raise_value);
+    let softened_secondary: ErrorEnvelope =
+      soften_error(build_error_envelope(seed.secondary_kind_handle));
     let secondary: Result<i64, ErrorEnvelope> =
-      result_map_err(lift_error_kind(seed.secondary_kind_handle), soften_error);
+      Result.Err(softened_secondary);
     return ErrorBridgeSummary {
       primary_score: result_score(primary)
         + result_unwrap_or(primary, -10)

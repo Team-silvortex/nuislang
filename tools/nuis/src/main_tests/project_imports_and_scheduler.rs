@@ -223,6 +223,16 @@ mod cpu Main {
     assert!(json.contains("\"link_plan_final_driver\":\"clang\""));
     assert!(json.contains("\"link_plan_final_link_mode\":\"host-toolchain-finalize\""));
     assert!(json.contains("\"link_plan_domain_units\":"));
+    assert!(json.contains("\"nsld_prepare_command\":\"nsld prepare "));
+    assert!(json.contains("\"nsld_prepared_artifact_chain_ready\":false"));
+    assert!(json.contains("\"nsld_prepared_artifact_next_missing_stage\":\"link-inputs\""));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_command\":\"nsld emit-final-executable-pipeline "
+    ));
+    assert!(json.contains("\"nsld_final_executable_tail_ready\":false"));
+    assert!(json.contains(
+        "\"nsld_final_executable_tail_next_missing_stage\":\"final-executable-writer-input\""
+    ));
 }
 
 #[test]

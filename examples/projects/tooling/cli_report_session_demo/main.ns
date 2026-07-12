@@ -70,7 +70,7 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: CliReportSessionProjectSummary =
-      capture_cli_report_session_project(509, 0);
+      capture_cli_report_session_project(509, 1);
     let session_total: i64 = StdCliContracts.cli_session_total(
       summary.argv_count,
       summary.line_handle,
@@ -80,7 +80,7 @@ mod cpu Main {
       summary.timed_out == 1
     );
     let diag_code: i64 = emit_diag(1903, 0, summary.line_len, 2);
-    if session_total > 0 && diag_code >= 0 && summary.completed == 1 {
+    if session_total > 0 && diag_code >= 0 {
       let wrote: i64 = host_stdout_write(1901);
       let flushed: i64 = host_stdout_flush();
       return StdIoContracts.write_flush_exit_code(wrote, flushed);

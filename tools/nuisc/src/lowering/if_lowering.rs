@@ -169,6 +169,13 @@ pub(super) fn lower_if_pair(
         return Ok(lowered);
     }
 
+    if else_body.is_empty() {
+        if let Some(returned) = lower_guard_return_chain(then_body, state, bindings)? {
+            lower_guard_return(condition_name.clone(), returned, state);
+            return Ok(LoweredIfOutcome::Continued);
+        }
+    }
+
     if then_body.len() != 1 || else_body.len() != 1 {
         if else_body.is_empty() {
             if let Some(then_branch) = prepare_terminal_branch(then_body, &state.pure_helpers) {

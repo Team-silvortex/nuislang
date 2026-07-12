@@ -13,6 +13,7 @@ pub struct LinkPlan {
     pub bridge_registry_path: Option<String>,
     pub host_bridge_plan_index_path: Option<String>,
     pub lowering_plan_index_path: Option<String>,
+    pub lowering_plan_index_source: String,
     pub host_ffi: LinkPlanHostFfiFootprint,
     pub domain_units: Vec<LinkPlanDomainUnit>,
     pub artifact_lowering_alignment: ArtifactLoweringAlignmentSummary,

@@ -256,28 +256,30 @@ mod cpu Main {
     let line_len: i64 = host_line_len(line_handle);
     let result: TaskResult<i64> =
       join_result(timeout(spawn(ping(argv_count + line_len)), seed.timeout_limit));
-
-    if task_completed(result) {
-      return PipelineCliSummary {
-        argv_count: argv_count,
-        line_handle: line_handle,
-        line_len: line_len,
-        completed: true,
-        timed_out: false,
-        selected_target_handle: task_value(result),
-        tick_ns: host_monotonic_time_ns()
-      };
-    }
-
-    return PipelineCliSummary {
+    let selected_target_handle: i64 = task_value(result);
+    let tick_ns: i64 = host_monotonic_time_ns();
+    let completed_summary: PipelineCliSummary = PipelineCliSummary {
+      argv_count: argv_count,
+      line_handle: line_handle,
+      line_len: line_len,
+      completed: true,
+      timed_out: false,
+      selected_target_handle: selected_target_handle,
+      tick_ns: tick_ns
+    };
+    let fallback_summary: PipelineCliSummary = PipelineCliSummary {
       argv_count: argv_count,
       line_handle: line_handle,
       line_len: line_len,
       completed: false,
       timed_out: true,
       selected_target_handle: 0,
-      tick_ns: host_monotonic_time_ns()
+      tick_ns: tick_ns
     };
+    if task_completed(result) {
+      return completed_summary;
+    }
+    return fallback_summary;
   }
 
   fn capture_pipeline_automation(
@@ -838,14 +840,69 @@ mod cpu Main {
       plan,
       build_build_pipeline_workflow_seed()
     );
+    let frontdoor: WorkflowFrontdoorSurface = build_frontdoor_surface(cli, pipeline);
 
     if cli.completed == false {
-      return build_failure_summary(seed, cli, automation, plan, pipeline);
+      let diag_code: i64 = host_diag_emit(
+        seed.cli.failed_text_handle,
+        cli.line_len + pipeline.pipeline.executed_steps,
+        seed.cli.failed_severity
+      );
+      let stderr_code: i64 = host_stderr_write(seed.cli.failed_text_handle);
+      let stderr_flushed: i64 = host_stderr_flush();
+      return CliBuildPipelineSummary {
+        cli: cli,
+        automation: automation,
+        plan: plan,
+        pipeline: pipeline,
+        frontdoor: frontdoor,
+        diag_code: 0,
+        stdout_code: 0,
+        stderr_code: 0,
+        stdout_flushed: 0,
+        stderr_flushed: 0
+      };
     }
     if pipeline.pipeline.overall_success {
-      return build_success_summary(seed, cli, automation, plan, pipeline);
+      let diag_code: i64 = host_diag_emit(
+        seed.cli.ready_text_handle,
+        cli.line_len + pipeline.pipeline.executed_steps,
+        seed.cli.ready_severity
+      );
+      let stdout_code: i64 = host_stdout_write(seed.cli.ready_text_handle);
+      let stdout_flushed: i64 = host_stdout_flush();
+      return CliBuildPipelineSummary {
+        cli: cli,
+        automation: automation,
+        plan: plan,
+        pipeline: pipeline,
+        frontdoor: frontdoor,
+        diag_code: 0,
+        stdout_code: 0,
+        stderr_code: 0,
+        stdout_flushed: 0,
+        stderr_flushed: 0
+      };
     }
-    return build_failure_summary(seed, cli, automation, plan, pipeline);
+    let diag_code: i64 = host_diag_emit(
+      seed.cli.failed_text_handle,
+      cli.line_len + pipeline.pipeline.executed_steps,
+      seed.cli.failed_severity
+    );
+    let stderr_code: i64 = host_stderr_write(seed.cli.failed_text_handle);
+    let stderr_flushed: i64 = host_stderr_flush();
+    return CliBuildPipelineSummary {
+      cli: cli,
+      automation: automation,
+      plan: plan,
+      pipeline: pipeline,
+      frontdoor: frontdoor,
+      diag_code: 0,
+      stdout_code: 0,
+      stderr_code: 0,
+      stdout_flushed: 0,
+      stderr_flushed: 0
+    };
   }
 
   fn summarize_pipeline_step(report: WorkflowStepReport) -> i64 {

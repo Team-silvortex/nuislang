@@ -70,26 +70,23 @@ mod cpu Main {
     let result: TaskResult<i64> = join_result(task);
     let timed_out: i64 = encode_timed_out(result);
     let tick_ns: i64 = host_monotonic_time_ns();
-
-    if task_completed(result) {
-      return TaskCliSummary {
-        argv_count: host_argv_count(),
-        completed: 1,
-        timed_out: timed_out,
-        value: task_value(result),
-        stdout_code: host_stdout_write(seed.ok_text_handle),
-        stderr_code: 0,
-        diag_code: emit_diag(
-          seed.ok_text_handle,
-          seed.diag_start,
-          seed.diag_end,
-          seed.diag_severity
-        ),
-        tick_ns: tick_ns
-      };
-    }
-
-    return TaskCliSummary {
+    let completed_value: i64 = task_value(result);
+    let completed_summary: TaskCliSummary = TaskCliSummary {
+      argv_count: host_argv_count(),
+      completed: 1,
+      timed_out: timed_out,
+      value: completed_value,
+      stdout_code: host_stdout_write(seed.ok_text_handle),
+      stderr_code: 0,
+      diag_code: emit_diag(
+        seed.ok_text_handle,
+        seed.diag_start,
+        seed.diag_end,
+        seed.diag_severity
+      ),
+      tick_ns: tick_ns
+    };
+    let fallback_summary: TaskCliSummary = TaskCliSummary {
       argv_count: host_argv_count(),
       completed: 0,
       timed_out: timed_out,
@@ -104,6 +101,10 @@ mod cpu Main {
       ),
       tick_ns: tick_ns
     };
+    if task_completed(result) {
+      return completed_summary;
+    }
+    return fallback_summary;
   }
 
   fn summarize_task_cli_recipe(

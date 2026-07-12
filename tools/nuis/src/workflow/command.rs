@@ -173,6 +173,15 @@ pub(crate) fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(
                 .map(|plan| plan.final_stage.link_mode.as_str())
                 .unwrap_or("<unavailable>")
         );
+        println!(
+            "  link_plan_lowering_plan_index_source: {}",
+            diagnostics
+                .link_plan
+                .as_ref()
+                .map(|plan| plan.lowering_plan_index_source.as_str())
+                .unwrap_or("<unavailable>")
+        );
+        print_nsld_prepared_artifact_chain(diagnostics.link_plan.as_ref());
         return Ok(());
     }
 
@@ -271,5 +280,75 @@ pub(crate) fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(
             .map(|plan| plan.final_stage.link_mode.as_str())
             .unwrap_or("<unavailable>")
     );
+    println!(
+        "  link_plan_lowering_plan_index_source: {}",
+        diagnostics
+            .link_plan
+            .as_ref()
+            .map(|plan| plan.lowering_plan_index_source.as_str())
+            .unwrap_or("<unavailable>")
+    );
+    print_nsld_prepared_artifact_chain(diagnostics.link_plan.as_ref());
     Ok(())
+}
+
+fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan>) {
+    if let Some(plan) = link_plan {
+        let output_dir = std::path::Path::new(&plan.output_dir);
+        let nsld_chain = nsld_prepared_artifact_chain_summary(output_dir);
+        println!("  nsld_prepare_command: {}", nsld_chain.prepare_command);
+        println!("  nsld_prepared_artifact_chain_ready: {}", nsld_chain.ready);
+        println!(
+            "  nsld_prepared_artifact_stages: {}/{}",
+            nsld_chain.present_count, nsld_chain.stage_count
+        );
+        println!(
+            "  nsld_prepared_artifact_next_missing_stage: {}",
+            nsld_chain.next_missing_stage.as_deref().unwrap_or("<none>")
+        );
+        let nsld_tail = nsld_final_executable_tail_summary(output_dir);
+        println!(
+            "  nsld_final_executable_pipeline_command: {}",
+            nsld_tail.pipeline_command
+        );
+        println!("  nsld_final_executable_tail_ready: {}", nsld_tail.ready);
+        println!(
+            "  nsld_final_executable_tail_stages: {}/{}",
+            nsld_tail.present_count, nsld_tail.stage_count
+        );
+        println!(
+            "  nsld_final_executable_tail_next_missing_stage: {}",
+            nsld_tail.next_missing_stage.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_valid: {}",
+            nsld_tail
+                .pipeline_valid
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_pipeline_blocker_count: {}",
+            nsld_tail
+                .blocker_count
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_pipeline_first_blocker: {}",
+            nsld_tail.first_blocker.as_deref().unwrap_or("<none>")
+        );
+    } else {
+        println!("  nsld_prepare_command: <unavailable>");
+        println!("  nsld_prepared_artifact_chain_ready: false");
+        println!("  nsld_prepared_artifact_stages: 0/0");
+        println!("  nsld_prepared_artifact_next_missing_stage: <unavailable>");
+        println!("  nsld_final_executable_pipeline_command: <unavailable>");
+        println!("  nsld_final_executable_tail_ready: false");
+        println!("  nsld_final_executable_tail_stages: 0/0");
+        println!("  nsld_final_executable_tail_next_missing_stage: <unavailable>");
+        println!("  nsld_final_executable_pipeline_valid: <unknown>");
+        println!("  nsld_final_executable_pipeline_blocker_count: <unknown>");
+        println!("  nsld_final_executable_pipeline_first_blocker: <none>");
+    }
 }

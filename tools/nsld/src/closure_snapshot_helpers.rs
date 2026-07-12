@@ -18,6 +18,14 @@ pub(crate) fn render_closure_snapshot(report: &NsldClosureReport) -> String {
     ));
     out.push_str(&format!("closed = {}\n", report.closed));
     out.push_str(&format!(
+        "lowering_plan_index_source = \"{}\"\n",
+        toml::escape_toml_string(&report.lowering_plan_index_source)
+    ));
+    out.push_str(&format!(
+        "lowering_plan_index_available = {}\n",
+        report.lowering_plan_index_available
+    ));
+    out.push_str(&format!(
         "linker_contract_hash = \"{}\"\n",
         toml::escape_toml_string(&report.linker_contract_hash)
     ));

@@ -43,7 +43,9 @@ pub(crate) fn nsld_closure_report(
     if plan.host_bridge_plan_index_path.is_some() {
         internal_contracts.push("host-bridge-plan-index".to_owned());
     }
-    if plan.lowering_plan_index_path.is_some() {
+    let lowering_plan_index_source = plan.lowering_plan_index_source.clone();
+    let lowering_plan_index_available = lowering_plan_index_source != "unavailable";
+    if lowering_plan_index_available {
         internal_contracts.push("lowering-plan-index".to_owned());
     }
     let sidecar_capabilities = nsld_sidecar_capability_diagnostics(plan);
@@ -248,6 +250,8 @@ pub(crate) fn nsld_closure_report(
     NsldClosureReport {
         manifest: manifest.display().to_string(),
         closed: unresolved.is_empty(),
+        lowering_plan_index_source,
+        lowering_plan_index_available,
         internal_contracts,
         linker_contract_hash,
         link_inputs: link_input_summary.inputs,

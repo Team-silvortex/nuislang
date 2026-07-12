@@ -24,7 +24,9 @@ pub(crate) use json_bits::{
 };
 pub(crate) use link_plan::{
     append_workflow_link_plan_json_fields, artifact_doctor_command_for_output_dir,
-    load_link_plan_for_output_dir, run_artifact_command_for_output_dir,
+    load_link_plan_for_output_dir, nsld_final_executable_tail_summary,
+    nsld_prepare_command_for_output_dir, nsld_prepared_artifact_chain_summary,
+    run_artifact_command_for_output_dir,
 };
 pub(crate) use render::render_workflow_json;
 

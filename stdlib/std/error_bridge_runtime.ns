@@ -236,8 +236,10 @@ mod cpu Main {
   fn summarize_error_bridge(primary_kind_handle: i64, secondary_kind_handle: i64) -> i64 {
     let primary: Result<i64, ErrorEnvelope> =
       result_map(lift_error_kind(primary_kind_handle), raise_value);
+    let softened_secondary: ErrorEnvelope =
+      soften_error(build_error_envelope(secondary_kind_handle));
     let secondary: Result<i64, ErrorEnvelope> =
-      result_map_err(lift_error_kind(secondary_kind_handle), soften_error);
+      Result.Err(softened_secondary);
     return result_score(primary)
       + result_unwrap_or(primary, -10)
       + result_score(secondary)

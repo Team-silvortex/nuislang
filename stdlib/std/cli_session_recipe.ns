@@ -110,6 +110,6 @@ mod cpu Main {
   }
 
   fn main() {
-    print(summarize_cli_session_recipe(509, 1901, 1903, 0));
+    print(summarize_cli_session_recipe(509, 1901, 1903, 1));
   }
 }

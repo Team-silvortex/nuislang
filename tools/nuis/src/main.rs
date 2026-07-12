@@ -46,10 +46,11 @@ use surface_render::append_json_field_strings;
 pub(crate) use workflow::{
     append_json_object_fields, append_workflow_link_plan_json_fields, artifact_lowering_units_json,
     debug_workflow_brief, debug_workflow_samples_brief, default_build_output_dir, handle_workflow,
-    json_object_array_field, load_link_plan_for_output_dir, print_workflow_frontdoor_surface,
-    project_abi_checks_json, project_domain_registry_checks_json, project_frontdoor_surface,
-    project_lowering_checks_json, single_source_frontdoor_surface, toolchain_frontdoor_surface,
-    workflow_frontdoor_json_object_field, WorkflowFrontdoorSurface,
+    json_object_array_field, load_link_plan_for_output_dir, nsld_final_executable_tail_summary,
+    nsld_prepare_command_for_output_dir, nsld_prepared_artifact_chain_summary,
+    print_workflow_frontdoor_surface, project_abi_checks_json, project_domain_registry_checks_json,
+    project_frontdoor_surface, project_lowering_checks_json, single_source_frontdoor_surface,
+    toolchain_frontdoor_surface, workflow_frontdoor_json_object_field, WorkflowFrontdoorSurface,
 };
 #[cfg(test)]
 pub(crate) use workflow::{
@@ -419,6 +420,15 @@ fn build_output_self_check_status(output_dir: Option<&Path>) -> (bool, Option<St
             Some("no output_dir available for self-check".to_owned()),
         );
     };
+    if !output_dir.exists() {
+        return (
+            false,
+            Some(format!(
+                "`{}` does not contain `nuis.build.manifest.toml`",
+                output_dir.display()
+            )),
+        );
+    }
     match run_build_output_self_check(output_dir) {
         Ok(_) => (true, None),
         Err(error) => (false, Some(error)),
@@ -963,6 +973,12 @@ fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), String> {
                 .map(|code| code.to_string())
                 .unwrap_or_else(|| "signal".to_owned())
         );
+        let doctor = probe_artifact_doctor(&input);
+        let link_plan = doctor
+            .output_dir
+            .as_ref()
+            .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
+        print_run_artifact_link_plan_status(link_plan.as_ref());
     }
     if status.success() {
         return Ok(());
@@ -974,9 +990,51 @@ fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), String> {
     ))
 }
 
+fn print_run_artifact_link_plan_status(link_plan: Option<&nuisc::linker::LinkPlan>) {
+    println!("  link_plan_available: {}", link_plan.is_some());
+    if let Some(plan) = link_plan {
+        println!("  link_plan_final_stage: {}", plan.final_stage.kind);
+        println!("  link_plan_final_driver: {}", plan.final_stage.driver);
+        println!(
+            "  link_plan_final_link_mode: {}",
+            plan.final_stage.link_mode
+        );
+        println!("  link_plan_final_output: {}", plan.final_stage.output_path);
+        println!(
+            "  link_plan_lowering_plan_index_path: {}",
+            plan.lowering_plan_index_path.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  link_plan_lowering_plan_index_source: {}",
+            plan.lowering_plan_index_source
+        );
+        print_nsld_artifact_chain_status(plan);
+    } else {
+        println!("  link_plan_final_stage: <unavailable>");
+        println!("  link_plan_final_driver: <unavailable>");
+        println!("  link_plan_final_link_mode: <unavailable>");
+        println!("  link_plan_final_output: <unavailable>");
+        println!("  link_plan_lowering_plan_index_path: <unavailable>");
+        println!("  link_plan_lowering_plan_index_source: <unavailable>");
+        println!("  nsld_prepare_command: <unavailable>");
+        println!("  nsld_prepared_artifact_chain_ready: false");
+        println!("  nsld_prepared_artifact_stages: 0/0");
+        println!("  nsld_prepared_artifact_next_missing_stage: <unavailable>");
+        println!("  nsld_final_executable_pipeline_command: <unavailable>");
+        println!("  nsld_final_executable_tail_ready: false");
+        println!("  nsld_final_executable_tail_stages: 0/0");
+        println!("  nsld_final_executable_tail_next_missing_stage: <unavailable>");
+        println!("  nsld_final_executable_pipeline_valid: <unknown>");
+        println!("  nsld_final_executable_pipeline_blocker_count: <unknown>");
+        println!("  nsld_final_executable_pipeline_first_blocker: <none>");
+    }
+}
+
 pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
     let mut source_kind = "binary".to_owned();
     let mut output_dir = if input.is_dir() {
+        Some(input.to_path_buf())
+    } else if looks_like_artifact_output_dir(input) {
         Some(input.to_path_buf())
     } else {
         input.parent().map(Path::to_path_buf)
@@ -985,7 +1043,7 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
     let mut artifact_path = None;
     let mut binary_path = None;
 
-    if input.is_dir() {
+    if input.is_dir() || looks_like_artifact_output_dir(input) {
         source_kind = "output_dir".to_owned();
         let candidate_manifest = input.join("nuis.build.manifest.toml");
         let candidate_artifact = input.join("nuis.compiled.artifact");
@@ -1196,6 +1254,10 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
         lowering_targets,
         lowering_units,
     }
+}
+
+fn looks_like_artifact_output_dir(input: &Path) -> bool {
+    !input.exists() && input.extension().is_none()
 }
 
 pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
@@ -1913,6 +1975,14 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
             .unwrap_or("<unavailable>")
     );
     println!(
+        "  link_plan_lowering_plan_index_source: {}",
+        diagnostics
+            .link_plan
+            .as_ref()
+            .map(|plan| plan.lowering_plan_index_source.as_str())
+            .unwrap_or("<unavailable>")
+    );
+    println!(
         "  link_plan_domain_units: {}",
         diagnostics
             .link_plan
@@ -1921,6 +1991,7 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
             .unwrap_or(0)
     );
     if let Some(plan) = diagnostics.link_plan.plan.as_ref() {
+        print_nsld_artifact_chain_status(plan);
         for unit in &plan.domain_units {
             let abi = unit.abi.as_deref().unwrap_or("<none>");
             let lowering = unit.selected_lowering_target.as_deref().unwrap_or("<none>");
@@ -2248,8 +2319,63 @@ fn handle_build_report(input: PathBuf, json: bool) -> Result<(), String> {
             "  link_plan_lowering_plan_index_path: {}",
             plan.lowering_plan_index_path.as_deref().unwrap_or("<none>")
         );
+        println!(
+            "  link_plan_lowering_plan_index_source: {}",
+            plan.lowering_plan_index_source
+        );
+        print_nsld_artifact_chain_status(plan);
     }
     Ok(())
+}
+
+fn print_nsld_artifact_chain_status(plan: &nuisc::linker::LinkPlan) {
+    let output_dir = Path::new(&plan.output_dir);
+    let nsld_chain = nsld_prepared_artifact_chain_summary(output_dir);
+    println!(
+        "  nsld_prepare_command: {}",
+        nsld_prepare_command_for_output_dir(output_dir)
+    );
+    println!("  nsld_prepared_artifact_chain_ready: {}", nsld_chain.ready);
+    println!(
+        "  nsld_prepared_artifact_stages: {}/{}",
+        nsld_chain.present_count, nsld_chain.stage_count
+    );
+    println!(
+        "  nsld_prepared_artifact_next_missing_stage: {}",
+        nsld_chain.next_missing_stage.as_deref().unwrap_or("<none>")
+    );
+    let nsld_tail = nsld_final_executable_tail_summary(output_dir);
+    println!(
+        "  nsld_final_executable_pipeline_command: {}",
+        nsld_tail.pipeline_command
+    );
+    println!("  nsld_final_executable_tail_ready: {}", nsld_tail.ready);
+    println!(
+        "  nsld_final_executable_tail_stages: {}/{}",
+        nsld_tail.present_count, nsld_tail.stage_count
+    );
+    println!(
+        "  nsld_final_executable_tail_next_missing_stage: {}",
+        nsld_tail.next_missing_stage.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  nsld_final_executable_pipeline_valid: {}",
+        nsld_tail
+            .pipeline_valid
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "<unknown>".to_owned())
+    );
+    println!(
+        "  nsld_final_executable_pipeline_blocker_count: {}",
+        nsld_tail
+            .blocker_count
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "<unknown>".to_owned())
+    );
+    println!(
+        "  nsld_final_executable_pipeline_first_blocker: {}",
+        nsld_tail.first_blocker.as_deref().unwrap_or("<none>")
+    );
 }
 
 fn handle_dump_ast(input: std::path::PathBuf) -> Result<(), String> {

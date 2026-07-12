@@ -35,15 +35,24 @@ mod cpu Main {
     .expect("write smoke test");
 
     let json = render_workflow_json(&project_root).expect("render workflow json");
+    let output_dir = default_build_output_dir(&project_root);
 
     assert!(json.contains("\"source_kind\":\"project\""));
     assert!(json.contains("\"workflow_kind\":\"project_compile_workflow\""));
+    assert!(json.contains(&format!(
+        "\"default_build_output_dir\":\"{}\"",
+        output_dir.display()
+    )));
     assert!(json.contains("\"artifact_workflow\":\"build -> inspect_artifact -> verify_artifact -> artifact_doctor -> verify_build_manifest -> run_artifact\""));
     assert!(json.contains("\"artifact_ready_to_run\":false"));
     assert!(json.contains("\"artifact_diagnostic_code\":\"missing_outputs\""));
     assert!(json.contains("\"artifact_self_check_ready\":false"));
+    assert!(json.contains("\"artifact_self_check_code\":\"missing_build_manifest\""));
     assert!(json.contains("\"artifact_recommended_next_step\":\"build\""));
-    assert!(json.contains("\"artifact_self_check_error\":\""));
+    assert!(json.contains(&format!(
+        "\"artifact_self_check_error\":\"`{}` does not contain `nuis.build.manifest.toml`\"",
+        output_dir.display()
+    )));
     assert!(json.contains("\"project_checks_available\":true"));
     assert!(json.contains("\"project_checks_code\":\"ok\""));
     assert!(json.contains("\"abi_checks_ok\":true"));
@@ -51,6 +60,7 @@ mod cpu Main {
     assert!(json.contains("\"lowering_checks_ok\":true"));
     assert!(json.contains("\"link_plan_available\":false"));
     assert!(json.contains("\"link_plan_final_stage\":null"));
+    assert!(json.contains("\"link_plan_lowering_plan_index_source\":null"));
     assert!(json.contains("\"compile_pipeline_available\":true"));
     assert!(json.contains("\"compile_pipeline_source_kind\":\"project\""));
     assert!(json.contains("\"compile_pipeline_ready_for_aot\":true"));
@@ -102,6 +112,17 @@ mod cpu Main {
     assert!(json.contains("\"link_plan_final_stage\":\"host-native-link\""));
     assert!(json.contains("\"link_plan_final_driver\":\"clang\""));
     assert!(json.contains("\"link_plan_final_link_mode\":\"host-toolchain-finalize\""));
+    assert!(json.contains("\"link_plan_lowering_plan_index_source\":\"compiled_artifact_section\""));
+    assert!(json.contains("\"nsld_prepare_command\":\"nsld prepare "));
+    assert!(json.contains("\"nsld_prepared_artifact_chain_ready\":false"));
+    assert!(json.contains("\"nsld_prepared_artifact_next_missing_stage\":\"link-inputs\""));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_command\":\"nsld emit-final-executable-pipeline "
+    ));
+    assert!(json.contains("\"nsld_final_executable_tail_ready\":false"));
+    assert!(json.contains(
+        "\"nsld_final_executable_tail_next_missing_stage\":\"final-executable-writer-input\""
+    ));
     assert!(json.contains("\"compile_pipeline_available\":true"));
     assert!(json.contains("\"compile_pipeline_ready_for_aot\":true"));
     assert!(json.contains("\"compile_pipeline_summary\":\"source_kind=project"));
@@ -124,18 +145,28 @@ mod cpu Main {
     .expect("write source");
 
     let json = render_workflow_json(&input).expect("render workflow json");
+    let output_dir = default_build_output_dir(&input);
 
     assert!(json.contains("\"source_kind\":\"single-file\""));
     assert!(json.contains("\"workflow_kind\":\"compile_workflow\""));
+    assert!(json.contains(&format!(
+        "\"default_build_output_dir\":\"{}\"",
+        output_dir.display()
+    )));
     assert!(json.contains("\"artifact_ready_to_run\":false"));
     assert!(json.contains("\"artifact_diagnostic_code\":\"missing_outputs\""));
     assert!(json.contains("\"artifact_self_check_ready\":false"));
+    assert!(json.contains("\"artifact_self_check_code\":\"missing_build_manifest\""));
     assert!(json.contains("\"artifact_recommended_next_step\":\"build\""));
-    assert!(json.contains("\"artifact_self_check_error\":\""));
+    assert!(json.contains(&format!(
+        "\"artifact_self_check_error\":\"`{}` does not contain `nuis.build.manifest.toml`\"",
+        output_dir.display()
+    )));
     assert!(json.contains("\"project_checks_available\":false"));
     assert!(json.contains("\"project_checks_code\":\"unavailable\""));
     assert!(json.contains("\"link_plan_available\":false"));
     assert!(json.contains("\"link_plan_final_stage\":null"));
+    assert!(json.contains("\"link_plan_lowering_plan_index_source\":null"));
     assert!(json.contains("\"compile_pipeline_available\":true"));
     assert!(json.contains("\"compile_pipeline_source_kind\":\"single_source\""));
     assert!(json.contains("\"compile_pipeline_ready_for_aot\":true"));

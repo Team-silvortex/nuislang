@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::aot;
+use nuis_artifact::protocol::COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML;
 
 use super::{
     build_artifact_lowering_alignment_summary, linker_clock_protocol, linker_final_stage,
@@ -96,6 +97,10 @@ pub fn build_link_plan(
     };
     let artifact_lowering_alignment =
         build_artifact_lowering_alignment_summary(&compiled_artifact, &domain_units);
+    let lowering_plan_index_source = lowering_plan_index_source(
+        report.lowering_plan_index_path.as_deref(),
+        &compiled_artifact,
+    );
     let lifecycle = LinkPlanLifecycle {
         bootstrap_entry: report.lifecycle_bootstrap_entry.clone(),
         tick_policy: report.lifecycle_tick_policy.clone(),
@@ -144,6 +149,7 @@ pub fn build_link_plan(
         bridge_registry_path: report.bridge_registry_path.clone(),
         host_bridge_plan_index_path: report.host_bridge_plan_index_path.clone(),
         lowering_plan_index_path: report.lowering_plan_index_path.clone(),
+        lowering_plan_index_source,
         host_ffi,
         domain_units,
         artifact_lowering_alignment,
@@ -157,4 +163,18 @@ pub fn build_link_plan_from_manifest(path: &Path) -> Result<LinkPlan, String> {
     let report = aot::verify_build_manifest(path)?;
     let artifact = aot::parse_nuis_compiled_artifact(Path::new(&report.artifact_path))?;
     Ok(build_link_plan(&report, &artifact))
+}
+
+fn lowering_plan_index_source(path: Option<&str>, artifact: &LinkPlanArtifact) -> String {
+    if path.is_some() {
+        "manifest_path".to_owned()
+    } else if artifact
+        .section_names
+        .iter()
+        .any(|name| name == COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML)
+    {
+        "compiled_artifact_section".to_owned()
+    } else {
+        "unavailable".to_owned()
+    }
 }

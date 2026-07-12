@@ -43,19 +43,16 @@ mod cpu Main {
     let timed_out: i64 = encode_timed_out(result);
     let scheduler_tick: i64 = cpu_tick_i64(0, 1);
     let monotonic_ns: i64 = host_monotonic_time_ns();
-
-    if task_completed(result) {
-      return TaskSchedulerSummary {
-        lane_code: 0 + seed.bias,
-        completed: 1,
-        timed_out: timed_out,
-        value: task_value(result),
-        scheduler_tick: scheduler_tick,
-        monotonic_ns: monotonic_ns
-      };
-    }
-
-    return TaskSchedulerSummary {
+    let completed_value: i64 = task_value(result);
+    let completed_summary: TaskSchedulerSummary = TaskSchedulerSummary {
+      lane_code: 0 + seed.bias,
+      completed: 1,
+      timed_out: timed_out,
+      value: completed_value,
+      scheduler_tick: scheduler_tick,
+      monotonic_ns: monotonic_ns
+    };
+    let fallback_summary: TaskSchedulerSummary = TaskSchedulerSummary {
       lane_code: 0 + seed.bias,
       completed: 0,
       timed_out: timed_out,
@@ -63,6 +60,10 @@ mod cpu Main {
       scheduler_tick: scheduler_tick,
       monotonic_ns: monotonic_ns
     };
+    if task_completed(result) {
+      return completed_summary;
+    }
+    return fallback_summary;
   }
 
   fn summarize_task_scheduler_recipe(payload: i64, timeout_limit: i64, bias: i64) -> i64 {

@@ -56,6 +56,7 @@ pub(crate) fn empty_link_plan() -> LinkPlan {
         bridge_registry_path: None,
         host_bridge_plan_index_path: None,
         lowering_plan_index_path: None,
+        lowering_plan_index_source: "unavailable".to_owned(),
         host_ffi: LinkPlanHostFfiFootprint {
             index_path: None,
             symbol_count: 0,

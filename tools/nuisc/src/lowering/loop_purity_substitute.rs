@@ -516,7 +516,7 @@ pub(in crate::lowering) fn prepare_terminal_branch(
             })
         }
         [calls @ .., NirStmt::Return(Some(returned)) | NirStmt::Expr(returned)]
-            if !calls.is_empty() && calls.len() <= 4 =>
+            if !calls.is_empty() && calls.len() <= 8 =>
         {
             if !is_terminal_branch_pure_expr(returned, pure_helpers) {
                 return None;

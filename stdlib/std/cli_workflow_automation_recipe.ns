@@ -236,28 +236,30 @@ mod cpu Main {
     let line_len: i64 = host_line_len(line_handle);
     let result: TaskResult<i64> =
       join_result(timeout(spawn(ping(argv_count + line_len)), seed.timeout_limit));
-
-    if task_completed(result) {
-      return CliSummary {
-        argv_count: argv_count,
-        line_handle: line_handle,
-        line_len: line_len,
-        completed: true,
-        timed_out: false,
-        selected_value: task_value(result),
-        tick_ns: host_monotonic_time_ns()
-      };
-    }
-
-    return CliSummary {
+    let selected_value: i64 = task_value(result);
+    let tick_ns: i64 = host_monotonic_time_ns();
+    let completed_summary: CliSummary = CliSummary {
+      argv_count: argv_count,
+      line_handle: line_handle,
+      line_len: line_len,
+      completed: true,
+      timed_out: false,
+      selected_value: selected_value,
+      tick_ns: tick_ns
+    };
+    let fallback_summary: CliSummary = CliSummary {
       argv_count: argv_count,
       line_handle: line_handle,
       line_len: line_len,
       completed: false,
       timed_out: true,
       selected_value: 0,
-      tick_ns: host_monotonic_time_ns()
+      tick_ns: tick_ns
     };
+    if task_completed(result) {
+      return completed_summary;
+    }
+    return fallback_summary;
   }
 
   fn capture_automation(seed: AutomationSeed, cache_value_handle: i64) -> AutomationSummary {
@@ -572,13 +574,15 @@ mod cpu Main {
     ok_severity: i64,
     err_severity: i64
   ) -> i64 {
+    let success_code: i64 = emit_success_report(cli, workflow, ok_text_handle, ok_severity);
+    let error_code: i64 = emit_error_report(cli, workflow, err_text_handle, err_severity);
     if cli.completed == false {
-      return emit_error_report(cli, workflow, err_text_handle, err_severity);
+      return error_code;
     }
     if workflow.overall_success {
-      return emit_success_report(cli, workflow, ok_text_handle, ok_severity);
+      return success_code;
     }
-    return emit_error_report(cli, workflow, err_text_handle, err_severity);
+    return error_code;
   }
 
   fn capture_workflow_from_cli(
@@ -588,10 +592,14 @@ mod cpu Main {
     third_step: WorkflowStep,
     fourth_step: WorkflowStep
   ) -> WorkflowQuadReport {
+    let completed_report: WorkflowQuadReport =
+      run_workflow_quad(first_step, second_step, third_step, fourth_step);
+    let skipped_report: WorkflowQuadReport =
+      skipped_quad_report(first_step, second_step, third_step, fourth_step);
     if cli.completed {
-      return run_workflow_quad(first_step, second_step, third_step, fourth_step);
+      return completed_report;
     }
-    return skipped_quad_report(first_step, second_step, third_step, fourth_step);
+    return skipped_report;
   }
 
   fn build_workflow_from_cli(
@@ -804,14 +812,18 @@ mod cpu Main {
       build_workflow_automation_seed(),
       automation
     );
+    let success_summary: CombinedSummary =
+      build_success_summary(seed, cli, automation, workflow);
+    let error_summary: CombinedSummary =
+      build_error_summary(seed, cli, automation, workflow);
 
     if cli.completed == false {
-      return build_error_summary(seed, cli, automation, workflow);
+      return error_summary;
     }
     if workflow.overall_success {
-      return build_success_summary(seed, cli, automation, workflow);
+      return success_summary;
     }
-    return build_error_summary(seed, cli, automation, workflow);
+    return error_summary;
   }
 
   fn summarize_workflow_step_report(report: WorkflowStepReport) -> i64 {

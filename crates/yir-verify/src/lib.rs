@@ -6,6 +6,7 @@ use yir_core::{
 };
 
 mod cpu_heap;
+mod cpu_heap_checks;
 mod cpu_heap_state;
 mod graph;
 mod project_abi_contracts;

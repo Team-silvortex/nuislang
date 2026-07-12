@@ -300,5 +300,9 @@ pub(crate) fn link_plan_json(plan: &linker::LinkPlan) -> String {
     if let Some(path) = &plan.lowering_plan_index_path {
         fields.push(json_string_field("lowering_plan_index_path", path));
     }
+    fields.push(json_string_field(
+        "lowering_plan_index_source",
+        &plan.lowering_plan_index_source,
+    ));
     format!("{{{}}}", fields.join(","))
 }

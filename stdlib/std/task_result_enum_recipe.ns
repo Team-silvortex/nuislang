@@ -208,16 +208,20 @@ mod cpu Main {
   }
 
   fn lift_task_result(result: TaskResult<i64>) -> Result<i64, ErrorEnvelope> {
+    let missing: Result<i64, ErrorEnvelope> = lift_error_kind(kind_result_missing());
+    let diagnostic: Result<i64, ErrorEnvelope> = lift_error_kind(kind_diagnostic_message());
     if task_completed(result) {
-      return Result.Ok(task_value(result));
+      let value: i64 = task_value(result);
+      let completed: Result<i64, ErrorEnvelope> = Result.Ok(value);
+      return completed;
     }
     if task_timed_out(result) {
-      return lift_error_kind(kind_result_missing());
+      return missing;
     }
     if task_cancelled(result) {
-      return lift_error_kind(kind_diagnostic_message());
+      return diagnostic;
     }
-    return lift_error_kind(kind_result_missing());
+    return missing;
   }
 
   fn raise_value(value: i64) -> i64 {

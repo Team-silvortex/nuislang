@@ -357,6 +357,656 @@ fn lowers_cpu_select_between_enum_variants_as_tagged_union() {
 }
 
 #[test]
+fn lowers_const_select_around_unselected_wrong_variant_payload_chain() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    for (name, instruction, value) in [
+        ("enabled", "cpu.const_bool", "false"),
+        ("payload", "cpu.const_i64", "41"),
+        ("one", "cpu.const_i64", "1"),
+        ("fallback", "cpu.const_i64", "7"),
+    ] {
+        module.nodes.push(Node {
+            name: name.to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse(instruction, vec![value.to_owned()]).unwrap(),
+        });
+    }
+    module.nodes.push(Node {
+        name: "err_variant".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Err".to_owned(), "value=payload".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "wrong_payload".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.variant_field",
+            vec![
+                "err_variant".to_owned(),
+                "Result.Ok".to_owned(),
+                "value".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_sum".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.add",
+            vec!["wrong_payload".to_owned(), "one".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_result".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Ok".to_owned(), "value=bad_sum".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "selected".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.select",
+            vec![
+                "enabled".to_owned(),
+                "bad_result".to_owned(),
+                "fallback".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    for (from, to) in [
+        ("payload", "err_variant"),
+        ("err_variant", "wrong_payload"),
+        ("wrong_payload", "bad_sum"),
+        ("one", "bad_sum"),
+        ("bad_sum", "bad_result"),
+        ("enabled", "selected"),
+        ("bad_result", "selected"),
+        ("fallback", "selected"),
+    ] {
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        });
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("ret i64"));
+    assert!(!llvm_ir.contains("select i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.variant_field `wrong_payload`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.add `bad_sum`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.struct `bad_result`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+}
+
+#[test]
+fn defers_dynamic_select_around_wrong_variant_payload_chain() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    for (name, value) in [
+        ("lhs_bias", "3"),
+        ("rhs", "3"),
+        ("payload", "41"),
+        ("one", "1"),
+        ("fallback", "7"),
+    ] {
+        module.nodes.push(Node {
+            name: name.to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec![value.to_owned()]).unwrap(),
+        });
+    }
+    module.nodes.push(Node {
+        name: "lhs_seed".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.tick_i64", vec!["5".to_owned(), "0".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "lhs".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.add",
+            vec!["lhs_seed".to_owned(), "lhs_bias".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "enabled".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.gt", vec!["lhs".to_owned(), "rhs".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "err_variant".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Err".to_owned(), "value=payload".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "wrong_payload".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.variant_field",
+            vec![
+                "err_variant".to_owned(),
+                "Result.Ok".to_owned(),
+                "value".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_sum".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.add",
+            vec!["wrong_payload".to_owned(), "one".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_result".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Ok".to_owned(), "value=bad_sum".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "selected".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.select",
+            vec![
+                "enabled".to_owned(),
+                "bad_result".to_owned(),
+                "fallback".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    for (from, to) in [
+        ("lhs_seed", "lhs"),
+        ("lhs_bias", "lhs"),
+        ("lhs", "enabled"),
+        ("rhs", "enabled"),
+        ("payload", "err_variant"),
+        ("err_variant", "wrong_payload"),
+        ("wrong_payload", "bad_sum"),
+        ("one", "bad_sum"),
+        ("bad_sum", "bad_result"),
+        ("enabled", "selected"),
+        ("bad_result", "selected"),
+        ("fallback", "selected"),
+    ] {
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        });
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("ret i64"));
+    assert!(llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert!(llvm_ir.contains("delayed branch lowering requires a compile-time constant condition"));
+    assert!(llvm_ir.contains("then `bad_result`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.variant_field `wrong_payload`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.add `bad_sum`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.struct `bad_result`"));
+}
+
+#[test]
+fn defers_const_select_when_selected_branch_is_wrong_variant_payload_chain() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    for (name, instruction, value) in [
+        ("enabled", "cpu.const_bool", "true"),
+        ("payload", "cpu.const_i64", "41"),
+        ("one", "cpu.const_i64", "1"),
+        ("fallback", "cpu.const_i64", "7"),
+    ] {
+        module.nodes.push(Node {
+            name: name.to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse(instruction, vec![value.to_owned()]).unwrap(),
+        });
+    }
+    module.nodes.push(Node {
+        name: "err_variant".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Err".to_owned(), "value=payload".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "wrong_payload".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.variant_field",
+            vec![
+                "err_variant".to_owned(),
+                "Result.Ok".to_owned(),
+                "value".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_sum".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.add",
+            vec!["wrong_payload".to_owned(), "one".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_result".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Ok".to_owned(), "value=bad_sum".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "selected".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.select",
+            vec![
+                "enabled".to_owned(),
+                "bad_result".to_owned(),
+                "fallback".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    for (from, to) in [
+        ("payload", "err_variant"),
+        ("err_variant", "wrong_payload"),
+        ("wrong_payload", "bad_sum"),
+        ("one", "bad_sum"),
+        ("bad_sum", "bad_result"),
+        ("enabled", "selected"),
+        ("bad_result", "selected"),
+        ("fallback", "selected"),
+    ] {
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        });
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert!(llvm_ir.contains("selected branch `bad_result` is delayed"));
+    assert!(llvm_ir.contains("depends on delayed `wrong_payload`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.variant_field `wrong_payload`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.add `bad_sum`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.struct `bad_result`"));
+}
+
+#[test]
+fn folds_known_i64_comparison_for_lazy_const_select() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    for (name, value) in [
+        ("lhs", "2"),
+        ("rhs", "3"),
+        ("payload", "41"),
+        ("one", "1"),
+        ("fallback", "7"),
+    ] {
+        module.nodes.push(Node {
+            name: name.to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec![value.to_owned()]).unwrap(),
+        });
+    }
+    module.nodes.push(Node {
+        name: "enabled".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.lt", vec!["lhs".to_owned(), "rhs".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "err_variant".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Err".to_owned(), "value=payload".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "wrong_payload".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.variant_field",
+            vec![
+                "err_variant".to_owned(),
+                "Result.Ok".to_owned(),
+                "value".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_sum".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.add",
+            vec!["wrong_payload".to_owned(), "one".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_result".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Ok".to_owned(), "value=bad_sum".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "selected".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.select",
+            vec![
+                "enabled".to_owned(),
+                "fallback".to_owned(),
+                "bad_result".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    for (from, to) in [
+        ("lhs", "enabled"),
+        ("rhs", "enabled"),
+        ("payload", "err_variant"),
+        ("err_variant", "wrong_payload"),
+        ("wrong_payload", "bad_sum"),
+        ("one", "bad_sum"),
+        ("bad_sum", "bad_result"),
+        ("enabled", "selected"),
+        ("fallback", "selected"),
+        ("bad_result", "selected"),
+    ] {
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        });
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("icmp slt i64"));
+    assert!(!llvm_ir.contains("select i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.variant_field `wrong_payload`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.add `bad_sum`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.struct `bad_result`"));
+}
+
+#[test]
+fn folds_known_i64_arithmetic_chain_for_lazy_const_select() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    for (name, value) in [
+        ("lhs_seed", "5"),
+        ("lhs_bias", "3"),
+        ("rhs", "3"),
+        ("payload", "41"),
+        ("one", "1"),
+        ("fallback", "7"),
+    ] {
+        module.nodes.push(Node {
+            name: name.to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec![value.to_owned()]).unwrap(),
+        });
+    }
+    module.nodes.push(Node {
+        name: "lhs".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.add",
+            vec!["lhs_seed".to_owned(), "lhs_bias".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "enabled".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.gt", vec!["lhs".to_owned(), "rhs".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "err_variant".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Err".to_owned(), "value=payload".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "wrong_payload".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.variant_field",
+            vec![
+                "err_variant".to_owned(),
+                "Result.Ok".to_owned(),
+                "value".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_sum".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.add",
+            vec!["wrong_payload".to_owned(), "one".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_result".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Ok".to_owned(), "value=bad_sum".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "selected".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.select",
+            vec![
+                "enabled".to_owned(),
+                "fallback".to_owned(),
+                "bad_result".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    for (from, to) in [
+        ("lhs_seed", "lhs"),
+        ("lhs_bias", "lhs"),
+        ("lhs", "enabled"),
+        ("rhs", "enabled"),
+        ("payload", "err_variant"),
+        ("err_variant", "wrong_payload"),
+        ("wrong_payload", "bad_sum"),
+        ("one", "bad_sum"),
+        ("bad_sum", "bad_result"),
+        ("enabled", "selected"),
+        ("fallback", "selected"),
+        ("bad_result", "selected"),
+    ] {
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        });
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("add i64"));
+    assert!(llvm_ir.contains("icmp sgt i64"));
+    assert!(!llvm_ir.contains("select i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.variant_field `wrong_payload`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.add `bad_sum`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.struct `bad_result`"));
+}
+
+#[test]
+fn folds_known_i64_equality_for_lazy_const_select() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(Resource {
+        name: "cpu0".to_owned(),
+        kind: ResourceKind::parse("cpu.main"),
+    });
+    for (name, value) in [
+        ("lhs", "2"),
+        ("rhs", "2"),
+        ("payload", "41"),
+        ("one", "1"),
+        ("fallback", "7"),
+    ] {
+        module.nodes.push(Node {
+            name: name.to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec![value.to_owned()]).unwrap(),
+        });
+    }
+    module.nodes.push(Node {
+        name: "enabled".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse("cpu.eq", vec!["lhs".to_owned(), "rhs".to_owned()]).unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "err_variant".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Err".to_owned(), "value=payload".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "wrong_payload".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.variant_field",
+            vec![
+                "err_variant".to_owned(),
+                "Result.Ok".to_owned(),
+                "value".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_sum".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.add",
+            vec!["wrong_payload".to_owned(), "one".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "bad_result".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.struct",
+            vec!["Result.Ok".to_owned(), "value=bad_sum".to_owned()],
+        )
+        .unwrap(),
+    });
+    module.nodes.push(Node {
+        name: "selected".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.select",
+            vec![
+                "enabled".to_owned(),
+                "fallback".to_owned(),
+                "bad_result".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    for (from, to) in [
+        ("lhs", "enabled"),
+        ("rhs", "enabled"),
+        ("payload", "err_variant"),
+        ("err_variant", "wrong_payload"),
+        ("wrong_payload", "bad_sum"),
+        ("one", "bad_sum"),
+        ("bad_sum", "bad_result"),
+        ("enabled", "selected"),
+        ("fallback", "selected"),
+        ("bad_result", "selected"),
+    ] {
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        });
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("icmp eq i64"));
+    assert!(!llvm_ir.contains("select i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.variant_field `wrong_payload`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.add `bad_sum`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.struct `bad_result`"));
+}
+
+#[test]
 fn emits_static_aot_tick_i64_values() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

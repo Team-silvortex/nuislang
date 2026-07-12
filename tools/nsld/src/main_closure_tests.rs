@@ -23,6 +23,8 @@ fn closure_reports_container_metadata_fingerprint() {
     assert!(report.payload_size_bytes > 0);
     assert!(report.payload_hash.starts_with("0x"));
     assert!(report.linker_contract_hash.starts_with("0x"));
+    assert_eq!(report.lowering_plan_index_source, "unavailable");
+    assert!(!report.lowering_plan_index_available);
     assert!(matches!(
         report.container_loader_readiness.as_str(),
         "blocked" | "host-assisted" | "self-contained"
@@ -60,6 +62,8 @@ fn closure_reports_container_metadata_fingerprint() {
     assert!(report_json.contains("\"payload_size_bytes\":"));
     assert!(report_json.contains("\"payload_hash\":\"0x"));
     assert!(report_json.contains("\"linker_contract_hash\":\"0x"));
+    assert!(report_json.contains("\"lowering_plan_index_source\":\"unavailable\""));
+    assert!(report_json.contains("\"lowering_plan_index_available\":false"));
     assert!(report_json.contains("\"container_loader_readiness\":"));
     assert!(report_json.contains("\"compatibility_domain_count\":1"));
     assert!(report_json.contains("\"compatibility_domain_table_hash\":\"0x"));
@@ -75,6 +79,41 @@ fn closure_reports_container_metadata_fingerprint() {
     assert!(
         report_json.contains("\"compatibility_domain_summary\":{\"count\":1,\"table_hash\":\"0x")
     );
+}
+
+#[test]
+fn closure_treats_compiled_artifact_section_lowering_index_as_contract() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-closure-lowering-section-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.lowering_plan_index_source = "compiled_artifact_section".to_owned();
+
+    let report = nsld_closure_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_closure_report_json(&report);
+    let emit = nsld_emit_closure_report(Path::new("manifest.toml"), &plan).unwrap();
+    let snapshot = fs::read_to_string(&emit.output_path).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert_eq!(
+        report.lowering_plan_index_source,
+        "compiled_artifact_section"
+    );
+    assert!(report.lowering_plan_index_available);
+    assert!(report
+        .internal_contracts
+        .iter()
+        .any(|contract| contract == "lowering-plan-index"));
+    assert!(report_json.contains("\"lowering_plan_index_source\":\"compiled_artifact_section\""));
+    assert!(report_json.contains("\"lowering_plan_index_available\":true"));
+    assert!(snapshot.contains("lowering_plan_index_source = \"compiled_artifact_section\""));
+    assert!(snapshot.contains("lowering_plan_index_available = true"));
 }
 
 #[test]

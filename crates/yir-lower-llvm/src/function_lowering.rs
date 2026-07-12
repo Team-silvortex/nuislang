@@ -38,6 +38,9 @@ pub(super) fn emit_cpu_function(
         body: Vec::new(),
         globals: Vec::new(),
         registers: BTreeMap::new(),
+        delayed_registers: BTreeMap::new(),
+        known_bool_values: BTreeMap::new(),
+        known_i64_values: BTreeMap::new(),
         buffer_lengths: BTreeMap::new(),
         next_reg: 0,
         next_global: *global_counter,
@@ -95,6 +98,18 @@ pub(super) fn emit_cpu_function(
 
         if lower_cpu_async_resource_node(node, &mut state) {
             continue;
+        }
+
+        if node.op.module != "cpu" || node.op.instruction != "select" {
+            if let Some((input, reason)) =
+                first_delayed_input(&node.op.args, &state.delayed_registers)
+            {
+                state.delayed_registers.insert(
+                    node.name.clone(),
+                    format!("depends on delayed `{input}`: {reason}"),
+                );
+                continue;
+            }
         }
 
         match node.op.cpu_llvm_lowering_class() {
@@ -180,19 +195,50 @@ pub(super) fn emit_cpu_function(
             continue;
         }
 
-        if lower_cpu_select_node(node, body, registers, &mut next_reg, last_cpu_value)? {
+        if lower_cpu_select_node(
+            node,
+            body,
+            registers,
+            &mut state.delayed_registers,
+            &state.known_bool_values,
+            &mut next_reg,
+            last_cpu_value,
+        )? {
             continue;
         }
 
-        if lower_cpu_scalar_equality_node(node, body, registers, &mut next_reg, last_cpu_value)? {
+        if lower_cpu_scalar_equality_node(
+            node,
+            body,
+            registers,
+            &state.known_i64_values,
+            &mut state.known_bool_values,
+            &mut next_reg,
+            last_cpu_value,
+        )? {
             continue;
         }
 
-        if lower_cpu_scalar_order_node(node, body, registers, &mut next_reg, last_cpu_value)? {
+        if lower_cpu_scalar_order_node(
+            node,
+            body,
+            registers,
+            &state.known_i64_values,
+            &mut state.known_bool_values,
+            &mut next_reg,
+            last_cpu_value,
+        )? {
             continue;
         }
 
-        if lower_cpu_scalar_node(node, body, registers, &mut next_reg, last_cpu_value)? {
+        if lower_cpu_scalar_node(
+            node,
+            body,
+            registers,
+            &mut state.known_i64_values,
+            &mut next_reg,
+            last_cpu_value,
+        )? {
             continue;
         }
 
@@ -389,5 +435,17 @@ pub(super) fn emit_cpu_function(
     Ok(EmittedCpuFunction {
         globals: state.globals,
         body,
+    })
+}
+
+fn first_delayed_input<'a>(
+    args: &'a [String],
+    delayed: &'a BTreeMap<String, String>,
+) -> Option<(&'a str, &'a str)> {
+    args.iter().find_map(|arg| {
+        let value_name = arg.split_once('=').map_or(arg.as_str(), |(_, value)| value);
+        delayed
+            .get(value_name.trim())
+            .map(|reason| (value_name.trim(), reason.as_str()))
     })
 }

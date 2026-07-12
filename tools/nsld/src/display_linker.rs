@@ -120,6 +120,14 @@ pub(crate) fn print_nsld_closure_report(report: &NsldClosureReport) {
     println!("Nsld linker closure");
     println!("  manifest: {}", report.manifest);
     println!("  closed: {}", report.closed);
+    println!(
+        "  lowering_plan_index_source: {}",
+        report.lowering_plan_index_source
+    );
+    println!(
+        "  lowering_plan_index_available: {}",
+        report.lowering_plan_index_available
+    );
     println!("  final_stage_link_mode: {}", report.final_stage_link_mode);
     println!("  host_wrapper_required: {}", report.host_wrapper_required);
     println!("  domain_count: {}", report.domain_count);
