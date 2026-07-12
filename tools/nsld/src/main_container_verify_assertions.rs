@@ -1,6 +1,9 @@
 use super::{
     container::{NsldContainerReport, NsldContainerVerifyReport},
     fnv1a64_hex,
+    main_container_domain_assertions::{
+        assert_matching_native_object_contract, assert_matching_shader_contract,
+    },
     reports::NsldPrepareReport,
 };
 
@@ -75,6 +78,7 @@ pub(crate) fn assert_matching_container_artifacts(
     assert!(container_source.contains("payload_hash = \"0x"));
     assert!(container_source.contains("container_section_table_hash = \"0x"));
     assert!(container_source.contains("metadata_table_hash = \"0x"));
+    assert!(container_source.contains("section_kind = \"shader-lowering-sidecar-input\""));
     assert!(container_source.contains("section_kind = \"native-object-output\""));
 }
 
@@ -176,10 +180,17 @@ pub(crate) fn assert_matching_container_verify_report(report: &NsldContainerVeri
     assert_eq!(report.actual_relocation_addend, Some(0));
     assert_matching_compat_domain(report);
     assert_matching_external_import(report);
+    assert_matching_shader_contract(report);
     assert_matching_native_object_contract(report);
 }
 
 pub(crate) fn assert_matching_container_verify_json(report_json: &str) {
+    assert!(report_json.contains("\"expected_shader_section_present\":true"));
+    assert!(report_json.contains("\"actual_shader_section_present\":true"));
+    assert!(report_json.contains(
+        "\"expected_shader_loader_symbol_id\":\"sym0001.hetero-node.shader.official.shader\""
+    ));
+    assert!(report_json.contains("\"actual_shader_relocation_id\":\"rel0001.hetero-node\""));
     assert!(report_json.contains("\"expected_native_object_section_present\":true"));
     assert!(report_json.contains("\"actual_native_object_section_present\":true"));
     assert!(report_json.contains("\"expected_compatibility_domain_count\":1"));
@@ -337,39 +348,6 @@ fn assert_matching_external_import(report: &NsldContainerVerifyReport) {
     );
     assert!(report.expected_external_import_required);
     assert_eq!(report.actual_external_import_required, Some(true));
-}
-
-fn assert_matching_native_object_contract(report: &NsldContainerVerifyReport) {
-    assert!(report.expected_native_object_section_present);
-    assert_eq!(
-        report.expected_native_object_section_id,
-        "sec0005.native-object-output"
-    );
-    assert!(report.actual_native_object_section_present);
-    assert_eq!(
-        report.actual_native_object_section_id.as_deref(),
-        Some("sec0005.native-object-output")
-    );
-    assert!(report.expected_native_object_loader_symbol_present);
-    assert_eq!(
-        report.expected_native_object_loader_symbol_id,
-        "sym0002.native-object-output"
-    );
-    assert!(report.actual_native_object_loader_symbol_present);
-    assert_eq!(
-        report.actual_native_object_loader_symbol_id.as_deref(),
-        Some("sym0002.native-object-output")
-    );
-    assert!(report.expected_native_object_relocation_present);
-    assert_eq!(
-        report.expected_native_object_relocation_id,
-        "rel0002.native-object"
-    );
-    assert!(report.actual_native_object_relocation_present);
-    assert_eq!(
-        report.actual_native_object_relocation_id.as_deref(),
-        Some("rel0002.native-object")
-    );
 }
 
 fn assert_tampered_loader_symbol(tampered_report: &NsldContainerVerifyReport) {

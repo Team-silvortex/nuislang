@@ -172,6 +172,8 @@ fn object_section_name(section_kind: &str, order_index: usize) -> String {
         "nsld-link-input-table" => ".nuis.meta.link_inputs".to_owned(),
         "nsld-link-unit-table" => ".nuis.meta.link_units".to_owned(),
         "nsld-link-bundle" => ".nuis.meta.link_bundle".to_owned(),
+        "shader-lowering-sidecar-input" => format!(".nuis.ir.shader.{order_index:04}"),
+        "kernel-lowering-sidecar-input" => format!(".nuis.ir.kernel.{order_index:04}"),
         "lowering-sidecar-input" => format!(".nuis.ir.sidecar.{order_index:04}"),
         "hetero-data-segment" => format!(".nuis.data.hetero.{order_index:04}"),
         other => format!(
@@ -188,6 +190,8 @@ fn object_section_role(section_kind: &str) -> String {
         "nsld-link-input-table"
         | "nsld-link-unit-table"
         | "nsld-link-bundle"
+        | "shader-lowering-sidecar-input"
+        | "kernel-lowering-sidecar-input"
         | "lowering-sidecar-input" => "metadata".to_owned(),
         "hetero-data-segment" => "data".to_owned(),
         _ => "extension".to_owned(),

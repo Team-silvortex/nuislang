@@ -58,6 +58,7 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_present: bool,
     pub(crate) final_executable_output_size_bytes: Option<usize>,
     pub(crate) final_executable_output_hash: Option<String>,
+    pub(crate) final_executable_output_image_header_required: Option<bool>,
     pub(crate) final_executable_output_image_header_valid: Option<bool>,
     pub(crate) final_executable_output_image_magic: Option<String>,
     pub(crate) final_executable_output_image_version: Option<usize>,
@@ -227,6 +228,8 @@ pub(crate) fn nsld_check_final_snapshot(
     let final_executable_output_present = final_executable_output_report.present;
     let final_executable_output_size_bytes = final_executable_output_report.size_bytes;
     let final_executable_output_hash = final_executable_output_report.output_hash.clone();
+    let final_executable_output_image_header_required =
+        Some(final_executable_output_report.output_image_header_required);
     let final_executable_output_image_header_valid =
         Some(final_executable_output_report.output_image_header_valid);
     let final_executable_output_image_magic =
@@ -295,6 +298,7 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_present,
         final_executable_output_size_bytes,
         final_executable_output_hash,
+        final_executable_output_image_header_required,
         final_executable_output_image_header_valid,
         final_executable_output_image_magic,
         final_executable_output_image_version,

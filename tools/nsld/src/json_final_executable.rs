@@ -449,6 +449,10 @@ pub(crate) fn nsld_final_executable_output_report_json(
         json_optional_usize_field("size_bytes", report.size_bytes),
         json_optional_string_field("output_hash", report.output_hash.as_deref()),
         json_bool_field(
+            "output_image_header_required",
+            report.output_image_header_required,
+        ),
+        json_bool_field(
             "output_image_header_valid",
             report.output_image_header_valid,
         ),

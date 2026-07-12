@@ -180,6 +180,24 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
         report.expected_native_object_relocation_id
     );
     println!(
+        "  expected_shader: section_present={} section_id={} loader_symbol_present={} loader_symbol_id={} relocation_present={} relocation_id={}",
+        report.expected_shader_section_present,
+        report.expected_shader_section_id,
+        report.expected_shader_loader_symbol_present,
+        report.expected_shader_loader_symbol_id,
+        report.expected_shader_relocation_present,
+        report.expected_shader_relocation_id
+    );
+    println!(
+        "  expected_kernel: section_present={} section_id={} loader_symbol_present={} loader_symbol_id={} relocation_present={} relocation_id={}",
+        report.expected_kernel_section_present,
+        report.expected_kernel_section_id,
+        report.expected_kernel_loader_symbol_present,
+        report.expected_kernel_loader_symbol_id,
+        report.expected_kernel_relocation_present,
+        report.expected_kernel_relocation_id
+    );
+    println!(
         "  actual_container_layout_hash: {}",
         report
             .actual_container_layout_hash
@@ -438,6 +456,24 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
         optional_string_text(report.actual_native_object_loader_symbol_id.as_deref()),
         report.actual_native_object_relocation_present,
         optional_string_text(report.actual_native_object_relocation_id.as_deref())
+    );
+    println!(
+        "  actual_shader: section_present={} section_id={} loader_symbol_present={} loader_symbol_id={} relocation_present={} relocation_id={}",
+        report.actual_shader_section_present,
+        optional_string_text(report.actual_shader_section_id.as_deref()),
+        report.actual_shader_loader_symbol_present,
+        optional_string_text(report.actual_shader_loader_symbol_id.as_deref()),
+        report.actual_shader_relocation_present,
+        optional_string_text(report.actual_shader_relocation_id.as_deref())
+    );
+    println!(
+        "  actual_kernel: section_present={} section_id={} loader_symbol_present={} loader_symbol_id={} relocation_present={} relocation_id={}",
+        report.actual_kernel_section_present,
+        optional_string_text(report.actual_kernel_section_id.as_deref()),
+        report.actual_kernel_loader_symbol_present,
+        optional_string_text(report.actual_kernel_loader_symbol_id.as_deref()),
+        report.actual_kernel_relocation_present,
+        optional_string_text(report.actual_kernel_relocation_id.as_deref())
     );
     for issue in &report.container_section_issues {
         println!("  container_section_issue: {issue}");

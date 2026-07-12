@@ -72,6 +72,7 @@ mod json_check_sections;
 mod json_closure;
 mod json_container;
 mod json_container_fragments;
+mod json_container_verify_domains;
 mod json_fields;
 mod json_final_executable;
 mod json_final_fragments;
@@ -104,6 +105,8 @@ mod main_cli_object_tests;
 mod main_cli_tests;
 #[cfg(test)]
 mod main_closure_tests;
+#[cfg(test)]
+mod main_container_domain_assertions;
 #[cfg(test)]
 mod main_container_tests;
 #[cfg(test)]

@@ -15,11 +15,21 @@ pub(crate) fn nsld_final_executable_launcher_dry_run_report(
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldFinalExecutableLauncherDryRunReport {
     let verify = nsld_verify_final_executable_launcher_manifest_report(manifest, plan);
-    let nsb_path = verify.actual_nsb_path.clone();
-    let nsb_bytes = nsb_path.as_deref().and_then(|path| fs::read(path).ok());
-    let nsb_hash_actual = nsb_bytes.as_ref().map(|bytes| fnv1a64_hex(bytes));
-    let nsb_hash_expected = verify.actual_nsb_hash.clone();
-    let nsb_hash_matches = nsb_hash_expected.is_some() && nsb_hash_actual == nsb_hash_expected;
+    let final_output_path = verify
+        .actual_final_output_path
+        .clone()
+        .or_else(|| verify.actual_nsb_path.clone());
+    let final_output_bytes = final_output_path
+        .as_deref()
+        .and_then(|path| fs::read(path).ok());
+    let final_output_hash_actual = final_output_bytes.as_ref().map(|bytes| fnv1a64_hex(bytes));
+    let final_output_hash_expected = verify
+        .actual_final_output_hash
+        .clone()
+        .or_else(|| verify.actual_nsb_hash.clone());
+    let final_output_hash_matches = final_output_hash_expected.is_some()
+        && final_output_hash_actual == final_output_hash_expected;
+    let image_header_required = verify.actual_image_header_required.unwrap_or(true);
     let mut blockers = Vec::new();
     if !verify.valid {
         blockers.push("host-launcher-manifest:invalid".to_owned());
@@ -30,16 +40,16 @@ pub(crate) fn nsld_final_executable_launcher_dry_run_report(
                 .map(|issue| format!("host-launcher-manifest:{issue}")),
         );
     }
-    if nsb_path.is_none() {
-        blockers.push("host-launcher:nsb-path-missing".to_owned());
+    if final_output_path.is_none() {
+        blockers.push("host-launcher:final-output-path-missing".to_owned());
     }
-    if nsb_bytes.is_none() {
-        blockers.push("host-launcher:nsb-unreadable".to_owned());
+    if final_output_bytes.is_none() {
+        blockers.push("host-launcher:final-output-unreadable".to_owned());
     }
-    if !nsb_hash_matches {
-        blockers.push("host-launcher:nsb-hash-mismatch".to_owned());
+    if !final_output_hash_matches {
+        blockers.push("host-launcher:final-output-hash-mismatch".to_owned());
     }
-    if verify.actual_image_header_valid != Some(true) {
+    if image_header_required && verify.actual_image_header_valid != Some(true) {
         blockers.push("host-launcher:image-header-invalid".to_owned());
     }
     let launch_steps = if blockers.is_empty() {
@@ -52,11 +62,19 @@ pub(crate) fn nsld_final_executable_launcher_dry_run_report(
         manifest: manifest.display().to_string(),
         launcher_manifest_path: verify.input_path,
         launcher_manifest_valid: verify.valid,
-        nsb_path,
-        nsb_readable: nsb_bytes.is_some(),
-        nsb_hash_expected,
-        nsb_hash_actual,
-        nsb_hash_matches,
+        final_output_path: final_output_path.clone(),
+        final_output_readable: final_output_bytes.is_some(),
+        final_output_hash_expected: final_output_hash_expected.clone(),
+        final_output_hash_actual: final_output_hash_actual.clone(),
+        final_output_hash_matches,
+        nsb_path: final_output_path,
+        nsb_readable: final_output_bytes.is_some(),
+        nsb_hash_expected: final_output_hash_expected,
+        nsb_hash_actual: final_output_hash_actual,
+        nsb_hash_matches: final_output_hash_matches,
+        output_kind: verify.actual_output_kind,
+        output_validation_mode: verify.actual_output_validation_mode,
+        image_header_required: verify.actual_image_header_required,
         image_header_valid: verify.actual_image_header_valid,
         entry_lifecycle_hook: verify.actual_entry_lifecycle_hook,
         scheduler_entry: verify.actual_scheduler_entry,
@@ -220,6 +238,29 @@ fn render_final_executable_launcher_dry_run(
     ));
     push_str_field(
         &mut out,
+        "final_output_path",
+        report.final_output_path.as_deref().unwrap_or(""),
+    );
+    out.push_str(&format!(
+        "final_output_readable = {}\n",
+        report.final_output_readable
+    ));
+    push_str_field(
+        &mut out,
+        "final_output_hash_expected",
+        report.final_output_hash_expected.as_deref().unwrap_or(""),
+    );
+    push_str_field(
+        &mut out,
+        "final_output_hash_actual",
+        report.final_output_hash_actual.as_deref().unwrap_or(""),
+    );
+    out.push_str(&format!(
+        "final_output_hash_matches = {}\n",
+        report.final_output_hash_matches
+    ));
+    push_str_field(
+        &mut out,
         "nsb_path",
         report.nsb_path.as_deref().unwrap_or(""),
     );
@@ -235,6 +276,20 @@ fn render_final_executable_launcher_dry_run(
         report.nsb_hash_actual.as_deref().unwrap_or(""),
     );
     out.push_str(&format!("nsb_hash_matches = {}\n", report.nsb_hash_matches));
+    push_str_field(
+        &mut out,
+        "output_kind",
+        report.output_kind.as_deref().unwrap_or(""),
+    );
+    push_str_field(
+        &mut out,
+        "output_validation_mode",
+        report.output_validation_mode.as_deref().unwrap_or(""),
+    );
+    out.push_str(&format!(
+        "image_header_required = {}\n",
+        report.image_header_required.unwrap_or(true)
+    ));
     out.push_str(&format!(
         "image_header_valid = {}\n",
         report.image_header_valid.unwrap_or(false)

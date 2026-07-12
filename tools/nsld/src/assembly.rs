@@ -61,7 +61,12 @@ pub(crate) fn nsld_assemble_plan_report(
         true,
     );
     for input in &link_input_summary.inputs {
-        push_assemble_section(&mut sections, "lowering-sidecar-input", &input.path, true);
+        push_assemble_section(
+            &mut sections,
+            &lowering_sidecar_section_kind(&input.domain_family),
+            &input.path,
+            true,
+        );
     }
     for segment in &plan.hetero_calculate.data_segments {
         if let Some(source_path) = &segment.source_path {
@@ -351,4 +356,12 @@ fn push_assemble_section(
         source_hash,
         required,
     });
+}
+
+fn lowering_sidecar_section_kind(domain_family: &str) -> String {
+    match domain_family {
+        "shader" => "shader-lowering-sidecar-input".to_owned(),
+        "kernel" => "kernel-lowering-sidecar-input".to_owned(),
+        _ => "lowering-sidecar-input".to_owned(),
+    }
 }

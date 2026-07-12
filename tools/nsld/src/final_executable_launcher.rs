@@ -16,11 +16,16 @@ pub(crate) fn nsld_final_executable_launcher_manifest_report(
 ) -> NsldFinalExecutableLauncherManifestReport {
     let output = nsld_final_executable_output_report(manifest, plan);
     let launcher_manifest_path = nsld_final_executable_launcher_manifest_path(plan);
+    let image_header_required = output.output_kind == "nuis-image";
+    let image_header_valid = !image_header_required || output.output_image_header_valid;
     let mut blockers = output.blockers.clone();
     if !output.runnable_candidate {
-        blockers.push("host-launcher:nsb-not-runnable-candidate".to_owned());
+        blockers.push(format!(
+            "host-launcher:{}-not-runnable-candidate",
+            output.output_kind
+        ));
     }
-    if !output.output_image_header_valid {
+    if image_header_required && !output.output_image_header_valid {
         blockers.push("host-launcher:nsb-image-header-invalid".to_owned());
     }
     let ready = blockers.is_empty();
@@ -34,26 +39,45 @@ pub(crate) fn nsld_final_executable_launcher_manifest_report(
         host_envelope_family: "host-process-envelope".to_owned(),
         host_os: env::consts::OS.to_owned(),
         host_arch: env::consts::ARCH.to_owned(),
+        output_kind: output.output_kind,
+        output_validation_mode: output.output_validation_mode,
+        final_output_path: output.output_path.clone(),
+        final_output_present: output.present,
+        final_output_size_bytes: output.size_bytes,
+        final_output_hash: output.output_hash.clone(),
         nsb_path: output.output_path,
         nsb_present: output.present,
         nsb_size_bytes: output.size_bytes,
         nsb_hash: output.output_hash,
-        image_header_required: true,
-        image_header_valid: output.output_image_header_valid,
+        image_header_required,
+        image_header_valid,
         entry_lifecycle_hook: "on_process_start".to_owned(),
         scheduler_entry: "nuis.scheduler.loop.v1".to_owned(),
-        verification_steps: vec![
-            "read-nsb-header".to_owned(),
-            "verify-nsb-magic-and-version".to_owned(),
-            "verify-nsb-size-and-hash".to_owned(),
-            "map-payload-region".to_owned(),
-            "enter-lifecycle-hook:on_process_start".to_owned(),
-        ],
+        verification_steps: launcher_verification_steps(image_header_required),
         blockers,
         notes: vec![
             "launcher-manifest-is-non-executing".to_owned(),
             "host-launcher-implementation-remains-separate-from-nsld-core-linking".to_owned(),
         ],
+    }
+}
+
+fn launcher_verification_steps(image_header_required: bool) -> Vec<String> {
+    if image_header_required {
+        vec![
+            "read-nsb-header".to_owned(),
+            "verify-nsb-magic-and-version".to_owned(),
+            "verify-nsb-size-and-hash".to_owned(),
+            "map-payload-region".to_owned(),
+            "enter-lifecycle-hook:on_process_start".to_owned(),
+        ]
+    } else {
+        vec![
+            "verify-host-native-output-presence".to_owned(),
+            "verify-host-native-output-hash".to_owned(),
+            "verify-host-native-invoke-plan".to_owned(),
+            "enter-host-native-process-boundary".to_owned(),
+        ]
     }
 }
 
@@ -100,6 +124,12 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
         actual_nsb_path,
         actual_nsb_size_bytes,
         actual_nsb_hash,
+        actual_output_kind,
+        actual_output_validation_mode,
+        actual_final_output_path,
+        actual_final_output_size_bytes,
+        actual_final_output_hash,
+        actual_image_header_required,
         actual_image_header_valid,
         actual_entry_lifecycle_hook,
         actual_scheduler_entry,
@@ -113,6 +143,15 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
             non_empty_toml_string(source, "nsb_path"),
             optional_usize_value(source, "nsb_size_bytes"),
             non_empty_toml_string(source, "nsb_hash"),
+            non_empty_toml_string(source, "output_kind"),
+            non_empty_toml_string(source, "output_validation_mode"),
+            non_empty_toml_string(source, "final_output_path")
+                .or_else(|| non_empty_toml_string(source, "nsb_path")),
+            optional_usize_value(source, "final_output_size_bytes")
+                .or_else(|| optional_usize_value(source, "nsb_size_bytes")),
+            non_empty_toml_string(source, "final_output_hash")
+                .or_else(|| non_empty_toml_string(source, "nsb_hash")),
+            toml::bool_value(source, "image_header_required"),
             toml::bool_value(source, "image_header_valid"),
             non_empty_toml_string(source, "entry_lifecycle_hook"),
             non_empty_toml_string(source, "scheduler_entry"),
@@ -123,6 +162,12 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
         Err(error) => {
             issues.push(error.clone());
             (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
                 None,
                 None,
                 None,
@@ -162,6 +207,44 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
                 actual_nsb_hash.as_deref().unwrap_or("missing")
             ));
         }
+        push_string_mismatch(
+            &mut issues,
+            "output_kind",
+            expected.output_kind.as_str(),
+            actual_output_kind.as_deref(),
+        );
+        push_string_mismatch(
+            &mut issues,
+            "output_validation_mode",
+            expected.output_validation_mode.as_str(),
+            actual_output_validation_mode.as_deref(),
+        );
+        push_string_mismatch(
+            &mut issues,
+            "final_output_path",
+            expected.final_output_path.as_str(),
+            actual_final_output_path.as_deref(),
+        );
+        if actual_final_output_size_bytes != expected.final_output_size_bytes {
+            issues.push(format!(
+                "final_output_size_bytes mismatch: expected {}, found {}",
+                optional_usize_text(expected.final_output_size_bytes),
+                optional_usize_text(actual_final_output_size_bytes)
+            ));
+        }
+        if actual_final_output_hash != expected.final_output_hash {
+            issues.push(format!(
+                "final_output_hash mismatch: expected {}, found {}",
+                expected.final_output_hash.as_deref().unwrap_or("missing"),
+                actual_final_output_hash.as_deref().unwrap_or("missing")
+            ));
+        }
+        push_bool_mismatch(
+            &mut issues,
+            "image_header_required",
+            expected.image_header_required,
+            actual_image_header_required,
+        );
         push_bool_mismatch(
             &mut issues,
             "image_header_valid",
@@ -219,6 +302,18 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
         actual_nsb_size_bytes,
         expected_nsb_hash: expected.nsb_hash,
         actual_nsb_hash,
+        expected_output_kind: expected.output_kind,
+        actual_output_kind,
+        expected_output_validation_mode: expected.output_validation_mode,
+        actual_output_validation_mode,
+        expected_final_output_path: expected.final_output_path,
+        actual_final_output_path,
+        expected_final_output_size_bytes: expected.final_output_size_bytes,
+        actual_final_output_size_bytes,
+        expected_final_output_hash: expected.final_output_hash,
+        actual_final_output_hash,
+        expected_image_header_required: expected.image_header_required,
+        actual_image_header_required,
         expected_image_header_valid: expected.image_header_valid,
         actual_image_header_valid,
         expected_entry_lifecycle_hook: expected.entry_lifecycle_hook,
@@ -260,6 +355,29 @@ pub(crate) fn render_final_executable_launcher_manifest(
     );
     push_str_field(&mut out, "host_os", &report.host_os);
     push_str_field(&mut out, "host_arch", &report.host_arch);
+    push_str_field(&mut out, "output_kind", &report.output_kind);
+    push_str_field(
+        &mut out,
+        "output_validation_mode",
+        &report.output_validation_mode,
+    );
+    push_str_field(&mut out, "final_output_path", &report.final_output_path);
+    out.push_str(&format!(
+        "final_output_present = {}\n",
+        report.final_output_present
+    ));
+    out.push_str(&format!(
+        "final_output_size_bytes = {}\n",
+        report
+            .final_output_size_bytes
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "0".to_owned())
+    ));
+    push_str_field(
+        &mut out,
+        "final_output_hash",
+        report.final_output_hash.as_deref().unwrap_or(""),
+    );
     push_str_field(&mut out, "nsb_path", &report.nsb_path);
     out.push_str(&format!("nsb_present = {}\n", report.nsb_present));
     out.push_str(&format!(

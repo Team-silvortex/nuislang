@@ -277,6 +277,54 @@ pub(crate) fn check_report_tail_fields(report: &NsldCheckReport) -> Vec<String> 
             "container_native_object_relocation_id",
             report.container_native_object_relocation_id.as_deref(),
         ),
+        json_bool_field(
+            "container_shader_section_present",
+            report.container_shader_section_present,
+        ),
+        json_optional_string_field(
+            "container_shader_section_id",
+            report.container_shader_section_id.as_deref(),
+        ),
+        json_bool_field(
+            "container_shader_loader_symbol_present",
+            report.container_shader_loader_symbol_present,
+        ),
+        json_optional_string_field(
+            "container_shader_loader_symbol_id",
+            report.container_shader_loader_symbol_id.as_deref(),
+        ),
+        json_bool_field(
+            "container_shader_relocation_present",
+            report.container_shader_relocation_present,
+        ),
+        json_optional_string_field(
+            "container_shader_relocation_id",
+            report.container_shader_relocation_id.as_deref(),
+        ),
+        json_bool_field(
+            "container_kernel_section_present",
+            report.container_kernel_section_present,
+        ),
+        json_optional_string_field(
+            "container_kernel_section_id",
+            report.container_kernel_section_id.as_deref(),
+        ),
+        json_bool_field(
+            "container_kernel_loader_symbol_present",
+            report.container_kernel_loader_symbol_present,
+        ),
+        json_optional_string_field(
+            "container_kernel_loader_symbol_id",
+            report.container_kernel_loader_symbol_id.as_deref(),
+        ),
+        json_bool_field(
+            "container_kernel_relocation_present",
+            report.container_kernel_relocation_present,
+        ),
+        json_optional_string_field(
+            "container_kernel_relocation_id",
+            report.container_kernel_relocation_id.as_deref(),
+        ),
         json_bool_field("artifact_chain_valid", report.artifact_chain_valid),
         json_string_array_field(
             "artifact_chain_advisories",

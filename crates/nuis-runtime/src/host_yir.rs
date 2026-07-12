@@ -199,4 +199,58 @@ kernel.reduce_sum total kernel0 projected
         assert_eq!(total.display, "28");
         assert_eq!(total.integer_checksum, 28);
     }
+
+    #[test]
+    fn executes_kernel_sub_div_family_on_host() {
+        let source = r#"
+yir 0.1
+
+resource kernel0 kernel.tensor
+
+kernel.tensor lhs kernel0 2 2 20,16,12,8
+kernel.tensor rhs kernel0 1 2 4,2
+kernel.sub diff kernel0 lhs rhs
+kernel.div quot kernel0 lhs rhs
+kernel.const_i64 scalar kernel0 2
+kernel.sub_scalar shifted kernel0 quot scalar
+kernel.div_scalar scaled kernel0 shifted scalar
+kernel.const_i32 lhs_i32 kernel0 18
+kernel.const_i32 rhs_i32 kernel0 3
+kernel.div_i32 exact_i32 kernel0 lhs_i32 rhs_i32
+kernel.reduce_sum total kernel0 scaled
+"#;
+
+        let summary = execute_host_yir_source(source).expect("host YIR executes");
+
+        assert_eq!(summary.kernel_nodes_executed, 11);
+        assert_eq!(summary.tensor_values, 6);
+        assert_eq!(summary.scalar_values, 5);
+        assert_eq!(summary.kernel_integer_checksum, 177);
+
+        let total = summary
+            .kernel_values
+            .iter()
+            .find(|value| value.node == "total")
+            .expect("total result exists");
+        assert_eq!(total.op, "kernel.reduce_sum");
+        assert_eq!(total.display, "5");
+        assert_eq!(total.integer_checksum, 5);
+    }
+
+    #[test]
+    fn rejects_kernel_division_by_zero_on_host() {
+        let source = r#"
+yir 0.1
+
+resource kernel0 kernel.tensor
+
+kernel.tensor lhs kernel0 1 2 8,4
+kernel.tensor rhs kernel0 1 2 2,0
+kernel.div bad kernel0 lhs rhs
+"#;
+
+        let error = execute_host_yir_source(source).expect_err("division by zero is rejected");
+
+        assert!(error.0.contains("kernel.div cannot divide by zero"));
+    }
 }

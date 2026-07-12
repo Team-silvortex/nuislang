@@ -1,6 +1,8 @@
 use super::{
-    main_test_support::empty_link_plan, nsld_container_plan_report, nsld_container_report,
-    nsld_emit_container_report, nsld_prepare_report, nsld_verify_container_plan_report,
+    main_container_domain_assertions::assert_matching_kernel_contract,
+    main_test_support::empty_link_plan, nsld_check_report, nsld_container_plan_report,
+    nsld_container_report, nsld_emit_container_report, nsld_prepare_report,
+    nsld_verify_container_plan_report, nsld_verify_container_report,
 };
 use nuisc::linker::LinkPlanHeteroNode;
 use std::{env, fs, path::Path};
@@ -81,6 +83,112 @@ validation_contracts = ["glm.resource-lifetime"]
         report.actual_container_layout_hash,
         Some(prepare.container_layout_hash)
     );
+}
+
+#[test]
+fn verify_container_tracks_kernel_domain_contract() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-container-kernel-domain-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let sidecar_path = dir.join("kernel.sidecar.toml");
+    let sidecar_source = r#"
+schema = "nuis-kernel-ir-sidecar-v1"
+[lowering_capabilities]
+capability_owner = "kernel-nustar"
+frontend_ir = "nuis-yir.kernel"
+native_ir = "coreml"
+dispatch_lowering = "kernel-host-reference-dispatch"
+validation_contracts = ["glm.resource-lifetime"]
+"#;
+    fs::write(&sidecar_path, sidecar_source).unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.domain_units.push(nuisc::linker::LinkPlanDomainUnit {
+        kind: "heterogeneous".to_owned(),
+        package_id: "official.kernel".to_owned(),
+        domain_family: "kernel".to_owned(),
+        abi: None,
+        machine_arch: None,
+        machine_os: None,
+        backend_family: Some("coreml".to_owned()),
+        vendor: None,
+        device_class: None,
+        target_device: None,
+        ir_format: None,
+        dispatch_abi: None,
+        backend_priority: None,
+        verification: None,
+        selected_lowering_target: Some("apple-ane.coreml".to_owned()),
+        contract_family: "nustar.kernel".to_owned(),
+        packaging_role: "hetero-contract".to_owned(),
+        artifact_stub_path: None,
+        artifact_stub_inline: None,
+        artifact_payload_path: None,
+        artifact_bridge_stub_path: None,
+        artifact_ir_sidecar_path: Some(sidecar_path.display().to_string()),
+        artifact_bridge_stub_inline: None,
+        artifact_payload_blob_path: None,
+        artifact_payload_blob_bytes: None,
+        artifact_payload_format: None,
+        artifact_payload_blob_inline: None,
+    });
+    plan.hetero_calculate.nodes.push(LinkPlanHeteroNode {
+        index: 0,
+        timestamp: "t0001.kernel".to_owned(),
+        domain_family: "kernel".to_owned(),
+        package_id: "official.kernel".to_owned(),
+        lifecycle_hook: "on_hetero_submission_progress".to_owned(),
+        wait_on: vec!["t0000.main".to_owned()],
+        emits: vec![
+            "t0001.kernel.submit".to_owned(),
+            "t0001.kernel.complete".to_owned(),
+            "t0001.kernel.data_commit".to_owned(),
+        ],
+        link_input: sidecar_path.display().to_string(),
+        c_world_wrapper: false,
+    });
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_verify_container_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_container_verify_report_json(&report);
+    let check_report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let check_json = super::json::check_report_json(&check_report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.valid, "{:?}", report.issues);
+    assert_matching_kernel_contract(&report);
+    assert!(report_json.contains("\"expected_kernel_section_present\":true"));
+    assert!(report_json.contains("\"actual_kernel_section_present\":true"));
+    assert!(report_json.contains(
+        "\"expected_kernel_loader_symbol_id\":\"sym0001.hetero-node.kernel.official.kernel\""
+    ));
+    assert!(report_json.contains("\"actual_kernel_relocation_id\":\"rel0001.hetero-node\""));
+    assert!(check_report.container_kernel_section_present);
+    assert_eq!(
+        check_report.container_kernel_section_id.as_deref(),
+        Some("sec0004.kernel-lowering-sidecar-input")
+    );
+    assert!(check_report.container_kernel_loader_symbol_present);
+    assert_eq!(
+        check_report.container_kernel_loader_symbol_id.as_deref(),
+        Some("sym0001.hetero-node.kernel.official.kernel")
+    );
+    assert!(check_report.container_kernel_relocation_present);
+    assert_eq!(
+        check_report.container_kernel_relocation_id.as_deref(),
+        Some("rel0001.hetero-node")
+    );
+    assert!(check_json.contains("\"container_kernel_section_present\":true"));
+    assert!(check_json
+        .contains("\"container_kernel_section_id\":\"sec0004.kernel-lowering-sidecar-input\""));
+    assert!(check_json.contains(
+        "\"container_kernel_loader_symbol_id\":\"sym0001.hetero-node.kernel.official.kernel\""
+    ));
+    assert!(check_json.contains("\"container_kernel_relocation_id\":\"rel0001.hetero-node\""));
 }
 
 #[test]

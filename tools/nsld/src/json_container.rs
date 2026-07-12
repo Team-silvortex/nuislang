@@ -7,6 +7,9 @@ use super::{
         nsld_container_compatibility_domains_json, nsld_container_external_imports_json,
         nsld_container_loader_symbols_json, nsld_container_relocations_json,
     },
+    json_container_verify_domains::{
+        actual_container_domain_fields_json, expected_container_domain_fields_json,
+    },
     json_fields::*,
     json_fragments::{
         compatibility_domain_summary_json, nsld_assemble_sections_json,
@@ -336,30 +339,7 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
             "expected_external_import_required",
             report.expected_external_import_required,
         ),
-        json_bool_field(
-            "expected_native_object_section_present",
-            report.expected_native_object_section_present,
-        ),
-        json_string_field(
-            "expected_native_object_section_id",
-            &report.expected_native_object_section_id,
-        ),
-        json_bool_field(
-            "expected_native_object_loader_symbol_present",
-            report.expected_native_object_loader_symbol_present,
-        ),
-        json_string_field(
-            "expected_native_object_loader_symbol_id",
-            &report.expected_native_object_loader_symbol_id,
-        ),
-        json_bool_field(
-            "expected_native_object_relocation_present",
-            report.expected_native_object_relocation_present,
-        ),
-        json_string_field(
-            "expected_native_object_relocation_id",
-            &report.expected_native_object_relocation_id,
-        ),
+        expected_container_domain_fields_json(report),
         json_optional_string_field(
             "actual_container_layout_hash",
             report.actual_container_layout_hash.as_deref(),
@@ -526,30 +506,7 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
             "actual_external_import_required",
             report.actual_external_import_required,
         ),
-        json_bool_field(
-            "actual_native_object_section_present",
-            report.actual_native_object_section_present,
-        ),
-        json_optional_string_field(
-            "actual_native_object_section_id",
-            report.actual_native_object_section_id.as_deref(),
-        ),
-        json_bool_field(
-            "actual_native_object_loader_symbol_present",
-            report.actual_native_object_loader_symbol_present,
-        ),
-        json_optional_string_field(
-            "actual_native_object_loader_symbol_id",
-            report.actual_native_object_loader_symbol_id.as_deref(),
-        ),
-        json_bool_field(
-            "actual_native_object_relocation_present",
-            report.actual_native_object_relocation_present,
-        ),
-        json_optional_string_field(
-            "actual_native_object_relocation_id",
-            report.actual_native_object_relocation_id.as_deref(),
-        ),
+        actual_container_domain_fields_json(report),
         json_string_array_field("container_section_issues", &report.container_section_issues),
         json_string_array_field("section_range_issues", &report.section_range_issues),
         json_string_array_field("loader_symbol_issues", &report.loader_symbol_issues),

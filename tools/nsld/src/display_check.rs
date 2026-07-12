@@ -249,12 +249,13 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_blocked_issues.len()
     );
     println!(
-        "  final_executable_output: path_present={} kind={} validation={} nsld_owned={} present={} header_valid={} magic={} version={} runnable={} size={} hash={} blockers={} issues={}",
+        "  final_executable_output: path_present={} kind={} validation={} nsld_owned={} present={} header_required={} header_valid={} magic={} version={} runnable={} size={} hash={} blockers={} issues={}",
         report.final_executable_output_path_present,
         report.final_executable_output_kind,
         report.final_executable_output_validation_mode,
         report.final_executable_output_nsld_owned,
         report.final_executable_output_present,
+        optional_bool_text(report.final_executable_output_image_header_required),
         optional_bool_text(report.final_executable_output_image_header_valid),
         optional_string_text(report.final_executable_output_image_magic.as_deref()),
         optional_usize_text(report.final_executable_output_image_version),
@@ -334,6 +335,24 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         optional_string_text(report.container_native_object_loader_symbol_id.as_deref()),
         report.container_native_object_relocation_present,
         optional_string_text(report.container_native_object_relocation_id.as_deref())
+    );
+    println!(
+        "  container_shader: section_present={} section_id={} loader_symbol_present={} loader_symbol_id={} relocation_present={} relocation_id={}",
+        report.container_shader_section_present,
+        optional_string_text(report.container_shader_section_id.as_deref()),
+        report.container_shader_loader_symbol_present,
+        optional_string_text(report.container_shader_loader_symbol_id.as_deref()),
+        report.container_shader_relocation_present,
+        optional_string_text(report.container_shader_relocation_id.as_deref())
+    );
+    println!(
+        "  container_kernel: section_present={} section_id={} loader_symbol_present={} loader_symbol_id={} relocation_present={} relocation_id={}",
+        report.container_kernel_section_present,
+        optional_string_text(report.container_kernel_section_id.as_deref()),
+        report.container_kernel_loader_symbol_present,
+        optional_string_text(report.container_kernel_loader_symbol_id.as_deref()),
+        report.container_kernel_relocation_present,
+        optional_string_text(report.container_kernel_relocation_id.as_deref())
     );
     println!(
         "  artifact_chain: valid={} advisories={} issues={}",

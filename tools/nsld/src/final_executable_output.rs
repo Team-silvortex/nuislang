@@ -29,6 +29,7 @@ pub(crate) fn nsld_final_executable_output_report(
         "nuis-image-header-size-and-hash"
     }
     .to_owned();
+    let output_image_header_required = !host_native_output;
     let emitted = final_emit.actual_emitted == Some(true);
     let path_present = Path::new(&output_path).exists();
     let nsld_owned_output = emitted && path_present;
@@ -174,6 +175,7 @@ pub(crate) fn nsld_final_executable_output_report(
         present,
         size_bytes,
         output_hash,
+        output_image_header_required,
         output_image_header_valid,
         output_image_magic,
         output_image_version,

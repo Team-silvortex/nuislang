@@ -27,6 +27,12 @@ pub(crate) fn nsld_final_executable_launcher_manifest_report_json(
         json_string_field("host_envelope_family", &report.host_envelope_family),
         json_string_field("host_os", &report.host_os),
         json_string_field("host_arch", &report.host_arch),
+        json_string_field("output_kind", &report.output_kind),
+        json_string_field("output_validation_mode", &report.output_validation_mode),
+        json_string_field("final_output_path", &report.final_output_path),
+        json_bool_field("final_output_present", report.final_output_present),
+        json_optional_usize_field("final_output_size_bytes", report.final_output_size_bytes),
+        json_optional_string_field("final_output_hash", report.final_output_hash.as_deref()),
         json_string_field("nsb_path", &report.nsb_path),
         json_bool_field("nsb_present", report.nsb_present),
         json_optional_usize_field("nsb_size_bytes", report.nsb_size_bytes),
@@ -83,6 +89,48 @@ pub(crate) fn nsld_final_executable_launcher_manifest_verify_report_json(
         json_optional_usize_field("actual_nsb_size_bytes", report.actual_nsb_size_bytes),
         json_optional_string_field("expected_nsb_hash", report.expected_nsb_hash.as_deref()),
         json_optional_string_field("actual_nsb_hash", report.actual_nsb_hash.as_deref()),
+        json_string_field("expected_output_kind", &report.expected_output_kind),
+        json_optional_string_field("actual_output_kind", report.actual_output_kind.as_deref()),
+        json_string_field(
+            "expected_output_validation_mode",
+            &report.expected_output_validation_mode,
+        ),
+        json_optional_string_field(
+            "actual_output_validation_mode",
+            report.actual_output_validation_mode.as_deref(),
+        ),
+        json_string_field(
+            "expected_final_output_path",
+            &report.expected_final_output_path,
+        ),
+        json_optional_string_field(
+            "actual_final_output_path",
+            report.actual_final_output_path.as_deref(),
+        ),
+        json_optional_usize_field(
+            "expected_final_output_size_bytes",
+            report.expected_final_output_size_bytes,
+        ),
+        json_optional_usize_field(
+            "actual_final_output_size_bytes",
+            report.actual_final_output_size_bytes,
+        ),
+        json_optional_string_field(
+            "expected_final_output_hash",
+            report.expected_final_output_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_final_output_hash",
+            report.actual_final_output_hash.as_deref(),
+        ),
+        json_bool_field(
+            "expected_image_header_required",
+            report.expected_image_header_required,
+        ),
+        json_optional_bool_field(
+            "actual_image_header_required",
+            report.actual_image_header_required,
+        ),
         json_bool_field(
             "expected_image_header_valid",
             report.expected_image_header_valid,
@@ -130,11 +178,31 @@ pub(crate) fn nsld_final_executable_launcher_dry_run_report_json(
         json_string_field("manifest", &report.manifest),
         json_string_field("launcher_manifest_path", &report.launcher_manifest_path),
         json_bool_field("launcher_manifest_valid", report.launcher_manifest_valid),
+        json_optional_string_field("final_output_path", report.final_output_path.as_deref()),
+        json_bool_field("final_output_readable", report.final_output_readable),
+        json_optional_string_field(
+            "final_output_hash_expected",
+            report.final_output_hash_expected.as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_hash_actual",
+            report.final_output_hash_actual.as_deref(),
+        ),
+        json_bool_field(
+            "final_output_hash_matches",
+            report.final_output_hash_matches,
+        ),
         json_optional_string_field("nsb_path", report.nsb_path.as_deref()),
         json_bool_field("nsb_readable", report.nsb_readable),
         json_optional_string_field("nsb_hash_expected", report.nsb_hash_expected.as_deref()),
         json_optional_string_field("nsb_hash_actual", report.nsb_hash_actual.as_deref()),
         json_bool_field("nsb_hash_matches", report.nsb_hash_matches),
+        json_optional_string_field("output_kind", report.output_kind.as_deref()),
+        json_optional_string_field(
+            "output_validation_mode",
+            report.output_validation_mode.as_deref(),
+        ),
+        json_optional_bool_field("image_header_required", report.image_header_required),
         json_optional_bool_field("image_header_valid", report.image_header_valid),
         json_optional_string_field(
             "entry_lifecycle_hook",

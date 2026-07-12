@@ -311,7 +311,10 @@ validation_contracts = ["glm.resource-lifetime"]
     assert_eq!(report.sections[1].section_kind, "nsld-link-input-table");
     assert_eq!(report.sections[2].section_kind, "nsld-link-unit-table");
     assert_eq!(report.sections[3].section_kind, "nsld-link-bundle");
-    assert_eq!(report.sections[4].section_kind, "lowering-sidecar-input");
+    assert_eq!(
+        report.sections[4].section_kind,
+        "shader-lowering-sidecar-input"
+    );
     assert!(report
         .sections
         .iter()

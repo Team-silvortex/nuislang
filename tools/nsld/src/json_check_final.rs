@@ -165,6 +165,10 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             report.final_executable_output_hash.as_deref(),
         ),
         json_optional_bool_field(
+            "final_executable_output_image_header_required",
+            report.final_executable_output_image_header_required,
+        ),
+        json_optional_bool_field(
             "final_executable_output_image_header_valid",
             report.final_executable_output_image_header_valid,
         ),

@@ -509,6 +509,7 @@ pub(crate) struct NsldFinalExecutableOutputReport {
     pub(crate) present: bool,
     pub(crate) size_bytes: Option<usize>,
     pub(crate) output_hash: Option<String>,
+    pub(crate) output_image_header_required: bool,
     pub(crate) output_image_header_valid: bool,
     pub(crate) output_image_magic: Option<String>,
     pub(crate) output_image_version: Option<usize>,

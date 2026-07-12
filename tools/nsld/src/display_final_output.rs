@@ -18,6 +18,10 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         optional_string_text(report.output_hash.as_deref())
     );
     println!(
+        "  output_image_header_required: {}",
+        report.output_image_header_required
+    );
+    println!(
         "  output_image_header_valid: {}",
         report.output_image_header_valid
     );

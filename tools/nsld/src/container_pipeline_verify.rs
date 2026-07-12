@@ -99,6 +99,18 @@ pub(crate) fn nsld_verify_container_report(
         native_object_loader_symbol_summary(&expected_report.loader_symbols);
     let (expected_native_object_relocation_present, expected_native_object_relocation_id) =
         native_object_relocation_summary(&expected_report.relocations);
+    let (expected_shader_section_present, expected_shader_section_id) =
+        shader_section_summary(&expected_report.sections);
+    let (expected_shader_loader_symbol_present, expected_shader_loader_symbol_id) =
+        shader_loader_symbol_summary(&expected_report.loader_symbols);
+    let (expected_shader_relocation_present, expected_shader_relocation_id) =
+        domain_relocation_summary(&expected_report.relocations, "shader");
+    let (expected_kernel_section_present, expected_kernel_section_id) =
+        domain_section_summary(&expected_report.sections, "kernel");
+    let (expected_kernel_loader_symbol_present, expected_kernel_loader_symbol_id) =
+        domain_loader_symbol_summary(&expected_report.loader_symbols, "kernel");
+    let (expected_kernel_relocation_present, expected_kernel_relocation_id) =
+        domain_relocation_summary(&expected_report.relocations, "kernel");
     let actual_sections = actual
         .as_ref()
         .map(|source| container_verify::container_section_entries(source))
@@ -117,6 +129,18 @@ pub(crate) fn nsld_verify_container_report(
         native_object_loader_symbol_optional_summary(&actual_loader_symbols);
     let (actual_native_object_relocation_present, actual_native_object_relocation_id) =
         native_object_relocation_optional_summary(&actual_relocations);
+    let (actual_shader_section_present, actual_shader_section_id) =
+        shader_section_optional_summary(&actual_sections);
+    let (actual_shader_loader_symbol_present, actual_shader_loader_symbol_id) =
+        shader_loader_symbol_optional_summary(&actual_loader_symbols);
+    let (actual_shader_relocation_present, actual_shader_relocation_id) =
+        domain_relocation_optional_summary(&actual_relocations, "shader");
+    let (actual_kernel_section_present, actual_kernel_section_id) =
+        domain_section_optional_summary(&actual_sections, "kernel");
+    let (actual_kernel_loader_symbol_present, actual_kernel_loader_symbol_id) =
+        domain_loader_symbol_optional_summary(&actual_loader_symbols, "kernel");
+    let (actual_kernel_relocation_present, actual_kernel_relocation_id) =
+        domain_relocation_optional_summary(&actual_relocations, "kernel");
 
     let ActualContainerFields {
         actual_container_layout_hash,
@@ -301,6 +325,18 @@ pub(crate) fn nsld_verify_container_report(
         expected_native_object_loader_symbol_id,
         expected_native_object_relocation_present,
         expected_native_object_relocation_id,
+        expected_shader_section_present,
+        expected_shader_section_id,
+        expected_shader_loader_symbol_present,
+        expected_shader_loader_symbol_id,
+        expected_shader_relocation_present,
+        expected_shader_relocation_id,
+        expected_kernel_section_present,
+        expected_kernel_section_id,
+        expected_kernel_loader_symbol_present,
+        expected_kernel_loader_symbol_id,
+        expected_kernel_relocation_present,
+        expected_kernel_relocation_id,
         actual_container_layout_hash,
         actual_container_hash,
         actual_metadata_table_hash,
@@ -348,6 +384,18 @@ pub(crate) fn nsld_verify_container_report(
         actual_native_object_loader_symbol_id,
         actual_native_object_relocation_present,
         actual_native_object_relocation_id,
+        actual_shader_section_present,
+        actual_shader_section_id,
+        actual_shader_loader_symbol_present,
+        actual_shader_loader_symbol_id,
+        actual_shader_relocation_present,
+        actual_shader_relocation_id,
+        actual_kernel_section_present,
+        actual_kernel_section_id,
+        actual_kernel_loader_symbol_present,
+        actual_kernel_loader_symbol_id,
+        actual_kernel_relocation_present,
+        actual_kernel_relocation_id,
         container_section_issues,
         section_range_issues,
         loader_symbol_issues,
@@ -414,6 +462,112 @@ fn native_object_relocation_optional_summary(
     relocations
         .iter()
         .find(|relocation| relocation.relocation_kind == "native-object-binding")
+        .map(|relocation| (true, Some(relocation.relocation_id.clone())))
+        .unwrap_or((false, None))
+}
+
+fn shader_section_summary(sections: &[container::NsldContainerSectionEntry]) -> (bool, String) {
+    domain_section_summary(sections, "shader")
+}
+
+fn shader_section_optional_summary(
+    sections: &[container::NsldContainerSectionEntry],
+) -> (bool, Option<String>) {
+    domain_section_optional_summary(sections, "shader")
+}
+
+fn shader_loader_symbol_summary(
+    symbols: &[container::NsldContainerLoaderSymbol],
+) -> (bool, String) {
+    domain_loader_symbol_summary(symbols, "shader")
+}
+
+fn shader_loader_symbol_optional_summary(
+    symbols: &[container::NsldContainerLoaderSymbol],
+) -> (bool, Option<String>) {
+    domain_loader_symbol_optional_summary(symbols, "shader")
+}
+
+fn domain_section_summary(
+    sections: &[container::NsldContainerSectionEntry],
+    domain_family: &str,
+) -> (bool, String) {
+    let section_kind = format!("{domain_family}-lowering-sidecar-input");
+    sections
+        .iter()
+        .find(|section| section.section_kind == section_kind)
+        .map(|section| (true, section.section_id.clone()))
+        .unwrap_or_else(|| (false, String::new()))
+}
+
+fn domain_section_optional_summary(
+    sections: &[container::NsldContainerSectionEntry],
+    domain_family: &str,
+) -> (bool, Option<String>) {
+    let section_kind = format!("{domain_family}-lowering-sidecar-input");
+    sections
+        .iter()
+        .find(|section| section.section_kind == section_kind)
+        .map(|section| (true, Some(section.section_id.clone())))
+        .unwrap_or((false, None))
+}
+
+fn domain_loader_symbol_summary(
+    symbols: &[container::NsldContainerLoaderSymbol],
+    domain_family: &str,
+) -> (bool, String) {
+    let symbol_fragment = format!(".hetero-node.{domain_family}.");
+    symbols
+        .iter()
+        .find(|symbol| {
+            symbol.symbol_kind == "hetero-node-dispatch"
+                && symbol.symbol_id.contains(&symbol_fragment)
+        })
+        .map(|symbol| (true, symbol.symbol_id.clone()))
+        .unwrap_or_else(|| (false, String::new()))
+}
+
+fn domain_loader_symbol_optional_summary(
+    symbols: &[container::NsldContainerLoaderSymbol],
+    domain_family: &str,
+) -> (bool, Option<String>) {
+    let symbol_fragment = format!(".hetero-node.{domain_family}.");
+    symbols
+        .iter()
+        .find(|symbol| {
+            symbol.symbol_kind == "hetero-node-dispatch"
+                && symbol.symbol_id.contains(&symbol_fragment)
+        })
+        .map(|symbol| (true, Some(symbol.symbol_id.clone())))
+        .unwrap_or((false, None))
+}
+
+fn domain_relocation_summary(
+    relocations: &[container::NsldContainerRelocationEntry],
+    domain_family: &str,
+) -> (bool, String) {
+    let symbol_fragment = format!(".hetero-node.{domain_family}.");
+    relocations
+        .iter()
+        .find(|relocation| {
+            relocation.relocation_kind == "hetero-node-binding"
+                && relocation.target_symbol_id.contains(&symbol_fragment)
+        })
+        .map(|relocation| (true, relocation.relocation_id.clone()))
+        .unwrap_or_else(|| (false, String::new()))
+}
+
+fn domain_relocation_optional_summary(
+    relocations: &[container::NsldContainerRelocationEntry],
+    domain_family: &str,
+) -> (bool, Option<String>) {
+    let symbol_fragment = format!(".hetero-node.{domain_family}.");
+    relocations
+        .iter()
+        .find(|relocation| {
+            relocation.relocation_kind == "hetero-node-binding"
+                && relocation.target_symbol_id.contains(&symbol_fragment)
+        })
         .map(|relocation| (true, Some(relocation.relocation_id.clone())))
         .unwrap_or((false, None))
 }

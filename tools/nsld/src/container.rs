@@ -217,7 +217,7 @@ pub(crate) fn hetero_loader_symbols(
             .or_else(|| {
                 sections
                     .iter()
-                    .filter(|section| section.section_kind == "lowering-sidecar-input")
+                    .filter(|section| is_lowering_sidecar_section(&section.section_kind))
                     .nth(node_index)
             })
         {
@@ -238,6 +238,15 @@ pub(crate) fn hetero_loader_symbols(
         }
     }
     symbols
+}
+
+fn is_lowering_sidecar_section(section_kind: &str) -> bool {
+    matches!(
+        section_kind,
+        "lowering-sidecar-input"
+            | "shader-lowering-sidecar-input"
+            | "kernel-lowering-sidecar-input"
+    )
 }
 
 pub(crate) fn native_object_loader_symbols(

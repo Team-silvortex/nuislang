@@ -256,7 +256,7 @@ fn verify_final_executable_launcher_manifest_reports_drift() {
 }
 
 #[test]
-fn final_executable_launcher_dry_run_rejects_tampered_nsb_bytes() {
+fn final_executable_launcher_dry_run_rejects_tampered_final_output_bytes() {
     let dir = env::temp_dir().join(format!(
         "nsld-final-executable-launcher-dry-run-tamper-{}",
         std::process::id()
@@ -295,10 +295,10 @@ fn final_executable_launcher_dry_run_rejects_tampered_nsb_bytes() {
     assert!(dry_run
         .blockers
         .iter()
-        .any(|blocker| blocker == "host-launcher:nsb-hash-mismatch"));
+        .any(|blocker| blocker == "host-launcher:final-output-hash-mismatch"));
     assert!(dry_run_json.contains("\"dry_run_ready\":false"));
     assert!(dry_run_json.contains("\"would_enter_lifecycle_hook\":false"));
-    assert!(dry_run_json.contains("\"host-launcher:nsb-hash-mismatch\""));
+    assert!(dry_run_json.contains("\"host-launcher:final-output-hash-mismatch\""));
 }
 
 #[test]
@@ -386,6 +386,7 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output.matches_expected_image, "{:?}", output.issues);
     assert_eq!(output.size_bytes, Some(output_bytes.len()));
     assert_eq!(output.output_hash, Some(fnv1a64_hex(&output_bytes)));
+    assert!(output.output_image_header_required);
     assert!(output.output_image_header_valid);
     assert_eq!(output.output_image_magic.as_deref(), Some("NUIFIMG"));
     assert_eq!(output.output_image_version, Some(1));
@@ -405,6 +406,7 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output_json.contains("\"present\":true"));
     assert!(output_json.contains("\"path_present\":true"));
     assert!(output_json.contains("\"nsld_owned_output\":true"));
+    assert!(output_json.contains("\"output_image_header_required\":true"));
     assert!(output_json.contains("\"output_image_header_valid\":true"));
     assert!(output_json.contains("\"output_image_magic\":\"NUIFIMG\""));
     assert!(output_json.contains("\"output_image_version\":1"));

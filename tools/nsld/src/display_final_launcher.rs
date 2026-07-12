@@ -25,6 +25,21 @@ pub(crate) fn print_nsld_final_executable_launcher_manifest_report(
     println!("  host_envelope_family: {}", report.host_envelope_family);
     println!("  host_os: {}", report.host_os);
     println!("  host_arch: {}", report.host_arch);
+    println!("  output_kind: {}", report.output_kind);
+    println!(
+        "  output_validation_mode: {}",
+        report.output_validation_mode
+    );
+    println!("  final_output_path: {}", report.final_output_path);
+    println!("  final_output_present: {}", report.final_output_present);
+    println!(
+        "  final_output_size_bytes: {}",
+        optional_usize_text(report.final_output_size_bytes)
+    );
+    println!(
+        "  final_output_hash: {}",
+        optional_string_text(report.final_output_hash.as_deref())
+    );
     println!("  nsb_path: {}", report.nsb_path);
     println!("  nsb_present: {}", report.nsb_present);
     println!(
@@ -100,6 +115,43 @@ pub(crate) fn print_nsld_final_executable_launcher_manifest_verify_report(
         "  actual_nsb_hash: {}",
         optional_string_text(report.actual_nsb_hash.as_deref())
     );
+    println!("  expected_output_kind: {}", report.expected_output_kind);
+    println!(
+        "  actual_output_kind: {}",
+        optional_string_text(report.actual_output_kind.as_deref())
+    );
+    println!(
+        "  expected_output_validation_mode: {}",
+        report.expected_output_validation_mode
+    );
+    println!(
+        "  actual_output_validation_mode: {}",
+        optional_string_text(report.actual_output_validation_mode.as_deref())
+    );
+    println!(
+        "  expected_final_output_path: {}",
+        report.expected_final_output_path
+    );
+    println!(
+        "  actual_final_output_path: {}",
+        optional_string_text(report.actual_final_output_path.as_deref())
+    );
+    println!(
+        "  expected_final_output_hash: {}",
+        optional_string_text(report.expected_final_output_hash.as_deref())
+    );
+    println!(
+        "  actual_final_output_hash: {}",
+        optional_string_text(report.actual_final_output_hash.as_deref())
+    );
+    println!(
+        "  expected_image_header_required: {}",
+        report.expected_image_header_required
+    );
+    println!(
+        "  actual_image_header_required: {}",
+        optional_bool_text(report.actual_image_header_required)
+    );
     println!(
         "  expected_entry_lifecycle_hook: {}",
         report.expected_entry_lifecycle_hook
@@ -147,6 +199,23 @@ pub(crate) fn print_nsld_final_executable_launcher_dry_run_report(
         report.launcher_manifest_valid
     );
     println!(
+        "  final_output_path: {}",
+        optional_string_text(report.final_output_path.as_deref())
+    );
+    println!("  final_output_readable: {}", report.final_output_readable);
+    println!(
+        "  final_output_hash_expected: {}",
+        optional_string_text(report.final_output_hash_expected.as_deref())
+    );
+    println!(
+        "  final_output_hash_actual: {}",
+        optional_string_text(report.final_output_hash_actual.as_deref())
+    );
+    println!(
+        "  final_output_hash_matches: {}",
+        report.final_output_hash_matches
+    );
+    println!(
         "  nsb_path: {}",
         optional_string_text(report.nsb_path.as_deref())
     );
@@ -160,6 +229,18 @@ pub(crate) fn print_nsld_final_executable_launcher_dry_run_report(
         optional_string_text(report.nsb_hash_actual.as_deref())
     );
     println!("  nsb_hash_matches: {}", report.nsb_hash_matches);
+    println!(
+        "  output_kind: {}",
+        optional_string_text(report.output_kind.as_deref())
+    );
+    println!(
+        "  output_validation_mode: {}",
+        optional_string_text(report.output_validation_mode.as_deref())
+    );
+    println!(
+        "  image_header_required: {}",
+        optional_bool_text(report.image_header_required)
+    );
     println!(
         "  image_header_valid: {}",
         report

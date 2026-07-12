@@ -344,6 +344,10 @@ fn check_reports_valid_final_executable_output_when_present() {
         Some(true)
     );
     assert_eq!(
+        report.final_executable_output_image_header_required,
+        Some(true)
+    );
+    assert_eq!(
         report.final_executable_output_image_header_valid,
         Some(true)
     );
@@ -371,6 +375,7 @@ fn check_reports_valid_final_executable_output_when_present() {
     ));
     assert!(report_json.contains("\"final_executable_output_nsld_owned\":true"));
     assert!(report_json.contains("\"final_executable_output_present\":true"));
+    assert!(report_json.contains("\"final_executable_output_image_header_required\":true"));
     assert!(report_json.contains("\"final_executable_output_image_header_valid\":true"));
     assert!(report_json.contains("\"final_executable_output_image_magic\":\"NUIFIMG\""));
     assert!(report_json.contains("\"final_executable_output_image_version\":1"));

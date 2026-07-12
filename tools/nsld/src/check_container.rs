@@ -47,6 +47,18 @@ pub(crate) struct NsldCheckContainerSnapshot {
     pub(crate) container_native_object_loader_symbol_id: Option<String>,
     pub(crate) container_native_object_relocation_present: bool,
     pub(crate) container_native_object_relocation_id: Option<String>,
+    pub(crate) container_shader_section_present: bool,
+    pub(crate) container_shader_section_id: Option<String>,
+    pub(crate) container_shader_loader_symbol_present: bool,
+    pub(crate) container_shader_loader_symbol_id: Option<String>,
+    pub(crate) container_shader_relocation_present: bool,
+    pub(crate) container_shader_relocation_id: Option<String>,
+    pub(crate) container_kernel_section_present: bool,
+    pub(crate) container_kernel_section_id: Option<String>,
+    pub(crate) container_kernel_loader_symbol_present: bool,
+    pub(crate) container_kernel_loader_symbol_id: Option<String>,
+    pub(crate) container_kernel_relocation_present: bool,
+    pub(crate) container_kernel_relocation_id: Option<String>,
 }
 
 pub(crate) fn nsld_check_container_snapshot(
@@ -140,6 +152,42 @@ pub(crate) fn nsld_check_container_snapshot(
     let container_native_object_relocation_id = container_verify_report
         .as_ref()
         .and_then(|report| report.actual_native_object_relocation_id.clone());
+    let container_shader_section_present = container_verify_report
+        .as_ref()
+        .is_some_and(|report| report.actual_shader_section_present);
+    let container_shader_section_id = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_shader_section_id.clone());
+    let container_shader_loader_symbol_present = container_verify_report
+        .as_ref()
+        .is_some_and(|report| report.actual_shader_loader_symbol_present);
+    let container_shader_loader_symbol_id = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_shader_loader_symbol_id.clone());
+    let container_shader_relocation_present = container_verify_report
+        .as_ref()
+        .is_some_and(|report| report.actual_shader_relocation_present);
+    let container_shader_relocation_id = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_shader_relocation_id.clone());
+    let container_kernel_section_present = container_verify_report
+        .as_ref()
+        .is_some_and(|report| report.actual_kernel_section_present);
+    let container_kernel_section_id = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_kernel_section_id.clone());
+    let container_kernel_loader_symbol_present = container_verify_report
+        .as_ref()
+        .is_some_and(|report| report.actual_kernel_loader_symbol_present);
+    let container_kernel_loader_symbol_id = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_kernel_loader_symbol_id.clone());
+    let container_kernel_relocation_present = container_verify_report
+        .as_ref()
+        .is_some_and(|report| report.actual_kernel_relocation_present);
+    let container_kernel_relocation_id = container_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_kernel_relocation_id.clone());
     let expected_container_report =
         container_present.then(|| nsld_container_report(manifest, plan));
     let container_loader_readiness = expected_container_report
@@ -231,6 +279,18 @@ pub(crate) fn nsld_check_container_snapshot(
         container_native_object_loader_symbol_id,
         container_native_object_relocation_present,
         container_native_object_relocation_id,
+        container_shader_section_present,
+        container_shader_section_id,
+        container_shader_loader_symbol_present,
+        container_shader_loader_symbol_id,
+        container_shader_relocation_present,
+        container_shader_relocation_id,
+        container_kernel_section_present,
+        container_kernel_section_id,
+        container_kernel_loader_symbol_present,
+        container_kernel_loader_symbol_id,
+        container_kernel_relocation_present,
+        container_kernel_relocation_id,
     }
 }
 

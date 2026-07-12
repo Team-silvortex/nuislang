@@ -377,6 +377,8 @@ pub(crate) fn nsld_check_report(
         final_executable_output_present: final_snapshot.final_executable_output_present,
         final_executable_output_size_bytes: final_snapshot.final_executable_output_size_bytes,
         final_executable_output_hash: final_snapshot.final_executable_output_hash,
+        final_executable_output_image_header_required: final_snapshot
+            .final_executable_output_image_header_required,
         final_executable_output_image_header_valid: final_snapshot
             .final_executable_output_image_header_valid,
         final_executable_output_image_magic: final_snapshot.final_executable_output_image_magic,
@@ -477,6 +479,20 @@ pub(crate) fn nsld_check_report(
             .container_native_object_relocation_present,
         container_native_object_relocation_id: container_snapshot
             .container_native_object_relocation_id,
+        container_shader_section_present: container_snapshot.container_shader_section_present,
+        container_shader_section_id: container_snapshot.container_shader_section_id,
+        container_shader_loader_symbol_present: container_snapshot
+            .container_shader_loader_symbol_present,
+        container_shader_loader_symbol_id: container_snapshot.container_shader_loader_symbol_id,
+        container_shader_relocation_present: container_snapshot.container_shader_relocation_present,
+        container_shader_relocation_id: container_snapshot.container_shader_relocation_id,
+        container_kernel_section_present: container_snapshot.container_kernel_section_present,
+        container_kernel_section_id: container_snapshot.container_kernel_section_id,
+        container_kernel_loader_symbol_present: container_snapshot
+            .container_kernel_loader_symbol_present,
+        container_kernel_loader_symbol_id: container_snapshot.container_kernel_loader_symbol_id,
+        container_kernel_relocation_present: container_snapshot.container_kernel_relocation_present,
+        container_kernel_relocation_id: container_snapshot.container_kernel_relocation_id,
         artifact_chain_valid,
         artifact_chain_advisories,
         artifact_chain_advisory_command_id,
