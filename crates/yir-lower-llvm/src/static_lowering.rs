@@ -2,12 +2,13 @@ use std::collections::BTreeMap;
 
 use yir_core::Node;
 
-use super::{fresh_reg, LlvmValueRef};
+use super::{fresh_reg, KnownFacts, LlvmValueRef};
 
 pub(crate) fn lower_cpu_static_node(
     node: &Node,
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
+    facts: &mut KnownFacts,
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
@@ -24,6 +25,9 @@ pub(crate) fn lower_cpu_static_node(
             ));
             body.push(format!("  {reg} = add i64 0, {}", node.op.args[1]));
             registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+            if let Ok(value) = node.op.args[1].parse::<i64>() {
+                facts.record_i64(node.name.clone(), value);
+            }
             *last_cpu_value = Some(reg);
         }
         "tick_i64" => {

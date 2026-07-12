@@ -5,7 +5,7 @@ use yir_core::Node;
 use super::{
     fresh_reg, lower_buffer_fill,
     value_ref::{get_i64, get_ptr},
-    LlvmValueRef,
+    KnownFacts, LlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_memory_node(
@@ -13,6 +13,7 @@ pub(crate) fn lower_cpu_memory_node(
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
     buffer_lengths: &mut BTreeMap<String, String>,
+    facts: &mut KnownFacts,
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
@@ -65,7 +66,12 @@ pub(crate) fn lower_cpu_memory_node(
             body.push(format!("  {raw} = call ptr @malloc(i64 {bytes})"));
             lower_buffer_fill(body, next_reg, raw.as_str(), len.as_str(), fill.as_str())?;
             registers.insert(node.name.clone(), LlvmValueRef::Ptr(raw.clone()));
-            buffer_lengths.insert(node.name.clone(), len);
+            let known_len = facts
+                .i64_values
+                .get(&node.op.args[0])
+                .map(i64::to_string)
+                .unwrap_or(len);
+            buffer_lengths.insert(node.name.clone(), known_len);
         }
         "load_value" => {
             let Some(ptr) = get_ptr(registers, &node.op.args[0]) else {
@@ -112,6 +118,9 @@ pub(crate) fn lower_cpu_memory_node(
                 return Ok(true);
             };
             registers.insert(node.name.clone(), LlvmValueRef::I64(len.clone()));
+            if let Ok(value) = len.parse::<i64>() {
+                facts.record_i64(node.name.clone(), value);
+            }
             *last_cpu_value = Some(len);
         }
         "load_at" => {
@@ -201,7 +210,12 @@ pub(crate) fn lower_cpu_memory_node(
             body.push(format!("  {cmp} = icmp eq ptr {ptr}, null"));
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+            let known_null = ptr == "null";
             registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+            if known_null {
+                facts.record_bool(node.name.clone(), true);
+                facts.record_i64(node.name.clone(), 1);
+            }
             *last_cpu_value = Some(reg);
         }
         "free" => {

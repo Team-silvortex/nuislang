@@ -39,8 +39,7 @@ pub(super) fn emit_cpu_function(
         globals: Vec::new(),
         registers: BTreeMap::new(),
         delayed_registers: BTreeMap::new(),
-        known_bool_values: BTreeMap::new(),
-        known_i64_values: BTreeMap::new(),
+        facts: KnownFacts::new(),
         buffer_lengths: BTreeMap::new(),
         next_reg: 0,
         next_global: *global_counter,
@@ -149,17 +148,32 @@ pub(super) fn emit_cpu_function(
             body,
             registers,
             buffer_lengths,
+            &mut state.facts,
             &mut next_reg,
             last_cpu_value,
         )? {
             continue;
         }
 
-        if lower_cpu_cast_node(node, body, registers, &mut next_reg, last_cpu_value)? {
+        if lower_cpu_cast_node(
+            node,
+            body,
+            registers,
+            &mut state.facts,
+            &mut next_reg,
+            last_cpu_value,
+        )? {
             continue;
         }
 
-        if lower_cpu_static_node(node, body, registers, &mut next_reg, last_cpu_value)? {
+        if lower_cpu_static_node(
+            node,
+            body,
+            registers,
+            &mut state.facts,
+            &mut next_reg,
+            last_cpu_value,
+        )? {
             continue;
         }
 
@@ -187,7 +201,14 @@ pub(super) fn emit_cpu_function(
             continue;
         }
 
-        if lower_cpu_bitwise_node(node, body, registers, &mut next_reg, last_cpu_value)? {
+        if lower_cpu_bitwise_node(
+            node,
+            body,
+            registers,
+            &mut state.facts,
+            &mut next_reg,
+            last_cpu_value,
+        )? {
             continue;
         }
 
@@ -200,7 +221,7 @@ pub(super) fn emit_cpu_function(
             body,
             registers,
             &mut state.delayed_registers,
-            &state.known_bool_values,
+            &mut state.facts,
             &mut next_reg,
             last_cpu_value,
         )? {
@@ -211,8 +232,7 @@ pub(super) fn emit_cpu_function(
             node,
             body,
             registers,
-            &state.known_i64_values,
-            &mut state.known_bool_values,
+            &mut state.facts,
             &mut next_reg,
             last_cpu_value,
         )? {
@@ -223,8 +243,7 @@ pub(super) fn emit_cpu_function(
             node,
             body,
             registers,
-            &state.known_i64_values,
-            &mut state.known_bool_values,
+            &mut state.facts,
             &mut next_reg,
             last_cpu_value,
         )? {
@@ -235,7 +254,7 @@ pub(super) fn emit_cpu_function(
             node,
             body,
             registers,
-            &mut state.known_i64_values,
+            &mut state.facts,
             &mut next_reg,
             last_cpu_value,
         )? {

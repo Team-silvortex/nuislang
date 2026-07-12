@@ -1,5 +1,9 @@
+mod core_runtime_tests;
 mod core_tests;
 mod extern_tests;
+mod fact_domain_tests;
+mod fact_lowering_tests;
+mod fact_scalar_tests;
 mod flow_async_tests;
 mod flow_reject_tests;
 mod flow_sync_tests;

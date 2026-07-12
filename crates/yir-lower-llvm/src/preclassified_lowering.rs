@@ -2,14 +2,9 @@ use yir_core::Node;
 
 use super::{
     fresh_global, fresh_reg, llvm_c_string_bytes,
-    value_ref::{
-        coerce_to_i64, get_mutex, get_mutex_guard, get_network_result, get_ptr, get_struct,
-        get_task, get_task_result, get_thread,
-    },
+    value_ref::{coerce_to_i64, get_network_result, get_ptr, get_struct},
     variant_select::{emit_variant_is_value, variant_field_value, variant_parent_name},
-    LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
-    NetworkResultLlvmValueRef, StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef,
-    ThreadLlvmValueRef,
+    KnownFacts, LlvmLoweringState, LlvmValueRef, NetworkResultLlvmValueRef, StructLlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
@@ -57,7 +52,8 @@ pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState)
                 },
             );
             state
-                .known_bool_values
+                .facts
+                .bool_values
                 .insert(node.name.clone(), value == "true");
             state.last_cpu_value = Some(widened);
             true
@@ -86,7 +82,7 @@ pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState)
                 .registers
                 .insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
             if let Ok(value) = node.op.args[0].parse::<i64>() {
-                state.known_i64_values.insert(node.name.clone(), value);
+                state.facts.record_i64(node.name.clone(), value);
             }
             state.last_cpu_value = Some(reg);
             true
@@ -151,6 +147,13 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
                     ));
                     return true;
                 };
+                let field_fact_key = KnownFacts::struct_field_key(&node.name, field_name.trim());
+                if let Some(value) = state.facts.get_i64(value_name.trim()) {
+                    state.facts.record_i64(field_fact_key.clone(), value);
+                }
+                if let Some(value) = state.facts.get_bool(value_name.trim()) {
+                    state.facts.record_bool(field_fact_key, value);
+                }
                 fields.push((field_name.trim().to_owned(), value_ref));
             }
             state.registers.insert(
@@ -187,6 +190,13 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
             {
                 state.last_cpu_value = Some(as_i64);
             }
+            let field_fact_key = KnownFacts::struct_field_key(&node.op.args[0], field_name);
+            if let Some(value) = state.facts.get_i64(&field_fact_key) {
+                state.facts.record_i64(node.name.clone(), value);
+            }
+            if let Some(value) = state.facts.get_bool(&field_fact_key) {
+                state.facts.record_bool(node.name.clone(), value);
+            }
             true
         }
         "variant_is" => {
@@ -212,6 +222,12 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
             };
             if let LlvmValueRef::Bool { i64, .. } = &bool_ref {
                 state.last_cpu_value = Some(i64.clone());
+            }
+            if let LlvmValueRef::Struct(struct_value) = &value_ref {
+                state
+                    .facts
+                    .bool_values
+                    .insert(node.name.clone(), struct_value.type_name == *variant_name);
             }
             state.registers.insert(node.name.clone(), bool_ref);
             true
@@ -347,10 +363,14 @@ pub(crate) fn lower_network_observer_node(node: &Node, state: &mut LlvmLoweringS
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::Bool {
-                    i1,
+                    i1: i1.clone(),
                     i64: widened.clone(),
                 },
             );
+            state
+                .facts
+                .bool_values
+                .insert(node.name.clone(), i1 == "true");
             state.last_cpu_value = Some(widened);
             true
         }
@@ -363,217 +383,6 @@ pub(crate) fn lower_network_observer_node(node: &Node, state: &mut LlvmLoweringS
                 return true;
             };
             let value_ref = (*result.value).clone();
-            state.registers.insert(node.name.clone(), value_ref.clone());
-            if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
-                state.last_cpu_value = Some(as_i64);
-            }
-            true
-        }
-        _ => false,
-    }
-}
-
-pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
-    match node.op.instruction.as_str() {
-        "spawn_task" => {
-            let Some(value_ref) = state.registers.get(&node.op.args[1]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.spawn_task `{}` because its value is outside the current CPU LLVM slice",
-                    node.name
-                ));
-                return true;
-            };
-            state.registers.insert(
-                node.name.clone(),
-                LlvmValueRef::Task(TaskLlvmValueRef {
-                    value: Box::new(value_ref),
-                }),
-            );
-            true
-        }
-        "spawn_thread" | "thread_spawn" => {
-            let Some(value_ref) = state.registers.get(&node.op.args[1]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.{} `{}` because its value is outside the current CPU LLVM slice",
-                    node.op.instruction, node.name
-                ));
-                return true;
-            };
-            state.registers.insert(
-                node.name.clone(),
-                LlvmValueRef::Thread(ThreadLlvmValueRef {
-                    value: Box::new(value_ref),
-                }),
-            );
-            true
-        }
-        "join_result" => {
-            let Some(task) = get_task(&state.registers, &node.op.args[0]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.join_result `{}` because its task is outside the current CPU LLVM slice",
-                    node.name
-                ));
-                return true;
-            };
-            state.registers.insert(
-                node.name.clone(),
-                LlvmValueRef::TaskResult(TaskResultLlvmValueRef {
-                    state: "completed".to_owned(),
-                    value: Some(task.value),
-                }),
-            );
-            true
-        }
-        "thread_join_result" => {
-            let Some(thread) = get_thread(&state.registers, &node.op.args[0]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.thread_join_result `{}` because its thread is outside the current CPU LLVM slice",
-                    node.name
-                ));
-                return true;
-            };
-            state.registers.insert(
-                node.name.clone(),
-                LlvmValueRef::TaskResult(TaskResultLlvmValueRef {
-                    state: "completed".to_owned(),
-                    value: Some(thread.value),
-                }),
-            );
-            true
-        }
-        "join" => {
-            let Some(task) = get_task(&state.registers, &node.op.args[0]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.join `{}` because its task is outside the current CPU LLVM slice",
-                    node.name
-                ));
-                return true;
-            };
-            let value_ref = (*task.value).clone();
-            state.registers.insert(node.name.clone(), value_ref.clone());
-            if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
-                state.last_cpu_value = Some(as_i64);
-            }
-            true
-        }
-        "thread_join" => {
-            let Some(thread) = get_thread(&state.registers, &node.op.args[0]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.thread_join `{}` because its thread is outside the current CPU LLVM slice",
-                    node.name
-                ));
-                return true;
-            };
-            let value_ref = (*thread.value).clone();
-            state.registers.insert(node.name.clone(), value_ref.clone());
-            if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
-                state.last_cpu_value = Some(as_i64);
-            }
-            true
-        }
-        "task_completed" | "task_timed_out" | "task_cancelled" => {
-            let Some(result) = get_task_result(&state.registers, &node.op.args[0]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.{} `{}` because its result is outside the current CPU LLVM slice",
-                    node.op.instruction, node.name
-                ));
-                return true;
-            };
-            let i1 = match node.op.instruction.as_str() {
-                "task_completed" if result.state == "completed" => "true",
-                "task_timed_out" if result.state == "timed_out" => "true",
-                "task_cancelled" if result.state == "cancelled" => "true",
-                _ => "false",
-            }
-            .to_owned();
-            let widened = fresh_reg(&mut state.next_reg);
-            state
-                .body
-                .push(format!("  {widened} = zext i1 {i1} to i64"));
-            state.registers.insert(
-                node.name.clone(),
-                LlvmValueRef::Bool {
-                    i1,
-                    i64: widened.clone(),
-                },
-            );
-            state.last_cpu_value = Some(widened);
-            true
-        }
-        "task_value" => {
-            let Some(result) = get_task_result(&state.registers, &node.op.args[0]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.task_value `{}` because its result is outside the current CPU LLVM slice",
-                    node.name
-                ));
-                return true;
-            };
-            let Some(value_ref) = result.value.map(|value| *value) else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.task_value `{}` because its result carries no payload",
-                    node.name
-                ));
-                return true;
-            };
-            state.registers.insert(node.name.clone(), value_ref.clone());
-            if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
-                state.last_cpu_value = Some(as_i64);
-            }
-            true
-        }
-        "mutex_new" => {
-            let Some(value_ref) = state.registers.get(&node.op.args[0]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.mutex_new `{}` because its value is outside the current CPU LLVM slice",
-                    node.name
-                ));
-                return true;
-            };
-            state.registers.insert(
-                node.name.clone(),
-                LlvmValueRef::Mutex(MutexLlvmValueRef {
-                    value: Box::new(value_ref),
-                }),
-            );
-            true
-        }
-        "mutex_lock" => {
-            let Some(mutex) = get_mutex(&state.registers, &node.op.args[0]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.mutex_lock `{}` because its mutex is outside the current CPU LLVM slice",
-                    node.name
-                ));
-                return true;
-            };
-            state.registers.insert(
-                node.name.clone(),
-                LlvmValueRef::MutexGuard(MutexGuardLlvmValueRef { value: mutex.value }),
-            );
-            true
-        }
-        "mutex_unlock" => {
-            let Some(guard) = get_mutex_guard(&state.registers, &node.op.args[0]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.mutex_unlock `{}` because its guard is outside the current CPU LLVM slice",
-                    node.name
-                ));
-                return true;
-            };
-            state.registers.insert(
-                node.name.clone(),
-                LlvmValueRef::Mutex(MutexLlvmValueRef { value: guard.value }),
-            );
-            true
-        }
-        "mutex_value" => {
-            let Some(guard) = get_mutex_guard(&state.registers, &node.op.args[0]).cloned() else {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.mutex_value `{}` because its guard is outside the current CPU LLVM slice",
-                    node.name
-                ));
-                return true;
-            };
-            let value_ref = (*guard.value).clone();
             state.registers.insert(node.name.clone(), value_ref.clone());
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
                 state.last_cpu_value = Some(as_i64);

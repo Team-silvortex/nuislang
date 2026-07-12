@@ -5,13 +5,14 @@ use yir_core::Node;
 use super::{
     fresh_reg,
     value_ref::{get_bool, get_f32, get_f64, get_i32, get_i64},
-    LlvmValueRef,
+    KnownFacts, LlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_cast_node(
     node: &Node,
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
+    facts: &mut KnownFacts,
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
@@ -44,6 +45,9 @@ pub(crate) fn lower_cpu_cast_node(
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = zext i1 {input} to i64"));
             registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+            if let Some(value) = facts.get_bool(&node.op.args[0]) {
+                facts.record_i64(node.name.clone(), i64::from(value));
+            }
             *last_cpu_value = Some(reg);
         }
         "cast_i64_to_bool" => {
@@ -65,6 +69,9 @@ pub(crate) fn lower_cpu_cast_node(
                     i64: i64.clone(),
                 },
             );
+            if let Some(value) = facts.get_i64(&node.op.args[0]) {
+                facts.record_bool(node.name.clone(), value != 0);
+            }
             *last_cpu_value = Some(i64);
         }
         "cast_i64_to_i32" => {

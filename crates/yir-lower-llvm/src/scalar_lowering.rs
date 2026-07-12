@@ -5,14 +5,14 @@ use yir_core::Node;
 use super::{
     fresh_reg,
     value_ref::{get_f32, get_f64, get_i32, get_i64},
-    LlvmValueRef,
+    KnownFacts, LlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_scalar_node(
     node: &Node,
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
-    known_i64_values: &mut BTreeMap<String, i64>,
+    facts: &mut KnownFacts,
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
@@ -49,7 +49,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = add i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                record_known_i64_binary_op(node, known_i64_values, i64::checked_add);
+                record_known_i64_binary_op(node, facts, i64::checked_add);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
                 get_i32(registers, &node.op.args[0]),
@@ -151,7 +151,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = sub i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                record_known_i64_binary_op(node, known_i64_values, i64::checked_sub);
+                record_known_i64_binary_op(node, facts, i64::checked_sub);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
                 get_i32(registers, &node.op.args[0]),
@@ -253,7 +253,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = mul i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                record_known_i64_binary_op(node, known_i64_values, i64::checked_mul);
+                record_known_i64_binary_op(node, facts, i64::checked_mul);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
                 get_i32(registers, &node.op.args[0]),
@@ -355,6 +355,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = sdiv i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                record_known_i64_binary_op(node, facts, i64::checked_div);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
                 get_i32(registers, &node.op.args[0]),
@@ -436,6 +437,7 @@ pub(crate) fn lower_cpu_scalar_node(
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = srem i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                record_known_i64_binary_op(node, facts, i64::checked_rem);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
                 get_i32(registers, &node.op.args[0]),
@@ -472,6 +474,7 @@ pub(crate) fn lower_cpu_scalar_node(
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = add i64 {mul}, {acc}"));
             registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+            record_known_i64_madd(node, facts);
             *last_cpu_value = Some(reg);
         }
         _ => return Ok(false),
@@ -482,16 +485,33 @@ pub(crate) fn lower_cpu_scalar_node(
 
 fn record_known_i64_binary_op(
     node: &Node,
-    known_i64_values: &mut BTreeMap<String, i64>,
+    facts: &mut KnownFacts,
     op: impl FnOnce(i64, i64) -> Option<i64>,
 ) {
     let (Some(lhs), Some(rhs)) = (
-        known_i64_values.get(&node.op.args[0]).copied(),
-        known_i64_values.get(&node.op.args[1]).copied(),
+        facts.get_i64(&node.op.args[0]),
+        facts.get_i64(&node.op.args[1]),
     ) else {
         return;
     };
     if let Some(value) = op(lhs, rhs) {
-        known_i64_values.insert(node.name.clone(), value);
+        facts.record_i64(node.name.clone(), value);
     }
+}
+
+fn record_known_i64_madd(node: &Node, facts: &mut KnownFacts) {
+    let (Some(lhs), Some(rhs), Some(acc)) = (
+        facts.get_i64(&node.op.args[0]),
+        facts.get_i64(&node.op.args[1]),
+        facts.get_i64(&node.op.args[2]),
+    ) else {
+        return;
+    };
+    let Some(value) = lhs
+        .checked_mul(rhs)
+        .and_then(|value| value.checked_add(acc))
+    else {
+        return;
+    };
+    facts.record_i64(node.name.clone(), value);
 }

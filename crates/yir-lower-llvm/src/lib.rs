@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use yir_core::{CpuLlvmLoweringClass, Resource, YirModule};
 use yir_verify::verify_module;
+mod async_resource_lowering;
 mod bitwise_lowering;
 mod call_lowering;
 mod call_return;
@@ -17,6 +18,7 @@ mod cast_lowering;
 mod emit_utils;
 mod extern_abi;
 mod extern_call_lowering;
+mod facts;
 mod function_lowering;
 mod guard_host_call;
 mod guard_return_lowering;
@@ -46,6 +48,7 @@ mod types;
 mod value_ref;
 mod variant_select;
 
+use async_resource_lowering::lower_cpu_async_resource_node;
 use bitwise_lowering::lower_cpu_bitwise_node;
 use call_lowering::lower_cpu_call_node;
 use call_return::{
@@ -56,6 +59,7 @@ use cast_lowering::lower_cpu_cast_node;
 use emit_utils::{fresh_block, fresh_global, fresh_reg, llvm_c_string_bytes, lower_buffer_fill};
 use extern_abi::render_dynamic_extern_decls;
 use extern_call_lowering::lower_cpu_extern_call_node;
+use facts::KnownFacts;
 use function_lowering::emit_cpu_function;
 use guard_return_lowering::{lower_cpu_guard_return_node, GuardReturnLoweringOutcome};
 use loop_async_post_flow_payload::async_post_flow_carry_source_payload_len;
@@ -77,8 +81,8 @@ use loop_scalar::{
 use memory_lowering::lower_cpu_memory_node;
 use param_lowering::lower_cpu_param_node;
 use preclassified_lowering::{
-    lower_cpu_aggregate_node, lower_cpu_async_resource_node, lower_cpu_literal_node,
-    lower_cpu_pointer_node, lower_network_observer_node,
+    lower_cpu_aggregate_node, lower_cpu_literal_node, lower_cpu_pointer_node,
+    lower_network_observer_node,
 };
 use print_lowering::lower_cpu_print_node;
 use return_lowering::{lower_cpu_return_node, ReturnLoweringOutcome};

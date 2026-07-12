@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use super::KnownFacts;
+
 #[derive(Clone)]
 pub(crate) enum LlvmValueRef {
     Bool { i1: String, i64: String },
@@ -61,8 +63,7 @@ pub(crate) struct LlvmLoweringState {
     pub(crate) globals: Vec<String>,
     pub(crate) registers: BTreeMap<String, LlvmValueRef>,
     pub(crate) delayed_registers: BTreeMap<String, String>,
-    pub(crate) known_bool_values: BTreeMap<String, bool>,
-    pub(crate) known_i64_values: BTreeMap<String, i64>,
+    pub(crate) facts: KnownFacts,
     pub(crate) buffer_lengths: BTreeMap<String, String>,
     pub(crate) next_reg: usize,
     pub(crate) next_global: usize,

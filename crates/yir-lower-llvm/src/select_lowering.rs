@@ -2,14 +2,17 @@ use std::collections::BTreeMap;
 
 use yir_core::Node;
 
-use super::{fresh_reg, value_ref::coerce_to_i64, variant_select::emit_select_value, LlvmValueRef};
+use super::{
+    fresh_reg, value_ref::coerce_to_i64, variant_select::emit_select_value, KnownFacts,
+    LlvmValueRef,
+};
 
 pub(crate) fn lower_cpu_select_node(
     node: &Node,
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
     delayed_registers: &mut BTreeMap<String, String>,
-    known_bool_values: &BTreeMap<String, bool>,
+    facts: &mut KnownFacts,
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
@@ -33,7 +36,7 @@ pub(crate) fn lower_cpu_select_node(
             else_value,
             then_delayed,
             else_delayed,
-            known_bool_values,
+            facts,
             next_reg,
             last_cpu_value,
         );
@@ -67,6 +70,7 @@ pub(crate) fn lower_cpu_select_node(
         return Ok(true);
     };
     registers.insert(node.name.clone(), selected.clone());
+    record_known_select_value(node, &cond_value, &then_value, &else_value, facts);
     if let Some(as_i64) = coerce_to_i64(&selected, body, next_reg) {
         *last_cpu_value = Some(as_i64);
     }
@@ -84,7 +88,7 @@ fn lower_lazy_const_select(
     else_value: Option<LlvmValueRef>,
     then_delayed: Option<String>,
     else_delayed: Option<String>,
-    known_bool_values: &BTreeMap<String, bool>,
+    facts: &mut KnownFacts,
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
@@ -95,8 +99,7 @@ fn lower_lazy_const_select(
         ));
         return Ok(true);
     };
-    let Some(cond) = const_select_condition(&node.op.args[0], &cond_value, known_bool_values)
-    else {
+    let Some(cond) = const_select_condition(&node.op.args[0], &cond_value, facts) else {
         let delayed_branches =
             delayed_select_branches(node, then_delayed.as_deref(), else_delayed.as_deref());
         body.push(format!(
@@ -136,6 +139,7 @@ fn lower_lazy_const_select(
     };
     delayed_registers.remove(unselected_name);
     registers.insert(node.name.clone(), selected.clone());
+    record_known_selected_branch(node, selected_name, facts);
     if let Some(as_i64) = coerce_to_i64(&selected, body, next_reg) {
         *last_cpu_value = Some(as_i64);
     }
@@ -145,17 +149,75 @@ fn lower_lazy_const_select(
 fn const_select_condition(
     cond_name: &str,
     value: &LlvmValueRef,
-    known_bool_values: &BTreeMap<String, bool>,
+    facts: &KnownFacts,
 ) -> Option<bool> {
-    if let Some(value) = known_bool_values.get(cond_name) {
-        return Some(*value);
+    if let Some(value) = facts.get_bool(cond_name) {
+        return Some(value);
+    }
+    if let Some(value) = facts.get_i64(cond_name) {
+        return Some(value != 0);
     }
     match value {
         LlvmValueRef::Bool { i1, .. } if i1 == "true" => Some(true),
         LlvmValueRef::Bool { i1, .. } if i1 == "false" => Some(false),
-        LlvmValueRef::I64(value) if value == "0" => Some(false),
-        LlvmValueRef::I64(_) => None,
+        LlvmValueRef::I64(value) => value.parse::<i64>().ok().map(|value| value != 0),
         _ => None,
+    }
+}
+
+fn record_known_select_value(
+    node: &Node,
+    cond_value: &LlvmValueRef,
+    then_value: &LlvmValueRef,
+    else_value: &LlvmValueRef,
+    facts: &mut KnownFacts,
+) {
+    let cond = const_select_condition(&node.op.args[0], cond_value, facts);
+    if let Some(selected_name) = cond.map(|value| {
+        if value {
+            node.op.args[1].as_str()
+        } else {
+            node.op.args[2].as_str()
+        }
+    }) {
+        record_known_selected_branch(node, selected_name, facts);
+        return;
+    }
+
+    if let (Some(then_value), Some(else_value)) = (
+        facts.get_i64(&node.op.args[1]),
+        facts.get_i64(&node.op.args[2]),
+    ) {
+        if then_value == else_value {
+            facts.record_i64(node.name.clone(), then_value);
+        }
+    }
+
+    if let (Some(then_value), Some(else_value)) = (
+        facts.get_bool(&node.op.args[1]),
+        facts.get_bool(&node.op.args[2]),
+    ) {
+        if then_value == else_value {
+            facts.record_bool(node.name.clone(), then_value);
+        }
+    }
+
+    if let (LlvmValueRef::I64(then_i64), LlvmValueRef::I64(else_i64)) = (then_value, else_value) {
+        if let (Ok(then_value), Ok(else_value)) = (then_i64.parse::<i64>(), else_i64.parse::<i64>())
+        {
+            if then_value == else_value {
+                facts.record_i64(node.name.clone(), then_value);
+            }
+        }
+    }
+}
+
+fn record_known_selected_branch(node: &Node, selected_name: &str, facts: &mut KnownFacts) {
+    if let Some(value) = facts.get_i64(selected_name) {
+        facts.record_i64(node.name.clone(), value);
+    }
+    if let Some(value) = facts.get_bool(selected_name) {
+        facts.record_bool(node.name.clone(), value);
     }
 }
 

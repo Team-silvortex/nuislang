@@ -5,15 +5,14 @@ use yir_core::Node;
 use super::{
     fresh_reg,
     value_ref::{get_f32, get_f64, get_i32, get_i64},
-    LlvmValueRef,
+    KnownFacts, LlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_scalar_order_node(
     node: &Node,
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
-    known_i64_values: &BTreeMap<String, i64>,
-    known_bool_values: &mut BTreeMap<String, bool>,
+    facts: &mut KnownFacts,
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
@@ -64,12 +63,7 @@ pub(crate) fn lower_cpu_scalar_order_node(
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                record_known_i64_comparison(
-                    node,
-                    known_i64_values,
-                    known_bool_values,
-                    |lhs, rhs| lhs < rhs,
-                );
+                record_known_i64_comparison(node, facts, |lhs, rhs| lhs < rhs);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
                 get_i32(registers, &node.op.args[0]),
@@ -209,12 +203,7 @@ pub(crate) fn lower_cpu_scalar_order_node(
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                record_known_i64_comparison(
-                    node,
-                    known_i64_values,
-                    known_bool_values,
-                    |lhs, rhs| lhs > rhs,
-                );
+                record_known_i64_comparison(node, facts, |lhs, rhs| lhs > rhs);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
                 get_i32(registers, &node.op.args[0]),
@@ -354,12 +343,7 @@ pub(crate) fn lower_cpu_scalar_order_node(
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                record_known_i64_comparison(
-                    node,
-                    known_i64_values,
-                    known_bool_values,
-                    |lhs, rhs| lhs <= rhs,
-                );
+                record_known_i64_comparison(node, facts, |lhs, rhs| lhs <= rhs);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
                 get_i32(registers, &node.op.args[0]),
@@ -427,12 +411,7 @@ pub(crate) fn lower_cpu_scalar_order_node(
                 let reg = fresh_reg(next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                record_known_i64_comparison(
-                    node,
-                    known_i64_values,
-                    known_bool_values,
-                    |lhs, rhs| lhs >= rhs,
-                );
+                record_known_i64_comparison(node, facts, |lhs, rhs| lhs >= rhs);
                 *last_cpu_value = Some(reg);
             } else if let (Some(lhs), Some(rhs)) = (
                 get_i32(registers, &node.op.args[0]),
@@ -466,15 +445,14 @@ pub(crate) fn lower_cpu_scalar_order_node(
 
 fn record_known_i64_comparison(
     node: &Node,
-    known_i64_values: &BTreeMap<String, i64>,
-    known_bool_values: &mut BTreeMap<String, bool>,
+    facts: &mut KnownFacts,
     compare: impl FnOnce(i64, i64) -> bool,
 ) {
     let (Some(lhs), Some(rhs)) = (
-        known_i64_values.get(&node.op.args[0]),
-        known_i64_values.get(&node.op.args[1]),
+        facts.get_i64(&node.op.args[0]),
+        facts.get_i64(&node.op.args[1]),
     ) else {
         return;
     };
-    known_bool_values.insert(node.name.clone(), compare(*lhs, *rhs));
+    facts.record_bool(node.name.clone(), compare(lhs, rhs));
 }
