@@ -328,6 +328,34 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
                 .unwrap_or_else(|| "<unknown>".to_owned())
         );
         println!(
+            "  nsld_final_executable_pipeline_final_executable_emitted: {}",
+            nsld_tail
+                .final_executable_emitted
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_pipeline_launcher_manifest_ready: {}",
+            nsld_tail
+                .launcher_manifest_ready
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_pipeline_launcher_dry_run_ready: {}",
+            nsld_tail
+                .launcher_dry_run_ready
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_pipeline_would_enter_lifecycle_hook: {}",
+            nsld_tail
+                .would_enter_lifecycle_hook
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
             "  nsld_final_executable_pipeline_blocker_count: {}",
             nsld_tail
                 .blocker_count
@@ -337,6 +365,45 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!(
             "  nsld_final_executable_pipeline_first_blocker: {}",
             nsld_tail.first_blocker.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_scheduler_metadata_payload_id: {}",
+            nsld_tail
+                .scheduler_metadata_payload_id
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_scheduler_metadata_present: {}",
+            nsld_tail
+                .scheduler_metadata_present
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_pipeline_scheduler_metadata_hash: {}",
+            nsld_tail
+                .scheduler_metadata_hash
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_required_stage_paths: {}/{}",
+            nsld_tail
+                .required_stage_path_present_count
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned()),
+            nsld_tail
+                .required_stage_path_count
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_pipeline_first_missing_required_stage_path: {}",
+            nsld_tail
+                .first_missing_required_stage_path
+                .as_deref()
+                .unwrap_or("<none>")
         );
     } else {
         println!("  nsld_prepare_command: <unavailable>");
@@ -348,7 +415,16 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!("  nsld_final_executable_tail_stages: 0/0");
         println!("  nsld_final_executable_tail_next_missing_stage: <unavailable>");
         println!("  nsld_final_executable_pipeline_valid: <unknown>");
+        println!("  nsld_final_executable_pipeline_final_executable_emitted: <unknown>");
+        println!("  nsld_final_executable_pipeline_launcher_manifest_ready: <unknown>");
+        println!("  nsld_final_executable_pipeline_launcher_dry_run_ready: <unknown>");
+        println!("  nsld_final_executable_pipeline_would_enter_lifecycle_hook: <unknown>");
         println!("  nsld_final_executable_pipeline_blocker_count: <unknown>");
         println!("  nsld_final_executable_pipeline_first_blocker: <none>");
+        println!("  nsld_final_executable_pipeline_scheduler_metadata_payload_id: <unknown>");
+        println!("  nsld_final_executable_pipeline_scheduler_metadata_present: <unknown>");
+        println!("  nsld_final_executable_pipeline_scheduler_metadata_hash: <unknown>");
+        println!("  nsld_final_executable_pipeline_required_stage_paths: <unknown>/<unknown>");
+        println!("  nsld_final_executable_pipeline_first_missing_required_stage_path: <none>");
     }
 }

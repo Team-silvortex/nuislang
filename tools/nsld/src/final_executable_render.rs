@@ -393,6 +393,26 @@ pub(crate) fn render_final_executable_layout_plan(
         toml::escape_toml_string(&report.scheduler_contract)
     ));
     out.push_str(&format!(
+        "scheduler_metadata_payload = \"{}\"\n",
+        toml::escape_toml_string(&report.scheduler_metadata_payload)
+    ));
+    out.push_str(&format!(
+        "scheduler_metadata_lifecycle_hook = \"{}\"\n",
+        toml::escape_toml_string(&report.scheduler_metadata_lifecycle_hook)
+    ));
+    out.push_str(&format!(
+        "scheduler_hetero_node_count = {}\n",
+        report.scheduler_hetero_node_count
+    ));
+    out.push_str(&format!(
+        "scheduler_wait_event_count = {}\n",
+        report.scheduler_wait_event_count
+    ));
+    out.push_str(&format!(
+        "scheduler_emit_event_count = {}\n",
+        report.scheduler_emit_event_count
+    ));
+    out.push_str(&format!(
         "data_segment_ordering = \"{}\"\n",
         toml::escape_toml_string(&report.data_segment_ordering)
     ));
@@ -529,6 +549,22 @@ pub(crate) fn render_final_executable_image_dry_run(
     ));
     out.push_str(&format!("payload_count = {}\n", report.payload_count));
     out.push_str(&format!("byte_span = {}\n", report.byte_span));
+    out.push_str(&format!(
+        "scheduler_metadata_payload_id = \"{}\"\n",
+        toml::escape_toml_string(&report.scheduler_metadata_payload_id)
+    ));
+    out.push_str(&format!(
+        "scheduler_metadata_present = {}\n",
+        report.scheduler_metadata_present
+    ));
+    out.push_str(&format!(
+        "scheduler_metadata_offset = {}\n",
+        optional_usize_toml(report.scheduler_metadata_offset)
+    ));
+    out.push_str(&format!(
+        "scheduler_metadata_hash = \"{}\"\n",
+        toml::escape_toml_string(report.scheduler_metadata_hash.as_deref().unwrap_or(""))
+    ));
     out.push_str(&format!(
         "image_constructed = {}\n",
         report.image_constructed

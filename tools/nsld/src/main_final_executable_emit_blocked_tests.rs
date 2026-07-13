@@ -70,7 +70,7 @@ fn emit_final_executable_writes_blocked_boundary_report() {
         emit.writer_blockers,
         vec!["final-executable-writer:host-assisted:not-implemented".to_owned()]
     );
-    assert_eq!(emit.input_count, 4);
+    assert_eq!(emit.input_count, 5);
     assert!(emit
         .blockers
         .iter()

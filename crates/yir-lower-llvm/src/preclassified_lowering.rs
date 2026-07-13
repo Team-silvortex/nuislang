@@ -68,6 +68,9 @@ pub(crate) fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState)
             state
                 .body
                 .push(format!("  {widened} = sext i32 {reg} to i64"));
+            if let Ok(value) = node.op.args[0].parse::<i32>() {
+                state.facts.record_i64(node.name.clone(), i64::from(value));
+            }
             state.last_cpu_value = Some(widened);
             true
         }
@@ -146,12 +149,7 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
                     return true;
                 };
                 let field_fact_key = KnownFacts::struct_field_key(&node.name, field_name.trim());
-                if let Some(value) = state.facts.get_i64(value_name.trim()) {
-                    state.facts.record_i64(field_fact_key.clone(), value);
-                }
-                if let Some(value) = state.facts.get_bool(value_name.trim()) {
-                    state.facts.record_bool(field_fact_key, value);
-                }
+                propagate_known_facts(value_name.trim(), &field_fact_key, &mut state.facts);
                 fields.push((field_name.trim().to_owned(), value_ref));
             }
             state.registers.insert(
@@ -189,12 +187,7 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
                 state.last_cpu_value = Some(as_i64);
             }
             let field_fact_key = KnownFacts::struct_field_key(&node.op.args[0], field_name);
-            if let Some(value) = state.facts.get_i64(&field_fact_key) {
-                state.facts.record_i64(node.name.clone(), value);
-            }
-            if let Some(value) = state.facts.get_bool(&field_fact_key) {
-                state.facts.record_bool(node.name.clone(), value);
-            }
+            propagate_known_facts(&field_fact_key, &node.name, &mut state.facts);
             true
         }
         "variant_is" => {
@@ -265,12 +258,7 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
                 state.last_cpu_value = Some(as_i64);
             }
             let field_fact_key = KnownFacts::struct_field_key(&node.op.args[0], field_name);
-            if let Some(value) = state.facts.get_i64(&field_fact_key) {
-                state.facts.record_i64(node.name.clone(), value);
-            }
-            if let Some(value) = state.facts.get_bool(&field_fact_key) {
-                state.facts.record_bool(node.name.clone(), value);
-            }
+            propagate_known_facts(&field_fact_key, &node.name, &mut state.facts);
             true
         }
         _ => false,

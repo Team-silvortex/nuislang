@@ -469,6 +469,22 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "output_byte_map_hash",
             report.output_byte_map_hash.as_deref(),
         ),
+        json_optional_string_field(
+            "scheduler_metadata_payload_id",
+            report.scheduler_metadata_payload_id.as_deref(),
+        ),
+        json_optional_bool_field(
+            "scheduler_metadata_present",
+            report.scheduler_metadata_present,
+        ),
+        json_optional_usize_field(
+            "scheduler_metadata_offset",
+            report.scheduler_metadata_offset,
+        ),
+        json_optional_string_field(
+            "scheduler_metadata_hash",
+            report.scheduler_metadata_hash.as_deref(),
+        ),
         json_optional_usize_field(
             "expected_image_size_bytes",
             report.expected_image_size_bytes,

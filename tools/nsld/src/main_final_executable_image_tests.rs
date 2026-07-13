@@ -66,6 +66,18 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
         emit.image_size_bytes,
         Some(report.image_header_size + report.payload_byte_span)
     );
+    assert_eq!(
+        report.scheduler_metadata_payload_id,
+        "payload0004.scheduler-metadata"
+    );
+    assert!(report.scheduler_metadata_present);
+    assert!(report
+        .scheduler_metadata_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(report
+        .scheduler_metadata_offset
+        .is_some_and(|offset| offset < report.payload_byte_span));
     assert!(verify.valid, "{:?}", verify.issues);
     assert_eq!(verify.actual_image_hash, emit.image_hash);
     assert_eq!(
@@ -98,6 +110,32 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
         verify.expected_payload_region_hash,
         verify.actual_payload_region_hash
     );
+    assert_eq!(
+        verify.expected_scheduler_metadata_payload_id,
+        "payload0004.scheduler-metadata"
+    );
+    assert_eq!(
+        verify.actual_scheduler_metadata_payload_id.as_deref(),
+        Some("payload0004.scheduler-metadata")
+    );
+    assert!(verify.expected_scheduler_metadata_present);
+    assert_eq!(verify.actual_scheduler_metadata_present, Some(true));
+    assert_eq!(
+        verify.expected_scheduler_metadata_offset,
+        report.scheduler_metadata_offset
+    );
+    assert_eq!(
+        verify.actual_scheduler_metadata_offset,
+        report.scheduler_metadata_offset
+    );
+    assert_eq!(
+        verify.expected_scheduler_metadata_hash,
+        report.scheduler_metadata_hash
+    );
+    assert_eq!(
+        verify.actual_scheduler_metadata_hash,
+        report.scheduler_metadata_hash
+    );
     assert!(verify
         .actual_payload_region_hash
         .as_deref()
@@ -105,8 +143,14 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
     assert!(report_source.contains("schema = \"nuis-nsld-final-executable-image-dry-run-v1\""));
     assert!(report_source.contains("image_magic = \"NUIFIMG\""));
     assert!(report_source.contains("image_header_size = 64"));
+    assert!(report_source
+        .contains("scheduler_metadata_payload_id = \"payload0004.scheduler-metadata\""));
+    assert!(report_source.contains("scheduler_metadata_present = true"));
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_image_dry_run\""));
     assert!(report_json.contains("\"image_magic\":\"NUIFIMG\""));
+    assert!(report_json
+        .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
+    assert!(report_json.contains("\"scheduler_metadata_present\":true"));
     assert!(emit_json.contains("\"kind\":\"nsld_final_executable_image_dry_run_emit\""));
     assert!(emit_json.contains("\"image_header_size\":64"));
     assert!(verify_json.contains("\"kind\":\"nsld_final_executable_image_dry_run_verify\""));
@@ -114,6 +158,9 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
     assert!(verify_json.contains("\"actual_image_version\":1"));
     assert!(verify_json.contains("\"actual_header_layout_hash\":\"0x"));
     assert!(verify_json.contains("\"actual_payload_region_hash\":\"0x"));
+    assert!(verify_json
+        .contains("\"actual_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
+    assert!(verify_json.contains("\"actual_scheduler_metadata_present\":true"));
     assert!(verify_json.contains("\"actual_image_header_size\":64"));
     assert!(verify_json.contains("\"valid\":true"));
 }

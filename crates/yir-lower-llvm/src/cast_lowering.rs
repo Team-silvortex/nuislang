@@ -32,6 +32,9 @@ pub(crate) fn lower_cpu_cast_node(
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = sext i32 {input} to i64"));
             registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+            if let Some(value) = facts.get_i64(&node.op.args[0]) {
+                facts.record_i64(node.name.clone(), value);
+            }
             *last_cpu_value = Some(reg);
         }
         "cast_bool_to_i64" => {
@@ -87,6 +90,12 @@ pub(crate) fn lower_cpu_cast_node(
             registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
             let widened = fresh_reg(next_reg);
             body.push(format!("  {widened} = sext i32 {reg} to i64"));
+            if let Some(value) = facts
+                .get_i64(&node.op.args[0])
+                .and_then(|value| i32::try_from(value).ok())
+            {
+                facts.record_i64(node.name.clone(), i64::from(value));
+            }
             *last_cpu_value = Some(widened);
         }
         "cast_i32_to_f32" => {
@@ -102,6 +111,12 @@ pub(crate) fn lower_cpu_cast_node(
             registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
             let widened = fresh_reg(next_reg);
             body.push(format!("  {widened} = fptosi float {reg} to i64"));
+            if let Some(value) = facts
+                .get_i64(&node.op.args[0])
+                .filter(|value| value.abs() <= 16_777_216)
+            {
+                facts.record_i64(node.name.clone(), value);
+            }
             *last_cpu_value = Some(widened);
         }
         "cast_i32_to_f64" => {
@@ -117,6 +132,9 @@ pub(crate) fn lower_cpu_cast_node(
             registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
             let widened = fresh_reg(next_reg);
             body.push(format!("  {widened} = fptosi double {reg} to i64"));
+            if let Some(value) = facts.get_i64(&node.op.args[0]) {
+                facts.record_i64(node.name.clone(), value);
+            }
             *last_cpu_value = Some(widened);
         }
         "cast_f32_to_f64" => {
@@ -132,6 +150,9 @@ pub(crate) fn lower_cpu_cast_node(
             registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
             let widened = fresh_reg(next_reg);
             body.push(format!("  {widened} = fptosi double {reg} to i64"));
+            if let Some(value) = facts.get_i64(&node.op.args[0]) {
+                facts.record_i64(node.name.clone(), value);
+            }
             *last_cpu_value = Some(widened);
         }
         "cast_f64_to_f32" => {
@@ -147,6 +168,12 @@ pub(crate) fn lower_cpu_cast_node(
             registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
             let widened = fresh_reg(next_reg);
             body.push(format!("  {widened} = fptosi float {reg} to i64"));
+            if let Some(value) = facts
+                .get_i64(&node.op.args[0])
+                .filter(|value| value.abs() <= 16_777_216)
+            {
+                facts.record_i64(node.name.clone(), value);
+            }
             *last_cpu_value = Some(widened);
         }
         _ => return Ok(false),

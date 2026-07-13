@@ -45,6 +45,37 @@ pub(crate) fn nsld_link_unit_report(
                 })
                 .map(|input| input.input_id.clone())
                 .collect::<Vec<_>>();
+            let mut hetero_nodes = plan
+                .hetero_calculate
+                .nodes
+                .iter()
+                .filter(|node| {
+                    node.domain_family == unit.domain_family && node.package_id == unit.package_id
+                })
+                .collect::<Vec<_>>();
+            hetero_nodes.sort_by(|left, right| {
+                left.index
+                    .cmp(&right.index)
+                    .then_with(|| left.timestamp.cmp(&right.timestamp))
+            });
+            let hetero_timestamps = hetero_nodes
+                .iter()
+                .map(|node| node.timestamp.clone())
+                .collect::<Vec<_>>();
+            let lifecycle_hooks = unique_ordered_strings(
+                hetero_nodes
+                    .iter()
+                    .map(|node| node.lifecycle_hook.clone())
+                    .collect(),
+            );
+            let wait_event_count = hetero_nodes
+                .iter()
+                .map(|node| node.wait_on.len())
+                .sum::<usize>();
+            let emit_event_count = hetero_nodes
+                .iter()
+                .map(|node| node.emits.len())
+                .sum::<usize>();
             let clock_edge_count = plan
                 .clock_protocol
                 .edges
@@ -87,6 +118,11 @@ pub(crate) fn nsld_link_unit_report(
                     .unwrap_or_else(|| "none".to_owned()),
                 packaging_role: unit.packaging_role.clone(),
                 link_input_ids,
+                hetero_node_count: hetero_nodes.len(),
+                hetero_timestamps,
+                lifecycle_hooks,
+                wait_event_count,
+                emit_event_count,
                 clock_edge_count,
                 data_segment_count,
                 requires_host_wrapper: host_wrapper_required
@@ -105,6 +141,7 @@ pub(crate) fn nsld_link_unit_report(
             .filter(|unit| unit.unit_kind == "hetero-domain")
             .count(),
         link_input_count: link_input_summary.count,
+        hetero_node_count: plan.hetero_calculate.nodes.len(),
         clock_edge_count: plan.clock_protocol.edges.len(),
         data_segment_count: plan.hetero_calculate.data_segments.len(),
         unit_table_hash,
@@ -131,6 +168,7 @@ pub(crate) fn nsld_emit_link_units_report(
         unit_count: report.unit_count,
         hetero_unit_count: report.hetero_unit_count,
         link_input_count: report.link_input_count,
+        hetero_node_count: report.hetero_node_count,
         unit_table_hash: report.unit_table_hash,
     })
 }
@@ -153,17 +191,19 @@ pub(crate) fn nsld_verify_link_units_report(
         actual_unit_count,
         actual_hetero_unit_count,
         actual_link_input_count,
+        actual_hetero_node_count,
         actual_unit_table_hash,
     ) = match actual.as_ref() {
         Ok(source) => (
             toml::usize_value(source, "unit_count"),
             toml::usize_value(source, "hetero_unit_count"),
             toml::usize_value(source, "link_input_count"),
+            toml::usize_value(source, "hetero_node_count"),
             toml::string_value(source, "unit_table_hash"),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None)
+            (None, None, None, None, None)
         }
     };
     if let Ok(actual) = actual {
@@ -197,6 +237,15 @@ pub(crate) fn nsld_verify_link_units_report(
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
+        if actual_hetero_node_count != Some(expected_report.hetero_node_count) {
+            issues.push(format!(
+                "hetero_node_count mismatch: expected {}, found {}",
+                expected_report.hetero_node_count,
+                actual_hetero_node_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
         if actual_unit_table_hash.as_deref() != Some(expected_report.unit_table_hash.as_str()) {
             issues.push(format!(
                 "unit_table_hash mismatch: expected {}, found {}",
@@ -215,13 +264,25 @@ pub(crate) fn nsld_verify_link_units_report(
         expected_unit_count: expected_report.unit_count,
         expected_hetero_unit_count: expected_report.hetero_unit_count,
         expected_link_input_count: expected_report.link_input_count,
+        expected_hetero_node_count: expected_report.hetero_node_count,
         expected_unit_table_hash: expected_report.unit_table_hash,
         actual_unit_count,
         actual_hetero_unit_count,
         actual_link_input_count,
+        actual_hetero_node_count,
         actual_unit_table_hash,
         issues,
     }
+}
+
+fn unique_ordered_strings(values: Vec<String>) -> Vec<String> {
+    let mut unique = Vec::new();
+    for value in values {
+        if !unique.contains(&value) {
+            unique.push(value);
+        }
+    }
+    unique
 }
 
 pub(crate) fn nsld_link_unit_table_hash(units: &[NsldLinkUnitDiagnostic]) -> String {
@@ -244,6 +305,16 @@ pub(crate) fn nsld_link_unit_table_hash(units: &[NsldLinkUnitDiagnostic]) -> Str
         material.push_str(&unit.packaging_role);
         material.push('\t');
         material.push_str(&unit.link_input_ids.join("|"));
+        material.push('\t');
+        material.push_str(&unit.hetero_node_count.to_string());
+        material.push('\t');
+        material.push_str(&unit.hetero_timestamps.join("|"));
+        material.push('\t');
+        material.push_str(&unit.lifecycle_hooks.join("|"));
+        material.push('\t');
+        material.push_str(&unit.wait_event_count.to_string());
+        material.push('\t');
+        material.push_str(&unit.emit_event_count.to_string());
         material.push('\t');
         material.push_str(&unit.clock_edge_count.to_string());
         material.push('\t');

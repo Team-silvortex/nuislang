@@ -27,6 +27,9 @@ pub(crate) struct NsldCheckFinalTailSnapshot {
     pub(crate) final_executable_pipeline_hash: Option<String>,
     pub(crate) final_executable_pipeline_ready: Option<bool>,
     pub(crate) final_executable_pipeline_emitted: Option<bool>,
+    pub(crate) final_executable_pipeline_scheduler_metadata_payload_id: Option<String>,
+    pub(crate) final_executable_pipeline_scheduler_metadata_present: Option<bool>,
+    pub(crate) final_executable_pipeline_scheduler_metadata_hash: Option<String>,
     pub(crate) final_executable_pipeline_required_stage_path_count: Option<usize>,
     pub(crate) final_executable_pipeline_required_stage_path_present_count: Option<usize>,
     pub(crate) final_executable_pipeline_missing_required_stage_paths: Vec<String>,
@@ -112,6 +115,17 @@ pub(crate) fn nsld_check_final_tail_snapshot(
     let final_executable_pipeline_emitted = final_executable_pipeline_verify_report
         .as_ref()
         .and_then(|report| report.actual_final_executable_emitted);
+    let final_executable_pipeline_scheduler_metadata_payload_id =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_scheduler_metadata_payload_id.clone());
+    let final_executable_pipeline_scheduler_metadata_present =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_scheduler_metadata_present);
+    let final_executable_pipeline_scheduler_metadata_hash = final_executable_pipeline_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_scheduler_metadata_hash.clone());
     let final_executable_pipeline_required_stage_path_count =
         final_executable_pipeline_verify_report
             .as_ref()
@@ -152,6 +166,9 @@ pub(crate) fn nsld_check_final_tail_snapshot(
         final_executable_pipeline_hash,
         final_executable_pipeline_ready,
         final_executable_pipeline_emitted,
+        final_executable_pipeline_scheduler_metadata_payload_id,
+        final_executable_pipeline_scheduler_metadata_present,
+        final_executable_pipeline_scheduler_metadata_hash,
         final_executable_pipeline_required_stage_path_count,
         final_executable_pipeline_required_stage_path_present_count,
         final_executable_pipeline_missing_required_stage_paths,

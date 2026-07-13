@@ -41,6 +41,22 @@ pub(crate) fn nsld_final_executable_launcher_manifest_report_json(
         json_bool_field("image_header_valid", report.image_header_valid),
         json_string_field("entry_lifecycle_hook", &report.entry_lifecycle_hook),
         json_string_field("scheduler_entry", &report.scheduler_entry),
+        json_optional_string_field(
+            "scheduler_metadata_payload_id",
+            report.scheduler_metadata_payload_id.as_deref(),
+        ),
+        json_optional_bool_field(
+            "scheduler_metadata_present",
+            report.scheduler_metadata_present,
+        ),
+        json_optional_usize_field(
+            "scheduler_metadata_offset",
+            report.scheduler_metadata_offset,
+        ),
+        json_optional_string_field(
+            "scheduler_metadata_hash",
+            report.scheduler_metadata_hash.as_deref(),
+        ),
         json_string_array_field("verification_steps", &report.verification_steps),
         json_usize_field("blocker_count", report.blockers.len()),
         json_string_array_field("blockers", &report.blockers),
@@ -152,6 +168,38 @@ pub(crate) fn nsld_final_executable_launcher_manifest_verify_report_json(
             "actual_scheduler_entry",
             report.actual_scheduler_entry.as_deref(),
         ),
+        json_optional_string_field(
+            "expected_scheduler_metadata_payload_id",
+            report.expected_scheduler_metadata_payload_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_scheduler_metadata_payload_id",
+            report.actual_scheduler_metadata_payload_id.as_deref(),
+        ),
+        json_optional_bool_field(
+            "expected_scheduler_metadata_present",
+            report.expected_scheduler_metadata_present,
+        ),
+        json_optional_bool_field(
+            "actual_scheduler_metadata_present",
+            report.actual_scheduler_metadata_present,
+        ),
+        json_optional_usize_field(
+            "expected_scheduler_metadata_offset",
+            report.expected_scheduler_metadata_offset,
+        ),
+        json_optional_usize_field(
+            "actual_scheduler_metadata_offset",
+            report.actual_scheduler_metadata_offset,
+        ),
+        json_optional_string_field(
+            "expected_scheduler_metadata_hash",
+            report.expected_scheduler_metadata_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_scheduler_metadata_hash",
+            report.actual_scheduler_metadata_hash.as_deref(),
+        ),
         json_string_array_field(
             "expected_verification_steps",
             &report.expected_verification_steps,
@@ -209,6 +257,22 @@ pub(crate) fn nsld_final_executable_launcher_dry_run_report_json(
             report.entry_lifecycle_hook.as_deref(),
         ),
         json_optional_string_field("scheduler_entry", report.scheduler_entry.as_deref()),
+        json_optional_string_field(
+            "scheduler_metadata_payload_id",
+            report.scheduler_metadata_payload_id.as_deref(),
+        ),
+        json_optional_bool_field(
+            "scheduler_metadata_present",
+            report.scheduler_metadata_present,
+        ),
+        json_optional_usize_field(
+            "scheduler_metadata_offset",
+            report.scheduler_metadata_offset,
+        ),
+        json_optional_string_field(
+            "scheduler_metadata_hash",
+            report.scheduler_metadata_hash.as_deref(),
+        ),
         json_bool_field("dry_run_ready", report.dry_run_ready),
         json_bool_field(
             "would_enter_lifecycle_hook",
@@ -304,6 +368,18 @@ pub(crate) fn nsld_final_executable_pipeline_emit_report_json(
             "would_enter_lifecycle_hook",
             report.would_enter_lifecycle_hook,
         ),
+        json_optional_string_field(
+            "scheduler_metadata_payload_id",
+            report.scheduler_metadata_payload_id.as_deref(),
+        ),
+        json_optional_bool_field(
+            "scheduler_metadata_present",
+            report.scheduler_metadata_present,
+        ),
+        json_optional_string_field(
+            "scheduler_metadata_hash",
+            report.scheduler_metadata_hash.as_deref(),
+        ),
         json_usize_field(
             "required_stage_path_count",
             report.required_stage_path_count,
@@ -370,6 +446,30 @@ pub(crate) fn nsld_final_executable_pipeline_verify_report_json(
         json_optional_bool_field(
             "actual_would_enter_lifecycle_hook",
             report.actual_would_enter_lifecycle_hook,
+        ),
+        json_optional_string_field(
+            "expected_scheduler_metadata_payload_id",
+            report.expected_scheduler_metadata_payload_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_scheduler_metadata_payload_id",
+            report.actual_scheduler_metadata_payload_id.as_deref(),
+        ),
+        json_optional_bool_field(
+            "expected_scheduler_metadata_present",
+            report.expected_scheduler_metadata_present,
+        ),
+        json_optional_bool_field(
+            "actual_scheduler_metadata_present",
+            report.actual_scheduler_metadata_present,
+        ),
+        json_optional_string_field(
+            "expected_scheduler_metadata_hash",
+            report.expected_scheduler_metadata_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_scheduler_metadata_hash",
+            report.actual_scheduler_metadata_hash.as_deref(),
         ),
         json_usize_field(
             "expected_required_stage_path_count",

@@ -78,6 +78,10 @@ pub(crate) fn nsld_final_executable_launcher_dry_run_report(
         image_header_valid: verify.actual_image_header_valid,
         entry_lifecycle_hook: verify.actual_entry_lifecycle_hook,
         scheduler_entry: verify.actual_scheduler_entry,
+        scheduler_metadata_payload_id: verify.actual_scheduler_metadata_payload_id,
+        scheduler_metadata_present: verify.actual_scheduler_metadata_present,
+        scheduler_metadata_offset: verify.actual_scheduler_metadata_offset,
+        scheduler_metadata_hash: verify.actual_scheduler_metadata_hash,
         dry_run_ready,
         would_enter_lifecycle_hook: dry_run_ready,
         launch_steps,
@@ -303,6 +307,30 @@ fn render_final_executable_launcher_dry_run(
         &mut out,
         "scheduler_entry",
         report.scheduler_entry.as_deref().unwrap_or(""),
+    );
+    push_str_field(
+        &mut out,
+        "scheduler_metadata_payload_id",
+        report
+            .scheduler_metadata_payload_id
+            .as_deref()
+            .unwrap_or(""),
+    );
+    out.push_str(&format!(
+        "scheduler_metadata_present = {}\n",
+        report.scheduler_metadata_present.unwrap_or(false)
+    ));
+    out.push_str(&format!(
+        "scheduler_metadata_offset = {}\n",
+        report
+            .scheduler_metadata_offset
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "0".to_owned())
+    ));
+    push_str_field(
+        &mut out,
+        "scheduler_metadata_hash",
+        report.scheduler_metadata_hash.as_deref().unwrap_or(""),
     );
     out.push_str(&format!("dry_run_ready = {}\n", report.dry_run_ready));
     out.push_str(&format!(

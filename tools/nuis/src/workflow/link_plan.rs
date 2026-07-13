@@ -87,8 +87,18 @@ pub(crate) struct NsldFinalExecutableTailSummary {
     pub(crate) next_missing_stage: Option<String>,
     pub(crate) pipeline_command: String,
     pub(crate) pipeline_valid: Option<bool>,
+    pub(crate) final_executable_emitted: Option<bool>,
+    pub(crate) launcher_manifest_ready: Option<bool>,
+    pub(crate) launcher_dry_run_ready: Option<bool>,
+    pub(crate) would_enter_lifecycle_hook: Option<bool>,
     pub(crate) blocker_count: Option<usize>,
     pub(crate) first_blocker: Option<String>,
+    pub(crate) scheduler_metadata_payload_id: Option<String>,
+    pub(crate) scheduler_metadata_present: Option<bool>,
+    pub(crate) scheduler_metadata_hash: Option<String>,
+    pub(crate) required_stage_path_count: Option<usize>,
+    pub(crate) required_stage_path_present_count: Option<usize>,
+    pub(crate) first_missing_required_stage_path: Option<String>,
 }
 
 pub(crate) fn nsld_prepare_command_for_output_dir(output_dir: &Path) -> String {
@@ -140,16 +150,42 @@ pub(crate) fn nsld_final_executable_tail_summary(
         }
     }
     let pipeline = output_dir.join("nuis.nsld.final-executable-pipeline.toml");
-    let (pipeline_valid, blocker_count, first_blocker) = fs::read_to_string(&pipeline)
+    let (
+        pipeline_valid,
+        final_executable_emitted,
+        launcher_manifest_ready,
+        launcher_dry_run_ready,
+        would_enter_lifecycle_hook,
+        blocker_count,
+        first_blocker,
+        scheduler_metadata_payload_id,
+        scheduler_metadata_present,
+        scheduler_metadata_hash,
+        required_stage_path_count,
+        required_stage_path_present_count,
+        first_missing_required_stage_path,
+    ) = fs::read_to_string(&pipeline)
         .ok()
         .map(|source| {
             (
                 parse_bool_field(&source, "valid"),
+                parse_bool_field(&source, "final_executable_emitted"),
+                parse_bool_field(&source, "launcher_manifest_ready"),
+                parse_bool_field(&source, "launcher_dry_run_ready"),
+                parse_bool_field(&source, "would_enter_lifecycle_hook"),
                 parse_usize_field(&source, "blocker_count"),
                 parse_first_string_array_item(&source, "blockers"),
+                parse_string_field(&source, "scheduler_metadata_payload_id"),
+                parse_bool_field(&source, "scheduler_metadata_present"),
+                parse_string_field(&source, "scheduler_metadata_hash"),
+                parse_usize_field(&source, "required_stage_path_count"),
+                parse_usize_field(&source, "required_stage_path_present_count"),
+                parse_first_string_array_item(&source, "missing_required_stage_paths"),
             )
         })
-        .unwrap_or((None, None, None));
+        .unwrap_or((
+            None, None, None, None, None, None, None, None, None, None, None, None, None,
+        ));
     let stage_count = NSLD_FINAL_EXECUTABLE_TAIL_STAGES.len();
     NsldFinalExecutableTailSummary {
         ready: present_count == stage_count && pipeline_valid == Some(true),
@@ -158,8 +194,18 @@ pub(crate) fn nsld_final_executable_tail_summary(
         next_missing_stage,
         pipeline_command: nsld_final_executable_pipeline_command_for_output_dir(output_dir),
         pipeline_valid,
+        final_executable_emitted,
+        launcher_manifest_ready,
+        launcher_dry_run_ready,
+        would_enter_lifecycle_hook,
         blocker_count,
         first_blocker,
+        scheduler_metadata_payload_id,
+        scheduler_metadata_present,
+        scheduler_metadata_hash,
+        required_stage_path_count,
+        required_stage_path_present_count,
+        first_missing_required_stage_path,
     }
 }
 
@@ -316,6 +362,30 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             Some(valid) => json_bool_field("nsld_final_executable_pipeline_valid", valid),
             None => "\"nsld_final_executable_pipeline_valid\":null".to_owned(),
         },
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_final_executable_emitted",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.final_executable_emitted),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_launcher_manifest_ready",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.launcher_manifest_ready),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_launcher_dry_run_ready",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.launcher_dry_run_ready),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_would_enter_lifecycle_hook",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.would_enter_lifecycle_hook),
+        ),
         match nsld_tail.as_ref().and_then(|summary| summary.blocker_count) {
             Some(count) => json_usize_field("nsld_final_executable_pipeline_blocker_count", count),
             None => "\"nsld_final_executable_pipeline_blocker_count\":null".to_owned(),
@@ -326,7 +396,61 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .as_ref()
                 .and_then(|summary| summary.first_blocker.as_deref()),
         ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_scheduler_metadata_payload_id",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.scheduler_metadata_payload_id.as_deref()),
+        ),
+        match nsld_tail
+            .as_ref()
+            .and_then(|summary| summary.scheduler_metadata_present)
+        {
+            Some(present) => json_bool_field(
+                "nsld_final_executable_pipeline_scheduler_metadata_present",
+                present,
+            ),
+            None => "\"nsld_final_executable_pipeline_scheduler_metadata_present\":null".to_owned(),
+        },
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_scheduler_metadata_hash",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.scheduler_metadata_hash.as_deref()),
+        ),
+        json_optional_usize_field(
+            "nsld_final_executable_pipeline_required_stage_path_count",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.required_stage_path_count),
+        ),
+        json_optional_usize_field(
+            "nsld_final_executable_pipeline_required_stage_path_present_count",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.required_stage_path_present_count),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_first_missing_required_stage_path",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.first_missing_required_stage_path.as_deref()),
+        ),
     ]
+}
+
+fn json_optional_bool_field(name: &str, value: Option<bool>) -> String {
+    match value {
+        Some(value) => json_bool_field(name, value),
+        None => format!("\"{name}\":null"),
+    }
+}
+
+fn json_optional_usize_field(name: &str, value: Option<usize>) -> String {
+    match value {
+        Some(value) => json_usize_field(name, value),
+        None => format!("\"{name}\":null"),
+    }
 }
 
 fn parse_bool_field(source: &str, key: &str) -> Option<bool> {
@@ -339,6 +463,12 @@ fn parse_bool_field(source: &str, key: &str) -> Option<bool> {
 
 fn parse_usize_field(source: &str, key: &str) -> Option<usize> {
     parse_scalar_field(source, key).and_then(|value| value.trim().parse().ok())
+}
+
+fn parse_string_field(source: &str, key: &str) -> Option<String> {
+    parse_scalar_field(source, key)
+        .and_then(|value| value.trim().strip_prefix('"')?.strip_suffix('"'))
+        .map(str::to_owned)
 }
 
 fn parse_first_string_array_item(source: &str, key: &str) -> Option<String> {

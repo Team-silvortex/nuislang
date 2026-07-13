@@ -53,6 +53,10 @@ pub(crate) fn nsld_final_executable_launcher_manifest_report(
         image_header_valid,
         entry_lifecycle_hook: "on_process_start".to_owned(),
         scheduler_entry: "nuis.scheduler.loop.v1".to_owned(),
+        scheduler_metadata_payload_id: output.scheduler_metadata_payload_id,
+        scheduler_metadata_present: output.scheduler_metadata_present,
+        scheduler_metadata_offset: output.scheduler_metadata_offset,
+        scheduler_metadata_hash: output.scheduler_metadata_hash,
         verification_steps: launcher_verification_steps(image_header_required),
         blockers,
         notes: vec![
@@ -133,6 +137,10 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
         actual_image_header_valid,
         actual_entry_lifecycle_hook,
         actual_scheduler_entry,
+        actual_scheduler_metadata_payload_id,
+        actual_scheduler_metadata_present,
+        actual_scheduler_metadata_offset,
+        actual_scheduler_metadata_hash,
         actual_verification_steps,
         actual_blocker_count,
         actual_blockers,
@@ -155,6 +163,10 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
             toml::bool_value(source, "image_header_valid"),
             non_empty_toml_string(source, "entry_lifecycle_hook"),
             non_empty_toml_string(source, "scheduler_entry"),
+            non_empty_toml_string(source, "scheduler_metadata_payload_id"),
+            toml::bool_value(source, "scheduler_metadata_present"),
+            optional_usize_value(source, "scheduler_metadata_offset"),
+            non_empty_toml_string(source, "scheduler_metadata_hash"),
             toml::string_array_value(source, "verification_steps"),
             toml::usize_value(source, "blocker_count"),
             toml::string_array_value(source, "blockers"),
@@ -162,6 +174,10 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
         Err(error) => {
             issues.push(error.clone());
             (
+                None,
+                None,
+                None,
+                None,
                 None,
                 None,
                 None,
@@ -263,6 +279,38 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
             expected.scheduler_entry.as_str(),
             actual_scheduler_entry.as_deref(),
         );
+        push_optional_string_mismatch(
+            &mut issues,
+            "scheduler_metadata_payload_id",
+            expected.scheduler_metadata_payload_id.as_deref(),
+            actual_scheduler_metadata_payload_id.as_deref(),
+        );
+        if actual_scheduler_metadata_present != expected.scheduler_metadata_present {
+            issues.push(format!(
+                "scheduler_metadata_present mismatch: expected {}, found {}",
+                optional_bool_text(expected.scheduler_metadata_present),
+                optional_bool_text(actual_scheduler_metadata_present)
+            ));
+        }
+        if actual_scheduler_metadata_offset != expected.scheduler_metadata_offset {
+            issues.push(format!(
+                "scheduler_metadata_offset mismatch: expected {}, found {}",
+                optional_usize_text(expected.scheduler_metadata_offset),
+                optional_usize_text(actual_scheduler_metadata_offset)
+            ));
+        }
+        if actual_scheduler_metadata_hash != expected.scheduler_metadata_hash {
+            issues.push(format!(
+                "scheduler_metadata_hash mismatch: expected {}, found {}",
+                expected
+                    .scheduler_metadata_hash
+                    .as_deref()
+                    .unwrap_or("missing"),
+                actual_scheduler_metadata_hash
+                    .as_deref()
+                    .unwrap_or("missing")
+            ));
+        }
         if actual_verification_steps != expected.verification_steps {
             issues.push(format!(
                 "verification_steps mismatch: expected [{}], found [{}]",
@@ -320,6 +368,14 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
         actual_entry_lifecycle_hook,
         expected_scheduler_entry: expected.scheduler_entry,
         actual_scheduler_entry,
+        expected_scheduler_metadata_payload_id: expected.scheduler_metadata_payload_id,
+        actual_scheduler_metadata_payload_id,
+        expected_scheduler_metadata_present: expected.scheduler_metadata_present,
+        actual_scheduler_metadata_present,
+        expected_scheduler_metadata_offset: expected.scheduler_metadata_offset,
+        actual_scheduler_metadata_offset,
+        expected_scheduler_metadata_hash: expected.scheduler_metadata_hash,
+        actual_scheduler_metadata_hash,
         expected_verification_steps: expected.verification_steps,
         actual_verification_steps,
         expected_blocker_count: expected.blockers.len(),
@@ -406,6 +462,30 @@ pub(crate) fn render_final_executable_launcher_manifest(
         &report.entry_lifecycle_hook,
     );
     push_str_field(&mut out, "scheduler_entry", &report.scheduler_entry);
+    push_str_field(
+        &mut out,
+        "scheduler_metadata_payload_id",
+        report
+            .scheduler_metadata_payload_id
+            .as_deref()
+            .unwrap_or(""),
+    );
+    out.push_str(&format!(
+        "scheduler_metadata_present = {}\n",
+        report.scheduler_metadata_present.unwrap_or(false)
+    ));
+    out.push_str(&format!(
+        "scheduler_metadata_offset = {}\n",
+        report
+            .scheduler_metadata_offset
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "0".to_owned())
+    ));
+    push_str_field(
+        &mut out,
+        "scheduler_metadata_hash",
+        report.scheduler_metadata_hash.as_deref().unwrap_or(""),
+    );
     out.push_str(&format!(
         "verification_steps = [{}]\n",
         toml::toml_string_array_literal(&report.verification_steps)
@@ -443,6 +523,12 @@ fn optional_usize_text(value: Option<usize>) -> String {
         .unwrap_or_else(|| "missing".to_owned())
 }
 
+fn optional_bool_text(value: Option<bool>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "missing".to_owned())
+}
+
 fn push_bool_mismatch(issues: &mut Vec<String>, field: &str, expected: bool, actual: Option<bool>) {
     if actual != Some(expected) {
         issues.push(format!(
@@ -465,6 +551,21 @@ fn push_string_mismatch(
         issues.push(format!(
             "{field} mismatch: expected {}, found {}",
             expected,
+            actual.unwrap_or("missing")
+        ));
+    }
+}
+
+fn push_optional_string_mismatch(
+    issues: &mut Vec<String>,
+    field: &str,
+    expected: Option<&str>,
+    actual: Option<&str>,
+) {
+    if actual != expected {
+        issues.push(format!(
+            "{field} mismatch: expected {}, found {}",
+            expected.unwrap_or("missing"),
             actual.unwrap_or("missing")
         ));
     }

@@ -16,6 +16,26 @@ pub(crate) fn nsld_final_executable_layout_plan_report_json(
         json_string_field("internal_binary_format", &report.internal_binary_format),
         json_string_field("lifecycle_entry_hook", &report.lifecycle_entry_hook),
         json_string_field("scheduler_contract", &report.scheduler_contract),
+        json_string_field(
+            "scheduler_metadata_payload",
+            &report.scheduler_metadata_payload,
+        ),
+        json_string_field(
+            "scheduler_metadata_lifecycle_hook",
+            &report.scheduler_metadata_lifecycle_hook,
+        ),
+        json_usize_field(
+            "scheduler_hetero_node_count",
+            report.scheduler_hetero_node_count,
+        ),
+        json_usize_field(
+            "scheduler_wait_event_count",
+            report.scheduler_wait_event_count,
+        ),
+        json_usize_field(
+            "scheduler_emit_event_count",
+            report.scheduler_emit_event_count,
+        ),
         json_string_field("data_segment_ordering", &report.data_segment_ordering),
         json_string_field("native_object_path", &report.native_object_path),
         json_bool_field("native_object_required", report.native_object_required),
@@ -104,6 +124,14 @@ pub(crate) fn nsld_final_executable_layout_plan_verify_report_json(
         json_optional_string_field(
             "actual_lifecycle_entry_hook",
             report.actual_lifecycle_entry_hook.as_deref(),
+        ),
+        json_usize_field(
+            "expected_scheduler_hetero_node_count",
+            report.expected_scheduler_hetero_node_count,
+        ),
+        json_optional_usize_field(
+            "actual_scheduler_hetero_node_count",
+            report.actual_scheduler_hetero_node_count,
         ),
         json_string_field(
             "expected_platform_envelope_family",

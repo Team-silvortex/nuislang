@@ -121,6 +121,15 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert!(manifest.image_header_valid);
     assert_eq!(manifest.entry_lifecycle_hook, "on_process_start");
     assert_eq!(manifest.scheduler_entry, "nuis.scheduler.loop.v1");
+    assert_eq!(
+        manifest.scheduler_metadata_payload_id.as_deref(),
+        Some("payload0004.scheduler-metadata")
+    );
+    assert_eq!(manifest.scheduler_metadata_present, Some(true));
+    assert!(manifest
+        .scheduler_metadata_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
     assert!(manifest
         .verification_steps
         .iter()
@@ -138,9 +147,31 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
         verify.actual_scheduler_entry.as_deref(),
         Some("nuis.scheduler.loop.v1")
     );
+    assert_eq!(
+        verify.actual_scheduler_metadata_payload_id.as_deref(),
+        Some("payload0004.scheduler-metadata")
+    );
+    assert_eq!(verify.actual_scheduler_metadata_present, Some(true));
+    assert_eq!(
+        verify.expected_scheduler_metadata_hash,
+        manifest.scheduler_metadata_hash
+    );
+    assert_eq!(
+        verify.actual_scheduler_metadata_hash,
+        manifest.scheduler_metadata_hash
+    );
     assert!(dry_run.dry_run_ready, "{:?}", dry_run.blockers);
     assert!(dry_run.would_enter_lifecycle_hook);
     assert_eq!(dry_run.nsb_hash_actual, Some(fnv1a64_hex(&output_bytes)));
+    assert_eq!(
+        dry_run.scheduler_metadata_payload_id.as_deref(),
+        Some("payload0004.scheduler-metadata")
+    );
+    assert_eq!(dry_run.scheduler_metadata_present, Some(true));
+    assert_eq!(
+        dry_run.scheduler_metadata_hash,
+        manifest.scheduler_metadata_hash
+    );
     assert!(dry_run
         .launch_steps
         .iter()
@@ -158,14 +189,27 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert!(dry_run_source.contains("schema = \"nuis-host-launcher-dry-run-v1\""));
     assert!(manifest_source.contains("entry_lifecycle_hook = \"on_process_start\""));
     assert!(manifest_source.contains("scheduler_entry = \"nuis.scheduler.loop.v1\""));
+    assert!(manifest_source
+        .contains("scheduler_metadata_payload_id = \"payload0004.scheduler-metadata\""));
+    assert!(manifest_source.contains("scheduler_metadata_present = true"));
+    assert!(dry_run_source
+        .contains("scheduler_metadata_payload_id = \"payload0004.scheduler-metadata\""));
+    assert!(dry_run_source.contains("scheduler_metadata_present = true"));
     assert!(manifest_json.contains("\"kind\":\"nsld_final_executable_launcher_manifest\""));
     assert!(manifest_json.contains("\"ready\":true"));
     assert!(manifest_json.contains("\"nsb_hash\":\"0x"));
+    assert!(manifest_json
+        .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
+    assert!(manifest_json.contains("\"scheduler_metadata_present\":true"));
     assert!(verify_json.contains("\"kind\":\"nsld_final_executable_launcher_manifest_verify\""));
     assert!(verify_json.contains("\"valid\":true"));
+    assert!(verify_json
+        .contains("\"actual_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(dry_run_json.contains("\"kind\":\"nsld_final_executable_launcher_dry_run\""));
     assert!(dry_run_json.contains("\"dry_run_ready\":true"));
     assert!(dry_run_json.contains("\"would_enter_lifecycle_hook\":true"));
+    assert!(dry_run_json
+        .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(dry_run_emit_json.contains("\"kind\":\"nsld_final_executable_launcher_dry_run_emit\""));
     assert!(dry_run_emit_json.contains("\"dry_run_ready\":true"));
     assert!(
@@ -400,6 +444,27 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
         output.output_byte_map_hash.as_deref(),
         Some(layout.byte_map_hash.as_str())
     );
+    assert_eq!(
+        output.scheduler_metadata_payload_id.as_deref(),
+        Some("payload0004.scheduler-metadata")
+    );
+    assert_eq!(output.scheduler_metadata_present, Some(true));
+    assert_eq!(
+        output.scheduler_metadata_offset,
+        layout
+            .byte_map_entries
+            .iter()
+            .find(|entry| entry.payload_id == "payload0004.scheduler-metadata")
+            .map(|entry| entry.offset)
+    );
+    assert_eq!(
+        output.scheduler_metadata_hash,
+        layout
+            .payloads
+            .iter()
+            .find(|payload| payload.payload_id == "payload0004.scheduler-metadata")
+            .map(|payload| payload.content_hash.clone())
+    );
     assert_eq!(output.expected_image_size_bytes, Some(image_bytes.len()));
     assert_eq!(output.expected_image_hash, Some(fnv1a64_hex(&image_bytes)));
     assert_eq!(image_bytes, output_bytes);
@@ -412,6 +477,10 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output_json.contains("\"output_image_version\":1"));
     assert!(output_json.contains("\"output_layout_hash\":\"0x"));
     assert!(output_json.contains("\"output_byte_map_hash\":\"0x"));
+    assert!(output_json
+        .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
+    assert!(output_json.contains("\"scheduler_metadata_present\":true"));
+    assert!(output_json.contains("\"scheduler_metadata_hash\":\"0x"));
     assert!(output_json.contains("\"matches_expected_image\":true"));
     assert!(output_json.contains("\"final_stage_plan_valid\":true"));
     assert!(output_json.contains("\"final_executable_emit_valid\":true"));

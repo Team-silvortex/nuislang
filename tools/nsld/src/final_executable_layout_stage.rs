@@ -56,6 +56,21 @@ pub(crate) fn nsld_final_executable_layout_plan_report(
     let internal_binary_format = "nuis-hetero-unified-binary".to_owned();
     let lifecycle_entry_hook = "on_process_start".to_owned();
     let scheduler_contract = "deterministic-lifecycle-hook-order".to_owned();
+    let scheduler_metadata_payload = "payload0004.scheduler-metadata".to_owned();
+    let scheduler_metadata_lifecycle_hook = "on_scheduler_metadata_load".to_owned();
+    let scheduler_hetero_node_count = plan.hetero_calculate.nodes.len();
+    let scheduler_wait_event_count = plan
+        .hetero_calculate
+        .nodes
+        .iter()
+        .map(|node| node.wait_on.len())
+        .sum::<usize>();
+    let scheduler_emit_event_count = plan
+        .hetero_calculate
+        .nodes
+        .iter()
+        .map(|node| node.emits.len())
+        .sum::<usize>();
     let data_segment_ordering = "deterministic-data-segment-order".to_owned();
     let compatibility_domain = if final_stage.native_object_required {
         "cffi-native-object".to_owned()
@@ -80,6 +95,11 @@ pub(crate) fn nsld_final_executable_layout_plan_report(
         &internal_binary_format,
         &lifecycle_entry_hook,
         &scheduler_contract,
+        &scheduler_metadata_payload,
+        &scheduler_metadata_lifecycle_hook,
+        scheduler_hetero_node_count,
+        scheduler_wait_event_count,
+        scheduler_emit_event_count,
         &data_segment_ordering,
         &native_object_path,
         final_stage.native_object_required,
@@ -105,6 +125,11 @@ pub(crate) fn nsld_final_executable_layout_plan_report(
         internal_binary_format,
         lifecycle_entry_hook,
         scheduler_contract,
+        scheduler_metadata_payload,
+        scheduler_metadata_lifecycle_hook,
+        scheduler_hetero_node_count,
+        scheduler_wait_event_count,
+        scheduler_emit_event_count,
         data_segment_ordering,
         native_object_path,
         native_object_required: final_stage.native_object_required,
@@ -168,6 +193,7 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
         actual_byte_span,
         actual_byte_map_hash,
         actual_lifecycle_entry_hook,
+        actual_scheduler_hetero_node_count,
         actual_platform_envelope_family,
     ) = match actual.as_ref() {
         Ok(source) => (
@@ -179,11 +205,12 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
             toml::usize_value(source, "byte_span"),
             toml::string_value(source, "byte_map_hash"),
             toml::string_value(source, "lifecycle_entry_hook"),
+            toml::usize_value(source, "scheduler_hetero_node_count"),
             toml::string_value(source, "platform_envelope_family"),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, Vec::new(), 0, 0, None, None, None, None)
+            (None, None, Vec::new(), 0, 0, None, None, None, None, None)
         }
     };
     if let Ok(actual) = actual {
@@ -256,6 +283,15 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
+        if actual_scheduler_hetero_node_count != Some(expected.scheduler_hetero_node_count) {
+            issues.push(format!(
+                "scheduler_hetero_node_count mismatch: expected {}, found {}",
+                expected.scheduler_hetero_node_count,
+                actual_scheduler_hetero_node_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
         if actual_platform_envelope_family.as_deref()
             != Some(expected.platform_envelope_family.as_str())
         {
@@ -289,6 +325,8 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
         actual_byte_map_hash,
         expected_lifecycle_entry_hook: expected.lifecycle_entry_hook,
         actual_lifecycle_entry_hook,
+        expected_scheduler_hetero_node_count: expected.scheduler_hetero_node_count,
+        actual_scheduler_hetero_node_count,
         expected_platform_envelope_family: expected.platform_envelope_family,
         actual_platform_envelope_family,
         issues,

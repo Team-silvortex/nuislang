@@ -17,6 +17,10 @@ pub(crate) fn final_executable_payloads(
             "fsi0001.container-payload" => ("payload0001.container-payload", "on_process_start"),
             "fsi0002.closure-snapshot" => ("payload0002.closure-snapshot", "on_debug_metadata"),
             "fsi0003.native-object" => ("payload0003.native-object", "on_cffi_native_object"),
+            "fsi0004.scheduler-metadata" => (
+                "payload0004.scheduler-metadata",
+                "on_scheduler_metadata_load",
+            ),
             _ => continue,
         };
         if input.input_id == "fsi0003.native-object" && !final_stage.native_object_required {
@@ -69,6 +73,11 @@ pub(crate) fn nsld_final_executable_layout_hash(
     internal_binary_format: &str,
     lifecycle_entry_hook: &str,
     scheduler_contract: &str,
+    scheduler_metadata_payload: &str,
+    scheduler_metadata_lifecycle_hook: &str,
+    scheduler_hetero_node_count: usize,
+    scheduler_wait_event_count: usize,
+    scheduler_emit_event_count: usize,
     data_segment_ordering: &str,
     native_object_path: &str,
     native_object_required: bool,
@@ -98,6 +107,16 @@ pub(crate) fn nsld_final_executable_layout_hash(
     material.push_str(lifecycle_entry_hook);
     material.push('\t');
     material.push_str(scheduler_contract);
+    material.push('\t');
+    material.push_str(scheduler_metadata_payload);
+    material.push('\t');
+    material.push_str(scheduler_metadata_lifecycle_hook);
+    material.push('\t');
+    material.push_str(&scheduler_hetero_node_count.to_string());
+    material.push('\t');
+    material.push_str(&scheduler_wait_event_count.to_string());
+    material.push('\t');
+    material.push_str(&scheduler_emit_event_count.to_string());
     material.push('\t');
     material.push_str(data_segment_ordering);
     material.push('\n');

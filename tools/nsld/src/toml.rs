@@ -153,6 +153,7 @@ pub(crate) fn render_link_unit_table(report: &NsldLinkUnitReport) -> String {
     writeln!(out, "unit_count = {}", report.unit_count).unwrap();
     writeln!(out, "hetero_unit_count = {}", report.hetero_unit_count).unwrap();
     writeln!(out, "link_input_count = {}", report.link_input_count).unwrap();
+    writeln!(out, "hetero_node_count = {}", report.hetero_node_count).unwrap();
     writeln!(out, "clock_edge_count = {}", report.clock_edge_count).unwrap();
     writeln!(out, "data_segment_count = {}", report.data_segment_count).unwrap();
     writeln!(
@@ -207,6 +208,21 @@ pub(crate) fn render_link_unit_table(report: &NsldLinkUnitReport) -> String {
             toml_string_array_literal(&unit.link_input_ids)
         )
         .unwrap();
+        writeln!(out, "hetero_node_count = {}", unit.hetero_node_count).unwrap();
+        writeln!(
+            out,
+            "hetero_timestamps = [{}]",
+            toml_string_array_literal(&unit.hetero_timestamps)
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "lifecycle_hooks = [{}]",
+            toml_string_array_literal(&unit.lifecycle_hooks)
+        )
+        .unwrap();
+        writeln!(out, "wait_event_count = {}", unit.wait_event_count).unwrap();
+        writeln!(out, "emit_event_count = {}", unit.emit_event_count).unwrap();
         writeln!(out, "clock_edge_count = {}", unit.clock_edge_count).unwrap();
         writeln!(out, "data_segment_count = {}", unit.data_segment_count).unwrap();
         writeln!(

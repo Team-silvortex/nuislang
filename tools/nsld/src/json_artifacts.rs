@@ -91,6 +91,7 @@ pub(crate) fn nsld_link_units_emit_report_json(report: &NsldLinkUnitsEmitReport)
         json_usize_field("unit_count", report.unit_count),
         json_usize_field("hetero_unit_count", report.hetero_unit_count),
         json_usize_field("link_input_count", report.link_input_count),
+        json_usize_field("hetero_node_count", report.hetero_node_count),
         json_string_field("unit_table_hash", &report.unit_table_hash),
     ];
     format!("{{{}}}", fields.join(","))
@@ -112,10 +113,15 @@ pub(crate) fn nsld_link_units_verify_report_json(report: &NsldLinkUnitsVerifyRep
             "expected_link_input_count",
             report.expected_link_input_count,
         ),
+        json_usize_field(
+            "expected_hetero_node_count",
+            report.expected_hetero_node_count,
+        ),
         json_string_field("expected_unit_table_hash", &report.expected_unit_table_hash),
         json_optional_usize_field("actual_unit_count", report.actual_unit_count),
         json_optional_usize_field("actual_hetero_unit_count", report.actual_hetero_unit_count),
         json_optional_usize_field("actual_link_input_count", report.actual_link_input_count),
+        json_optional_usize_field("actual_hetero_node_count", report.actual_hetero_node_count),
         json_optional_string_field(
             "actual_unit_table_hash",
             report.actual_unit_table_hash.as_deref(),

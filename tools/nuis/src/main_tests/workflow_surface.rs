@@ -123,6 +123,20 @@ mod cpu Main {
     assert!(json.contains(
         "\"nsld_final_executable_tail_next_missing_stage\":\"final-executable-writer-input\""
     ));
+    assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_payload_id\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_present\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_hash\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_final_executable_emitted\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_launcher_manifest_ready\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_launcher_dry_run_ready\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_would_enter_lifecycle_hook\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":null"));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_first_missing_required_stage_path\":null")
+    );
     assert!(json.contains("\"compile_pipeline_available\":true"));
     assert!(json.contains("\"compile_pipeline_ready_for_aot\":true"));
     assert!(json.contains("\"compile_pipeline_summary\":\"source_kind=project"));

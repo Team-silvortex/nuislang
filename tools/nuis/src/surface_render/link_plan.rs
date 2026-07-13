@@ -79,11 +79,47 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         writeln!(out, "  nsld_final_executable_pipeline_valid: <unavailable>")?;
         writeln!(
             out,
+            "  nsld_final_executable_pipeline_final_executable_emitted: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_launcher_manifest_ready: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_launcher_dry_run_ready: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_would_enter_lifecycle_hook: <unavailable>"
+        )?;
+        writeln!(
+            out,
             "  nsld_final_executable_pipeline_blocker_count: <unavailable>"
         )?;
         writeln!(
             out,
             "  nsld_final_executable_pipeline_first_blocker: <none>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_scheduler_metadata_payload_id: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_scheduler_metadata_present: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_scheduler_metadata_hash: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_required_stage_paths: <unavailable>/<unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_first_missing_required_stage_path: <none>"
         )?;
     }
     Ok(())
@@ -199,6 +235,30 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
                 .as_ref()
                 .and_then(|summary| summary.pipeline_valid),
         ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_final_executable_emitted",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.final_executable_emitted),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_launcher_manifest_ready",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.launcher_manifest_ready),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_launcher_dry_run_ready",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.launcher_dry_run_ready),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_would_enter_lifecycle_hook",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.would_enter_lifecycle_hook),
+        ),
         json_optional_usize_field(
             "nsld_final_executable_pipeline_blocker_count",
             final_tail_summary
@@ -210,6 +270,42 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
             final_tail_summary
                 .as_ref()
                 .and_then(|summary| summary.first_blocker.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_scheduler_metadata_payload_id",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.scheduler_metadata_payload_id.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_scheduler_metadata_present",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.scheduler_metadata_present),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_scheduler_metadata_hash",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.scheduler_metadata_hash.as_deref()),
+        ),
+        json_optional_usize_field(
+            "nsld_final_executable_pipeline_required_stage_path_count",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.required_stage_path_count),
+        ),
+        json_optional_usize_field(
+            "nsld_final_executable_pipeline_required_stage_path_present_count",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.required_stage_path_present_count),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_first_missing_required_stage_path",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.first_missing_required_stage_path.as_deref()),
         ),
     ]
 }
@@ -274,6 +370,38 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_pipeline_final_executable_emitted: {}",
+        final_tail
+            .final_executable_emitted
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_launcher_manifest_ready: {}",
+        final_tail
+            .launcher_manifest_ready
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_launcher_dry_run_ready: {}",
+        final_tail
+            .launcher_dry_run_ready
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_would_enter_lifecycle_hook: {}",
+        final_tail
+            .would_enter_lifecycle_hook
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_pipeline_blocker_count: {}",
         final_tail
             .blocker_count
@@ -284,6 +412,50 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
         out,
         "  nsld_final_executable_pipeline_first_blocker: {}",
         final_tail.first_blocker.as_deref().unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_scheduler_metadata_payload_id: {}",
+        final_tail
+            .scheduler_metadata_payload_id
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_scheduler_metadata_present: {}",
+        final_tail
+            .scheduler_metadata_present
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_scheduler_metadata_hash: {}",
+        final_tail
+            .scheduler_metadata_hash
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_required_stage_paths: {}/{}",
+        final_tail
+            .required_stage_path_present_count
+            .map(|count| count.to_string())
+            .unwrap_or_else(|| "<unavailable>".to_owned()),
+        final_tail
+            .required_stage_path_count
+            .map(|count| count.to_string())
+            .unwrap_or_else(|| "<unavailable>".to_owned())
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_first_missing_required_stage_path: {}",
+        final_tail
+            .first_missing_required_stage_path
+            .as_deref()
+            .unwrap_or("<none>")
     )?;
     Ok(())
 }

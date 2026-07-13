@@ -107,6 +107,13 @@ pub(crate) fn nsld_final_stage_plan_report(
             native_object_path,
             native_object_required,
         ),
+        final_stage_input(
+            4,
+            "fsi0004.scheduler-metadata",
+            "nsld-scheduler-metadata",
+            PathBuf::from(&plan.output_dir).join("nuis.nsld.link-units.toml"),
+            true,
+        ),
     ];
     let mut blockers = Vec::with_capacity(6);
     for input in &inputs {

@@ -31,6 +31,17 @@ fn final_executable_layout_plan_captures_nsld_owned_binary_boundary() {
         "deterministic-lifecycle-hook-order"
     );
     assert_eq!(
+        report.scheduler_metadata_payload,
+        "payload0004.scheduler-metadata"
+    );
+    assert_eq!(
+        report.scheduler_metadata_lifecycle_hook,
+        "on_scheduler_metadata_load"
+    );
+    assert_eq!(report.scheduler_hetero_node_count, 0);
+    assert_eq!(report.scheduler_wait_event_count, 0);
+    assert_eq!(report.scheduler_emit_event_count, 0);
+    assert_eq!(
         report.data_segment_ordering,
         "deterministic-data-segment-order"
     );
@@ -45,6 +56,10 @@ fn final_executable_layout_plan_captures_nsld_owned_binary_boundary() {
         .payload_names
         .iter()
         .any(|payload| payload == "native-object-output"));
+    assert!(report
+        .payload_names
+        .iter()
+        .any(|payload| payload == "nsld-scheduler-metadata"));
     assert!(report.payloads.iter().any(|payload| {
         payload.payload_id == "payload0003.native-object"
             && payload.lifecycle_hook == "on_cffi_native_object"
@@ -69,6 +84,10 @@ fn final_executable_layout_plan_captures_nsld_owned_binary_boundary() {
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_layout_plan\""));
     assert!(report_json.contains("\"internal_binary_format\":\"nuis-hetero-unified-binary\""));
     assert!(report_json.contains("\"lifecycle_entry_hook\":\"on_process_start\""));
+    assert!(
+        report_json.contains("\"scheduler_metadata_payload\":\"payload0004.scheduler-metadata\"")
+    );
+    assert!(report_json.contains("\"scheduler_hetero_node_count\":0"));
     assert!(report_json.contains("\"byte_map_hash\":\"0x"));
     assert!(report_json.contains("\"byte_map_entries\":["));
 }
@@ -153,7 +172,11 @@ fn verify_final_executable_layout_plan_reports_protocol_drift() {
         )
         .replace(&byte_span_line, "byte_span = 0")
         .replace(&payloads_line, &tampered_payloads_line)
-        .replace("payload_count = 4", "payload_count = 0");
+        .replace("payload_count = 5", "payload_count = 0")
+        .replace(
+            "scheduler_hetero_node_count = 0",
+            "scheduler_hetero_node_count = 9",
+        );
     fs::write(&emit.output_path, damaged).unwrap();
     let verify = nsld_verify_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan);
     let verify_json = super::json::nsld_final_executable_layout_plan_verify_report_json(&verify);
@@ -166,6 +189,7 @@ fn verify_final_executable_layout_plan_reports_protocol_drift() {
         Some("elf")
     );
     assert_eq!(verify.actual_payload_count, Some(0));
+    assert_eq!(verify.actual_scheduler_hetero_node_count, Some(9));
     assert!(verify
         .actual_payloads
         .iter()
@@ -204,7 +228,12 @@ fn verify_final_executable_layout_plan_reports_protocol_drift() {
         .iter()
         .any(|issue| issue
             == "lifecycle_entry_hook mismatch: expected on_process_start, found drift"));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue == "scheduler_hetero_node_count mismatch: expected 0, found 9"));
     assert!(verify_json.contains("\"actual_lifecycle_entry_hook\":\"drift\""));
+    assert!(verify_json.contains("\"actual_scheduler_hetero_node_count\":9"));
     assert!(verify_json.contains("\"actual_platform_envelope_family\":\"elf\""));
     assert!(verify_json.contains("tampered-"));
     assert!(verify_json.contains("\"actual_payload_entry_count\":"));

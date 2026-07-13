@@ -3,6 +3,7 @@ use super::{
         parse_final_executable_image_header, FINAL_EXECUTABLE_IMAGE_HEADER_SIZE,
         FINAL_EXECUTABLE_IMAGE_MAGIC_TEXT, FINAL_EXECUTABLE_IMAGE_VERSION,
     },
+    final_executable_image_stage::nsld_verify_final_executable_image_dry_run_report,
     final_stage::{nsld_verify_final_executable_emit_report, nsld_verify_final_stage_plan_report},
     fnv1a64_hex,
     reports::NsldFinalExecutableOutputReport,
@@ -15,6 +16,7 @@ pub(crate) fn nsld_final_executable_output_report(
 ) -> NsldFinalExecutableOutputReport {
     let final_stage = nsld_verify_final_stage_plan_report(manifest, plan);
     let final_emit = nsld_verify_final_executable_emit_report(manifest, plan);
+    let image_dry_run = nsld_verify_final_executable_image_dry_run_report(manifest, plan);
     let output_path = plan.final_stage.output_path.clone();
     let host_native_output = plan.final_stage.link_mode == "host-toolchain-finalize";
     let output_kind = if host_native_output {
@@ -55,6 +57,10 @@ pub(crate) fn nsld_final_executable_output_report(
     let output_byte_map_hash = output_header
         .as_ref()
         .map(|header| header.byte_map_hash.clone());
+    let scheduler_metadata_payload_id = image_dry_run.actual_scheduler_metadata_payload_id.clone();
+    let scheduler_metadata_present = image_dry_run.actual_scheduler_metadata_present;
+    let scheduler_metadata_offset = image_dry_run.actual_scheduler_metadata_offset;
+    let scheduler_metadata_hash = image_dry_run.actual_scheduler_metadata_hash.clone();
     let output_image_header_valid = output_header.as_ref().is_some_and(|header| {
         let payload_end = header.payload_offset.saturating_add(header.payload_span);
         header.magic == FINAL_EXECUTABLE_IMAGE_MAGIC_TEXT
@@ -184,6 +190,10 @@ pub(crate) fn nsld_final_executable_output_report(
         output_payload_byte_span,
         output_layout_hash,
         output_byte_map_hash,
+        scheduler_metadata_payload_id,
+        scheduler_metadata_present,
+        scheduler_metadata_offset,
+        scheduler_metadata_hash,
         expected_image_size_bytes,
         expected_image_hash,
         matches_expected_image,

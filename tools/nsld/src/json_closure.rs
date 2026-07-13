@@ -208,6 +208,7 @@ pub(crate) fn nsld_link_unit_report_json(report: &NsldLinkUnitReport) -> String 
         json_usize_field("unit_count", report.unit_count),
         json_usize_field("hetero_unit_count", report.hetero_unit_count),
         json_usize_field("link_input_count", report.link_input_count),
+        json_usize_field("hetero_node_count", report.hetero_node_count),
         json_usize_field("clock_edge_count", report.clock_edge_count),
         json_usize_field("data_segment_count", report.data_segment_count),
         json_string_field("unit_table_hash", &report.unit_table_hash),

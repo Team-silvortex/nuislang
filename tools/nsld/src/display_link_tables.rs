@@ -13,6 +13,7 @@ pub(crate) fn print_nsld_link_units_emit_report(report: &NsldLinkUnitsEmitReport
     println!("  unit_count: {}", report.unit_count);
     println!("  hetero_unit_count: {}", report.hetero_unit_count);
     println!("  link_input_count: {}", report.link_input_count);
+    println!("  hetero_node_count: {}", report.hetero_node_count);
     println!("  unit_table_hash: {}", report.unit_table_hash);
 }
 
@@ -31,6 +32,10 @@ pub(crate) fn print_nsld_link_units_verify_report(report: &NsldLinkUnitsVerifyRe
         report.expected_link_input_count
     );
     println!(
+        "  expected_hetero_node_count: {}",
+        report.expected_hetero_node_count
+    );
+    println!(
         "  expected_unit_table_hash: {}",
         report.expected_unit_table_hash
     );
@@ -45,6 +50,10 @@ pub(crate) fn print_nsld_link_units_verify_report(report: &NsldLinkUnitsVerifyRe
     println!(
         "  actual_link_input_count: {}",
         optional_usize_text(report.actual_link_input_count)
+    );
+    println!(
+        "  actual_hetero_node_count: {}",
+        optional_usize_text(report.actual_hetero_node_count)
     );
     println!(
         "  actual_unit_table_hash: {}",

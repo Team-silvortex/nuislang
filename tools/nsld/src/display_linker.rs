@@ -339,12 +339,13 @@ pub(crate) fn print_nsld_link_unit_report(report: &NsldLinkUnitReport) {
     println!("  unit_count: {}", report.unit_count);
     println!("  hetero_unit_count: {}", report.hetero_unit_count);
     println!("  link_input_count: {}", report.link_input_count);
+    println!("  hetero_node_count: {}", report.hetero_node_count);
     println!("  clock_edge_count: {}", report.clock_edge_count);
     println!("  data_segment_count: {}", report.data_segment_count);
     println!("  unit_table_hash: {}", report.unit_table_hash);
     for unit in &report.units {
         println!(
-            "  link_unit: order={} id={} kind={} domain={} package={} backend={} target={} role={} inputs={} clock_edges={} data_segments={} host_wrapper={} order_key={}",
+            "  link_unit: order={} id={} kind={} domain={} package={} backend={} target={} role={} inputs={} hetero_nodes={} timestamps={} lifecycle_hooks={} wait_events={} emit_events={} clock_edges={} data_segments={} host_wrapper={} order_key={}",
             unit.order_index,
             unit.unit_id,
             unit.unit_kind,
@@ -354,6 +355,11 @@ pub(crate) fn print_nsld_link_unit_report(report: &NsldLinkUnitReport) {
             unit.lowering_target,
             unit.packaging_role,
             unit.link_input_ids.join(","),
+            unit.hetero_node_count,
+            unit.hetero_timestamps.join(","),
+            unit.lifecycle_hooks.join(","),
+            unit.wait_event_count,
+            unit.emit_event_count,
             unit.clock_edge_count,
             unit.data_segment_count,
             unit.requires_host_wrapper,

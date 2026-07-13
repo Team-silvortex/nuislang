@@ -176,6 +176,22 @@ pub(crate) fn print_nsld_final_executable_image_dry_run_report(
     println!("  byte_map_hash: {}", report.byte_map_hash);
     println!("  payload_count: {}", report.payload_count);
     println!("  byte_span: {}", report.byte_span);
+    println!(
+        "  scheduler_metadata_payload_id: {}",
+        report.scheduler_metadata_payload_id
+    );
+    println!(
+        "  scheduler_metadata_present: {}",
+        report.scheduler_metadata_present
+    );
+    println!(
+        "  scheduler_metadata_offset: {}",
+        optional_usize_text(report.scheduler_metadata_offset)
+    );
+    println!(
+        "  scheduler_metadata_hash: {}",
+        optional_string_text(report.scheduler_metadata_hash.as_deref())
+    );
     println!("  image_constructed: {}", report.image_constructed);
     println!("  image_ready: {}", report.image_ready);
     println!(
@@ -298,6 +314,38 @@ pub(crate) fn print_nsld_final_executable_image_dry_run_verify_report(
     println!(
         "  actual_payload_region_hash: {}",
         optional_string_text(report.actual_payload_region_hash.as_deref())
+    );
+    println!(
+        "  expected_scheduler_metadata_payload_id: {}",
+        report.expected_scheduler_metadata_payload_id
+    );
+    println!(
+        "  actual_scheduler_metadata_payload_id: {}",
+        optional_string_text(report.actual_scheduler_metadata_payload_id.as_deref())
+    );
+    println!(
+        "  expected_scheduler_metadata_present: {}",
+        report.expected_scheduler_metadata_present
+    );
+    println!(
+        "  actual_scheduler_metadata_present: {}",
+        optional_bool_text(report.actual_scheduler_metadata_present)
+    );
+    println!(
+        "  expected_scheduler_metadata_offset: {}",
+        optional_usize_text(report.expected_scheduler_metadata_offset)
+    );
+    println!(
+        "  actual_scheduler_metadata_offset: {}",
+        optional_usize_text(report.actual_scheduler_metadata_offset)
+    );
+    println!(
+        "  expected_scheduler_metadata_hash: {}",
+        optional_string_text(report.expected_scheduler_metadata_hash.as_deref())
+    );
+    println!(
+        "  actual_scheduler_metadata_hash: {}",
+        optional_string_text(report.actual_scheduler_metadata_hash.as_deref())
     );
     println!(
         "  expected_image_constructed: {}",

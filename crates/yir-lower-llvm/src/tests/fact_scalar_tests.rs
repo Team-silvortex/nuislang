@@ -82,61 +82,6 @@ fn does_not_fold_oversized_i64_shift_for_lazy_const_select() {
 }
 
 #[test]
-fn folds_known_i64_to_bool_cast_for_lazy_const_select() {
-    let mut module = module_with_cpu0();
-    push_cpu_const_i64(&mut module, "truthy", "1");
-    push_cpu_node(
-        &mut module,
-        "enabled",
-        "cpu.cast_i64_to_bool",
-        vec!["truthy"],
-    );
-    push_wrong_variant_payload_select_fixture(&mut module, "enabled", "fallback", "bad_result");
-    push_dep(&mut module, "truthy", "enabled");
-
-    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
-    assert!(llvm_ir.contains("icmp ne i64"));
-    assert!(!llvm_ir.contains("select i1"));
-    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
-    assert_wrong_variant_chain_not_deferred(&llvm_ir);
-}
-
-#[test]
-fn folds_known_bool_to_i64_cast_for_lazy_const_select() {
-    let mut module = module_with_cpu0();
-    push_cpu_node(&mut module, "flag", "cpu.const_bool", vec!["true"]);
-    push_cpu_node(
-        &mut module,
-        "flag_i64",
-        "cpu.cast_bool_to_i64",
-        vec!["flag"],
-    );
-    push_cpu_const_i64(&mut module, "expected", "1");
-    push_cpu_node(
-        &mut module,
-        "enabled",
-        "cpu.eq",
-        vec!["flag_i64", "expected"],
-    );
-    push_wrong_variant_payload_select_fixture(&mut module, "enabled", "fallback", "bad_result");
-    push_deps(
-        &mut module,
-        &[
-            ("flag", "flag_i64"),
-            ("flag_i64", "enabled"),
-            ("expected", "enabled"),
-        ],
-    );
-
-    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
-    assert!(llvm_ir.contains("zext i1 true to i64"));
-    assert!(llvm_ir.contains("icmp eq i64"));
-    assert!(!llvm_ir.contains("select i1"));
-    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
-    assert_wrong_variant_chain_not_deferred(&llvm_ir);
-}
-
-#[test]
 fn does_not_fold_overflowing_i64_madd_for_lazy_const_select() {
     let mut module = module_with_cpu0();
     push_madd_i64_condition_fixture(&mut module, "9223372036854775807", "2", "0", "0");

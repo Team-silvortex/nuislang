@@ -44,6 +44,21 @@ pub(crate) fn nsld_final_executable_image_dry_run_report(
     let image_ready = image_constructed && blockers.is_empty();
     let image_size_bytes = image.as_ref().map(Vec::len);
     let image_hash = image.as_ref().map(|bytes| fnv1a64_hex(bytes));
+    let scheduler_metadata_payload_id = layout.scheduler_metadata_payload.clone();
+    let scheduler_metadata_payload = layout
+        .payloads
+        .iter()
+        .find(|payload| payload.payload_id == scheduler_metadata_payload_id);
+    let scheduler_metadata_offset = layout
+        .byte_map_entries
+        .iter()
+        .find(|entry| entry.payload_id == scheduler_metadata_payload_id)
+        .map(|entry| entry.offset);
+    let scheduler_metadata_present = scheduler_metadata_payload
+        .map(|payload| payload.present)
+        .unwrap_or(false);
+    let scheduler_metadata_hash =
+        scheduler_metadata_payload.map(|payload| payload.content_hash.clone());
 
     NsldFinalExecutableImageDryRunReport {
         manifest: manifest.display().to_string(),
@@ -62,6 +77,10 @@ pub(crate) fn nsld_final_executable_image_dry_run_report(
         byte_map_hash: layout.byte_map_hash,
         payload_count: layout.payload_count,
         byte_span: layout.byte_span,
+        scheduler_metadata_payload_id,
+        scheduler_metadata_present,
+        scheduler_metadata_offset,
+        scheduler_metadata_hash,
         image_constructed,
         image_ready,
         image_size_bytes,
@@ -140,6 +159,10 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
         actual_image_ready,
         actual_image_size_bytes,
         actual_image_hash,
+        actual_scheduler_metadata_payload_id,
+        actual_scheduler_metadata_present,
+        actual_scheduler_metadata_offset,
+        actual_scheduler_metadata_hash,
         actual_blockers,
     ) = match actual.as_ref() {
         Ok(source) => (
@@ -151,11 +174,29 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
             toml::bool_value(source, "image_ready"),
             optional_usize_value(source, "image_size_bytes"),
             non_empty_toml_string(source, "image_hash"),
+            non_empty_toml_string(source, "scheduler_metadata_payload_id"),
+            toml::bool_value(source, "scheduler_metadata_present"),
+            optional_usize_value(source, "scheduler_metadata_offset"),
+            non_empty_toml_string(source, "scheduler_metadata_hash"),
             toml::string_array_value(source, "blockers"),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, None, None, None, None, None, None, Vec::new())
+            (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Vec::new(),
+            )
         }
     };
     if let Ok(actual) = actual {
@@ -225,6 +266,40 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
                     .clone()
                     .unwrap_or_else(|| "missing".to_owned()),
                 actual_image_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        push_optional_string_mismatch(
+            &mut issues,
+            "scheduler_metadata_payload_id",
+            Some(expected.scheduler_metadata_payload_id.as_str()),
+            actual_scheduler_metadata_payload_id.as_deref(),
+        );
+        if actual_scheduler_metadata_present != Some(expected.scheduler_metadata_present) {
+            issues.push(format!(
+                "scheduler_metadata_present mismatch: expected {}, found {}",
+                expected.scheduler_metadata_present,
+                actual_scheduler_metadata_present
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_scheduler_metadata_offset != expected.scheduler_metadata_offset {
+            issues.push(format!(
+                "scheduler_metadata_offset mismatch: expected {}, found {}",
+                optional_usize_toml(expected.scheduler_metadata_offset),
+                optional_usize_toml(actual_scheduler_metadata_offset)
+            ));
+        }
+        if actual_scheduler_metadata_hash != expected.scheduler_metadata_hash {
+            issues.push(format!(
+                "scheduler_metadata_hash mismatch: expected {}, found {}",
+                expected
+                    .scheduler_metadata_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned()),
+                actual_scheduler_metadata_hash
                     .clone()
                     .unwrap_or_else(|| "missing".to_owned())
             ));
@@ -351,6 +426,14 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
         actual_payload_region_count: payload_region.actual_count,
         expected_payload_region_hash: payload_region.expected_hash,
         actual_payload_region_hash: payload_region.actual_hash,
+        expected_scheduler_metadata_payload_id: expected.scheduler_metadata_payload_id,
+        actual_scheduler_metadata_payload_id,
+        expected_scheduler_metadata_present: expected.scheduler_metadata_present,
+        actual_scheduler_metadata_present,
+        expected_scheduler_metadata_offset: expected.scheduler_metadata_offset,
+        actual_scheduler_metadata_offset,
+        expected_scheduler_metadata_hash: expected.scheduler_metadata_hash,
+        actual_scheduler_metadata_hash,
         expected_image_constructed: expected.image_constructed,
         actual_image_constructed,
         expected_image_ready: expected.image_ready,

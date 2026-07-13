@@ -274,6 +274,22 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             "final_executable_pipeline_emitted",
             report.final_executable_pipeline_emitted,
         ),
+        json_optional_string_field(
+            "final_executable_pipeline_scheduler_metadata_payload_id",
+            report
+                .final_executable_pipeline_scheduler_metadata_payload_id
+                .as_deref(),
+        ),
+        json_optional_bool_field(
+            "final_executable_pipeline_scheduler_metadata_present",
+            report.final_executable_pipeline_scheduler_metadata_present,
+        ),
+        json_optional_string_field(
+            "final_executable_pipeline_scheduler_metadata_hash",
+            report
+                .final_executable_pipeline_scheduler_metadata_hash
+                .as_deref(),
+        ),
         json_optional_usize_field(
             "final_executable_pipeline_required_stage_path_count",
             report.final_executable_pipeline_required_stage_path_count,

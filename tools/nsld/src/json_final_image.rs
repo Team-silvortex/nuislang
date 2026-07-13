@@ -18,6 +18,22 @@ pub(crate) fn nsld_final_executable_image_dry_run_report_json(
         json_string_field("byte_map_hash", &report.byte_map_hash),
         json_usize_field("payload_count", report.payload_count),
         json_usize_field("byte_span", report.byte_span),
+        json_string_field(
+            "scheduler_metadata_payload_id",
+            &report.scheduler_metadata_payload_id,
+        ),
+        json_bool_field(
+            "scheduler_metadata_present",
+            report.scheduler_metadata_present,
+        ),
+        json_optional_usize_field(
+            "scheduler_metadata_offset",
+            report.scheduler_metadata_offset,
+        ),
+        json_optional_string_field(
+            "scheduler_metadata_hash",
+            report.scheduler_metadata_hash.as_deref(),
+        ),
         json_bool_field("image_constructed", report.image_constructed),
         json_bool_field("image_ready", report.image_ready),
         json_optional_usize_field("image_size_bytes", report.image_size_bytes),
@@ -116,6 +132,38 @@ pub(crate) fn nsld_final_executable_image_dry_run_verify_report_json(
         json_optional_string_field(
             "actual_payload_region_hash",
             report.actual_payload_region_hash.as_deref(),
+        ),
+        json_string_field(
+            "expected_scheduler_metadata_payload_id",
+            &report.expected_scheduler_metadata_payload_id,
+        ),
+        json_optional_string_field(
+            "actual_scheduler_metadata_payload_id",
+            report.actual_scheduler_metadata_payload_id.as_deref(),
+        ),
+        json_bool_field(
+            "expected_scheduler_metadata_present",
+            report.expected_scheduler_metadata_present,
+        ),
+        json_optional_bool_field(
+            "actual_scheduler_metadata_present",
+            report.actual_scheduler_metadata_present,
+        ),
+        json_optional_usize_field(
+            "expected_scheduler_metadata_offset",
+            report.expected_scheduler_metadata_offset,
+        ),
+        json_optional_usize_field(
+            "actual_scheduler_metadata_offset",
+            report.actual_scheduler_metadata_offset,
+        ),
+        json_optional_string_field(
+            "expected_scheduler_metadata_hash",
+            report.expected_scheduler_metadata_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_scheduler_metadata_hash",
+            report.actual_scheduler_metadata_hash.as_deref(),
         ),
         json_bool_field(
             "expected_image_constructed",

@@ -12,6 +12,8 @@ use super::{
         nsld_emit_final_executable_launcher_manifest_report,
         nsld_emit_final_executable_layout_plan_report, nsld_emit_final_executable_report,
         nsld_emit_final_executable_writer_input_report, nsld_emit_final_stage_plan_report,
+        nsld_final_executable_launcher_dry_run_report,
+        nsld_final_executable_launcher_manifest_report,
     },
     fnv1a64_hex,
     reports::{NsldFinalExecutablePipelineEmitReport, NsldFinalExecutablePipelineVerifyReport},
@@ -31,6 +33,8 @@ pub(crate) fn nsld_emit_final_executable_pipeline_report(
     let final_executable = nsld_emit_final_executable_report(manifest, plan)?;
     let launcher_manifest = nsld_emit_final_executable_launcher_manifest_report(manifest, plan)?;
     let launcher_dry_run = nsld_emit_final_executable_launcher_dry_run_report(manifest, plan)?;
+    let launcher_manifest_report = nsld_final_executable_launcher_manifest_report(manifest, plan);
+    let launcher_dry_run_report = nsld_final_executable_launcher_dry_run_report(manifest, plan);
     let mut blockers = final_executable.blockers.clone();
     let required_stage_paths = final_executable_pipeline_required_stage_paths(
         final_executable.emitted,
@@ -77,6 +81,21 @@ pub(crate) fn nsld_emit_final_executable_pipeline_report(
         launcher_manifest_ready: launcher_manifest.ready,
         launcher_dry_run_ready: launcher_dry_run.dry_run_ready,
         would_enter_lifecycle_hook: launcher_dry_run.dry_run_ready,
+        scheduler_metadata_payload_id: launcher_manifest_report
+            .scheduler_metadata_payload_id
+            .clone()
+            .or_else(|| {
+                launcher_dry_run_report
+                    .scheduler_metadata_payload_id
+                    .clone()
+            }),
+        scheduler_metadata_present: launcher_manifest_report
+            .scheduler_metadata_present
+            .or(launcher_dry_run_report.scheduler_metadata_present),
+        scheduler_metadata_hash: launcher_manifest_report
+            .scheduler_metadata_hash
+            .clone()
+            .or_else(|| launcher_dry_run_report.scheduler_metadata_hash.clone()),
         required_stage_path_count: required_stage_paths.len(),
         required_stage_path_present_count: required_stage_paths.len()
             - missing_required_stage_paths.len(),
@@ -118,6 +137,9 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         actual_launcher_manifest_ready,
         actual_launcher_dry_run_ready,
         actual_would_enter_lifecycle_hook,
+        actual_scheduler_metadata_payload_id,
+        actual_scheduler_metadata_present,
+        actual_scheduler_metadata_hash,
         actual_required_stage_path_count,
         actual_required_stage_path_present_count,
         actual_missing_required_stage_paths,
@@ -131,6 +153,9 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
             toml::bool_value(source, "launcher_manifest_ready"),
             toml::bool_value(source, "launcher_dry_run_ready"),
             toml::bool_value(source, "would_enter_lifecycle_hook"),
+            non_empty_toml_string(source, "scheduler_metadata_payload_id"),
+            toml::bool_value(source, "scheduler_metadata_present"),
+            non_empty_toml_string(source, "scheduler_metadata_hash"),
             toml::usize_value(source, "required_stage_path_count"),
             toml::usize_value(source, "required_stage_path_present_count"),
             toml::string_array_value(source, "missing_required_stage_paths"),
@@ -140,6 +165,9 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         Err(error) => {
             issues.push(error.clone());
             (
+                None,
+                None,
+                None,
                 None,
                 None,
                 None,
@@ -183,6 +211,31 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
             expected.would_enter_lifecycle_hook,
             actual_would_enter_lifecycle_hook,
         );
+        push_optional_string_mismatch(
+            &mut issues,
+            "scheduler_metadata_payload_id",
+            expected.scheduler_metadata_payload_id.as_deref(),
+            actual_scheduler_metadata_payload_id.as_deref(),
+        );
+        if actual_scheduler_metadata_present != expected.scheduler_metadata_present {
+            issues.push(format!(
+                "scheduler_metadata_present mismatch: expected {}, found {}",
+                optional_bool_text(expected.scheduler_metadata_present),
+                optional_bool_text(actual_scheduler_metadata_present)
+            ));
+        }
+        if actual_scheduler_metadata_hash != expected.scheduler_metadata_hash {
+            issues.push(format!(
+                "scheduler_metadata_hash mismatch: expected {}, found {}",
+                expected
+                    .scheduler_metadata_hash
+                    .as_deref()
+                    .unwrap_or("missing"),
+                actual_scheduler_metadata_hash
+                    .as_deref()
+                    .unwrap_or("missing")
+            ));
+        }
         push_usize_mismatch(
             &mut issues,
             "required_stage_path_count",
@@ -235,6 +288,12 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         actual_launcher_dry_run_ready,
         expected_would_enter_lifecycle_hook: expected.would_enter_lifecycle_hook,
         actual_would_enter_lifecycle_hook,
+        expected_scheduler_metadata_payload_id: expected.scheduler_metadata_payload_id,
+        actual_scheduler_metadata_payload_id,
+        expected_scheduler_metadata_present: expected.scheduler_metadata_present,
+        actual_scheduler_metadata_present,
+        expected_scheduler_metadata_hash: expected.scheduler_metadata_hash,
+        actual_scheduler_metadata_hash,
         expected_required_stage_path_count: expected.required_stage_path_count,
         actual_required_stage_path_count,
         expected_required_stage_path_present_count: expected.required_stage_path_present_count,
@@ -325,6 +384,11 @@ fn nsld_final_executable_pipeline_snapshot(
         launcher_dry_run_ready: launcher_dry_run.actual_dry_run_ready == Some(true),
         would_enter_lifecycle_hook: launcher_dry_run.actual_would_enter_lifecycle_hook
             == Some(true),
+        scheduler_metadata_payload_id: launcher_manifest
+            .actual_scheduler_metadata_payload_id
+            .clone(),
+        scheduler_metadata_present: launcher_manifest.actual_scheduler_metadata_present,
+        scheduler_metadata_hash: launcher_manifest.actual_scheduler_metadata_hash.clone(),
         required_stage_path_count: required_stage_paths.len(),
         required_stage_path_present_count: required_stage_paths.len()
             - missing_required_stage_paths.len(),
@@ -385,6 +449,20 @@ fn render_final_executable_pipeline(report: &NsldFinalExecutablePipelineEmitRepo
         "would_enter_lifecycle_hook = {}\n",
         report.would_enter_lifecycle_hook
     ));
+    push_optional_str_field(
+        &mut out,
+        "scheduler_metadata_payload_id",
+        report.scheduler_metadata_payload_id.as_deref(),
+    );
+    out.push_str(&format!(
+        "scheduler_metadata_present = {}\n",
+        report.scheduler_metadata_present.unwrap_or(false)
+    ));
+    push_optional_str_field(
+        &mut out,
+        "scheduler_metadata_hash",
+        report.scheduler_metadata_hash.as_deref(),
+    );
     out.push_str(&format!(
         "required_stage_path_count = {}\n",
         report.required_stage_path_count
@@ -458,6 +536,20 @@ fn push_str_field(out: &mut String, key: &str, value: &str) {
     ));
 }
 
+fn push_optional_str_field(out: &mut String, key: &str, value: Option<&str>) {
+    push_str_field(out, key, value.unwrap_or(""));
+}
+
+fn non_empty_toml_string(source: &str, key: &str) -> Option<String> {
+    toml::string_value(source, key).filter(|value| !value.is_empty())
+}
+
+fn optional_bool_text(value: Option<bool>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "missing".to_owned())
+}
+
 fn push_usize_mismatch(
     issues: &mut Vec<String>,
     key: &str,
@@ -481,6 +573,21 @@ fn push_bool_mismatch(issues: &mut Vec<String>, key: &str, expected: bool, actua
             actual
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "missing".to_owned())
+        ));
+    }
+}
+
+fn push_optional_string_mismatch(
+    issues: &mut Vec<String>,
+    key: &str,
+    expected: Option<&str>,
+    actual: Option<&str>,
+) {
+    if actual != expected {
+        issues.push(format!(
+            "{key} mismatch: expected {}, found {}",
+            expected.unwrap_or("missing"),
+            actual.unwrap_or("missing")
         ));
     }
 }

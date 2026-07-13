@@ -83,8 +83,8 @@ fn final_executable_writer_plan_reports_host_assisted_steps() {
     assert_eq!(report.final_stage_driver, "clang");
     assert_eq!(report.final_stage_link_mode, "host-toolchain-finalize");
     assert!(report.host_wrapper_required);
-    assert_eq!(report.input_count, 4);
-    assert_eq!(report.inputs.len(), 4);
+    assert_eq!(report.input_count, 5);
+    assert_eq!(report.inputs.len(), 5);
     assert!(report.inputs.iter().any(|input| {
         input.input_id == "fsi0003.native-object" && input.required && input.present
     }));

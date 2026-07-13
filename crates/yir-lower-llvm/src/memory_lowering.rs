@@ -67,9 +67,8 @@ pub(crate) fn lower_cpu_memory_node(
             lower_buffer_fill(body, next_reg, raw.as_str(), len.as_str(), fill.as_str())?;
             registers.insert(node.name.clone(), LlvmValueRef::Ptr(raw.clone()));
             let known_len = facts
-                .i64_values
-                .get(&node.op.args[0])
-                .map(i64::to_string)
+                .get_i64(&node.op.args[0])
+                .map(|value| value.to_string())
                 .unwrap_or(len);
             buffer_lengths.insert(node.name.clone(), known_len);
         }

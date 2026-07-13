@@ -54,6 +54,22 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         optional_string_text(report.output_byte_map_hash.as_deref())
     );
     println!(
+        "  scheduler_metadata_payload_id: {}",
+        optional_string_text(report.scheduler_metadata_payload_id.as_deref())
+    );
+    println!(
+        "  scheduler_metadata_present: {}",
+        optional_bool_text(report.scheduler_metadata_present)
+    );
+    println!(
+        "  scheduler_metadata_offset: {}",
+        optional_usize_text(report.scheduler_metadata_offset)
+    );
+    println!(
+        "  scheduler_metadata_hash: {}",
+        optional_string_text(report.scheduler_metadata_hash.as_deref())
+    );
+    println!(
         "  expected_image_size_bytes: {}",
         optional_usize_text(report.expected_image_size_bytes)
     );

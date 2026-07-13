@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 #[derive(Default)]
 pub(crate) struct KnownFacts {
-    pub(crate) bool_values: BTreeMap<String, bool>,
-    pub(crate) i64_values: BTreeMap<String, i64>,
+    bool_values: BTreeMap<String, bool>,
+    i64_values: BTreeMap<String, i64>,
 }
 
 impl KnownFacts {

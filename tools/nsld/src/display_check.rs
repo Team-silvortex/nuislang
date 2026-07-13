@@ -309,6 +309,20 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_pipeline_issues.len()
     );
     println!(
+        "  final_executable_pipeline_scheduler_metadata: payload_id={} present={} hash={}",
+        optional_string_text(
+            report
+                .final_executable_pipeline_scheduler_metadata_payload_id
+                .as_deref()
+        ),
+        optional_bool_text(report.final_executable_pipeline_scheduler_metadata_present),
+        optional_string_text(
+            report
+                .final_executable_pipeline_scheduler_metadata_hash
+                .as_deref()
+        )
+    );
+    println!(
         "  container_loader: readiness={} blockers={} metadata_table_hash={} external_imports={}",
         optional_string_text(report.container_loader_readiness.as_deref()),
         report.container_loader_blockers.len(),

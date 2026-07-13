@@ -54,6 +54,22 @@ pub(crate) fn print_nsld_final_executable_launcher_manifest_report(
     println!("  image_header_valid: {}", report.image_header_valid);
     println!("  entry_lifecycle_hook: {}", report.entry_lifecycle_hook);
     println!("  scheduler_entry: {}", report.scheduler_entry);
+    println!(
+        "  scheduler_metadata_payload_id: {}",
+        optional_string_text(report.scheduler_metadata_payload_id.as_deref())
+    );
+    println!(
+        "  scheduler_metadata_present: {}",
+        optional_bool_text(report.scheduler_metadata_present)
+    );
+    println!(
+        "  scheduler_metadata_offset: {}",
+        optional_usize_text(report.scheduler_metadata_offset)
+    );
+    println!(
+        "  scheduler_metadata_hash: {}",
+        optional_string_text(report.scheduler_metadata_hash.as_deref())
+    );
     for step in &report.verification_steps {
         println!("  verification_step: {step}");
     }
@@ -168,6 +184,38 @@ pub(crate) fn print_nsld_final_executable_launcher_manifest_verify_report(
         "  actual_scheduler_entry: {}",
         optional_string_text(report.actual_scheduler_entry.as_deref())
     );
+    println!(
+        "  expected_scheduler_metadata_payload_id: {}",
+        optional_string_text(report.expected_scheduler_metadata_payload_id.as_deref())
+    );
+    println!(
+        "  actual_scheduler_metadata_payload_id: {}",
+        optional_string_text(report.actual_scheduler_metadata_payload_id.as_deref())
+    );
+    println!(
+        "  expected_scheduler_metadata_present: {}",
+        optional_bool_text(report.expected_scheduler_metadata_present)
+    );
+    println!(
+        "  actual_scheduler_metadata_present: {}",
+        optional_bool_text(report.actual_scheduler_metadata_present)
+    );
+    println!(
+        "  expected_scheduler_metadata_offset: {}",
+        optional_usize_text(report.expected_scheduler_metadata_offset)
+    );
+    println!(
+        "  actual_scheduler_metadata_offset: {}",
+        optional_usize_text(report.actual_scheduler_metadata_offset)
+    );
+    println!(
+        "  expected_scheduler_metadata_hash: {}",
+        optional_string_text(report.expected_scheduler_metadata_hash.as_deref())
+    );
+    println!(
+        "  actual_scheduler_metadata_hash: {}",
+        optional_string_text(report.actual_scheduler_metadata_hash.as_deref())
+    );
     for step in &report.expected_verification_steps {
         println!("  expected_verification_step: {step}");
     }
@@ -255,6 +303,22 @@ pub(crate) fn print_nsld_final_executable_launcher_dry_run_report(
     println!(
         "  scheduler_entry: {}",
         optional_string_text(report.scheduler_entry.as_deref())
+    );
+    println!(
+        "  scheduler_metadata_payload_id: {}",
+        optional_string_text(report.scheduler_metadata_payload_id.as_deref())
+    );
+    println!(
+        "  scheduler_metadata_present: {}",
+        optional_bool_text(report.scheduler_metadata_present)
+    );
+    println!(
+        "  scheduler_metadata_offset: {}",
+        optional_usize_text(report.scheduler_metadata_offset)
+    );
+    println!(
+        "  scheduler_metadata_hash: {}",
+        optional_string_text(report.scheduler_metadata_hash.as_deref())
     );
     println!("  dry_run_ready: {}", report.dry_run_ready);
     println!(

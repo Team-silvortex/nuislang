@@ -435,6 +435,15 @@ pub(crate) fn nsld_check_report(
         final_executable_pipeline_hash: final_snapshot.tail.final_executable_pipeline_hash,
         final_executable_pipeline_ready: final_snapshot.tail.final_executable_pipeline_ready,
         final_executable_pipeline_emitted: final_snapshot.tail.final_executable_pipeline_emitted,
+        final_executable_pipeline_scheduler_metadata_payload_id: final_snapshot
+            .tail
+            .final_executable_pipeline_scheduler_metadata_payload_id,
+        final_executable_pipeline_scheduler_metadata_present: final_snapshot
+            .tail
+            .final_executable_pipeline_scheduler_metadata_present,
+        final_executable_pipeline_scheduler_metadata_hash: final_snapshot
+            .tail
+            .final_executable_pipeline_scheduler_metadata_hash,
         final_executable_pipeline_required_stage_path_count: final_snapshot
             .tail
             .final_executable_pipeline_required_stage_path_count,

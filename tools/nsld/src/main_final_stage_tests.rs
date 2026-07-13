@@ -25,7 +25,7 @@ fn final_stage_plan_reports_deterministic_boundary_after_prepare() {
     assert_eq!(report.final_stage_link_mode, "host-toolchain-finalize");
     assert!(report.host_wrapper_required);
     assert_eq!(report.compatibility_mode, "host-assisted-wrapper");
-    assert_eq!(report.input_count, 4);
+    assert_eq!(report.input_count, 5);
     assert!(report.inputs.iter().all(|input| input.present));
     assert!(report.container_hash.starts_with("0x"));
     assert!(report.payload_hash.starts_with("0x"));
@@ -39,9 +39,10 @@ fn final_stage_plan_reports_deterministic_boundary_after_prepare() {
     assert!(report_json.contains("\"kind\":\"nsld_final_stage_plan\""));
     assert!(report_json.contains("\"plan_hash\":\"0x"));
     assert!(report_json.contains("\"final_stage_driver\":\"clang\""));
-    assert!(report_json.contains("\"input_count\":4"));
+    assert!(report_json.contains("\"input_count\":5"));
     assert!(report_json.contains("\"inputs\":[{"));
     assert!(report_json.contains("\"input_id\":\"fsi0002.closure-snapshot\""));
+    assert!(report_json.contains("\"input_id\":\"fsi0004.scheduler-metadata\""));
     assert!(report_json.contains("\"container_hash\":\"0x"));
     assert!(report_json.contains("\"payload_hash\":\"0x"));
 }

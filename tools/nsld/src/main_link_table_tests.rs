@@ -4,6 +4,7 @@ use super::{
     nsld_sidecar_capability_diagnostics, nsld_verify_link_bundle_report,
     nsld_verify_link_inputs_report, nsld_verify_link_units_report, toml,
 };
+use nuisc::linker::LinkPlanHeteroNode;
 use std::{env, fs, path::Path};
 
 #[test]
@@ -123,6 +124,21 @@ validation_contracts = ["glm.resource-lifetime"]
         artifact_payload_format: None,
         artifact_payload_blob_inline: None,
     });
+    plan.hetero_calculate.nodes.push(LinkPlanHeteroNode {
+        index: 0,
+        timestamp: "t0001.shader".to_owned(),
+        domain_family: "shader".to_owned(),
+        package_id: "official.shader".to_owned(),
+        lifecycle_hook: "on_hetero_submission_progress".to_owned(),
+        wait_on: vec!["t0000.main".to_owned()],
+        emits: vec![
+            "t0001.shader.submit".to_owned(),
+            "t0001.shader.complete".to_owned(),
+            "t0001.shader.data_commit".to_owned(),
+        ],
+        link_input: sidecar_path.display().to_string(),
+        c_world_wrapper: false,
+    });
 
     let report = nsld_link_unit_report(Path::new("manifest.toml"), &plan);
     fs::remove_dir_all(dir).unwrap();
@@ -130,6 +146,7 @@ validation_contracts = ["glm.resource-lifetime"]
     assert_eq!(report.unit_count, 1);
     assert_eq!(report.hetero_unit_count, 1);
     assert_eq!(report.link_input_count, 1);
+    assert_eq!(report.hetero_node_count, 1);
     assert_eq!(report.units[0].unit_id, "lu0000.shader.official.shader");
     assert_eq!(report.units[0].unit_kind, "hetero-domain");
     assert_eq!(report.units[0].backend_family, "metal");
@@ -138,6 +155,14 @@ validation_contracts = ["glm.resource-lifetime"]
         report.units[0].link_input_ids[0],
         "li0000.shader.official.shader"
     );
+    assert_eq!(report.units[0].hetero_node_count, 1);
+    assert_eq!(report.units[0].hetero_timestamps, vec!["t0001.shader"]);
+    assert_eq!(
+        report.units[0].lifecycle_hooks,
+        vec!["on_hetero_submission_progress"]
+    );
+    assert_eq!(report.units[0].wait_event_count, 1);
+    assert_eq!(report.units[0].emit_event_count, 3);
     assert_eq!(
         report.unit_table_hash,
         nsld_link_unit_table_hash(&report.units)
@@ -190,6 +215,17 @@ validation_contracts = ["glm.resource-lifetime"]
         artifact_payload_format: None,
         artifact_payload_blob_inline: None,
     });
+    plan.hetero_calculate.nodes.push(LinkPlanHeteroNode {
+        index: 0,
+        timestamp: "t0001.shader".to_owned(),
+        domain_family: "shader".to_owned(),
+        package_id: "official.shader".to_owned(),
+        lifecycle_hook: "on_hetero_submission_progress".to_owned(),
+        wait_on: vec!["t0000.main".to_owned()],
+        emits: vec!["t0001.shader.complete".to_owned()],
+        link_input: sidecar_path.display().to_string(),
+        c_world_wrapper: false,
+    });
     let unit_report = nsld_link_unit_report(Path::new("manifest.toml"), &plan);
     fs::write(
         dir.join("nuis.nsld.link-units.toml"),
@@ -205,6 +241,7 @@ validation_contracts = ["glm.resource-lifetime"]
     assert_eq!(report.actual_unit_count, Some(1));
     assert_eq!(report.actual_hetero_unit_count, Some(1));
     assert_eq!(report.actual_link_input_count, Some(1));
+    assert_eq!(report.actual_hetero_node_count, Some(1));
     assert_eq!(
         report.actual_unit_table_hash,
         Some(unit_report.unit_table_hash)
