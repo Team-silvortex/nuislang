@@ -445,11 +445,24 @@ pub(crate) fn nsld_final_executable_output_report_json(
         json_string_field("output_validation_mode", &report.output_validation_mode),
         json_string_field("boundary_status", &report.boundary_status),
         json_string_field("materialization_status", &report.materialization_status),
+        json_string_field(
+            "execution_handoff_contract",
+            &report.execution_handoff_contract,
+        ),
+        json_bool_field("execution_handoff_ready", report.execution_handoff_ready),
         json_string_field("execution_handoff_status", &report.execution_handoff_status),
         json_string_field("execution_handoff_target", &report.execution_handoff_target),
         json_string_field(
             "execution_handoff_evidence_status",
             &report.execution_handoff_evidence_status,
+        ),
+        json_optional_string_field(
+            "execution_handoff_first_blocker",
+            report.execution_handoff_first_blocker.as_deref(),
+        ),
+        json_string_field(
+            "execution_handoff_decision_code",
+            &report.execution_handoff_decision_code,
         ),
         json_string_field("recommended_next_action", &report.recommended_next_action),
         json_bool_field("path_present", report.path_present),

@@ -391,12 +391,20 @@ pub(crate) fn nsld_check_report(
             .final_executable_output_boundary_status,
         final_executable_output_materialization_status: final_snapshot
             .final_executable_output_materialization_status,
+        final_executable_output_execution_handoff_contract: final_snapshot
+            .final_executable_output_execution_handoff_contract,
+        final_executable_output_execution_handoff_ready: final_snapshot
+            .final_executable_output_execution_handoff_ready,
         final_executable_output_execution_handoff_status: final_snapshot
             .final_executable_output_execution_handoff_status,
         final_executable_output_execution_handoff_target: final_snapshot
             .final_executable_output_execution_handoff_target,
         final_executable_output_execution_handoff_evidence_status: final_snapshot
             .final_executable_output_execution_handoff_evidence_status,
+        final_executable_output_execution_handoff_first_blocker: final_snapshot
+            .final_executable_output_execution_handoff_first_blocker,
+        final_executable_output_execution_handoff_decision_code: final_snapshot
+            .final_executable_output_execution_handoff_decision_code,
         final_executable_output_recommended_next_action: final_snapshot
             .final_executable_output_recommended_next_action,
         final_executable_output_nsld_owned: final_snapshot.final_executable_output_nsld_owned,

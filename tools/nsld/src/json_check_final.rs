@@ -157,6 +157,14 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             &report.final_executable_output_materialization_status,
         ),
         json_string_field(
+            "final_executable_output_execution_handoff_contract",
+            &report.final_executable_output_execution_handoff_contract,
+        ),
+        json_bool_field(
+            "final_executable_output_execution_handoff_ready",
+            report.final_executable_output_execution_handoff_ready,
+        ),
+        json_string_field(
             "final_executable_output_execution_handoff_status",
             &report.final_executable_output_execution_handoff_status,
         ),
@@ -167,6 +175,16 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
         json_string_field(
             "final_executable_output_execution_handoff_evidence_status",
             &report.final_executable_output_execution_handoff_evidence_status,
+        ),
+        json_optional_string_field(
+            "final_executable_output_execution_handoff_first_blocker",
+            report
+                .final_executable_output_execution_handoff_first_blocker
+                .as_deref(),
+        ),
+        json_string_field(
+            "final_executable_output_execution_handoff_decision_code",
+            &report.final_executable_output_execution_handoff_decision_code,
         ),
         json_string_field(
             "final_executable_output_recommended_next_action",

@@ -29,6 +29,25 @@ pub(crate) fn nsld_final_executable_launcher_manifest_report_json(
         json_string_field("host_arch", &report.host_arch),
         json_string_field("output_kind", &report.output_kind),
         json_string_field("output_validation_mode", &report.output_validation_mode),
+        json_string_field(
+            "execution_handoff_contract",
+            &report.execution_handoff_contract,
+        ),
+        json_bool_field("execution_handoff_ready", report.execution_handoff_ready),
+        json_string_field("execution_handoff_status", &report.execution_handoff_status),
+        json_string_field("execution_handoff_target", &report.execution_handoff_target),
+        json_string_field(
+            "execution_handoff_evidence_status",
+            &report.execution_handoff_evidence_status,
+        ),
+        json_optional_string_field(
+            "execution_handoff_first_blocker",
+            report.execution_handoff_first_blocker.as_deref(),
+        ),
+        json_string_field(
+            "execution_handoff_decision_code",
+            &report.execution_handoff_decision_code,
+        ),
         json_string_field("final_output_path", &report.final_output_path),
         json_bool_field("final_output_present", report.final_output_present),
         json_optional_usize_field("final_output_size_bytes", report.final_output_size_bytes),
@@ -114,6 +133,62 @@ pub(crate) fn nsld_final_executable_launcher_manifest_verify_report_json(
         json_optional_string_field(
             "actual_output_validation_mode",
             report.actual_output_validation_mode.as_deref(),
+        ),
+        json_string_field(
+            "expected_execution_handoff_contract",
+            &report.expected_execution_handoff_contract,
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_contract",
+            report.actual_execution_handoff_contract.as_deref(),
+        ),
+        json_bool_field(
+            "expected_execution_handoff_ready",
+            report.expected_execution_handoff_ready,
+        ),
+        json_optional_bool_field(
+            "actual_execution_handoff_ready",
+            report.actual_execution_handoff_ready,
+        ),
+        json_string_field(
+            "expected_execution_handoff_status",
+            &report.expected_execution_handoff_status,
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_status",
+            report.actual_execution_handoff_status.as_deref(),
+        ),
+        json_string_field(
+            "expected_execution_handoff_target",
+            &report.expected_execution_handoff_target,
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_target",
+            report.actual_execution_handoff_target.as_deref(),
+        ),
+        json_string_field(
+            "expected_execution_handoff_evidence_status",
+            &report.expected_execution_handoff_evidence_status,
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_evidence_status",
+            report.actual_execution_handoff_evidence_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_execution_handoff_first_blocker",
+            report.expected_execution_handoff_first_blocker.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_first_blocker",
+            report.actual_execution_handoff_first_blocker.as_deref(),
+        ),
+        json_string_field(
+            "expected_execution_handoff_decision_code",
+            &report.expected_execution_handoff_decision_code,
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_decision_code",
+            report.actual_execution_handoff_decision_code.as_deref(),
         ),
         json_string_field(
             "expected_final_output_path",
@@ -250,6 +325,31 @@ pub(crate) fn nsld_final_executable_launcher_dry_run_report_json(
             "output_validation_mode",
             report.output_validation_mode.as_deref(),
         ),
+        json_optional_string_field(
+            "execution_handoff_contract",
+            report.execution_handoff_contract.as_deref(),
+        ),
+        json_optional_bool_field("execution_handoff_ready", report.execution_handoff_ready),
+        json_optional_string_field(
+            "execution_handoff_status",
+            report.execution_handoff_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "execution_handoff_target",
+            report.execution_handoff_target.as_deref(),
+        ),
+        json_optional_string_field(
+            "execution_handoff_evidence_status",
+            report.execution_handoff_evidence_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "execution_handoff_first_blocker",
+            report.execution_handoff_first_blocker.as_deref(),
+        ),
+        json_optional_string_field(
+            "execution_handoff_decision_code",
+            report.execution_handoff_decision_code.as_deref(),
+        ),
         json_optional_bool_field("image_header_required", report.image_header_required),
         json_optional_bool_field("image_header_valid", report.image_header_valid),
         json_optional_string_field(
@@ -373,6 +473,25 @@ pub(crate) fn nsld_final_executable_pipeline_emit_report_json(
             "entrypoint_materialization_status",
             &report.entrypoint_materialization_status,
         ),
+        json_string_field(
+            "execution_handoff_contract",
+            &report.execution_handoff_contract,
+        ),
+        json_bool_field("execution_handoff_ready", report.execution_handoff_ready),
+        json_string_field("execution_handoff_status", &report.execution_handoff_status),
+        json_string_field("execution_handoff_target", &report.execution_handoff_target),
+        json_string_field(
+            "execution_handoff_evidence_status",
+            &report.execution_handoff_evidence_status,
+        ),
+        json_optional_string_field(
+            "execution_handoff_first_blocker",
+            report.execution_handoff_first_blocker.as_deref(),
+        ),
+        json_string_field(
+            "execution_handoff_decision_code",
+            &report.execution_handoff_decision_code,
+        ),
         json_optional_string_field(
             "scheduler_metadata_payload_id",
             report.scheduler_metadata_payload_id.as_deref(),
@@ -467,6 +586,62 @@ pub(crate) fn nsld_final_executable_pipeline_verify_report_json(
         json_optional_string_field(
             "actual_entrypoint_materialization_status",
             report.actual_entrypoint_materialization_status.as_deref(),
+        ),
+        json_string_field(
+            "expected_execution_handoff_contract",
+            &report.expected_execution_handoff_contract,
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_contract",
+            report.actual_execution_handoff_contract.as_deref(),
+        ),
+        json_bool_field(
+            "expected_execution_handoff_ready",
+            report.expected_execution_handoff_ready,
+        ),
+        json_optional_bool_field(
+            "actual_execution_handoff_ready",
+            report.actual_execution_handoff_ready,
+        ),
+        json_string_field(
+            "expected_execution_handoff_status",
+            &report.expected_execution_handoff_status,
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_status",
+            report.actual_execution_handoff_status.as_deref(),
+        ),
+        json_string_field(
+            "expected_execution_handoff_target",
+            &report.expected_execution_handoff_target,
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_target",
+            report.actual_execution_handoff_target.as_deref(),
+        ),
+        json_string_field(
+            "expected_execution_handoff_evidence_status",
+            &report.expected_execution_handoff_evidence_status,
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_evidence_status",
+            report.actual_execution_handoff_evidence_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_execution_handoff_first_blocker",
+            report.expected_execution_handoff_first_blocker.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_first_blocker",
+            report.actual_execution_handoff_first_blocker.as_deref(),
+        ),
+        json_string_field(
+            "expected_execution_handoff_decision_code",
+            &report.expected_execution_handoff_decision_code,
+        ),
+        json_optional_string_field(
+            "actual_execution_handoff_decision_code",
+            report.actual_execution_handoff_decision_code.as_deref(),
         ),
         json_optional_string_field(
             "expected_scheduler_metadata_payload_id",

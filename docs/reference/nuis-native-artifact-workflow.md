@@ -86,9 +86,20 @@ artifact-follow-up state:
 * `nsld_final_executable_output_ready`
 * `nsld_final_executable_output_boundary_status`
 * `nsld_final_executable_output_materialization_status`
+* `nsld_final_executable_output_execution_handoff_contract`
+* `nsld_final_executable_output_execution_handoff_ready`
 * `nsld_final_executable_output_execution_handoff_status`
 * `nsld_final_executable_output_execution_handoff_target`
 * `nsld_final_executable_output_execution_handoff_evidence_status`
+* `nsld_final_executable_output_execution_handoff_first_blocker`
+* `nsld_final_executable_output_execution_handoff_decision_code`
+* `nsld_final_executable_pipeline_execution_handoff_contract`
+* `nsld_final_executable_pipeline_execution_handoff_ready`
+* `nsld_final_executable_pipeline_execution_handoff_status`
+* `nsld_final_executable_pipeline_execution_handoff_target`
+* `nsld_final_executable_pipeline_execution_handoff_evidence_status`
+* `nsld_final_executable_pipeline_execution_handoff_first_blocker`
+* `nsld_final_executable_pipeline_execution_handoff_decision_code`
 * `nsld_final_executable_output_recommended_next_action`
 * `nsld_final_executable_output_path_present`
 * `nsld_final_executable_output_nsld_owned`
@@ -114,6 +125,12 @@ Short reading rule:
   state for the final-output boundary
 * `nsld_final_executable_output_materialization_status` distinguishes host-native
   readiness from the self-contained internal image route
+* `nsld_final_executable_output_execution_handoff_contract` versions the
+  handoff field group so runner, materializer, and debugger consumers can branch
+  on an explicit protocol
+* `nsld_final_executable_output_execution_handoff_ready` is the script-friendly
+  boolean mirror for whether the verified output boundary can hand off to the
+  next execution owner
 * `nsld_final_executable_output_execution_handoff_status` distinguishes whether
   the output can hand off directly to a runner, still needs entrypoint
   materialization, or is blocked
@@ -123,6 +140,19 @@ Short reading rule:
 * `nsld_final_executable_output_execution_handoff_evidence_status` names the
   proof class backing the handoff, such as the host invoke plan or the internal
   image header/hash evidence
+* `nsld_final_executable_output_execution_handoff_first_blocker` mirrors the
+  first blocker that prevents that handoff, so scripts do not need to parse the
+  full blocker list for the common branch
+* `nsld_final_executable_output_execution_handoff_decision_code` is the compact
+  branch code for CI, nsdb, and future runner/materializer routing
+* Nsld launcher manifest and launcher dry-run artifacts preserve the same
+  `nsld-final-output-handoff-v1` decision group instead of inventing a second
+  launch-readiness model
+* the final-executable pipeline summary preserves that same handoff group so
+  automation can route from the pipeline report first
+* the `nsld_final_executable_pipeline_execution_handoff_*` fields are the
+  `nuis` frontdoor mirror of that pipeline route; they are `null` until the
+  pipeline artifact exists
 * `nsld_final_executable_output_recommended_next_action` gives scripts the next
   boundary action without forcing them to interpret every blocker string
 * `nsld_self_owned_image_status` is the normalized script-facing state for the
@@ -151,6 +181,10 @@ The current line should be described honestly:
   through `clang`
 * the self-contained internal image route can produce an Nsld-owned `.nsb`
   image and launcher dry-run metadata
+* launcher metadata now carries the final-output handoff contract through to
+  the non-executing launch preflight layer
+* final-executable pipeline metadata carries the same handoff contract as its
+  top-level route summary
 * heterogeneous bundle packing is modeled separately from host-native final
   link
 * this is not yet the final host-shell / OS-native `nuis` linker architecture

@@ -47,6 +47,28 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
         Some("host-launcher-ready")
     );
     assert_eq!(
+        verify.actual_execution_handoff_contract.as_deref(),
+        Some("nsld-final-output-handoff-v1")
+    );
+    assert_eq!(verify.actual_execution_handoff_ready, Some(true));
+    assert_eq!(
+        verify.actual_execution_handoff_status.as_deref(),
+        Some("entrypoint-materializer-required")
+    );
+    assert_eq!(
+        verify.actual_execution_handoff_target.as_deref(),
+        Some("entrypoint-materializer")
+    );
+    assert_eq!(
+        verify.actual_execution_handoff_evidence_status.as_deref(),
+        Some("image-header-and-hash-ready")
+    );
+    assert_eq!(verify.actual_execution_handoff_first_blocker, None);
+    assert_eq!(
+        verify.actual_execution_handoff_decision_code.as_deref(),
+        Some("handoff-entrypoint-materializer")
+    );
+    assert_eq!(
         verify.actual_scheduler_metadata_payload_id.as_deref(),
         Some("payload0004.scheduler-metadata")
     );
@@ -63,6 +85,25 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert_eq!(
         pipeline.entrypoint_materialization_status,
         "host-launcher-ready"
+    );
+    assert_eq!(
+        pipeline.execution_handoff_contract,
+        "nsld-final-output-handoff-v1"
+    );
+    assert!(pipeline.execution_handoff_ready);
+    assert_eq!(
+        pipeline.execution_handoff_status,
+        "entrypoint-materializer-required"
+    );
+    assert_eq!(pipeline.execution_handoff_target, "entrypoint-materializer");
+    assert_eq!(
+        pipeline.execution_handoff_evidence_status,
+        "image-header-and-hash-ready"
+    );
+    assert_eq!(pipeline.execution_handoff_first_blocker, None);
+    assert_eq!(
+        pipeline.execution_handoff_decision_code,
+        "handoff-entrypoint-materializer"
     );
     assert_eq!(
         pipeline.scheduler_metadata_payload_id.as_deref(),
@@ -86,6 +127,10 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert!(pipeline_json.contains("\"launcher_dry_run_ready\":true"));
     assert!(pipeline_json.contains("\"self_owned_image_status\":\"ready\""));
     assert!(pipeline_json.contains("\"entrypoint_materialization_status\":\"host-launcher-ready\""));
+    assert!(pipeline_json.contains("\"execution_handoff_ready\":true"));
+    assert!(pipeline_json.contains("\"execution_handoff_target\":\"entrypoint-materializer\""));
+    assert!(pipeline_json
+        .contains("\"execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""));
     assert!(pipeline_json
         .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(pipeline_json.contains("\"scheduler_metadata_present\":true"));
@@ -96,6 +141,11 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert!(verify_json.contains("\"actual_self_owned_image_status\":\"ready\""));
     assert!(verify_json
         .contains("\"actual_entrypoint_materialization_status\":\"host-launcher-ready\""));
+    assert!(verify_json.contains("\"actual_execution_handoff_ready\":true"));
+    assert!(verify_json.contains("\"actual_execution_handoff_target\":\"entrypoint-materializer\""));
+    assert!(verify_json.contains(
+        "\"actual_execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""
+    ));
     assert!(verify_json
         .contains("\"actual_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(check.valid);

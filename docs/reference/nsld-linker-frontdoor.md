@@ -211,6 +211,8 @@ the optional final-executable boundary artifacts:
 * optional `nuis.nsld.final-executable-host-invoke-plan.toml`
 * optional `nuis.nsld.final-executable-layout.toml`
 * optional `nuis.nsld.final-executable.blocked.toml`
+* optional `nuis.nsld.final-executable-launcher.toml`
+* optional `nuis.nsld.final-executable-launcher-dry-run.toml`
 
 `nsld emit-inputs` is the explicit materialization command for the link-input
 table. `nsld inputs` remains accepted as the alpha-era compatibility alias.
@@ -249,6 +251,17 @@ The prepare JSON report also exposes
 `object_image_relocation_records`, so orchestration tools can inspect the
 active relocation registry and actual backend relocation records without
 opening the dry-run TOML separately.
+
+The launcher artifacts are still non-executing protocol artifacts. The launcher
+manifest carries the `nsld-final-output-handoff-v1` field group copied from the
+verified final-output boundary, and the launcher dry-run preserves the same
+handoff contract, target, evidence status, first blocker, and decision code.
+That means future host runners, entrypoint materializers, nsdb, or packaging
+tools can consume the launcher layer without re-deriving whether the output
+belongs to `host-runner`, `entrypoint-materializer`, or no execution owner yet.
+The final-executable pipeline summary also copies that same handoff group, so
+automation can route from the pipeline report without opening the launcher TOML
+unless it needs lower-level diagnostics.
 
 `nsld assemble-plan` is the first dry-run view of binary assembly. It consumes
 the prepared bundle state and lists the sections that a future Nsld-owned
@@ -1175,9 +1188,13 @@ read-only output boundary exposed by `final-executable-output` and reports
 `final_executable_output_path_present`,
 `final_executable_output_boundary_status`,
 `final_executable_output_materialization_status`,
+`final_executable_output_execution_handoff_contract`,
+`final_executable_output_execution_handoff_ready`,
 `final_executable_output_execution_handoff_status`,
 `final_executable_output_execution_handoff_target`,
 `final_executable_output_execution_handoff_evidence_status`,
+`final_executable_output_execution_handoff_first_blocker`,
+`final_executable_output_execution_handoff_decision_code`,
 `final_executable_output_recommended_next_action`,
 `final_executable_output_nsld_owned`,
 `final_executable_output_present`,
@@ -1200,14 +1217,23 @@ Scripts should prefer the normalized `boundary_status` /
 `final_executable_output_boundary_status` field for high-level branching, use
 `materialization_status` /
 `final_executable_output_materialization_status` to distinguish host-native from
-self-contained image readiness, use `execution_handoff_status` /
+self-contained image readiness, use `execution_handoff_contract` /
+`final_executable_output_execution_handoff_contract` to identify the handoff
+field-group protocol, use `execution_handoff_ready` /
+`final_executable_output_execution_handoff_ready` for the script-friendly
+handoff gate, use `execution_handoff_status` /
 `final_executable_output_execution_handoff_status` to distinguish runner-ready
 outputs from outputs that still need an entrypoint materializer, use
 `execution_handoff_target` /
 `final_executable_output_execution_handoff_target` to name the abstract owner of
 that handoff, use `execution_handoff_evidence_status` /
 `final_executable_output_execution_handoff_evidence_status` to identify the
-proof class backing the handoff, and use
+proof class backing the handoff, use `execution_handoff_first_blocker` /
+`final_executable_output_execution_handoff_first_blocker` for the first
+machine-readable blocker preventing that handoff, use
+`execution_handoff_decision_code` /
+`final_executable_output_execution_handoff_decision_code` as a compact branch
+code for CI, nsdb, and future runner/materializer routing, and use
 `recommended_next_action` /
 `final_executable_output_recommended_next_action` for the next scripted boundary
 step. Blockers and issues remain diagnostic detail.

@@ -32,9 +32,22 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
     assert!(!report.present);
     assert_eq!(report.boundary_status, "missing");
     assert_eq!(report.materialization_status, "blocked");
+    assert_eq!(
+        report.execution_handoff_contract,
+        "nsld-final-output-handoff-v1"
+    );
+    assert!(!report.execution_handoff_ready);
     assert_eq!(report.execution_handoff_status, "blocked");
     assert_eq!(report.execution_handoff_target, "none");
     assert_eq!(report.execution_handoff_evidence_status, "blocked");
+    assert_eq!(
+        report.execution_handoff_first_blocker.as_deref(),
+        Some("final-executable-output:missing")
+    );
+    assert_eq!(
+        report.execution_handoff_decision_code,
+        "emit-final-executable"
+    );
     assert_eq!(
         report.recommended_next_action,
         "emit-final-executable-pipeline"
@@ -55,9 +68,14 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_output\""));
     assert!(report_json.contains("\"boundary_status\":\"missing\""));
     assert!(report_json.contains("\"materialization_status\":\"blocked\""));
+    assert!(report_json.contains("\"execution_handoff_contract\":\"nsld-final-output-handoff-v1\""));
+    assert!(report_json.contains("\"execution_handoff_ready\":false"));
     assert!(report_json.contains("\"execution_handoff_status\":\"blocked\""));
     assert!(report_json.contains("\"execution_handoff_target\":\"none\""));
     assert!(report_json.contains("\"execution_handoff_evidence_status\":\"blocked\""));
+    assert!(report_json
+        .contains("\"execution_handoff_first_blocker\":\"final-executable-output:missing\""));
+    assert!(report_json.contains("\"execution_handoff_decision_code\":\"emit-final-executable\""));
     assert!(report_json.contains("\"recommended_next_action\":\"emit-final-executable-pipeline\""));
     assert!(report_json.contains("\"present\":false"));
     assert!(report_json.contains("\"output_image_header_valid\":false"));
@@ -137,6 +155,25 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert_eq!(manifest.entry_lifecycle_hook, "on_process_start");
     assert_eq!(manifest.scheduler_entry, "nuis.scheduler.loop.v1");
     assert_eq!(
+        manifest.execution_handoff_contract,
+        "nsld-final-output-handoff-v1"
+    );
+    assert!(manifest.execution_handoff_ready);
+    assert_eq!(
+        manifest.execution_handoff_status,
+        "entrypoint-materializer-required"
+    );
+    assert_eq!(manifest.execution_handoff_target, "entrypoint-materializer");
+    assert_eq!(
+        manifest.execution_handoff_evidence_status,
+        "image-header-and-hash-ready"
+    );
+    assert_eq!(manifest.execution_handoff_first_blocker, None);
+    assert_eq!(
+        manifest.execution_handoff_decision_code,
+        "handoff-entrypoint-materializer"
+    );
+    assert_eq!(
         manifest.scheduler_metadata_payload_id.as_deref(),
         Some("payload0004.scheduler-metadata")
     );
@@ -163,6 +200,28 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
         Some("nuis.scheduler.loop.v1")
     );
     assert_eq!(
+        verify.actual_execution_handoff_contract.as_deref(),
+        Some("nsld-final-output-handoff-v1")
+    );
+    assert_eq!(verify.actual_execution_handoff_ready, Some(true));
+    assert_eq!(
+        verify.actual_execution_handoff_status.as_deref(),
+        Some("entrypoint-materializer-required")
+    );
+    assert_eq!(
+        verify.actual_execution_handoff_target.as_deref(),
+        Some("entrypoint-materializer")
+    );
+    assert_eq!(
+        verify.actual_execution_handoff_evidence_status.as_deref(),
+        Some("image-header-and-hash-ready")
+    );
+    assert_eq!(verify.actual_execution_handoff_first_blocker, None);
+    assert_eq!(
+        verify.actual_execution_handoff_decision_code.as_deref(),
+        Some("handoff-entrypoint-materializer")
+    );
+    assert_eq!(
         verify.actual_scheduler_metadata_payload_id.as_deref(),
         Some("payload0004.scheduler-metadata")
     );
@@ -184,6 +243,19 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     );
     assert_eq!(dry_run.scheduler_metadata_present, Some(true));
     assert_eq!(
+        dry_run.execution_handoff_contract.as_deref(),
+        Some("nsld-final-output-handoff-v1")
+    );
+    assert_eq!(dry_run.execution_handoff_ready, Some(true));
+    assert_eq!(
+        dry_run.execution_handoff_target.as_deref(),
+        Some("entrypoint-materializer")
+    );
+    assert_eq!(
+        dry_run.execution_handoff_decision_code.as_deref(),
+        Some("handoff-entrypoint-materializer")
+    );
+    assert_eq!(
         dry_run.scheduler_metadata_hash,
         manifest.scheduler_metadata_hash
     );
@@ -204,25 +276,44 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert!(dry_run_source.contains("schema = \"nuis-host-launcher-dry-run-v1\""));
     assert!(manifest_source.contains("entry_lifecycle_hook = \"on_process_start\""));
     assert!(manifest_source.contains("scheduler_entry = \"nuis.scheduler.loop.v1\""));
+    assert!(manifest_source.contains("execution_handoff_ready = true"));
+    assert!(manifest_source.contains("execution_handoff_target = \"entrypoint-materializer\""));
+    assert!(manifest_source
+        .contains("execution_handoff_decision_code = \"handoff-entrypoint-materializer\""));
     assert!(manifest_source
         .contains("scheduler_metadata_payload_id = \"payload0004.scheduler-metadata\""));
     assert!(manifest_source.contains("scheduler_metadata_present = true"));
     assert!(dry_run_source
         .contains("scheduler_metadata_payload_id = \"payload0004.scheduler-metadata\""));
+    assert!(
+        dry_run_source.contains("execution_handoff_contract = \"nsld-final-output-handoff-v1\"")
+    );
+    assert!(dry_run_source
+        .contains("execution_handoff_decision_code = \"handoff-entrypoint-materializer\""));
     assert!(dry_run_source.contains("scheduler_metadata_present = true"));
     assert!(manifest_json.contains("\"kind\":\"nsld_final_executable_launcher_manifest\""));
     assert!(manifest_json.contains("\"ready\":true"));
     assert!(manifest_json.contains("\"nsb_hash\":\"0x"));
+    assert!(manifest_json.contains("\"execution_handoff_ready\":true"));
+    assert!(manifest_json.contains("\"execution_handoff_target\":\"entrypoint-materializer\""));
     assert!(manifest_json
         .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(manifest_json.contains("\"scheduler_metadata_present\":true"));
     assert!(verify_json.contains("\"kind\":\"nsld_final_executable_launcher_manifest_verify\""));
     assert!(verify_json.contains("\"valid\":true"));
+    assert!(verify_json.contains(
+        "\"actual_execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""
+    ));
     assert!(verify_json
         .contains("\"actual_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(dry_run_json.contains("\"kind\":\"nsld_final_executable_launcher_dry_run\""));
     assert!(dry_run_json.contains("\"dry_run_ready\":true"));
     assert!(dry_run_json.contains("\"would_enter_lifecycle_hook\":true"));
+    assert!(
+        dry_run_json.contains("\"execution_handoff_contract\":\"nsld-final-output-handoff-v1\"")
+    );
+    assert!(dry_run_json
+        .contains("\"execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""));
     assert!(dry_run_json
         .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(dry_run_emit_json.contains("\"kind\":\"nsld_final_executable_launcher_dry_run_emit\""));
@@ -442,6 +533,11 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert_eq!(output.boundary_status, "ready");
     assert_eq!(output.materialization_status, "self-contained-image-ready");
     assert_eq!(
+        output.execution_handoff_contract,
+        "nsld-final-output-handoff-v1"
+    );
+    assert!(output.execution_handoff_ready);
+    assert_eq!(
         output.execution_handoff_status,
         "entrypoint-materializer-required"
     );
@@ -449,6 +545,11 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert_eq!(
         output.execution_handoff_evidence_status,
         "image-header-and-hash-ready"
+    );
+    assert_eq!(output.execution_handoff_first_blocker, None);
+    assert_eq!(
+        output.execution_handoff_decision_code,
+        "handoff-entrypoint-materializer"
     );
     assert_eq!(
         output.recommended_next_action,
@@ -501,12 +602,17 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output_json.contains("\"present\":true"));
     assert!(output_json.contains("\"boundary_status\":\"ready\""));
     assert!(output_json.contains("\"materialization_status\":\"self-contained-image-ready\""));
+    assert!(output_json.contains("\"execution_handoff_contract\":\"nsld-final-output-handoff-v1\""));
+    assert!(output_json.contains("\"execution_handoff_ready\":true"));
     assert!(
         output_json.contains("\"execution_handoff_status\":\"entrypoint-materializer-required\"")
     );
     assert!(output_json.contains("\"execution_handoff_target\":\"entrypoint-materializer\""));
     assert!(output_json
         .contains("\"execution_handoff_evidence_status\":\"image-header-and-hash-ready\""));
+    assert!(output_json.contains("\"execution_handoff_first_blocker\":null"));
+    assert!(output_json
+        .contains("\"execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""));
     assert!(output_json
         .contains("\"recommended_next_action\":\"materialize-host-shell-or-os-entrypoint\""));
     assert!(output_json.contains("\"path_present\":true"));
@@ -661,9 +767,22 @@ fn final_executable_output_rejects_tampered_output_bytes() {
     assert!(output.present);
     assert_eq!(output.boundary_status, "invalid");
     assert_eq!(output.materialization_status, "blocked");
+    assert_eq!(
+        output.execution_handoff_contract,
+        "nsld-final-output-handoff-v1"
+    );
+    assert!(!output.execution_handoff_ready);
     assert_eq!(output.execution_handoff_status, "blocked");
     assert_eq!(output.execution_handoff_target, "none");
     assert_eq!(output.execution_handoff_evidence_status, "blocked");
+    assert_eq!(
+        output.execution_handoff_first_blocker.as_deref(),
+        Some("final-executable-output:image-header-invalid")
+    );
+    assert_eq!(
+        output.execution_handoff_decision_code,
+        "inspect-output-diagnostics"
+    );
     assert_eq!(
         output.recommended_next_action,
         "inspect-final-output-diagnostics"
@@ -698,6 +817,11 @@ fn final_executable_output_rejects_tampered_output_bytes() {
         "blocked"
     );
     assert_eq!(
+        check.final_executable_output_execution_handoff_contract,
+        "nsld-final-output-handoff-v1"
+    );
+    assert!(!check.final_executable_output_execution_handoff_ready);
+    assert_eq!(
         check.final_executable_output_execution_handoff_status,
         "blocked"
     );
@@ -708,6 +832,16 @@ fn final_executable_output_rejects_tampered_output_bytes() {
     assert_eq!(
         check.final_executable_output_execution_handoff_evidence_status,
         "blocked"
+    );
+    assert_eq!(
+        check
+            .final_executable_output_execution_handoff_first_blocker
+            .as_deref(),
+        Some("final-executable-output:image-header-invalid")
+    );
+    assert_eq!(
+        check.final_executable_output_execution_handoff_decision_code,
+        "inspect-output-diagnostics"
     );
     assert_eq!(
         check.final_executable_output_recommended_next_action,
@@ -724,9 +858,17 @@ fn final_executable_output_rejects_tampered_output_bytes() {
     assert!(output_json.contains("\"present\":true"));
     assert!(output_json.contains("\"boundary_status\":\"invalid\""));
     assert!(output_json.contains("\"materialization_status\":\"blocked\""));
+    assert!(output_json.contains("\"execution_handoff_contract\":\"nsld-final-output-handoff-v1\""));
+    assert!(output_json.contains("\"execution_handoff_ready\":false"));
     assert!(output_json.contains("\"execution_handoff_status\":\"blocked\""));
     assert!(output_json.contains("\"execution_handoff_target\":\"none\""));
     assert!(output_json.contains("\"execution_handoff_evidence_status\":\"blocked\""));
+    assert!(output_json.contains(
+        "\"execution_handoff_first_blocker\":\"final-executable-output:image-header-invalid\""
+    ));
+    assert!(
+        output_json.contains("\"execution_handoff_decision_code\":\"inspect-output-diagnostics\"")
+    );
     assert!(
         output_json.contains("\"recommended_next_action\":\"inspect-final-output-diagnostics\"")
     );

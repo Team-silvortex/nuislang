@@ -464,6 +464,55 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
             nsld_tail.first_blocker.as_deref().unwrap_or("<none>")
         );
         println!(
+            "  nsld_final_executable_pipeline_execution_handoff_contract: {}",
+            nsld_tail
+                .execution_handoff_contract
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_execution_handoff_ready: {}",
+            nsld_tail
+                .execution_handoff_ready
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_pipeline_execution_handoff_status: {}",
+            nsld_tail
+                .execution_handoff_status
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_execution_handoff_target: {}",
+            nsld_tail
+                .execution_handoff_target
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_execution_handoff_evidence_status: {}",
+            nsld_tail
+                .execution_handoff_evidence_status
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_execution_handoff_first_blocker: {}",
+            nsld_tail
+                .execution_handoff_first_blocker
+                .as_deref()
+                .unwrap_or("<none>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_execution_handoff_decision_code: {}",
+            nsld_tail
+                .execution_handoff_decision_code
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
             "  nsld_final_executable_pipeline_scheduler_metadata_payload_id: {}",
             nsld_tail
                 .scheduler_metadata_payload_id
@@ -558,6 +607,14 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
             nsld_final_output.materialization_status
         );
         println!(
+            "  nsld_final_executable_output_execution_handoff_contract: {}",
+            nsld_final_output.execution_handoff_contract
+        );
+        println!(
+            "  nsld_final_executable_output_execution_handoff_ready: {}",
+            nsld_final_output.execution_handoff_ready
+        );
+        println!(
             "  nsld_final_executable_output_execution_handoff_status: {}",
             nsld_final_output.execution_handoff_status
         );
@@ -568,6 +625,17 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!(
             "  nsld_final_executable_output_execution_handoff_evidence_status: {}",
             nsld_final_output.execution_handoff_evidence_status
+        );
+        println!(
+            "  nsld_final_executable_output_execution_handoff_first_blocker: {}",
+            nsld_final_output
+                .execution_handoff_first_blocker
+                .as_deref()
+                .unwrap_or("<none>")
+        );
+        println!(
+            "  nsld_final_executable_output_execution_handoff_decision_code: {}",
+            nsld_final_output.execution_handoff_decision_code
         );
         println!(
             "  nsld_final_executable_output_recommended_next_action: {}",
@@ -635,6 +703,13 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!("  nsld_final_executable_pipeline_would_enter_lifecycle_hook: <unknown>");
         println!("  nsld_final_executable_pipeline_blocker_count: <unknown>");
         println!("  nsld_final_executable_pipeline_first_blocker: <none>");
+        println!("  nsld_final_executable_pipeline_execution_handoff_contract: <unknown>");
+        println!("  nsld_final_executable_pipeline_execution_handoff_ready: <unknown>");
+        println!("  nsld_final_executable_pipeline_execution_handoff_status: <unknown>");
+        println!("  nsld_final_executable_pipeline_execution_handoff_target: <unknown>");
+        println!("  nsld_final_executable_pipeline_execution_handoff_evidence_status: <unknown>");
+        println!("  nsld_final_executable_pipeline_execution_handoff_first_blocker: <none>");
+        println!("  nsld_final_executable_pipeline_execution_handoff_decision_code: <unknown>");
         println!("  nsld_final_executable_pipeline_scheduler_metadata_payload_id: <unknown>");
         println!("  nsld_final_executable_pipeline_scheduler_metadata_present: <unknown>");
         println!("  nsld_final_executable_pipeline_scheduler_metadata_hash: <unknown>");
@@ -650,9 +725,13 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!("  nsld_final_executable_output_ready: <unavailable>");
         println!("  nsld_final_executable_output_boundary_status: <unavailable>");
         println!("  nsld_final_executable_output_materialization_status: <unavailable>");
+        println!("  nsld_final_executable_output_execution_handoff_contract: <unavailable>");
+        println!("  nsld_final_executable_output_execution_handoff_ready: <unavailable>");
         println!("  nsld_final_executable_output_execution_handoff_status: <unavailable>");
         println!("  nsld_final_executable_output_execution_handoff_target: <unavailable>");
         println!("  nsld_final_executable_output_execution_handoff_evidence_status: <unavailable>");
+        println!("  nsld_final_executable_output_execution_handoff_first_blocker: <none>");
+        println!("  nsld_final_executable_output_execution_handoff_decision_code: <unavailable>");
         println!("  nsld_final_executable_output_recommended_next_action: <unavailable>");
         println!("  nsld_final_executable_output_path_present: <unavailable>");
         println!("  nsld_final_executable_output_nsld_owned: <unavailable>");

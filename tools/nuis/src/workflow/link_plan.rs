@@ -118,6 +118,13 @@ pub(crate) struct NsldFinalExecutableTailSummary {
     pub(crate) would_enter_lifecycle_hook: Option<bool>,
     pub(crate) blocker_count: Option<usize>,
     pub(crate) first_blocker: Option<String>,
+    pub(crate) execution_handoff_contract: Option<String>,
+    pub(crate) execution_handoff_ready: Option<bool>,
+    pub(crate) execution_handoff_status: Option<String>,
+    pub(crate) execution_handoff_target: Option<String>,
+    pub(crate) execution_handoff_evidence_status: Option<String>,
+    pub(crate) execution_handoff_first_blocker: Option<String>,
+    pub(crate) execution_handoff_decision_code: Option<String>,
     pub(crate) scheduler_metadata_payload_id: Option<String>,
     pub(crate) scheduler_metadata_present: Option<bool>,
     pub(crate) scheduler_metadata_hash: Option<String>,
@@ -137,9 +144,13 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) ready: bool,
     pub(crate) boundary_status: String,
     pub(crate) materialization_status: String,
+    pub(crate) execution_handoff_contract: String,
+    pub(crate) execution_handoff_ready: bool,
     pub(crate) execution_handoff_status: String,
     pub(crate) execution_handoff_target: String,
     pub(crate) execution_handoff_evidence_status: String,
+    pub(crate) execution_handoff_first_blocker: Option<String>,
+    pub(crate) execution_handoff_decision_code: String,
     pub(crate) recommended_next_action: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned: Option<bool>,
@@ -685,6 +696,13 @@ pub(crate) fn nsld_final_executable_tail_summary(
         would_enter_lifecycle_hook,
         blocker_count,
         first_blocker,
+        pipeline_execution_handoff_contract,
+        pipeline_execution_handoff_ready,
+        pipeline_execution_handoff_status,
+        pipeline_execution_handoff_target,
+        pipeline_execution_handoff_evidence_status,
+        pipeline_execution_handoff_first_blocker,
+        pipeline_execution_handoff_decision_code,
         scheduler_metadata_payload_id,
         scheduler_metadata_present,
         scheduler_metadata_hash,
@@ -704,6 +722,13 @@ pub(crate) fn nsld_final_executable_tail_summary(
                 parse_bool_field(&source, "would_enter_lifecycle_hook"),
                 parse_usize_field(&source, "blocker_count"),
                 parse_first_string_array_item(&source, "blockers"),
+                parse_string_field(&source, "execution_handoff_contract"),
+                parse_bool_field(&source, "execution_handoff_ready"),
+                parse_string_field(&source, "execution_handoff_status"),
+                parse_string_field(&source, "execution_handoff_target"),
+                parse_string_field(&source, "execution_handoff_evidence_status"),
+                parse_string_field(&source, "execution_handoff_first_blocker"),
+                parse_string_field(&source, "execution_handoff_decision_code"),
                 parse_string_field(&source, "scheduler_metadata_payload_id"),
                 parse_bool_field(&source, "scheduler_metadata_present"),
                 parse_string_field(&source, "scheduler_metadata_hash"),
@@ -716,7 +741,7 @@ pub(crate) fn nsld_final_executable_tail_summary(
         })
         .unwrap_or((
             None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-            None,
+            None, None, None, None, None, None, None, None,
         ));
     let (
         self_owned_image_path,
@@ -766,6 +791,13 @@ pub(crate) fn nsld_final_executable_tail_summary(
         would_enter_lifecycle_hook,
         blocker_count,
         first_blocker,
+        execution_handoff_contract: pipeline_execution_handoff_contract,
+        execution_handoff_ready: pipeline_execution_handoff_ready,
+        execution_handoff_status: pipeline_execution_handoff_status,
+        execution_handoff_target: pipeline_execution_handoff_target,
+        execution_handoff_evidence_status: pipeline_execution_handoff_evidence_status,
+        execution_handoff_first_blocker: pipeline_execution_handoff_first_blocker,
+        execution_handoff_decision_code: pipeline_execution_handoff_decision_code,
         scheduler_metadata_payload_id,
         scheduler_metadata_present,
         scheduler_metadata_hash,
@@ -863,22 +895,11 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         host_native_output,
     )
     .to_owned();
-    let execution_handoff_status = nsld_final_executable_output_execution_handoff_status(
+    let execution_handoff = nsld_final_executable_output_execution_handoff(
         boundary_status.as_str(),
         host_native_output,
-    )
-    .to_owned();
-    let execution_handoff_target = nsld_final_executable_output_execution_handoff_target(
-        boundary_status.as_str(),
-        host_native_output,
-    )
-    .to_owned();
-    let execution_handoff_evidence_status =
-        nsld_final_executable_output_execution_handoff_evidence_status(
-            boundary_status.as_str(),
-            host_native_output,
-        )
-        .to_owned();
+        &blockers,
+    );
     let recommended_next_action = nsld_final_executable_output_recommended_next_action(
         boundary_status.as_str(),
         host_native_output,
@@ -889,15 +910,30 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         ready,
         boundary_status,
         materialization_status,
-        execution_handoff_status,
-        execution_handoff_target,
-        execution_handoff_evidence_status,
+        execution_handoff_contract: execution_handoff.contract,
+        execution_handoff_ready: execution_handoff.ready,
+        execution_handoff_status: execution_handoff.status,
+        execution_handoff_target: execution_handoff.target,
+        execution_handoff_evidence_status: execution_handoff.evidence_status,
+        execution_handoff_first_blocker: execution_handoff.first_blocker,
+        execution_handoff_decision_code: execution_handoff.decision_code,
         recommended_next_action,
         path_present,
         nsld_owned,
         blockers,
         first_blocker,
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldFinalExecutableOutputHandoff {
+    contract: String,
+    ready: bool,
+    status: String,
+    target: String,
+    evidence_status: String,
+    first_blocker: Option<String>,
+    decision_code: String,
 }
 
 fn nsld_final_executable_output_materialization_status(
@@ -925,6 +961,78 @@ fn nsld_final_executable_output_recommended_next_action(
         "unreadable" => "inspect-final-output-permissions",
         "invalid" | "blocked" => "inspect-final-output-diagnostics",
         _ => "inspect-final-output-boundary",
+    }
+}
+
+fn nsld_final_executable_output_execution_handoff_contract() -> &'static str {
+    "nsld-final-output-handoff-v1"
+}
+
+fn nsld_final_executable_output_execution_handoff(
+    boundary_status: &str,
+    host_native_output: bool,
+    blockers: &[String],
+) -> NsldFinalExecutableOutputHandoff {
+    let ready = nsld_final_executable_output_execution_handoff_ready(boundary_status);
+    NsldFinalExecutableOutputHandoff {
+        contract: nsld_final_executable_output_execution_handoff_contract().to_owned(),
+        ready,
+        status: nsld_final_executable_output_execution_handoff_status(
+            boundary_status,
+            host_native_output,
+        )
+        .to_owned(),
+        target: nsld_final_executable_output_execution_handoff_target(
+            boundary_status,
+            host_native_output,
+        )
+        .to_owned(),
+        evidence_status: nsld_final_executable_output_execution_handoff_evidence_status(
+            boundary_status,
+            host_native_output,
+        )
+        .to_owned(),
+        first_blocker: nsld_final_executable_output_execution_handoff_first_blocker(
+            ready, blockers,
+        ),
+        decision_code: nsld_final_executable_output_execution_handoff_decision_code(
+            boundary_status,
+            host_native_output,
+        )
+        .to_owned(),
+    }
+}
+
+fn nsld_final_executable_output_execution_handoff_ready(boundary_status: &str) -> bool {
+    boundary_status == "ready"
+}
+
+fn nsld_final_executable_output_execution_handoff_first_blocker(
+    execution_handoff_ready: bool,
+    blockers: &[String],
+) -> Option<String> {
+    if execution_handoff_ready {
+        None
+    } else {
+        blockers
+            .iter()
+            .find(|blocker| blocker.starts_with("final-executable-output:"))
+            .or_else(|| blockers.first())
+            .cloned()
+    }
+}
+
+fn nsld_final_executable_output_execution_handoff_decision_code(
+    boundary_status: &str,
+    host_native_output: bool,
+) -> &'static str {
+    match boundary_status {
+        "ready" if host_native_output => "handoff-host-runner",
+        "ready" => "handoff-entrypoint-materializer",
+        "missing" => "emit-final-executable",
+        "not-nsld-owned" | "ownership-unknown" | "unreadable" => "inspect-output-boundary",
+        "invalid" | "blocked" => "inspect-output-diagnostics",
+        _ => "inspect-output-boundary",
     }
 }
 
@@ -1435,6 +1543,48 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .and_then(|summary| summary.first_blocker.as_deref()),
         ),
         json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_contract",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_contract.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_execution_handoff_ready",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_ready),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_status",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_status.as_deref()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_target",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_target.as_deref()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_evidence_status",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_evidence_status.as_deref()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_first_blocker",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_first_blocker.as_deref()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_decision_code",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_decision_code.as_deref()),
+        ),
+        json_optional_string_field(
             "nsld_final_executable_pipeline_scheduler_metadata_payload_id",
             nsld_tail
                 .as_ref()
@@ -1535,6 +1685,18 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .map(|summary| summary.materialization_status.as_str()),
         ),
         json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_contract",
+            nsld_final_output
+                .as_ref()
+                .map(|summary| summary.execution_handoff_contract.as_str()),
+        ),
+        json_bool_field(
+            "nsld_final_executable_output_execution_handoff_ready",
+            nsld_final_output
+                .as_ref()
+                .is_some_and(|summary| summary.execution_handoff_ready),
+        ),
+        json_optional_string_field(
             "nsld_final_executable_output_execution_handoff_status",
             nsld_final_output
                 .as_ref()
@@ -1551,6 +1713,18 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             nsld_final_output
                 .as_ref()
                 .map(|summary| summary.execution_handoff_evidence_status.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_first_blocker",
+            nsld_final_output
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_first_blocker.as_deref()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_decision_code",
+            nsld_final_output
+                .as_ref()
+                .map(|summary| summary.execution_handoff_decision_code.as_str()),
         ),
         json_optional_string_field(
             "nsld_final_executable_output_recommended_next_action",

@@ -98,6 +98,19 @@ pub(crate) fn nsld_emit_final_executable_pipeline_report(
         would_enter_lifecycle_hook: launcher_dry_run.dry_run_ready,
         self_owned_image_status,
         entrypoint_materialization_status,
+        execution_handoff_contract: launcher_manifest_report.execution_handoff_contract.clone(),
+        execution_handoff_ready: launcher_manifest_report.execution_handoff_ready,
+        execution_handoff_status: launcher_manifest_report.execution_handoff_status.clone(),
+        execution_handoff_target: launcher_manifest_report.execution_handoff_target.clone(),
+        execution_handoff_evidence_status: launcher_manifest_report
+            .execution_handoff_evidence_status
+            .clone(),
+        execution_handoff_first_blocker: launcher_manifest_report
+            .execution_handoff_first_blocker
+            .clone(),
+        execution_handoff_decision_code: launcher_manifest_report
+            .execution_handoff_decision_code
+            .clone(),
         scheduler_metadata_payload_id: launcher_manifest_report
             .scheduler_metadata_payload_id
             .clone()
@@ -156,6 +169,13 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         actual_would_enter_lifecycle_hook,
         actual_self_owned_image_status,
         actual_entrypoint_materialization_status,
+        actual_execution_handoff_contract,
+        actual_execution_handoff_ready,
+        actual_execution_handoff_status,
+        actual_execution_handoff_target,
+        actual_execution_handoff_evidence_status,
+        actual_execution_handoff_first_blocker,
+        actual_execution_handoff_decision_code,
         actual_scheduler_metadata_payload_id,
         actual_scheduler_metadata_present,
         actual_scheduler_metadata_hash,
@@ -174,6 +194,13 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
             toml::bool_value(source, "would_enter_lifecycle_hook"),
             non_empty_toml_string(source, "self_owned_image_status"),
             non_empty_toml_string(source, "entrypoint_materialization_status"),
+            non_empty_toml_string(source, "execution_handoff_contract"),
+            toml::bool_value(source, "execution_handoff_ready"),
+            non_empty_toml_string(source, "execution_handoff_status"),
+            non_empty_toml_string(source, "execution_handoff_target"),
+            non_empty_toml_string(source, "execution_handoff_evidence_status"),
+            non_empty_toml_string(source, "execution_handoff_first_blocker"),
+            non_empty_toml_string(source, "execution_handoff_decision_code"),
             non_empty_toml_string(source, "scheduler_metadata_payload_id"),
             toml::bool_value(source, "scheduler_metadata_present"),
             non_empty_toml_string(source, "scheduler_metadata_hash"),
@@ -186,6 +213,13 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         Err(error) => {
             issues.push(error.clone());
             (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
                 None,
                 None,
                 None,
@@ -245,6 +279,48 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
             "entrypoint_materialization_status",
             Some(expected.entrypoint_materialization_status.as_str()),
             actual_entrypoint_materialization_status.as_deref(),
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "execution_handoff_contract",
+            Some(expected.execution_handoff_contract.as_str()),
+            actual_execution_handoff_contract.as_deref(),
+        );
+        push_bool_mismatch(
+            &mut issues,
+            "execution_handoff_ready",
+            expected.execution_handoff_ready,
+            actual_execution_handoff_ready,
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "execution_handoff_status",
+            Some(expected.execution_handoff_status.as_str()),
+            actual_execution_handoff_status.as_deref(),
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "execution_handoff_target",
+            Some(expected.execution_handoff_target.as_str()),
+            actual_execution_handoff_target.as_deref(),
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "execution_handoff_evidence_status",
+            Some(expected.execution_handoff_evidence_status.as_str()),
+            actual_execution_handoff_evidence_status.as_deref(),
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "execution_handoff_first_blocker",
+            expected.execution_handoff_first_blocker.as_deref(),
+            actual_execution_handoff_first_blocker.as_deref(),
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "execution_handoff_decision_code",
+            Some(expected.execution_handoff_decision_code.as_str()),
+            actual_execution_handoff_decision_code.as_deref(),
         );
         push_optional_string_mismatch(
             &mut issues,
@@ -327,6 +403,20 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         actual_self_owned_image_status,
         expected_entrypoint_materialization_status: expected.entrypoint_materialization_status,
         actual_entrypoint_materialization_status,
+        expected_execution_handoff_contract: expected.execution_handoff_contract,
+        actual_execution_handoff_contract,
+        expected_execution_handoff_ready: expected.execution_handoff_ready,
+        actual_execution_handoff_ready,
+        expected_execution_handoff_status: expected.execution_handoff_status,
+        actual_execution_handoff_status,
+        expected_execution_handoff_target: expected.execution_handoff_target,
+        actual_execution_handoff_target,
+        expected_execution_handoff_evidence_status: expected.execution_handoff_evidence_status,
+        actual_execution_handoff_evidence_status,
+        expected_execution_handoff_first_blocker: expected.execution_handoff_first_blocker,
+        actual_execution_handoff_first_blocker,
+        expected_execution_handoff_decision_code: expected.execution_handoff_decision_code,
+        actual_execution_handoff_decision_code,
         expected_scheduler_metadata_payload_id: expected.scheduler_metadata_payload_id,
         actual_scheduler_metadata_payload_id,
         expected_scheduler_metadata_present: expected.scheduler_metadata_present,
@@ -440,6 +530,30 @@ fn nsld_final_executable_pipeline_snapshot(
             == Some(true),
         self_owned_image_status,
         entrypoint_materialization_status,
+        execution_handoff_contract: launcher_manifest
+            .actual_execution_handoff_contract
+            .clone()
+            .unwrap_or_default(),
+        execution_handoff_ready: launcher_manifest.actual_execution_handoff_ready == Some(true),
+        execution_handoff_status: launcher_manifest
+            .actual_execution_handoff_status
+            .clone()
+            .unwrap_or_default(),
+        execution_handoff_target: launcher_manifest
+            .actual_execution_handoff_target
+            .clone()
+            .unwrap_or_default(),
+        execution_handoff_evidence_status: launcher_manifest
+            .actual_execution_handoff_evidence_status
+            .clone()
+            .unwrap_or_default(),
+        execution_handoff_first_blocker: launcher_manifest
+            .actual_execution_handoff_first_blocker
+            .clone(),
+        execution_handoff_decision_code: launcher_manifest
+            .actual_execution_handoff_decision_code
+            .clone()
+            .unwrap_or_default(),
         scheduler_metadata_payload_id: launcher_manifest
             .actual_scheduler_metadata_payload_id
             .clone(),
@@ -553,6 +667,40 @@ fn render_final_executable_pipeline(report: &NsldFinalExecutablePipelineEmitRepo
         &mut out,
         "entrypoint_materialization_status",
         &report.entrypoint_materialization_status,
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_contract",
+        &report.execution_handoff_contract,
+    );
+    out.push_str(&format!(
+        "execution_handoff_ready = {}\n",
+        report.execution_handoff_ready
+    ));
+    push_str_field(
+        &mut out,
+        "execution_handoff_status",
+        &report.execution_handoff_status,
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_target",
+        &report.execution_handoff_target,
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_evidence_status",
+        &report.execution_handoff_evidence_status,
+    );
+    push_optional_str_field(
+        &mut out,
+        "execution_handoff_first_blocker",
+        report.execution_handoff_first_blocker.as_deref(),
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_decision_code",
+        &report.execution_handoff_decision_code,
     );
     push_optional_str_field(
         &mut out,

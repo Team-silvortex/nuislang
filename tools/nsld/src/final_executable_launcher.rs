@@ -41,6 +41,13 @@ pub(crate) fn nsld_final_executable_launcher_manifest_report(
         host_arch: env::consts::ARCH.to_owned(),
         output_kind: output.output_kind,
         output_validation_mode: output.output_validation_mode,
+        execution_handoff_contract: output.execution_handoff_contract,
+        execution_handoff_ready: output.execution_handoff_ready,
+        execution_handoff_status: output.execution_handoff_status,
+        execution_handoff_target: output.execution_handoff_target,
+        execution_handoff_evidence_status: output.execution_handoff_evidence_status,
+        execution_handoff_first_blocker: output.execution_handoff_first_blocker,
+        execution_handoff_decision_code: output.execution_handoff_decision_code,
         final_output_path: output.output_path.clone(),
         final_output_present: output.present,
         final_output_size_bytes: output.size_bytes,
@@ -130,6 +137,13 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
         actual_nsb_hash,
         actual_output_kind,
         actual_output_validation_mode,
+        actual_execution_handoff_contract,
+        actual_execution_handoff_ready,
+        actual_execution_handoff_status,
+        actual_execution_handoff_target,
+        actual_execution_handoff_evidence_status,
+        actual_execution_handoff_first_blocker,
+        actual_execution_handoff_decision_code,
         actual_final_output_path,
         actual_final_output_size_bytes,
         actual_final_output_hash,
@@ -153,6 +167,13 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
             non_empty_toml_string(source, "nsb_hash"),
             non_empty_toml_string(source, "output_kind"),
             non_empty_toml_string(source, "output_validation_mode"),
+            non_empty_toml_string(source, "execution_handoff_contract"),
+            toml::bool_value(source, "execution_handoff_ready"),
+            non_empty_toml_string(source, "execution_handoff_status"),
+            non_empty_toml_string(source, "execution_handoff_target"),
+            non_empty_toml_string(source, "execution_handoff_evidence_status"),
+            non_empty_toml_string(source, "execution_handoff_first_blocker"),
+            non_empty_toml_string(source, "execution_handoff_decision_code"),
             non_empty_toml_string(source, "final_output_path")
                 .or_else(|| non_empty_toml_string(source, "nsb_path")),
             optional_usize_value(source, "final_output_size_bytes")
@@ -174,6 +195,13 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
         Err(error) => {
             issues.push(error.clone());
             (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
                 None,
                 None,
                 None,
@@ -234,6 +262,48 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
             "output_validation_mode",
             expected.output_validation_mode.as_str(),
             actual_output_validation_mode.as_deref(),
+        );
+        push_string_mismatch(
+            &mut issues,
+            "execution_handoff_contract",
+            expected.execution_handoff_contract.as_str(),
+            actual_execution_handoff_contract.as_deref(),
+        );
+        push_bool_mismatch(
+            &mut issues,
+            "execution_handoff_ready",
+            expected.execution_handoff_ready,
+            actual_execution_handoff_ready,
+        );
+        push_string_mismatch(
+            &mut issues,
+            "execution_handoff_status",
+            expected.execution_handoff_status.as_str(),
+            actual_execution_handoff_status.as_deref(),
+        );
+        push_string_mismatch(
+            &mut issues,
+            "execution_handoff_target",
+            expected.execution_handoff_target.as_str(),
+            actual_execution_handoff_target.as_deref(),
+        );
+        push_string_mismatch(
+            &mut issues,
+            "execution_handoff_evidence_status",
+            expected.execution_handoff_evidence_status.as_str(),
+            actual_execution_handoff_evidence_status.as_deref(),
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "execution_handoff_first_blocker",
+            expected.execution_handoff_first_blocker.as_deref(),
+            actual_execution_handoff_first_blocker.as_deref(),
+        );
+        push_string_mismatch(
+            &mut issues,
+            "execution_handoff_decision_code",
+            expected.execution_handoff_decision_code.as_str(),
+            actual_execution_handoff_decision_code.as_deref(),
         );
         push_string_mismatch(
             &mut issues,
@@ -354,6 +424,20 @@ pub(crate) fn nsld_verify_final_executable_launcher_manifest_report(
         actual_output_kind,
         expected_output_validation_mode: expected.output_validation_mode,
         actual_output_validation_mode,
+        expected_execution_handoff_contract: expected.execution_handoff_contract,
+        actual_execution_handoff_contract,
+        expected_execution_handoff_ready: expected.execution_handoff_ready,
+        actual_execution_handoff_ready,
+        expected_execution_handoff_status: expected.execution_handoff_status,
+        actual_execution_handoff_status,
+        expected_execution_handoff_target: expected.execution_handoff_target,
+        actual_execution_handoff_target,
+        expected_execution_handoff_evidence_status: expected.execution_handoff_evidence_status,
+        actual_execution_handoff_evidence_status,
+        expected_execution_handoff_first_blocker: expected.execution_handoff_first_blocker,
+        actual_execution_handoff_first_blocker,
+        expected_execution_handoff_decision_code: expected.execution_handoff_decision_code,
+        actual_execution_handoff_decision_code,
         expected_final_output_path: expected.final_output_path,
         actual_final_output_path,
         expected_final_output_size_bytes: expected.final_output_size_bytes,
@@ -416,6 +500,43 @@ pub(crate) fn render_final_executable_launcher_manifest(
         &mut out,
         "output_validation_mode",
         &report.output_validation_mode,
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_contract",
+        &report.execution_handoff_contract,
+    );
+    out.push_str(&format!(
+        "execution_handoff_ready = {}\n",
+        report.execution_handoff_ready
+    ));
+    push_str_field(
+        &mut out,
+        "execution_handoff_status",
+        &report.execution_handoff_status,
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_target",
+        &report.execution_handoff_target,
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_evidence_status",
+        &report.execution_handoff_evidence_status,
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_first_blocker",
+        report
+            .execution_handoff_first_blocker
+            .as_deref()
+            .unwrap_or(""),
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_decision_code",
+        &report.execution_handoff_decision_code,
     );
     push_str_field(&mut out, "final_output_path", &report.final_output_path);
     out.push_str(&format!(

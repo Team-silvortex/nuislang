@@ -15,6 +15,14 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         report.materialization_status
     );
     println!(
+        "  execution_handoff_contract: {}",
+        report.execution_handoff_contract
+    );
+    println!(
+        "  execution_handoff_ready: {}",
+        report.execution_handoff_ready
+    );
+    println!(
         "  execution_handoff_status: {}",
         report.execution_handoff_status
     );
@@ -25,6 +33,14 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
     println!(
         "  execution_handoff_evidence_status: {}",
         report.execution_handoff_evidence_status
+    );
+    println!(
+        "  execution_handoff_first_blocker: {}",
+        optional_string_text(report.execution_handoff_first_blocker.as_deref())
+    );
+    println!(
+        "  execution_handoff_decision_code: {}",
+        report.execution_handoff_decision_code
     );
     println!(
         "  recommended_next_action: {}",

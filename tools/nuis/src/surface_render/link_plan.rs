@@ -210,6 +210,34 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         )?;
         writeln!(
             out,
+            "  nsld_final_executable_pipeline_execution_handoff_contract: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_execution_handoff_ready: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_execution_handoff_status: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_execution_handoff_target: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_execution_handoff_evidence_status: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_execution_handoff_first_blocker: <none>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_execution_handoff_decision_code: <unavailable>"
+        )?;
+        writeln!(
+            out,
             "  nsld_final_executable_pipeline_scheduler_metadata_payload_id: <unavailable>"
         )?;
         writeln!(
@@ -249,6 +277,14 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         )?;
         writeln!(
             out,
+            "  nsld_final_executable_output_execution_handoff_contract: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_execution_handoff_ready: <unavailable>"
+        )?;
+        writeln!(
+            out,
             "  nsld_final_executable_output_execution_handoff_status: <unavailable>"
         )?;
         writeln!(
@@ -258,6 +294,14 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         writeln!(
             out,
             "  nsld_final_executable_output_execution_handoff_evidence_status: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_execution_handoff_first_blocker: <none>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_execution_handoff_decision_code: <unavailable>"
         )?;
         writeln!(
             out,
@@ -620,6 +664,48 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
                 .and_then(|summary| summary.first_blocker.as_deref()),
         ),
         crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_contract",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_contract.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_execution_handoff_ready",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_ready),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_status",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_status.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_target",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_target.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_evidence_status",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_evidence_status.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_first_blocker",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_first_blocker.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_execution_handoff_decision_code",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_decision_code.as_deref()),
+        ),
+        crate::json_optional_string_field(
             "nsld_final_executable_pipeline_scheduler_metadata_payload_id",
             final_tail_summary
                 .as_ref()
@@ -717,6 +803,18 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
                 .map(|summary| summary.materialization_status.as_str()),
         ),
         crate::json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_contract",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.execution_handoff_contract.as_str()),
+        ),
+        crate::json_bool_field(
+            "nsld_final_executable_output_execution_handoff_ready",
+            final_output_summary
+                .as_ref()
+                .is_some_and(|summary| summary.execution_handoff_ready),
+        ),
+        crate::json_optional_string_field(
             "nsld_final_executable_output_execution_handoff_status",
             final_output_summary
                 .as_ref()
@@ -733,6 +831,18 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
             final_output_summary
                 .as_ref()
                 .map(|summary| summary.execution_handoff_evidence_status.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_first_blocker",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.execution_handoff_first_blocker.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_decision_code",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.execution_handoff_decision_code.as_str()),
         ),
         crate::json_optional_string_field(
             "nsld_final_executable_output_recommended_next_action",
@@ -1081,6 +1191,62 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_pipeline_execution_handoff_contract: {}",
+        final_tail
+            .execution_handoff_contract
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_execution_handoff_ready: {}",
+        final_tail
+            .execution_handoff_ready
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_execution_handoff_status: {}",
+        final_tail
+            .execution_handoff_status
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_execution_handoff_target: {}",
+        final_tail
+            .execution_handoff_target
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_execution_handoff_evidence_status: {}",
+        final_tail
+            .execution_handoff_evidence_status
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_execution_handoff_first_blocker: {}",
+        final_tail
+            .execution_handoff_first_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_execution_handoff_decision_code: {}",
+        final_tail
+            .execution_handoff_decision_code
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_pipeline_scheduler_metadata_payload_id: {}",
         final_tail
             .scheduler_metadata_payload_id
@@ -1190,6 +1356,16 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_execution_handoff_contract: {}",
+        final_output.execution_handoff_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_execution_handoff_ready: {}",
+        crate::yes_no(final_output.execution_handoff_ready)
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_execution_handoff_status: {}",
         final_output.execution_handoff_status
     )?;
@@ -1202,6 +1378,19 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
         out,
         "  nsld_final_executable_output_execution_handoff_evidence_status: {}",
         final_output.execution_handoff_evidence_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_execution_handoff_first_blocker: {}",
+        final_output
+            .execution_handoff_first_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_execution_handoff_decision_code: {}",
+        final_output.execution_handoff_decision_code
     )?;
     writeln!(
         out,

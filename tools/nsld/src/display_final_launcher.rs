@@ -30,6 +30,34 @@ pub(crate) fn print_nsld_final_executable_launcher_manifest_report(
         "  output_validation_mode: {}",
         report.output_validation_mode
     );
+    println!(
+        "  execution_handoff_contract: {}",
+        report.execution_handoff_contract
+    );
+    println!(
+        "  execution_handoff_ready: {}",
+        report.execution_handoff_ready
+    );
+    println!(
+        "  execution_handoff_status: {}",
+        report.execution_handoff_status
+    );
+    println!(
+        "  execution_handoff_target: {}",
+        report.execution_handoff_target
+    );
+    println!(
+        "  execution_handoff_evidence_status: {}",
+        report.execution_handoff_evidence_status
+    );
+    println!(
+        "  execution_handoff_first_blocker: {}",
+        optional_string_text(report.execution_handoff_first_blocker.as_deref())
+    );
+    println!(
+        "  execution_handoff_decision_code: {}",
+        report.execution_handoff_decision_code
+    );
     println!("  final_output_path: {}", report.final_output_path);
     println!("  final_output_present: {}", report.final_output_present);
     println!(
@@ -286,6 +314,34 @@ pub(crate) fn print_nsld_final_executable_launcher_dry_run_report(
         optional_string_text(report.output_validation_mode.as_deref())
     );
     println!(
+        "  execution_handoff_contract: {}",
+        optional_string_text(report.execution_handoff_contract.as_deref())
+    );
+    println!(
+        "  execution_handoff_ready: {}",
+        optional_bool_text(report.execution_handoff_ready)
+    );
+    println!(
+        "  execution_handoff_status: {}",
+        optional_string_text(report.execution_handoff_status.as_deref())
+    );
+    println!(
+        "  execution_handoff_target: {}",
+        optional_string_text(report.execution_handoff_target.as_deref())
+    );
+    println!(
+        "  execution_handoff_evidence_status: {}",
+        optional_string_text(report.execution_handoff_evidence_status.as_deref())
+    );
+    println!(
+        "  execution_handoff_first_blocker: {}",
+        optional_string_text(report.execution_handoff_first_blocker.as_deref())
+    );
+    println!(
+        "  execution_handoff_decision_code: {}",
+        optional_string_text(report.execution_handoff_decision_code.as_deref())
+    );
+    println!(
         "  image_header_required: {}",
         optional_bool_text(report.image_header_required)
     );
@@ -444,6 +500,34 @@ pub(crate) fn print_nsld_final_executable_pipeline_emit_report(
         report.entrypoint_materialization_status
     );
     println!(
+        "  execution_handoff_contract: {}",
+        report.execution_handoff_contract
+    );
+    println!(
+        "  execution_handoff_ready: {}",
+        report.execution_handoff_ready
+    );
+    println!(
+        "  execution_handoff_status: {}",
+        report.execution_handoff_status
+    );
+    println!(
+        "  execution_handoff_target: {}",
+        report.execution_handoff_target
+    );
+    println!(
+        "  execution_handoff_evidence_status: {}",
+        report.execution_handoff_evidence_status
+    );
+    println!(
+        "  execution_handoff_first_blocker: {}",
+        optional_string_text(report.execution_handoff_first_blocker.as_deref())
+    );
+    println!(
+        "  execution_handoff_decision_code: {}",
+        report.execution_handoff_decision_code
+    );
+    println!(
         "  required_stage_path_count: {}",
         report.required_stage_path_count
     );
@@ -530,6 +614,62 @@ pub(crate) fn print_nsld_final_executable_pipeline_verify_report(
     println!(
         "  actual_entrypoint_materialization_status: {}",
         optional_string_text(report.actual_entrypoint_materialization_status.as_deref())
+    );
+    println!(
+        "  expected_execution_handoff_contract: {}",
+        report.expected_execution_handoff_contract
+    );
+    println!(
+        "  actual_execution_handoff_contract: {}",
+        optional_string_text(report.actual_execution_handoff_contract.as_deref())
+    );
+    println!(
+        "  expected_execution_handoff_ready: {}",
+        report.expected_execution_handoff_ready
+    );
+    println!(
+        "  actual_execution_handoff_ready: {}",
+        optional_bool_text(report.actual_execution_handoff_ready)
+    );
+    println!(
+        "  expected_execution_handoff_status: {}",
+        report.expected_execution_handoff_status
+    );
+    println!(
+        "  actual_execution_handoff_status: {}",
+        optional_string_text(report.actual_execution_handoff_status.as_deref())
+    );
+    println!(
+        "  expected_execution_handoff_target: {}",
+        report.expected_execution_handoff_target
+    );
+    println!(
+        "  actual_execution_handoff_target: {}",
+        optional_string_text(report.actual_execution_handoff_target.as_deref())
+    );
+    println!(
+        "  expected_execution_handoff_evidence_status: {}",
+        report.expected_execution_handoff_evidence_status
+    );
+    println!(
+        "  actual_execution_handoff_evidence_status: {}",
+        optional_string_text(report.actual_execution_handoff_evidence_status.as_deref())
+    );
+    println!(
+        "  expected_execution_handoff_first_blocker: {}",
+        optional_string_text(report.expected_execution_handoff_first_blocker.as_deref())
+    );
+    println!(
+        "  actual_execution_handoff_first_blocker: {}",
+        optional_string_text(report.actual_execution_handoff_first_blocker.as_deref())
+    );
+    println!(
+        "  expected_execution_handoff_decision_code: {}",
+        report.expected_execution_handoff_decision_code
+    );
+    println!(
+        "  actual_execution_handoff_decision_code: {}",
+        optional_string_text(report.actual_execution_handoff_decision_code.as_deref())
     );
     println!(
         "  expected_required_stage_path_count: {}",

@@ -74,6 +74,13 @@ pub(crate) fn nsld_final_executable_launcher_dry_run_report(
         nsb_hash_matches: final_output_hash_matches,
         output_kind: verify.actual_output_kind,
         output_validation_mode: verify.actual_output_validation_mode,
+        execution_handoff_contract: verify.actual_execution_handoff_contract,
+        execution_handoff_ready: verify.actual_execution_handoff_ready,
+        execution_handoff_status: verify.actual_execution_handoff_status,
+        execution_handoff_target: verify.actual_execution_handoff_target,
+        execution_handoff_evidence_status: verify.actual_execution_handoff_evidence_status,
+        execution_handoff_first_blocker: verify.actual_execution_handoff_first_blocker,
+        execution_handoff_decision_code: verify.actual_execution_handoff_decision_code,
         image_header_required: verify.actual_image_header_required,
         image_header_valid: verify.actual_image_header_valid,
         entry_lifecycle_hook: verify.actual_entry_lifecycle_hook,
@@ -289,6 +296,49 @@ fn render_final_executable_launcher_dry_run(
         &mut out,
         "output_validation_mode",
         report.output_validation_mode.as_deref().unwrap_or(""),
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_contract",
+        report.execution_handoff_contract.as_deref().unwrap_or(""),
+    );
+    out.push_str(&format!(
+        "execution_handoff_ready = {}\n",
+        report.execution_handoff_ready.unwrap_or(false)
+    ));
+    push_str_field(
+        &mut out,
+        "execution_handoff_status",
+        report.execution_handoff_status.as_deref().unwrap_or(""),
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_target",
+        report.execution_handoff_target.as_deref().unwrap_or(""),
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_evidence_status",
+        report
+            .execution_handoff_evidence_status
+            .as_deref()
+            .unwrap_or(""),
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_first_blocker",
+        report
+            .execution_handoff_first_blocker
+            .as_deref()
+            .unwrap_or(""),
+    );
+    push_str_field(
+        &mut out,
+        "execution_handoff_decision_code",
+        report
+            .execution_handoff_decision_code
+            .as_deref()
+            .unwrap_or(""),
     );
     out.push_str(&format!(
         "image_header_required = {}\n",

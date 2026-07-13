@@ -252,6 +252,19 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_tail_ready\":false"));
     assert!(json.contains("\"nsld_final_executable_pipeline_final_executable_emitted\":null"));
     assert!(json.contains("\"nsld_final_executable_pipeline_launcher_manifest_ready\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_execution_handoff_contract\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_execution_handoff_ready\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_execution_handoff_status\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_execution_handoff_target\":null"));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_execution_handoff_evidence_status\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_execution_handoff_first_blocker\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_execution_handoff_decision_code\":null")
+    );
     assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_payload_id\":null"));
     assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":null"));
     assert!(json.contains("\"nsld_self_owned_image_ready\":"));
@@ -261,9 +274,17 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_ready\":"));
     assert!(json.contains("\"nsld_final_executable_output_boundary_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_materialization_status\":"));
+    assert!(json.contains("\"nsld_final_executable_output_execution_handoff_contract\":"));
+    assert!(json.contains("\"nsld_final_executable_output_execution_handoff_ready\":false"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_target\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_evidence_status\":"));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_execution_handoff_first_blocker\":\"final-executable-output:ownership-unknown\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_execution_handoff_decision_code\":\"inspect-output-boundary\""
+    ));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
@@ -334,9 +355,13 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_ready\":"));
     assert!(json.contains("\"nsld_final_executable_output_boundary_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_materialization_status\":"));
+    assert!(json.contains("\"nsld_final_executable_output_execution_handoff_contract\":"));
+    assert!(json.contains("\"nsld_final_executable_output_execution_handoff_ready\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_target\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_evidence_status\":"));
+    assert!(json.contains("\"nsld_final_executable_output_execution_handoff_first_blocker\":"));
+    assert!(json.contains("\"nsld_final_executable_output_execution_handoff_decision_code\":"));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
@@ -396,6 +421,16 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_pipeline_launcher_dry_run_ready\":true"));
     assert!(json.contains("\"nsld_final_executable_pipeline_would_enter_lifecycle_hook\":true"));
     assert!(json.contains(
+        "\"nsld_final_executable_pipeline_execution_handoff_contract\":\"nsld-final-output-handoff-v1\""
+    ));
+    assert!(json.contains("\"nsld_final_executable_pipeline_execution_handoff_ready\":true"));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_execution_handoff_target\":\"entrypoint-materializer\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""
+    ));
+    assert!(json.contains(
         "\"nsld_final_executable_pipeline_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""
     ));
     assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_present\":true"));
@@ -412,9 +447,13 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_ready\":"));
     assert!(json.contains("\"nsld_final_executable_output_boundary_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_materialization_status\":"));
+    assert!(json.contains("\"nsld_final_executable_output_execution_handoff_contract\":"));
+    assert!(json.contains("\"nsld_final_executable_output_execution_handoff_ready\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_target\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_evidence_status\":"));
+    assert!(json.contains("\"nsld_final_executable_output_execution_handoff_first_blocker\":"));
+    assert!(json.contains("\"nsld_final_executable_output_execution_handoff_decision_code\":"));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));

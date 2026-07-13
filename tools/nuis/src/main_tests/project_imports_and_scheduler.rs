@@ -277,6 +277,19 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_pipeline_launcher_manifest_ready\":null"));
     assert!(json.contains("\"nsld_final_executable_pipeline_launcher_dry_run_ready\":null"));
     assert!(json.contains("\"nsld_final_executable_pipeline_would_enter_lifecycle_hook\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_execution_handoff_contract\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_execution_handoff_ready\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_execution_handoff_status\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_execution_handoff_target\":null"));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_execution_handoff_evidence_status\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_execution_handoff_first_blocker\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_execution_handoff_decision_code\":null")
+    );
     assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":null"));
     assert!(
         json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":null")

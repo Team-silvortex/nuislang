@@ -56,9 +56,13 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_validation_mode: String,
     pub(crate) final_executable_output_boundary_status: String,
     pub(crate) final_executable_output_materialization_status: String,
+    pub(crate) final_executable_output_execution_handoff_contract: String,
+    pub(crate) final_executable_output_execution_handoff_ready: bool,
     pub(crate) final_executable_output_execution_handoff_status: String,
     pub(crate) final_executable_output_execution_handoff_target: String,
     pub(crate) final_executable_output_execution_handoff_evidence_status: String,
+    pub(crate) final_executable_output_execution_handoff_first_blocker: Option<String>,
+    pub(crate) final_executable_output_execution_handoff_decision_code: String,
     pub(crate) final_executable_output_recommended_next_action: String,
     pub(crate) final_executable_output_nsld_owned: bool,
     pub(crate) final_executable_output_present: bool,
@@ -236,6 +240,11 @@ pub(crate) fn nsld_check_final_snapshot(
     let final_executable_output_materialization_status = final_executable_output_report
         .materialization_status
         .clone();
+    let final_executable_output_execution_handoff_contract = final_executable_output_report
+        .execution_handoff_contract
+        .clone();
+    let final_executable_output_execution_handoff_ready =
+        final_executable_output_report.execution_handoff_ready;
     let final_executable_output_execution_handoff_status = final_executable_output_report
         .execution_handoff_status
         .clone();
@@ -244,6 +253,12 @@ pub(crate) fn nsld_check_final_snapshot(
         .clone();
     let final_executable_output_execution_handoff_evidence_status = final_executable_output_report
         .execution_handoff_evidence_status
+        .clone();
+    let final_executable_output_execution_handoff_first_blocker = final_executable_output_report
+        .execution_handoff_first_blocker
+        .clone();
+    let final_executable_output_execution_handoff_decision_code = final_executable_output_report
+        .execution_handoff_decision_code
         .clone();
     let final_executable_output_recommended_next_action = final_executable_output_report
         .recommended_next_action
@@ -321,9 +336,13 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_validation_mode,
         final_executable_output_boundary_status,
         final_executable_output_materialization_status,
+        final_executable_output_execution_handoff_contract,
+        final_executable_output_execution_handoff_ready,
         final_executable_output_execution_handoff_status,
         final_executable_output_execution_handoff_target,
         final_executable_output_execution_handoff_evidence_status,
+        final_executable_output_execution_handoff_first_blocker,
+        final_executable_output_execution_handoff_decision_code,
         final_executable_output_recommended_next_action,
         final_executable_output_nsld_owned,
         final_executable_output_present,

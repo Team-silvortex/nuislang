@@ -249,12 +249,20 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_blocked_issues.len()
     );
     println!(
-        "  final_executable_output: status={} materialization={} handoff={} handoff_target={} handoff_evidence={} next_action={} path_present={} kind={} validation={} nsld_owned={} present={} header_required={} header_valid={} magic={} version={} runnable={} size={} hash={} blockers={} issues={}",
+        "  final_executable_output: status={} materialization={} handoff_contract={} handoff_ready={} handoff={} handoff_target={} handoff_evidence={} handoff_first_blocker={} handoff_decision={} next_action={} path_present={} kind={} validation={} nsld_owned={} present={} header_required={} header_valid={} magic={} version={} runnable={} size={} hash={} blockers={} issues={}",
         report.final_executable_output_boundary_status,
         report.final_executable_output_materialization_status,
+        report.final_executable_output_execution_handoff_contract,
+        report.final_executable_output_execution_handoff_ready,
         report.final_executable_output_execution_handoff_status,
         report.final_executable_output_execution_handoff_target,
         report.final_executable_output_execution_handoff_evidence_status,
+        optional_string_text(
+            report
+                .final_executable_output_execution_handoff_first_blocker
+                .as_deref()
+        ),
+        report.final_executable_output_execution_handoff_decision_code,
         report.final_executable_output_recommended_next_action,
         report.final_executable_output_path_present,
         report.final_executable_output_kind,

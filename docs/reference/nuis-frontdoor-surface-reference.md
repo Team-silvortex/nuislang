@@ -95,6 +95,12 @@ These fields now form the current visible link summary:
 * `nsld_final_executable_output_materialization_status`
   the normalized materialization layer for the visible output:
   `host-native-ready`, `self-contained-image-ready`, or `blocked`
+* `nsld_final_executable_output_execution_handoff_contract`
+  the contract family/version for the handoff field group, currently
+  `nsld-final-output-handoff-v1`
+* `nsld_final_executable_output_execution_handoff_ready`
+  whether the current final output has enough verified boundary evidence to
+  hand off to its next execution owner
 * `nsld_final_executable_output_execution_handoff_status`
   the normalized execution handoff layer for the visible output:
   `runner-ready`, `entrypoint-materializer-required`, or `blocked`
@@ -104,6 +110,32 @@ These fields now form the current visible link summary:
 * `nsld_final_executable_output_execution_handoff_evidence_status`
   the normalized evidence source for that handoff:
   `host-invoke-plan-ready`, `image-header-and-hash-ready`, or `blocked`
+* `nsld_final_executable_output_execution_handoff_first_blocker`
+  the first machine-readable blocker preventing execution handoff, or `null`
+  when the handoff gate is ready
+* `nsld_final_executable_output_execution_handoff_decision_code`
+  the compact machine branch for CI and future debugger/linker routing, such as
+  `handoff-host-runner`, `handoff-entrypoint-materializer`,
+  `emit-final-executable`, or `inspect-output-diagnostics`
+  Nsld launcher manifest and launcher dry-run artifacts carry the same
+  `nsld-final-output-handoff-v1` decision group forward; they do not define a
+  separate launch-readiness protocol. The final-executable pipeline summary
+  also carries the same group for top-level automation routing.
+* `nsld_final_executable_pipeline_execution_handoff_contract`
+  pipeline-level mirror of the same handoff contract, or `null` when the
+  pipeline TOML is not present
+* `nsld_final_executable_pipeline_execution_handoff_ready`
+  pipeline-level handoff gate copied from the final-executable pipeline summary
+* `nsld_final_executable_pipeline_execution_handoff_status`
+  pipeline-level handoff state for routing without opening launcher TOML
+* `nsld_final_executable_pipeline_execution_handoff_target`
+  pipeline-level target owner such as `host-runner` or `entrypoint-materializer`
+* `nsld_final_executable_pipeline_execution_handoff_evidence_status`
+  pipeline-level proof class backing that route
+* `nsld_final_executable_pipeline_execution_handoff_first_blocker`
+  first pipeline-level blocker for that handoff, or `null` / `<none>`
+* `nsld_final_executable_pipeline_execution_handoff_decision_code`
+  compact pipeline-level route code for CI and future runner/materializer tools
 * `nsld_final_executable_output_recommended_next_action`
   the script-facing next action for the current boundary, such as
   `emit-final-executable-pipeline`,
